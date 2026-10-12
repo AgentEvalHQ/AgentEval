@@ -128,6 +128,8 @@ Gates record the command's final decision: eval's golden-trace comparison, redte
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
 Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
 Cancellation during eval or redteam execution seals completed results in an `aborted` run with no final gate.
+Redteam and the OWASP, MITRE, and NIST benchmarks also preserve their completed scan if cancellation occurs
+during subsequent persistence or report generation. `--no-aef` still suppresses this evidence.
 An interrupted stochastic case keeps its completed trials and an incomplete rollup.
 
 **How the run says what was tested.** `execution.targetMode` is never assumed:

@@ -192,143 +192,157 @@ public static class BenchNistCommand
             return (1, null);
         }
 
-        var report = benchmark.GenerateReport(redTeamResult);
-        if (isMock)
-        {
-            return (MockTarget.Finish("bench nist",
-                $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
-        }
-
-        var incompleteReasons = new List<string>();
-        if (judgeLedger is { Failures: > 0 } ledger)
-        {
-            incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
-        }
-        if (redTeamResult.WasTruncated)
-        {
-            incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
-        }
-        var incomplete = incompleteReasons.Count > 0;
-        if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
-            report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
-        // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
-        // indeterminate unless what it measured already fails it (B10ap).
-        compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
-        var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
-
-        // ── Persist through the unified output-store ─────────────────────────
-        string runId;
         try
         {
-            var manifest = await store!.StartRunAsync(
-                subjectIdentity,
-                new RunContext(
-                    EvalProject: "AgentEval.RedTeam",
-                    EvalProjectPath: "src/AgentEval.RedTeam/",
-                    Harness: "BenchNistCommand",
-                    Seed: null,
-                    ParentInvocationId: null,
-                    Kind: "benchmark"));
-            runId = manifest.Run.RunId;
+            var report = benchmark.GenerateReport(redTeamResult);
+            if (isMock)
+            {
+                return (MockTarget.Finish("bench nist",
+                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+            }
 
-            var scenarioResult = EvalResultPersistence.ToScenarioResult(
-                compositeEval,
-                scenarioId: $"nist-{preset.ToLowerInvariant()}",
-                scenarioName: $"NIST AI RMF — {preset}",
-                subjectModel: agentModel);
-            await store!.WriteScenarioResultAsync(runId, scenarioResult);
+            var incompleteReasons = new List<string>();
+            if (judgeLedger is { Failures: > 0 } ledger)
+            {
+                incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
+            }
+            if (redTeamResult.WasTruncated)
+            {
+                incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
+            }
+            var incomplete = incompleteReasons.Count > 0;
+            if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
+                report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
+            // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
+            // indeterminate unless what it measured already fails it (B10ap).
+            compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
+            var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
 
-            var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
-            var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
-            var summary = new RunSummary(
-                SchemaVersion: "1.0",
-                RunId: runId,
-                Verdict: verdict,
-                Stats: runStats,
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overallScore"] = compositeEval.Score.Value,
-                    ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
-                });
-            await store!.CompleteRunAsync(manifest, summary, ct);
-            Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            // ── Persist through the unified output-store ─────────────────────────
+            string runId;
+            try
+            {
+                var manifest = await store!.StartRunAsync(
+                    subjectIdentity,
+                    new RunContext(
+                        EvalProject: "AgentEval.RedTeam",
+                        EvalProjectPath: "src/AgentEval.RedTeam/",
+                        Harness: "BenchNistCommand",
+                        Seed: null,
+                        ParentInvocationId: null,
+                        Kind: "benchmark"));
+                runId = manifest.Run.RunId;
+
+                var scenarioResult = EvalResultPersistence.ToScenarioResult(
+                    compositeEval,
+                    scenarioId: $"nist-{preset.ToLowerInvariant()}",
+                    scenarioName: $"NIST AI RMF — {preset}",
+                    subjectModel: agentModel);
+                await store!.WriteScenarioResultAsync(runId, scenarioResult);
+
+                var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+                var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+                var summary = new RunSummary(
+                    SchemaVersion: "1.0",
+                    RunId: runId,
+                    Verdict: verdict,
+                    Stats: runStats,
+                    Metrics: new Dictionary<string, double>
+                    {
+                        ["overallScore"] = compositeEval.Score.Value,
+                        ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
+                    });
+                await store!.CompleteRunAsync(manifest, summary, ct);
+                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Failed to persist NIST AI RMF run to output store: {ex.Message}");
+                return (1, null);
+            }
+
+            // ── Persist the rich NIST compliance evidence ────────────────────────
+            try
+            {
+                var reporter = new NistAiRmfComplianceReporter();
+                await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                    new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to persist NIST AI RMF compliance evidence: {ex.Message}");
+            }
+
+            // ── Emit JSON + Markdown reports alongside ───────────────────────────
+            var sanitizedSubject = FileSystemLayout.Sanitize(subject);
+            var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+            var outputDir = Path.Combine(agentEvalDir, "compliance", "NIST-AI-RMF", sanitizedSubject, ts);
+            Directory.CreateDirectory(outputDir);
+
+            try
+            {
+                var jsonPath = Path.Combine(outputDir, "report.json");
+                await File.WriteAllTextAsync(jsonPath, report.ToJson());
+                Console.WriteLine($"JSON report:     {jsonPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write NIST AI RMF JSON report: {ex.Message}");
+            }
+
+            try
+            {
+                var mdPath = Path.Combine(outputDir, "report.md");
+                await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
+                Console.WriteLine($"Markdown report: {mdPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write NIST AI RMF Markdown report: {ex.Message}");
+            }
+
+            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+                compositeEval, outputDir, subjectIdentity, benchmarkLabel: "NIST AI RMF", runId: runId);
+            if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
+            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
+
+            ct.ThrowIfCancellationRequested();
+
+            var finalExit = indeterminate ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(compositeEval.Score.Label);
+
+            // ── AEF ───────────────────────────────────────────────────────────────
+            // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
+            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                    agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
+                return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
+
+            // ── Exit code ─────────────────────────────────────────────────────────
+            Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+                $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
+                $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
+
+            if (indeterminate)
+            {
+                // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
+                // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
+                Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
+                return (ExitCodes.GateIndeterminate, outputDir);
+            }
+            if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
+                Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
+
+            return (finalExit, outputDir);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"Failed to persist NIST AI RMF run to output store: {ex.Message}");
+            // The scan may finish before persistence or report generation is cancelled.
+            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled"))
+                return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
-
-        // ── Persist the rich NIST compliance evidence ────────────────────────
-        try
-        {
-            var reporter = new NistAiRmfComplianceReporter();
-            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
-                new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to persist NIST AI RMF compliance evidence: {ex.Message}");
-        }
-
-        // ── Emit JSON + Markdown reports alongside ───────────────────────────
-        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
-        var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "compliance", "NIST-AI-RMF", sanitizedSubject, ts);
-        Directory.CreateDirectory(outputDir);
-
-        try
-        {
-            var jsonPath = Path.Combine(outputDir, "report.json");
-            await File.WriteAllTextAsync(jsonPath, report.ToJson());
-            Console.WriteLine($"JSON report:     {jsonPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write NIST AI RMF JSON report: {ex.Message}");
-        }
-
-        try
-        {
-            var mdPath = Path.Combine(outputDir, "report.md");
-            await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
-            Console.WriteLine($"Markdown report: {mdPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write NIST AI RMF Markdown report: {ex.Message}");
-        }
-
-        var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
-            compositeEval, outputDir, subjectIdentity, benchmarkLabel: "NIST AI RMF", runId: runId);
-        if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-        if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
-
-        var finalExit = indeterminate ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(compositeEval.Score.Label);
-
-        // ── AEF ───────────────────────────────────────────────────────────────
-        // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
-        if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
-            return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
-
-        // ── Exit code ─────────────────────────────────────────────────────────
-        Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
-            $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
-            $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
-
-        if (indeterminate)
-        {
-            // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
-            // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
-            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
-            return (ExitCodes.GateIndeterminate, outputDir);
-        }
-        if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
-            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
-
-        return (finalExit, outputDir);
     }
 
     /// <summary>Resolves a NIST AI RMF preset spec into a <see cref="NistBenchmarkRun"/>.</summary>

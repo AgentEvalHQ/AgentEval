@@ -677,167 +677,171 @@ internal static class RedTeamCommand
 
         var runner = new RedTeamRunner();
 
-        RedTeamResult result;
+        RedTeamResult? result = null;
         try
         {
             result = await runner.ScanAsync(agent, scanOptions, ct);
             ct.ThrowIfCancellationRequested();
+
+            // 7. Export. Compliance reporters (e.g. NIST AI RMF) render via their own ToJson/ToMarkdown — they are not
+            // IReportExporters — so they branch here; the json/sarif/markdown/junit formats go through ResolveExporter.
+            if (TryRenderComplianceReport(opts.Format, result, out var complianceContent))
+            {
+                if (opts.Output is not null)
+                {
+                    await File.WriteAllTextAsync(opts.Output.FullName, complianceContent, ct);
+                    if (!opts.Quiet)
+                        Console.Error.WriteLine($"  Report written to: {opts.Output.FullName}");
+                }
+                else
+                {
+                    Console.Write(complianceContent);
+                }
+            }
+            else
+            {
+                var exporter = ResolveExporter(opts.Format);
+
+                if (opts.Output is not null)
+                {
+                    await exporter.ExportToFileAsync(result, opts.Output.FullName, ct);
+                    if (!opts.Quiet)
+                        Console.Error.WriteLine($"  Report written to: {opts.Output.FullName}");
+                }
+                else
+                {
+                    var report = exporter.Export(result);
+                    Console.Write(report);
+                }
+            }
+
+            // 8. Summary (unless --quiet)
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine($"  === Red Team Summary ===");
+                Console.Error.WriteLine($"  {result.Summary}");
+                // RC-6 honesty: lead with the conclusive-only score + coverage, not the inconclusive-diluted OverallScore.
+                Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
+                if (result.InconclusiveProbes > 0)
+                    Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
+                // The second headline number, always: an agent that refuses everything passes on attacks alone.
+                Console.Error.WriteLine($"  Over-refusal: {result.OverRefusalSummary}");
+
+                // Built-in target post-scan summary (e.g. the gatekeeper-demo gate-block count — the closed loop).
+                if (selectedTarget is not null && gateTrace is not null)
+                {
+                    selectedTarget.WritePostScanSummary(result, gateTrace, Console.Error);
+                }
+            }
+
+            // 8b. Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied
+            // cohort and report a z-score. Informational only — it never changes the verdict or exit code (a model can be
+            // "unusually vulnerable" relative to peers yet still pass absolutely, and vice-versa).
+            if (opts.Calibration is not null && !opts.Quiet)
+            {
+                var profile = await CalibrationProfile.LoadAsync(opts.Calibration.FullName, ct);
+                var calibration = Calibrator.Calibrate(result, profile);
+                PrintCalibration(calibration);
+            }
+
+            // 9. Baseline capture (W-E1) — write a snapshot the next run can diff against.
+            if (opts.SaveBaseline is not null)
+            {
+                await RedTeamBaseline
+                    .FromResult(result, version: string.IsNullOrWhiteSpace(opts.BaselineVersion) ? "unspecified" : opts.BaselineVersion, notes: opts.BaselineNote)
+                    .SaveAsync(opts.SaveBaseline.FullName, ct);
+                if (!opts.Quiet)
+                {
+                    Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
+                    // Honesty: a baseline captured from a low-coverage run carries that coverage forward;
+                    // future comparisons measure drops relative to it, not relative to a perfect 100%.
+                    if (result.ConclusiveRate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop)
+                        Console.Error.WriteLine(
+                            $"  Note: this baseline's coverage is only {result.ConclusiveRate * 100:F0}% conclusive — " +
+                            "future runs are compared against that level, not 100%.");
+                }
+            }
+
+            // 10. Regression gate (W-E2) — diff against a baseline. A non-comparable scan (intensity mismatch / FailFast
+            // truncation) throws from Compare and is surfaced honestly as a runtime error by the caller's try/catch.
+            RegressionStatus? regression = null;
+            string? baselineDigest = null;
+            InvalidOperationException? comparisonError = null;
+            if (opts.Baseline is not null)
+            {
+                var baselineBytes = await File.ReadAllBytesAsync(opts.Baseline.FullName, ct);
+                using var baselineReader = new StreamReader(new MemoryStream(baselineBytes));
+                var baseline = BaselineSerializer.FromJson(await baselineReader.ReadToEndAsync(ct));
+                baselineDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(baselineBytes)).ToLowerInvariant();
+                try
+                {
+                    if (!string.Equals(baseline.AgentName, result.AgentName, StringComparison.Ordinal))
+                    {
+                        // The demo's name says which model it ran on. A scripted baseline against a real-model run (or one
+                        // model against another) compares two different instruments, so it is refused, like an intensity
+                        // mismatch. Any other agent may have been renamed, so it only gets a note.
+                        if (baseline.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal)
+                            && result.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal))
+                        {
+                            throw new InvalidOperationException(
+                                $"The baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'. They are " +
+                                "different instruments: take the baseline on the same model, or pass --scripted for both.");
+                        }
+                        if (!opts.Quiet)
+                            Console.Error.WriteLine(
+                                $"  Note: the baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'.");
+                    }
+                    var comparison = new RedTeamBaselineComparer().Compare(result, baseline);
+                    regression = comparison.Status;
+                    if (!opts.Quiet)
+                        PrintComparison(comparison);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // A refused comparison is evidence too. Preserve the command's runtime-error behavior, and record
+                    // that this gate could not decide; never serialize the exception's potentially sensitive message.
+                    comparisonError = ex;
+                }
+            }
+
+            ct.ThrowIfCancellationRequested();
+
+            // 11. Honest exit-code gate (W-E3).
+            var exitCode = comparisonError is null ? ComputeExitCode(failOn, regression, result.Passed) : ExitCodes.RuntimeError;
+            var gate = new AefCommandGate
+            {
+                GateId = "gate:redteam",
+                Rule = "fail-on:" + failOn,
+                Outcome = comparisonError is not null ? AefGateOutcome.Inconclusive
+                    : exitCode == ExitCodes.Success ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
+                ExitCode = exitCode,
+                Comparability = comparisonError is not null ? AefComparability.Incomparable
+                    : regression is not null && failOn != "never" ? AefComparability.Comparable : AefComparability.NotApplicable,
+                Ext = baselineDigest is null ? null : new System.Text.Json.Nodes.JsonObject
+                {
+                    ["agenteval.redteam"] = new System.Text.Json.Nodes.JsonObject { ["baselineDigest"] = baselineDigest },
+                },
+            };
+            var aefFailed = !opts.NoAef && WriteAef(opts, result, resolvedName, selectedTarget is not null,
+                sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live,
+                gate, judgeClient);
+            if (aefFailed)
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            if (comparisonError is not null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(comparisonError).Throw();
+            return exitCode;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            // Export, calibration and baseline I/O can be cancelled after the scan has finished too.
+            // Preserve that completed scan, but do not publish a gate for an unfinished command.
             if (!opts.NoAef)
-                WriteAef(opts, partialScan.Snapshot(), resolvedName, selectedTarget is not null,
+                WriteAef(opts, result ?? partialScan.Snapshot(), resolvedName, selectedTarget is not null,
                     sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live,
                     gate: null, judgeClient, abortReason: "cancelled");
             throw;
         }
-
-        // 7. Export. Compliance reporters (e.g. NIST AI RMF) render via their own ToJson/ToMarkdown — they are not
-        // IReportExporters — so they branch here; the json/sarif/markdown/junit formats go through ResolveExporter.
-        if (TryRenderComplianceReport(opts.Format, result, out var complianceContent))
-        {
-            if (opts.Output is not null)
-            {
-                await File.WriteAllTextAsync(opts.Output.FullName, complianceContent, ct);
-                if (!opts.Quiet)
-                    Console.Error.WriteLine($"  Report written to: {opts.Output.FullName}");
-            }
-            else
-            {
-                Console.Write(complianceContent);
-            }
-        }
-        else
-        {
-            var exporter = ResolveExporter(opts.Format);
-
-            if (opts.Output is not null)
-            {
-                await exporter.ExportToFileAsync(result, opts.Output.FullName, ct);
-                if (!opts.Quiet)
-                    Console.Error.WriteLine($"  Report written to: {opts.Output.FullName}");
-            }
-            else
-            {
-                var report = exporter.Export(result);
-                Console.Write(report);
-            }
-        }
-
-        // 8. Summary (unless --quiet)
-        if (!opts.Quiet)
-        {
-            Console.Error.WriteLine();
-            Console.Error.WriteLine($"  === Red Team Summary ===");
-            Console.Error.WriteLine($"  {result.Summary}");
-            // RC-6 honesty: lead with the conclusive-only score + coverage, not the inconclusive-diluted OverallScore.
-            Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
-            if (result.InconclusiveProbes > 0)
-                Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
-            // The second headline number, always: an agent that refuses everything passes on attacks alone.
-            Console.Error.WriteLine($"  Over-refusal: {result.OverRefusalSummary}");
-
-            // Built-in target post-scan summary (e.g. the gatekeeper-demo gate-block count — the closed loop).
-            if (selectedTarget is not null && gateTrace is not null)
-            {
-                selectedTarget.WritePostScanSummary(result, gateTrace, Console.Error);
-            }
-        }
-
-        // 8b. Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied
-        // cohort and report a z-score. Informational only — it never changes the verdict or exit code (a model can be
-        // "unusually vulnerable" relative to peers yet still pass absolutely, and vice-versa).
-        if (opts.Calibration is not null && !opts.Quiet)
-        {
-            var profile = await CalibrationProfile.LoadAsync(opts.Calibration.FullName, ct);
-            var calibration = Calibrator.Calibrate(result, profile);
-            PrintCalibration(calibration);
-        }
-
-        // 9. Baseline capture (W-E1) — write a snapshot the next run can diff against.
-        if (opts.SaveBaseline is not null)
-        {
-            await RedTeamBaseline
-                .FromResult(result, version: string.IsNullOrWhiteSpace(opts.BaselineVersion) ? "unspecified" : opts.BaselineVersion, notes: opts.BaselineNote)
-                .SaveAsync(opts.SaveBaseline.FullName, ct);
-            if (!opts.Quiet)
-            {
-                Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
-                // Honesty: a baseline captured from a low-coverage run carries that coverage forward;
-                // future comparisons measure drops relative to it, not relative to a perfect 100%.
-                if (result.ConclusiveRate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop)
-                    Console.Error.WriteLine(
-                        $"  Note: this baseline's coverage is only {result.ConclusiveRate * 100:F0}% conclusive — " +
-                        "future runs are compared against that level, not 100%.");
-            }
-        }
-
-        // 10. Regression gate (W-E2) — diff against a baseline. A non-comparable scan (intensity mismatch / FailFast
-        // truncation) throws from Compare and is surfaced honestly as a runtime error by the caller's try/catch.
-        RegressionStatus? regression = null;
-        string? baselineDigest = null;
-        InvalidOperationException? comparisonError = null;
-        if (opts.Baseline is not null)
-        {
-            var baselineBytes = await File.ReadAllBytesAsync(opts.Baseline.FullName, ct);
-            using var baselineReader = new StreamReader(new MemoryStream(baselineBytes));
-            var baseline = BaselineSerializer.FromJson(await baselineReader.ReadToEndAsync(ct));
-            baselineDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(baselineBytes)).ToLowerInvariant();
-            try
-            {
-                if (!string.Equals(baseline.AgentName, result.AgentName, StringComparison.Ordinal))
-                {
-                    // The demo's name says which model it ran on. A scripted baseline against a real-model run (or one
-                    // model against another) compares two different instruments, so it is refused, like an intensity
-                    // mismatch. Any other agent may have been renamed, so it only gets a note.
-                    if (baseline.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal)
-                        && result.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal))
-                    {
-                        throw new InvalidOperationException(
-                            $"The baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'. They are " +
-                            "different instruments: take the baseline on the same model, or pass --scripted for both.");
-                    }
-                    if (!opts.Quiet)
-                        Console.Error.WriteLine(
-                            $"  Note: the baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'.");
-                }
-                var comparison = new RedTeamBaselineComparer().Compare(result, baseline);
-                regression = comparison.Status;
-                if (!opts.Quiet)
-                    PrintComparison(comparison);
-            }
-            catch (InvalidOperationException ex)
-            {
-                // A refused comparison is evidence too. Preserve the command's runtime-error behavior, and record
-                // that this gate could not decide; never serialize the exception's potentially sensitive message.
-                comparisonError = ex;
-            }
-        }
-
-        // 11. Honest exit-code gate (W-E3).
-        var exitCode = comparisonError is null ? ComputeExitCode(failOn, regression, result.Passed) : ExitCodes.RuntimeError;
-        var gate = new AefCommandGate
-        {
-            GateId = "gate:redteam",
-            Rule = "fail-on:" + failOn,
-            Outcome = comparisonError is not null ? AefGateOutcome.Inconclusive
-                : exitCode == ExitCodes.Success ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
-            ExitCode = exitCode,
-            Comparability = comparisonError is not null ? AefComparability.Incomparable
-                : regression is not null && failOn != "never" ? AefComparability.Comparable : AefComparability.NotApplicable,
-            Ext = baselineDigest is null ? null : new System.Text.Json.Nodes.JsonObject
-            {
-                ["agenteval.redteam"] = new System.Text.Json.Nodes.JsonObject { ["baselineDigest"] = baselineDigest },
-            },
-        };
-        var aefFailed = !opts.NoAef && WriteAef(opts, result, resolvedName, selectedTarget is not null,
-            sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live,
-            gate, judgeClient);
-        if (aefFailed)
-            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        if (comparisonError is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(comparisonError).Throw();
-        return exitCode;
     }
 
     /// <summary>

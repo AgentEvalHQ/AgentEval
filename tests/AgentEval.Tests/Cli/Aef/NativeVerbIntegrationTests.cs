@@ -226,6 +226,116 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Redteam_CancelAfterReport_PreservesCompletedScanWithoutGate(bool noAef)
+    {
+        using var cancel = new CancellationTokenSource();
+        await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
+        var options = new RedTeamOptions
+        {
+            Endpoint = endpoint.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
+            Attacks = "PromptInjection", MaxProbes = 1, Quiet = true,
+            Format = "json", Aef = new DirectoryInfo(Path.Combine(_root, "redteam-aef")), NoAef = noAef,
+            SaveBaseline = new FileInfo(Path.Combine(_root, "baseline.json")),
+        };
+        var original = Console.Out;
+        using var output = new CancelOnReportWriter(cancel);
+        try
+        {
+            Console.SetOut(output);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RedTeamCommand.ExecuteAsync(options, cancel.Token));
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
+        Assert.True(output.ReportWritten);
+        Assert.Single(endpoint.Requests);
+        if (noAef)
+        {
+            Assert.False(Directory.Exists(options.Aef.FullName));
+            return;
+        }
+        var dir = RunDirectory(options.Aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    [Theory]
+    [InlineData("owasp")]
+    [InlineData("mitre")]
+    [InlineData("nist")]
+    public async Task Bench_CancelAfterPersistence_SealsCompletedScanWithoutGate(string family)
+    {
+        using var cancel = new CancellationTokenSource();
+        await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
+        await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test");
+        var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "http-subject");
+        using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test");
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
+        var aef = new DirectoryInfo(Path.Combine(_root, "bench-aef"));
+        var original = Console.Out;
+        using var output = new CancelOnPersistenceWriter(cancel);
+        try
+        {
+            Console.SetOut(output);
+            var result = family switch
+            {
+                "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+                "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+                _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+            };
+            Assert.Equal(1, result.ExitCode);
+        }
+        finally
+        {
+            Console.SetOut(original);
+            (agent as IDisposable)?.Dispose();
+        }
+
+        Assert.True(cancel.IsCancellationRequested);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    private sealed class CancelOnPersistenceWriter(CancellationTokenSource cancel) : StringWriter
+    {
+        public override void WriteLine(string? value)
+        {
+            base.WriteLine(value);
+            if (value?.StartsWith("Persisted run ", StringComparison.Ordinal) is true)
+                cancel.Cancel();
+        }
+    }
+
+    private sealed class CancelOnReportWriter(CancellationTokenSource cancel) : StringWriter
+    {
+        public bool ReportWritten { get; private set; }
+
+        public override void Write(string? value)
+        {
+            base.Write(value);
+            if (value?.TrimStart().StartsWith('{') is true)
+            {
+                ReportWritten = true;
+                cancel.Cancel();
+            }
+        }
+    }
+
     private static JsonObject Document(string dir, string name) => JsonNode.Parse(File.ReadAllText(Path.Combine(dir, name)))!.AsObject();
 
     private static void AssertIntact(string dir)

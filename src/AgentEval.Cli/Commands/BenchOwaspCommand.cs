@@ -216,153 +216,167 @@ public static class BenchOwaspCommand
             return (1, null);
         }
 
-        var report = benchmark.GenerateReport(redTeamResult);
-        if (isMock)
-        {
-            return (MockTarget.Finish("bench owasp",
-                $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
-        }
-
-        var incompleteReasons = new List<string>();
-        if (judgeLedger is { Failures: > 0 } ledger)
-        {
-            incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
-        }
-        if (redTeamResult.WasTruncated)
-        {
-            incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
-        }
-        var incomplete = incompleteReasons.Count > 0;
-        if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
-            report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
-        // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
-        // indeterminate unless what it measured already fails it (B10ap).
-        compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
-        var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
-
-        // ── Persist through the unified output-store ─────────────────────────
-        string runId;
         try
         {
-            var manifest = await store!.StartRunAsync(
-                subjectIdentity,
-                new RunContext(
-                    EvalProject: "AgentEval.RedTeam",
-                    EvalProjectPath: "src/AgentEval.RedTeam/",
-                    Harness: "BenchOwaspCommand",
-                    Seed: null,
-                    ParentInvocationId: null,
-                    Kind: "benchmark"));
-            runId = manifest.Run.RunId;
+            var report = benchmark.GenerateReport(redTeamResult);
+            if (isMock)
+            {
+                return (MockTarget.Finish("bench owasp",
+                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+            }
 
-            // Write the 10-leaf composite as the run's "scenario result" — the
-            // recursive tree is preserved as JSON inside ScenarioResult.Output, so
-            // a downstream reader can rehydrate the full EvalResult via
-            // EvalResultPersistence.FromScenarioResult.
-            var scenarioResult = EvalResultPersistence.ToScenarioResult(
+            var incompleteReasons = new List<string>();
+            if (judgeLedger is { Failures: > 0 } ledger)
+            {
+                incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
+            }
+            if (redTeamResult.WasTruncated)
+            {
+                incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
+            }
+            var incomplete = incompleteReasons.Count > 0;
+            if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
+                report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
+            // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
+            // indeterminate unless what it measured already fails it (B10ap).
+            compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
+            var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
+
+            // ── Persist through the unified output-store ─────────────────────────
+            string runId;
+            try
+            {
+                var manifest = await store!.StartRunAsync(
+                    subjectIdentity,
+                    new RunContext(
+                        EvalProject: "AgentEval.RedTeam",
+                        EvalProjectPath: "src/AgentEval.RedTeam/",
+                        Harness: "BenchOwaspCommand",
+                        Seed: null,
+                        ParentInvocationId: null,
+                        Kind: "benchmark"));
+                runId = manifest.Run.RunId;
+
+                // Write the 10-leaf composite as the run's "scenario result" — the
+                // recursive tree is preserved as JSON inside ScenarioResult.Output, so
+                // a downstream reader can rehydrate the full EvalResult via
+                // EvalResultPersistence.FromScenarioResult.
+                var scenarioResult = EvalResultPersistence.ToScenarioResult(
+                    compositeEval,
+                    scenarioId: $"owasp-{preset.ToLowerInvariant()}",
+                    scenarioName: $"OWASP LLM Top 10 — {preset}",
+                    subjectModel: agentModel);
+                await store!.WriteScenarioResultAsync(runId, scenarioResult);
+
+                var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+                var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+                var summary = new RunSummary(
+                    SchemaVersion: "1.0",
+                    RunId: runId,
+                    Verdict: verdict,
+                    Stats: runStats,
+                    Metrics: new Dictionary<string, double>
+                    {
+                        ["overallScore"] = compositeEval.Score.Value,
+                        ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
+                    });
+                await store!.CompleteRunAsync(manifest, summary, ct);
+                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
+                return (1, null);
+            }
+
+            // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
+            try
+            {
+                var reporter = new OWASPComplianceReporter();
+                await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                    new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to persist OWASP compliance evidence: {ex.Message}");
+            }
+
+            // ── Emit JSON + Markdown reports alongside ───────────────────────────
+            var sanitizedSubject = FileSystemLayout.Sanitize(subject);
+            var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+            var outputDir = Path.Combine(agentEvalDir, "compliance", "OWASP-LLM-Top10", sanitizedSubject, ts);
+            Directory.CreateDirectory(outputDir);
+
+            try
+            {
+                var jsonPath = Path.Combine(outputDir, "report.json");
+                await File.WriteAllTextAsync(jsonPath, report.ToJson());
+                Console.WriteLine($"JSON report:     {jsonPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write OWASP JSON report: {ex.Message}");
+            }
+
+            try
+            {
+                var mdPath = Path.Combine(outputDir, "report.md");
+                await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
+                Console.WriteLine($"Markdown report: {mdPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write OWASP Markdown report: {ex.Message}");
+            }
+
+            // T0.5 (v1.1): emit generic HTML + PDF alongside JSON/MD for parity with the
+            // compliance commands (GDPR / EU AI Act / Agentic). Both are best-effort.
+            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
                 compositeEval,
-                scenarioId: $"owasp-{preset.ToLowerInvariant()}",
-                scenarioName: $"OWASP LLM Top 10 — {preset}",
-                subjectModel: agentModel);
-            await store!.WriteScenarioResultAsync(runId, scenarioResult);
+                outputDir,
+                subjectIdentity,
+                benchmarkLabel: "OWASP LLM Top 10",
+                runId: runId);
+            if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
+            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
 
-            var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
-            var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
-            var summary = new RunSummary(
-                SchemaVersion: "1.0",
-                RunId: runId,
-                Verdict: verdict,
-                Stats: runStats,
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overallScore"] = compositeEval.Score.Value,
-                    ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
-                });
-            await store!.CompleteRunAsync(manifest, summary, ct);
-            Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            ct.ThrowIfCancellationRequested();
+
+            var finalExit = indeterminate ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(compositeEval.Score.Label);
+
+            // ── AEF ───────────────────────────────────────────────────────────────
+            // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
+            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                    agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
+                return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
+
+            // ── Exit code ─────────────────────────────────────────────────────────
+            Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+                $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
+                $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
+
+            if (indeterminate)
+            {
+                // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
+                // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
+                Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
+                return (ExitCodes.GateIndeterminate, outputDir);
+            }
+            if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
+                Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
+
+            return (finalExit, outputDir);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
+            // The scan may finish before persistence or report generation is cancelled.
+            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled"))
+                return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
-
-        // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
-        try
-        {
-            var reporter = new OWASPComplianceReporter();
-            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
-                new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to persist OWASP compliance evidence: {ex.Message}");
-        }
-
-        // ── Emit JSON + Markdown reports alongside ───────────────────────────
-        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
-        var ts = report.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "compliance", "OWASP-LLM-Top10", sanitizedSubject, ts);
-        Directory.CreateDirectory(outputDir);
-
-        try
-        {
-            var jsonPath = Path.Combine(outputDir, "report.json");
-            await File.WriteAllTextAsync(jsonPath, report.ToJson());
-            Console.WriteLine($"JSON report:     {jsonPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write OWASP JSON report: {ex.Message}");
-        }
-
-        try
-        {
-            var mdPath = Path.Combine(outputDir, "report.md");
-            await File.WriteAllTextAsync(mdPath, report.ToMarkdown());
-            Console.WriteLine($"Markdown report: {mdPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write OWASP Markdown report: {ex.Message}");
-        }
-
-        // T0.5 (v1.1): emit generic HTML + PDF alongside JSON/MD for parity with the
-        // compliance commands (GDPR / EU AI Act / Agentic). Both are best-effort.
-        var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
-            compositeEval,
-            outputDir,
-            subjectIdentity,
-            benchmarkLabel: "OWASP LLM Top 10",
-            runId: runId);
-        if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-        if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
-
-        var finalExit = indeterminate ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(compositeEval.Score.Label);
-
-        // ── AEF ───────────────────────────────────────────────────────────────
-        // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
-        if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
-            return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
-
-        // ── Exit code ─────────────────────────────────────────────────────────
-        Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
-            $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
-            $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
-
-        if (indeterminate)
-        {
-            // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
-            // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
-            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
-            return (ExitCodes.GateIndeterminate, outputDir);
-        }
-        if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
-            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
-
-        return (finalExit, outputDir);
     }
 
     /// <summary>

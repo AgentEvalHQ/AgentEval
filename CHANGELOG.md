@@ -31,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Composite summaries distinguish the mean case score from the preset's aggregate score and verdict.
 - **AEF command decisions and partial evidence:** redteam and verdict-bearing benchmarks record their final gates;
   eval records its golden-trace decision. Redteam and OWASP/MITRE/NIST record complete reported judge token totals.
-  Cancelled eval and redteam execution seals completed evidence as aborted, without a final gate.
+  Cancelled eval and redteam execution seals completed evidence as aborted, without a final gate. Redteam and
+  OWASP/MITRE/NIST also retain completed scans when subsequent persistence or reporting is cancelled.
 - **`bench owasp`, `bench mitre` and `bench nist` write each scan as sealed AEF evidence** (`--aef`, `--no-aef`,
   `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
   benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
