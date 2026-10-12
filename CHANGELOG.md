@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Per-case eval usage:** single-run eval case roots retain scoped agent and judge usage, including
+  subsequent named-metric calls, without repeating it on metric children. Completed-case counts survive
+  cancellation while incomplete run totals remain unknown. Interrupted streams retain observed model identity.
+
 - **Native usage summaries:** eval, redteam and scan summaries accept invocation-meter totals without
   adding the same role's legacy ledger again. Reported model aliases remain distinct from fallback deployment
   names without double counting; run cost is omitted when any recorded role's cost is unknown.

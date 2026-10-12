@@ -16,6 +16,42 @@ namespace AgentEval.Tests;
 /// </summary>
 public class MAFEvaluationHarnessTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunBatchAsync_CaseScope_RestoresContextAfterCompletionCancellationOrObserverFailure(int mode)
+    {
+        var context = new AsyncLocal<int?>();
+        var disposed = new List<int>();
+        using var cancellation = new CancellationTokenSource();
+        var harness = new MAFEvaluationHarness(verbose: false);
+        var callbacks = 0;
+        var task = harness.RunBatchAsync(new SimpleTestableAgent("subject", "answer"),
+            [new DatasetTestCase { Id = "first", Input = "one" }, new DatasetTestCase { Id = "second", Input = "two" }],
+            null, cancellation.Token, _ =>
+            {
+                Assert.Equal(callbacks++, context.Value);
+                if (mode == 1) cancellation.Cancel();
+                if (mode == 2) throw new IOException("observer failed");
+            }, index =>
+            {
+                Assert.Null(context.Value);
+                context.Value = index;
+                return new CaseScope(() => { disposed.Add(index); context.Value = null; });
+            });
+        if (mode == 1) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+        else if (mode == 2) await Assert.ThrowsAsync<IOException>(() => task);
+        else Assert.Equal(2, (await task).Results.Count);
+        Assert.Equal(mode == 0 ? new[] { 0, 1 } : new[] { 0 }, disposed);
+        Assert.Null(context.Value);
+    }
+
+    private sealed class CaseScope(Action dispose) : IDisposable
+    {
+        public void Dispose() => dispose();
+    }
+
     #region Constructor Tests
 
     [Fact]

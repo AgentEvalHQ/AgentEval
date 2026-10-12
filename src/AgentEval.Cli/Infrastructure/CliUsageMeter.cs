@@ -21,6 +21,7 @@ internal sealed class CliUsageMeter : IDisposable
     private CliUsageMeter() { _previous = Active.Value; Active.Value = this; }
     internal static CliUsageMeter Begin() => new();
     internal static IReadOnlyList<AefUsage>? CurrentUsage => Active.Value?.Snapshot();
+    internal static IReadOnlyList<AefUsage>? ForCase(string caseId) => Active.Value?.Snapshot(caseId);
     internal static IChatClient Wrap(IChatClient client, string? role, string? model = null) =>
         Active.Value is { } meter ? new MeteredClient(client, meter, role switch
         {

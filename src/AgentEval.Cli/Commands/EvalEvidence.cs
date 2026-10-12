@@ -32,9 +32,10 @@ internal sealed class EvalEvidence : IDisposable
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 
-    public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null)
+    public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null, bool caseUsage = false)
     {
-        try { _session?.Add(result, caseId, passingScore, content); }
+        try { _session?.Add(result, caseId, passingScore, content,
+            caseUsage ? AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId) : null); }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 
@@ -56,7 +57,11 @@ internal sealed class EvalEvidence : IDisposable
 
     public void AddMetrics(string caseId, IReadOnlyList<AgentEval.Core.MetricResult> metrics)
     {
-        try { _session?.AddMetrics(caseId, metrics); }
+        try
+        {
+            _session?.AddMetrics(caseId, metrics);
+            _session?.UpdateCaseUsage(caseId, AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId));
+        }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 

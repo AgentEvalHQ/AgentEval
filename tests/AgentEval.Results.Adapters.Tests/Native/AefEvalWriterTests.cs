@@ -44,6 +44,32 @@ public sealed class AefEvalWriterTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Session_ObservedCaseUsage_DoesNotRepeatOnChildrenOrRollup(bool trials)
+    {
+        using var session = AefEvalWriter.Start(_out, Options(), Start, trials ? 1 : null, trials ? 1 : null);
+        AefUsage[] usage = [new() { Role = AefUsageRole.Agent, Model = "agent", InputTokens = 10 }];
+        session.Add(Pass(), "case", null, null, usage);
+        if (!trials)
+        {
+            session.AddMetrics("case", [new() { MetricName = "code_check", Score = 100, Passed = true }]);
+            usage = [.. usage, new() { Role = AefUsageRole.Judge, Model = "judge", InputTokens = 5 }];
+            session.UpdateCaseUsage("case", usage);
+        }
+        var (dir, _) = session.Complete(Start.AddSeconds(1), null, null, null, usage);
+        var observed = Assert.Single(AefTestRuns.Results(dir), l => l["usage"] is not null);
+        Assert.Equal(trials ? 1 : 2, observed["usage"]!.AsArray().Count);
+        Assert.Equal(10, (long)observed["usage"]![0]!["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void Session_MetricInstrument_RetainsOwnRubricAndDoesNotInventModelForCodeShortcut()
     {

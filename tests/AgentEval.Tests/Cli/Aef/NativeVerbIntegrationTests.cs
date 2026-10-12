@@ -464,15 +464,15 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         using var usageMeter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         var calls = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult(
-            Interlocked.Increment(ref calls) == 1 ? "Hi" : """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}"""));
-        var options = Options(endpoint.Endpoint, metrics: "llm_relevance", azure: azure);
+            Interlocked.Increment(ref calls) <= 2 ? "Hi" : """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}"""));
+        var options = Options(endpoint.Endpoint, count: 2, metrics: "llm_relevance", azure: azure);
         using var customClient = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(endpoint.Endpoint, "local-model", "local-test");
         Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None,
             agentClientOverride: clientOverride ? customClient : null));
-        Assert.Equal(2, endpoint.Requests.Count);
+        Assert.Equal(4, endpoint.Requests.Count);
         var metered = usageMeter.Snapshot()!;
-        Assert.Equal(10, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Agent).InputTokens);
-        Assert.Equal(10, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Judge).InputTokens);
+        Assert.Equal(20, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Agent).InputTokens);
+        Assert.Equal(20, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Judge).InputTokens);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         var judge = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
@@ -480,12 +480,27 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(clientOverride ? null : azure ? "azure" : "openai-compatible", (string?)judge["provider"]);
         var rubric = (string?)judge["rubricDigest"];
         Assert.Matches("^sha256:[0-9a-f]{64}$", rubric!);
-        var metricLine = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
-            .Single(l => (string?)l["path"] == "case/metrics/llm_relevance");
-        Assert.Equal(rubric, (string?)metricLine["annotator"]!["rubricDigest"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+        var roots = lines.Where(l => (string?)l["path"] == "case").ToArray();
+        Assert.Equal(2, roots.Length);
+        Assert.All(roots, root =>
+        {
+            var caseUsage = root["usage"]!.AsArray();
+            Assert.Equal(2, caseUsage.Count);
+            Assert.All(caseUsage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));
+            Assert.Single(caseUsage, u => (string?)u!["role"] == "agent");
+            Assert.Single(caseUsage, u => (string?)u!["role"] == "judge");
+        });
+        var metrics = lines.Where(l => (string?)l["path"] == "case/metrics/llm_relevance").ToArray();
+        Assert.Equal(2, metrics.Length);
+        Assert.All(metrics, metric =>
+        {
+            Assert.Equal(rubric, (string?)metric["annotator"]!["rubricDigest"]);
+            Assert.Null(metric["usage"]);
+        });
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
-        Assert.All(usage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));
+        Assert.All(usage, u => Assert.Equal(20, (long)u!["gen_ai.usage.input_tokens"]!));
         Assert.Single(usage, u => (string?)u!["role"] == "judge");
         Assert.Single(usage, u => (string?)u!["role"] == "agent");
         Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
@@ -536,6 +551,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(1)]
     public async Task Eval_CancelDuringHttpCall_SealsAbortedCompletedPrefix(int completedCases)
     {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         using var cancel = new CancellationTokenSource();
         var count = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync(async (_, requestCancelled) =>
@@ -557,6 +573,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("aborted", (string?)header["status"]);
         Assert.Equal("cancelled", (string?)header["abortReason"]);
         Assert.Equal(completedCases, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+        Assert.All(File.ReadAllLines(Path.Combine(dir, "results.ndjson")), line =>
+            Assert.Equal(10, (long)JsonNode.Parse(line)!["usage"]![0]!["gen_ai.usage.input_tokens"]!));
+        Assert.Null(Document(dir, "summary.json")["usage"]![0]!["gen_ai.usage.input_tokens"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 

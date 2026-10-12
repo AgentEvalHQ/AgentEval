@@ -510,7 +510,20 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         IEnumerable<DatasetTestCase> testCases,
         EvaluationOptions? options,
         CancellationToken cancellationToken,
-        Action<TestResult>? onResult)
+        Action<TestResult>? onResult) =>
+        await RunBatchAsync(agent, testCases, options, cancellationToken, onResult, null);
+
+    /// <summary>Runs a batch with a disposable observation scope around each case, including its completion callback.</summary>
+    /// <param name="agent">The agent to evaluate.</param>
+    /// <param name="testCases">The dataset cases, in order.</param>
+    /// <param name="options">Evaluation options.</param>
+    /// <param name="cancellationToken">The batch cancellation token.</param>
+    /// <param name="onResult">Called synchronously for each completed case.</param>
+    /// <param name="beginCase">Creates a scope for the zero-based case index; disposed on completion, cancellation or failure.</param>
+    /// <returns>The batch summary when all cases completed.</returns>
+    public async Task<TestSummary> RunBatchAsync(
+        IEvaluableAgent agent, IEnumerable<DatasetTestCase> testCases, EvaluationOptions? options,
+        CancellationToken cancellationToken, Action<TestResult>? onResult, Func<int, IDisposable?>? beginCase)
     {
         options ??= new EvaluationOptions();
         var results = new List<TestResult>();
@@ -518,6 +531,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         foreach (var datasetCase in testCases)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            using var caseScope = beginCase?.Invoke(results.Count);
 
             var testCase = datasetCase.ToTestCase();
             _logger.LogInformation($"\n🧪 Test: {testCase.Name}");

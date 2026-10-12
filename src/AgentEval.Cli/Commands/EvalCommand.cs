@@ -446,8 +446,9 @@ internal static class EvalCommand
                 completed.Add(result);
                 evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
                     AefCliOptions.ContentCapture == AefContentCapture.On
-                        ? new AefNativeContent { Input = testCases[index].Input, Expected = testCases[index].ExpectedOutput } : null);
-            });
+                        ? new AefNativeContent { Input = testCases[index].Input, Expected = testCases[index].ExpectedOutput } : null,
+                    caseUsage: true);
+            }, index => CliUsageMeter.Attribute(caseId: caseIds[index]));
             ct.ThrowIfCancellationRequested();
 
             // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test

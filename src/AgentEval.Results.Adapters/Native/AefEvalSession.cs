@@ -105,7 +105,11 @@ public static partial class AefEvalWriter
         public string Directory => _folder.Directory;
 
         /// <summary>Appends a completed case, or the next completed trial of that case, to disk.</summary>
-        public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null)
+        public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null) =>
+            Add(result, caseId, passingScore, content, null);
+
+        /// <summary>Appends a case or trial with observed usage replacing legacy totals for the observed roles.</summary>
+        public void Add(TestResult result, string caseId, int? passingScore, AefNativeContent? content, IReadOnlyList<AefUsage>? usage)
         {
             EnsureOpen();
             ArgumentNullException.ThrowIfNull(result);
@@ -126,18 +130,32 @@ public static partial class AefEvalWriter
                 var entry = AddCase(_writer, result, caseId, passingScore, content, _options.JudgeModel);
                 _roots.Add((entry.Handle.ResultId, entry.Root.State));
                 _cases.Add(caseId, (entry.Handle, entry.Root, passingScore));
+                UpdateCaseUsage(caseId, usage);
                 if (result.MetricResults is { Count: > 0 } metrics) AddMetrics(caseId, metrics);
             }
             else
             {
                 if (!_trials.TryGetValue(caseId, out var trials)) _trials.Add(caseId, trials = []);
                 if (trials.Count >= _plannedTrials) throw new ArgumentException("A case cannot exceed its planned trial count.", nameof(caseId));
-                _writer.AddResult(AefNativeContent.Attach(_writer, Line(result, caseId, trials.Count, _options.JudgeModel), content));
+                var line = Line(result, caseId, trials.Count, _options.JudgeModel);
+                _writer.AddResult(AefNativeContent.Attach(_writer, line with { Usage = AefNativeUsage.Merge(usage, line.Usage) }, content));
                 trials.Add(result);
                 if (trials.Count == _plannedTrials) AddRollup(caseId, trials);
             }
             _all.Add(result);
             if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge, _options.JudgeProvider, result.JudgeRubricDigest);
+        }
+
+        /// <summary>Updates the single-run case root with cumulative case usage; child results do not repeat it.</summary>
+        public void UpdateCaseUsage(string caseId, IReadOnlyList<AefUsage>? usage)
+        {
+            EnsureOpen();
+            if (usage is null) return;
+            if (!_cases.TryGetValue(caseId, out var entry))
+                throw new ArgumentException("Usage requires an already recorded single-run case.", nameof(caseId));
+            var root = entry.Root with { Usage = AefNativeUsage.Merge(usage, entry.Root.Usage) };
+            _writer.UpdateResult(entry.Handle, root);
+            _cases[caseId] = (entry.Handle, root, entry.PassingScore);
         }
 
         private void RecordJudge(string model, string? provider, string? rubricDigest = null)
