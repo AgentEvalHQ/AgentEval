@@ -66,6 +66,7 @@ public sealed class DecisionEval : AtomicEval
     private readonly Func<EvalInput, object>? _stateProjector;
     private readonly Func<string?, JudgeCostMap.ModelRate>? _rateResolver;
     private readonly string _promptHash;
+    private readonly string _rubricDigest;
     private readonly string? _reference;
 
     /// <summary>Initialises a new <see cref="DecisionEval"/>.</summary>
@@ -133,7 +134,9 @@ public sealed class DecisionEval : AtomicEval
         _stateProjector = stateProjector;
         _rateResolver = rateResolver;
         _reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
-        _promptHash = HashPrompt(instructions, trueCriteria, falseCriteria, _reference);
+        var instrumentHash = HashPrompt(instructions, trueCriteria, falseCriteria, _reference);
+        _promptHash = instrumentHash[..16];
+        _rubricDigest = "sha256:" + instrumentHash;
     }
 
     /// <summary>The yes/no question this eval asks.</summary>
@@ -223,7 +226,7 @@ public sealed class DecisionEval : AtomicEval
                 PromptHash: _promptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false),
+                CacheHit: false) { RubricDigest = _rubricDigest },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -252,7 +255,7 @@ public sealed class DecisionEval : AtomicEval
         var material = instructions + "\u001f" + (trueCriteria ?? "") + "\u001f" + (falseCriteria ?? "")
             + (reference is null ? "" : "\u001f" + reference);
         var bytes = Encoding.UTF8.GetBytes(material.Replace("\r\n", "\n", StringComparison.Ordinal));
-        return Convert.ToHexString(SHA256.HashData(bytes))[..16].ToLowerInvariant();
+        return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 }
 

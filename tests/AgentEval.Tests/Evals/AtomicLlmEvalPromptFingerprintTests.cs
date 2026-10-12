@@ -52,6 +52,8 @@ public class AtomicLlmEvalPromptFingerprintTests
 
         Assert.NotNull(provenance.PromptHash);
         Assert.Equal(16, provenance.PromptHash!.Length);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", provenance.RubricDigest!);
+        Assert.Equal(provenance.PromptHash, provenance.RubricDigest![7..23]);
     }
 
     [Fact]

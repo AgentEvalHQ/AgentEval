@@ -168,8 +168,9 @@ public static class AefCompositeRunWriter
         var runId = folder.RunId;
         var directory = folder.Directory;
         // The models that graded a leaf: a leaf whose judge gave no verdict (error, skipped) was not graded ([RUN-9]).
-        var judges = (emptyResults ? [] : trials ?? [preset]).SelectMany(Leaves).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance.JudgeModel).Where(m => !string.IsNullOrWhiteSpace(m))
-            .Distinct(StringComparer.Ordinal).Select(m => new AefJudge { Model = m!, Mode = AefJudgeMode.Single }).ToList();
+        var judges = (emptyResults ? [] : trials ?? [preset]).SelectMany(Leaves).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance).Where(p => !string.IsNullOrWhiteSpace(p.JudgeModel))
+            .Select(p => new AefJudge { Model = p.JudgeModel!, Mode = AefJudgeMode.Single, RubricDigest = p.RubricDigest })
+            .Distinct().ToList();
         var header = new AefRunHeader
         {
             RunId = runId,

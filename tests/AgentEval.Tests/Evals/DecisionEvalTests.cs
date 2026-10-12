@@ -139,6 +139,8 @@ public class DecisionEvalTests
         Assert.Equal("~typesafe/jev-latest", client.LastRequest!.Model);           // and the alias went on the wire
         Assert.NotNull(result.Provenance.PromptHash);
         Assert.Equal(16, result.Provenance.PromptHash!.Length);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", result.Provenance.RubricDigest!);
+        Assert.Equal(result.Provenance.PromptHash, result.Provenance.RubricDigest![7..23]);
         Assert.False(result.Provenance.CacheHit);
     }
 

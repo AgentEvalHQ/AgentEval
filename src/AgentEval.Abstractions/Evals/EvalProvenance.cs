@@ -12,4 +12,10 @@ public sealed record EvalProvenance(
     string? PromptHash,
     int? TokensUsed,
     double EstimatedCost,
-    bool CacheHit);
+    bool CacheHit)
+{
+    /// <summary>Full SHA-256 of the rubric/instrument, as sha256: plus 64 hex characters, when known.</summary>
+    /// <remarks>The legacy <see cref="PromptHash"/> remains a short compatibility fingerprint.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+}

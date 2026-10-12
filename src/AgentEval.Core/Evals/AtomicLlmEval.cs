@@ -165,7 +165,8 @@ public sealed class AtomicLlmEval : AtomicEval
     }
 
     // Computed on first use, after JudgeSeesToolData is initialised.
-    private string PromptHash => _promptHash ??= HashPrompt(_criteria,
+    private string PromptHash => InstrumentHash[..16];
+    private string InstrumentHash => _promptHash ??= HashPrompt(_criteria,
         JudgeSeesToolData == JudgeToolData.None
             ? _promptMaterial
             : _promptMaterial + "\u001f" + "judge-sees-tool-data:" + JudgeSeesToolData);
@@ -334,7 +335,7 @@ public sealed class AtomicLlmEval : AtomicEval
                 PromptHash: PromptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false),
+                CacheHit: false) { RubricDigest = "sha256:" + InstrumentHash },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -449,7 +450,7 @@ public sealed class AtomicLlmEval : AtomicEval
     }
 
     /// <summary>The instrument fingerprint: framing version, evaluator prompt material and the declared criteria.</summary>
-    /// <remarks>Same shape as <c>DecisionEval</c>'s: SHA-256 over unit-separated parts, first 16 hex characters.</remarks>
+    /// <remarks>Same shape as <c>DecisionEval</c>'s: SHA-256 over unit-separated parts; the legacy fingerprint takes its first 16 hex characters.</remarks>
     private static string HashPrompt(IReadOnlyList<string> criteria, string evaluatorMaterial)
     {
         var material = JudgeInputFramingVersion + "\u001f" + evaluatorMaterial + "\u001f" + string.Join("\u001e", criteria);
@@ -457,6 +458,6 @@ public sealed class AtomicLlmEval : AtomicEval
         // and the same prompt from an LF checkout (the Linux-built package) are the same instrument, and must not
         // hash apart into a comparison-blocking mismatch.
         material = material.Replace("\r\n", "\n", StringComparison.Ordinal);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))[..16].ToLowerInvariant();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant();
     }
 }

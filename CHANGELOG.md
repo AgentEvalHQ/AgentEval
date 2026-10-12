@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Judge rubric identity:** atomic LLM and decision evaluations retain a full SHA-256 rubric digest alongside
+  the unchanged short prompt fingerprint. Native composite headers preserve distinct rubrics for the same model;
+  legacy results without a full digest leave it absent. Mock placeholder provenance clears the digest.
+
 - **Agentic budget metadata:** AEF configuration records the applied, normalized budget tier (`all` when no
   filter applies), including explicit mock evidence and interrupted runs. Other benchmark families omit it.
 

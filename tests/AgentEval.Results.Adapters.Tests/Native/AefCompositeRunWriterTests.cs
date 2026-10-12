@@ -99,6 +99,29 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
     [Fact]
+    public void Write_SameModelDifferentRubrics_PreservesDistinctInstrumentsAndLegacyAbsence()
+    {
+        var first = Leaf("first", "pass", 1, "atomic-llm", "judge");
+        first = first with { Provenance = first.Provenance with { RubricDigest = "sha256:" + new string('a', 64) } };
+        var second = first with { Metric = first.Metric with { Key = "second" },
+            Provenance = first.Provenance with { RubricDigest = "sha256:" + new string('b', 64) } };
+        var legacy = Leaf("legacy", "pass", 1, "atomic-llm", "judge");
+        legacy = legacy with { Provenance = legacy.Provenance with { PromptHash = "0123456789abcdef" } };
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), first, second, legacy);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(3, judges.Count);
+        Assert.Equal(first.Provenance.RubricDigest, (string?)judges[0]!["rubricDigest"]);
+        Assert.Equal(second.Provenance.RubricDigest, (string?)judges[1]!["rubricDigest"]);
+        Assert.Null(judges[2]!["rubricDigest"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Fact]
     public void WriteAbortedEmpty_NoCompletedEvaluation_WritesNoPlannedResultsOrJudges()
     {
         var preset = Composite("preset", "error", 0, null, new EvalLineage("required-error", []),

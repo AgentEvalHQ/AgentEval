@@ -229,6 +229,11 @@ Signing and unsealed controls cannot be combined with `--no-aef`. Use `--aef <di
 at a chosen destination. `run --plan` supports signing and explicit placement too, but requires sealed evidence
 and checks identity/content flags against the saved plan as described above.
 
+Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
+decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
+`PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints
+are not promoted to full digests, and placeholder mock judges do not claim rubric identity.
+
 With content capture on, eval records dataset inputs, expected answers, actual responses and observed tool calls;
 redteam and scan benchmarks record available probe/control prompts, responses, folded transcripts and grading
 explanations; composite benchmarks record available summaries, supporting evidence and recommendations. Observed
