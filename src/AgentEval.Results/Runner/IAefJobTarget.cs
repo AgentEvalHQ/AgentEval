@@ -21,6 +21,10 @@ public interface IAefJobTarget
     long CloseSeconds { get; }
     /// <summary>The suites resolved without executing the target.</summary>
     IReadOnlyList<IAefJobSuite> Suites { get; }
+    /// <summary>The purposes to which this target can deliver credentials, such as subject or judge.</summary>
+    IReadOnlyCollection<string> CredentialPurposes { get; }
+    /// <summary>Installs purpose-scoped credentials without network calls or process environment changes.</summary>
+    void SetCredentials(AefJobCredentials credentials);
 }
 
 /// <summary>A resolved suite with stable identities, declared metrics and bounded cases.</summary>

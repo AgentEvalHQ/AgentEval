@@ -23,15 +23,27 @@ public static class AefJobRunner
     /// <summary>Accepts or refuses a plan, then executes its suites sequentially and writes sealed evidence and events.</summary>
     public static async Task<AefJobResult> RunAsync(byte[] plan, JsonObject runner, IAefJobTarget target, string output, AefJobOptions options, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(plan);
-        ArgumentNullException.ThrowIfNull(runner);
-        ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(output);
-        ArgumentNullException.ThrowIfNull(options);
         if (File.Exists(output) || (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any()))
         {
             throw new ArgumentException($"{output} is a file or a folder that is not empty: a job writes into a new or empty folder.", nameof(output));
         }
+
+        var job = CreateJob(plan, runner, target, options);
+        Directory.CreateDirectory(output);
+        return await job.RunAsync(output, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Uses execution's validation, acceptance and estimate rules without calls, events or filesystem writes.</summary>
+    public static AefJobAnalysis Analyze(byte[] plan, JsonObject runner, IAefJobTarget target, AefJobOptions options) =>
+        CreateJob(plan, runner, target, options).Analyze();
+
+    private static Job CreateJob(byte[] plan, JsonObject runner, IAefJobTarget target, AefJobOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(options);
 
         if (AefSchemas.Reader.Validate("runner", runner) is { } manifestProblem)
         {
@@ -44,9 +56,7 @@ public static class AefJobRunner
             || c.SecondsBound < 0 || (target.TargetMode != AefTargetMode.Scripted && c.SecondsBound > 4_294_967)))
             throw new ArgumentException("Target cost bounds must be finite and nonnegative; live time bounds must fit a cancellation timer.", nameof(target));
         CheckClock(target, options.At);
-        var job = new Job(document, plan, runner, target, options);
-        Directory.CreateDirectory(output);
-        return await job.RunAsync(output, cancellationToken).ConfigureAwait(false);
+        return new Job(document, plan, runner, target, options);
     }
 
     // A plan that reads ([ENC-1]–[ENC-7], within [ENC-17]) and names a planId a job.refused can carry (PLAN-7); its other
@@ -113,6 +123,7 @@ public static class AefJobRunner
         private AefTime _clock => _jobClock.Now;
         private long _done;
         private EventWriter? _events;
+        private AefJobCredentials? _credentials;
 
         public Job(JsonObject plan, byte[] bytes, JsonObject runner, IAefJobTarget target, AefJobOptions options)
         {
@@ -134,7 +145,7 @@ public static class AefJobRunner
 
         public async Task<AefJobResult> RunAsync(string output, CancellationToken cancellationToken)
         {
-            _events = new EventWriter(Path.Combine(output, EventsFile), _jobId);
+            _events = new EventWriter(Path.Combine(output, EventsFile), _jobId, _options.Progress);
             var (refusal, suites) = Decide();
             if (refusal is not null)
             {
@@ -145,13 +156,18 @@ public static class AefJobRunner
                 return new AefJobResult(_jobId, _events.Count, "job.refused", null, refusal, [], _clock);
             }
 
-            _events.Emit("job.accepted", _clock, new JsonObject { ["planId"] = AefNode.String(_plan["planId"]), ["planDigest"] = _planDigest, ["runnerId"] = _runnerId });
-            Estimate(suites);
-
             string? limit = null, why = null;
             OpenRun? activeRun = null;
             try
             {
+                _events.Emit("job.accepted", _clock, new JsonObject { ["planId"] = AefNode.String(_plan["planId"]), ["planDigest"] = _planDigest, ["runnerId"] = _runnerId });
+                if (_target.TargetMode != AefTargetMode.Scripted) _target.SetCredentials(_credentials!);
+                var estimate = Estimate(suites);
+                _events.Emit("plan.estimated", _clock, new JsonObject
+                {
+                    ["cases"] = estimate.Cases, ["usdLow"] = estimate.UsdLow,
+                    ["usdHigh"] = estimate.UsdHigh, ["priceTable"] = estimate.PriceTable,
+                });
                 cancellationToken.ThrowIfCancellationRequested();
                 for (var k = 0; k < suites.Count && why is null; k++)
                 {
@@ -196,6 +212,12 @@ public static class AefJobRunner
             failure["runs"] = runs;
             _events.Emit("job.failed", _clock, failure);
             return new AefJobResult(_jobId, _events.Count, "job.failed", limit, why, [.. _sealed], _clock);
+        }
+
+        public AefJobAnalysis Analyze()
+        {
+            var (reason, suites) = Decide();
+            return new AefJobAnalysis(reason is null, reason, reason is null ? Estimate(suites) : null);
         }
 
         private AefJobResult FailIo(OpenRun? run)
@@ -266,36 +288,43 @@ public static class AefJobRunner
             // [PLAN-3]: every credential, whatever the target needs, before job.accepted. A value goes to the process its
             // purpose names; the scripted target, in this process, takes none, so it is dropped here, and never written.
             var i = 0;
+            var values = new Dictionary<string, string>(StringComparer.Ordinal);
+            var purposes = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
             foreach (var credential in AefNode.Objects(_plan["credentialRefs"]))
             {
                 i++;
                 var name = AefNode.String(credential["name"]) ?? "";
                 var scheme = AefNode.String(credential["scheme"]);
-                var set = scheme == "env" && AefNode.String(credential["path"]) is { } variable && !string.IsNullOrEmpty(_options.Environment(variable));
-                if (!set)
+                var value = scheme == "env" && AefNode.String(credential["path"]) is { } variable ? _options.Environment(variable) : null;
+                if (string.IsNullOrEmpty(value))
                 {
                     return (scheme == "env"
                         ? $"credential {i} ({name}) cannot be resolved: the variable it names is not set, or empty, where the runner runs ([PLAN-3])"
                         : $"credential {i} ({name}) is kept in a {scheme} this runner cannot reach ([PLAN-3])", []);
                 }
+                if (_target.TargetMode == AefTargetMode.Scripted) continue;
+                var purpose = AefNode.String(credential["purpose"])!;
+                if (!_target.CredentialPurposes.Contains(purpose, StringComparer.Ordinal))
+                    return ($"credential {i} ({name}) names a purpose this target cannot receive ([PLAN-3])", []);
+                if (values.TryGetValue(name, out var existing) && !string.Equals(existing, value, StringComparison.Ordinal))
+                    return ($"credential {i} ({name}) conflicts with another value assigned to the same name ([PLAN-3])", []);
+                values[name] = value;
+                if (!purposes.TryGetValue(purpose, out var overlay)) purposes[purpose] = overlay = new(StringComparer.Ordinal);
+                overlay[name] = value;
             }
 
+            _credentials = new AefJobCredentials(purposes);
             return (null, resolved);
         }
 
         // plan.estimated: the cases of the plan's suites, at most its cases limit, and the sums of the usd and usdBound of
         // the cases it counts (the first ones, in run order), each computed exactly and rounded once (§9.2.1, [SUM-5]).
-        private void Estimate(List<(JsonObject Plan, IAefJobSuite Target)> suites)
+        private AefJobEstimate Estimate(List<(JsonObject Plan, IAefJobSuite Target)> suites)
         {
             var planned = suites.SelectMany(s => s.Target.Cases).ToList();
             var counted = CasesLimit is { } limit && limit < planned.Count ? planned.Take((int)limit).ToList() : planned;
-            _events!.Emit("plan.estimated", _clock, new JsonObject
-            {
-                ["cases"] = (long)counted.Count,
-                ["usdLow"] = AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdLow)),
-                ["usdHigh"] = AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdBound)),
-                ["priceTable"] = _target.PriceTable,
-            });
+            return new AefJobEstimate(counted.Count, AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdLow)),
+                AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdBound)), _target.PriceTable);
         }
 
         // [PLAN-9]: the first limit, in [PLAN-2]'s order, the case could pass, and why; or none. open is the run the case
@@ -519,8 +548,9 @@ public static class AefJobRunner
     /// The job's event stream ([STRM-1], §6.4): each event numbered from 1, with the job's id, checked against the writer
     /// runner-event schema ([VER-2]) and appended to the file as one NDJSON line ([ENC-5]).
     /// </summary>
-    private sealed class EventWriter(string path, string jobId)
+    private sealed class EventWriter(string path, string jobId, Stream? progress)
     {
+        private Stream? _progress = progress;
         public int Count { get; private set; }
 
         public void Emit(string kind, AefTime at, JsonObject members)
@@ -544,12 +574,25 @@ public static class AefJobRunner
                 throw new InvalidOperationException($"The {kind} event would not be valid against the writer runner-event schema ([VER-2]): {problem}");
             }
 
+            var line = AefJsonWriter.Line(e);
             using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
             {
-                stream.Write(AefJsonWriter.Line(e));
+                stream.Write(line);
             }
 
             Count++;
+            try
+            {
+                _progress?.Write(line);
+                _progress?.Flush();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The persisted event already has its sequence number. Disable a broken mirror so a terminal
+                // failure can still be appended to the authoritative stream without duplicating that number.
+                _progress = null;
+                throw;
+            }
         }
     }
 }

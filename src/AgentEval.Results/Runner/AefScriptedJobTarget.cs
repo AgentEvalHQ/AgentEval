@@ -13,6 +13,9 @@ internal sealed class AefScriptedJobTarget(AefScriptedTarget target) : IAefJobTa
     public string PriceTable => target.PriceTable;
     public string Fingerprint => target.Fingerprint;
     public long CloseSeconds => target.CloseSeconds;
+    public IReadOnlyCollection<string> CredentialPurposes => [];
+    // Scripted conformance resolves every credential but deliberately delivers none (§9.2.1).
+    public void SetCredentials(AefJobCredentials credentials) { }
     public IReadOnlyList<IAefJobSuite> Suites { get; } = target.Suites.Select(s => (IAefJobSuite)new Suite(s)).ToArray();
 
     private sealed class Suite(AefScriptedSuite suite) : IAefJobSuite

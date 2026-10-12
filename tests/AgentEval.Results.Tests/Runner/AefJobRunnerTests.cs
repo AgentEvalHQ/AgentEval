@@ -18,6 +18,130 @@ public sealed class AefJobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_DeliversCredentialsByPurposeWithoutChangingEnvironmentOrWritingSecrets()
+    {
+        const string subjectName = "S1_UNIT_SUBJECT_KEY";
+        var before = Environment.GetEnvironmentVariable(subjectName);
+        var plan = JsonNode.Parse(Plan())!;
+        plan["credentialRefs"] = new JsonArray(
+            Credential(subjectName, "SUBJECT_SECRET_PATH", "subject"),
+            Credential("S1_UNIT_JUDGE_KEY", "JUDGE_SECRET_PATH", "judge"));
+        var bytes = Encoding.UTF8.GetBytes(plan.ToJsonString());
+        var target = new Target(new Case(_ => ValueTask.FromResult(Passed())));
+        var options = new AefJobOptions { At = Start, Environment = path => path == "SUBJECT_SECRET_PATH" ? "secret-subject-value" : "secret-judge-value" };
+        Assert.True(AefJobRunner.Analyze(bytes, Manifest(), target, options).Accepted);
+        Assert.Null(target.Credentials);
+        Assert.False(Directory.Exists(_output));
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, _output, options);
+        Assert.Equal("job.sealed", result.Terminal);
+        Assert.Equal("secret-subject-value", Assert.Single(target.Credentials!.ForPurpose("subject")).Value);
+        Assert.Equal("secret-judge-value", Assert.Single(target.Credentials.ForPurpose("judge")).Value);
+        Assert.Empty(target.Credentials.ForPurpose("attacker"));
+        Assert.Equal(before, Environment.GetEnvironmentVariable(subjectName));
+        var evidence = string.Concat(Directory.GetFiles(_output, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("secret-subject-value", evidence);
+        Assert.DoesNotContain("secret-judge-value", evidence);
+        Assert.DoesNotContain("SECRET_PATH", evidence);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Analyze_ConflictingNameOrUnsupportedPurpose_RefusesBeforeCredentialDelivery(bool unsupported)
+    {
+        var plan = JsonNode.Parse(Plan())!;
+        plan["credentialRefs"] = unsupported
+            ? new JsonArray(Credential("API_KEY", "SECRET_FIRST_PATH", "attacker"))
+            : new JsonArray(Credential("API_KEY", "SECRET_FIRST_PATH", "subject"), Credential("API_KEY", "SECRET_SECOND_PATH", "judge"));
+        var bytes = Encoding.UTF8.GetBytes(plan.ToJsonString());
+        var target = new Target(new Case(_ => throw new InvalidOperationException("must not execute")));
+        var options = new AefJobOptions { At = Start, Environment = path => path == "SECRET_FIRST_PATH" ? "secret-first" : "secret-second" };
+        var analysis = AefJobRunner.Analyze(bytes, Manifest(), target, options);
+        Assert.False(analysis.Accepted);
+        Assert.Contains(unsupported ? "cannot receive" : "conflicts", analysis.Reason);
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, _output, options);
+        Assert.Equal("job.refused", result.Terminal);
+        Assert.Equal(analysis.Reason, result.Reason);
+        Assert.Null(target.Credentials);
+        var evidence = File.ReadAllText(Path.Combine(_output, "events.ndjson"));
+        Assert.DoesNotContain("secret-", evidence);
+        Assert.DoesNotContain("SECRET_", evidence);
+        Assert.Single(Events());
+    }
+
+    private static JsonObject Credential(string name, string path, string purpose) => new()
+    {
+        ["name"] = name, ["scheme"] = "env", ["path"] = path, ["purpose"] = purpose,
+    };
+
+    [Fact]
+    public async Task Analyze_DoesNotExecuteOrWrite_AndMatchesExecutionEstimateAndProgress()
+    {
+        var calls = 0;
+        var target = new Target(new Case(_ =>
+        {
+            calls++;
+            return ValueTask.FromResult(Passed());
+        }));
+        using var progress = new MemoryStream();
+        var options = new AefJobOptions { At = Start, Progress = progress };
+        var analysis = AefJobRunner.Analyze(Plan(), Manifest(), target, options);
+        Assert.True(analysis.Accepted);
+        Assert.Null(analysis.Reason);
+        Assert.Equal(0, calls);
+        Assert.Equal(0, progress.Length);
+        Assert.False(Directory.Exists(_output));
+
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), target, _output, options);
+        Assert.Equal("job.sealed", result.Terminal);
+        Assert.Equal(1, calls);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(_output, "events.ndjson")), progress.ToArray());
+        Assert.True(progress.CanWrite);
+        var estimate = Assert.Single(Events(), e => (string?)e["kind"] == "plan.estimated");
+        Assert.Equal(analysis.Estimate!.Cases, (long)estimate["cases"]!);
+        Assert.Equal(analysis.Estimate.UsdLow, (double)estimate["usdLow"]!);
+        Assert.Equal(analysis.Estimate.UsdHigh, (double)estimate["usdHigh"]!);
+        Assert.Equal(analysis.Estimate.PriceTable, (string?)estimate["priceTable"]);
+    }
+
+    [Fact]
+    public async Task Analyze_UnresolvedCredential_MatchesRefusalWithoutExposingPath()
+    {
+        var plan = JsonNode.Parse(Plan())!;
+        plan["credentialRefs"] = new JsonArray(new JsonObject
+        {
+            ["name"] = "API_KEY", ["scheme"] = "env", ["path"] = "SECRET_VARIABLE_PATH", ["purpose"] = "subject",
+        });
+        var bytes = Encoding.UTF8.GetBytes(plan.ToJsonString());
+        var target = new Target(new Case(_ => throw new InvalidOperationException("must not execute")));
+        using var progress = new MemoryStream();
+        var options = new AefJobOptions { At = Start, Environment = _ => null, Progress = progress };
+        var analysis = AefJobRunner.Analyze(bytes, Manifest(), target, options);
+        Assert.False(analysis.Accepted);
+        Assert.Null(analysis.Estimate);
+        Assert.DoesNotContain("SECRET_VARIABLE_PATH", analysis.Reason);
+        Assert.Equal(0, progress.Length);
+        Assert.False(Directory.Exists(_output));
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, _output, options);
+        Assert.Equal("job.refused", result.Terminal);
+        Assert.Equal(analysis.Reason, result.Reason);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(_output, "events.ndjson")), progress.ToArray());
+    }
+
+    [Fact]
+    public async Task RunAsync_ProgressWriteFails_PersistsFailureWithUniqueEventSequence()
+    {
+        using var progress = new FailingProgress();
+        var target = new Target(new Case(_ => throw new InvalidOperationException("must not execute")));
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), target, _output,
+            new AefJobOptions { At = Start, Progress = progress });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Null(result.Limit);
+        Assert.Equal(new long[] { 1, 2 }, Events().Select(e => (long)e["seq"]!));
+        AssertStream();
+    }
+
+    [Fact]
     public void ElapsedClock_AdvancesMonotonicallyAcrossFractionalSecondBoundary()
     {
         var provider = new ManualTime();
@@ -168,6 +292,9 @@ public sealed class AefJobRunnerTests : IDisposable
 
     private sealed class Target(IAefJobCase testCase) : IAefJobTarget
     {
+        public AefJobCredentials? Credentials { get; private set; }
+        public IReadOnlyCollection<string> CredentialPurposes => ["subject", "judge"];
+        public void SetCredentials(AefJobCredentials credentials) => Credentials = credentials;
         public AefTargetMode TargetMode => AefTargetMode.Live;
         public string Isolation => "process";
         public string PriceTable => "unit-prices";
@@ -192,5 +319,10 @@ public sealed class AefJobRunnerTests : IDisposable
         public long Timestamp { get; set; }
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
         public override long GetTimestamp() => Timestamp;
+    }
+
+    private sealed class FailingProgress : MemoryStream
+    {
+        public override void Write(ReadOnlySpan<byte> buffer) => throw new IOException("secret output path");
     }
 }

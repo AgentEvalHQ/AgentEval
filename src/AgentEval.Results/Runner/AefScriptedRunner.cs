@@ -35,6 +35,9 @@ public sealed class AefJobOptions
 
     /// <summary>The execution clock; defaults to simulated time for scripted targets and monotonic elapsed time otherwise.</summary>
     public IAefJobClock? Clock { get; init; }
+
+    /// <summary>Optional progress destination. Receives the exact persisted NDJSON event bytes; remains caller-owned.</summary>
+    public Stream? Progress { get; init; }
 }
 
 /// <summary>What a job wrote (<see cref="AefScriptedRunner.Run"/>).</summary>
