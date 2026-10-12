@@ -168,6 +168,9 @@ public static class BenchNistCommand
 
         Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running NIST AI RMF benchmark ({preset}) for subject '{subject}'...");
 
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
+            storeRunId is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -182,7 +185,7 @@ public static class BenchNistCommand
         {
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, abortReason: "cancelled"))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -236,6 +239,7 @@ public static class BenchNistCommand
                         ParentInvocationId: null,
                         Kind: "benchmark"));
                 runId = manifest.Run.RunId;
+                storeRunId = runId;
 
                 var scenarioResult = EvalResultPersistence.ToScenarioResult(
                     compositeEval,
@@ -318,7 +322,7 @@ public static class BenchNistCommand
             // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, storeV1: StoreLink()))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -343,7 +347,7 @@ public static class BenchNistCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled"))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

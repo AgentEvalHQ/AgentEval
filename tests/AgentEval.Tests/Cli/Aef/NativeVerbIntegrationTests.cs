@@ -523,9 +523,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(bool mitre)
+    [InlineData("owasp")]
+    [InlineData("mitre")]
+    [InlineData("nist")]
+    public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(string family)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
         await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test");
@@ -536,12 +537,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
         var aef = new DirectoryInfo(Path.Combine(_root, "bench-aef"));
 
-        async Task<int> Run(DirectoryInfo destination, bool noAef) => mitre
-            ? (await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true)).ExitCode
-            : (await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true)).ExitCode;
+        async Task<int> Run(DirectoryInfo destination, bool noAef) => (family switch
+        {
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+            "nist" => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+            _ => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+        }).ExitCode;
         var written = await Run(aef, false);
+        AssertStoreLink(RunDirectory(aef.FullName));
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
         var notWritten = new DirectoryInfo(Path.Combine(_root, "disabled-aef"));
@@ -556,7 +562,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
         Assert.Equal(written, (int)gate["exitCode"]!);
-        AssertArtifactBytes(dir, reportBytes);
+        if (family != "nist") AssertArtifactBytes(dir, reportBytes);
         (agent as IDisposable)?.Dispose();
     }
 
@@ -702,6 +708,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.True(cancel.IsCancellationRequested);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));

@@ -302,7 +302,7 @@ TypedMemEval exposes the same progress method and retains typed outcomes on inte
 the aggregate score and gate; a missing typed vector never substitutes the compatibility accuracy field. Returned
 full results remain available after persistence or report failure.
 
-Perf, memory, LongMemEval, TypedMemEval and both trace-fidelity commands record an existing store manifest's ID
+Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
 in `run.json` under `ext.agenteval.store-v1.runId`. The AEF run keeps its own identity. No directory path is stored;
 an interrupted run may link an incomplete manifest, while a run stopped before manifest creation has no link.
 Native adapter options also support ordered `trialRunIds` for hosts persisting repeated trials.

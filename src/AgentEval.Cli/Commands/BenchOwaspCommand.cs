@@ -188,6 +188,9 @@ public static class BenchOwaspCommand
 
         Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running OWASP benchmark ({preset}) for subject '{subject}'...");
 
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
+            storeRunId is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -208,7 +211,7 @@ public static class BenchOwaspCommand
         {
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, abortReason: "cancelled"))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -262,6 +265,7 @@ public static class BenchOwaspCommand
                         ParentInvocationId: null,
                         Kind: "benchmark"));
                 runId = manifest.Run.RunId;
+                storeRunId = runId;
 
                 // Write the 10-leaf composite as the run's "scenario result" — the
                 // recursive tree is preserved as JSON inside ScenarioResult.Output, so
@@ -355,7 +359,7 @@ public static class BenchOwaspCommand
             // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, complianceArtifacts: complianceArtifacts))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, storeV1: StoreLink(), complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -380,7 +384,7 @@ public static class BenchOwaspCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled", complianceArtifacts: complianceArtifacts))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled", complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
