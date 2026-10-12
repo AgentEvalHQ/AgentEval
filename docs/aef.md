@@ -232,7 +232,10 @@ and checks identity/content flags against the saved plan as described above.
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
 `PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints
-are not promoted to full digests, and placeholder mock judges do not claim rubric identity.
+are not promoted to full digests, and placeholder mock judges do not claim rubric identity. Individual measured LLM
+and decision-model leaves also carry the model and rubric digest in their annotator. Decision-model leaves
+use the `LLM` annotator kind; code checks remain `CODE`. Rubric identity is available with content capture off;
+judge reasoning is attached only with capture on.
 
 With content capture on, eval records dataset inputs, expected answers, actual responses and observed tool calls;
 redteam and scan benchmarks record available probe/control prompts, responses, folded transcripts and grading

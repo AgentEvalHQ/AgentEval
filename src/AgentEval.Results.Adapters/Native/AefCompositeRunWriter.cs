@@ -370,7 +370,8 @@ public static class AefCompositeRunWriter
         }
 
         AefSeverity? severity = state is AefState.Failed or AefState.Warn && AefNames.TryParse<AefSeverity>(node.Score.Severity, out var s) ? s : null;
-        var llm = node.Provenance.Type == "atomic-llm" && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel);
+        var llm = node.Provenance.Type is "atomic-llm" or "atomic-decision"
+            && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel);
         var line = new AefResult
         {
             Evidence = artifactEvidence,
@@ -390,7 +391,12 @@ public static class AefCompositeRunWriter
                     ? [new AefScore { Metric = ScoreMetric, Value = node.Score.Value }, new AefScore { Metric = PresetScoreMetric, Value = node.Score.Value }]
                     : [new AefScore { Metric = ScoreMetric, Value = node.Score.Value }]
                 : null,
-            Annotator = subs.Count > 0 || !measured || trials is not null ? null : new AefAnnotator { Kind = llm ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code, Model = llm ? node.Provenance.JudgeModel : null },
+            Annotator = subs.Count > 0 || !measured || trials is not null ? null : new AefAnnotator
+            {
+                Kind = llm ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code,
+                Model = llm ? node.Provenance.JudgeModel : null,
+                RubricDigest = llm ? node.Provenance.RubricDigest : null,
+            },
             Aggregation = aggregation,
             Component = component,
             Ext = component is not null && shape.OnFailure != "Averaged"

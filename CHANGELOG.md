@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Decision-judge evidence:** native composite leaf results identify decision models as model judges rather
+  than code checks, and carry known rubric digests beside the model. Judge reasoning remains capture-on only;
+  code checks, aggregates and unmeasured results do not gain model annotations.
+
 - **Judge rubric identity:** atomic LLM and decision evaluations retain a full SHA-256 rubric digest alongside
   the unchanged short prompt fingerprint. Native composite headers preserve distinct rubrics for the same model;
   legacy results without a full digest leave it absent. Mock placeholder provenance clears the digest.

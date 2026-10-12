@@ -98,6 +98,40 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
+    [Theory]
+    [InlineData("atomic-llm", false)]
+    [InlineData("atomic-llm", true)]
+    [InlineData("atomic-decision", false)]
+    [InlineData("atomic-decision", true)]
+    [InlineData("atomic-code", false)]
+    [InlineData("atomic-code", true)]
+    public void Write_LeafAnnotator_PreservesModelRubricAndContentPolicy(string type, bool capture)
+    {
+        var leaf = Leaf("case", "pass", 1, type, type == "atomic-code" ? null : "judge");
+        var digest = "sha256:" + new string('c', 64);
+        leaf = leaf with { Provenance = leaf.Provenance with { RubricDigest = digest } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, leaf, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+                ContentCapture = capture ? AefContentCapture.On : AefContentCapture.Off,
+            }, Start, Start.AddSeconds(1));
+        var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
+        var modelJudged = type != "atomic-code";
+        Assert.Equal(modelJudged ? "LLM" : "CODE", (string?)line["annotator"]!["kind"]);
+        Assert.Equal(modelJudged ? "judge" : null, (string?)line["annotator"]!["model"]);
+        Assert.Equal(modelJudged ? digest : null, (string?)line["annotator"]!["rubricDigest"]);
+        Assert.Null(line["annotator"]!["promptHash"]);
+        Assert.Equal(capture && modelJudged, line["reasoning"] is not null);
+        if (!capture) Assert.DoesNotContain("secret", File.ReadAllText(Path.Combine(dir, "results.ndjson")));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void Write_SameModelDifferentRubrics_PreservesDistinctInstrumentsAndLegacyAbsence()
     {
