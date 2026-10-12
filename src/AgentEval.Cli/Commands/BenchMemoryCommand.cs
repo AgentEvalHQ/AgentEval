@@ -128,6 +128,8 @@ public static class BenchMemoryCommand
         var startedAt = DateTimeOffset.UtcNow;
         string Verdict(MemoryBenchmarkResult value) => !value.IsComplete ? "INCOMPLETE"
             : value.OverallScore >= 70 ? "PASS" : value.OverallScore >= 50 ? "WARN" : "FAIL";
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null)
         {
             if (noAef) return false;
@@ -138,13 +140,13 @@ public static class BenchMemoryCommand
             });
             if (observed is null)
                 return BenchAef.WriteResult(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode,
-                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true);
+                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true, storeV1: StoreLink());
             var verdict = result is null ? "INCOMPLETE" : Verdict(observed);
             var (tree, shape) = BenchAef.MemoryTree(observed, preset, verdict, model);
             return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
                 startedAt, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
-                abortReason: reason);
+                abortReason: reason, storeV1: StoreLink());
         }
         try
         {
@@ -174,6 +176,7 @@ public static class BenchMemoryCommand
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             var runId = manifest.Run.RunId;
+            storeRunId = runId;
 
             // Align with canonical MemoryBenchmarkResult.Passed semantics
             // (src/AgentEval.Memory/Models/MemoryBenchmarkResult.cs:75 — Passed => OverallScore >= 70).

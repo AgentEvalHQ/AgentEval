@@ -24,6 +24,8 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Related store-v1 run identities, if persistence created any.</summary>
+    public AefStoreV1Link? StoreV1 { get; init; }
     /// <summary>Whether to persist evaluation details as evidence blobs; off by default.</summary>
     public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
     /// <summary>Exact compliance reports linked to their observed root cases.</summary>
@@ -151,6 +153,7 @@ public static class AefCompositeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        var storeExtension = options.StoreV1?.ToExtension();
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "bench");
         var runId = folder.RunId;
         var directory = folder.Directory;
@@ -174,6 +177,7 @@ public static class AefCompositeRunWriter
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
             ContentCapture = options.ContentCapture,
             Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
+            Ext = storeExtension,
         };
 
         var writer = AefRunWriter.Create(directory, header);

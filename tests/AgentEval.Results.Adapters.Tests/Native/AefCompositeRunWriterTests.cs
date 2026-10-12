@@ -18,6 +18,38 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Write_StoreV1Links_PreservesAggregateAndOrderedTrialIds()
+    {
+        var (dir, _) = AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+                StoreV1 = new() { RunId = "aggregate-1", TrialRunIds = ["trial-1", "trial-2"] },
+            }, Start, Start.AddSeconds(1));
+        var header = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
+        var link = header["ext"]!["agenteval.store-v1"]!;
+        Assert.Equal("aggregate-1", (string?)link["runId"]);
+        Assert.Equal(new[] { "trial-1", "trial-2" }, link["trialRunIds"]!.AsArray().Select(n => (string)n!));
+        Assert.NotEqual("aggregate-1", (string?)header["runId"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Theory]
+    [InlineData("C:\\private\\run")]
+    [InlineData("/private/run")]
+    [InlineData("../run")]
+    public void Write_StoreV1Path_RejectsBeforeWriting(string identity)
+    {
+        Assert.Throws<ArgumentException>(() => AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+                StoreV1 = new() { RunId = identity },
+            }, Start, Start.AddSeconds(1)));
+        Assert.False(Directory.Exists(_out));
+    }
+
     private static EvalResult Leaf(string key, string label, double value, string type = "atomic-code", string? judge = null, string severity = "none") => new(
         new(key, key, "test", "1.0.0"),
         new EvalScore(value, null, label, label == "pass", null, label == "pass" ? "none" : severity, null),

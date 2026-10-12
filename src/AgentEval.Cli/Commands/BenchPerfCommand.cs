@@ -177,12 +177,14 @@ public static class BenchPerfCommand
 
         EvalResult? result = null;
         var startedAt = DateTimeOffset.UtcNow;
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "perf", preset, subject, subjectVersion,
             agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, emptyResults: result is null);
+            abortReason: reason, emptyResults: result is null, storeV1: StoreLink());
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);
@@ -207,6 +209,7 @@ public static class BenchPerfCommand
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             var runId = manifest.Run.RunId;
+            storeRunId = runId;
 
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 result,

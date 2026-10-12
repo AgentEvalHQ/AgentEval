@@ -24,13 +24,14 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
             {
+                StoreV1 = storeV1,
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
                 ContentCapture = AefCliOptions.ContentCapture,
@@ -67,9 +68,9 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
-        string? abortReason = null, bool emptyResults = false) =>
+        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -86,8 +87,8 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -96,8 +97,8 @@ internal static class BenchAef
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
-        string? abortReason = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason);
+        string? abortReason = null, AefStoreV1Link? storeV1 = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1);
 
     /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
     internal static AefCommandGate Gate(string label, int exitCode) => new()
@@ -190,13 +191,14 @@ internal static class BenchAef
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
             var options = new AefCompositeRunOptions
             {
+                StoreV1 = storeV1,
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
                 ContentCapture = AefCliOptions.ContentCapture,

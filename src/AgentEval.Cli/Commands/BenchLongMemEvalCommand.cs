@@ -170,6 +170,8 @@ public static class BenchLongMemEvalCommand
         ExternalBenchmarkResult? result = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null, int? exitCode = null)
         {
             if (noAef) return false;
@@ -184,7 +186,7 @@ public static class BenchLongMemEvalCommand
                 BenchAef.QuestionTree(observed, "longmemeval", preset,
                     result is null ? "INCONCLUSIVE" : LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
                     chatClientOverride is null ? deployment : null), startedAt, DateTimeOffset.UtcNow,
-                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0);
+                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0, storeV1: StoreLink());
         }
         try
         {
@@ -221,6 +223,7 @@ public static class BenchLongMemEvalCommand
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             runId = manifest.Run.RunId;
+            storeRunId = runId;
 
             // Shape B / Convention 3 (ADR-017): LongMemEval's native ExternalBenchmarkResult
             // is "N questions → accuracy", which doesn't fit the per-scenario EvalResult shape.

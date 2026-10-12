@@ -301,6 +301,11 @@ hosts needing completed-question observations can use `RunWithProgressAsync`.
 TypedMemEval exposes the same progress method and retains typed outcomes on interruption. Partial runs withhold
 the aggregate score and gate; a missing typed vector never substitutes the compatibility accuracy field. Returned
 full results remain available after persistence or report failure.
+
+Perf, memory, LongMemEval, TypedMemEval and both trace-fidelity commands record an existing store manifest's ID
+in `run.json` under `ext.agenteval.store-v1.runId`. The AEF run keeps its own identity. No directory path is stored;
+an interrupted run may link an incomplete manifest, while a run stopped before manifest creation has no link.
+Native adapter options also support ordered `trialRunIds` for hosts persisting repeated trials.
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
 nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
 started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path

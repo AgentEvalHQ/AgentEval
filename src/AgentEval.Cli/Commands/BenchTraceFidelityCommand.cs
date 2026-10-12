@@ -83,11 +83,13 @@ public static class BenchTraceFidelityCommand
         var result = new TraceFidelityRunner(ParsePreset(preset)).ReconcileToEvalResult(agentTrace, chatTrace);
 
         // ── Persist via the canonical output store (manifest + native report) ──
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
             subjectKind: "agent", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason);
+            abortReason: reason, storeV1: StoreLink());
         try
         {
             var store = new FileSystemOutputStore(agentEvalDir);
@@ -108,6 +110,7 @@ public static class BenchTraceFidelityCommand
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             var runId = manifest.Run.RunId;
+            storeRunId = runId;
 
             var subResults = result.Details.SubResults ?? (IReadOnlyList<EvalResult>)Array.Empty<EvalResult>();
             // The root's verdict and the label's exit code, as every other bench command (B10w): a warn (0.80-0.99) read

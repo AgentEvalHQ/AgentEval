@@ -190,6 +190,8 @@ public static class BenchTypedMemEvalCommand
         ExternalBenchmarkResult? result = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null)
         {
             if (noAef) return false;
@@ -201,7 +203,7 @@ public static class BenchTypedMemEvalCommand
             return BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", verticalName, subject!, subjectVersion,
                 chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
-                emptyResults: result is null && completed.Count == 0);
+                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink());
         }
         try
         {
@@ -262,6 +264,7 @@ public static class BenchTypedMemEvalCommand
                     ParentInvocationId: null,
                     Kind: "benchmark"));
             runId = manifest.Run.RunId;
+            storeRunId = runId;
 
             // Shape B / Convention 3 (ADR-017): the native result is "N questions → a typed outcome
             // vector", which doesn't fit the per-scenario EvalResult shape. Skip per-scenario writes

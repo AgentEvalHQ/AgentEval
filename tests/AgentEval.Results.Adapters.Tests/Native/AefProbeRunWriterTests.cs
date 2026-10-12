@@ -17,6 +17,20 @@ public sealed class AefProbeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Write_InterruptedTrialStoreLinks_PreservesOnlyRecordedIdentities()
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out, [], new AefProbeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, SuiteRef = "bench:test",
+            AbortReason = "cancelled", StoreV1 = new() { TrialRunIds = ["trial-1"] },
+        }, Start, Start.AddSeconds(1));
+        var link = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["ext"]!["agenteval.store-v1"]!;
+        Assert.Null(link["runId"]);
+        Assert.Equal("trial-1", (string?)link["trialRunIds"]![0]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
     private static AefAttack Attack(bool? success) => new()
     {
         Technique = "PromptInjection",

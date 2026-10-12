@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native benchmark store links:** AEF headers can retain path-free store-v1 run and ordered trial identities.
+  Perf, memory, LongMemEval, TypedMemEval and both trace-fidelity commands now link manifests that were actually
+  created, including interrupted persistence. Runs stopped before manifest creation omit the link.
+
 - **TypedMemEval interruption evidence:** completed typed question outcomes survive cancellation or later failure.
   Partial evidence withholds the benchmark aggregate and command gate; missing typed vectors never fall back to
   compatibility accuracy. The existing runner API remains available beside a synchronous progress method.

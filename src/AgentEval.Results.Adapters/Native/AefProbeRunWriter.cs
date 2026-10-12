@@ -48,6 +48,8 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Related store-v1 benchmark run identities, if persistence created any.</summary>
+    public AefStoreV1Link? StoreV1 { get; init; }
     /// <summary>Whether to persist observed content as evidence blobs; off by default.</summary>
     public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
     /// <summary>Exact compliance reports linked to their observed root cases.</summary>
@@ -128,6 +130,7 @@ public static class AefProbeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        var storeExtension = options.StoreV1?.ToExtension();
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "redteam");
         var runId = folder.RunId;
         var directory = folder.Directory;
@@ -137,6 +140,7 @@ public static class AefProbeRunWriter
         {
             RunId = runId,
             Producer = AefConverter.DefaultProducer,
+            Ext = storeExtension,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
             Suite = new AefSuite

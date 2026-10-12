@@ -783,6 +783,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(defaultOutput ? Path.Combine(_root, ".agenteval", "aef") : outputRoot);
         AssertIntact(dir);
+        AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson"));
@@ -897,6 +898,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
@@ -942,6 +944,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
@@ -993,6 +996,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
@@ -1001,6 +1005,19 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("scored", (string?)line["state"]);
         Assert.Equal("correct", (string?)line["ext"]!["agenteval.typedmemeval"]!["outcome"]);
         Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+    }
+
+    private void AssertStoreLink(string directory)
+    {
+        var manifests = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories);
+        var link = Document(directory, "run.json")["ext"]?["agenteval.store-v1"];
+        if (manifests.Length == 0) Assert.Null(link);
+        else
+        {
+            var manifest = JsonNode.Parse(File.ReadAllText(Assert.Single(manifests)))!;
+            Assert.Equal((string?)manifest["run"]!["runId"], (string?)link?["runId"]);
+            Assert.NotNull(link);
+        }
     }
 
     private sealed class FailOnPerfPersistenceWriter : StringWriter
