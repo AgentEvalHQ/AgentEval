@@ -60,6 +60,12 @@ public class BenchCommandTests : IDisposable
         Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        if (completed == 0)
+        {
+            Assert.Empty(lines);
+            Assert.Null(header["judges"]);
+            return;
+        }
         Assert.Contains(lines, l => (string?)l["state"] == "error");
         if (completed > 0) Assert.Contains(lines, l => (string?)l["state"] == "passed");
         Assert.DoesNotContain("secret answer", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)), StringComparison.Ordinal);

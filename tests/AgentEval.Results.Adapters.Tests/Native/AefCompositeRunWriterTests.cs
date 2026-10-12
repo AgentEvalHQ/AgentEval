@@ -35,6 +35,29 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
     [Fact]
+    public void WriteAbortedEmpty_NoCompletedEvaluation_WritesNoPlannedResultsOrJudges()
+    {
+        var preset = Composite("preset", "error", 0, null, new EvalLineage("required-error", []),
+            Leaf("planned", "pass", 1, "atomic-llm", "not-called"));
+        var (dir, _) = AefCompositeRunWriter.WriteAbortedEmpty(_out, preset, new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+            AbortReason = "cancelled",
+            ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 3, Aggregation = AefTrialAggregation.MajorityVote },
+        }, Start, Start.AddSeconds(1));
+
+        Assert.Empty(File.ReadAllBytes(Path.Combine(dir, "results.ndjson")));
+        var header = AefTestRuns.Document(dir, "run.json");
+        Assert.Equal("aborted", (string?)header["status"]);
+        Assert.Null(header["judges"]);
+        Assert.Equal(3, (int)header["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+    }
+
+    [Fact]
     public void WriteAbortedTrials_DifferentLeafBreakdowns_PreservesOnlyObservedPathsAndExactRollups()
     {
         var first = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []),

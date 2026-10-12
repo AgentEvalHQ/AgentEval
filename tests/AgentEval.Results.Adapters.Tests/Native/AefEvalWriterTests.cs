@@ -38,6 +38,69 @@ public sealed class AefEvalWriterTests : IDisposable
     };
 
     [Fact]
+    public void Session_DisposedBeforeCompletion_LeavesRunningEvidenceOnDisk()
+    {
+        string dir;
+        using (var session = AefEvalWriter.Start(_out, Options(), Start))
+        {
+            dir = session.Directory;
+            Assert.Empty(File.ReadAllBytes(Path.Combine(dir, "results.ndjson")));
+            session.Add(Summary().Results[0], "c1");
+            Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+            Assert.Equal("running", (string?)AefTestRuns.Document(dir, "run.json")["status"]);
+            Assert.False(File.Exists(Path.Combine(dir, "seal.json")));
+        }
+        Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.Equal("running", (string?)AefTestRuns.Document(dir, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "summary.json")));
+    }
+
+    [Fact]
+    public void Session_PartialTrials_AreVisibleBeforeAbortAndRollUpUnderOriginalPolicy()
+    {
+        using var session = AefEvalWriter.Start(_out, Options(), Start, plannedTrials: 3, requirePasses: 2);
+        session.Add(Summary().Results[0], "c1");
+        var before = JsonNode.Parse(File.ReadAllLines(Path.Combine(session.Directory, "results.ndjson")).Single())!;
+        Assert.Equal(0, (int)before["trial"]!);
+        var (dir, _) = session.Complete(Start.AddSeconds(5), abortReason: "cancelled");
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(2, lines.Count);
+        Assert.Equal("error", (string?)Assert.Single(lines, l => l["trials"] is not null)["state"]);
+        Assert.Equal(3, (int)AefTestRuns.Document(dir, "run.json")["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        Assert.Throws<InvalidOperationException>(() => session.Add(Summary().Results[0], "c2"));
+    }
+
+    [Fact]
+    public void Session_LateMetrics_PreserveHarnessVerdictAndTypedAbsencesWithoutContent()
+    {
+        using var session = AefEvalWriter.Start(_out, Options() with { GateRule = "all-cases-pass" }, Start);
+        session.Add(Summary().Results[0], "c1", 70);
+        session.AddMetrics("c1",
+        [
+            AgentEval.Core.MetricResult.Fail("code_quality", "secret explanation", 25),
+            AgentEval.Core.MetricResult.NotMeasured("llm_context", "secret missing context"),
+        ]);
+        var lines = File.ReadAllLines(Path.Combine(session.Directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(3, lines.Count);
+        Assert.Equal("passed", (string?)lines[0]["state"]);
+        Assert.Equal(1, (int)lines[0]["aggregation"]!["measured"]!);
+        Assert.Equal(2, (int)lines[0]["aggregation"]!["total"]!);
+        Assert.Equal(1, (int)lines[0]["aggregation"]!["unmeasured"]!["not_measured"]!);
+        Assert.Equal("case/metrics/code_quality", (string?)lines[1]["path"]);
+        Assert.Equal("failed", (string?)lines[1]["state"]);
+        Assert.Equal("not_measured", (string?)lines[2]["state"]);
+        Assert.Null(lines[2]["scores"]);
+        var (dir, _) = session.Complete(Start.AddSeconds(5));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("ship", (string?)gate["outcome"]);
+    }
+
+    [Fact]
     public void Write_GivesASealedRun_IntactUnderBothVerifiers_WithOneRootPerCase()
     {
         var (dir, runHash) = AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], Options(), Start, Start.AddSeconds(5));

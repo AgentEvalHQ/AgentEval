@@ -359,7 +359,8 @@ public static class BenchCommand
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
-                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null))
+                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults)))
                 return ExitCodes.RuntimeError;
             return 1;
         }

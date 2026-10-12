@@ -72,7 +72,7 @@ public sealed class AefRunWriter
     private const string TracesPath = "traces.otlp.jsonl";
     private const string LogsPath = "logs.otlp.jsonl";
 
-    private readonly AefRunHeader _header;
+    private AefRunHeader _header;
     private readonly bool _contentOff;
     private readonly HashSet<string> _paths = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _lines = new(StringComparer.Ordinal);
@@ -134,6 +134,21 @@ public sealed class AefRunWriter
         writer.WriteFile(MetricsPath, AefJsonWriter.Document(MetricsJson([], null)));
         writer.WriteFile(ResultsPath, []);
         return writer;
+    }
+
+    /// <summary>
+    /// Records the judges that have actually graded results so far and refreshes the running header ([RUN-9]).
+    /// A producer can discover these during execution; a closed run cannot be changed.
+    /// </summary>
+    public void SetJudges(IReadOnlyList<AefJudge>? judges)
+    {
+        EnsureRunning();
+        var updated = _header with { Judges = judges?.ToArray() };
+        CheckHeader(updated);
+        var json = updated.ToJson(AefRunStatus.Running, null, null);
+        Valid("run", json, "run.json");
+        WriteFile(RunPath, AefJsonWriter.Document(json));
+        _header = updated;
     }
 
     /// <summary>

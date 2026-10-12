@@ -80,6 +80,15 @@ public static class AefCompositeRunWriter
         DateTimeOffset startedAt, DateTimeOffset endedAt) =>
         WriteCore(runsRoot, preset, shape, options, startedAt, endedAt, null);
 
+    /// <summary>Writes an aborted run with no result lines when evaluation produced no completed node.</summary>
+    public static (string Directory, string RunHash) WriteAbortedEmpty(
+        string runsRoot, EvalResult preset, AefCompositeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.AbortReason is null) throw new ArgumentException("An empty aborted run requires an abort reason.", nameof(options));
+        return WriteCore(runsRoot, preset, Undescribed, options, startedAt, endedAt, null, emptyResults: true);
+    }
+
     /// <summary>Writes each repeated preset tree and its caller-computed majority-vote rollup, preserving trial parentage.</summary>
     public static (string Directory, string RunHash) WriteTrials(
         string runsRoot, EvalResult rollup, IReadOnlyList<EvalResult> trials, AefComponentShape shape,
@@ -113,7 +122,8 @@ public static class AefCompositeRunWriter
 
     private static (string Directory, string RunHash) WriteCore(
         string runsRoot, EvalResult preset, AefComponentShape shape, AefCompositeRunOptions options,
-        DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<EvalResult>? trials, bool abortedTrials = false)
+        DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<EvalResult>? trials, bool abortedTrials = false,
+        bool emptyResults = false)
     {
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(shape);
@@ -121,8 +131,8 @@ public static class AefCompositeRunWriter
         // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
         // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
         var single = (preset.Details.SubResults ?? []).Count == 0;
-        IReadOnlyList<EvalResult> cases = single ? [preset] : preset.Details.SubResults!;
-        IReadOnlyList<AefComponentShape> caseShapes = single ? [shape]
+        IReadOnlyList<EvalResult> cases = emptyResults ? [] : single ? [preset] : preset.Details.SubResults!;
+        IReadOnlyList<AefComponentShape> caseShapes = emptyResults ? [] : single ? [shape]
             : shape.Children.Count == 0 ? cases.Select(_ => Undescribed).ToList()
             : shape.Children;
         if (cases.Count != caseShapes.Count)
@@ -135,7 +145,7 @@ public static class AefCompositeRunWriter
         var runId = folder.RunId;
         var directory = folder.Directory;
         // The models that graded a leaf: a leaf whose judge gave no verdict (error, skipped) was not graded ([RUN-9]).
-        var judges = (trials ?? [preset]).SelectMany(Leaves).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance.JudgeModel).Where(m => !string.IsNullOrWhiteSpace(m))
+        var judges = (emptyResults ? [] : trials ?? [preset]).SelectMany(Leaves).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance.JudgeModel).Where(m => !string.IsNullOrWhiteSpace(m))
             .Distinct(StringComparer.Ordinal).Select(m => new AefJudge { Model = m!, Mode = AefJudgeMode.Single }).ToList();
         var header = new AefRunHeader
         {
@@ -157,7 +167,7 @@ public static class AefCompositeRunWriter
         };
 
         var writer = AefRunWriter.Create(directory, header);
-        var presetMeasured = IsMeasured(StateOf(preset.Score)) && double.IsFinite(preset.Score.Value);
+        var presetMeasured = !emptyResults && IsMeasured(StateOf(preset.Score)) && double.IsFinite(preset.Score.Value);
         try
         {
             writer.SetMetrics(

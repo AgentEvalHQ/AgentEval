@@ -128,6 +128,12 @@ Gates record the command's final decision: eval's golden-trace comparison, redte
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
 Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
 Cancellation during eval or redteam execution seals completed results in an `aborted` run with no final gate.
+Eval creates its running folder before evaluation and appends each completed case or stochastic trial immediately.
+For single-run eval, named `--metrics` results are added as `case/metrics/<name>` children when scoring finishes.
+Their verdicts do not change the harness's case verdict or gate; unmeasured metrics carry no score. LLM metric
+calls are recorded as judge usage, including when they use the subject's model as the evaluator.
+If the process is killed before it can close the run, the folder remains `running` and unsealed with the evidence
+already written. An interrupted GDPR, EU AI Act, or agentic benchmark with no completed evaluation has empty results.
 Redteam and the OWASP, MITRE, and NIST benchmarks also preserve their completed scan if cancellation occurs
 during subsequent persistence or report generation. `--no-aef` still suppresses this evidence.
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished

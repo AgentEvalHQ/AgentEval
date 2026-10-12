@@ -392,7 +392,11 @@ internal static class EvalCommand
         // here was both wasted work AND could THROW for a reason (no evaluator client available) that
         // --runs > 1 is supposed to just warn-and-ignore, not fail the whole run on (review).
         IReadOnlyList<IMetric>? selectedMetricInstances = null;
-        IChatClient? metricsEvaluatorClient = judgeClient ?? chatClient;
+        // Meter the fallback only in its judging role; the agent keeps its original client.
+        if (judgeLedger is null && chatClient is not null && opts.Runs <= 1
+            && selectedMetrics?.Any(name => name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
+            judgeLedger = new JudgeCallLedger(chatClient);
+        IChatClient? metricsEvaluatorClient = judgeLedger ?? chatClient;
         if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
@@ -431,9 +435,16 @@ internal static class EvalCommand
         var completed = new List<TestResult>();
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger),
+            () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
-            var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct, completed.Add);
+            var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct, result =>
+            {
+                var index = completed.Count;
+                completed.Add(result);
+                evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore);
+            });
             ct.ThrowIfCancellationRequested();
 
             // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
@@ -454,6 +465,7 @@ internal static class EvalCommand
                 {
                     var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
                     summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
+                    evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
                 }
             }
 
@@ -499,19 +511,19 @@ internal static class EvalCommand
                 ExitCode = exitCode,
                 Comparability = AefComparability.Comparable,
             };
-            var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-                (runs, aefOptions) => AefEvalWriter.Write(runs, summary, caseIds, aefOptions with { Gate = gate },
-                    startedAt, DateTimeOffset.UtcNow, testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
+            var aefFailed = evidence.Complete(gate);
             return aefFailed ? ExitCodes.RuntimeError : exitCode;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // Close independently of the cancelled token. The completed prefix remains evidence; no interrupted
             // case becomes a measured failure and no final gate is invented. Never persist exception messages.
-            WriteAef(opts, resolvedName, targetMode, judgeLedger,
-                (runs, aefOptions) => AefEvalWriter.Write(runs, new TestSummary("BatchEvaluation", completed),
-                    caseIds.Take(completed.Count).ToList(), aefOptions with { AbortReason = "cancelled" },
-                    startedAt, DateTimeOffset.UtcNow, testCases.Take(completed.Count).Select(c => c.ToTestCase().PassingScore).ToList()));
+            evidence.Complete(abortReason: "cancelled");
+            throw;
+        }
+        catch
+        {
+            evidence.Complete(abortReason: "evaluation-failed");
             throw;
         }
     }
@@ -591,60 +603,32 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    /// <summary>
-    /// Writes the run as sealed AEF evidence (S1 #5a); returns true only when an explicit <c>--aef</c> could not be
-    /// written. A write the user did not ask for fails with a warning: the evaluation's own result stands.
-    /// </summary>
-    private static bool WriteAef(
-        EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge,
-        Func<string, AefEvalRunOptions, (string Directory, string RunHash)> write)
+    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge)
     {
-        var root = EvalAef.Root(opts);
-        if (root is null)
+        var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
+        return new AefEvalRunOptions
         {
-            if (!opts.NoAef && !opts.Quiet)
-                Console.Error.WriteLine("  AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
-            return false;
-        }
-
-        try
-        {
-            var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
-            var (directory, runHash) = write(Path.Combine(root, "runs"), new AefEvalRunOptions
-            {
-                SubjectRef = subjectRef,
-                SubjectKind = AefEvalWriter.KindOf(subjectRef),
-                SubjectVersion = opts.SubjectVersion,
-                Endpoint = opts.Endpoint,
-                // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
-                JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
-                TargetMode = targetMode,
-                // Golden-trace callers supply their comparison decision after it has been computed.
-                GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
-                JudgeUsage = judge is { ReportedUsage: true }
-                    ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
-                    : null,
-                DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
-                DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
-            });
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}…)");
-            return false;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
-        {
-            if (opts.Aef is not null)
-            {
-                Console.Error.WriteLine($"  Error: the AEF run was not written: {ex.Message}");
-                return true;
-            }
-
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  Warning: the AEF run was not written: {ex.Message}");
-            return false;
-        }
+            SubjectRef = subjectRef,
+            SubjectKind = AefEvalWriter.KindOf(subjectRef),
+            SubjectVersion = opts.SubjectVersion,
+            Endpoint = opts.Endpoint,
+            // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
+            JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
+            MetricJudgeModel = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName,
+            TargetMode = targetMode,
+            // Golden-trace callers supply their comparison decision after it has been computed.
+            GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
+            JudgeUsage = judge is { ReportedUsage: true }
+                ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
+                : null,
+            DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
+            DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
+        };
     }
-
+    private static AefUsage? AefJudgeUsage(EvalOptions opts, string resolvedName, JudgeCallLedger? judge) =>
+        judge is { ReportedUsage: true }
+            ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
+            : null;
     private static string EndpointLabel(EvalOptions opts) =>
         opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure");
 
@@ -773,15 +757,18 @@ internal static class EvalCommand
         var allPassed = true;
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
-        var completed = new List<List<TestResult>>();
+        var caseIds = EvalAef.CaseIds(datasetTestCases);
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger),
+            () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
+            opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 
         try
         {
             foreach (var datasetTestCase in datasetTestCases)
             {
                 var testCase = datasetTestCase.ToTestCase();
-                var completedTrials = new List<TestResult>();
-                completed.Add(completedTrials);
+                var caseId = caseIds[results.Count];
+
 
                 if (!opts.Quiet)
                     Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
@@ -793,7 +780,7 @@ internal static class EvalCommand
                         if (progress.LastResult is not { } trial) return;
                         if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
                             ct.ThrowIfCancellationRequested();
-                        completedTrials.Add(trial);
+                        evidence.Add(trial, caseId);
                         stochasticOptions.OnProgress?.Invoke(progress);
                     },
                 }, ct);
@@ -819,10 +806,7 @@ internal static class EvalCommand
             await ExportReportAsync(opts, report, ct);
 
             // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
-            var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-                (runs, aefOptions) => AefEvalWriter.WriteTrials(
-                    runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
-                    AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));
+            var aefFailed = evidence.Complete();
 
             // Summary
             if (!opts.Quiet)
@@ -840,13 +824,12 @@ internal static class EvalCommand
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            var ids = EvalAef.CaseIds(datasetTestCases);
-            var captured = completed.Select((trials, i) => (Trials: trials, Id: ids[i])).Where(c => c.Trials.Count > 0).ToList();
-            WriteAef(opts, resolvedName, targetMode, judgeLedger,
-                (runs, aefOptions) => AefEvalWriter.WriteAbortedTrials(runs,
-                    captured.Select(c => (IReadOnlyList<TestResult>)c.Trials).ToList(), captured.Select(c => c.Id).ToList(),
-                    opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs),
-                    aefOptions with { AbortReason = "cancelled" }, startTime, DateTimeOffset.UtcNow));
+            evidence.Complete(abortReason: "cancelled");
+            throw;
+        }
+        catch
+        {
+            evidence.Complete(abortReason: "evaluation-failed");
             throw;
         }
     }

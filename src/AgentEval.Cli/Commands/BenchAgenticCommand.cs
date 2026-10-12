@@ -361,7 +361,7 @@ public static class BenchAgenticCommand
         {
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled"))
+                startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled", emptyResults: !progress.HasCompletedResults))
                 return ExitCodes.RuntimeError;
             return 1;
         }

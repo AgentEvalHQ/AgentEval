@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GDPR and EU AI Act support `--runs N`: individual trial trees and majority-vote rollups are preserved in AEF.
   Composite summaries distinguish the mean case score from the preset's aggregate score and verdict.
 - **AEF command decisions and partial evidence:** redteam and verdict-bearing benchmarks record their final gates;
+  eval writes completed cases and stochastic trials incrementally into a running folder, retaining unsealed evidence
+  if the process stops before closing. Interrupted composite benchmarks with no completed evaluations write empty results.
+  Single-run eval retains named metric children and their measured/absent states without changing the harness gate;
+  named LLM metrics record their judge and separately metered usage, including the subject-client fallback.
   eval records its golden-trace decision. Redteam and OWASP/MITRE/NIST record complete reported judge token totals.
   Cancelled eval and redteam execution seals completed evidence as aborted, without a final gate. Redteam and
   OWASP/MITRE/NIST also retain completed scans when subsequent persistence or reporting is cancelled.

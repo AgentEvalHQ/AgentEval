@@ -296,6 +296,24 @@ public class AefRunWriterTests
     }
 
     [Fact]
+    public void SetJudges_DuringRun_PreservesResultsAndSurvivesClose()
+    {
+        using var run = new WriterRun();
+        var writer = run.Create();
+        writer.AddResult(WriterRun.Leaf("k1"));
+        var results = run.Read("results.ndjson");
+
+        writer.SetJudges([new AefJudge { Model = "actual-judge", Mode = AefJudgeMode.Single }]);
+
+        Assert.Equal("running", run.Json("run.json")["status"]!.GetValue<string>());
+        Assert.Equal("actual-judge", run.Json("run.json")["judges"]![0]!["model"]!.GetValue<string>());
+        Assert.Equal(results, run.Read("results.ndjson"));
+        writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
+        Assert.Equal("actual-judge", run.Json("run.json")["judges"]![0]!["model"]!.GetValue<string>());
+        Assert.Empty(run.Problems());
+    }
+
+    [Fact]
     public void AfterClose_NothingChanges()
     {
         using var run = new WriterRun();
@@ -308,6 +326,7 @@ public class AefRunWriterTests
         Assert.Throws<InvalidOperationException>(() => writer.UpdateResult(line, WriterRun.Leaf("k1", m: 0.1)));
         Assert.Throws<InvalidOperationException>(() => writer.PutBlob("x"u8));
         Assert.Throws<InvalidOperationException>(() => writer.SetMetrics([WriterRun.Metric()]));
+        Assert.Throws<InvalidOperationException>(() => writer.SetJudges([new AefJudge { Model = "judge", Mode = AefJudgeMode.Single }]));
         Assert.Throws<InvalidOperationException>(() => writer.SetSummary(new AefSummary { Lanes = [] }));
         Assert.Throws<InvalidOperationException>(() => writer.PutExtFile("a", "x"u8));
         Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(2)));

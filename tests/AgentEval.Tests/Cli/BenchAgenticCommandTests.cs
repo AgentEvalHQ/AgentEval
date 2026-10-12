@@ -124,6 +124,11 @@ public class BenchAgenticCommandTests : IDisposable
         Assert.Equal("aborted", (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!["status"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        if (completed == 0)
+        {
+            Assert.Empty(lines);
+            return;
+        }
         Assert.Contains(lines, l => (string?)l["state"] == "error");
         if (completed > 0) Assert.Contains(lines, l => (string?)l["state"] == "passed");
     }

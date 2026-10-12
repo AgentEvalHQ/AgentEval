@@ -35,7 +35,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Directory.Delete(_root, recursive: true);
     }
 
-    private EvalOptions Options(string endpoint, int count = 1, int runs = 1)
+    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null)
     {
         var dataset = Path.Combine(_root, "dataset.yaml");
         File.WriteAllText(dataset, string.Concat(Enumerable.Range(0, count).Select(i => $"- id: c{i}\n  input: secret-prompt-{i}\n  expected: Hi\n")));
@@ -45,7 +45,79 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")), Quiet = true,
             Aef = new DirectoryInfo(Path.Combine(_root, "aef")), SubjectVersion = "1",
             Runs = runs,
+            Metrics = metrics,
         };
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Eval_BlockedSecondCall_FirstResultAlreadyExistsInRunningFolder(int runs)
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var count = 0;
+        await using var endpoint = await LocalChatEndpoint.StartAsync(async (_, ct) =>
+        {
+            if (Interlocked.Increment(ref count) == 2)
+            {
+                entered.SetResult();
+                await release.Task.WaitAsync(ct);
+            }
+            return "Hi";
+        });
+        var options = Options(endpoint.Endpoint, 2, runs);
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var evaluation = EvalCommand.ExecuteAsync(options, cancel.Token);
+        try
+        {
+            await entered.Task.WaitAsync(cancel.Token);
+            var dir = RunDirectory(options.Aef!.FullName);
+            Assert.Equal("running", (string?)Document(dir, "run.json")["status"]);
+            Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+            Assert.False(File.Exists(Path.Combine(dir, "seal.json")));
+        }
+        finally { release.TrySetResult(); }
+        Assert.Equal(0, await evaluation);
+        AssertIntact(RunDirectory(options.Aef!.FullName));
+    }
+
+    [Fact]
+    public async Task Eval_LlmMetricUsingSubjectClient_RecordsJudgeAndSeparateUsage()
+    {
+        var calls = 0;
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult(
+            Interlocked.Increment(ref calls) == 1 ? "Hi" : """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}"""));
+        var options = Options(endpoint.Endpoint, metrics: "llm_relevance");
+        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        Assert.Equal(2, endpoint.Requests.Count);
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var judge = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
+        Assert.Equal("local-model", (string?)judge["model"]);
+        var usage = Document(dir, "summary.json")["usage"]!.AsArray();
+        Assert.Equal(2, usage.Count);
+        Assert.All(usage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));
+        Assert.Single(usage, u => (string?)u!["role"] == "judge");
+        Assert.Single(usage, u => (string?)u!["role"] == "agent");
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+    }
+
+    [Fact]
+    public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync();
+        var options = Options(endpoint.Endpoint, metrics: "code_toxicity");
+        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        Assert.Single(endpoint.Requests);
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal("passed", (string?)lines[0]["state"]);
+        var metric = Assert.Single(lines, l => (string?)l["path"] == "case/metrics/code_toxicity");
+        Assert.Equal((string?)lines[0]["resultId"], (string?)metric["parentResultId"]);
+        Assert.Equal("code_toxicity", (string?)metric["scores"]![0]!["metric"]);
+        Assert.DoesNotContain("secret-prompt", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
     [Fact]

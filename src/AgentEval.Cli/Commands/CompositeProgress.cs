@@ -14,6 +14,11 @@ internal sealed class CompositeProgress(CompositeEval benchmark)
     private readonly HashSet<string> _started = [];
     private readonly Dictionary<string, EvalResult> _completed = [];
 
+    public bool HasCompletedResults
+    {
+        get { lock (_sync) return _completed.Count > 0; }
+    }
+
     public void Started(IReadOnlyList<int> path)
     {
         lock (_sync) _started.Add(string.Join('/', path));

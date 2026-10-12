@@ -31,6 +31,9 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public string? JudgeModel { get; init; }
 
+    /// <summary>The model used by named LLM metrics, when different from the optional harness judge.</summary>
+    public string? MetricJudgeModel { get; init; }
+
     /// <summary>
     /// What the judge consumed over the run, when its responses reported it: the run summary's judge usage entry
     /// ([SUM-7]). It counts every judge call, a call that produced no verdict included.
@@ -70,10 +73,11 @@ public sealed record AefEvalRunOptions
 /// Writes an <c>agenteval eval</c> run as a sealed AEF run: one root line per case at path <c>case</c> in lane
 /// <c>eval</c>, with the metrics <c>pass</c> and <c>score</c> and a summary over them. A case's judge criteria and
 /// assertions are its children, at <c>case/criteria/&lt;n&gt;</c> and <c>case/assertions/&lt;n&gt;</c> (1-based), recorded beside
-/// its own verdict (<c>Own</c>, §7.5). A case run several times (<c>--runs</c>) has one line per trial and a rollup line
+/// its own verdict (<c>Own</c>, §7.5). Named metrics are children at <c>case/metrics/&lt;name&gt;</c>.
+/// A case run several times (<c>--runs</c>) has one line per trial and a rollup line
 /// ([RES-8]), without children. The run is AgentEval's own (no <c>imported</c>), sealed by its producer.
 /// </summary>
-public static class AefEvalWriter
+public static partial class AefEvalWriter
 {
     public const string Lane = "eval";
     public const string CasePath = "case";
@@ -171,118 +175,20 @@ public static class AefEvalWriter
             throw new ArgumentException("one case id per case", nameof(caseIds));
         }
 
-        var all = cases.SelectMany(c => c).ToList();
-
-        // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
-        using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "eval");
-        var runId = folder.RunId;
-        var directory = folder.Directory;
-        var digest = DatasetDigest(options.DatasetBytes);
-        var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
-        var header = new AefRunHeader
-        {
-            RunId = runId,
-            Producer = AefConverter.DefaultProducer,
-            Subject = new AefSubject { Ref = options.SubjectRef, Kind = options.SubjectKind, Version = options.SubjectVersion },
-            Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
-            Suite = new AefSuite
-            {
-                Ref = AefConverter.TypedRef("dataset", options.DatasetName),
-                Version = "sha256-" + digest["sha256:".Length..][..12],
-                Digest = digest,
-                Frozen = true,
-                ExecutionPolicy = requirePasses is { } k
-                    ? new AefExecutionPolicy { TrialsPerCase = plannedTrials ?? cases[0].Count, RequirePasses = k, Aggregation = AefTrialAggregation.AtLeast }
-                    : null,
-            },
-            Judges = options.JudgeModel is not null && all.Any(Graded)
-                ? [new AefJudge { Model = options.JudgeModel, Mode = AefJudgeMode.Single }]
-                : null,
-            StartedAt = AefTime.FromDateTimeOffset(startedAt),
-            ContentCapture = options.ContentCapture,
-            Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
-        };
-
-        var writer = AefRunWriter.Create(directory, header);
+        using var session = Start(runsRoot, options, startedAt,
+            plannedTrials ?? (requirePasses is null ? null : cases[0].Count), requirePasses);
         try
         {
-            writer.SetMetrics(
-            [
-                new AefMetric
-                {
-                    Id = PassMetric, Kind = AefMetricKind.Rate, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 1),
-                    Description = "A case counts 1 when it passed (SUM-4).",
-                },
-                new AefMetric
-                {
-                    Id = ScoreMetric, Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 100),
-                    Description = "The case's score from AgentEval's evaluation harness (0 to 100); for a case run in trials, the mean over its measured trials.",
-                },
-            ]);
-
-            var roots = new List<(string ResultId, AefState State)>();
             for (var i = 0; i < cases.Count; i++)
-            {
-                if (requirePasses is not { } required)
-                {
-                    roots.Add(AddCase(writer, cases[i][0], caseIds[i], passingScores?[i]));
-                    continue;
-                }
-
-                for (var t = 0; t < cases[i].Count; t++)
-                {
-                    writer.AddResult(Line(cases[i][t], caseIds[i], t));
-                }
-
-                var rollup = Rollup(cases[i], caseIds[i], required, plannedTrials);
-                roots.Add((writer.AddResult(rollup).ResultId, rollup.State));
-            }
-
-            if (options.AbortReason is not null)
-            {
-                // No final gate decision was taken for an interrupted evaluation.
-            }
-            else if (options.Gate is { } gate)
-            {
-                gate.Write(writer, runId, endedAt, roots.Select(r => r.ResultId).ToList());
-            }
-            else if (options.GateRule is { } rule)
-            {
-                // The command's own gate: every case passed, or it does not ship (exit 1, as the command exits).
-                var notPassed = roots.Where(r => r.State != AefState.Passed).Select(r => r.ResultId).ToList();
-                writer.AddGate(new AefGateDecision
-                {
-                    GateId = "gate:eval",
-                    DecisionId = runId + "-gate",
-                    Rule = new AefGateRule(rule),
-                    Inputs = new AefGateInputs { Results = roots.Select(r => r.ResultId).ToList() },
-                    Comparability = AefComparability.NotApplicable,
-                    Outcome = notPassed.Count == 0 ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
-                    ExitCode = notPassed.Count == 0 ? 0 : 1,
-                    Decisive = notPassed.Count > 0 ? notPassed : null,
-                    DecidedAt = AefTime.FromDateTimeOffset(endedAt),
-                });
-            }
-
-            var cost = all.Select(r => r.Performance?.EstimatedCost).Where(c => c is not null).Sum(c => (double)c!.Value);
-            writer.SetSummary(new AefSummary
-            {
-                Lanes = [new AefSummaryLane(Lane, [new AefSummaryEntry { Metric = PassMetric, Path = CasePath }, new AefSummaryEntry { Metric = ScoreMetric, Path = CasePath }])],
-                Cost = cost > 0 ? new AefCost(cost, "AgentEval's estimate from the agent's reported token usage; judge calls are not included") : null,
-                Usage = Totals(all, options.JudgeUsage),
-            });
-            writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
-                AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
-            var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
-            return (directory, seal.RunHash);
+                foreach (var result in cases[i]) session.Add(result, caseIds[i], passingScores?[i]);
+            return session.Complete(endedAt);
         }
         catch
         {
-            AefConverter.Discard(directory, existed: false);
+            AefConverter.Discard(session.Directory, existed: false);
             throw;
         }
     }
-
     /// <summary>
     /// <c>subject.kind</c> for a ref: the part before its colon when it is one of <c>subject.kind</c>'s values, and
     /// <c>other</c> otherwise, as a runner derives it ([PLAN-10]).
@@ -378,7 +284,7 @@ public static class AefEvalWriter
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
     // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
-    private static (string ResultId, AefState State) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
+    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
     {
         var children = new List<AefResult>();
         var criteria = result.JudgeFailed ? [] : result.CriteriaResults ?? [];
@@ -426,7 +332,7 @@ public static class AefEvalWriter
             writer.AddResult(child, handle);
         }
 
-        return (handle.ResultId, root.State);
+        return (handle, root);
     }
 
     private static AefResult Child(string caseId, string path, string evaluator, AefState state) => new()
