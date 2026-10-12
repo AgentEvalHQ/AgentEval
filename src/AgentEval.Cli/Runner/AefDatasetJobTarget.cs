@@ -301,7 +301,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
                     new EvaluationOptions { Verbose = false, EvaluateResponse = judge is not null, ModelName = owner._subject!.Model }, ct).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
                 if (_clients.Any(c => c.Client.BoundExceeded)) throw new IOException("A provider exceeded its declared token bound.");
-                var mapped = AefEvalWriter.MapCase(result, CaseId, testCase.PassingScore);
+                var mapped = AefEvalWriter.MapCase(result, CaseId, testCase.PassingScore, owner._judge?.Model);
                 return new AefJobCaseResult(mapped.Root with { Usage = Usage(_clients) }, IncurredUsd, 0,
                     mapped.Children.Select((child, index) => new AefJobCaseNode(child)
                     {
@@ -311,7 +311,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
                             ? [new(AefEvidenceKind.JudgeReasoning, criteria[index].Explanation)] : null,
                     }).ToArray(),
                     owner._judge is { } graded && !result.JudgeFailed && result.CriteriaResults is not null
-                        ? [new AefJudge { Model = graded.Model, Provider = graded.Provider, Mode = AefJudgeMode.Single }] : null)
+                        ? [new AefJudge { Model = graded.Model, Provider = graded.Provider, RubricDigest = result.JudgeRubricDigest, Mode = AefJudgeMode.Single }] : null)
                 {
                     Content = owner._captureContent ?
                     [

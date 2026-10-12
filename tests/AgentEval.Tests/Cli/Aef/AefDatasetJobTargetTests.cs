@@ -125,6 +125,14 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         var directory = RunDirectory(result);
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!;
         Assert.Equal("gpt-4o-mini", (string?)header["judges"]![0]!["model"]);
+        var rubric = (string?)header["judges"]![0]!["rubricDigest"];
+        Assert.Matches("^sha256:[0-9a-f]{64}$", rubric!);
+        var nodes = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+        Assert.Null(nodes[0]["annotator"]);
+        Assert.Equal("LLM", (string?)nodes[1]["annotator"]!["kind"]);
+        Assert.Equal("gpt-4o-mini", (string?)nodes[1]["annotator"]!["model"]);
+        Assert.Equal(rubric, (string?)nodes[1]["annotator"]!["rubricDigest"]);
+        Assert.Null(nodes[1]["annotator"]!["promptHash"]);
         Assert.Equal(2, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
         Assert.Empty(RunnerEventStream.Verify(Events(), plan));

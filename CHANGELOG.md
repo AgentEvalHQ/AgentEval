@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native grader annotations:** eval criteria, trials and named metrics identify known model judges;
+  assertions and code metrics identify code grading. Unmeasured results and aggregate decisions do not
+  claim additional grading. Dataset runner headers and criterion annotations retain observed rubric identity.
+
 - **Harness rubric identity:** successful normal and streaming evaluations retain a full instrument digest
   through to native AEF judge headers. Distinct criteria remain distinct for the same judge model; case input,
   output and rationale are excluded, and unknown or failed grading does not invent an observed rubric.

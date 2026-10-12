@@ -19,6 +19,47 @@ public sealed class AefEvalWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Session_Annotators_IdentifyMeasuredGradersWithoutAnnotatingAggregates(bool trials)
+    {
+        var digest = "sha256:" + new string('a', 64);
+        using var session = AefEvalWriter.Start(_out, Options() with { MetricJudgeModel = "metric-judge" }, Start,
+            trials ? 2 : null, trials ? 1 : null);
+        TestResult Result(bool failed) => new()
+        {
+            TestName = "private", Passed = !failed, Score = 90, JudgeFailed = failed,
+            JudgeRubricDigest = digest,
+            CriteriaResults = [new AgentEval.Core.CriterionResult { Criterion = "private criterion", Met = true }],
+            AssertionResults = [AgentEval.Output.AssertionResult.Undecidable("private assertion", "private detail")],
+        };
+        session.Add(Result(false), "case");
+        if (trials) session.Add(Result(true), "case");
+        else session.AddMetrics("case", [AgentEval.Core.MetricResult.Pass("llm_quality", 90),
+            AgentEval.Core.MetricResult.Pass("code_quality", 100), AgentEval.Core.MetricResult.NotMeasured("llm_absent", "private")]);
+        var (dir, _) = session.Complete(Start.AddSeconds(1));
+        var lines = AefTestRuns.Results(dir);
+        var judged = Assert.Single(lines, l => (string?)l["annotator"]?["model"] == "judge-x");
+        Assert.Equal("LLM", (string?)judged["annotator"]!["kind"]);
+        Assert.Equal(digest, (string?)judged["annotator"]!["rubricDigest"]);
+        Assert.Null(judged["annotator"]!["promptHash"]);
+        Assert.All(lines.Where(l => l["aggregation"] is not null || l["trials"] is not null
+            || (string?)l["state"] is "error" or "not_measured"), l => Assert.Null(l["annotator"]));
+        if (!trials)
+        {
+            Assert.Equal(2, lines.Count(l => (string?)l["annotator"]?["kind"] == "CODE"));
+            var metric = Assert.Single(lines, l => (string?)l["annotator"]?["model"] == "metric-judge");
+            Assert.Null(metric["annotator"]!["rubricDigest"]); // Never borrow the harness rubric.
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void Session_DistinctObservedRubrics_RetainsEachWithoutFailedJudge()
     {
@@ -147,7 +188,7 @@ public sealed class AefEvalWriterTests : IDisposable
         using var session = AefEvalWriter.Start(_out, Options(), Start);
         session.Add(result, "unchanged-id", 70);
         var (original, _) = session.Complete(Start.AddSeconds(1));
-        var mapped = AefEvalWriter.MapCase(result, "unchanged-id", 70);
+        var mapped = AefEvalWriter.MapCase(result, "unchanged-id", 70, Options().JudgeModel);
         var directory = Path.Combine(_out, "mapped");
         var writer = AefRunWriter.Create(directory, new AefRunHeader
         {

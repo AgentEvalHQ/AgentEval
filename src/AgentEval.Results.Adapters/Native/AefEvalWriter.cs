@@ -104,11 +104,15 @@ public static partial class AefEvalWriter
     /// lane, timestamps and usage accounting. Criteria, assertions and named metrics preserve the same Own
     /// aggregation as the incremental eval writer; no prompt, response or judge explanation is included.
     /// </summary>
-    public static AefEvalCase MapCase(TestResult result, string caseId, int? passingScore = null)
+    public static AefEvalCase MapCase(TestResult result, string caseId, int? passingScore = null) =>
+        MapCase(result, caseId, passingScore, judgeModel: null);
+
+    /// <summary>Maps a case with known harness and metric judge models; unknown models remain unannotated.</summary>
+    public static AefEvalCase MapCase(TestResult result, string caseId, int? passingScore, string? judgeModel, string? metricJudgeModel = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(caseId);
-        var (root, children) = MapBaseCase(result, caseId, passingScore);
+        var (root, children) = MapBaseCase(result, caseId, passingScore, judgeModel);
         var metrics = new List<AefMetric>();
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var metric in result.MetricResults ?? [])
@@ -117,7 +121,7 @@ public static partial class AefEvalWriter
                 throw new ArgumentException("A named metric can be recorded only once per case.", nameof(result));
             ValidateMetricName(metric.MetricName, nameof(result));
             metrics.Add(NamedMetric(metric.MetricName));
-            children.Add(MetricChild(caseId, metric));
+            children.Add(MetricChild(caseId, metric, metricJudgeModel ?? judgeModel));
             root = IncludeMetric(root, metric, passingScore);
         }
         return new AefEvalCase(root, children, metrics);
@@ -323,22 +327,25 @@ public static partial class AefEvalWriter
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
     // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
-    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore, AefNativeContent? content = null)
+    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore, AefNativeContent? content = null, string? judgeModel = null)
     {
-        var (root, children) = MapBaseCase(result, caseId, passingScore);
+        var (root, children) = MapBaseCase(result, caseId, passingScore, judgeModel);
         root = AefNativeContent.Attach(writer, root, content);
         var handle = writer.AddResult(root);
         foreach (var child in children) writer.AddResult(child, handle);
         return (handle, root);
     }
 
-    private static (AefResult Root, List<AefResult> Children) MapBaseCase(TestResult result, string caseId, int? passingScore)
+    private static (AefResult Root, List<AefResult> Children) MapBaseCase(TestResult result, string caseId, int? passingScore, string? judgeModel)
     {
         var children = new List<AefResult>();
         var criteria = result.JudgeFailed ? [] : result.CriteriaResults ?? [];
         for (var n = 0; n < criteria.Count; n++)
         {
-            children.Add(Child(caseId, $"{CasePath}/criteria/{n + 1}", "agenteval.judge.criterion", criteria[n].Met ? AefState.Passed : AefState.Failed));
+            children.Add(Child(caseId, $"{CasePath}/criteria/{n + 1}", "agenteval.judge.criterion", criteria[n].Met ? AefState.Passed : AefState.Failed) with
+            {
+                Annotator = HarnessAnnotator(result, judgeModel),
+            });
         }
 
         var assertions = result.AssertionResults ?? [];
@@ -352,15 +359,19 @@ public static partial class AefEvalWriter
                 _ => AefState.Inconclusive,
             };
             // Not the assertion's name: it can quote the expected text (Contain("…"), a regex), which is content ([RUN-11]).
-            children.Add(Child(caseId, $"{CasePath}/assertions/{n + 1}", "agenteval.assertion", state));
+            children.Add(Child(caseId, $"{CasePath}/assertions/{n + 1}", "agenteval.assertion", state) with
+            {
+                Annotator = new AefAnnotator { Kind = AefAnnotatorKind.Code },
+            });
         }
 
-        var root = Line(result, caseId, trial: null);
+        var root = Line(result, caseId, trial: null, judgeModel);
         if (children.Count > 0)
         {
             var measuredCase = root.State != AefState.Error;
             root = root with
             {
+                Annotator = null, // The children identify graders; this node records the harness decision.
                 Aggregation = new AefAggregation
                 {
                     Strategy = AefAggregationStrategy.Own,
@@ -388,10 +399,15 @@ public static partial class AefEvalWriter
         Id = name, Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(0, 100),
     };
 
-    private static AefResult MetricChild(string caseId, AgentEval.Core.MetricResult metric) =>
+    private static AefResult MetricChild(string caseId, AgentEval.Core.MetricResult metric, string? judgeModel = null) =>
         Child(caseId, $"{CasePath}/metrics/{Uri.EscapeDataString(metric.MetricName)}", "agenteval.metric",
             metric.Measured ? metric.Passed ? AefState.Passed : AefState.Failed : AefState.NotMeasured) with
         {
+            Annotator = !metric.Measured ? null
+                : metric.MetricName.StartsWith("llm_", StringComparison.Ordinal) && judgeModel is not null
+                    ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = judgeModel }
+                : metric.MetricName.StartsWith("code_", StringComparison.Ordinal)
+                    ? new AefAnnotator { Kind = AefAnnotatorKind.Code } : null,
             Scores = metric.Measured ? [new AefScore { Metric = metric.MetricName, Value = metric.Score }] : null,
             Reason = metric.Measured ? null : "The metric could not be measured",
         };
@@ -402,6 +418,7 @@ public static partial class AefEvalWriter
         var absent = (previous?.Unmeasured?.NotMeasured ?? 0) + (metric.Measured ? 0 : 1);
         return root with
         {
+            Annotator = null,
             Aggregation = new AefAggregation
             {
                 Strategy = AefAggregationStrategy.Own,
@@ -425,7 +442,12 @@ public static partial class AefEvalWriter
         Component = new AefComponent(0, false),
     };
 
-    private static AefResult Line(TestResult result, string caseId, int? trial)
+    private static AefAnnotator? HarnessAnnotator(TestResult result, string? judgeModel) =>
+        Graded(result) && judgeModel is not null
+            ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = judgeModel, RubricDigest = result.JudgeRubricDigest }
+            : null;
+
+    private static AefResult Line(TestResult result, string caseId, int? trial, string? judgeModel = null)
     {
         var state = StateOf(result);
         var performance = result.Performance;
@@ -457,6 +479,7 @@ public static partial class AefEvalWriter
             Lane = Lane,
             DurationMs = performance is { } p && p.EndTime > p.StartTime ? (p.EndTime - p.StartTime).TotalMilliseconds : null,
             Usage = usage,   // no test name: without a dataset id it is the start of the input ([RUN-11])
+            Annotator = state == AefState.Error ? null : HarnessAnnotator(result, judgeModel),
             Trial = trial,
         };
     }

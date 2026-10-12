@@ -123,7 +123,7 @@ public static partial class AefEvalWriter
                 : null;
             if (_requirePasses is null)
             {
-                var entry = AddCase(_writer, result, caseId, passingScore, content);
+                var entry = AddCase(_writer, result, caseId, passingScore, content, _options.JudgeModel);
                 _roots.Add((entry.Handle.ResultId, entry.Root.State));
                 _cases.Add(caseId, (entry.Handle, entry.Root, passingScore));
                 if (result.MetricResults is { Count: > 0 } metrics) AddMetrics(caseId, metrics);
@@ -132,7 +132,7 @@ public static partial class AefEvalWriter
             {
                 if (!_trials.TryGetValue(caseId, out var trials)) _trials.Add(caseId, trials = []);
                 if (trials.Count >= _plannedTrials) throw new ArgumentException("A case cannot exceed its planned trial count.", nameof(caseId));
-                _writer.AddResult(AefNativeContent.Attach(_writer, Line(result, caseId, trials.Count), content));
+                _writer.AddResult(AefNativeContent.Attach(_writer, Line(result, caseId, trials.Count, _options.JudgeModel), content));
                 trials.Add(result);
                 if (trials.Count == _plannedTrials) AddRollup(caseId, trials);
             }
@@ -166,7 +166,7 @@ public static partial class AefEvalWriter
                     _metrics.Add(NamedMetric(metricId));
                     _writer.SetMetrics(_metrics);
                 }
-                var child = MetricChild(caseId, metric);
+                var child = MetricChild(caseId, metric, _options.MetricJudgeModel ?? _options.JudgeModel);
                 if (_options.ContentCapture == AefContentCapture.On && metric.Explanation is { } explanation)
                     child = AefNativeContent.Attach(_writer, child,
                         metric.Measured && metricId.StartsWith("llm_", StringComparison.Ordinal)

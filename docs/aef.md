@@ -233,6 +233,10 @@ Native harness judge headers also retain the full instrument digest reported by 
 It covers the system/template/rubric-reading instructions and ordered declared criteria, with CRLF normalized
 to LF, excluding case input, output and returned rationale. Normal and streaming harness paths preserve it;
 unknown evaluators leave it absent. Failed grading does not register an observed rubric.
+Measured criteria and trial lines carry known judge models and rubric digests in their annotators.
+Assertions and code metrics use CODE; measured LLM metrics use their own configured judge, without borrowing
+the harness rubric. Aggregate decisions and unmeasured lines do not claim a grader. The dataset runner uses
+the same mapping and retains the observed rubric in its judge header. No annotation adds a prompt hash.
 
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
