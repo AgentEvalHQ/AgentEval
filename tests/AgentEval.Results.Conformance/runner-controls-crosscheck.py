@@ -23,9 +23,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_POST(self):
-        requests.append(self.rfile.read(int(self.headers["Content-Length"])))
+        request = self.rfile.read(int(self.headers["Content-Length"]))
+        requests.append(request)
+        reply = json.dumps({"overallScore": 90, "summary": "private-judge-summary",
+                            "criteriaResults": [{"criterion": "1. correct", "met": True, "explanation": "private-reason"}]}) \
+            if json.loads(request).get("model") == "gpt-4o" else "Hi"
         body = json.dumps({"id": "test", "object": "chat.completion", "created": 1, "model": "gpt-4o-mini",
-                           "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hi"}, "finish_reason": "stop"}],
+                           "choices": [{"index": 0, "message": {"role": "assistant", "content": reply}, "finish_reason": "stop"}],
                            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -72,15 +76,39 @@ try:
         assert json.loads((job / "runner-options.json").read_text())["signingKeyId"]
         policy = folder / "policy.json"
         policy.write_text(json.dumps({"keys": [{"identity": "test:runner", "publicKey": (keys / "ecdsa-a.pub.pem").read_text()}]}))
-        for header in (job / "runs").glob("*/run.json"):
-            for command in (cli + ["aef", "verify", str(header.parent), "--json", "--policy", str(policy)],
-                            [sys.executable, str(root / "contracts/aef/tools/aef_verify.py"), "run", str(header.parent), "--policy", str(policy)]):
+        def verify_identity(run):
+            for command in (cli + ["aef", "verify", str(run), "--json", "--policy", str(policy)],
+                            [sys.executable, str(root / "contracts/aef/tools/aef_verify.py"), "run", str(run), "--policy", str(policy)]):
                 checked = subprocess.run(command, capture_output=True, text=True, timeout=60)
                 report = json.loads(checked.stdout)
                 assert checked.returncode == 0 and report["outcome"] == "intact" and not report["problems"] and report["signedBy"] == ["test:runner"], report
+        for header in (job / "runs").glob("*/run.json"):
+            verify_identity(header.parent)
         verify = runpy.run_path(str(root / "tests/AgentEval.Results.Conformance/runner-crosscheck.py"))["verify_job"]
         assert verify(root, job, tfm) == 1
-        print(f"{tfm}: signed runner identity, stream/conform, exact plan, output placement and 8 no-request/no-write preflights passed")
+        assert "private-input" not in "".join(p.read_text() for p in job.rglob("*") if p.is_file())
+
+        # Capture is permission from the plan, not an override by the command line.
+        plan["contentCapture"] = "on"
+        plan["judges"] = [{"model": "gpt-4o"}]
+        plan["ext"]["agenteval.run"]["judge"] = {"endpoint": plan["subject"]["endpoint"]}
+        path.write_text(json.dumps(plan))
+        (folder / "cases.json").write_text('[{"id":"one","input":"private-input","expected":"Hi","evaluationCriteria":["correct"]}]')
+        base[base.index("--aef") + 1] = str(folder / "captured")
+        controls[controls.index("--aef-content") + 1] = "on"
+        result = json.loads(invoke(controls, 0).stdout)
+        captured = folder / "captured" / "jobs" / result["jobId"]
+        assert len(requests) == 6 and (captured / "plan.json").read_bytes() == path.read_bytes()
+        assert verify(root, captured, tfm) == 1
+        run = next((captured / "runs").glob("*/run.json")).parent
+        verify_identity(run)
+        evidence = [json.loads(line) for line in (run / "evidence.ndjson").read_text().splitlines()]
+        assert {e["kind"] for e in evidence} == {"input", "output", "expected", "judge_reasoning"}, evidence
+        lines = [json.loads(line) for line in (run / "results.ndjson").read_text().splitlines()]
+        assert any(len(line.get("evidence", [])) == 4 and line.get("reasoning") for line in lines)
+        assert "private-input" in "".join(p.read_text() for p in (run / "blobs").rglob("*") if p.is_file())
+        assert "private-reason" in "".join(p.read_text() for p in (run / "blobs").rglob("*") if p.is_file())
+        print(f"{tfm}: signed runner, off/on content with judge, stream/conform, exact plans and 8 no-request/no-write preflights passed")
 finally:
     server.shutdown()
     server.server_close()

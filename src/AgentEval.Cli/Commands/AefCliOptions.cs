@@ -24,11 +24,16 @@ internal sealed class AefCliOptions
     {
         if (command.Options.Any(o => o.Name == "--aef"))
         {
+            var runner = IsRunner(command);
             var key = new Option<string?>("--aef-key") { Description = "Sign AEF evidence with an unencrypted PKCS#8 ECDSA P-256 key" };
-            var unsealed = new Option<bool>("--aef-unsealed") { Description = "Leave closed AEF evidence unsealed for a host to seal later" };
+            var unsealed = new Option<bool>("--aef-unsealed") { Description = runner
+                ? "Not supported for runner jobs, which require sealed evidence"
+                : "Leave closed AEF evidence unsealed for a host to seal later" };
             command.Options.Add(key);
             command.Options.Add(unsealed);
-            var content = new Option<string?>("--aef-content") { Description = "Capture observed content in AEF evidence blobs: on|off (default: off)" };
+            var content = new Option<string?>("--aef-content") { Description = runner
+                ? "Assert on|off matches the saved plan's contentCapture; defaults to the plan and never overrides it"
+                : "Capture observed content in AEF evidence blobs: on|off (default: off)" };
             command.Options.Add(content);
             _commands.Add(command, new(key, unsealed, content));
         }
@@ -48,7 +53,7 @@ internal sealed class AefCliOptions
             return ExitCodes.UsageError;
         }
         var noAef = parsed.CommandResult.Command.Options.OfType<Option<bool>>().FirstOrDefault(o => o.Name == "--no-aef");
-        if (parsed.CommandResult.Command.Name == "run" && (unsealed || (noAef is not null && parsed.GetValue(noAef))))
+        if (IsRunner(parsed.CommandResult.Command) && (unsealed || (noAef is not null && parsed.GetValue(noAef))))
         {
             Console.Error.WriteLine("Error: runner jobs require sealed AEF evidence; --no-aef and --aef-unsealed are not supported.");
             return ExitCodes.UsageError;
@@ -90,5 +95,6 @@ internal sealed class AefCliOptions
     }
 
     private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content);
+    private static bool IsRunner(Command command) => command.Name == "run" && command.Options.Any(o => o.Name == "--plan");
     private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture, AefContentCapture? RequestedContentCapture);
 }

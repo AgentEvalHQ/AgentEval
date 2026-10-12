@@ -93,12 +93,20 @@ public interface IAefJobCase
 /// <param name="Children">Optional child evidence.</param>
 /// <param name="Judges">Models that actually graded this case.</param>
 public sealed record AefJobCaseResult(AefResult Root, double Usd, long Seconds,
-    IReadOnlyList<AefJobCaseNode>? Children = null, IReadOnlyList<AefJudge>? Judges = null);
+    IReadOnlyList<AefJobCaseNode>? Children = null, IReadOnlyList<AefJudge>? Judges = null)
+{
+    /// <summary>Observed root content; ignored by the writer when the plan disables capture.</summary>
+    public IReadOnlyList<AefTextEvidence>? Content { get; init; }
+}
 
 /// <summary>A result tree below a case root.</summary>
 /// <param name="Result">The child result.</param>
 /// <param name="Children">Its children, if any.</param>
-public sealed record AefJobCaseNode(AefResult Result, IReadOnlyList<AefJobCaseNode>? Children = null);
+public sealed record AefJobCaseNode(AefResult Result, IReadOnlyList<AefJobCaseNode>? Children = null)
+{
+    /// <summary>Observed child content; ignored by the writer when the plan disables capture.</summary>
+    public IReadOnlyList<AefTextEvidence>? Content { get; init; }
+}
 
 /// <summary>The job clock; simulated clocks advance explicitly, real clocks measure elapsed execution.</summary>
 public interface IAefJobClock

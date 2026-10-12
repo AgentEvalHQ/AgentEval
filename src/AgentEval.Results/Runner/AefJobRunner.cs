@@ -644,6 +644,7 @@ public static class AefJobRunner
                 StartedAt = started,
                 EndedAt = _clock,
             };
+            root = run.Writer.AttachContent(root, result.Content);
             var handle = run.Writer.AddResult(root);
             WriteChildren(run.Writer, handle, result.Children, root.Lane);
             if (result.Judges is { Count: > 0 })
@@ -666,7 +667,7 @@ public static class AefJobRunner
             if (children is null) return;
             foreach (var child in children)
             {
-                var handle = writer.AddResult(child.Result with { Lane = lane }, parent);
+                var handle = writer.AddResult(writer.AttachContent(child.Result with { Lane = lane }, child.Content), parent);
                 WriteChildren(writer, handle, child.Children, lane);
             }
         }

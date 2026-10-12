@@ -26,6 +26,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
 {
     private Role? _subject, _judge;
     private AefJobCredentials? _credentials;
+    private bool _captureContent;
     private long _caseSeconds = 60, _preparationSeconds = 30;
     public AefTargetMode TargetMode => AefTargetMode.Live;
     public string Isolation => "process";
@@ -84,6 +85,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
 
     private async Task ResolveAsync(JsonObject plan, byte[] planBytes, string planDirectory, CancellationToken ct)
     {
+        _captureContent = (string?)plan["contentCapture"] == "on";
         var config = plan["ext"]?["agenteval.run"] as JsonObject
             ?? throw Refuse("The live dataset runner requires ext.agenteval.run endpoint and budget settings.");
         Only(config, "model", "azure", "deployment", "inputCap", "outputCap", "maxCalls", "caseSeconds", "preparationSeconds", "closeSeconds", "judge");
@@ -301,9 +303,25 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
                 if (_clients.Any(c => c.Client.BoundExceeded)) throw new IOException("A provider exceeded its declared token bound.");
                 var mapped = AefEvalWriter.MapCase(result, CaseId, testCase.PassingScore);
                 return new AefJobCaseResult(mapped.Root with { Usage = Usage(_clients) }, IncurredUsd, 0,
-                    mapped.Children.Select(c => new AefJobCaseNode(c)).ToArray(),
+                    mapped.Children.Select((child, index) => new AefJobCaseNode(child)
+                    {
+                        // MapCase records criteria first, in their original order.
+                        Content = owner._captureContent && !result.JudgeFailed && result.CriteriaResults is { } criteria
+                            && index < criteria.Count
+                            ? [new(AefEvidenceKind.JudgeReasoning, criteria[index].Explanation)] : null,
+                    }).ToArray(),
                     owner._judge is { } graded && !result.JudgeFailed && result.CriteriaResults is not null
-                        ? [new AefJudge { Model = graded.Model, Provider = graded.Provider, Mode = AefJudgeMode.Single }] : null);
+                        ? [new AefJudge { Model = graded.Model, Provider = graded.Provider, Mode = AefJudgeMode.Single }] : null)
+                {
+                    Content = owner._captureContent ?
+                    [
+                        new(AefEvidenceKind.Input, testCase.Input),
+                        new(AefEvidenceKind.Output, result.ActualOutput),
+                        new(AefEvidenceKind.Expected, data.ExpectedOutput),
+                        new(AefEvidenceKind.JudgeReasoning, !result.JudgeFailed && result.CriteriaResults is not null
+                            && result.Details.Length > 0 ? result.Details : null),
+                    ] : null,
+                };
             }
         }
     }

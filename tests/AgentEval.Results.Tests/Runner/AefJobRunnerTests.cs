@@ -16,6 +16,43 @@ public sealed class AefJobRunnerTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task RunAsync_ContentFromTarget_ObeysPlanAndLinksExactText(bool capture)
+    {
+        var document = JsonNode.Parse(Plan())!;
+        document["contentCapture"] = capture ? "on" : "off";
+        var bytes = Encoding.UTF8.GetBytes(document.ToJsonString());
+        var target = new Target(new Case(_ => ValueTask.FromResult(Passed() with
+        {
+            Content = [new(AefEvidenceKind.Input, "private-input α\r\n"),
+                new(AefEvidenceKind.JudgeReasoning, "private-reason")],
+        })));
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.sealed", result.Terminal);
+        var folder = RunDirectory();
+        var verified = AefRunVerifier.Verify(folder);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(folder, "results.ndjson"))))!;
+        if (capture)
+        {
+            Assert.Equal(2, line["evidence"]!.AsArray().Count);
+            Assert.NotNull(line["reasoning"]);
+            var blobs = Directory.GetFiles(Path.Combine(folder, "blobs"), "*", SearchOption.AllDirectories).Select(File.ReadAllText).ToArray();
+            Assert.Contains("private-input α\r\n", blobs);
+            Assert.Contains("private-reason", blobs);
+        }
+        else
+        {
+            Assert.Null(line["evidence"]);
+            Assert.Null(line["reasoning"]);
+            Assert.False(Directory.Exists(Path.Combine(folder, "blobs")));
+            Assert.DoesNotContain("private-", string.Concat(Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task RunWorkspaceAsync_Signer_SignsCompletedAndCancelledEvidence(bool cancel)
     {
         using var signer = EcdsaP256Signer.Generate();

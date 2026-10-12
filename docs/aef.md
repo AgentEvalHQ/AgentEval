@@ -87,8 +87,11 @@ Runner identity and capture policy belong to the saved plan. `--subject` asserts
 `--subject-version` asserts its version, and `--aef-content on|off` asserts its capture setting. A mismatch is an
 input error; these flags do not rewrite the plan. Unlike native standalone commands, runner jobs reject
 `--no-aef` and `--aef-unsealed`: the protocol requires sealed evidence. Dry-run validates these controls and
-the signing key without requests or file writes. The dataset runner currently emits metrics and usage;
-plan-permitted content attachments remain separate implementation work.
+the signing key without requests or file writes. With plan capture on, the dataset runner attaches exact UTF-8
+input, expected output and observed response blobs to the case root. Observed judge summaries attach to the root
+and criterion explanations to their child results, also through each result's reasoning field. With capture off,
+the producer omits these items and the shared writer ignores supplied text without writing blobs. Credentials
+and provider error details are excluded in either mode; interrupted cases do not invent missing responses.
 
 After building the CLI, `python tests/AgentEval.Results.Conformance/runner-controls-crosscheck.py net10.0`
 (also `net8.0`) checks actual signed identity, explicit output placement, unchanged plan bytes, preflight/dry-run

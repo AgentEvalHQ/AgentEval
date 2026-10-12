@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Results.Integrity;
@@ -290,6 +291,32 @@ public sealed class AefRunWriter
         }
 
         return blob;
+    }
+
+    /// <summary>
+    /// Attaches observed UTF-8 text blobs to a result before adding it. Content-off runs ignore the supplied
+    /// items without enumerating them. Evidence IDs are bound to this run's result identity and item order;
+    /// judge reasoning is also linked from the result's reasoning field.
+    /// </summary>
+    public AefResult AttachContent(AefResult result, IEnumerable<AefTextEvidence>? content)
+    {
+        EnsureRunning();
+        ArgumentNullException.ThrowIfNull(result);
+        if (_contentOff || content is null) return result;
+        List<string> ids = [];
+        var reasoning = result.Reasoning;
+        var index = 0;
+        foreach (var item in content)
+        {
+            if (item.Text is null) continue;
+            var identity = ResultIdOf(result.CaseId, result.Path, result.Trial) + ":" + item.Kind + ":" + index++;
+            var id = "E-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))).ToLowerInvariant();
+            var blob = PutBlob(Encoding.UTF8.GetBytes(item.Text));
+            if (item.Kind == AefEvidenceKind.JudgeReasoning) reasoning = blob;
+            AddEvidence(new AefEvidence { EvidenceId = id, Kind = item.Kind, Link = AefEvidenceLink.ToBlob(blob) });
+            ids.Add(id);
+        }
+        return ids.Count == 0 ? result : result with { Evidence = [.. result.Evidence ?? [], .. ids], Reasoning = reasoning };
     }
 
     /// <summary>Stores a blob read from <paramref name="content"/> to its end (<see cref="PutBlob(ReadOnlySpan{byte})"/>), hashed as it is copied.</summary>

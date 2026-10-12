@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Security.Cryptography;
-using System.Text;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Native;
@@ -29,7 +27,6 @@ public sealed record AefNativeContent
     internal static AefResult Attach(AefRunWriter writer, AefResult line, AefNativeContent? content)
     {
         if (content is null) return line;
-        List<string> ids = [];
         List<(AefEvidenceKind Kind, string? Text)> items =
         [
             (AefEvidenceKind.Input, content.Input), (AefEvidenceKind.Output, content.Output),
@@ -38,22 +35,6 @@ public sealed record AefNativeContent
             (AefEvidenceKind.Transcript, content.Transcript),
         ];
         if (content.ToolCalls is { } calls) items.AddRange(calls.Select(c => (AefEvidenceKind.ToolCall, (string?)c)));
-        AefBlob? reasoning = line.Reasoning;
-        var index = 0;
-        foreach (var (kind, text) in items)
-        {
-            if (text is null) continue;
-            var identity = writer.ResultIdOf(line.CaseId, line.Path, line.Trial) + ":" + kind + ":" + index++;
-            var id = "E-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))).ToLowerInvariant();
-            var blob = writer.PutBlob(Encoding.UTF8.GetBytes(text));
-            if (kind == AefEvidenceKind.JudgeReasoning) reasoning = blob;
-            writer.AddEvidence(new AefEvidence
-            {
-                EvidenceId = id, Kind = kind,
-                Link = AefEvidenceLink.ToBlob(blob),
-            });
-            ids.Add(id);
-        }
-        return ids.Count == 0 ? line : line with { Evidence = [.. line.Evidence ?? [], .. ids], Reasoning = reasoning };
+        return writer.AttachContent(line, items.Select(item => new AefTextEvidence(item.Kind, item.Text)));
     }
 }

@@ -98,13 +98,16 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(Output, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
     }
 
-    [Fact]
-    public async Task RunAsync_JudgeAndSubject_ReceiveDistinctScopedKeysAndRecordActualJudge()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_JudgeAndSubject_ReceiveDistinctScopedKeysAndRecordActualJudge(bool capture)
     {
-        File.WriteAllText(Dataset, """[{"id":"c1","input":"secret-prompt","evaluationCriteria":["correct"]}]""");
-        await using var subject = await LocalChatEndpoint.StartAsync("Hi");
+        File.WriteAllText(Dataset, """[{"id":"c1","input":"secret-prompt","expected":"secret-expected","evaluationCriteria":["correct"]}]""");
+        await using var subject = await LocalChatEndpoint.StartAsync("secret-output");
         await using var judge = await LocalChatEndpoint.StartAsync("""{"overallScore":90,"summary":"good","criteriaResults":[{"criterion":"1. correct","met":true,"explanation":"secret-reason"}]}""");
         var plan = Plan(subject.Endpoint);
+        plan["contentCapture"] = capture ? "on" : "off";
         plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-4o-mini" });
         plan["ext"]!["agenteval.run"]!["judge"] = new JsonObject { ["endpoint"] = judge.Endpoint };
         plan["credentialRefs"] = new JsonArray(
@@ -125,7 +128,20 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         Assert.Equal(2, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
         Assert.Empty(RunnerEventStream.Verify(Events(), plan));
-        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(Output, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+        var saved = string.Concat(Directory.GetFiles(Output, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("secret-subject-key", saved);
+        Assert.DoesNotContain("secret-judge-key", saved);
+        if (capture)
+        {
+            Assert.Contains("secret-prompt", saved);
+            Assert.Contains("secret-output", saved);
+            Assert.Contains("secret-expected", saved);
+            Assert.Contains("secret-reason", saved);
+            var evidence = File.ReadAllLines(Path.Combine(directory, "evidence.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+            Assert.Contains(evidence, e => (string?)e["kind"] == "judge_reasoning");
+            Assert.NotNull(JsonNode.Parse(File.ReadLines(Path.Combine(directory, "results.ndjson")).First())!["reasoning"]);
+        }
+        else Assert.DoesNotContain("secret", saved);
     }
 
     [Theory]

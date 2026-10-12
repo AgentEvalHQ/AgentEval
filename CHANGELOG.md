@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plan-controlled runner content:** dataset jobs with `contentCapture: on` attach input/expected/output,
+  judge summaries and per-criterion rationale. Shared writer text attachment enforces capture-off even when
+  a target supplies content; native adapters reuse the same attachment logic and result-bound evidence IDs.
+
 - **Runner signing and evidence controls:** `run --aef-key` signs completed and aborted seals; `--aef` selects
   the job evidence base. Subject/version/content flags assert saved-plan values without rewriting its bytes.
   Jobs reject no-evidence/unsealed modes, and dry-run validates controls without requests or writes. Public
