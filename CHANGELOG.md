@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Native CLI signing and host sealing:** `eval`, `redteam` and evaluating `bench` commands accept
+  `--aef-key <pkcs8.pem>` and `--aef-unsealed`. Keys and conflicting options are checked before command execution
+  or diagnostic-file initialization. Help does not load keys. Signers are scoped to one invocation.
+
 - **Native AEF adapters can leave closed evidence unsealed:** set `Seal = false` on eval, probe or composite
   run options for a host to seal later. The writer verifies the closed evidence and returns a null run hash;
   combining this mode with a signer is rejected before creating a run. Default sealing is unchanged.

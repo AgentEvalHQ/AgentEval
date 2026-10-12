@@ -3,6 +3,8 @@
 // Licensed under the MIT License.
 
 using System.Text.Json.Nodes;
+using System.CommandLine;
+using System.Security.Cryptography;
 using AgentEval.Cli.Commands;
 using AgentEval.Results.Integrity;
 using AgentEval.Tests.TestHelpers;
@@ -47,6 +49,46 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Runs = runs,
             Metrics = metrics,
         };
+    }
+
+    [Fact]
+    public async Task Eval_SharedUnsealedControl_LeavesClosedEvidenceWithoutSeal()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("Hi"));
+        var command = EvalCommand.Create();
+        var controls = new AefCliOptions(command);
+        var options = Options(endpoint.Endpoint);
+        var parsed = command.Parse(["--aef-unsealed", "--dataset", options.Dataset.FullName]);
+        var code = await controls.InvokeAsync(parsed, () => EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        Assert.Equal(0, code);
+        var directory = RunDirectory(options.Aef!.FullName);
+        var verified = AefRunVerifier.Verify(directory);
+        Assert.Equal(AefOutcome.Unsealed, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        Assert.Equal("completed", (string?)Document(directory, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(directory, "seal.json")));
+    }
+
+    [Fact]
+    public async Task Eval_SharedSigningControl_ProducesSignedSeal()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("Hi"));
+        var command = EvalCommand.Create();
+        var controls = new AefCliOptions(command);
+        var options = Options(endpoint.Endpoint);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var keyPath = Path.Combine(_root, "key.pem");
+        File.WriteAllText(keyPath, key.ExportPkcs8PrivateKeyPem());
+        var parsed = command.Parse(["--aef-key", keyPath, "--dataset", options.Dataset.FullName]);
+        var code = await controls.InvokeAsync(parsed, () => EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        Assert.Equal(0, code);
+        var directory = RunDirectory(options.Aef!.FullName);
+        AssertIntact(directory);
+        using var expectedSigner = new AgentEval.Results.Signatures.EcdsaP256Signer(key);
+        var envelope = Document(directory, "attestation.dsse.json");
+        Assert.Equal(expectedSigner.KeyId, (string?)envelope["signatures"]![0]!["keyid"]);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(directory, "seal.json")), Convert.FromBase64String((string)envelope["payload"]!));
+        Assert.DoesNotContain("PRIVATE KEY", File.ReadAllText(Path.Combine(directory, "seal.json")));
     }
 
     [Theory]

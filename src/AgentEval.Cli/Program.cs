@@ -1045,6 +1045,7 @@ rootCmd.Add(AgentEval.Cli.Runner.RunnerManifest.Create());
 var aefRunCommand = AgentEval.Cli.Runner.RunCommand.Create();
 rootCmd.Add(aefRunCommand);
 
+var nativeAefOptions = new AefCliOptions(rootCmd);
 var parseResult = rootCmd.Parse(args);
 
 // A parse error — an unknown command or option, a value that does not convert (`--runs abc`), a missing required
@@ -1061,12 +1062,18 @@ if (parseResult.Action is System.CommandLine.Invocation.ParseErrorAction)
 }
 
 // A dry-run must not create even explicitly requested diagnostic files.
+if (parseResult.Action is System.CommandLine.Help.HelpAction)
+    return await parseResult.InvokeAsync();
+
 if (parseResult.CommandResult.Command == aefRunCommand && AgentEval.Cli.Runner.RunCommand.IsDryRun(parseResult))
     return await parseResult.InvokeAsync();
 
-using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
-using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
-return await parseResult.InvokeAsync();
+return await nativeAefOptions.InvokeAsync(parseResult, async () =>
+{
+    using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
+    using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
+    return await parseResult.InvokeAsync();
+});
 
 namespace AgentEval.Cli.Commands
 {

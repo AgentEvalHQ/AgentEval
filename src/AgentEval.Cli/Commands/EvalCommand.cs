@@ -608,6 +608,8 @@ internal static class EvalCommand
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         return new AefEvalRunOptions
         {
+            Seal = AefCliOptions.Seal,
+            Signer = AefCliOptions.Signer,
             SubjectRef = subjectRef,
             SubjectKind = AefEvalWriter.KindOf(subjectRef),
             SubjectVersion = opts.SubjectVersion,

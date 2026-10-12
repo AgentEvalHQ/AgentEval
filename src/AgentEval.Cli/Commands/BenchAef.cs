@@ -30,6 +30,8 @@ internal static class BenchAef
         {
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan), new AefProbeRunOptions
             {
+                Seal = AefCliOptions.Seal,
+                Signer = AefCliOptions.Signer,
                 SubjectRef = AefEvalWriter.Ref("agent", subject),
                 SubjectVersion = subjectVersion,
                 JudgeModel = judgeModel,
@@ -187,6 +189,8 @@ internal static class BenchAef
         {
             var options = new AefCompositeRunOptions
             {
+                Seal = AefCliOptions.Seal,
+                Signer = AefCliOptions.Signer,
                 SubjectRef = AefEvalWriter.Ref(subjectKind, subject),   // the bench's own subject kind
                 SubjectVersion = subjectVersion,
                 TargetMode = targetMode,

@@ -197,11 +197,21 @@ in `.agenteval/aef/runs/<yyyy>/<MM>/<runId>/`, and the command prints its folder
 |---|---|
 | `--aef <dir>` | Write the run under `<dir>/runs/` instead, anywhere. If it cannot be written, the command fails (exit 3). |
 | `--no-aef` | Write no AEF run. |
+| `--aef-key <pkcs8.pem>` | Sign the native run's seal with an unencrypted ECDSA P-256 private key. The key is loaded before execution. |
+| `--aef-unsealed` | Close and verify the native run without sealing it, for a host to seal later. No run hash is reported. Incompatible with `--aef-key`. |
 | `--subject <kind:name>` | `eval` and `redteam`: the subject's ref, such as `agent:support-bot` (default `model:<model>`; a built-in redteam target is `agent:<target>`). Bench families use `--subject` as the agent's name. |
 | `--subject-version <v>` | The subject's exact version. A checkpoint lane only counts runs that name one. |
 
 Without a workspace and without `--aef`, the command says so and writes no run. Without `--aef`, a run that cannot be
 written is a warning, never a failure.
+
+Signing and unsealed controls cannot be combined with `--no-aef`. Use `--aef <dir>` to explicitly require evidence
+at a chosen destination. These controls apply to the native evaluation commands; `run --plan` continues to use
+the runner protocol's mandatory sealed evidence. Runner signing and plan-governed content controls are separate.
+
+After building the CLI, `python tests/AgentEval.Results.Conformance/native-controls-crosscheck.py net10.0`
+(also `net8.0`) exercises these controls through the executable against a loopback HTTP server. It checks
+preflight/help side effects and verifies signed identity and unsealed evidence with both .NET and Python.
 
 **What each command records**
 

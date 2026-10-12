@@ -864,6 +864,8 @@ internal static class RedTeamCommand
             var lines = RedTeamAef.Lines(result);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
+                Seal = AefCliOptions.Seal,
+                Signer = AefCliOptions.Signer,
                 SubjectRef = opts.Subject ?? AefEvalWriter.Ref(builtInTarget ? "agent" : "model", resolvedName),
                 SubjectVersion = opts.SubjectVersion,
                 Endpoint = builtInTarget ? null : opts.Endpoint,
