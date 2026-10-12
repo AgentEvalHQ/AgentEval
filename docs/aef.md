@@ -312,6 +312,10 @@ persistence; an aggregate that was never created has no `runId`. Native adapter 
 Native run options accept `Config` and `CostPolicy`. CLI configuration uses an explicit list of applied settings:
 eval trial counts, repeated-run success thresholds, named metrics, and sampling settings (only for endpoint targets);
 red-team intensity, attack selection and failure policy; benchmark preset and requested trial count, including aborts.
+Eval uses `config.thresholds.case` when every dataset case has the same passing score. With differing scores,
+`config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
+Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
+come from the evaluation definition, so they remain distinct from the producer package version.
 The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending
 limit implied. Hosts that override rates can supply their own policy identity (or omit it); this name is not a
 fingerprint of runtime pricing overrides. Configuration does not copy command-line arguments, prompts, keys or paths.

@@ -181,7 +181,7 @@ public static class AefCompositeRunWriter
             Suite = new AefSuite
             {
                 Ref = options.SuiteRef,
-                Version = AefConverter.Version,
+                Version = preset.Metric.Version,
                 Digest = AefProbeRunWriter.RosterDigest(Keys(preset)),
                 Frozen = true,
                 ExecutionPolicy = options.ExecutionPolicy,

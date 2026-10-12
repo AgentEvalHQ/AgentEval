@@ -59,6 +59,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
                 StoreV1 = new() { RunId = "aggregate-1", TrialRunIds = ["trial-1", "trial-2"] },
             }, Start, Start.AddSeconds(1));
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
+        Assert.Equal("1.0.0", (string?)header["suite"]!["version"]);
         var link = header["ext"]!["agenteval.store-v1"]!;
         Assert.Equal("aggregate-1", (string?)link["runId"]);
         Assert.Equal(new[] { "trial-1", "trial-2" }, link["trialRunIds"]!.AsArray().Select(n => (string)n!));

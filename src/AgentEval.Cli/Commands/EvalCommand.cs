@@ -435,7 +435,7 @@ internal static class EvalCommand
         var completed = new List<TestResult>();
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger),
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -605,7 +605,7 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge)
+    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -615,12 +615,25 @@ internal static class EvalCommand
             if (opts.Temperature is { } temperature) settings["temperature"] = temperature;
             if (opts.MaxTokens is { } maxTokens) settings["maxTokens"] = maxTokens;
         }
-        if (!string.IsNullOrWhiteSpace(opts.Metrics))
+        if (opts.Runs == 1 && !string.IsNullOrWhiteSpace(opts.Metrics))
             settings["metrics"] = new System.Text.Json.Nodes.JsonArray(opts.Metrics.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                 .Select(name => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(name)).ToArray());
+        var scores = cases.Select(c => c.ToTestCase().PassingScore).ToArray();
+        IReadOnlyDictionary<string, AefThreshold>? thresholds = null;
+        if (scores.Length > 0 && scores.Distinct().Count() == 1)
+            thresholds = new Dictionary<string, AefThreshold> { ["case"] = new(AefThresholdOp.AtLeast, scores[0]) };
+        else if (scores.Length > 0)
+        {
+            // Case IDs are already the evidence identities; never use prompt-derived display names.
+            var ids = EvalAef.CaseIds(cases);
+            var perCase = new System.Text.Json.Nodes.JsonObject();
+            for (var i = 0; i < ids.Count; i++)
+                perCase[ids[i]] = new System.Text.Json.Nodes.JsonObject { ["op"] = ">=", ["value"] = scores[i] };
+            settings["caseThresholds"] = perCase;
+        }
         return new AefEvalRunOptions
         {
-            Config = new AefRunConfig { Settings = settings },
+            Config = new AefRunConfig { Settings = settings, Thresholds = thresholds },
             Seal = AefCliOptions.Seal,
             Signer = AefCliOptions.Signer,
             ContentCapture = AefCliOptions.ContentCapture,
@@ -774,7 +787,7 @@ internal static class EvalCommand
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
         var caseIds = EvalAef.CaseIds(datasetTestCases);
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger),
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
             opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 

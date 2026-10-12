@@ -84,6 +84,39 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(true, 3)]
+    public async Task Eval_DatasetThresholds_RecordsAppliedPerCasePolicy(bool mixed, int runs)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync();
+        var options = Options(endpoint.Endpoint, count: 2, runs: runs, metrics: "code_toxicity");
+        File.WriteAllText(options.Dataset.FullName,
+            "- id: low\n  input: secret-one\n  expected: Hi\n  passingScore: 60\n" +
+            $"- id: high\n  input: secret-two\n  expected: Hi\n  passingScore: {(mixed ? 90 : 60)}\n");
+        var exit = await EvalCommand.ExecuteAsync(options, CancellationToken.None);
+        Assert.NotEqual(2, exit);
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var config = Document(dir, "run.json")["config"]!;
+        if (mixed)
+        {
+            Assert.Null(config["thresholds"]);
+            Assert.Equal(60, (int)config["caseThresholds"]!["low"]!["value"]!);
+            Assert.Equal(90, (int)config["caseThresholds"]!["high"]!["value"]!);
+        }
+        else
+        {
+            Assert.Equal(">=", (string?)config["thresholds"]!["case"]!["op"]);
+            Assert.Equal(60, (int)config["thresholds"]!["case"]!["value"]!);
+            Assert.Null(config["caseThresholds"]);
+        }
+        if (runs > 1) Assert.Null(config["metrics"]);
+        else Assert.Equal("code_toxicity", (string?)Assert.Single(config["metrics"]!.AsArray()));
+        Assert.DoesNotContain("secret-one", File.ReadAllText(Path.Combine(dir, "run.json")));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task BenchEvidence_Endpoint_RemovesSecretsAndMatchesRunner(bool scan)

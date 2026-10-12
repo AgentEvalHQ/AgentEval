@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native threshold and suite facts:** eval headers record a shared case threshold only when all dataset cases
+  agree; mixed policies are keyed by evidence case ID. Stochastic headers no longer claim ignored named metrics.
+  Composite suite versions now retain the evaluation definition's exact version instead of the package version.
+
 - **Native run configuration and pricing:** eval/probe/composite headers accept applied configuration and
   pricing policy. CLI evidence records eval sampling/trial/metric settings, red-team intensity/attack/failure
   settings, and benchmark preset/trial counts. ModelPricing.TableName names the bundled baseline; native headers
