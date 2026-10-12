@@ -15,6 +15,7 @@ internal sealed class AefCliOptions
     private readonly Dictionary<Command, Binding> _commands = [];
     internal static bool Seal => Active.Value?.Seal ?? true;
     internal static IAefSigner? Signer => Active.Value?.Signer;
+    internal static AefContentCapture ContentCapture => Active.Value?.ContentCapture ?? AefContentCapture.Off;
 
     internal AefCliOptions(Command root) => Register(root);
 
@@ -26,7 +27,9 @@ internal sealed class AefCliOptions
             var unsealed = new Option<bool>("--aef-unsealed") { Description = "Leave closed AEF evidence unsealed for a host to seal later" };
             command.Options.Add(key);
             command.Options.Add(unsealed);
-            _commands.Add(command, new(key, unsealed));
+            var content = new Option<string?>("--aef-content") { Description = "Capture observed content in AEF evidence blobs: on|off (default: off)" };
+            command.Options.Add(content);
+            _commands.Add(command, new(key, unsealed, content));
         }
         foreach (var child in command.Subcommands) Register(child);
     }
@@ -37,10 +40,16 @@ internal sealed class AefCliOptions
         if (!_commands.TryGetValue(parsed.CommandResult.Command, out var binding)) return await invoke();
         var keyPath = parsed.GetValue(binding.Key);
         var unsealed = parsed.GetValue(binding.Unsealed);
-        var noAef = parsed.CommandResult.Command.Options.OfType<Option<bool>>().FirstOrDefault(o => o.Name == "--no-aef");
-        if ((keyPath is not null || unsealed) && noAef is not null && parsed.GetValue(noAef))
+        var content = parsed.GetValue(binding.Content);
+        if (content is not null and not "on" and not "off")
         {
-            Console.Error.WriteLine("Error: --no-aef cannot be combined with --aef-key or --aef-unsealed.");
+            Console.Error.WriteLine("Error: --aef-content must be on or off.");
+            return ExitCodes.UsageError;
+        }
+        var noAef = parsed.CommandResult.Command.Options.OfType<Option<bool>>().FirstOrDefault(o => o.Name == "--no-aef");
+        if ((keyPath is not null || unsealed || content == "on") && noAef is not null && parsed.GetValue(noAef))
+        {
+            Console.Error.WriteLine("Error: --no-aef cannot be combined with --aef-key, --aef-unsealed or --aef-content on.");
             return ExitCodes.UsageError;
         }
         if (keyPath is not null && unsealed)
@@ -63,7 +72,7 @@ internal sealed class AefCliOptions
         var previous = Active.Value;
         try
         {
-            Active.Value = new(!unsealed, signer);
+            Active.Value = new(!unsealed, signer, content == "on" ? AefContentCapture.On : AefContentCapture.Off);
             return await invoke();
         }
         finally
@@ -73,6 +82,6 @@ internal sealed class AefCliOptions
         }
     }
 
-    private sealed record Binding(Option<string?> Key, Option<bool> Unsealed);
-    private sealed record Settings(bool Seal, IAefSigner? Signer);
+    private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content);
+    private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture);
 }

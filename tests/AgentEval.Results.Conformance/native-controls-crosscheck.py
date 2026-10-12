@@ -55,14 +55,19 @@ try:
                 "--model", "local", "--api-key", "local-test", "--quiet"]
         diagnostic = folder / "diagnostic.log"
         for options in (["--aef-key", "missing.pem"], ["--aef-unsealed", "--aef-key", "missing.pem"],
-                        ["--aef-unsealed", "--no-aef"]):
+                        ["--aef-unsealed", "--no-aef"], ["--aef-content", "yes"],
+                        ["--aef-content", "on", "--no-aef"]):
             invoke(base + options + ["--log-file", str(diagnostic)], 2)
             assert not requests and not diagnostic.exists(), "preflight performed work"
         invoke(["eval", "--help", "--aef-key", "missing.pem", "--log-file", str(diagnostic)])
         assert not requests and not diagnostic.exists(), "help performed work"
-        for mode in ("signed", "unsealed"):
+        for mode in ("signed", "unsealed", "content", "trials"):
             destination = folder / mode
-            options = ["--aef-key", str(keys / "ecdsa-a.key.pem")] if mode == "signed" else ["--aef-unsealed"]
+            options = ["--aef-unsealed"] if mode == "unsealed" else ["--aef-key", str(keys / "ecdsa-a.key.pem")]
+            capture = mode in ("content", "trials")
+            options += ["--aef-content", "on" if capture else "off"]
+            if mode == "trials":
+                options += ["--runs", "3"]
             invoke(base + ["--aef", str(destination)] + options)
             headers = list(destination.rglob("run.json"))
             assert len(headers) == 1
@@ -73,13 +78,19 @@ try:
                 checked = subprocess.run(command, capture_output=True, text=True, timeout=60)
                 assert checked.returncode == 0, checked.stderr
                 result = json.loads(checked.stdout)
-                assert result["outcome"] == ("intact" if mode == "signed" else "unsealed"), result
+                assert result["outcome"] == ("unsealed" if mode == "unsealed" else "intact"), result
                 assert not result["problems"], result
-                if mode == "signed":
+                if mode != "unsealed":
                     assert "test:local" in result["signedBy"], result
-            assert (run / "attestation.dsse.json").exists() == (mode == "signed")
+            assert (run / "attestation.dsse.json").exists() == (mode != "unsealed")
+            captured = b"".join(path.read_bytes() for path in run.rglob("*") if path.is_file())
+            assert (b"private-prompt" in captured) == capture
+            if mode == "trials":
+                results = [json.loads(line) for line in (run / "results.ndjson").read_text().splitlines()]
+                assert len([r for r in results if r.get("evidence")]) == 3, results
+                assert all(not r.get("evidence") for r in results if "trial" not in r), results
             print(f"ok {tfm}: {mode} native CLI evidence cross-verified")
-        assert len(requests) == 2, len(requests)
+        assert len(requests) == 6, len(requests)
         print(f"ok {tfm}: conflicts, invalid key and help performed no HTTP or diagnostic writes")
 finally:
     server.shutdown()

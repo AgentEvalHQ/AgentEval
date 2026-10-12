@@ -22,6 +22,66 @@ public sealed class AefEvalWriterTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Session_NamedMetricContent_LinksReasoningOnlyForObservedLlmGrading(bool capture)
+    {
+        using var session = AefEvalWriter.Start(_out, Options() with
+        {
+            ContentCapture = capture ? AefContentCapture.On : AefContentCapture.Off,
+            MetricJudgeModel = "metric-judge",
+        }, Start);
+        session.Add(new TestResult
+        {
+            TestName = "case", Passed = true, Score = 100,
+            MetricResults = [AgentEval.Core.MetricResult.Pass("llm_quality", 95, "private rationale"),
+                AgentEval.Core.MetricResult.NotMeasured("code_context", "private absence")],
+        }, "case");
+        var (directory, _) = session.Complete(Start.AddSeconds(1));
+        var lines = AefTestRuns.Results(directory);
+        Assert.Equal(capture ? 1 : 0, lines.Count(l => l["reasoning"] is not null));
+        Assert.Equal(capture ? 2 : 0, lines.Count(l => l["evidence"] is not null));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        if (AefTestRuns.ReferenceVerify(directory) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Session_ContentTrials_LinksEachObservedTrialWithoutInventingRollupContent(bool aborted)
+    {
+        using var session = AefEvalWriter.Start(_out, Options() with { ContentCapture = AefContentCapture.On }, Start, 2, 1);
+        var count = aborted ? 1 : 2;
+        for (var i = 0; i < count; i++)
+        {
+            var tools = new ToolUsageReport();
+            tools.AddCall(new ToolCallRecord { Name = "lookup", CallId = "a", Arguments = new Dictionary<string, object?> { ["query"] = "private-query" }, Result = "private-result", WasExecuted = true });
+            tools.AddCall(new ToolCallRecord { Name = "check", CallId = "b", Result = "private-check", WasExecuted = true });
+            session.Add(new TestResult { TestName = "case", Passed = true, Score = 100, ActualOutput = "private-output-" + i,
+                    ToolUsage = tools, CriteriaResults = [], Details = "private-reason" },
+                "case", content: new AefNativeContent { Input = "private-input" });
+        }
+        var (directory, _) = session.Complete(Start.AddSeconds(1), abortReason: aborted ? "cancelled" : null);
+        var lines = AefTestRuns.Results(directory);
+        Assert.Equal(count, lines.Count(l => l["evidence"] is not null));
+        Assert.Null(Assert.Single(lines, l => l["trial"] is null)["evidence"]);
+        Assert.All(lines.Where(l => l["trial"] is not null), l => Assert.NotNull(l["reasoning"]));
+        var evidence = File.ReadAllLines(Path.Combine(directory, "evidence.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(2 * count, evidence.Count(e => (string?)e["kind"] == "tool_call"));
+        Assert.Equal(count, evidence.Count(e => (string?)e["kind"] == "judge_reasoning"));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        if (AefTestRuns.ReferenceVerify(directory) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void MapCase_CompleteEvidence_MatchesIncrementalWriterWithoutContent(bool judgeFailed)
     {
         var result = new TestResult

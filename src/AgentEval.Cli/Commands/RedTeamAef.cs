@@ -11,8 +11,8 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Maps a red-team scan to AEF probe lines (S1 #5a): a line per probe at <c>probe</c>, case
 /// <c>&lt;attack&gt;/&lt;probe&gt;</c> (a <c>--transform</c> codec is already part of the probe id), and a line per benign
-/// control at <c>control</c>, case <c>benign/&lt;probe&gt;</c>. No prompt, response, grader reason or error message is
-/// carried: reasons name the kind of absence only ([RUN-11]).
+/// control at <c>control</c>, case <c>benign/&lt;probe&gt;</c>. Content is omitted by default; explicit capture carries
+/// observed content separately. Structural reasons name the kind of absence only ([RUN-11]).
 /// </summary>
 internal static class RedTeamAef
 {
@@ -61,7 +61,7 @@ internal static class RedTeamAef
         }
     }
 
-    public static IReadOnlyList<AefProbeLine> Lines(RedTeamResult result)
+    public static IReadOnlyList<AefProbeLine> Lines(RedTeamResult result, bool captureContent = false)
     {
         var lines = new List<AefProbeLine>();
         foreach (var attack in result.AttackResults)
@@ -82,6 +82,7 @@ internal static class RedTeamAef
                 lines.Add(new AefProbeLine
                 {
                     CaseId = $"{attack.AttackName}/{probe.ProbeId}",
+                    Content = captureContent ? Content(probe) : null,
                     State = state,
                     Reason = state switch
                     {
@@ -116,6 +117,7 @@ internal static class RedTeamAef
             lines.Add(new AefProbeLine
             {
                 CaseId = $"benign/{control.ProbeId}",
+                Content = captureContent ? Content(control, judgeGraded: true) : null,
                 Control = true,
                 State = state,
                 Reason = state == AefState.Error ? ErrorReason(control.ErrorKind) : null,
@@ -130,6 +132,16 @@ internal static class RedTeamAef
 
     private static AefAnnotatorKind Grader(ProbeResult probe) =>
         probe.Grading?.ShippedBy == GradingProvenanceKind.Judge ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code;
+
+    private static AefNativeContent Content(ProbeResult probe, bool judgeGraded = false) => new()
+    {
+        Input = probe.Prompt,
+        // Folded probes store their transcript in Response, not a single subject output.
+        Output = probe.TurnsUsed is null && probe.NodesExplored is null ? probe.Response : null,
+        Transcript = probe.TurnsUsed is not null || probe.NodesExplored is not null ? probe.Response : null,
+        JudgeReasoning = probe.Rationale ?? ((judgeGraded || Grader(probe) == AefAnnotatorKind.Llm) && !probe.HasError ? probe.Reason : null),
+        Document = probe.HasError ? null : probe.Reason,
+    };
 
     private static string ErrorReason(ProbeErrorKind kind) => kind switch
     {

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Opt-in native AEF content capture:** `--aef-content on|off` defaults to off. Eval inputs/expected answers/outputs,
+  available probe content and composite evaluation details are stored in result-linked blobs only when enabled.
+  Repeated and interrupted runs preserve content on observed trials without inventing content for synthetic rollups.
+
 - **Native CLI signing and host sealing:** `eval`, `redteam` and evaluating `bench` commands accept
   `--aef-key <pkcs8.pem>` and `--aef-unsealed`. Keys and conflicting options are checked before command execution
   or diagnostic-file initialization. Help does not load keys. Signers are scoped to one invocation.

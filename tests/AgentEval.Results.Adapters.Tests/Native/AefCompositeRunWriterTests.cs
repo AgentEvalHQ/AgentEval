@@ -57,8 +57,10 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
     }
 
-    [Fact]
-    public void WriteAbortedTrials_DifferentLeafBreakdowns_PreservesOnlyObservedPathsAndExactRollups()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WriteAbortedTrials_DifferentLeafBreakdowns_PreservesOnlyObservedPathsAndExactRollups(bool captureContent)
     {
         var first = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []),
             Composite("leaf", "pass", 1, null, new EvalLineage("threshold", []), Leaf("claim", "pass", 1)));
@@ -68,6 +70,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
             {
                 SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
                 AbortReason = "cancelled",
+                ContentCapture = captureContent ? AefContentCapture.On : AefContentCapture.Off,
                 ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 3, Aggregation = AefTrialAggregation.MajorityVote },
             }, Start, Start.AddSeconds(1));
 
@@ -77,6 +80,8 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(5, lines.Count);
+        Assert.Equal(captureContent, lines.Any(l => l["evidence"] is not null));
+        Assert.All(lines.Where(l => l["trial"] is null), l => Assert.Null(l["evidence"]));
         var roots = lines.Where(l => (string?)l["path"] == "case").ToList();
         Assert.Equal(2, (int)Assert.Single(roots, l => l["trials"] is not null)["trials"]!["n"]!);
         var claim = Assert.Single(lines, l => (string?)l["path"] == "case/claim" && l["trials"] is not null);

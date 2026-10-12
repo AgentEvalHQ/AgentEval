@@ -10,11 +10,13 @@ namespace AgentEval.Results.Adapters.Native;
 
 /// <summary>
 /// One probe of an adversarial scan, as AEF records it: a line at <c>probe</c> in lane <c>redteam</c>, or, for a
-/// benign control, at <c>control</c> in lane <c>over-refusal</c>. It holds no prompt, response or grader reasoning
-/// ([RUN-11]).
+/// benign control, at <c>control</c> in lane <c>over-refusal</c>. Optional observed content is kept separate and
+/// persisted only with explicit capture ([RUN-11]).
 /// </summary>
 public sealed record AefProbeLine
 {
+    /// <summary>Observed content; ignored unless the run explicitly enables content capture.</summary>
+    public AefNativeContent? Content { get; init; }
     /// <summary>The case id: <c>&lt;attack&gt;/&lt;probe&gt;</c> for a probe, <c>benign/&lt;probe&gt;</c> for a control.</summary>
     public required string CaseId { get; init; }
 
@@ -46,6 +48,8 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Whether to persist observed content as evidence blobs; off by default.</summary>
+    public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
@@ -145,7 +149,7 @@ public static class AefProbeRunWriter
                 ? [new AefJudge { Model = options.JudgeModel, Mode = AefJudgeMode.Single }]
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
-            ContentCapture = AefContentCapture.Off,
+            ContentCapture = options.ContentCapture,
             Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
         };
 
@@ -178,7 +182,8 @@ public static class AefProbeRunWriter
             var resultIds = new List<string>();
             foreach (var line in lines)
             {
-                resultIds.Add(writer.AddResult(Line(line, options.JudgeModel, options.Lane)).ResultId);
+                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane),
+                    options.ContentCapture == AefContentCapture.On ? line.Content : null)).ResultId);
             }
 
             if (options.AbortReason is null)

@@ -197,6 +197,7 @@ in `.agenteval/aef/runs/<yyyy>/<MM>/<runId>/`, and the command prints its folder
 |---|---|
 | `--aef <dir>` | Write the run under `<dir>/runs/` instead, anywhere. If it cannot be written, the command fails (exit 3). |
 | `--no-aef` | Write no AEF run. |
+| `--aef-content on\|off` | Persist observed content as linked evidence blobs. Default `off`; incompatible with `--no-aef` when `on`. |
 | `--aef-key <pkcs8.pem>` | Sign the native run's seal with an unencrypted ECDSA P-256 private key. The key is loaded before execution. |
 | `--aef-unsealed` | Close and verify the native run without sealing it, for a host to seal later. No run hash is reported. Incompatible with `--aef-key`. |
 | `--subject <kind:name>` | `eval` and `redteam`: the subject's ref, such as `agent:support-bot` (default `model:<model>`; a built-in redteam target is `agent:<target>`). Bench families use `--subject` as the agent's name. |
@@ -208,6 +209,15 @@ written is a warning, never a failure.
 Signing and unsealed controls cannot be combined with `--no-aef`. Use `--aef <dir>` to explicitly require evidence
 at a chosen destination. These controls apply to the native evaluation commands; `run --plan` continues to use
 the runner protocol's mandatory sealed evidence. Runner signing and plan-governed content controls are separate.
+
+With content capture on, eval records dataset inputs, expected answers, actual responses and observed tool calls;
+redteam and scan benchmarks record available probe/control prompts, responses, folded transcripts and grading
+explanations; composite benchmarks record available summaries, supporting evidence and recommendations. Observed
+judge rationale is also linked through the result's `reasoning` field. Content is stored in blobs referenced by
+each result, including individual trials. Synthetic interrupted-trial rollups do not claim a trial's content as
+their own. Existing upstream redaction remains in effect; capture does not reconstruct missing content. With
+capture off, these fields and blobs are omitted. This flag does not enable request logging or include provider
+configuration and signing keys in evidence.
 
 After building the CLI, `python tests/AgentEval.Results.Conformance/native-controls-crosscheck.py net10.0`
 (also `net8.0`) exercises these controls through the executable against a loopback HTTP server. It checks
@@ -263,7 +273,7 @@ An interrupted stochastic case keeps its completed trials and an incomplete roll
 - `scripted` for a scripted model (`redteam --sut gatekeeper-demo --scripted`);
 - `mocked` for a stand-in. A `--sut mock` run is not stored and writes no AEF run.
 
-**No content.** These runs are written with `contentCapture: off`: no prompt, response, judge reasoning, criterion
+**No content by default.** With the default `contentCapture: off`, runs contain no prompt, response, judge reasoning, criterion
 text, assertion name or message, or error message. A typed absence says only its kind ("the probe timed out", "the
 judge produced no verdict"). A dataset row without an `id` is written under the loader's id (`item_0`), never its text.
 The dataset itself is identified by its digest.

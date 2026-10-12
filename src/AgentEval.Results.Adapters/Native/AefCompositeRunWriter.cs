@@ -24,6 +24,8 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Whether to persist evaluation details as evidence blobs; off by default.</summary>
+    public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
@@ -67,7 +69,7 @@ public sealed record AefCompositeRunOptions
 /// <c>case/&lt;key&gt;/…</c>. States come from each score's measurement and label, as §7.5 reads them; a composite records
 /// its strategy, threshold, score, how many parts were measured, and the rule that decided it with the parts that did
 /// ([RES-5], <see cref="EvalDetails.Lineage"/>). Metrics: <c>pass</c> (a rate) and <c>score</c> (0..1). Content capture is
-/// off: no eval summary, recommendation or judge reasoning is written.
+/// off by default: summaries, recommendations and supporting evidence are captured only with explicit opt-in.
 /// </summary>
 public static class AefCompositeRunWriter
 {
@@ -168,7 +170,7 @@ public static class AefCompositeRunWriter
             },
             Judges = judges.Count > 0 ? judges : null,   // the models that graded a leaf ([RUN-9])
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
-            ContentCapture = AefContentCapture.Off,
+            ContentCapture = options.ContentCapture,
             Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
         };
 
@@ -205,7 +207,7 @@ public static class AefCompositeRunWriter
                         throw new ArgumentException("Repeated presets must have the same ordered case keys.", nameof(trials));
                     for (var i = 0; i < trialCases.Count; i++)
                         Add(writer, trialCases[i], caseShapes[i], trialCases[i].Metric.Key, CasePath, null, null, trial: t,
-                            capture: (line, parent) => captured.Add((line, parent?.Path)));
+                            capture: (line, parent) => captured.Add((line, parent?.Path)), contentCapture: options.ContentCapture);
                 }
                 AddAbortedRollups(writer, captured);
             }
@@ -215,11 +217,11 @@ public static class AefCompositeRunWriter
                 if (caseTrials is not null)
                 {
                     for (var t = 0; t < caseTrials.Count; t++)
-                        Add(writer, caseTrials[t], caseShapes[i], cases[i].Metric.Key, CasePath, null, null, trial: t);
+                        Add(writer, caseTrials[t], caseShapes[i], cases[i].Metric.Key, CasePath, null, null, trial: t, contentCapture: options.ContentCapture);
                 }
                 Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null,
                     options.CaseExt is { } caseExt && caseExt.TryGetValue(cases[i].Metric.Key, out var ext) ? ext : null,
-                    trials: caseTrials, presetMeasured: presetMeasured);
+                    trials: caseTrials, presetMeasured: presetMeasured, contentCapture: options.ContentCapture);
             }
 
             if (options.AbortReason is null)
@@ -304,7 +306,7 @@ public static class AefCompositeRunWriter
     private static void Add(AefRunWriter writer, EvalResult node, AefComponentShape shape, string caseId, string path,
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,
         IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false,
-        Action<AefResult, AefResultHandle?>? capture = null)
+        Action<AefResult, AefResultHandle?>? capture = null, AefContentCapture contentCapture = AefContentCapture.Off)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -371,6 +373,16 @@ public static class AefCompositeRunWriter
                 ? new JsonObject { ["agenteval.component"] = new JsonObject { ["onFailure"] = shape.OnFailure } }
                 : caseExt?.DeepClone().AsObject(),
         };
+        if (contentCapture == AefContentCapture.On &&
+            (node.Details.Summary is not null || node.Details.Evidence is { Count: > 0 } || node.Details.Recommendations is { Count: > 0 }))
+            line = AefNativeContent.Attach(writer, line, new AefNativeContent
+            {
+                JudgeReasoning = llm ? node.Details.Summary : null,
+                Document = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    node.Details.Summary, node.Details.Evidence, node.Details.Recommendations,
+                }),
+            });
         var handle = writer.AddResult(line, parent);
         capture?.Invoke(line, parent);
 
@@ -378,7 +390,7 @@ public static class AefCompositeRunWriter
         {
             var child = described ? shape.Children[i] : Undescribed;
             Add(writer, subs[i], child, caseId, childPaths[i], handle, new AefComponent(child.Weight, child.Required),
-                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList(), capture: capture);
+                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList(), capture: capture, contentCapture: contentCapture);
         }
     }
 
@@ -397,6 +409,8 @@ public static class AefCompositeRunWriter
             var children = childCounts.GetValueOrDefault((group.Key.CaseId, group.Key.Path));
             var rollup = first.Result with
             {
+                Evidence = null,
+                Reasoning = null,
                 Trial = null,
                 Trials = new AefTrials(group.Count(), group.Count(x => x.Result.State == AefState.Passed),
                     AefTrialAggregation.MajorityVote, group.Select(x => x.Result.State).Distinct().Count() == 1),

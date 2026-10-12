@@ -25,6 +25,8 @@ public sealed class AefCliOptionsTests
     [InlineData("--no-aef --aef-key missing.pem")]
     [InlineData("--aef-unsealed --aef-key missing.pem")]
     [InlineData("--aef-key missing.pem")]
+    [InlineData("--aef-content yes")]
+    [InlineData("--aef-content on --no-aef")]
     public async Task Invoke_InvalidControls_RejectsBeforeInvokingCommand(string args)
     {
         var (command, controls) = Create();

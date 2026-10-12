@@ -32,9 +32,9 @@ internal sealed class EvalEvidence : IDisposable
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 
-    public void Add(TestResult result, string caseId, int? passingScore = null)
+    public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null)
     {
-        try { _session?.Add(result, caseId, passingScore); }
+        try { _session?.Add(result, caseId, passingScore, content); }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 

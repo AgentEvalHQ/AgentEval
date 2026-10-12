@@ -443,7 +443,9 @@ internal static class EvalCommand
             {
                 var index = completed.Count;
                 completed.Add(result);
-                evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore);
+                evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
+                    AefCliOptions.ContentCapture == AefContentCapture.On
+                        ? new AefNativeContent { Input = testCases[index].Input, Expected = testCases[index].ExpectedOutput } : null);
             });
             ct.ThrowIfCancellationRequested();
 
@@ -610,6 +612,7 @@ internal static class EvalCommand
         {
             Seal = AefCliOptions.Seal,
             Signer = AefCliOptions.Signer,
+            ContentCapture = AefCliOptions.ContentCapture,
             SubjectRef = subjectRef,
             SubjectKind = AefEvalWriter.KindOf(subjectRef),
             SubjectVersion = opts.SubjectVersion,
@@ -782,7 +785,8 @@ internal static class EvalCommand
                         if (progress.LastResult is not { } trial) return;
                         if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
                             ct.ThrowIfCancellationRequested();
-                        evidence.Add(trial, caseId);
+                        evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
+                            ? new AefNativeContent { Input = datasetTestCase.Input, Expected = datasetTestCase.ExpectedOutput } : null);
                         stochasticOptions.OnProgress?.Invoke(progress);
                     },
                 }, ct);

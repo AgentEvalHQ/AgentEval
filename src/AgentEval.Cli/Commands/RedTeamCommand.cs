@@ -861,11 +861,12 @@ internal static class RedTeamCommand
 
         try
         {
-            var lines = RedTeamAef.Lines(result);
+            var lines = RedTeamAef.Lines(result, AefCliOptions.ContentCapture == AefContentCapture.On);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
+                ContentCapture = AefCliOptions.ContentCapture,
                 SubjectRef = opts.Subject ?? AefEvalWriter.Ref(builtInTarget ? "agent" : "model", resolvedName),
                 SubjectVersion = opts.SubjectVersion,
                 Endpoint = builtInTarget ? null : opts.Endpoint,

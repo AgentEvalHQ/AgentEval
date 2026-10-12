@@ -311,9 +311,10 @@ public static partial class AefEvalWriter
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
     // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
-    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
+    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore, AefNativeContent? content = null)
     {
         var (root, children) = MapBaseCase(result, caseId, passingScore);
+        root = AefNativeContent.Attach(writer, root, content);
         var handle = writer.AddResult(root);
         foreach (var child in children) writer.AddResult(child, handle);
         return (handle, root);

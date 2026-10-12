@@ -12,6 +12,22 @@ namespace AgentEval.Tests.Cli.Classic;
 /// <summary>How a red-team scan's probes become AEF lines (S1 #5a).</summary>
 public class RedTeamAefTests
 {
+    [Fact]
+    public void Lines_ExplicitCapture_PreservesFoldedTranscriptAndObservedJudgeReason()
+    {
+        Assert.All(RedTeamAef.Lines(Result()), line => Assert.Null(line.Content));
+        var lines = RedTeamAef.Lines(Result(), captureContent: true);
+        var judged = Assert.Single(lines, line => line.CaseId == "PromptInjection/p2");
+        Assert.Equal("secret attack prompt", judged.Content!.Input);
+        Assert.Equal("secret agent reply", judged.Content.Transcript);
+        Assert.Null(judged.Content.Output);
+        Assert.Equal("matched: secret agent reply", judged.Content.JudgeReasoning);
+        var failed = Assert.Single(lines, line => line.CaseId == "PromptInjection/p4");
+        Assert.Null(failed.Content!.Document);
+        Assert.Null(failed.Content.JudgeReasoning);
+        Assert.All(lines.Where(l => l.Control), l => Assert.Equal("matched: secret agent reply", l.Content!.JudgeReasoning));
+    }
+
     private static ProbeResult Probe(string id, EvaluationOutcome outcome, string? error = null, ProbeErrorKind kind = ProbeErrorKind.None,
         GraderProvenance? grading = null) => new()
     {
