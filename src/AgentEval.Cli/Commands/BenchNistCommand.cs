@@ -141,7 +141,7 @@ public static class BenchNistCommand
         }
         else
         {
-            MockTarget.PrintBanner("bench nist", "a stand-in that refuses every request");
+            MockTarget.PrintBanner("bench nist", "a stand-in that refuses every request", aefRequested: aef is not null && !noAef);
             agent = new MockTarget.RefusingAgent(subject);
         }
         var isMock = agent is MockTarget.RefusingAgent;
@@ -180,8 +180,8 @@ public static class BenchNistCommand
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
@@ -197,8 +197,12 @@ public static class BenchNistCommand
             var report = benchmark.GenerateReport(redTeamResult);
             if (isMock)
             {
+                if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                    AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
+                    ExitCodes.GateIndeterminate, judgeLedger))
+                    return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench nist",
-                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
             }
 
             var incompleteReasons = new List<string>();
@@ -312,8 +316,8 @@ public static class BenchNistCommand
 
             // ── AEF ───────────────────────────────────────────────────────────────
             // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
-                    agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                    !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                     judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
@@ -337,8 +341,8 @@ public static class BenchNistCommand
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // The scan may finish before persistence or report generation is cancelled.
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);

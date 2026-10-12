@@ -81,6 +81,59 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         };
     }
 
+    [Theory]
+    [InlineData("owasp")]
+    [InlineData("mitre")]
+    [InlineData("nist")]
+    public async Task BenchScan_Mock_ExplicitEvidenceIsMockedAndDefaultStoresNothing(string family)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        async Task<(int ExitCode, string? ReportDir)> Run(DirectoryInfo? aef, bool noAef = false, CancellationToken ct = default) => family switch
+        {
+            "owasp" => await BenchOwaspCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
+                mock: true, aef: aef, noAef: noAef, ct: ct),
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
+                mock: true, aef: aef, noAef: noAef, ct: ct),
+            _ => await BenchNistCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
+                mock: true, aef: aef, noAef: noAef, ct: ct),
+        };
+        Assert.Equal(11, (await Run(null)).ExitCode);
+        Assert.Empty(Directory.GetFileSystemEntries(workspace));
+        var disabled = new DirectoryInfo(Path.Combine(_root, "disabled"));
+        Assert.Equal(11, (await Run(disabled, noAef: true)).ExitCode);
+        Assert.False(disabled.Exists);
+
+        var destination = new DirectoryInfo(Path.Combine(_root, "explicit"));
+        var result = await Run(destination);
+        Assert.Equal(11, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Empty(Directory.GetFileSystemEntries(workspace));
+        var run = RunDirectory(destination.FullName);
+        AssertIntact(run);
+        var header = Document(run, "run.json");
+        Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
+        Assert.True(header["judges"] is null || header["judges"]!.AsArray().Count == 0);
+        var lines = File.ReadAllLines(Path.Combine(run, "results.ndjson")).Select(l => JsonNode.Parse(l)!);
+        Assert.All(lines, line => Assert.NotEqual("LLM", (string?)line["annotator"]?["kind"]));
+        var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
+        Assert.Equal(11, (int)gate["exitCode"]!);
+        Assert.Equal("inconclusive", (string?)gate["outcome"]);
+
+        var cancelled = new DirectoryInfo(Path.Combine(_root, "cancelled"));
+        Assert.Equal(1, (await Run(cancelled, ct: new CancellationToken(canceled: true))).ExitCode);
+        var aborted = RunDirectory(cancelled.FullName);
+        AssertIntact(aborted);
+        var abortedHeader = Document(aborted, "run.json");
+        Assert.Equal("mocked", (string?)abortedHeader["execution"]!["targetMode"]);
+        Assert.Equal("aborted", (string?)abortedHeader["status"]);
+        Assert.False(File.Exists(Path.Combine(aborted, "gates.ndjson")));
+
+        var blocked = Path.Combine(_root, "blocked");
+        File.WriteAllText(blocked, "not a directory");
+        Assert.Equal(3, (await Run(new DirectoryInfo(blocked))).ExitCode);
+    }
+
     [Fact]
     public async Task Eval_SharedUnsealedControl_LeavesClosedEvidenceWithoutSeal()
     {

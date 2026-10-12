@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 AgentEval Contributors
+"""Verify explicit mocked scan evidence through the CLI without providers."""
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+root = Path(__file__).resolve().parents[2]
+tfm = sys.argv[1] if len(sys.argv) > 1 else "net10.0"
+cli = ["dotnet", str(root / f"src/AgentEval.Cli/bin/Debug/{tfm}/AgentEval.Cli.dll")]
+
+
+def invoke(args, expected):
+    result = subprocess.run(cli + args, capture_output=True, text=True, timeout=60)
+    assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
+    return result
+
+
+with tempfile.TemporaryDirectory(prefix="aef-mock-") as temporary:
+    for family in ("owasp", "mitre", "nist"):
+        workspace = Path(temporary) / family
+        store = workspace / ".agenteval"
+        store.mkdir(parents=True)
+        args = ["bench", family, "--root", str(workspace), "--subject", "mock-subject",
+                "--preset", "smoke", "--sut", "mock"]
+        invoke(args, 11)
+        assert not list(store.iterdir()), "Default mock wrote legacy data or AEF"
+        destination = workspace / "evidence"
+        invoke(args + ["--aef", str(destination)], 11)
+        assert not list(store.iterdir()), "Explicit mock wrote legacy data"
+        headers = list(destination.rglob("run.json"))
+        assert len(headers) == 1, headers
+        run = headers[0].parent
+        header = json.loads(headers[0].read_text())
+        assert header["execution"]["targetMode"] == "mocked"
+        assert not header.get("judges"), header
+        gates = [json.loads(line) for line in (run / "gates.ndjson").read_text().splitlines()]
+        assert len(gates) == 1 and gates[0]["exitCode"] == 11 and gates[0]["outcome"] == "inconclusive"
+        for command in (cli + ["aef", "verify", str(run), "--json"],
+                        [sys.executable, str(root / "contracts/aef/tools/aef_verify.py"), "run", str(run)]):
+            result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+            report = json.loads(result.stdout)
+            assert result.returncode == 0 and report["outcome"] == "intact" and not report["problems"], report
+        disabled = workspace / "disabled"
+        invoke(args + ["--aef", str(disabled), "--no-aef"], 11)
+        assert not disabled.exists()
+        blocked = workspace / "blocked"
+        blocked.write_text("not a directory")
+        invoke(args + ["--aef", str(blocked)], 3)
+        assert not list(store.iterdir())
+print(f"{tfm}: 12 actual CLI mock scenarios passed; 3 mocked runs accepted by CLI and Python")

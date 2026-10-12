@@ -278,7 +278,14 @@ An interrupted stochastic case keeps its completed trials and an incomplete roll
 - `replayed` when the command graded an answer or trace the agent already gave (`--response`, `bench agentic`, the
   trace-fidelity families);
 - `scripted` for a scripted model (`redteam --sut gatekeeper-demo --scripted`);
-- `mocked` for a stand-in. A `--sut mock` run is not stored and writes no AEF run.
+- `mocked` for a stand-in. OWASP, MITRE and NIST `--sut mock` scans write AEF only when `--aef` is explicit;
+  they retain exit 11 and an inconclusive command gate. Defaults write nothing, and legacy storage remains off.
+  Cancellation preserves an explicitly requested aborted mock run without a gate. Other mock benchmark families
+  are still being audited for this opt-in behavior.
+
+After building the CLI, `python tests/AgentEval.Results.Conformance/native-mock-crosscheck.py net10.0`
+(also `net8.0`) checks these three scan families through the executable, including defaults, opt-out and write
+failures, and verifies the explicit mocked runs with both .NET and Python.
 
 **No content by default.** With the default `contentCapture: off`, runs contain no prompt, response, judge reasoning, criterion
 text, assertion name or message, or error message. A typed absence says only its kind ("the probe timed out", "the

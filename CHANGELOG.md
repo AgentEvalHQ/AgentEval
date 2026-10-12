@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Explicit mock scan evidence:** OWASP, MITRE and NIST benchmarks honor `--sut mock --aef <dir>` with
+  mocked AEF provenance, exit 11 and an inconclusive gate. Default mock runs still store nothing; cancellation
+  preserves explicitly requested aborted evidence, and explicit write failures return exit 3.
+
 - **Native compliance artifacts:** GDPR/EU AI Act rich JSON reports (with content capture on) and OWASP/MITRE
   content-free control summaries are attached byte-for-byte to matching AEF roots. Source-run binding rejects
   overwritten reports; completed reports can remain attached when later rendering is cancelled.

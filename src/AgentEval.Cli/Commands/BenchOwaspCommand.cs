@@ -160,7 +160,7 @@ public static class BenchOwaspCommand
         }
         else
         {
-            MockTarget.PrintBanner("bench owasp", "a stand-in that refuses every request");
+            MockTarget.PrintBanner("bench owasp", "a stand-in that refuses every request", aefRequested: aef is not null && !noAef);
             agent = new MockTarget.RefusingAgent(subject);
         }
         var isMock = agent is MockTarget.RefusingAgent;
@@ -206,8 +206,8 @@ public static class BenchOwaspCommand
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, abortReason: "cancelled"))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
@@ -223,8 +223,12 @@ public static class BenchOwaspCommand
             var report = benchmark.GenerateReport(redTeamResult);
             if (isMock)
             {
+                if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                    AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
+                    ExitCodes.GateIndeterminate, judgeLedger))
+                    return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench owasp",
-                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+                    $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
             }
 
             var incompleteReasons = new List<string>();
@@ -349,8 +353,8 @@ public static class BenchOwaspCommand
 
             // ── AEF ───────────────────────────────────────────────────────────────
             // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
-                    agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                    !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                     judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
@@ -374,8 +378,8 @@ public static class BenchOwaspCommand
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // The scan may finish before persistence or report generation is cancelled.
-            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled", complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);

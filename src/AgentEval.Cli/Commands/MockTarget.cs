@@ -93,18 +93,19 @@ internal static class MockTarget
     }
 
     /// <summary>Prints the banner that opens a mock run.</summary>
-    public static void PrintBanner(string command, string standIn) =>
+    public static void PrintBanner(string command, string standIn, bool aefRequested = false) =>
         Console.Error.WriteLine(
             $"MOCK RUN: {command} is running against {standIn}, not an agent. " +
-            "The result measures nothing about any agent and is not stored in .agenteval/.");
+            "The result measures nothing about any agent and " +
+            (aefRequested ? "only explicitly requested mocked AEF evidence will be stored." : "is not stored in .agenteval/."));
 
     /// <summary>
     /// Prints the result line of a mock run and returns <see cref="ExitCodes.GateIndeterminate"/>: a mock run
     /// never passes or fails a gate.
     /// </summary>
-    public static int Finish(string command, string result)
+    public static int Finish(string command, string result, bool aefWritten = false)
     {
-        Console.WriteLine($"MOCK RESULT ({command}, stand-in, not stored): {result}");
+        Console.WriteLine($"MOCK RESULT ({command}, stand-in, {(aefWritten ? "explicit mocked AEF only" : "not stored")}): {result}");
         return ExitCodes.GateIndeterminate;
     }
 
