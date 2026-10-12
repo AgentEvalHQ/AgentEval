@@ -115,7 +115,20 @@ written is a warning, never a failure.
 | `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
 
-Not yet: `bench --runs` above 1 (the command says so).
+`bench gdpr --runs N` and `bench eu-ai-act --runs N` preserve each trial's tree and a corresponding
+majority-vote rollup tree. Ties choose the more severe label; a pass supported by only some requested trials
+becomes a warning. Error and skipped trials contribute no vote.
+
+Composite benchmark summaries retain `score@case` as the arithmetic mean. A separate `preset-score@case`
+entry records the preset's own aggregate value and verdict, with an `agenteval.*` aggregate method. It is
+`not_measured` when the preset withholds its score. These are distinct metrics because AEF allows only one
+summary entry per lane, metric and path.
+
+Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
+and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
+Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
+Cancellation during eval or redteam execution seals completed results in an `aborted` run with no final gate.
+An interrupted stochastic case keeps its completed trials and an incomplete rollup.
 
 **How the run says what was tested.** `execution.targetMode` is never assumed:
 

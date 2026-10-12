@@ -195,6 +195,7 @@ var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspa
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED; there is no default." };
 var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. Without it, --sut or --from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
+var benchEuAiActRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). Repeated runs are aggregated via MajorityVote and preserved as AEF trials." };
 var benchEuAiActAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
 var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave. Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
@@ -203,6 +204,7 @@ benchEuAiActCmd.Add(benchEuAiActRootOpt);
 benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
+benchEuAiActCmd.Add(benchEuAiActRunsOpt);
 benchEuAiActCmd.Add(benchEuAiActAzureFromEnvOpt);
 var benchEuAiActAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
 var benchEuAiActNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
@@ -257,7 +259,8 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
         aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };

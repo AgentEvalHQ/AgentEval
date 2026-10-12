@@ -44,6 +44,12 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public string? GateRule { get; init; }
 
+    /// <summary>The command's final decision; takes precedence over <see cref="GateRule"/> when supplied.</summary>
+    public AefCommandGate? Gate { get; init; }
+
+    /// <summary>A content-free reason for an interrupted run; when set the run closes aborted and records no gate.</summary>
+    public string? AbortReason { get; init; }
+
     /// <summary>How the run drove its target ([RUN-7]); a stand-in target is never <c>live</c>.</summary>
     public required AefTargetMode TargetMode { get; init; }
 
@@ -76,6 +82,12 @@ public static class AefEvalWriter
 
     /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
     /// <param name="passingScores">Each case's passing score, the threshold of its own verdict; null records none.</param>
+    /// <param name="runsRoot">The root folder for runs.</param>
+    /// <param name="summary">The completed evaluation results.</param>
+    /// <param name="caseIds">One stable dataset id per result.</param>
+    /// <param name="options">Run identity and recording options.</param>
+    /// <param name="startedAt">When evaluation started.</param>
+    /// <param name="endedAt">When evaluation and its gate decision finished.</param>
     public static (string Directory, string RunHash) Write(
         string runsRoot, TestSummary summary, IReadOnlyList<string> caseIds, AefEvalRunOptions options,
         DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<int>? passingScores = null)
@@ -132,9 +144,25 @@ public static class AefEvalWriter
         throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "no number of passing trials meets the threshold");
     }
 
+    /// <summary>Seals the completed trials of an interrupted run, retaining its original execution policy.</summary>
+    public static (string Directory, string RunHash) WriteAbortedTrials(
+        string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> trials, IReadOnlyList<string> caseIds,
+        int plannedTrials, int requirePasses, AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        ArgumentNullException.ThrowIfNull(trials);
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.AbortReason is null) throw new ArgumentException("An interrupted run needs an abort reason.", nameof(options));
+        if (plannedTrials is < 1 or > 1000 || requirePasses < 1 || requirePasses > plannedTrials)
+            throw new ArgumentOutOfRangeException(nameof(plannedTrials), "The original policy requires 1 to 1000 trials and a pass count within it.");
+        if (trials.Any(t => t.Count < 1 || t.Count > plannedTrials))
+            throw new ArgumentException("Only cases with completed trials belong in an interrupted run.", nameof(trials));
+        return WriteRun(runsRoot, trials, caseIds, requirePasses, options, startedAt, endedAt, plannedTrials: plannedTrials);
+    }
+
     private static (string Directory, string RunHash) WriteRun(
         string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> cases, IReadOnlyList<string> caseIds, int? requirePasses,
-        AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<int>? passingScores = null)
+        AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<int>? passingScores = null,
+        int? plannedTrials = null)
     {
         ArgumentNullException.ThrowIfNull(caseIds);
         ArgumentNullException.ThrowIfNull(options);
@@ -164,7 +192,7 @@ public static class AefEvalWriter
                 Digest = digest,
                 Frozen = true,
                 ExecutionPolicy = requirePasses is { } k
-                    ? new AefExecutionPolicy { TrialsPerCase = cases[0].Count, RequirePasses = k, Aggregation = AefTrialAggregation.AtLeast }
+                    ? new AefExecutionPolicy { TrialsPerCase = plannedTrials ?? cases[0].Count, RequirePasses = k, Aggregation = AefTrialAggregation.AtLeast }
                     : null,
             },
             Judges = options.JudgeModel is not null && all.Any(Graded)
@@ -206,11 +234,19 @@ public static class AefEvalWriter
                     writer.AddResult(Line(cases[i][t], caseIds[i], t));
                 }
 
-                var rollup = Rollup(cases[i], caseIds[i], required);
+                var rollup = Rollup(cases[i], caseIds[i], required, plannedTrials);
                 roots.Add((writer.AddResult(rollup).ResultId, rollup.State));
             }
 
-            if (options.GateRule is { } rule)
+            if (options.AbortReason is not null)
+            {
+                // No final gate decision was taken for an interrupted evaluation.
+            }
+            else if (options.Gate is { } gate)
+            {
+                gate.Write(writer, runId, endedAt, roots.Select(r => r.ResultId).ToList());
+            }
+            else if (options.GateRule is { } rule)
             {
                 // The command's own gate: every case passed, or it does not ship (exit 1, as the command exits).
                 var notPassed = roots.Where(r => r.State != AefState.Passed).Select(r => r.ResultId).ToList();
@@ -235,7 +271,8 @@ public static class AefEvalWriter
                 Cost = cost > 0 ? new AefCost(cost, "AgentEval's estimate from the agent's reported token usage; judge calls are not included") : null,
                 Usage = Totals(all, options.JudgeUsage),
             });
-            writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
+            writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
+                AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
             var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
             return (directory, seal.RunHash);
         }
@@ -313,12 +350,13 @@ public static class AefEvalWriter
     // A case's result over its trials ([RES-8]): passed when at least requirePasses trials passed; failed when they could
     // not have, even had every unmeasured trial passed; otherwise not decided, an error. Its score is the mean of the
     // measured trials'. Usage and duration stay on the trial lines, so nothing is counted twice.
-    private static AefResult Rollup(IReadOnlyList<TestResult> trials, string caseId, int requirePasses)
+    private static AefResult Rollup(IReadOnlyList<TestResult> trials, string caseId, int requirePasses, int? plannedTrials = null)
     {
         var states = trials.Select(StateOf).ToList();
         var passed = states.Count(s => s == AefState.Passed);
         var unmeasured = states.Count(s => s == AefState.Error);
-        var state = passed >= requirePasses ? AefState.Passed
+        var incomplete = plannedTrials is { } planned && trials.Count < planned;
+        var state = incomplete ? AefState.Error : passed >= requirePasses ? AefState.Passed
             : passed + unmeasured >= requirePasses ? AefState.Error
             : AefState.Failed;
         var measured = trials.Where(t => StateOf(t) != AefState.Error).ToList();
@@ -328,7 +366,7 @@ public static class AefEvalWriter
             Path = CasePath,
             Evaluator = new AefEvaluator("agenteval.harness", AefConverter.Version),
             State = state,
-            Reason = state == AefState.Error
+            Reason = incomplete ? "The case was interrupted before all requested trials completed" : state == AefState.Error
                 ? $"{unmeasured} of {trials.Count} trials were not measured, so whether at least {requirePasses} pass is undecided"
                 : null,
             Scores = state == AefState.Error || measured.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = measured.Average(t => (double)t.Score) }],

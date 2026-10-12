@@ -482,6 +482,10 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 
 **Families**
 
+GDPR and EU AI Act accept `--runs N` (at least 1, default 1). Repeated runs use majority voting,
+retain each trial in AEF, and persist the voted result for reporting. Ties choose the more severe label;
+a pass supported by only some requested trials becomes a warning. `--sut mock` still runs only its demonstration.
+
 | Family | Purpose |
 |--------|---------|
 | `gdpr` | GDPR compliance benchmark. |

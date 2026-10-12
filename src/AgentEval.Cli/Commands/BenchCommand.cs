@@ -55,6 +55,11 @@ public static class BenchCommand
         string? subjectVersion = null,
         bool agentIsLive = false)
     {
+        if (runs < 1)
+        {
+            Console.Error.WriteLine("Error: --runs must be at least 1.");
+            return ExitCodes.UsageError;
+        }
         // agentIsLive: the caller resolved agentOverride from --sut, a real target. Any other agentOverride is a stand-in,
         // which the AEF run records as mocked, never live (RUN-7).
         var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
@@ -215,6 +220,7 @@ public static class BenchCommand
 
         string runId;
         EvalResult compositeResult;
+        IReadOnlyList<EvalResult>? trialResults = null;
         var startedAt = DateTimeOffset.UtcNow;
         try
         {
@@ -222,8 +228,9 @@ public static class BenchCommand
             {
                 // Stochastic mode: run N times, aggregate via MajorityVote.
                 compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct);
-                // Use the benchmark key as the run ID for reporting purposes.
-                runId = $"{benchmark.Key}.runs{runs}.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+                trialResults = compositeResult.Details.SubResults!;
+                compositeResult = StochasticBenchRunner.RollupTree(trialResults);
+                runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
             }
             else
             {
@@ -303,33 +310,31 @@ public static class BenchCommand
             Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
         }
 
+        var overall = evidence.Summary.OverallStatus;
+        var finalExit = BenchExitCodes.FromLabel(overall);
         // ── AEF ───────────────────────────────────────────────────────────────
         // One run of the preset as sealed evidence. A live agent (--from-env, or --sut) is live; a stand-in is mocked; a
-        // supplied --response is replayed: the subject was not driven, its recorded answer was graded. --runs above 1 is
-        // not written yet (its MajorityVote root is AgentEval's, not one run of the preset).
+        // supplied --response is replayed: the subject was not driven, its recorded answer was graded.
+        // Repeated runs retain each trial tree and a corresponding majority-vote rollup tree.
         var aefFailed = false;
-        if (!noAef && runs > 1)
-        {
-            Console.Error.WriteLine("AEF: --runs above 1 is not written as AEF yet, so this benchmark wrote no AEF run.");
-        }
-        else if (!noAef)
+        if (!noAef)
         {
             var targetMode = agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
                 : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                 : AgentEval.Results.Writing.AefTargetMode.Mocked;
             aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
-                compositeResult, startedAt, DateTimeOffset.UtcNow);
+                compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
+                trials: trialResults);
         }
 
         // ── Exit code ─────────────────────────────────────────────────────────
         if (aefFailed)
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        var overall = evidence.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
 
         // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
         // the shared helper exists specifically so a future policy change lands in one place.
-        return BenchExitCodes.FromLabel(overall);
+        return finalExit;
     }
 
     /// <summary>

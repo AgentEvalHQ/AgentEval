@@ -95,4 +95,32 @@ public sealed class AefProbeRunWriterTests : IDisposable
     [Fact]
     public void RosterDigest_DoesNotDependOnOrderOrRepeats() =>
         Assert.Equal(AefProbeRunWriter.RosterDigest(["b", "a", "a"]), AefProbeRunWriter.RosterDigest(["a", "b"]));
+
+    [Theory]
+    [InlineData("vuln", 1, AefGateOutcome.NoShip)]
+    [InlineData("regression", 4, AefGateOutcome.NoShip)]
+    [InlineData("never", 0, AefGateOutcome.Ship)]
+    public void Write_CommandGateAndUsage_PreservesPolicyEvenWithFailedProbe(string policy, int exitCode, AefGateOutcome outcome)
+    {
+        var options = Options() with
+        {
+            Gate = new AefCommandGate { GateId = "gate:redteam", Rule = "fail-on:" + policy, ExitCode = exitCode, Outcome = outcome },
+            JudgeUsage = new AefUsage { Role = AefUsageRole.Judge, Model = "judge-x", InputTokens = 123, OutputTokens = 45 },
+        };
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new AefProbeLine { CaseId = "attack/p1", State = AefState.Failed, Annotator = AefAnnotatorKind.Llm }],
+            options, Start, Start.AddMinutes(1));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("fail-on:" + policy, (string?)gate["rule"]!["strategy"]);
+        Assert.Equal(exitCode, (int)gate["exitCode"]!);
+        Assert.Equal(exitCode == 0 ? "ship" : "no_ship", (string?)gate["outcome"]);
+        Assert.Single(gate["inputs"]!["results"]!.AsArray());
+        var usage = AefTestRuns.Document(dir, "summary.json")["usage"]![0]!;
+        Assert.Equal(123, (long)usage["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(45, (long)usage["gen_ai.usage.output_tokens"]!);
+    }
 }

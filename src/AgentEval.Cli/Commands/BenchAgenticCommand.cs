@@ -328,14 +328,15 @@ public static class BenchAgenticCommand
         }
 
         // ── AEF ───────────────────────────────────────────────────────────────
+        var overall = result.Summary.OverallStatus;
+        var finalExit = BenchExitCodes.FromLabel(overall);
         // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
         // replayed.
         if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow))
+                AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         // ── Exit code ─────────────────────────────────────────────────────────
-        var overall = result.Summary.OverallStatus;
         // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
         // indeterminate (11), not "gate failed" (9).
         var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
@@ -349,7 +350,7 @@ public static class BenchAgenticCommand
 
         // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
         // the shared helper exists specifically so a future policy change lands in one place.
-        return BenchExitCodes.FromLabel(overall);
+        return finalExit;
     }
 
     /// <summary>The presets built only from pure-code evaluators: they never call a judge.</summary>

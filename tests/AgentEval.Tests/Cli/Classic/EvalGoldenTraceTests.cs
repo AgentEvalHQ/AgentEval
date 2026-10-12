@@ -52,6 +52,7 @@ public sealed class EvalGoldenTraceTests : IDisposable
         Runs = runs,
         SaveGolden = save,
         Golden = golden,
+        Aef = new DirectoryInfo(Path.Combine(dataset.DirectoryName!, "aef-" + Guid.NewGuid().ToString("N"))),
         FailOnToolChange = failOnToolChange,
     };
 
@@ -129,6 +130,26 @@ public sealed class EvalGoldenTraceTests : IDisposable
 
         Assert.Equal(ExitCodes.Success, lenient);
         Assert.Equal(ExitCodes.TestFailure, strict);
+    }
+
+    [Theory]
+    [InlineData("Hi", "Bonjour", 1)]
+    [InlineData("Bonjour", "Bonjour", 0)]
+    public async Task ExecuteAsync_GoldenGate_AefMatchesTheComparisonExit(string before, string after, int expected)
+    {
+        var golden = GoldenPath();
+        await RunAsync(Options(Dataset(before), save: golden));
+        var options = Options(Dataset(after), golden: golden);
+        var (exit, _, _) = await RunAsync(options);
+
+        Assert.Equal(expected, exit);
+        var gatePath = Assert.Single(Directory.GetFiles(options.Aef!.FullName, "gates.ndjson", SearchOption.AllDirectories));
+        var gate = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(gatePath).Single())!;
+        Assert.Equal("golden-trace", (string?)gate["rule"]!["strategy"]);
+        Assert.Equal(exit, (int)gate["exitCode"]!);
+        Assert.Equal(exit == 0 ? "ship" : "no_ship", (string?)gate["outcome"]);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+            AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(gatePath)!).Outcome);
     }
 
     [Fact]

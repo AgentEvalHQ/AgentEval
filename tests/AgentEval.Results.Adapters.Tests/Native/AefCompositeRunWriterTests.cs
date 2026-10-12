@@ -54,11 +54,16 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         var (dir, _) = AefCompositeRunWriter.Write(_out, preset, shape, new AefCompositeRunOptions
         {
             SubjectRef = "agent:support", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/standard",
+            Gate = new AefCommandGate { GateId = "gate:bench", Rule = "label:fail", ExitCode = 9, Outcome = AefGateOutcome.NoShip },
         }, Start, Start.AddMinutes(2));
 
         var verification = AefRunVerifier.Verify(dir);
         Assert.Equal(AefOutcome.Intact, verification.Outcome);
         Assert.Empty(verification.Problems);
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal(9, (int)gate["exitCode"]!);
+        Assert.Equal("no_ship", (string?)gate["outcome"]);
+        Assert.Equal(2, gate["inputs"]!["results"]!.AsArray().Count);
         if (AefTestRuns.ReferenceVerify(dir) is { } reference)
         {
             Assert.Equal("intact", (string?)reference["outcome"]);
@@ -90,6 +95,13 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
         var summary = AefTestRuns.Document(dir, "summary.json");
         Assert.Equal("fail", (string?)summary["ext"]!["agenteval.bench"]!["label"]);
+        var entries = summary["lanes"]![0]!["metrics"]!.AsArray();
+        var mean = Assert.Single(entries, e => (string?)e!["metric"] == "score")!;
+        var aggregate = Assert.Single(entries, e => (string?)e!["metric"] == "preset-score")!;
+        Assert.Equal(0.55, (double)mean["value"]!);
+        Assert.Equal(0.4, (double)aggregate["value"]!);
+        Assert.Equal("failed", (string?)aggregate["verdict"]);
+        Assert.Equal("agenteval.weightedsum", (string?)aggregate["aggregate"]!["method"]);
         var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.DoesNotContain("secret", all, StringComparison.Ordinal);   // summaries and recommendations are content
     }
@@ -113,6 +125,60 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Assert.Equal("Own", (string?)lines["case"]["aggregation"]!["strategy"]);
         Assert.Equal(0.0, (double)lines["case/2"]["component"]!["weight"]!);
         Assert.Equal("failed", (string?)lines["case/2"]["state"]);
+    }
+
+    [Fact]
+    public void WriteTrials_PreservesTreesDisagreementAndAbsences_IntactUnderBothVerifiers()
+    {
+        EvalResult Preset(string label, string childLabel, double value) =>
+            Composite("p", label, value, 0.7, new EvalLineage("threshold", []),
+                Composite("article", label, value, 0.7, new EvalLineage("threshold", []), Leaf("judge", childLabel, value, "atomic-llm", "judge-x")));
+        var trials = new[] { Preset("pass", "pass", 1), Preset("fail", "fail", 0), Preset("error", "error", 0) };
+        var rollup = Preset("fail", "fail", 0.5);
+        var shape = new AefComponentShape(1, true, "Averaged", [new(1, true, "Averaged", [Leaf()])]);
+        var (dir, _) = AefCompositeRunWriter.WriteTrials(_out, rollup, trials, shape,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/x" },
+            Start, Start.AddMinutes(1));
+
+        var verification = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        Assert.Equal(8, lines.Count);
+        foreach (var root in lines.Where(l => (string?)l["path"] == "case"))
+        {
+            var child = Assert.Single(lines, l => (string?)l["parentResultId"] == (string?)root["resultId"]);
+            Assert.Equal((int?)root["trial"], (int?)child["trial"]);
+        }
+        foreach (var aggregate in lines.Where(l => l["trial"] is null))
+        {
+            Assert.Equal(3, (int)aggregate["trials"]!["n"]!);
+            Assert.Equal(1, (int)aggregate["trials"]!["passed"]!);
+            Assert.False((bool)aggregate["trials"]!["agree"]!);
+            Assert.Null(aggregate["annotator"]);
+        }
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Write_WithheldPresetScore_DoesNotPublishItsPlaceholderAsAnAggregate()
+    {
+        var preset = Composite("p", "warn", 0, 0.7, new EvalLineage("required-error", []), Leaf("a", "pass", 0.8));
+        preset = preset with { Score = preset.Score with { Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/x" },
+            Start, Start.AddMinutes(1));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        var metrics = AefTestRuns.Document(dir, "summary.json")["lanes"]![0]!["metrics"]!.AsArray();
+        Assert.Equal(0.8, (double)Assert.Single(metrics, m => (string?)m!["metric"] == "score")!["value"]!);
+        var aggregate = Assert.Single(metrics, m => (string?)m!["metric"] == "preset-score")!;
+        Assert.Equal("not_measured", (string?)aggregate["verdict"]);
+        Assert.Null(aggregate["value"]);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
     }
 
     [Fact]

@@ -51,8 +51,14 @@ public static class BenchEuAiActCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false)
+        bool agentIsLive = false,
+        int runs = 1)
     {
+        if (runs < 1)
+        {
+            Console.Error.WriteLine("Error: --runs must be at least 1.");
+            return ExitCodes.UsageError;
+        }
         // agentIsLive: the caller resolved agentOverride from --sut, a real target. Any other agentOverride is a stand-in,
         // which the AEF run records as mocked, never live (RUN-7).
         var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
@@ -197,7 +203,8 @@ public static class BenchEuAiActCommand
             }
 
             return MockTarget.Finish("bench eu-ai-act",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer");
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer" +
+                (runs > 1 ? " (--runs is ignored for a mock run)" : ""));
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
@@ -211,11 +218,21 @@ public static class BenchEuAiActCommand
 
         string runId;
         EvalResult compositeResult;
+        IReadOnlyList<EvalResult>? trialResults = null;
         var startedAt = DateTimeOffset.UtcNow;
         try
         {
             var runner = new EuAiActBenchmarkRunner();
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
+            if (runs > 1)
+            {
+                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct,
+                    async token => (await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: token)).Item2);
+                trialResults = compositeResult.Details.SubResults!;
+                compositeResult = StochasticBenchRunner.RollupTree(trialResults);
+                runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
+            }
+            else
+                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
         }
         catch (Exception ex)
         {
@@ -236,7 +253,7 @@ public static class BenchEuAiActCommand
         var options = new EuAiActReportOptions(
             Preset: basePreset,
             DomainPacks: domainPacks,
-            JudgeMode: "mode-a",                // EU AI Act has no stochastic --runs path in v1; symmetric with GDPR call site
+            JudgeMode: runs > 1 ? "multi-judge" : "mode-a",
             JudgeModel: judgeModelName);
         EuAiActComplianceEvidence evidence;
         try
@@ -281,24 +298,26 @@ public static class BenchEuAiActCommand
             Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
         }
 
+        var overall = evidence.Summary.OverallStatus;
+        var finalExit = BenchExitCodes.FromLabel(overall);
         // ── AEF ───────────────────────────────────────────────────────────────
         // As bench gdpr: a live agent is live, a stand-in mocked, a graded --response replayed.
         var aefFailed = !noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
             agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
                 : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                 : AgentEval.Results.Writing.AefTargetMode.Mocked,
-            benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow);
+            benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
+            trials: trialResults);
 
         // ── Exit code ─────────────────────────────────────────────────────────
         if (aefFailed)
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        var overall = evidence.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
 
         // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping —
         // OverallStatus is always exactly "PASS"/"WARN"/"FAIL", see MapLabelToStatus, so this is behaviorally
         // unchanged); the shared helper exists specifically so a future policy change lands in one place.
-        return BenchExitCodes.FromLabel(overall);
+        return finalExit;
     }
 
     /// <summary>

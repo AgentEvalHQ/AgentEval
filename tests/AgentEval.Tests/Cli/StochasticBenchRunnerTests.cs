@@ -89,6 +89,32 @@ public class StochasticBenchRunnerTests
     }
 
     [Fact]
+    public async Task RollupTree_PartialPass_PreservesWarningAtEveryNode()
+    {
+        var result = await Run("pass", "error", "error");
+        var rollup = StochasticBenchRunner.RollupTree(result.Details.SubResults!);
+
+        Assert.Equal("gdpr.test", rollup.Metric.Key);
+        Assert.Equal(result.Score, rollup.Score);
+        var child = Assert.Single(rollup.Details.SubResults!);
+        Assert.Equal("leaf", child.Metric.Key);
+        Assert.Equal("warn", child.Score.Label);
+        Assert.Equal(1, child.Score.Value);
+        Assert.Null(child.Provenance.JudgeModel);
+    }
+
+    [Fact]
+    public async Task RollupTree_AllErrors_WithholdsEveryScore()
+    {
+        var result = await Run("error", "error");
+        var rollup = StochasticBenchRunner.RollupTree(result.Details.SubResults!);
+
+        Assert.Equal("error", rollup.Score.Label);
+        Assert.Equal(MeasurementState.NotMeasured, rollup.Score.Measurement);
+        Assert.Equal(MeasurementState.NotMeasured, Assert.Single(rollup.Details.SubResults!).Score.Measurement);
+    }
+
+    [Fact]
     public async Task EveryRunPassing_IsAPass()
     {
         var result = await Run("pass", "pass", "pass");

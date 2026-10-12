@@ -262,21 +262,22 @@ public static class BenchLongMemEvalCommand
             return 1;
         }
 
-        // AEF: a case per question. The environment's provider is live; a client passed in (tests) is a stand-in.
-        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "longmemeval", preset, subject, subjectVersion,
-                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                BenchAef.QuestionTree(result, "longmemeval", preset, LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
-                    chatClientOverride is null ? deployment : null),
-                startedAt, DateTimeOffset.UtcNow))
-            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-
-        return LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
+        var finalExit = LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
         {
             "INCONCLUSIVE" => ExitCodes.GateInconclusive,
             "WARN" => ExitCodes.GateWarning,
             "PASS" => ExitCodes.Success,
             _ => ExitCodes.GateFailed,
         };
+        // AEF: a case per question. The environment's provider is live; a client passed in (tests) is a stand-in.
+        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "longmemeval", preset, subject, subjectVersion,
+                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                BenchAef.QuestionTree(result, "longmemeval", preset, LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
+                    chatClientOverride is null ? deployment : null),
+                startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+
+        return finalExit;
     }
 
     /// <summary>

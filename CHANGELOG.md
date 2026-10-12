@@ -27,7 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   composite's strategy, threshold, measured parts and the rule that decided it, and each part's weight, whether it is
   required and its failure effect; a leaf's own breakdown (groundedness's claims) beside its verdict. A live agent
   is `live`, a stand-in `mocked`, a graded `--response` `replayed` (bench agentic always grades one).
-  `--runs` above 1 is not written yet.
+  GDPR and EU AI Act support `--runs N`: individual trial trees and majority-vote rollups are preserved in AEF.
+  Composite summaries distinguish the mean case score from the preset's aggregate score and verdict.
+- **AEF command decisions and partial evidence:** redteam and verdict-bearing benchmarks record their final gates;
+  eval records its golden-trace decision. Redteam and OWASP/MITRE/NIST record complete reported judge token totals.
+  Cancelled eval and redteam execution seals completed evidence as aborted, without a final gate.
 - **`bench owasp`, `bench mitre` and `bench nist` write each scan as sealed AEF evidence** (`--aef`, `--no-aef`,
   `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
   benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
@@ -216,6 +220,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Repeated GDPR benchmark reports referenced an unsaved run.** The voted result is now persisted before report
+  generation, so `bench gdpr --runs N` can finish and write its report and AEF trial evidence.
 - **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
   process and stopped it on Ctrl+C only. A service manager, `kill` or a CI step sends SIGTERM to the launcher alone,
   so the launcher exited and the server kept the port and went on serving. Ctrl+C and SIGTERM now both stop the

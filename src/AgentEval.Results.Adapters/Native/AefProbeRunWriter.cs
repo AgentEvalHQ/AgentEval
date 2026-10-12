@@ -58,6 +58,15 @@ public sealed record AefProbeRunOptions
     /// <summary>The judge model, if one was configured; named only when it graded a line ([RUN-9]).</summary>
     public string? JudgeModel { get; init; }
 
+    /// <summary>Reported judge usage, including calls that did not produce a verdict ([SUM-7]).</summary>
+    public AefUsage? JudgeUsage { get; init; }
+
+    /// <summary>The command's final decision, recorded before sealing ([GATE-1]).</summary>
+    public AefCommandGate? Gate { get; init; }
+
+    /// <summary>A content-free interruption reason; the run closes aborted without a final gate.</summary>
+    public string? AbortReason { get; init; }
+
     /// <summary>How the scan drove its target ([RUN-7]): a stand-in is <c>mocked</c>, a scripted model <c>scripted</c>.</summary>
     public required AefTargetMode TargetMode { get; init; }
 
@@ -103,7 +112,7 @@ public static class AefProbeRunWriter
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(options);
-        if (lines.Count == 0)
+        if (lines.Count == 0 && options.AbortReason is null)
         {
             throw new ArgumentException("a scan with no probe lines has nothing to record", nameof(lines));
         }
@@ -162,10 +171,14 @@ public static class AefProbeRunWriter
             }
 
             writer.SetMetrics(metrics);
+            var resultIds = new List<string>();
             foreach (var line in lines)
             {
-                writer.AddResult(Line(line, options.JudgeModel, options.Lane));
+                resultIds.Add(writer.AddResult(Line(line, options.JudgeModel, options.Lane)).ResultId);
             }
+
+            if (options.AbortReason is null)
+                options.Gate?.Write(writer, runId, endedAt, resultIds);
 
             var lanes = new List<AefSummaryLane>
             {
@@ -191,8 +204,14 @@ public static class AefProbeRunWriter
                 };
             }
 
-            writer.SetSummary(new AefSummary { Lanes = lanes, Ext = ext.Count > 0 ? ext : null });
-            writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
+            writer.SetSummary(new AefSummary
+            {
+                Lanes = lanes,
+                Ext = ext.Count > 0 ? ext : null,
+                Usage = options.JudgeUsage is { } usage ? [usage] : null,
+            });
+            writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
+                AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
             var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
             return (directory, seal.RunHash);
         }

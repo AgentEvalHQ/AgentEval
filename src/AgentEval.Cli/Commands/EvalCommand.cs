@@ -428,74 +428,92 @@ internal static class EvalCommand
 
         // 6c. Standard single-run evaluation path
         var startedAt = DateTimeOffset.UtcNow;
-        var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct);
-
-        // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
-        // case's REAL captured response (never re-invokes the agent) and attach the results to
-        // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
-        // already projects it into the exported report's MetricScores) that nothing previously populated.
-        // Purely additive: the harness's own pass/fail gate above is completely unchanged.
-        if (selectedMetricInstances is not null)
-        {
-            var metricsBuilder = AgentEvalBuilder.Create();
-            if (metricsEvaluatorClient is not null)
-                metricsBuilder.WithEvaluatorClient(metricsEvaluatorClient);
-            foreach (var metric in selectedMetricInstances)
-                metricsBuilder.AddMetric(metric);
-
-            await using var metricRunner = await metricsBuilder.BuildAsync(ct);
-            for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
-            {
-                var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
-                summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
-            }
-        }
-
-        // 6e. The run as sealed AEF evidence (S1 #5a): into the workspace's .agenteval/aef, or --aef. A write failure
-        // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
-        // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
+        var completed = new List<TestResult>();
+        var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-            (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow,
-                testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
-
-        // 7. Export
-        var report = summary.ToEvaluationReport(
-            agentName: resolvedName,
-            modelName: resolvedName,
-            endpoint: EndpointLabel(opts));
-        await ExportReportAsync(opts, report, ct);
-
-        // 8. Summary (unless --quiet)
-        if (!opts.Quiet)
-            ConsoleReporter.WriteSummary(summary);
-
-        // 9. Golden trace: compare with the saved run first, then save this one (both may be given, to update it).
-        var thisRun = GoldenTrace.FromResults(summary.Results, resolvedName);
-        GoldenTraceComparison? comparison = null;
-        if (golden is not null)
+        try
         {
-            comparison = GoldenTraceComparer.Compare(golden, thisRun);
-            WriteGoldenComparison(comparison, opts);
-        }
+            var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct, completed.Add);
+            ct.ThrowIfCancellationRequested();
 
-        if (opts.SaveGolden is not null)
-        {
-            await thisRun.SaveAsync(opts.SaveGolden.FullName, ct);
+            // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
+            // case's REAL captured response (never re-invokes the agent) and attach the results to
+            // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
+            // already projects it into the exported report's MetricScores) that nothing previously populated.
+            // Purely additive: the harness's own pass/fail gate above is completely unchanged.
+            if (selectedMetricInstances is not null)
+            {
+                var metricsBuilder = AgentEvalBuilder.Create();
+                if (metricsEvaluatorClient is not null)
+                    metricsBuilder.WithEvaluatorClient(metricsEvaluatorClient);
+                foreach (var metric in selectedMetricInstances)
+                    metricsBuilder.AddMetric(metric);
+
+                await using var metricRunner = await metricsBuilder.BuildAsync(ct);
+                for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
+                {
+                    var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
+                    summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
+                }
+            }
+
+            // 7. Export
+            var report = summary.ToEvaluationReport(
+                agentName: resolvedName,
+                modelName: resolvedName,
+                endpoint: EndpointLabel(opts));
+            await ExportReportAsync(opts, report, ct);
+
+            // 8. Summary (unless --quiet)
             if (!opts.Quiet)
-                Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
-        }
+                ConsoleReporter.WriteSummary(summary);
 
-        // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
-        // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
-        // that was already failing in the golden trace does not fail the run.
-        if (aefFailed)
-            return ExitCodes.RuntimeError;
-        if (comparison is not null)
-            return comparison.HasRegression || (opts.FailOnToolChange && comparison.HasToolChange)
-                ? ExitCodes.TestFailure
-                : ExitCodes.Success;
-        return summary.AllPassed ? ExitCodes.Success : ExitCodes.TestFailure;
+            // 9. Golden trace: compare with the saved run first, then save this one (both may be given, to update it).
+            var thisRun = GoldenTrace.FromResults(summary.Results, resolvedName);
+            GoldenTraceComparison? comparison = null;
+            if (golden is not null)
+            {
+                comparison = GoldenTraceComparer.Compare(golden, thisRun);
+                WriteGoldenComparison(comparison, opts);
+            }
+
+            if (opts.SaveGolden is not null)
+            {
+                await thisRun.SaveAsync(opts.SaveGolden.FullName, ct);
+                if (!opts.Quiet)
+                    Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
+            }
+
+            // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
+            // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
+            // that was already failing in the golden trace does not fail the run.
+            var passed = comparison is not null
+                ? !comparison.HasRegression && !(opts.FailOnToolChange && comparison.HasToolChange)
+                : summary.AllPassed;
+            var exitCode = passed ? ExitCodes.Success : ExitCodes.TestFailure;
+            var gate = comparison is null ? null : new AefCommandGate
+            {
+                GateId = "gate:eval",
+                Rule = "golden-trace",
+                Outcome = passed ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
+                ExitCode = exitCode,
+                Comparability = AefComparability.Comparable,
+            };
+            var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
+                (runs, aefOptions) => AefEvalWriter.Write(runs, summary, caseIds, aefOptions with { Gate = gate },
+                    startedAt, DateTimeOffset.UtcNow, testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
+            return aefFailed ? ExitCodes.RuntimeError : exitCode;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Close independently of the cancelled token. The completed prefix remains evidence; no interrupted
+            // case becomes a measured failure and no final gate is invented. Never persist exception messages.
+            WriteAef(opts, resolvedName, targetMode, judgeLedger,
+                (runs, aefOptions) => AefEvalWriter.Write(runs, new TestSummary("BatchEvaluation", completed),
+                    caseIds.Take(completed.Count).ToList(), aefOptions with { AbortReason = "cancelled" },
+                    startedAt, DateTimeOffset.UtcNow, testCases.Take(completed.Count).Select(c => c.ToTestCase().PassingScore).ToList()));
+            throw;
+        }
     }
 
     /// <summary>
@@ -601,7 +619,7 @@ internal static class EvalCommand
                 // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
                 JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
                 TargetMode = targetMode,
-                // The gate the exit code applies; against a golden trace it is the regression check, not recorded yet.
+                // Golden-trace callers supply their comparison decision after it has been computed.
                 GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
                 JudgeUsage = judge is { ReportedUsage: true }
                     ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
@@ -755,54 +773,82 @@ internal static class EvalCommand
         var allPassed = true;
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
+        var completed = new List<List<TestResult>>();
 
-        foreach (var datasetTestCase in datasetTestCases)
+        try
         {
-            var testCase = datasetTestCase.ToTestCase();
-
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
-
-            var result = await runner.RunStochasticTestAsync(agent, testCase, stochasticOptions, ct);
-            results.Add(result);
-
-            if (!opts.Quiet)
+            foreach (var datasetTestCase in datasetTestCases)
             {
-                // stdout is the export's channel, and this mode has no export; the table is a human report, so it
-                // goes to stderr with every other line here (OutputOptions writes to Console.Out by default).
-                result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
-                Console.Error.WriteLine($"    {result.Summary}");
+                var testCase = datasetTestCase.ToTestCase();
+                var completedTrials = new List<TestResult>();
+                completed.Add(completedTrials);
+
+                if (!opts.Quiet)
+                    Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
+
+                var result = await runner.RunStochasticTestAsync(agent, testCase, stochasticOptions with
+                {
+                    OnProgress = progress =>
+                    {
+                        if (progress.LastResult is not { } trial) return;
+                        if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
+                            ct.ThrowIfCancellationRequested();
+                        completedTrials.Add(trial);
+                        stochasticOptions.OnProgress?.Invoke(progress);
+                    },
+                }, ct);
+                results.Add(result);
+                ct.ThrowIfCancellationRequested();
+
+                if (!opts.Quiet)
+                {
+                    // stdout is the export's channel, and this mode has no export; the table is a human report, so it
+                    // goes to stderr with every other line here (OutputOptions writes to Console.Out by default).
+                    result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
+                    Console.Error.WriteLine($"    {result.Summary}");
+                }
+
+                if (!result.Passed)
+                    allPassed = false;
             }
 
-            if (!result.Passed)
-                allPassed = false;
+            // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
+            var report = StochasticReport.Build(
+                results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
+                agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
+            await ExportReportAsync(opts, report, ct);
+
+            // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
+            var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
+                (runs, aefOptions) => AefEvalWriter.WriteTrials(
+                    runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
+                    AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));
+
+            // Summary
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine($"  === Stochastic Summary ===");
+                Console.Error.WriteLine($"  Test cases: {datasetTestCases.Count}");
+                Console.Error.WriteLine($"  Passed: {results.Count(r => r.Passed)}/{results.Count}");
+                Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
+            }
+
+            if (aefFailed)
+                return ExitCodes.RuntimeError;
+            return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
         }
-
-        // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
-        var report = StochasticReport.Build(
-            results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
-            agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
-        await ExportReportAsync(opts, report, ct);
-
-        // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
-        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-            (runs, aefOptions) => AefEvalWriter.WriteTrials(
-                runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
-                AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));
-
-        // Summary
-        if (!opts.Quiet)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine();
-            Console.Error.WriteLine($"  === Stochastic Summary ===");
-            Console.Error.WriteLine($"  Test cases: {datasetTestCases.Count}");
-            Console.Error.WriteLine($"  Passed: {results.Count(r => r.Passed)}/{results.Count}");
-            Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
+            var ids = EvalAef.CaseIds(datasetTestCases);
+            var captured = completed.Select((trials, i) => (Trials: trials, Id: ids[i])).Where(c => c.Trials.Count > 0).ToList();
+            WriteAef(opts, resolvedName, targetMode, judgeLedger,
+                (runs, aefOptions) => AefEvalWriter.WriteAbortedTrials(runs,
+                    captured.Select(c => (IReadOnlyList<TestResult>)c.Trials).ToList(), captured.Select(c => c.Id).ToList(),
+                    opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs),
+                    aefOptions with { AbortReason = "cancelled" }, startTime, DateTimeOffset.UtcNow));
+            throw;
         }
-
-        if (aefFailed)
-            return ExitCodes.RuntimeError;
-        return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
     }
 }
 

@@ -16,6 +16,51 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 internal static class RedTeamAef
 {
+    /// <summary>Thread-safe capture of completed probes, including an attack interrupted before it could return.</summary>
+    internal sealed class PartialScan(string agentName)
+    {
+        private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
+        private readonly object _sync = new();
+        private readonly Dictionary<IAttackType, List<ProbeResult>> _attacks = new();
+        private readonly List<ProbeResult> _controls = [];
+
+        public void Add(IAttackType attack, ProbeResult result, bool control)
+        {
+            lock (_sync)
+            {
+                if (control)
+                    _controls.Add(result);
+                else
+                {
+                    if (!_attacks.TryGetValue(attack, out var probes))
+                        _attacks.Add(attack, probes = []);
+                    probes.Add(result);
+                }
+            }
+        }
+
+        public RedTeamResult Snapshot()
+        {
+            lock (_sync)
+            {
+                return new RedTeamResult
+                {
+                    AgentName = agentName,
+                    StartedAt = _startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    AttackResults = _attacks.Select(pair => new AttackResult
+                    {
+                        AttackName = pair.Key.Name, AttackDisplayName = pair.Key.DisplayName,
+                        OwaspId = pair.Key.OwaspLlmId, MitreAtlasIds = pair.Key.MitreAtlasIds.ToArray(),
+                        NotMeasurableReason = pair.Key.NotMeasurableReason, Severity = pair.Key.DefaultSeverity,
+                        ProbeResults = pair.Value.OrderBy(p => p.ProbeId, StringComparer.Ordinal).ToList(),
+                    }).ToList(),
+                    BenignControlResults = _controls.ToList(),
+                };
+            }
+        }
+    }
+
     public static IReadOnlyList<AefProbeLine> Lines(RedTeamResult result)
     {
         var lines = new List<AefProbeLine>();

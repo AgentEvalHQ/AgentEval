@@ -252,7 +252,7 @@ public static class BenchPerfCommand
         // AEF: the perf result as sealed evidence (the mock run returned above, unstored).
         if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "perf", preset, subject, subjectVersion,
                 agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                result, startedAt, DateTimeOffset.UtcNow))
+                result, startedAt, DateTimeOffset.UtcNow, exitCode: BenchExitCodes.FromLabel(result.Score.Label)))
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         // Reuse fix (BUG-22 follow-up): was an inlined duplicate of BenchExitCodes.FromLabel

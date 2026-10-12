@@ -194,12 +194,23 @@ public static class BenchMitreCommand
 
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
+        var partialScan = new RedTeamAef.PartialScan(agent.Name);
+        benchmark.Pipeline.OnProbeCompleted(partialScan.Add);
         try
         {
             // Single-scan pattern (Phase 6): one pipeline execution; the
             // RedTeamResult feeds both BuildEvalResult and GenerateReport.
             redTeamResult = await benchmark.ScanAsync(agent, ct);
+            ct.ThrowIfCancellationRequested();
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
+                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, abortReason: "cancelled"))
+                return (ExitCodes.RuntimeError, null);
+            return (1, null);
         }
         catch (Exception ex)
         {
@@ -328,11 +339,13 @@ public static class BenchMitreCommand
         if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
         if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
 
+        var finalExit = indeterminate ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(compositeEval.Score.Label);
+
         // ── AEF ───────────────────────────────────────────────────────────────
         // The scan's probes as sealed evidence, lane mitre; a mock run is not stored, so it writes none.
         if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                 agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, compositeEval))
+                judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
             return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
         // ── Exit code ─────────────────────────────────────────────────────────
@@ -350,7 +363,6 @@ public static class BenchMitreCommand
         if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
             Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
 
-        var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
     }
 

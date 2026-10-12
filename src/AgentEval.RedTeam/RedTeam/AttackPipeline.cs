@@ -37,6 +37,7 @@ public sealed class AttackPipeline
     private TimeSpan? _timeoutPerTurn;
     private TimeSpan _maxConversationDuration = TimeSpan.Zero;
     private int _parallelism = 1;
+    private Action<IAttackType, ProbeResult, bool>? _onProbeCompleted;
 
     private AttackPipeline() { }
 
@@ -44,6 +45,16 @@ public sealed class AttackPipeline
     /// Creates a new attack pipeline.
     /// </summary>
     public static AttackPipeline Create() => new();
+
+    /// <summary>Observes each completed probe, including benign controls, so callers can retain partial evidence.</summary>
+    /// <param name="callback">Receives the attack, completed result and whether the probe is a benign control. May run concurrently.</param>
+    /// <returns>This pipeline.</returns>
+    public AttackPipeline OnProbeCompleted(Action<IAttackType, ProbeResult, bool> callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        _onProbeCompleted = callback;
+        return this;
+    }
 
     /// <summary>
     /// Adds an attack type to the pipeline.
@@ -299,6 +310,7 @@ public sealed class AttackPipeline
             TimeoutPerTurn = _timeoutPerTurn ?? _timeoutPerProbe,
             MaxConversationDuration = _maxConversationDuration,
             Parallelism = _parallelism,
+            OnProbeCompleted = _onProbeCompleted,
             // The runner applies this as an internal deadline and returns a truncated result when
             // it fires (vs. an external cancel via cancellationToken, which still throws).
             OverallTimeout = _timeout,

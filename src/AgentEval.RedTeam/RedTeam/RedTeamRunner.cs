@@ -274,6 +274,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
 
             probeResults.Add(probeResult);
             onCompleted?.Invoke(probeResult);
+            options.OnProbeCompleted?.Invoke(attack, probeResult, !allowExplain);
             completedProbes++;
             lastOutcome = probeResult.Outcome;
 
@@ -340,6 +341,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                         var r = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken).ConfigureAwait(false);
                         indexed[idx] = r;
                         onCompleted?.Invoke(r);
+                        options.OnProbeCompleted?.Invoke(attack, r, !allowExplain);
 
                         if (stopOnSucceeded && r.Outcome == EvaluationOutcome.Succeeded)
                             Interlocked.Exchange(ref failFastHit, 1);

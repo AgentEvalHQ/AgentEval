@@ -255,7 +255,8 @@ public static class BenchMemoryCommand
                 var (tree, shape) = BenchAef.MemoryTree(result, preset, verdict, model);
                 if (BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion,
                         chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                        shape, tree, startedAt, DateTimeOffset.UtcNow))
+                        shape, tree, startedAt, DateTimeOffset.UtcNow,
+                        exitCode: verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)))
                     return ExitCodes.RuntimeError;   // an explicit --aef could not be written
             }
 

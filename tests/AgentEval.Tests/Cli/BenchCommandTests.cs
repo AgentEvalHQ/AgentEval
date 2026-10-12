@@ -33,6 +33,28 @@ public class BenchCommandTests : IDisposable
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
+    [Fact]
+    public async Task RepeatedRuns_WriteSealedTrialTrees()
+    {
+        InitWorkspace();
+        var root = new DirectoryInfo(Path.Combine(_root, "trial-aef"));
+        var exit = await BenchCommand.RunGdprAsync("standard", "subject", _root, "question",
+            evaluatorOverride: new PassingStubEvaluator(), responseText: "answer", runs: 2, aef: root);
+
+        var headerPath = Assert.Single(Directory.GetFiles(root.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(headerPath)!;
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson"))
+            .Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => (int?)l["trial"] == 1);
+        Assert.Contains(lines, l => (int?)l["trial"] == 0);
+        Assert.All(lines.Where(l => l["trial"] is null), l => Assert.Equal(2, (int)l["trials"]!["n"]!));
+        var gate = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal(exit, (int)gate["exitCode"]!);
+    }
+
     private void InitWorkspace()
     {
         var dir = Path.Combine(_root, ".agenteval");

@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Collections.Concurrent;
+using System.Net;
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace AgentEval.Tests.TestHelpers;
+
+/// <summary>A local OpenAI-compatible endpoint with scripted replies and usage; it exercises the real HTTP client.</summary>
+internal sealed class LocalChatEndpoint : IAsyncDisposable
+{
+    private readonly WebApplication _app;
+    private readonly ConcurrentQueue<JsonObject> _requests = new();
+
+    private LocalChatEndpoint(WebApplication app) => _app = app;
+
+    public string Endpoint { get; private set; } = "";
+
+    public IReadOnlyList<JsonObject> Requests => _requests.ToArray();
+
+    public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply)
+    {
+        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
+        builder.Logging.ClearProviders();
+        // Let the OS reserve a port in the actual server bind, avoiding a free-port lookup race under parallel load.
+        builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
+        var app = builder.Build();
+        var endpoint = new LocalChatEndpoint(app);
+        app.MapPost("/v1/chat/completions", async (HttpContext context) =>
+        {
+            var request = (await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted))!.AsObject();
+            endpoint._requests.Enqueue(request);
+            var text = await reply(request, context.RequestAborted);
+            await context.Response.WriteAsJsonAsync(new
+            {
+                id = "chatcmpl-local",
+                @object = "chat.completion",
+                created = 1,
+                model = (string?)request["model"] ?? "local-model",
+                choices = new[] { new { index = 0, message = new { role = "assistant", content = text }, finish_reason = "stop" } },
+                usage = new { prompt_tokens = 10, completion_tokens = 5, total_tokens = 15 },
+            }, context.RequestAborted);
+        });
+        try
+        {
+            await app.StartAsync();
+            endpoint.Endpoint = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single() + "/v1";
+            return endpoint;
+        }
+        catch
+        {
+            await app.DisposeAsync();
+            throw;
+        }
+    }
+
+    public static Task<LocalChatEndpoint> StartAsync(string reply = "Hi") =>
+        StartAsync((_, _) => Task.FromResult(reply));
+
+    public async ValueTask DisposeAsync()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await _app.StopAsync(timeout.Token);
+        await _app.DisposeAsync();
+    }
+}
