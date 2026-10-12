@@ -48,6 +48,12 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Content-free configuration actually applied by the producer.</summary>
+    public AefRunConfig? Config { get; init; }
+
+    /// <summary>Pricing policy; defaults to the bundled baseline, with no implied spending limit.</summary>
+    public AefCostPolicy? CostPolicy { get; init; } = new() { PriceTable = AgentEval.Models.ModelPricing.TableName };
+
     /// <summary>Related store-v1 benchmark run identities, if persistence created any.</summary>
     public AefStoreV1Link? StoreV1 { get; init; }
     /// <summary>Whether to persist observed content as evidence blobs; off by default.</summary>
@@ -140,6 +146,8 @@ public static class AefProbeRunWriter
         {
             RunId = runId,
             Producer = AefConverter.DefaultProducer,
+            Config = options.Config,
+            CostPolicy = options.CostPolicy,
             Ext = storeExtension,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },

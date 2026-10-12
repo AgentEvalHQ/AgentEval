@@ -608,8 +608,19 @@ internal static class EvalCommand
     private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
+        var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
+        if (opts.Runs > 1) settings["successThreshold"] = opts.SuccessThreshold;
+        if (opts.Sut is null)
+        {
+            if (opts.Temperature is { } temperature) settings["temperature"] = temperature;
+            if (opts.MaxTokens is { } maxTokens) settings["maxTokens"] = maxTokens;
+        }
+        if (!string.IsNullOrWhiteSpace(opts.Metrics))
+            settings["metrics"] = new System.Text.Json.Nodes.JsonArray(opts.Metrics.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(name => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(name)).ToArray());
         return new AefEvalRunOptions
         {
+            Config = new AefRunConfig { Settings = settings },
             Seal = AefCliOptions.Seal,
             Signer = AefCliOptions.Signer,
             ContentCapture = AefCliOptions.ContentCapture,

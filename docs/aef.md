@@ -309,6 +309,12 @@ Agentic benchmarks also link their created store manifests, including interrupte
 GDPR and EU AI Act also record single-run identities, or ordered `trialRunIds` plus the aggregate `runId` for
 repeated runs. IDs are captured immediately after manifest creation, including an interrupted trial or aggregate
 persistence; an aggregate that was never created has no `runId`. Native adapter options expose the same links.
+Native run options accept `Config` and `CostPolicy`. CLI configuration uses an explicit list of applied settings:
+eval trial counts, repeated-run success thresholds, named metrics, and sampling settings (only for endpoint targets);
+red-team intensity, attack selection and failure policy; benchmark preset and requested trial count, including aborts.
+The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending
+limit implied. Hosts that override rates can supply their own policy identity (or omit it); this name is not a
+fingerprint of runtime pricing overrides. Configuration does not copy command-line arguments, prompts, keys or paths.
 `AefCompositeRunOptions.Endpoint` accepts the actual target endpoint when known, as the eval and probe options do.
 Environment-backed perf, scan, GDPR/EU AI Act, memory and autoaudit commands capture the endpoint at client
 construction; explicit scan/perf endpoint targets also forward it, including for interrupted runs. Supplied

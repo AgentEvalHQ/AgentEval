@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native run configuration and pricing:** eval/probe/composite headers accept applied configuration and
+  pricing policy. CLI evidence records eval sampling/trial/metric settings, red-team intensity/attack/failure
+  settings, and benchmark preset/trial counts. ModelPricing.TableName names the bundled baseline; native headers
+  publish that identity without inventing a spending limit, and hosts can supply a different pricing policy.
+
 - **Benchmark target endpoint wiring:** environment-backed benchmark commands retain the endpoint captured
   when their client was constructed; explicit scan/perf endpoints also reach AEF deployment headers. Interrupted
   runs keep the same endpoint. Replayed responses, mocks and unknown custom-target endpoints remain absent.

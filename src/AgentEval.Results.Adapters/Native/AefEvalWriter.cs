@@ -13,6 +13,12 @@ namespace AgentEval.Results.Adapters.Native;
 /// <summary>What <c>agenteval eval</c> knows about its run that its results do not hold (S1 #5a).</summary>
 public sealed record AefEvalRunOptions
 {
+    /// <summary>Content-free configuration actually applied by the producer.</summary>
+    public AefRunConfig? Config { get; init; }
+
+    /// <summary>Pricing policy; defaults to the bundled baseline, with no implied spending limit.</summary>
+    public AefCostPolicy? CostPolicy { get; init; } = new() { PriceTable = AgentEval.Models.ModelPricing.TableName };
+
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]); by default <c>model:</c> and the model or deployment.</summary>
     public required string SubjectRef { get; init; }
 

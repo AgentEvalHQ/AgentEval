@@ -57,6 +57,8 @@ public static partial class AefEvalWriter
                 {
                     RunId = runId,
                     Producer = AefConverter.DefaultProducer,
+                    Config = options.Config,
+                    CostPolicy = options.CostPolicy,
                     Subject = new AefSubject { Ref = options.SubjectRef, Kind = options.SubjectKind, Version = options.SubjectVersion },
                     Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
                     Suite = new AefSuite

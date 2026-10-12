@@ -31,6 +31,7 @@ internal static class BenchAef
         {
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
             {
+                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
                 Seal = AefCliOptions.Seal,
@@ -199,6 +200,7 @@ internal static class BenchAef
         {
             var options = new AefCompositeRunOptions
             {
+                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 } },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
                 Seal = AefCliOptions.Seal,

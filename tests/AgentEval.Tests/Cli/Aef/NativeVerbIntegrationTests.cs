@@ -69,7 +69,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Directory.Delete(_root, recursive: true);
     }
 
-    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null)
+    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null, float? temperature = null, int? maxTokens = null)
     {
         var dataset = Path.Combine(_root, "dataset.yaml");
         File.WriteAllText(dataset, string.Concat(Enumerable.Range(0, count).Select(i => $"- id: c{i}\n  input: secret-prompt-{i}\n  expected: Hi\n")));
@@ -79,7 +79,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")), Quiet = true,
             Aef = new DirectoryInfo(Path.Combine(_root, "aef")), SubjectVersion = "1",
             Runs = runs,
-            Metrics = metrics,
+            Metrics = metrics, Temperature = temperature, MaxTokens = maxTokens,
         };
     }
 
@@ -432,7 +432,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     public async Task Eval_HttpTarget_WritesLiveSealedEvidenceWithoutContent()
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync();
-        var options = Options(endpoint.Endpoint);
+        var options = Options(endpoint.Endpoint, temperature: 0.2f, maxTokens: 128);
 
         var exit = await EvalCommand.ExecuteAsync(options, CancellationToken.None);
 
@@ -440,6 +440,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Single(endpoint.Requests);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
+        var config = Document(dir, "run.json")["config"]!;
+        Assert.Equal(1, (int)config["runs"]!);
+        Assert.Equal(128, (int)config["maxTokens"]!);
+        Assert.Equal(0.2, (double)config["temperature"]!, 6);
+        Assert.Null(config["successThreshold"]);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
         Assert.Equal(exit, (int)gate["exitCode"]!);
@@ -537,6 +542,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(endpoint.Requests);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(2, (int)Document(dir, "run.json")["config"]!["runs"]!);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertCompositeStoreLinks(dir, 2);
         var header = Document(dir, "run.json");
@@ -590,6 +596,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(judgeEndpoint.Requests);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal("smoke", (string?)Document(dir, "run.json")["config"]!["preset"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
@@ -619,6 +626,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(judge.Requests);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
+        Assert.Equal("never", (string?)Document(dir, "run.json")["config"]!["failOn"]);
+        Assert.Equal("quick", (string?)Document(dir, "run.json")["config"]!["intensity"]);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
         Assert.Equal("fail-on:never", (string?)gate["rule"]!["strategy"]);
@@ -774,6 +783,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.True(cancel.IsCancellationRequested);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(2, (int)Document(dir, "run.json")["config"]!["runs"]!);
         AssertCompositeStoreLinks(dir, 2);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
@@ -1297,6 +1307,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 
     private static void AssertIntact(string dir)
     {
+        Assert.Equal(AgentEval.Models.ModelPricing.TableName, (string?)Document(dir, "run.json")["costPolicy"]!["priceTable"]);
+        Assert.Null(Document(dir, "run.json")["costPolicy"]!["maxUsd"]);
         var report = AefRunVerifier.Verify(dir);
         Assert.Equal(AefOutcome.Intact, report.Outcome);
         Assert.Empty(report.Problems);

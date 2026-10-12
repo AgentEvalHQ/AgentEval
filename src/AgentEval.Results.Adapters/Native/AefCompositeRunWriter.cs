@@ -24,6 +24,12 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Content-free configuration actually applied by the producer.</summary>
+    public AefRunConfig? Config { get; init; }
+
+    /// <summary>Pricing policy; defaults to the bundled baseline, with no implied spending limit.</summary>
+    public AefCostPolicy? CostPolicy { get; init; } = new() { PriceTable = AgentEval.Models.ModelPricing.TableName };
+
     /// <summary>Related store-v1 run identities, if persistence created any.</summary>
     public AefStoreV1Link? StoreV1 { get; init; }
     /// <summary>Whether to persist evaluation details as evidence blobs; off by default.</summary>
@@ -168,6 +174,8 @@ public static class AefCompositeRunWriter
         {
             RunId = runId,
             Producer = AefConverter.DefaultProducer,
+            Config = options.Config,
+            CostPolicy = options.CostPolicy,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
             Suite = new AefSuite
