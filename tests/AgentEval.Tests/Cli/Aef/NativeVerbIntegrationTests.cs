@@ -508,6 +508,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(endpoint.Requests);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertCompositeStoreLinks(dir, 2);
         var header = Document(dir, "run.json");
         Assert.Equal("live", (string?)header["execution"]!["targetMode"]);
         Assert.Equal("1", (string?)header["subject"]!["version"]);
@@ -741,6 +742,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.True(cancel.IsCancellationRequested);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        AssertCompositeStoreLinks(dir, 2);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
@@ -1012,6 +1014,104 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("scored", (string?)line["state"]);
         Assert.Equal("correct", (string?)line["ext"]!["agenteval.typedmemeval"]!["outcome"]);
         Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+    }
+
+    [Theory]
+    [InlineData(false, 1, false, false)]
+    [InlineData(true, 1, false, false)]
+    [InlineData(false, 2, false, false)]
+    [InlineData(true, 2, false, false)]
+    [InlineData(false, 2, true, false)]
+    [InlineData(true, 2, true, false)]
+    [InlineData(false, 2, false, true)]
+    [InlineData(true, 2, false, true)]
+    public async Task Composite_ReportFailure_RetainsEvidenceAndPersistedLinks(bool euAiAct, int runs, bool noAef, bool invalidDestination)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "report-failure" }.ToJsonString());
+        // A file at the report directory forces failure after evaluation and store persistence.
+        File.WriteAllText(Path.Combine(workspace, "compliance"), "occupied");
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
+        var exit = euAiAct
+            ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef, noAef: noAef)
+            : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef, noAef: noAef);
+        Assert.Equal(invalidDestination ? 3 : 1, exit);
+        if (noAef || invalidDestination)
+        {
+            Assert.False(Directory.Exists(aef.FullName));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        if (runs == 1) AssertStoreLink(dir);
+        else AssertCompositeStoreLinks(dir, runs);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public async Task Composite_CancelFirstTrial_LinksCreatedManifestWithoutAggregate(bool euAiAct, int runs)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "trial-cancel" }.ToJsonString());
+        using var cancellation = new CancellationTokenSource();
+        var judge = new CancellingEvaluator(cancellation);
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var exit = euAiAct
+            ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
+                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token)
+            : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
+                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token);
+        Assert.Equal(1, exit);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        var manifest = JsonNode.Parse(File.ReadAllText(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories))))!;
+        var link = Document(dir, "run.json")["ext"]!["agenteval.store-v1"]!;
+        var id = (string)manifest["run"]!["runId"]!;
+        if (runs == 1) Assert.Equal(id, (string?)link["runId"]);
+        else
+        {
+            Assert.Null(link["runId"]);
+            Assert.Equal(id, (string?)Assert.Single(link["trialRunIds"]!.AsArray()));
+        }
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    private sealed class CancellingEvaluator(CancellationTokenSource cancellation) : AgentEval.Core.IEvaluator
+    {
+        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            cancellation.Cancel();
+            ct.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("Cancellation was not forwarded to the judge.");
+        }
+    }
+
+    private void AssertCompositeStoreLinks(string directory, int trials)
+    {
+        var manifests = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories)
+            .Select(path => JsonNode.Parse(File.ReadAllText(path))!).ToList();
+        var link = Document(directory, "run.json")["ext"]!["agenteval.store-v1"]!;
+        var trialIds = link["trialRunIds"]!.AsArray().Select(id => (string)id!).ToArray();
+        Assert.Equal(trials, trialIds.Length);
+        Assert.Equal(trials, trialIds.Distinct().Count());
+        var aggregate = (string)link["runId"]!;
+        Assert.DoesNotContain(aggregate, trialIds);
+        Assert.Equal(manifests.Select(m => (string)m["run"]!["runId"]!).Order(),
+            trialIds.Append(aggregate).Order());
     }
 
     private void AssertStoreLink(string directory)

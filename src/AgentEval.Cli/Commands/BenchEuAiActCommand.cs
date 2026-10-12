@@ -209,12 +209,25 @@ public static class BenchEuAiActCommand
         var partialTrials = new List<CompositeProgress>();
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
         EvalResult? completedRollup = null;
+        string? storeRunId = null;
+        var trialRunIds = new List<string>();
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
+            storeRunId is null && trialRunIds.Count == 0 ? null : new()
+            {
+                RunId = storeRunId,
+                TrialRunIds = runs > 1 ? trialRunIds.ToArray() : null,
+            };
+        void TrialCreated(string id)
+        {
+            if (runs > 1) trialRunIds.Add(id);
+            else storeRunId = id;
+        }
         async Task<(string RunId, EvalResult Result)> RunTrial(CancellationToken token)
         {
             var progress = new CompositeProgress(benchmark);
             partialTrials.Add(progress);
             return await new EuAiActBenchmarkRunner().RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput,
-                progress.Completed, progress.Started, ct: token);
+                TrialCreated, progress.Completed, progress.Started, ct: token);
         }
         try
         {
@@ -232,7 +245,7 @@ public static class BenchEuAiActCommand
                     trialResults = compositeResult.Details.SubResults!;
                     compositeResult = StochasticBenchRunner.RollupTree(trialResults);
                     completedRollup = compositeResult;
-                    runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
+                    runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct, id => storeRunId = id);
                 }
                 else
                     (runId, compositeResult) = await RunTrial(ct);
@@ -240,7 +253,7 @@ public static class BenchEuAiActCommand
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
+                throw;
             }
 
             // ── Generate reports ─────────────────────────────────────────────────
@@ -266,7 +279,7 @@ public static class BenchEuAiActCommand
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
-                return 1;
+                throw;
             }
 
             // Derive output directory (mirrors FileSystemOutputStore path convention)
@@ -312,7 +325,7 @@ public static class BenchEuAiActCommand
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-                trials: trialResults, complianceArtifacts: complianceArtifacts);
+                trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink());
 
             // ── Exit code ─────────────────────────────────────────────────────────
             if (aefFailed)
@@ -324,16 +337,17 @@ public static class BenchEuAiActCommand
             // unchanged); the shared helper exists specifically so a future policy change lands in one place.
             return finalExit;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception ex)
         {
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             var snapshots = partialTrials.Select(p => p.Snapshot()).ToList();
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
                 agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
-                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
-                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts))
+                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: abortReason, requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink()))
                 return ExitCodes.RuntimeError;
             return 1;
         }

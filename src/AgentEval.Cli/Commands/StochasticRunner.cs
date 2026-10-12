@@ -93,10 +93,11 @@ internal static class StochasticBenchRunner
 
     /// <summary>Persists the voted tree so compliance reports reference a real, completed source run.</summary>
     internal static async Task<string> PersistRollupAsync(IOutputStore store, SubjectIdentity subject,
-        EvalResult rollup, EvalInput input, CancellationToken ct)
+        EvalResult rollup, EvalInput input, CancellationToken ct, Action<string>? onRunCreated = null)
     {
         var manifest = await store.StartRunAsync(subject,
             new RunContext("AgentEval.Cli", "src/AgentEval.Cli/", "StochasticBenchRunner", null, null, "compliance"), ct);
+        onRunCreated?.Invoke(manifest.Run.RunId);
         static IEnumerable<EvalResult> Leaves(EvalResult node) => node.Details.SubResults is { Count: > 0 } parts
             ? parts.SelectMany(Leaves) : [node];
         var leaves = Leaves(rollup).ToList();

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Composite store links and failure evidence:** GDPR and EU AI Act native evidence retains persisted trial
+  identities in execution order and the aggregate manifest identity when created. Fatal evaluation/report errors
+  now retain observed evidence in an aborted run without a command gate; explicit output failures still return
+  the runtime-error exit. Existing runner APIs remain available alongside manifest-aware progress overloads.
+
 - **Native benchmark store links:** AEF headers can retain path-free store-v1 run and ordered trial identities.
   Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands now link manifests that were actually
   created, including interrupted persistence. Runs stopped before manifest creation omit the link.
