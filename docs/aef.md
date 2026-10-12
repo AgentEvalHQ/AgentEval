@@ -76,8 +76,28 @@ Run a plan with `agenteval run --plan ./plans/eval.json --runner-id local-eval -
 The root must exist; when omitted it is discovered from the current directory, falling back to that directory.
 The job writes `.agenteval/aef/jobs/<jobId>/` with exact `plan.json` bytes, `runner.json`, `events.ndjson`, and
 `runs/<runId>/`. Existing job directories are refused. `--json` prints a terminal report containing the job ID,
-terminal event, sealed run IDs and any failure reason/limit. Dry-run, progress and budget-override CLI options
-are still being connected.
+terminal event, sealed run IDs and any failure reason/limit.
+
+Use `--dry-run --json` to resolve the same plan and credentials and return an acceptance/estimate report without
+requests, events or file writes (including diagnostic files). Accepted reports contain `cases`, `calls.target`,
+`calls.judge`, `models`, `costRange` (low/high/currency/priceTable), `durationRange` (low/high/unit), `warnings`
+and `effectiveMaxUsd`. Call counts are upper bounds, including each suite's readiness and judge retries, and
+respect the case limit. Lower cost/time bounds are unknown and reported as zero; the price-table fingerprint
+identifies the software price snapshot, not a provider quote or a pricing date. Refusals report `accepted: false`
+and a content-free `reason`. Exit codes are 0 for acceptance and 3 for refusal; malformed input remains 2.
+
+`--progress ndjson` sends exactly the persisted `events.ndjson` bytes to stdout, with no terminal summary.
+It cannot be combined with `--json` or `--dry-run`. The same terminal exit codes still apply.
+
+`--max-usd <number>` adds a finite, non-negative ceiling; it can only lower the plan's cap.
+`--refuse-over-budget` optionally refuses before acceptance when the full upper estimate exceeds that effective
+cap. Without this flag the runner admits cases sequentially while their bounds fit, even when the complete plan
+estimate is larger. Both dry-run and execution use these same rules.
+
+Additional budget options leave `plan.json` and its digest unchanged. They are recorded in `runner-options.json`
+and `job.accepted`/`job.refused`'s `ext."agenteval.runner"`, and contribute to the job ID. Run `costPolicy.maxUsd`
+records the lower effective cap. Readers of the base protocol still check the original plan cap; consumers
+enforcing the additional operator cap should also inspect the recorded options and run cost policy.
 
 | Outcome | Exit code |
 |---|---|

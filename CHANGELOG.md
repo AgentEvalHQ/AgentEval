@@ -29,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calls. Unresolvable targets are refused before acceptance. Provider failures retain actual spend and identify
   a crossed cost limit. `runner manifest` exposes schema-checked local capabilities with an explicit runner ID;
   `run --plan` saves exact plan bytes and the manifest beside job events and runs in the workspace, with
-  documented terminal exit codes. Dry-run, progress and budget-override CLI options remain in progress.
+  documented terminal exit codes. `--dry-run --json` resolves and estimates without requests or file writes;
+  `--progress ndjson` mirrors persisted event bytes. `--max-usd` can only lower the plan cap and
+  `--refuse-over-budget` opts into upfront estimate refusal; both use the engine's shared acceptance rules.
+  Operator budget options are recorded separately and bound into job identity, preserving exact plan bytes.
   Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
   reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
   preserving criteria, assertions, named metrics, typed absences and content privacy.

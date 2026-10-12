@@ -57,6 +57,9 @@ public static class AefJobRunner
             file.Write(plan);
         using (var file = new FileStream(Path.Combine(output, "runner.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
             file.Write(AefJsonWriter.Compact(runner));
+        if (job.Policy is { } policy)
+            using (var file = new FileStream(Path.Combine(output, "runner-options.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                file.Write(AefJsonWriter.Compact(policy));
         return await job.RunAsync(output, cancellationToken).ConfigureAwait(false);
     }
 
@@ -66,6 +69,8 @@ public static class AefJobRunner
         ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(options);
+        if (options.MaxUsd is { } cap && (!double.IsFinite(cap) || cap < 0))
+            throw new AefInputException("The additional cost cap must be finite and non-negative.");
 
         if (AefSchemas.Reader.Validate("runner", runner) is { } manifestProblem)
         {
@@ -155,6 +160,27 @@ public static class AefJobRunner
 
         public string JobId => _jobId;
 
+        public JsonObject? Policy
+        {
+            get
+            {
+                if (_options.MaxUsd is null && !_options.RefuseOverBudget) return null;
+                var policy = new JsonObject();
+                if (_options.MaxUsd is { } cap) policy["maxUsd"] = cap;
+                if (_options.RefuseOverBudget) policy["refuseOverBudget"] = true;
+                return policy;
+            }
+        }
+
+        private double MaxUsd => Math.Min(AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0,
+            _options.MaxUsd ?? double.MaxValue);
+
+        private JsonObject WithPolicy(JsonObject fields)
+        {
+            if (Policy is { } policy) fields["ext"] = new JsonObject { ["agenteval.runner"] = policy };
+            return fields;
+        }
+
         public Job(JsonObject plan, byte[] bytes, JsonObject runner, IAefJobTarget target, AefJobOptions options)
         {
             _plan = plan;
@@ -170,6 +196,7 @@ public static class AefJobRunner
             // The job's id, from everything that decides what it writes: one job run twice writes the same bytes, and two
             // jobs that would write different runs never share a run id ([RUN-13]).
             var seed = string.Join('\u001F', "aef-job", _planDigest, Encoding.UTF8.GetString(AefJsonWriter.Compact(runner)), target.Fingerprint, _start.ToString());
+            if (Policy is { } policy) seed += '\u001F' + Encoding.UTF8.GetString(AefJsonWriter.Compact(policy));
             _jobId = "job-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed)), 0, 12).ToLowerInvariant();
         }
 
@@ -179,10 +206,10 @@ public static class AefJobRunner
             var (refusal, suites) = Decide();
             if (refusal is not null)
             {
-                _events.Emit("job.refused", _clock, new JsonObject
+                _events.Emit("job.refused", _clock, WithPolicy(new JsonObject
                 {
                     ["planId"] = AefNode.String(_plan["planId"]), ["planDigest"] = _planDigest, ["runnerId"] = _runnerId, ["reason"] = Cut(refusal),
-                });
+                }));
                 return new AefJobResult(_jobId, _events.Count, "job.refused", null, refusal, [], _clock);
             }
 
@@ -190,7 +217,7 @@ public static class AefJobRunner
             OpenRun? activeRun = null;
             try
             {
-                _events.Emit("job.accepted", _clock, new JsonObject { ["planId"] = AefNode.String(_plan["planId"]), ["planDigest"] = _planDigest, ["runnerId"] = _runnerId });
+                _events.Emit("job.accepted", _clock, WithPolicy(new JsonObject { ["planId"] = AefNode.String(_plan["planId"]), ["planDigest"] = _planDigest, ["runnerId"] = _runnerId }));
                 if (_target.TargetMode != AefTargetMode.Scripted) _target.SetCredentials(_credentials!);
                 var estimate = Estimate(suites);
                 _events.Emit("plan.estimated", _clock, new JsonObject
@@ -412,6 +439,8 @@ public static class AefJobRunner
             }
 
             _credentials = new AefJobCredentials(purposes);
+            if (_options.RefuseOverBudget && Estimate(resolved).UsdHigh > MaxUsd)
+                return ("The estimated upper cost exceeds the effective cost cap; upfront budget refusal was requested.", []);
             return (null, resolved);
         }
 
@@ -441,7 +470,7 @@ public static class AefJobRunner
         private (string? Limit, string? Why) Check(IAefJobCase next, IAefJobSuite suite, OpenRun? open)
         {
             var where = $"before case {next.CaseId} of suite {suite.Ref} version {suite.Version}";
-            var maxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0;
+            var maxUsd = MaxUsd;
 
             // The spend so far plus the case's cost bound, as the two verifiers of the budget will sum the job once the case
             // has cost its bound (Q4-39 R7R-3), each rounded once and compared with maxUsd (equal is within it): [STRM-3]'s
@@ -472,7 +501,7 @@ public static class AefJobRunner
 
         private (string? Limit, string? Why) CheckActual(OpenRun run)
         {
-            var maxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0;
+            var maxUsd = MaxUsd;
             if (AefSummaryCalculator.ExactSum(_spent) > maxUsd
                 || AefSummaryCalculator.ExactSum(_sealed.Contains(run.RunId) ? _totals : _totals.Append(AefSummaryCalculator.ExactSum(run.Usd))) > maxUsd)
                 return ("maxUsd", "The case exceeded the job's cost limit");
@@ -509,7 +538,7 @@ public static class AefJobRunner
                 // §9.2.1, round 8). The plan's judges bound which may; none is within them ([STRM-4]).
                 StartedAt = _clock,
                 ContentCapture = AefNode.String(_plan["contentCapture"]) == "on" ? AefContentCapture.On : AefContentCapture.Off,
-                CostPolicy = new AefCostPolicy { MaxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")), PriceTable = _target.PriceTable },
+                CostPolicy = new AefCostPolicy { MaxUsd = MaxUsd, PriceTable = _target.PriceTable },
                 Provenance = new AefProvenance { PlanId = AefNode.String(_plan["planId"])!, PlanDigest = _planDigest, JobId = _jobId, RunnerId = _runnerId },
                 Execution = new AefExecution { TargetMode = _target.TargetMode, Stimulus = AefStimulus.Suite },
             };

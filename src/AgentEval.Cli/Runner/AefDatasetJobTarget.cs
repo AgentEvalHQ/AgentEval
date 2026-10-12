@@ -37,6 +37,33 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
     public IReadOnlyCollection<string> CredentialPurposes => _judge is null ? ["subject"] : ["subject", "judge"];
     public void SetCredentials(AefJobCredentials credentials) => _credentials = credentials;
 
+    internal JsonObject DescribeEstimate(AefJobEstimate estimate)
+    {
+        long remaining = estimate.Cases, runs = 0, seconds = 0;
+        foreach (var suite in Suites)
+        {
+            var count = Math.Min(remaining, suite.Cases.Count);
+            if (count == 0) break;
+            runs++;
+            seconds = checked(seconds + suite.PreparationSecondsBound + CloseSeconds + count * _caseSeconds);
+            remaining -= count;
+        }
+        return new JsonObject
+        {
+            ["cases"] = estimate.Cases,
+            ["calls"] = new JsonObject { ["target"] = checked(runs + estimate.Cases * _subject!.MaxCalls),
+                ["judge"] = _judge is null ? 0 : checked(runs + estimate.Cases * _judge.MaxCalls) },
+            ["models"] = new JsonArray(Roles().Select(r => r.Model).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(m => (JsonNode?)JsonValue.Create(m)).ToArray()),
+            ["costRange"] = new JsonObject { ["low"] = estimate.UsdLow, ["high"] = estimate.UsdHigh,
+                ["currency"] = "USD", ["priceTable"] = estimate.PriceTable },
+            ["durationRange"] = new JsonObject { ["low"] = 0, ["high"] = seconds, ["unit"] = "seconds" },
+            ["warnings"] = new JsonArray("Calls are upper bounds and include readiness and judge retries.",
+                "Cost and duration lower bounds are unknown and reported as zero; missing usage is charged at its reserved bound.",
+                "The price table identifies a captured software price snapshot, not a provider quote or a pricing date."),
+        };
+    }
+
     /// <summary>Reads files only. No client, credential delivery, temporary file or provider request is created.</summary>
     internal static async Task<AefDatasetJobTarget> LoadAsync(byte[] planBytes, string planDirectory, CancellationToken ct = default)
     {

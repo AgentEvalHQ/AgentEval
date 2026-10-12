@@ -14,13 +14,12 @@ using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Runner;
 
-/// <summary>How <see cref="AefScriptedRunner.Run"/> runs a job.</summary>
+/// <summary>Execution and analysis settings shared by <see cref="AefJobRunner"/> and its scripted adapter.</summary>
 public sealed class AefJobOptions
 {
     /// <summary>
-    /// Where the job's clock starts (spec 09 §9.2.1 "The job's clock", the operation's <c>--at</c>): the first event is
-    /// at it, and the clock moves only when a case runs, by its <c>seconds</c>, and when a run is closed and sealed, by
-    /// the target's <c>closeSeconds</c>.
+    /// The job clock's starting instant. Scripted jobs advance simulated time by preparation, case and closing
+    /// durations (spec 09 §9.2.1); live jobs measure monotonic elapsed time from this instant.
     /// </summary>
     public required AefTime At { get; init; }
 
@@ -38,6 +37,12 @@ public sealed class AefJobOptions
 
     /// <summary>Optional progress destination. Receives the exact persisted NDJSON event bytes; remains caller-owned.</summary>
     public Stream? Progress { get; init; }
+
+    /// <summary>Optional additional cost ceiling. May only lower the plan's cap; the supplied plan bytes remain unchanged.</summary>
+    public double? MaxUsd { get; init; }
+
+    /// <summary>Refuse before acceptance when the full estimated upper cost exceeds the effective cap. Off by default.</summary>
+    public bool RefuseOverBudget { get; init; }
 }
 
 /// <summary>What a job wrote (<see cref="AefScriptedRunner.Run"/>).</summary>

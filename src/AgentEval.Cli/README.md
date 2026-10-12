@@ -55,7 +55,9 @@ agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset age
 
 ```bash
 agenteval runner manifest --runner-id local-eval --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --dry-run --json
 agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --progress ndjson --max-usd 1
 ```
 
 The local runner supports text-only dataset plans against existing OpenAI-compatible or Azure endpoints.

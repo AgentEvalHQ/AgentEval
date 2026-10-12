@@ -29,6 +29,63 @@ public sealed class AefJobRunnerTests : IDisposable
         if (Directory.Exists(_output)) Directory.Delete(_output, recursive: true);
     }
 
+    [Theory]
+    [InlineData(false, "job.failed")]
+    [InlineData(true, "job.refused")]
+    public async Task RunAsync_AdditionalCap_StopsBeforeCallsAndOptionallyRefuses(bool upfront, string terminal)
+    {
+        var calls = 0;
+        var testCase = new Case(_ => { calls++; return ValueTask.FromResult(Passed()); });
+        var target = new Target(testCase);
+        var options = new AefJobOptions { At = Start, MaxUsd = 0.5, RefuseOverBudget = upfront };
+        Assert.Equal(!upfront, AefJobRunner.Analyze(Plan(), Manifest(), target, options).Accepted);
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), target, _output, options);
+        Assert.Equal(terminal, result.Terminal);
+        Assert.Equal(0, calls);
+        Assert.Equal(0.5, (double)Events()[0]["ext"]!["agenteval.runner"]!["maxUsd"]!);
+        AssertStream();
+    }
+
+    [Theory]
+    [InlineData(1.0, 1.0)]
+    [InlineData(10.0, 2.0)]
+    public async Task RunWorkspaceAsync_AdditionalCap_PreservesPlanAndRecordsEffectivePolicy(double requested, double effective)
+    {
+        var plan = Plan();
+        var result = await AefJobRunner.RunWorkspaceAsync(plan, Manifest(), new Target(new Case(_ => ValueTask.FromResult(Passed()))),
+            _output, new AefJobOptions { At = Start, MaxUsd = requested });
+        var folder = Path.Combine(_output, result.JobId);
+        Assert.Equal("job.sealed", result.Terminal);
+        Assert.Equal(plan, File.ReadAllBytes(Path.Combine(folder, "plan.json")));
+        Assert.Equal(requested, (double)Json(folder, "runner-options.json")["maxUsd"]!);
+        Assert.Equal(effective, (double)Json(RunDirectory(), "run.json")["costPolicy"]!["maxUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Analyze_InvalidAdditionalCap_RefusesWithoutWrites(double cap)
+    {
+        Assert.Throws<AefInputException>(() => AefJobRunner.Analyze(Plan(), Manifest(),
+            new Target(new Case(_ => ValueTask.FromResult(Passed()))), new AefJobOptions { At = Start, MaxUsd = cap }));
+        Assert.False(Directory.Exists(_output));
+    }
+
+    [Fact]
+    public async Task RunAsync_ActualSpendOverAdditionalCap_StopsEvenBelowOriginalPlanCap()
+    {
+        var testCase = new Case(_ => ValueTask.FromResult(Passed() with { Usd = 1.5 }));
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase), _output,
+            new AefJobOptions { At = Start, MaxUsd = 1 });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal("maxUsd", result.Limit);
+        Assert.Equal(1.5, (double)Json(RunDirectory(), "summary.json")["cost"]!["totalUsd"]!);
+        Assert.Equal(1, (double)Json(RunDirectory(), "run.json")["costPolicy"]!["maxUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+    }
+
     [Fact]
     public async Task RunWorkspaceAsync_ExistingJob_RefusesWithoutChangingEvidence()
     {
