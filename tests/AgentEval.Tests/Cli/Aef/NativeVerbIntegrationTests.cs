@@ -207,6 +207,37 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task BenchGdpr_FromEnvironment_UsesHttpTargetAndSealsLiveTrials()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync("I respect privacy and minimize personal data.");
+        using var environment = new ProviderEnvironmentScope(
+            ("AI_INFERENCE_PROVIDER", "openai-compatible"),
+            ("OPENAI_COMPATIBLE_ENDPOINT", endpoint.Endpoint),
+            ("OPENAI_COMPATIBLE_MODEL", "local-model"),
+            ("OPENAI_COMPATIBLE_API_KEY", "local-test"));
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
+        var aef = new DirectoryInfo(Path.Combine(_root, "gdpr-aef"));
+
+        var exit = await BenchCommand.RunGdprAsync("smoke", "http-subject", _root, "privacy question",
+            evaluatorOverride: new PassingEvaluator(), azureFromEnv: true, runs: 2, aef: aef, subjectVersion: "1");
+
+        Assert.Equal(0, exit);
+        Assert.NotEmpty(endpoint.Requests);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        var header = Document(dir, "run.json");
+        Assert.Equal("live", (string?)header["execution"]!["targetMode"]);
+        Assert.Equal("1", (string?)header["subject"]!["version"]);
+        Assert.Equal(2, (int)header["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => l["trial"] is not null);
+        Assert.Contains(lines, l => l["trials"] is not null);
+        Assert.DoesNotContain("I respect privacy", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+    }
+
+    [Fact]
     public async Task BenchOwasp_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit()
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
