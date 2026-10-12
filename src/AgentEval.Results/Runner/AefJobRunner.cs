@@ -51,6 +51,10 @@ public static class AefJobRunner
         }
 
         var document = ReadPlan(plan);
+        if (target.Suites.Any(s => !double.IsFinite(s.PreparationUsdLow) || !double.IsFinite(s.PreparationUsdBound)
+            || s.PreparationUsdLow < 0 || s.PreparationUsdBound < s.PreparationUsdLow
+            || s.PreparationSecondsBound is < 0 or > 4_294_967))
+            throw new ArgumentException("Preparation requires finite nonnegative cost bounds and a time bound within the cancellation timer range.", nameof(target));
         if (target.CloseSeconds < 0 || target.Suites.SelectMany(s => s.Cases).Any(c =>
             !double.IsFinite(c.UsdLow) || !double.IsFinite(c.UsdBound) || c.UsdLow < 0 || c.UsdBound < c.UsdLow
             || c.SecondsBound < 0 || (target.TargetMode != AefTargetMode.Scripted && c.SecondsBound > 4_294_967)))
@@ -90,6 +94,7 @@ public static class AefJobRunner
         var seconds = 0L;
         foreach (var suite in target.Suites)
         {
+            seconds = Math.Min(beyond, seconds + suite.PreparationSecondsBound);
             foreach (var scripted in suite.Cases)
             {
                 seconds = Math.Min(beyond, seconds + Math.Min(beyond, scripted.SecondsBound));
@@ -177,7 +182,17 @@ public static class AefJobRunner
                         cancellationToken.ThrowIfCancellationRequested();
                         (limit, why) = Check(next, suite, activeRun);
                         if (limit is not null) break;
-                        activeRun ??= Open(k, planSuite, suite, output);
+                        if (activeRun is null)
+                        {
+                            activeRun = Open(k, planSuite, suite, output);
+                            var preparationFailure = await PrepareAsync(activeRun, cancellationToken).ConfigureAwait(false);
+                            (limit, why) = CheckActual(activeRun);
+                            why ??= preparationFailure;
+                            if (why is not null) break;
+                            (limit, why) = Check(next, suite, activeRun);
+                            if (why is not null) break;
+                        }
+                        cancellationToken.ThrowIfCancellationRequested();
                         var violation = await RunCaseAsync(activeRun, next, suite, planSuite, cancellationToken).ConfigureAwait(false);
                         (limit, why) = CheckActual(activeRun);
                         why ??= violation;
@@ -321,10 +336,21 @@ public static class AefJobRunner
         // the cases it counts (the first ones, in run order), each computed exactly and rounded once (§9.2.1, [SUM-5]).
         private AefJobEstimate Estimate(List<(JsonObject Plan, IAefJobSuite Target)> suites)
         {
-            var planned = suites.SelectMany(s => s.Target.Cases).ToList();
-            var counted = CasesLimit is { } limit && limit < planned.Count ? planned.Take((int)limit).ToList() : planned;
-            return new AefJobEstimate(counted.Count, AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdLow)),
-                AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdBound)), _target.PriceTable);
+            var remaining = CasesLimit ?? long.MaxValue;
+            long count = 0;
+            var low = new List<double>();
+            var high = new List<double>();
+            foreach (var (_, suite) in suites)
+            {
+                var take = (int)Math.Min(remaining, suite.Cases.Count);
+                if (take == 0) continue;
+                low.Add(suite.PreparationUsdLow);
+                high.Add(suite.PreparationUsdBound);
+                foreach (var c in suite.Cases.Take(take)) { low.Add(c.UsdLow); high.Add(c.UsdBound); }
+                count += take;
+                remaining -= take;
+            }
+            return new AefJobEstimate(count, AefSummaryCalculator.ExactSum(low), AefSummaryCalculator.ExactSum(high), _target.PriceTable);
         }
 
         // [PLAN-9]: the first limit, in [PLAN-2]'s order, the case could pass, and why; or none. open is the run the case
@@ -339,8 +365,9 @@ public static class AefJobRunner
             // spentUsd, the job's cases summed exactly; and [STRM-4]'s sum of the runs' cost.totalUsd, each run's own cases
             // summed exactly and rounded once, this run's with the bound. The two can differ in the last bit, and a runner
             // that keeps to its bounds passes neither ([PLAN-9]).
-            var spend = AefSummaryCalculator.ExactSum(_spent.Append(next.UsdBound));
-            var runs = AefSummaryCalculator.ExactSum(_totals.Append(AefSummaryCalculator.ExactSum((open?.Usd ?? []).Append(next.UsdBound))));
+            var preparation = open is null ? suite.PreparationUsdBound : 0;
+            var spend = AefSummaryCalculator.ExactSum(_spent.Append(next.UsdBound).Append(preparation));
+            var runs = AefSummaryCalculator.ExactSum(_totals.Append(AefSummaryCalculator.ExactSum((open?.Usd ?? []).Append(next.UsdBound).Append(preparation))));
             if (spend > maxUsd || runs > maxUsd)
             {
                 return ("maxUsd", $"stopped {where}: the spend so far plus its cost bound would be above maxUsd ([PLAN-9])");
@@ -351,7 +378,8 @@ public static class AefJobRunner
                 return ("cases", $"stopped {where}: the plan's {cases} cases are complete ([PLAN-9])");
             }
 
-            if (TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout - next.SecondsBound - _target.CloseSeconds)) > 0)
+            if (TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout - next.SecondsBound
+                - _target.CloseSeconds - (open is null ? suite.PreparationSecondsBound : 0))) > 0)
             {
                 return ("timeout", $"stopped {where}: the time since job.accepted, plus its time bound, plus the time kept for closing and sealing the run, would be above the timeout ([PLAN-9])");
             }
@@ -410,6 +438,55 @@ public static class AefJobRunner
 
         // A case: its line (the case's root at path check, its caseId unrewritten, its state; a severity on a failed or
         // warn line, a reason on a typed absence), the clock moved by its seconds, its usd added to the spend.
+        private async Task<string?> PrepareAsync(OpenRun run, CancellationToken cancellationToken)
+        {
+            var suite = run.Suite;
+            var started = _clock;
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_target.TargetMode != AefTargetMode.Scripted && suite.PreparationSecondsBound > 0)
+                deadline.CancelAfter(TimeSpan.FromSeconds(suite.PreparationSecondsBound));
+            AefJobPreparationResult result;
+            var unboundedAsync = false;
+            try
+            {
+                var preparation = suite.PrepareAsync(deadline.Token);
+                unboundedAsync = suite.PreparationSecondsBound == 0 && !preparation.IsCompleted;
+                if (unboundedAsync) deadline.Cancel();
+                result = await preparation.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ChargePreparation(run, suite.PreparationIncurredUsd);
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ChargePreparation(run, suite.PreparationIncurredUsd);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                ChargePreparation(run, suite.PreparationIncurredUsd);
+                return deadline.IsCancellationRequested ? "Run preparation exceeded its time bound"
+                    : $"Run preparation threw {ex.GetType().Name}";
+            }
+            if (result.Seconds < 0) throw new InvalidOperationException("Preparation duration must be nonnegative.");
+            _jobClock.Advance(result.Seconds);
+            ChargePreparation(run, result.Usd);
+            if (result.Usd > suite.PreparationUsdBound) return "Run preparation exceeded its cost bound";
+            if (unboundedAsync || result.Seconds > suite.PreparationSecondsBound
+                || (suite.PreparationSecondsBound > 0 && _clock.CompareTo(started.AddSeconds(suite.PreparationSecondsBound)) > 0))
+                return "Run preparation exceeded its time bound";
+            return result.Ready ? null : "The target was not ready";
+        }
+
+        private void ChargePreparation(OpenRun run, double usd)
+        {
+            if (usd == 0) return;
+            AddSpend(run, usd);
+            _events!.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+        }
+
         private async Task<string?> RunCaseAsync(OpenRun run, IAefJobCase next, IAefJobSuite suite, JsonObject planSuite, CancellationToken cancellationToken)
         {
             var started = _clock;

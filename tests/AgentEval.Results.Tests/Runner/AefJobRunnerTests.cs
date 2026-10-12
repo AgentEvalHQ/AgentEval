@@ -18,6 +18,89 @@ public sealed class AefJobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_PreparationCost_IsEstimatedReservedAndChargedWithoutCountingACase()
+    {
+        var preparations = 0;
+        var testCase = new Case(_ => ValueTask.FromResult(Passed()));
+        var suite = new Suite(testCase, _ =>
+        {
+            preparations++;
+            return ValueTask.FromResult(new AefJobPreparationResult(true, 0.25, 0));
+        }, preparationBound: 0.5);
+        var target = new Target(testCase, suite);
+        var options = new AefJobOptions { At = Start };
+        var estimate = AefJobRunner.Analyze(Plan(), Manifest(), target, options).Estimate!;
+        Assert.Equal(1, estimate.Cases);
+        Assert.Equal(1.5, estimate.UsdHigh);
+        Assert.Equal(0, preparations);
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), target, _output, options);
+        Assert.Equal("job.sealed", result.Terminal);
+        Assert.Equal(1, preparations);
+        Assert.Single(Events(), e => (string?)e["kind"] == "case.completed");
+        Assert.Equal(0.35, (double)Json(RunDirectory(), "summary.json")["cost"]!["totalUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        AssertStream();
+    }
+
+    [Fact]
+    public async Task RunAsync_PreparationAndCaseDoNotFit_StopsBeforeEitherCallOrRunCreation()
+    {
+        var testCase = new Case(_ => throw new InvalidOperationException("must not execute"));
+        var suite = new Suite(testCase, _ => throw new InvalidOperationException("must not prepare"), preparationBound: 1.5);
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal("maxUsd", result.Limit);
+        Assert.Empty(result.Runs);
+        Assert.Empty(Directory.GetFiles(_output, "run.json", SearchOption.AllDirectories));
+        AssertStream();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_CancelPreparation_RetainsItsCostInEmptyAbortedRun(bool returnsReady)
+    {
+        using var cancel = new CancellationTokenSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var testCase = new Case(_ => throw new InvalidOperationException("must not execute"));
+        var suite = new Suite(testCase, async ct =>
+        {
+            entered.SetResult();
+            if (returnsReady)
+            {
+                cancel.Cancel();
+                return new AefJobPreparationResult(true, 0.2, 0);
+            }
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return new AefJobPreparationResult(true, 0, 0);
+        }, preparationBound: 0.5, preparationIncurred: 0.2);
+        var execution = AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output, new AefJobOptions { At = Start }, cancel.Token);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cancel.Cancel();
+        Assert.Equal("job.cancelled", (await execution).Terminal);
+        Assert.Empty(File.ReadAllText(Path.Combine(RunDirectory(), "results.ndjson")));
+        Assert.Equal(0.2, (double)Json(RunDirectory(), "summary.json")["cost"]!["totalUsd"]!);
+        Assert.Equal("aborted", (string?)Json(RunDirectory(), "run.json")["status"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        AssertStream();
+    }
+
+    [Fact]
+    public async Task RunAsync_TargetNotReady_SealsPreparationCostWithoutExecutingCase()
+    {
+        var testCase = new Case(_ => throw new InvalidOperationException("must not execute"));
+        var suite = new Suite(testCase, _ => ValueTask.FromResult(new AefJobPreparationResult(false, 0.2, 0)), preparationBound: 0.5);
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal("The target was not ready", result.Reason);
+        Assert.Null(result.Limit);
+        Assert.Empty(File.ReadAllText(Path.Combine(RunDirectory(), "results.ndjson")));
+        Assert.Equal(0.2, (double)Json(RunDirectory(), "summary.json")["cost"]!["totalUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        AssertStream();
+    }
+
+    [Fact]
     public async Task RunAsync_DeliversCredentialsByPurposeWithoutChangingEnvironmentOrWritingSecrets()
     {
         const string subjectName = "S1_UNIT_SUBJECT_KEY";
@@ -290,7 +373,7 @@ public sealed class AefJobRunnerTests : IDisposable
         public ValueTask<AefJobCaseResult> RunAsync(CancellationToken cancellationToken) => run(cancellationToken);
     }
 
-    private sealed class Target(IAefJobCase testCase) : IAefJobTarget
+    private sealed class Target(IAefJobCase testCase, IAefJobSuite? suite = null) : IAefJobTarget
     {
         public AefJobCredentials? Credentials { get; private set; }
         public IReadOnlyCollection<string> CredentialPurposes => ["subject", "judge"];
@@ -300,11 +383,17 @@ public sealed class AefJobRunnerTests : IDisposable
         public string PriceTable => "unit-prices";
         public string Fingerprint => "unit-target";
         public long CloseSeconds => 1;
-        public IReadOnlyList<IAefJobSuite> Suites => [new Suite(testCase)];
+        public IReadOnlyList<IAefJobSuite> Suites => [suite ?? new Suite(testCase)];
     }
 
-    private sealed class Suite(IAefJobCase testCase) : IAefJobSuite
+    private sealed class Suite(IAefJobCase testCase, Func<CancellationToken, ValueTask<AefJobPreparationResult>>? prepare = null,
+        double preparationBound = 0, double preparationIncurred = 0) : IAefJobSuite
     {
+        public double PreparationUsdBound => preparationBound;
+        public double PreparationIncurredUsd => preparationIncurred;
+        public long PreparationSecondsBound => prepare is null ? 0 : 5;
+        public ValueTask<AefJobPreparationResult> PrepareAsync(CancellationToken ct) =>
+            prepare?.Invoke(ct) ?? ValueTask.FromResult(new AefJobPreparationResult(true, 0, 0));
         public string Ref => "suite:test";
         public string Version => "1";
         public string Digest => "sha256:" + new string('a', 64);

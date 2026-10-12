@@ -44,7 +44,24 @@ public interface IAefJobSuite
     IReadOnlyList<AefMetric> Metrics { get; }
     /// <summary>The entries summarized in the lane assigned by the plan.</summary>
     IReadOnlyList<AefSummaryEntry> SummaryEntries { get; }
+    /// <summary>Known lower cost estimate for preparing this run.</summary>
+    double PreparationUsdLow => 0;
+    /// <summary>Upper cost bound for preparing this run, charged separately from cases.</summary>
+    double PreparationUsdBound => 0;
+    /// <summary>Upper time bound for preparation in seconds; zero means no asynchronous preparation.</summary>
+    long PreparationSecondsBound => 0;
+    /// <summary>Preparation cost incurred so far, including on interruption.</summary>
+    double PreparationIncurredUsd => 0;
+    /// <summary>Prepares the run after its first case and preparation jointly fit the remaining limits.</summary>
+    ValueTask<AefJobPreparationResult> PrepareAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new AefJobPreparationResult(true, 0, 0));
 }
+
+/// <summary>Readiness and cost of preparing one run; preparation does not count as a case.</summary>
+/// <param name="Ready">Whether the target is ready to execute cases.</param>
+/// <param name="Usd">The cost incurred by preparation.</param>
+/// <param name="Seconds">Preparation duration on a simulated clock.</param>
+public sealed record AefJobPreparationResult(bool Ready, double Usd, long Seconds);
 
 /// <summary>A case executed only after its cost and time bounds fit the remaining job budget.</summary>
 public interface IAefJobCase
