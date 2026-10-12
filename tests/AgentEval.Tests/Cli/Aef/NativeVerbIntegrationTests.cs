@@ -653,11 +653,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData("nist", true)]
     public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(string family, bool fromEnvironment)
     {
+        using var usageMeter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         // A weak PII shape forces an inconclusive oracle verdict; the fallback judge then supplies the verdict.
         await using var endpoint = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
         await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: SUCCEEDED\nCONFIDENCE: 0.95\nREASON: test");
         var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "http-subject");
-        using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test");
+        using var judge = AgentEval.Cli.Infrastructure.CliUsageMeter.Wrap(
+            AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test"), "judge", "local-judge");
         Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
         File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
             new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
@@ -678,6 +680,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
         }).ExitCode;
         var written = await Run(aef, false);
+        var usage = Document(RunDirectory(aef.FullName), "summary.json")["usage"]!.AsArray();
+        Assert.Equal(2, usage.Count);
+        Assert.Equal(endpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(judgeEndpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!);
         AssertStoreLink(RunDirectory(aef.FullName));
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));

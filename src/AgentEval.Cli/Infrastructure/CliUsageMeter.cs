@@ -102,6 +102,12 @@ internal sealed class CliUsageMeter : IDisposable
         }
     }
 
+    private void ObserveModel(Call call, string? model)
+    {
+        if (model is null) return;
+        lock (_sync) call.Model = model;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -140,6 +146,8 @@ internal sealed class CliUsageMeter : IDisposable
             await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
             {
                 reportedModel = update.ModelId ?? reportedModel;
+                // Model identity is observed even when enumeration later fails or is abandoned.
+                meter.ObserveModel(call, update.ModelId);
                 foreach (var usage in update.Contents.OfType<UsageContent>())
                 {
                     if (usage.Details.InputTokenCount is { } i)

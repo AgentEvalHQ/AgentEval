@@ -17,7 +17,7 @@ public class CliUsageMeterTests
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
             ChatOptions? options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            yield return new ChatResponseUpdate { Contents = [new UsageContent(new() { InputTokenCount = 10, OutputTokenCount = 2 })] };
+            yield return new ChatResponseUpdate { ModelId = "reported-model", Contents = [new UsageContent(new() { InputTokenCount = 10, OutputTokenCount = 2 })] };
             await Task.Yield();
             if (failStream) throw new IOException("private failure");
         }
@@ -85,6 +85,7 @@ public class CliUsageMeterTests
         using var client = CliUsageMeter.Wrap(new Client(failStream: fail), "judge", "same");
         try { await foreach (var update in client.GetStreamingResponseAsync("q")) { if (stopEarly) break; } }
         catch (IOException) when (fail) { }
+        Assert.Equal("reported-model", Assert.Single(meter.Snapshot()!).Model);
         if (fail || stopEarly)
         {
             var unknown = Assert.Single(meter.Snapshot()!);
