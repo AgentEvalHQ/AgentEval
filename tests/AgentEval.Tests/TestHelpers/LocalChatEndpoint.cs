@@ -20,6 +20,8 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly ConcurrentQueue<JsonObject> _requests = new();
+    private readonly ConcurrentQueue<string> _authorizationHeaders = new();
+    private readonly ConcurrentQueue<string> _apiKeyHeaders = new();
 
     private LocalChatEndpoint(WebApplication app) => _app = app;
 
@@ -27,7 +29,12 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
 
     public IReadOnlyList<JsonObject> Requests => _requests.ToArray();
 
-    public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply)
+    public IReadOnlyList<string> AuthorizationHeaders => _authorizationHeaders.ToArray();
+
+    public IReadOnlyList<string> ApiKeyHeaders => _apiKeyHeaders.ToArray();
+
+    public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply,
+        int statusCode = StatusCodes.Status200OK)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
         builder.Logging.ClearProviders();
@@ -35,10 +42,19 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
         var app = builder.Build();
         var endpoint = new LocalChatEndpoint(app);
-        app.MapPost("/v1/chat/completions", async (HttpContext context) =>
+        async Task HandleChat(HttpContext context)
         {
             var request = (await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted))!.AsObject();
             endpoint._requests.Enqueue(request);
+            endpoint._authorizationHeaders.Enqueue(context.Request.Headers.Authorization.ToString());
+            endpoint._apiKeyHeaders.Enqueue(context.Request.Headers["api-key"].ToString());
+            if (statusCode != StatusCodes.Status200OK)
+            {
+                context.Response.StatusCode = statusCode;
+                await context.Response.WriteAsJsonAsync(new { error = new { message = "Scripted endpoint failure", type = "server_error" } },
+                    context.RequestAborted);
+                return;
+            }
             var text = await reply(request, context.RequestAborted);
             await context.Response.WriteAsJsonAsync(new
             {
@@ -49,7 +65,9 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
                 choices = new[] { new { index = 0, message = new { role = "assistant", content = text }, finish_reason = "stop" } },
                 usage = new { prompt_tokens = 10, completion_tokens = 5, total_tokens = 15 },
             }, context.RequestAborted);
-        });
+        }
+        app.MapPost("/v1/chat/completions", HandleChat);
+        app.MapPost("/openai/deployments/{deployment}/chat/completions", HandleChat);
         try
         {
             await app.StartAsync();

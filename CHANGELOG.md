@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preparation retains incurred cost in an aborted run without inventing a completed case.
   Async resource cleanup runs once per started run on completion, cancellation and failures, with an independent
   deadline. Closing-time overruns and cleanup errors are reported while retaining any sealed evidence.
+  Runner client foundations now include purpose-scoped endpoint creation without ambient key fallback or SDK
+  retries, plus per-role call, text-input and output-token caps. Missing usage and interrupted calls retain their
+  reserved cost; reported token overruns stop further calls. Live dataset and CLI wiring remain in progress.
 - **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
   `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.

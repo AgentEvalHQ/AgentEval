@@ -8,6 +8,8 @@
 // AzureChatAgentFactory is the AZURE_OPENAI_* env-var convention (used by --from-env).
 
 using System.ClientModel;
+using System.ClientModel.Primitives;
+using AgentEval.Results;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -21,6 +23,39 @@ namespace AgentEval.Cli.Infrastructure;
 /// </summary>
 internal static class EndpointFactory
 {
+    /// <summary>
+    /// Creates the runner's endpoint client using only the purpose-scoped key. Each chat invocation makes
+    /// at most one SDK attempt, so transport retries cannot bypass the runner's per-role call budget.
+    /// </summary>
+    /// <remarks>
+    /// OpenAI-compatible local servers may be keyless; Azure requires an explicit scoped key.
+    /// This path deliberately does not use the interactive CLI's environment-variable fallbacks.
+    /// </remarks>
+    internal static IChatClient CreateForRunner(string endpoint, string model, string? apiKey, bool azure = false)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+            throw new AefInputException("Runner endpoint must be an absolute HTTP(S) URI without user info, query or fragment.");
+        if (string.IsNullOrWhiteSpace(model))
+            throw new AefInputException("Runner model must be specified.");
+        if (apiKey is not null && string.IsNullOrWhiteSpace(apiKey))
+            throw new AefInputException("Runner credential must be non-empty when supplied.");
+
+        if (azure)
+        {
+            if (apiKey is null)
+                throw new AefInputException("Runner Azure endpoint requires a purpose-scoped credential.");
+            var options = new AzureOpenAIClientOptions { RetryPolicy = new ClientRetryPolicy(0) };
+            return new AzureOpenAIClient(uri, new AzureKeyCredential(apiKey), options)
+                .GetChatClient(model).AsIChatClient();
+        }
+
+        var openAIOptions = new OpenAIClientOptions { Endpoint = uri, RetryPolicy = new ClientRetryPolicy(0) };
+        return new OpenAIClient(new ApiKeyCredential(apiKey ?? "no-key-needed"), openAIOptions)
+            .GetChatClient(model).AsIChatClient();
+    }
+
     /// <summary>
     /// Creates an <see cref="IChatClient"/> for any OpenAI-compatible endpoint.
     /// Works with OpenAI, Ollama, Groq, vLLM, LM Studio, Together.ai, Fireworks, Mistral, etc.
