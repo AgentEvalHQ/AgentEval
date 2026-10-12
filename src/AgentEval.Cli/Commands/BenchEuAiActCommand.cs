@@ -216,108 +216,124 @@ public static class BenchEuAiActCommand
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
 
-        string runId;
-        EvalResult compositeResult;
-        IReadOnlyList<EvalResult>? trialResults = null;
         var startedAt = DateTimeOffset.UtcNow;
+        var progress = new CompositeProgress(benchmark);
         try
         {
-            var runner = new EuAiActBenchmarkRunner();
-            if (runs > 1)
+            string runId;
+            EvalResult compositeResult;
+            IReadOnlyList<EvalResult>? trialResults = null;
+
+            try
             {
-                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct,
-                    async token => (await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: token)).Item2);
-                trialResults = compositeResult.Details.SubResults!;
-                compositeResult = StochasticBenchRunner.RollupTree(trialResults);
-                runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
+                var runner = new EuAiActBenchmarkRunner();
+                if (runs > 1)
+                {
+                    compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct,
+                        async token => (await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: token)).Item2);
+                    trialResults = compositeResult.Details.SubResults!;
+                    compositeResult = StochasticBenchRunner.RollupTree(trialResults);
+                    runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
+                }
+                else
+                    (runId, compositeResult) = await runner.RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput, progress.Completed, progress.Started, ct: ct);
             }
-            else
-                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            {
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                return 1;
+            }
+
+            // ── Generate reports ─────────────────────────────────────────────────
+            // Split the composite preset string (e.g. "standard+high-risk-employment") into a
+            // base preset + ordered domain-pack list so eu-ai-act-evidence.json records each
+            // pack separately. The base name is what the schema's `preset` enum accepts; the
+            // packs land in a structured `domainPacks` array.
+            var presetTokens = preset.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var basePreset = presetTokens.Length > 0 ? presetTokens[0].ToLowerInvariant() : "standard";
+            var domainPacks = presetTokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
+
+            var reporter = new EuAiActComplianceReporter(articles);
+            var options = new EuAiActReportOptions(
+                Preset: basePreset,
+                DomainPacks: domainPacks,
+                JudgeMode: runs > 1 ? "multi-judge" : "mode-a",
+                JudgeModel: judgeModelName);
+            EuAiActComplianceEvidence evidence;
+            try
+            {
+                evidence = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            {
+                Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
+                return 1;
+            }
+
+            // Derive output directory (mirrors FileSystemOutputStore path convention)
+            var sanitizedSubject = FileSystemLayout.Sanitize(subject);
+            var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+            var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
+            Directory.CreateDirectory(outputDir);
+
+            // Markdown report
+            try
+            {
+                var md = new MarkdownRenderer().Render(evidence);
+                var mdPath = Path.Combine(outputDir, "report.md");
+                await File.WriteAllTextAsync(mdPath, md);
+                Console.WriteLine($"Markdown report: {mdPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            {
+                Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
+            }
+
+            // PDF report
+            try
+            {
+                var pdfRenderer = new EuAiActPdfRenderer(articles);
+                var pdfPath = Path.Combine(outputDir, "report.pdf");
+                await pdfRenderer.RenderAsync(evidence, pdfPath);
+                Console.WriteLine($"PDF report: {pdfPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            {
+                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
+            }
+
+            if (runs == 1) ct.ThrowIfCancellationRequested();
+            var overall = evidence.Summary.OverallStatus;
+            var finalExit = BenchExitCodes.FromLabel(overall);
+            // ── AEF ───────────────────────────────────────────────────────────────
+            // As bench gdpr: a live agent is live, a stand-in mocked, a graded --response replayed.
+            var aefFailed = !noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
+                agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                    : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                    : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
+                trials: trialResults);
+
+            // ── Exit code ─────────────────────────────────────────────────────────
+            if (aefFailed)
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
+
+            // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping —
+            // OverallStatus is always exactly "PASS"/"WARN"/"FAIL", see MapLabelToStatus, so this is behaviorally
+            // unchanged); the shared helper exists specifically so a future policy change lands in one place.
+            return finalExit;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested && runs == 1)
         {
-            Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+            if (!noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
+                agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                    : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                    : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                benchmark, progress.Snapshot(), startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled"))
+                return ExitCodes.RuntimeError;
             return 1;
         }
-
-        // ── Generate reports ─────────────────────────────────────────────────
-        // Split the composite preset string (e.g. "standard+high-risk-employment") into a
-        // base preset + ordered domain-pack list so eu-ai-act-evidence.json records each
-        // pack separately. The base name is what the schema's `preset` enum accepts; the
-        // packs land in a structured `domainPacks` array.
-        var presetTokens = preset.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var basePreset = presetTokens.Length > 0 ? presetTokens[0].ToLowerInvariant() : "standard";
-        var domainPacks = presetTokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
-
-        var reporter = new EuAiActComplianceReporter(articles);
-        var options = new EuAiActReportOptions(
-            Preset: basePreset,
-            DomainPacks: domainPacks,
-            JudgeMode: runs > 1 ? "multi-judge" : "mode-a",
-            JudgeModel: judgeModelName);
-        EuAiActComplianceEvidence evidence;
-        try
-        {
-            evidence = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
-            return 1;
-        }
-
-        // Derive output directory (mirrors FileSystemOutputStore path convention)
-        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
-        var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
-        Directory.CreateDirectory(outputDir);
-
-        // Markdown report
-        try
-        {
-            var md = new MarkdownRenderer().Render(evidence);
-            var mdPath = Path.Combine(outputDir, "report.md");
-            await File.WriteAllTextAsync(mdPath, md);
-            Console.WriteLine($"Markdown report: {mdPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
-        }
-
-        // PDF report
-        try
-        {
-            var pdfRenderer = new EuAiActPdfRenderer(articles);
-            var pdfPath = Path.Combine(outputDir, "report.pdf");
-            await pdfRenderer.RenderAsync(evidence, pdfPath);
-            Console.WriteLine($"PDF report: {pdfPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-        }
-
-        var overall = evidence.Summary.OverallStatus;
-        var finalExit = BenchExitCodes.FromLabel(overall);
-        // ── AEF ───────────────────────────────────────────────────────────────
-        // As bench gdpr: a live agent is live, a stand-in mocked, a graded --response replayed.
-        var aefFailed = !noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
-            agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
-                : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
-                : AgentEval.Results.Writing.AefTargetMode.Mocked,
-            benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-            trials: trialResults);
-
-        // ── Exit code ─────────────────────────────────────────────────────────
-        if (aefFailed)
-            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
-
-        // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping —
-        // OverallStatus is always exactly "PASS"/"WARN"/"FAIL", see MapLabelToStatus, so this is behaviorally
-        // unchanged); the shared helper exists specifically so a future policy change lands in one place.
-        return finalExit;
     }
 
     /// <summary>

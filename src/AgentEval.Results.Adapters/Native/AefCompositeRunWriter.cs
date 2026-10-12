@@ -45,6 +45,9 @@ public sealed record AefCompositeRunOptions
     /// <summary>The command's final decision, if this benchmark applies a gate ([GATE-1]).</summary>
     public AefCommandGate? Gate { get; init; }
 
+    /// <summary>A content-free reason when execution was interrupted; suppresses any final gate.</summary>
+    public string? AbortReason { get; init; }
+
     /// <summary>
     /// Facts a case's root line carries in <c>ext</c>, by case id: what the producer measured that AEF has no field for
     /// (TypedMemEval's typed outcome, say). Never content.
@@ -166,7 +169,8 @@ public static class AefCompositeRunWriter
                     trials: caseTrials, presetMeasured: presetMeasured);
             }
 
-            options.Gate?.Write(writer, runId, endedAt, cases.Select(c => writer.ResultIdOf(c.Metric.Key, CasePath)).ToList());
+            if (options.AbortReason is null)
+                options.Gate?.Write(writer, runId, endedAt, cases.Select(c => writer.ResultIdOf(c.Metric.Key, CasePath)).ToList());
 
             writer.SetSummary(new AefSummary
             {
@@ -197,13 +201,14 @@ public static class AefCompositeRunWriter
                     {
                         ["preset"] = preset.Metric.Key,
                         ["label"] = preset.Score.Label,
-                        ["score"] = double.IsFinite(preset.Score.Value) ? preset.Score.Value : null,
+                        ["score"] = presetMeasured ? preset.Score.Value : null,
                         ["strategy"] = preset.Details.AggregationStrategy,
                         ["rulePath"] = preset.Details.Lineage?.RulePath,
                     },
                 },
             });
-            writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
+            writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
+                AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
             var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
             return (directory, seal.RunHash);
         }
@@ -224,7 +229,12 @@ public static class AefCompositeRunWriter
         return score.Measurement switch
         {
             MeasurementState.NotApplicable => AefState.NotApplicable,
-            MeasurementState.NotMeasured => AefState.NotMeasured,
+            MeasurementState.NotMeasured => score.Label switch
+            {
+                "error" => AefState.Error,
+                "skipped" => AefState.Skipped,
+                _ => AefState.NotMeasured,
+            },
             _ => score.Label switch
             {
                 "pass" => AefState.Passed,

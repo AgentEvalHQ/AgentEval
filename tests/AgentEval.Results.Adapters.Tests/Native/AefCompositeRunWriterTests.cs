@@ -35,6 +35,35 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
     [Fact]
+    public void Write_AbortedTree_RetainsMeasuredChildrenWithoutGateOrInventedParentScore()
+    {
+        var interrupted = Leaf("interrupted", "error", 0);
+        interrupted = interrupted with { Score = interrupted.Score with { Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured } };
+        var article = Composite("article", "error", 0, null, new EvalLineage("required-error", []),
+            Leaf("finished", "pass", 1), interrupted);
+        var preset = Composite("preset", "error", 0, null, new EvalLineage("required-error", []), article);
+        var shape = new AefComponentShape(1, true, "Averaged", [new(1, true, "Averaged", [Leaf(), Leaf()])]);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, shape, new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+            AbortReason = "cancelled",
+            Gate = new AefCommandGate { GateId = "gate:bench", Rule = "label:pass", ExitCode = 0, Outcome = AefGateOutcome.Ship },
+        }, Start, Start.AddSeconds(1));
+
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        Assert.Equal("aborted", (string?)AefTestRuns.Document(dir, "run.json")["status"]);
+        Assert.Null(AefTestRuns.Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(3, lines.Count);
+        Assert.Equal("passed", (string?)Assert.Single(lines, l => (string?)l["path"] == "case/finished")["state"]);
+        foreach (var line in lines.Where(l => (string?)l["state"] == "error")) Assert.Null(line["scores"]);
+    }
+
+    [Fact]
     public void Write_RecordsTheTree_ItsRulesAndComponents_IntactUnderBothVerifiers()
     {
         // A preset of two articles: art5 failed on its required judge part (failure-effect), art6 errored (required-error).

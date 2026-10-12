@@ -33,6 +33,53 @@ public class BenchCommandTests : IDisposable
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
+    [Theory]
+    [InlineData("gdpr", 0)]
+    [InlineData("gdpr", 1)]
+    [InlineData("eu-ai-act", 0)]
+    [InlineData("eu-ai-act", 1)]
+    public async Task CancelledComposite_PreservesFinishedLeavesAndWithholdsGate(string family, int completed)
+    {
+        InitWorkspace();
+        using var cancel = new CancellationTokenSource();
+        var evaluator = new CancellingEvaluator(cancel, completed);
+        var root = new DirectoryInfo(Path.Combine(_root, "cancel-aef"));
+        var exit = family == "gdpr"
+            ? await BenchCommand.RunGdprAsync("standard", "subject", _root, "question",
+                evaluatorOverride: evaluator, responseText: "secret answer", aef: root, ct: cancel.Token)
+            : await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question",
+                evaluatorOverride: evaluator, responseText: "secret answer", aef: root, ct: cancel.Token);
+
+        Assert.Equal(1, exit);
+        var dir = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(root.FullName, "run.json", SearchOption.AllDirectories)))!;
+        var verified = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
+        Assert.Equal("aborted", (string?)header["status"]);
+        Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => (string?)l["state"] == "error");
+        if (completed > 0) Assert.Contains(lines, l => (string?)l["state"] == "passed");
+        Assert.DoesNotContain("secret answer", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)), StringComparison.Ordinal);
+    }
+
+    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator
+    {
+        private int _calls;
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) > completed)
+            {
+                cancel.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            return new PassingStubEvaluator().EvaluateAsync(input, output, criteria, cancellationToken);
+        }
+    }
+
     [Fact]
     public async Task RepeatedRuns_WriteSealedTrialTrees()
     {
