@@ -30,20 +30,8 @@ public sealed class AefDatasetJobTargetTests : IDisposable
     }
     public void Dispose()
     {
-        if (Environment.GetEnvironmentVariable("AEF_RUNNER_FIXTURES") is { Length: > 0 } fixtures
-            && _plan is not null && Directory.Exists(Path.Combine(Output, "runs")))
-        {
-            var destination = Path.Combine(fixtures, Path.GetFileName(_root));
-            foreach (var file in Directory.GetFiles(Output, "*", SearchOption.AllDirectories))
-            {
-                var target = Path.Combine(destination, Path.GetRelativePath(Output, file));
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(file, target);
-            }
-            File.WriteAllBytes(Path.Combine(destination, "plan.json"), Bytes(_plan));
-            File.WriteAllBytes(Path.Combine(destination, "runner.json"), Bytes(Manifest()));
-            File.WriteAllText(Path.Combine(destination, "expected-stream.txt"), _expectValidStream ? "valid" : "budget-violation");
-        }
+        if (_plan is not null)
+            AefRunnerFixtures.Retain(Output, Path.GetFileName(_root), Bytes(_plan), Bytes(Manifest()), !_expectValidStream);
         Directory.Delete(_root, true);
     }
     private static byte[] Bytes(JsonObject plan) => Encoding.UTF8.GetBytes(plan.ToJsonString());

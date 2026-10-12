@@ -143,6 +143,22 @@ conversation history. Missing usage, failed requests and interrupted calls retai
 token totals unknown. Reported overruns stop the job; evidence retains actual spend, even when it exceeds the
 declared budget. Such a provider violation is not reported as a compliant budget run.
 
+To repeat the offline runner integration checks after restoring the solution:
+
+```bash
+bash tests/AgentEval.Results.Conformance/runner-crosscheck.sh net10.0
+bash tests/AgentEval.Results.Conformance/runner-crosscheck.sh net8.0
+```
+
+The script retains successful, refused and interrupted test jobs temporarily, verifies each sealed run with
+`agenteval aef verify` and the Python reference verifier, and compares .NET/Python `stream` and `conform` findings.
+An intentional provider overrun must report the expected budget violation in both implementations.
+It also drives the actual executable against loopback HTTP: dry-run with diagnostic flags, exact progress bytes,
+separate subject/judge keys, case/time/cost limits, upfront and unresolved-target refusals, readiness failure,
+missing usage, provider overrun and SIGINT cancellation. SIGINT is exercised on POSIX hosts; Windows explicitly
+skips that process-signal scenario, while cooperative cancellation remains covered by the .NET tests.
+No external model endpoint or paid call is used. Temporary fixtures are removed on exit.
+
 ### Export a run, check it, sign it
 
 ```bash

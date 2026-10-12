@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--progress ndjson` mirrors persisted event bytes. `--max-usd` can only lower the plan cap and
   `--refuse-over-budget` opts into upfront estimate refusal; both use the engine's shared acceptance rules.
   Operator budget options are recorded separately and bound into job identity, preserving exact plan bytes.
+  `runner-crosscheck.sh` repeats offline runner integration, compares .NET/Python stream and run-conformance
+  findings, and drives the actual CLI through limits, refusals, scoped keys, missing usage and POSIX cancellation.
   Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
   reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
   preserving criteria, assertions, named metrics, typed absences and content privacy.

@@ -17,7 +17,14 @@ public sealed class RunnerCommandTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "runner-command-" + Guid.NewGuid().ToString("N"));
     public RunnerCommandTests() => Directory.CreateDirectory(_root);
-    public void Dispose() => Directory.Delete(_root, true);
+    public void Dispose()
+    {
+        var jobs = Path.Combine(_root, ".agenteval", "aef", "jobs");
+        if (Directory.Exists(jobs))
+            foreach (var job in Directory.GetDirectories(jobs))
+                AefRunnerFixtures.Retain(job, Path.GetFileName(_root) + "-" + Path.GetFileName(job));
+        Directory.Delete(_root, true);
+    }
 
     [Fact]
     public void Manifest_IdentityPrecedence_UsesOptionThenEnvironmentThenConfiguration()
