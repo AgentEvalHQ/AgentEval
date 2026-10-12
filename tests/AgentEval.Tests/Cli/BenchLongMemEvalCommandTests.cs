@@ -121,6 +121,53 @@ public sealed class BenchLongMemEvalCommandTests
             out _));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public async Task RunAsync_InterruptedAfterQuestion_PreservesObservedResult(bool fail, bool noAef, bool invalidOutput)
+    {
+        using var fixture = WorkspaceFixture.Create(Question("first"), Question("second"));
+        using var environment = new EnvironmentVariableScope("LONGMEMEVAL_DATASET_PATH", fixture.DatasetPath);
+        using var cancel = new CancellationTokenSource();
+        using var client = new SequenceChatClient("agent answer", "yes");
+        var aef = new DirectoryInfo(Path.Combine(fixture.Root, "evidence"));
+        if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
+        string? observed = null;
+        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "subject", fixture.Root,
+            client, cancel.Token, aef, noAef, onQuestionCompleted: question =>
+            {
+                observed = question.QuestionId;
+                if (fail) throw new InvalidOperationException("test failure after question");
+                cancel.Cancel();
+            }));
+        Assert.Equal(invalidOutput ? 3 : 1, invocation.ExitCode);
+        Assert.NotNull(observed);
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(fixture.Root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var header = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(header)!;
+        var verified = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        var run = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!;
+        Assert.Equal("aborted", (string?)run["status"]);
+        Assert.Equal("mocked", (string?)run["execution"]!["targetMode"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var line = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
+        Assert.Equal(observed, (string?)line["caseId"]);
+        if (Environment.GetEnvironmentVariable("AEF_VERB_FIXTURES") is { Length: > 0 } retained)
+        {
+            var destination = Path.Combine(retained, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(destination);
+            foreach (var file in Directory.GetFiles(dir)) File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
+        }
+    }
+
     private static object Question(string id) => new
     {
         question_id = id,

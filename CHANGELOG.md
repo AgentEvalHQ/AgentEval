@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **LongMemEval interruption evidence:** completed question results survive cancellation or later failure through
+  a synchronous progress API. Partial runs omit benchmark-wide accuracy and command gates; returned full results
+  remain available when persistence is interrupted.
+
 - **Memory benchmark interruption evidence:** completed categories now travel with progress updates, allowing
   the CLI to retain them in an aborted AEF run on cancellation. Completed results also survive persistence
   interruption; absent results are not fabricated and aborted runs have no gate.

@@ -57,7 +57,8 @@ public static class BenchLongMemEvalCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null)
+        string? subjectVersion = null,
+        Action<QuestionResult>? onQuestionCompleted = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -166,11 +167,33 @@ public static class BenchLongMemEvalCommand
         Console.WriteLine();
 
         // ── Run ──────────────────────────────────────────────────────────────
-        ExternalBenchmarkResult result;
+        ExternalBenchmarkResult? result = null;
+        var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
+        bool WriteEvidence(string? reason = null, int? exitCode = null)
+        {
+            if (noAef) return false;
+            var observed = result ?? new ExternalBenchmarkResult
+            {
+                BenchmarkId = "longmemeval", BenchmarkName = "Interrupted LongMemEval", Options = options,
+                OverallAccuracy = null, TaskAveragedAccuracy = null, PerTypeResults = [],
+                QuestionResults = completed.ToArray(), Duration = DateTimeOffset.UtcNow - startedAt,
+            };
+            return BenchAef.WriteResult(aef, agentEvalDir, "longmemeval", preset, subject, subjectVersion,
+                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                BenchAef.QuestionTree(observed, "longmemeval", preset,
+                    result is null ? "INCONCLUSIVE" : LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
+                    chatClientOverride is null ? deployment : null), startedAt, DateTimeOffset.UtcNow,
+                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0);
+        }
         try
         {
-            result = await runner.RunAsync(agent, benchmarkConfig, options, ct);
+            result = await runner.RunWithProgressAsync(agent, benchmarkConfig, options, question =>
+            {
+                completed.Add(question);
+                onQuestionCompleted?.Invoke(question);
+            }, ct);
+            ct.ThrowIfCancellationRequested();
         }
         catch (LongMemEvalDatasetNotFoundException ex)
         {
@@ -181,7 +204,7 @@ public static class BenchLongMemEvalCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"LongMemEval run failed: {ex.GetType().Name}: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         // ── Persist via output store ─────────────────────────────────────────
@@ -255,11 +278,12 @@ public static class BenchLongMemEvalCommand
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
             Console.WriteLine($"   Native:    {Path.Combine(runDir, "report-native.json")}");
+            ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist LongMemEval run: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         var finalExit = LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
@@ -270,11 +294,7 @@ public static class BenchLongMemEvalCommand
             _ => ExitCodes.GateFailed,
         };
         // AEF: a case per question. The environment's provider is live; a client passed in (tests) is a stand-in.
-        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "longmemeval", preset, subject, subjectVersion,
-                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                BenchAef.QuestionTree(result, "longmemeval", preset, LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
-                    chatClientOverride is null ? deployment : null),
-                startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
+        if (WriteEvidence(exitCode: finalExit))
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         return finalExit;
