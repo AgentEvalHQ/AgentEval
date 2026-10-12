@@ -175,16 +175,23 @@ public static class BenchPerfCommand
 
         Console.WriteLine($"Running perf benchmark ({preset}) for subject '{subject}'...");
 
-        EvalResult result;
+        EvalResult? result = null;
         var startedAt = DateTimeOffset.UtcNow;
+        bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
+            aef, agentEvalDir, "perf", preset, subject, subjectVersion,
+            agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
+            exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
+            abortReason: reason, emptyResults: result is null);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);
+            ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Performance benchmark failed: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         // ── Persist through the output store ─────────────────────────────────
@@ -220,6 +227,7 @@ public static class BenchPerfCommand
                 });
             await store.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            ct.ThrowIfCancellationRequested();
 
             // T0.5 (v1.1): emit JSON + HTML + PDF reports alongside the canonical run.
             // Perf previously emitted nothing beyond the store; this brings it to parity
@@ -246,20 +254,19 @@ public static class BenchPerfCommand
                 runId: runId);
             if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
             if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
+            ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist perf run to output store: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         Console.WriteLine($"Overall result: composite verdict {result.Score.Label.ToUpperInvariant()} " +
             $"(score {result.Score.Value:F3})");
 
         // AEF: the perf result as sealed evidence (the mock run returned above, unstored).
-        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "perf", preset, subject, subjectVersion,
-                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                result, startedAt, DateTimeOffset.UtcNow, exitCode: BenchExitCodes.FromLabel(result.Score.Label)))
+        if (WriteEvidence())
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         // Reuse fix (BUG-22 follow-up): was an inlined duplicate of BenchExitCodes.FromLabel

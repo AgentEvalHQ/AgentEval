@@ -284,6 +284,9 @@ If the process is killed before it can close the run, the folder remains `runnin
 already written. An interrupted GDPR, EU AI Act, or agentic benchmark with no completed evaluation has empty results.
 Redteam and the OWASP, MITRE, and NIST benchmarks also preserve their completed scan if cancellation occurs
 during subsequent persistence or report generation. `--no-aef` still suppresses this evidence.
+Live perf benchmarks retain a returned result when persistence fails or reporting is cancelled. Evaluation failures
+before a result is returned produce an empty aborted run. Neither path adds a gate; an explicit AEF write failure
+returns exit 3, while a default-output failure remains a warning alongside the original failure exit.
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
 nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
 started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path

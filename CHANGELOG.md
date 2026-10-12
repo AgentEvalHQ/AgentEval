@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Live perf interruption evidence:** evaluation and persistence failures now retain an aborted AEF run,
+  including any returned benchmark result. Cancellation after persistence/reporting omits the gate;
+  `--no-aef` and explicit-output failure exit behavior remain respected.
+
 ### Added
 
 - **Plan-controlled runner content:** dataset jobs with `contentCapture: on` attach input/expected/output,

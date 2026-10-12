@@ -743,6 +743,68 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Path.Combine(_root, ".agenteval", "compliance"), euAiAct ? "eu-ai-act-evidence.json" : "gdpr-evidence.json", SearchOption.AllDirectories))));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, false, false, false, true)]
+    public async Task Perf_Interrupted_RetainsOnlyObservedEvidence(bool noAef, bool invalidOutput, bool defaultOutput, bool failPersistence = false, bool beforeEvaluation = false)
+    {
+        using var cancel = new CancellationTokenSource();
+        await using var endpoint = await LocalChatEndpoint.StartAsync("Measured response");
+        var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "perf-subject");
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "perf-cancel" }.ToJsonString());
+        var outputRoot = Path.Combine(_root, "perf-aef");
+        if (invalidOutput) File.WriteAllText(outputRoot, "not a directory");
+        var original = Console.Out;
+        using StringWriter output = failPersistence ? new FailOnPerfPersistenceWriter()
+            : new CancelOnPersistenceWriter(cancel, beforeEvaluation ? "Running perf benchmark" : "Persisted run ");
+        try
+        {
+            Console.SetOut(output);
+            var exit = await BenchPerfCommand.RunAsync("latency", agent.Name, "hello", _root, agent,
+                ct: cancel.Token, aef: defaultOutput ? null : new DirectoryInfo(outputRoot), noAef: noAef, agentIsLive: true);
+            Assert.Equal(invalidOutput ? 3 : 1, exit);
+        }
+        finally
+        {
+            Console.SetOut(original);
+            (agent as IDisposable)?.Dispose();
+        }
+        Assert.Equal(!failPersistence, cancel.IsCancellationRequested);
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(_root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var dir = RunDirectory(defaultOutput ? Path.Combine(_root, ".agenteval", "aef") : outputRoot);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson"));
+        if (beforeEvaluation)
+        {
+            Assert.Empty(endpoint.Requests);
+            Assert.Empty(lines);
+        }
+        else Assert.NotEmpty(lines);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    private sealed class FailOnPerfPersistenceWriter : StringWriter
+    {
+        public override void WriteLine(string? value)
+        {
+            if (value?.StartsWith("Persisted run ", StringComparison.Ordinal) == true)
+                throw new IOException("Test persistence failure after measurement");
+            base.WriteLine(value);
+        }
+    }
+
     private sealed class PassingEvaluator : AgentEval.Core.IEvaluator
     {
         public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default) =>
