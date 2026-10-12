@@ -151,7 +151,7 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
         return judge with
         {
             Reason = reason,
-            Metadata = Merge(keyword.Metadata, capped, provenance),
+            Metadata = Merge(keyword.Metadata, capped, provenance is null ? null : provenance with { RubricDigest = judge.RubricDigest }),
         };
     }
 

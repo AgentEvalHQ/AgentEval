@@ -238,6 +238,12 @@ Assertions and code metrics use CODE; measured LLM metrics use their own configu
 the harness rubric. Aggregate decisions and unmeasured lines do not claim a grader. The dataset runner uses
 the same mapping and retains the observed rubric in its judge header. No annotation adds a prompt hash.
 
+Native probe judge headers and annotators retain the full digest of the actual LLM judge system prompt and
+user template. Built-in template versions and custom template text are distinguished; CRLF is normalized.
+Probe prompts, responses, identifiers and returned rationale are excluded. Different attack-family rubrics
+remain separate header entries for the same model. A discarded judge verdict does not supply the keyword
+verdict's rubric; unknown instruments (including separate control graders) remain absent.
+
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
 `PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints

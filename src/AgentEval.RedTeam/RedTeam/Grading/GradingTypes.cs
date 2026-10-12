@@ -87,6 +87,10 @@ public sealed record GraderProvenance(
     OracleEvidenceClass EvidenceClass,
     GradingProvenanceKind ShippedBy)
 {
+    /// <summary>Full SHA-256 identity of the judge instrument, excluding probe and response content; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+
     /// <summary>True when the keyword and judge verdicts differ. Computed — never a third source of truth.</summary>
     public bool Disagreed => KeywordOutcome != JudgeOutcome;
 }

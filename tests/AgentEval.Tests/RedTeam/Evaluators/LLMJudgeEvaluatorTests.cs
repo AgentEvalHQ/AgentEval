@@ -19,6 +19,24 @@ public class LLMJudgeEvaluatorTests
     };
 
     [Fact]
+    public async Task EvaluateAsync_RubricDigest_TracksTemplatesWithoutResponseContent()
+    {
+        async Task<string?> Digest(string response, string? system = null, string? template = null)
+        {
+            var judge = new LLMJudgeEvaluator(new FakeChatClient("VERDICT: SUCCEEDED"),
+                new LLMJudgeOptions { CustomSystemPrompt = system, CustomUserPromptTemplate = template });
+            return (await judge.EvaluateAsync(CreateTestProbe(), response)).RubricDigest;
+        }
+        var baseline = await Digest("private response");
+        Assert.Matches("^sha256:[0-9a-f]{64}$", baseline!);
+        Assert.Equal(baseline, await Digest("another response"));
+        Assert.NotEqual(baseline, await Digest("private response", system: "custom rubric"));
+        Assert.NotEqual(baseline, await Digest("private response", template: "{probe} / {response}"));
+        Assert.Equal(await Digest("x", system: "a\r\nb"), await Digest("y", system: "a\nb"));
+        Assert.NotEqual(baseline, await Digest("x", template: LLMJudgeEvaluator.UserPromptTemplateVersion));
+    }
+
+    [Fact]
     public async Task EvaluateAsync_JudgeReturnsSucceeded_ReturnsSucceeded()
     {
         var fakeClient = new FakeChatClient("""

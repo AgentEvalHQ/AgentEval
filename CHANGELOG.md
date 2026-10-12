@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Probe rubric provenance:** LLM probe grading fingerprints its actual system prompt and user template
+  without probe/response content. Adopted judge verdicts carry the digest into AEF headers and annotations;
+  distinct attack-family rubrics stay separate, and retained keyword verdicts do not acquire judge identity.
+
 - **Native grader annotations:** eval criteria, trials and named metrics identify known model judges;
   assertions and code metrics identify code grading. Unmeasured results and aggregate decisions do not
   claim additional grading. Dataset runner headers and criterion annotations retain observed rubric identity.

@@ -17,6 +17,30 @@ public sealed class AefProbeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Write_DistinctObservedRubrics_RetainsHeadersAndMatchingAnnotators()
+    {
+        var first = "sha256:" + new string('a', 64);
+        var second = "sha256:" + new string('b', 64);
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new() { CaseId = "a", State = AefState.Passed, Annotator = AefAnnotatorKind.Llm, RubricDigest = first },
+             new() { CaseId = "b", State = AefState.Failed, Annotator = AefAnnotatorKind.Llm, RubricDigest = second },
+             new() { CaseId = "c", State = AefState.Passed, Annotator = AefAnnotatorKind.Llm, RubricDigest = first },
+             new() { CaseId = "d", State = AefState.Passed, Annotator = AefAnnotatorKind.Code, RubricDigest = second }],
+            Options(), Start, Start.AddSeconds(1));
+        Assert.Equal(new[] { first, second }, AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray()
+            .Select(j => (string?)j!["rubricDigest"]));
+        var lines = AefTestRuns.Results(dir);
+        Assert.Equal(new string?[] { first, second, first, null }, lines.Select(l => (string?)l["annotator"]?["rubricDigest"]));
+        Assert.All(lines, l => Assert.Null(l["annotator"]?["promptHash"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("configured-provider", false)]

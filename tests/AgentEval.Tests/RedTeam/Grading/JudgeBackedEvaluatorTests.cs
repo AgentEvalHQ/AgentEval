@@ -59,6 +59,8 @@ public class JudgeBackedEvaluatorTests
         Assert.Equal(EvaluationOutcome.Succeeded, r.Outcome);
         Assert.Equal(EvidenceFidelity.IntentToAct, GradingMetadata.FidelityOf(r));   // judge ⇒ capped
         Assert.Equal(GradingProvenanceKind.Judge, GradingMetadata.ProvenanceOf(r)!.ShippedBy);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", GradingMetadata.ProvenanceOf(r)!.RubricDigest!);
+        Assert.Equal(r.RubricDigest, GradingMetadata.ProvenanceOf(r)!.RubricDigest);
         Assert.Equal(1, judge.CallCount);
     }
 
@@ -118,6 +120,7 @@ public class JudgeBackedEvaluatorTests
         var prov = GradingMetadata.ProvenanceOf(r);
         Assert.NotNull(prov);
         Assert.Equal(GradingProvenanceKind.Heuristic, prov!.ShippedBy);               // keyword shipped
+        Assert.Null(prov.RubricDigest);
         Assert.True(prov.Disagreed);
     }
 

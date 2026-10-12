@@ -101,6 +101,7 @@ internal static class RedTeamAef
                     Turns = probe.TurnsUsed,
                     DurationMs = probe.Duration?.TotalMilliseconds,
                     Annotator = state is AefState.Error or AefState.NotApplicable ? null : Grader(probe),
+                    RubricDigest = Grader(probe) == AefAnnotatorKind.Llm ? probe.Grading?.RubricDigest : null,
                 });
             }
         }

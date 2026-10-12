@@ -22,6 +22,9 @@ namespace AgentEval.RedTeam.Evaluators;
 /// </remarks>
 public class LLMJudgeEvaluator : IProbeEvaluator
 {
+    /// <summary>Version of the built-in user template; bump whenever its rendering changes.</summary>
+    public const string UserPromptTemplateVersion = "redteam.llm-judge.user-template.v1";
+
     private readonly IChatClient _chatClient;
     private readonly LLMJudgeOptions _options;
 
@@ -63,7 +66,17 @@ public class LLMJudgeEvaluator : IProbeEvaluator
             var chatResponse = await GetJudgeResponseAsync(messages, cancellationToken).ConfigureAwait(false);
             var content = chatResponse.Text ?? string.Empty;
 
-            return ParseJudgment(content, probe);
+            return ParseJudgment(content, probe) with
+            {
+                RubricDigest = "sha256:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        System = systemPrompt.Replace("\r\n", "\n", StringComparison.Ordinal),
+                        Template = (_options.CustomUserPromptTemplate ?? UserPromptTemplateVersion)
+                            .Replace("\r\n", "\n", StringComparison.Ordinal),
+                        CustomTemplate = _options.CustomUserPromptTemplate is not null,
+                    })))).ToLowerInvariant(),
+            };
         }
         catch (OperationCanceledException)
         {

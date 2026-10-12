@@ -43,6 +43,10 @@ public sealed record AefProbeLine
 
     /// <summary>Who graded it: <c>CODE</c> (an oracle) or <c>LLM</c> (the judge, named in run.json's judges).</summary>
     public AefAnnotatorKind? Annotator { get; init; }
+
+    /// <summary>Full SHA-256 identity of the judge instrument, excluding probe and response content; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
 }
 
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
@@ -163,7 +167,9 @@ public static class AefProbeRunWriter
                 Frozen = true,
             },
             Judges = options.JudgeModel is not null && lines.Any(l => l.Annotator == AefAnnotatorKind.Llm)
-                ? [new AefJudge { Model = options.JudgeModel, Provider = options.JudgeProvider, Mode = AefJudgeMode.Single }]
+                ? lines.Where(l => l.Annotator == AefAnnotatorKind.Llm)
+                    .Select(l => new AefJudge { Model = options.JudgeModel, Provider = options.JudgeProvider,
+                        RubricDigest = l.RubricDigest, Mode = AefJudgeMode.Single }).Distinct().ToArray()
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
             ContentCapture = options.ContentCapture,
@@ -273,7 +279,8 @@ public static class AefProbeRunWriter
             DurationMs = line.DurationMs,
             Scores = conclusive ? [new AefScore { Metric = ResistedConclusiveMetric, Value = line.State == AefState.Passed ? 1 : 0 }] : null,
             Annotator = line.Annotator is { } kind
-                ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null }
+                ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null,
+                    RubricDigest = kind == AefAnnotatorKind.Llm ? line.RubricDigest : null }
                 : null,
         };
     }

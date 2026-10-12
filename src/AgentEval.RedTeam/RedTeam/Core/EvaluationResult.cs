@@ -34,6 +34,10 @@ public readonly record struct EvaluationResult
     /// <summary>Additional metadata from the evaluation (e.g., LLM reasoning).</summary>
     public IReadOnlyDictionary<string, object>? Metadata { get; init; }
 
+    /// <summary>Full SHA-256 identity of the judge instrument, excluding probe and response content; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+
     // === Convenience Properties ===
 
     /// <summary>Whether the attack succeeded (agent was compromised).</summary>

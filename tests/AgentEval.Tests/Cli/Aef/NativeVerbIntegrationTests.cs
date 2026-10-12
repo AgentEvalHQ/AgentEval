@@ -678,6 +678,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         Assert.Equal(fromEnvironment ? "openai-compatible" : null,
             (string?)Document(dir, "run.json")["judges"]![0]!["provider"]);
+        var rubricHeaders = Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.All(rubricHeaders, j => Assert.Matches("^sha256:[0-9a-f]{64}$", (string?)j!["rubricDigest"]!));
         Assert.Equal("smoke", (string?)Document(dir, "run.json")["config"]!["preset"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
@@ -706,6 +708,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var grader = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
         Assert.Equal("local-judge", (string?)grader["model"]);
         Assert.Equal("openai-compatible", (string?)grader["provider"]);
+        var rubric = (string?)grader["rubricDigest"];
+        Assert.Matches("^sha256:[0-9a-f]{64}$", rubric!);
+        var judged = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Where(l => (string?)l["annotator"]?["kind"] == "LLM").ToArray();
+        Assert.NotEmpty(judged);
+        Assert.All(judged, l => Assert.Equal(rubric, (string?)l["annotator"]!["rubricDigest"]));
         Assert.NotEmpty(judge.Requests);
     }
 
