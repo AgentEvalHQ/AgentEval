@@ -593,28 +593,37 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("owasp")]
-    [InlineData("mitre")]
-    [InlineData("nist")]
-    public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(string family)
+    [InlineData("owasp", false)]
+    [InlineData("owasp", true)]
+    [InlineData("mitre", false)]
+    [InlineData("mitre", true)]
+    [InlineData("nist", false)]
+    [InlineData("nist", true)]
+    public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(string family, bool fromEnvironment)
     {
-        await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
-        await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test");
+        // A weak PII shape forces an inconclusive oracle verdict; the fallback judge then supplies the verdict.
+        await using var endpoint = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
+        await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: SUCCEEDED\nCONFIDENCE: 0.95\nREASON: test");
         var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "http-subject");
         using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test");
         Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
         File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
             new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
+        using var environment = new ProviderEnvironmentScope(
+            ("AI_INFERENCE_PROVIDER", "openai-compatible"),
+            ("OPENAI_COMPATIBLE_ENDPOINT", judgeEndpoint.Endpoint),
+            ("OPENAI_COMPATIBLE_MODEL", "judge"),
+            ("OPENAI_COMPATIBLE_API_KEY", "local-test"));
         var aef = new DirectoryInfo(Path.Combine(_root, "bench-aef"));
 
         async Task<int> Run(DirectoryInfo destination, bool noAef) => (family switch
         {
             "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
             "nist" => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
             _ => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
         }).ExitCode;
         var written = await Run(aef, false);
         AssertStoreLink(RunDirectory(aef.FullName));
@@ -626,9 +635,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(disabled, written);
         Assert.False(notWritten.Exists);
         Assert.NotEmpty(endpoint.Requests);
-        Assert.NotEmpty(judgeEndpoint.Requests);
+        Assert.True(judgeEndpoint.Requests.Count > 2, "Expected actual grading calls beyond the two preflight requests.");
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(fromEnvironment ? "openai-compatible" : null,
+            (string?)Document(dir, "run.json")["judges"]![0]!["provider"]);
         Assert.Equal("smoke", (string?)Document(dir, "run.json")["config"]!["preset"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);

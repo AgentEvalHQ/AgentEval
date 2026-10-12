@@ -37,8 +37,14 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public string? JudgeModel { get; init; }
 
+    /// <summary>The configured judge provider, when known from client construction.</summary>
+    public string? JudgeProvider { get; init; }
+
     /// <summary>The model used by named LLM metrics, when different from the optional harness judge.</summary>
     public string? MetricJudgeModel { get; init; }
+
+    /// <summary>The named metrics' provider; used with MetricJudgeModel, without guessing from the harness judge.</summary>
+    public string? MetricJudgeProvider { get; init; }
 
     /// <summary>
     /// What the judge consumed over the run, when its responses reported it: the run summary's judge usage entry

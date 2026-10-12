@@ -20,6 +20,31 @@ public sealed class AefEvalWriterTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData(null, null, 1)]
+    [InlineData("judge-x", null, 2)]
+    [InlineData("judge-x", "metric-provider", 2)]
+    public void Session_ProviderIdentity_SeparatesExplicitMetricJudgeFromHarness(string? metricModel, string? metricProvider, int count)
+    {
+        using var session = AefEvalWriter.Start(_out, Options() with
+        {
+            JudgeProvider = "harness-provider", MetricJudgeModel = metricModel, MetricJudgeProvider = metricProvider,
+        }, Start);
+        session.Add(new TestResult { TestName = "case", Passed = true, Score = 90, CriteriaResults = [] }, "case");
+        session.AddMetrics("case", [AgentEval.Core.MetricResult.Pass("llm_quality", 90)]);
+        var (dir, _) = session.Complete(Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.Equal(count, judges.Count);
+        Assert.Equal("harness-provider", (string?)judges[0]!["provider"]);
+        if (count == 2) Assert.Equal(metricProvider, (string?)judges[1]!["provider"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Session_NamedMetricContent_LinksReasoningOnlyForObservedLlmGrading(bool capture)

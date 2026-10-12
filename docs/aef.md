@@ -243,6 +243,14 @@ Composite judge headers retain `JudgeProvider` when the evaluator or decision tr
 transports expose their configured provider. Unknown providers stay absent: an OpenAI-compatible SDK or a
 model name alone does not identify the service that graded the result.
 
+Native eval/probe writer options accept `JudgeProvider`; eval also accepts `MetricJudgeProvider` for an
+explicit `MetricJudgeModel`. When metrics reuse the harness judge (no separate metric model), they reuse its
+provider. An explicit metric model with an unknown provider stays unknown, even if its model name matches
+the harness judge. Scan benchmarks capture the provider from their judge factory, including aborted runs;
+custom client overrides leave it absent. A configured provider is listed only when a judge graded a result.
+An adopted fallback-judge success carries judge provenance; a judge refusal that the oracle cannot support
+still leaves the original verdict unchanged and does not claim that the judge supplied the result.
+
 Panel wrappers persist `JudgePanelSize`: their first N sub-results are panel members in definition order;
 any following adjudicator is a separate invocation. Composite AEF headers use these explicit facts to record
 `mode: panel` and the configured size for measured member judges, including members that grade several criteria.

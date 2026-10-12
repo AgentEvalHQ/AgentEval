@@ -72,8 +72,8 @@ public enum GradingProvenanceKind
 }
 
 /// <summary>
-/// ADR-021 (§5): per-probe grading provenance, populated only on the judge-primary path where both a
-/// keyword and a judge verdict exist; <c>null</c> everywhere else (so a non-judge run is byte-identical).
+/// ADR-021 (§5): per-probe grading provenance for judge-primary routing and adopted fallback-judge verdicts.
+/// Absent when no judge verdict participates in these paths (so a non-judge run is unchanged).
 /// Captures the keyword-vs-judge disagreement — the highest-value honesty signal.
 /// </summary>
 /// <param name="KeywordOutcome">The advisory keyword/structural oracle's verdict.</param>

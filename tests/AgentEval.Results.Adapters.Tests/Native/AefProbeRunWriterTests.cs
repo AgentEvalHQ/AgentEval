@@ -17,6 +17,27 @@ public sealed class AefProbeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("configured-provider", false)]
+    [InlineData("configured-provider", true)]
+    public void Write_ProviderIdentity_RecordsOnlyObservedJudge(string? provider, bool codeOnly)
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new AefProbeLine { CaseId = "probe", State = AefState.Passed,
+                Annotator = codeOnly ? AefAnnotatorKind.Code : AefAnnotatorKind.Llm }],
+            Options() with { JudgeProvider = provider }, Start, Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"];
+        if (codeOnly) Assert.Null(judges);
+        else Assert.Equal(provider, (string?)judges![0]!["provider"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void Write_InterruptedTrialStoreLinks_PreservesOnlyRecordedIdentities()
     {

@@ -72,6 +72,9 @@ public sealed record AefProbeRunOptions
     /// <summary>The judge model, if one was configured; named only when it graded a line ([RUN-9]).</summary>
     public string? JudgeModel { get; init; }
 
+    /// <summary>The configured judge provider, when known from client construction.</summary>
+    public string? JudgeProvider { get; init; }
+
     /// <summary>Reported judge usage, including calls that did not produce a verdict ([SUM-7]).</summary>
     public AefUsage? JudgeUsage { get; init; }
 
@@ -160,7 +163,7 @@ public static class AefProbeRunWriter
                 Frozen = true,
             },
             Judges = options.JudgeModel is not null && lines.Any(l => l.Annotator == AefAnnotatorKind.Llm)
-                ? [new AefJudge { Model = options.JudgeModel, Mode = AefJudgeMode.Single }]
+                ? [new AefJudge { Model = options.JudgeModel, Provider = options.JudgeProvider, Mode = AefJudgeMode.Single }]
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
             ContentCapture = options.ContentCapture,

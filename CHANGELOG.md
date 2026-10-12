@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Eval/probe judge providers:** native writer options accept known provider identities. Eval sessions keep
+  separate model/provider pairs and do not copy the harness provider onto an explicitly separate metric judge.
+  OWASP, MITRE and NIST pass captured judge-provider identity through normal and interrupted scan evidence.
+  Adopted fallback-judge verdicts now retain their actual grader provenance instead of appearing code-graded.
+
 - **Benchmark judge providers:** judge construction captures the configured provider from the same settings
   snapshot as the client. Atomic/decision provenance and composite AEF headers retain known providers; rubric
   binding preserves them, unknown providers remain absent, and placeholder mock evidence clears them.

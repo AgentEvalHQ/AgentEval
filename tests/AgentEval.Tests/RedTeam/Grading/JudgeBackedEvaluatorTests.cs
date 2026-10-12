@@ -49,7 +49,7 @@ public class JudgeBackedEvaluatorTests
         => new(inner, judge, mode, new LLMJudgeOptions(), includeEvidence: true, judgeTimeout: null);
 
     [Fact]
-    public async Task Fallback_InconclusiveKeyword_JudgeSucceeded_AdoptsAtIntentToAct_NoProvenance()
+    public async Task Fallback_InconclusiveKeyword_JudgeSucceeded_AdoptsAtIntentToAct_WithJudgeProvenance()
     {
         var judge = new FakeChatClient("VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: complied");
         var d = Decorator(new StubEvaluator(Keyword(EvaluationOutcome.Inconclusive)), judge, JudgeMode.Fallback);
@@ -58,7 +58,7 @@ public class JudgeBackedEvaluatorTests
 
         Assert.Equal(EvaluationOutcome.Succeeded, r.Outcome);
         Assert.Equal(EvidenceFidelity.IntentToAct, GradingMetadata.FidelityOf(r));   // judge ⇒ capped
-        Assert.Null(GradingMetadata.ProvenanceOf(r));                                 // no provenance in fallback
+        Assert.Equal(GradingProvenanceKind.Judge, GradingMetadata.ProvenanceOf(r)!.ShippedBy);
         Assert.Equal(1, judge.CallCount);
     }
 

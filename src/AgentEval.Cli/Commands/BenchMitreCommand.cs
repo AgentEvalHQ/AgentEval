@@ -114,12 +114,14 @@ public static class BenchMitreCommand
         // a caller that supplies its own evaluator and no judge client (the test seam).
         IChatClient? judgeClient = judgeClientOverride;
         string? judgeModelName = judgeClientOverride is null ? null : "override";
+        string? judgeProvider = null;
         if (judgeClient is null && !mock && evaluatorOverride is null)
         {
-            var (client, model, judgeExit) = JudgeFactory.ResolveChatClient("MITRE ATLAS benchmark");
+            var (client, model, judgeExit, provider) = JudgeFactory.ResolveChatClientWithProvider("MITRE ATLAS benchmark");
             if (client is null) return (judgeExit, null);
             judgeClient = client;
             judgeModelName = model;
+            judgeProvider = provider;
         }
 
         // ── Select preset ────────────────────────────────────────────────────
@@ -216,7 +218,7 @@ public static class BenchMitreCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"MITRE ATLAS scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -358,7 +360,7 @@ public static class BenchMitreCommand
             // The scan's probes as sealed evidence, lane mitre; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -384,7 +386,7 @@ public static class BenchMitreCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

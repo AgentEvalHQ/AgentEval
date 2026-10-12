@@ -33,7 +33,7 @@ public static partial class AefEvalWriter
         private readonly Dictionary<string, (AefResultHandle Handle, AefResult Root, int? PassingScore)> _cases = new(StringComparer.Ordinal);
         private readonly HashSet<(string CaseId, string Metric)> _caseMetrics = [];
         private readonly List<AefMetric> _metrics = [];
-        private readonly HashSet<string> _judges = new(StringComparer.Ordinal);
+        private readonly List<AefJudge> _judges = [];
         private bool _disposed;
 
         internal Session(string runsRoot, AefEvalRunOptions options, DateTimeOffset startedAt, int? plannedTrials, int? requirePasses)
@@ -137,13 +137,15 @@ public static partial class AefEvalWriter
                 if (trials.Count == _plannedTrials) AddRollup(caseId, trials);
             }
             _all.Add(result);
-            if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge);
+            if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge, _options.JudgeProvider);
         }
 
-        private void RecordJudge(string model)
+        private void RecordJudge(string model, string? provider)
         {
-            if (_judges.Add(model))
-                _writer.SetJudges(_judges.Select(j => new AefJudge { Model = j, Mode = AefJudgeMode.Single }).ToArray());
+            var judge = new AefJudge { Model = model, Provider = provider, Mode = AefJudgeMode.Single };
+            if (_judges.Contains(judge)) return;
+            _judges.Add(judge);
+            _writer.SetJudges(_judges.ToArray());
         }
 
         /// <summary>Appends named metric results for an already recorded single-run case, preserving its own verdict.</summary>
@@ -178,7 +180,7 @@ public static partial class AefEvalWriter
                 _caseMetrics.Add((caseId, metricId));
                 if (metric.Measured && metricId.StartsWith("llm_", StringComparison.Ordinal)
                     && (_options.MetricJudgeModel ?? _options.JudgeModel) is { } model)
-                    RecordJudge(model);
+                    RecordJudge(model, _options.MetricJudgeModel is null ? _options.JudgeProvider : _options.MetricJudgeProvider);
             }
         }
 

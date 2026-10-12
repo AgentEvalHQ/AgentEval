@@ -24,7 +24,7 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -41,6 +41,7 @@ internal static class BenchAef
                 SubjectRef = AefEvalWriter.Ref("agent", subject),
                 SubjectVersion = subjectVersion,
                 JudgeModel = judgeModel,
+                JudgeProvider = judgeProvider,
                 TargetMode = targetMode,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
                 ProbesNotRun = scan.SkippedProbes,
