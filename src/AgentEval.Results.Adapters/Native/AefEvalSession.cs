@@ -169,7 +169,7 @@ public static partial class AefEvalWriter
                 var child = MetricChild(caseId, metric, _options.MetricJudgeModel ?? _options.JudgeModel);
                 if (_options.ContentCapture == AefContentCapture.On && metric.Explanation is { } explanation)
                     child = AefNativeContent.Attach(_writer, child,
-                        metric.Measured && metricId.StartsWith("llm_", StringComparison.Ordinal)
+                        metric.Measured && metric.ModelGraded != false && metricId.StartsWith("llm_", StringComparison.Ordinal)
                             ? new AefNativeContent { JudgeReasoning = explanation }
                             : new AefNativeContent { Document = explanation });
                 _writer.AddResult(child, entry.Handle);
@@ -178,9 +178,9 @@ public static partial class AefEvalWriter
                 entry = (entry.Handle, root, entry.PassingScore);
                 _cases[caseId] = entry;
                 _caseMetrics.Add((caseId, metricId));
-                if (metric.Measured && metricId.StartsWith("llm_", StringComparison.Ordinal)
+                if (metric.Measured && metric.ModelGraded != false && metricId.StartsWith("llm_", StringComparison.Ordinal)
                     && (_options.MetricJudgeModel ?? _options.JudgeModel) is { } model)
-                    RecordJudge(model, _options.MetricJudgeModel is null ? _options.JudgeProvider : _options.MetricJudgeProvider);
+                    RecordJudge(model, _options.MetricJudgeModel is null ? _options.JudgeProvider : _options.MetricJudgeProvider, metric.RubricDigest);
             }
         }
 

@@ -45,7 +45,7 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
         var responseText = response.Text ?? "";
         
-        return ParseFaithfulnessResult(responseText);
+        return MetricInstrument.Model(ParseFaithfulnessResult(responseText), BuildFaithfulnessPrompt("", "", ""));
     }
     
     private static string BuildFaithfulnessPrompt(string contextText, string input, string output)
@@ -139,7 +139,7 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
         var prompt = BuildRelevancePrompt(context.Input, context.Output);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseRelevanceResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseRelevanceResult(response.Text ?? ""), BuildRelevancePrompt("", ""));
     }
     
     private static string BuildRelevancePrompt(string input, string output)
@@ -234,7 +234,7 @@ public class ContextPrecisionMetric : IRAGMetric
         var prompt = BuildPrecisionPrompt(context.Input, context.Context);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParsePrecisionResult(response.Text ?? "");
+        return MetricInstrument.Model(ParsePrecisionResult(response.Text ?? ""), BuildPrecisionPrompt("", ""));
     }
     
     private static string BuildPrecisionPrompt(string input, string contextText)
@@ -332,7 +332,7 @@ public class ContextRecallMetric : IRAGMetric
         var prompt = BuildRecallPrompt(context.Input, context.GroundTruth, context.Context);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseRecallResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseRecallResult(response.Text ?? ""), BuildRecallPrompt("", "", ""));
     }
     
     private static string BuildRecallPrompt(string input, string groundTruth, string contextText)
@@ -430,7 +430,7 @@ public class AnswerCorrectnessMetric : IRAGMetric
         var prompt = BuildCorrectnessPrompt(context.Input, context.GroundTruth, context.Output);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseCorrectnessResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseCorrectnessResult(response.Text ?? ""), BuildCorrectnessPrompt("", "", ""));
     }
     
     private static string BuildCorrectnessPrompt(string input, string groundTruth, string output)

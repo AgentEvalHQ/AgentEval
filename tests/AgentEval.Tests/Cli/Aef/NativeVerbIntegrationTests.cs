@@ -474,6 +474,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var judge = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
         Assert.Equal("local-model", (string?)judge["model"]);
         Assert.Equal(clientOverride ? null : azure ? "azure" : "openai-compatible", (string?)judge["provider"]);
+        var rubric = (string?)judge["rubricDigest"];
+        Assert.Matches("^sha256:[0-9a-f]{64}$", rubric!);
+        var metricLine = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Single(l => (string?)l["path"] == "case/metrics/llm_relevance");
+        Assert.Equal(rubric, (string?)metricLine["annotator"]!["rubricDigest"]);
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
         Assert.All(usage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));

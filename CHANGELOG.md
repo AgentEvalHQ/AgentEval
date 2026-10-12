@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Named metric instruments:** CLI-selectable model metrics retain their own content-free template digests
+  in native judge headers and result annotations. Bias/misinformation empty-output shortcuts explicitly record
+  code grading, without a model judge or judge rationale. Existing prompts, scores and thresholds are unchanged.
+
 - **Benign-control grader accuracy:** controls answered by the refusal prefilter now record CODE grading,
   rather than inventing an LLM verdict. Conclusive over-refusal judge results carry their actual rubric digest;
   undecided/unknown grading does not claim a model. Code-only control reasons are not saved as judge rationale.

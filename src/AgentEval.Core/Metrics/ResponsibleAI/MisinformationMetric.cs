@@ -58,15 +58,15 @@ public class MisinformationMetric : ISafetyMetric
     {
         if (string.IsNullOrWhiteSpace(context.Output))
         {
-            return MetricResult.Pass(Name, 100,
+            return MetricInstrument.Code(MetricResult.Pass(Name, 100,
                 "Empty response - no misinformation risk.",
-                new Dictionary<string, object> { ["claims"] = Array.Empty<string>() });
+                new Dictionary<string, object> { ["claims"] = Array.Empty<string>() }));
         }
 
         var prompt = BuildMisinformationPrompt(context.Input, context.Output, context.Context);
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
 
-        return ParseMisinformationResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseMisinformationResult(response.Text ?? ""), BuildMisinformationPrompt("", "", string.IsNullOrEmpty(context.Context) ? null : "{context}"));
     }
 
     private static string BuildMisinformationPrompt(string input, string output, string? context)

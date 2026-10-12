@@ -19,6 +19,30 @@ public sealed class AefEvalWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Session_MetricInstrument_RetainsOwnRubricAndDoesNotInventModelForCodeShortcut()
+    {
+        var digest = "sha256:" + new string('e', 64);
+        using var session = AefEvalWriter.Start(_out, Options(), Start);
+        session.Add(new TestResult { TestName = "case", Passed = true, Score = 100 }, "case");
+        session.AddMetrics("case", [
+            new() { MetricName = "llm_relevance", Score = 90, Passed = true, ModelGraded = true, RubricDigest = digest },
+            new() { MetricName = "llm_bias", Score = 100, Passed = true, ModelGraded = false },
+        ]);
+        var (dir, _) = session.Complete(Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.Equal(digest, (string?)Assert.Single(judges)!["rubricDigest"]);
+        var lines = AefTestRuns.Results(dir);
+        Assert.Equal(digest, (string?)lines.Single(l => (string?)l["path"] == "case/metrics/llm_relevance")["annotator"]!["rubricDigest"]);
+        Assert.Equal("CODE", (string?)lines.Single(l => (string?)l["path"] == "case/metrics/llm_bias")["annotator"]!["kind"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

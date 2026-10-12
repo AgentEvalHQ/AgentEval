@@ -235,7 +235,10 @@ to LF, excluding case input, output and returned rationale. Normal and streaming
 unknown evaluators leave it absent. Failed grading does not register an observed rubric.
 Measured criteria and trial lines carry known judge models and rubric digests in their annotators.
 Assertions and code metrics use CODE; measured LLM metrics use their own configured judge, without borrowing
-the harness rubric. Aggregate decisions and unmeasured lines do not claim a grader. The dataset runner uses
+the harness rubric. Built-in CLI-selectable LLM metrics report their own template digest after a model call,
+using empty/fixed data slots and preserving configured task criteria and template branches. The bias and
+misinformation empty-output shortcuts explicitly report code grading and omit judge identity. Missing-input
+metrics retain no instrument. Unknown third-party metric provenance remains absent. Aggregate decisions and unmeasured lines do not claim a grader. The dataset runner uses
 the same mapping and retains the observed rubric in its judge header. No annotation adds a prompt hash.
 
 Native probe judge headers and annotators retain the full digest of the actual LLM judge system prompt and

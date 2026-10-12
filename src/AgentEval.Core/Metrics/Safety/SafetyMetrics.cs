@@ -64,7 +64,7 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
         var responseText = response.Text ?? "";
         
-        return ParseGroundednessResult(responseText);
+        return MetricInstrument.Model(ParseGroundednessResult(responseText), BuildGroundednessPrompt("", "", ""));
     }
     
     private static string BuildGroundednessPrompt(string contextText, string input, string output)
@@ -201,7 +201,7 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
         var prompt = BuildCoherencePrompt(context.Input, context.Output);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseCoherenceResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseCoherenceResult(response.Text ?? ""), BuildCoherencePrompt("", ""));
     }
     
     private static string BuildCoherencePrompt(string input, string output)
@@ -313,7 +313,7 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
         var prompt = BuildFluencyPrompt(context.Output);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseFluencyResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseFluencyResult(response.Text ?? ""), BuildFluencyPrompt(""));
     }
     
     private static string BuildFluencyPrompt(string output)

@@ -307,7 +307,7 @@ public class TaskCompletionMetric : IAgenticMetric
         var prompt = BuildTaskCompletionPrompt(context.Input, context.Output, toolsUsed, criteriaList);
         
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseCompletionResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseCompletionResult(response.Text ?? ""), BuildTaskCompletionPrompt("", "", string.IsNullOrEmpty(toolsUsed) ? "" : "{tools}", criteriaList));
     }
     
     private static string BuildTaskCompletionPrompt(string input, string output, string toolsUsed, string criteriaList)

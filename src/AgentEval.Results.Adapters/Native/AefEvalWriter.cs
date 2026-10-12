@@ -404,9 +404,9 @@ public static partial class AefEvalWriter
             metric.Measured ? metric.Passed ? AefState.Passed : AefState.Failed : AefState.NotMeasured) with
         {
             Annotator = !metric.Measured ? null
-                : metric.MetricName.StartsWith("llm_", StringComparison.Ordinal) && judgeModel is not null
-                    ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = judgeModel }
-                : metric.MetricName.StartsWith("code_", StringComparison.Ordinal)
+                : metric.ModelGraded != false && metric.MetricName.StartsWith("llm_", StringComparison.Ordinal) && judgeModel is not null
+                    ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = judgeModel, RubricDigest = metric.RubricDigest }
+                : metric.ModelGraded == false || metric.MetricName.StartsWith("code_", StringComparison.Ordinal)
                     ? new AefAnnotator { Kind = AefAnnotatorKind.Code } : null,
             Scores = metric.Measured ? [new AefScore { Metric = metric.MetricName, Value = metric.Score }] : null,
             Reason = metric.Measured ? null : "The metric could not be measured",
