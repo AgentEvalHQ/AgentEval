@@ -55,6 +55,8 @@ public interface IAefJobSuite
     /// <summary>Prepares the run after its first case and preparation jointly fit the remaining limits.</summary>
     ValueTask<AefJobPreparationResult> PrepareAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult(new AefJobPreparationResult(true, 0, 0));
+    /// <summary>Releases run resources after sealing or failure. Must honor cancellation and make no charged model calls.</summary>
+    ValueTask CloseAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 /// <summary>Readiness and cost of preparing one run; preparation does not count as a case.</summary>

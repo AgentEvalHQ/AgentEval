@@ -18,6 +18,115 @@ public sealed class AefJobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_ProgressFailsAfterSealing_StillAnnouncesSealedRunAndCleansUp()
+    {
+        using var progress = new FailOnEvidenceProgress();
+        var cleanups = 0;
+        var testCase = new Case(_ => ValueTask.FromResult(Passed()));
+        var suite = new Suite(testCase, close: _ => { cleanups++; return ValueTask.CompletedTask; });
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output,
+            new AefJobOptions { At = Start, Progress = progress });
+        Assert.Equal("job.failed", result.Terminal);
+        var run = Assert.Single(result.Runs);
+        Assert.Equal(run, (string?)Assert.Single(Events()[^1]["runs"]!.AsArray()));
+        Assert.Equal(1, cleanups);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        AssertStream();
+    }
+
+    [Fact]
+    public async Task RunAsync_CleanupDeadline_CancelsCooperativeCleanupAndReportsFailure()
+    {
+        var testCase = new Case(_ => ValueTask.FromResult(Passed()));
+        var suite = new Suite(testCase, close: async ct => await Task.Delay(Timeout.InfiniteTimeSpan, ct));
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output,
+            new AefJobOptions { At = Start }).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Null(result.Limit);
+        Assert.Contains("reserved time", result.Reason);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_ClosingOverrunsTime_ReportsTheLimitActuallyExceeded(bool planTimeout)
+    {
+        var provider = new ManualTime();
+        var clock = new AefElapsedJobClock(Start, provider);
+        var testCase = new Case(_ => ValueTask.FromResult(Passed()));
+        var suite = new Suite(testCase, close: _ =>
+        {
+            provider.Timestamp = 61 * TimeSpan.TicksPerSecond;
+            return ValueTask.CompletedTask;
+        });
+        var plan = JsonNode.Parse(Plan())!;
+        if (planTimeout) plan["limits"]!["timeout"] = "PT1M";
+        var result = await AefJobRunner.RunAsync(Encoding.UTF8.GetBytes(plan.ToJsonString()), Manifest(), new Target(testCase, suite),
+            _output, new AefJobOptions { At = Start, Clock = clock });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal(planTimeout ? "timeout" : null, result.Limit);
+        Assert.Equal(Start.AddSeconds(61), result.EndsAt);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+    }
+
+    [Fact]
+    public async Task RunAsync_CleanupFails_KeepsSealedEvidenceAndReportsContentFreeFailure()
+    {
+        var calls = 0;
+        var testCase = new Case(_ => ValueTask.FromResult(Passed()));
+        var suite = new Suite(testCase, close: _ =>
+        {
+            calls++;
+            throw new IOException("secret cleanup path");
+        });
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Null(result.Limit);
+        Assert.Equal(1, calls);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        Assert.DoesNotContain("secret", File.ReadAllText(Path.Combine(_output, "events.ndjson")));
+        AssertStream();
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("cancel")]
+    [InlineData("io")]
+    [InlineData("invalid-result")]
+    public async Task RunAsync_EveryStartedRun_ReleasesResourcesOnce(string outcome)
+    {
+        using var cancel = new CancellationTokenSource();
+        var calls = 0;
+        bool? cleanupCancelled = null;
+        bool? wasSealed = null;
+        var testCase = new Case(ct =>
+        {
+            if (outcome == "cancel") { cancel.Cancel(); throw new OperationCanceledException(ct); }
+            if (outcome == "io") throw new IOException("secret path");
+            var result = Passed();
+            return ValueTask.FromResult(outcome == "invalid-result" ? result with { Root = result.Root with { CaseId = "wrong" } } : result);
+        });
+        var suite = new Suite(testCase, close: ct =>
+        {
+            calls++;
+            cleanupCancelled = ct.IsCancellationRequested;
+            wasSealed = File.Exists(Path.Combine(RunDirectory(), "seal.json"));
+            return ValueTask.CompletedTask;
+        });
+        var execution = AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output, new AefJobOptions { At = Start }, cancel.Token);
+        if (outcome == "invalid-result") await Assert.ThrowsAsync<InvalidOperationException>(() => execution);
+        else
+        {
+            var result = await execution;
+            Assert.Equal(outcome switch { "cancel" => "job.cancelled", "io" => "job.failed", _ => "job.sealed" }, result.Terminal);
+        }
+        Assert.Equal(1, calls);
+        Assert.False(cleanupCancelled);
+        Assert.Equal(outcome != "invalid-result", wasSealed);
+    }
+
+    [Fact]
     public async Task RunAsync_PreparationCost_IsEstimatedReservedAndChargedWithoutCountingACase()
     {
         var preparations = 0;
@@ -387,8 +496,9 @@ public sealed class AefJobRunnerTests : IDisposable
     }
 
     private sealed class Suite(IAefJobCase testCase, Func<CancellationToken, ValueTask<AefJobPreparationResult>>? prepare = null,
-        double preparationBound = 0, double preparationIncurred = 0) : IAefJobSuite
+        double preparationBound = 0, double preparationIncurred = 0, Func<CancellationToken, ValueTask>? close = null) : IAefJobSuite
     {
+        public ValueTask CloseAsync(CancellationToken ct) => close?.Invoke(ct) ?? ValueTask.CompletedTask;
         public double PreparationUsdBound => preparationBound;
         public double PreparationIncurredUsd => preparationIncurred;
         public long PreparationSecondsBound => prepare is null ? 0 : 5;
@@ -413,5 +523,15 @@ public sealed class AefJobRunnerTests : IDisposable
     private sealed class FailingProgress : MemoryStream
     {
         public override void Write(ReadOnlySpan<byte> buffer) => throw new IOException("secret output path");
+    }
+
+    private sealed class FailOnEvidenceProgress : MemoryStream
+    {
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            if (Encoding.UTF8.GetString(buffer).Contains("evidence.produced", StringComparison.Ordinal))
+                throw new IOException("secret output path");
+            base.Write(buffer);
+        }
     }
 }

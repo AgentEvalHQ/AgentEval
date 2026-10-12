@@ -55,7 +55,8 @@ public static class AefJobRunner
             || s.PreparationUsdLow < 0 || s.PreparationUsdBound < s.PreparationUsdLow
             || s.PreparationSecondsBound is < 0 or > 4_294_967))
             throw new ArgumentException("Preparation requires finite nonnegative cost bounds and a time bound within the cancellation timer range.", nameof(target));
-        if (target.CloseSeconds < 0 || target.Suites.SelectMany(s => s.Cases).Any(c =>
+        if (target.CloseSeconds < 0 || (target.TargetMode != AefTargetMode.Scripted && target.CloseSeconds > 4_294_967)
+            || target.Suites.SelectMany(s => s.Cases).Any(c =>
             !double.IsFinite(c.UsdLow) || !double.IsFinite(c.UsdBound) || c.UsdLow < 0 || c.UsdBound < c.UsdLow
             || c.SecondsBound < 0 || (target.TargetMode != AefTargetMode.Scripted && c.SecondsBound > 4_294_967)))
             throw new ArgumentException("Target cost bounds must be finite and nonnegative; live time bounds must fit a cancellation timer.", nameof(target));
@@ -199,20 +200,41 @@ public static class AefJobRunner
                         if (why is not null) break;
                     }
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (activeRun is not null) Seal(activeRun, limit, why);
+                    if (activeRun is not null)
+                    {
+                        Seal(activeRun, limit, why);
+                        var cleanupFailure = await CloseResourcesAsync(activeRun).ConfigureAwait(false);
+                        why ??= cleanupFailure;
+                        if (TimeoutExceeded && limit is null)
+                        {
+                            limit = "timeout";
+                            why = "Closing the run exceeded the job's time limit";
+                        }
+                    }
                     activeRun = null;
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 try { if (activeRun is not null) Seal(activeRun, null, "The job was cancelled"); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return FailIo(activeRun); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return await FailIoAsync(activeRun).ConfigureAwait(false); }
+                if (activeRun is not null)
+                {
+                    var cleanupFailure = await CloseResourcesAsync(activeRun).ConfigureAwait(false);
+                    if (TimeoutExceeded) return Fail("Closing the run exceeded the job's time limit", "timeout");
+                    if (cleanupFailure is not null) return Fail(cleanupFailure);
+                }
                 _events.Emit("job.cancelled", _clock, new JsonObject { ["reason"] = "The job was cancelled" });
                 return new AefJobResult(_jobId, _events.Count, "job.cancelled", null, "The job was cancelled", [.. _sealed], _clock);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return FailIo(activeRun);
+                return await FailIoAsync(activeRun).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Unexpected implementation errors still release acquired resources; the original error propagates.
+                if (activeRun is not null) await CloseResourcesAsync(activeRun).ConfigureAwait(false);
             }
 
             var runs = new JsonArray([.. _sealed.Select(r => (JsonNode?)JsonValue.Create(r))]);
@@ -235,18 +257,52 @@ public static class AefJobRunner
             return new AefJobAnalysis(reason is null, reason, reason is null ? Estimate(suites) : null);
         }
 
-        private AefJobResult FailIo(OpenRun? run)
+        private async Task<AefJobResult> FailIoAsync(OpenRun? run)
         {
             // A permanently unwritable event file still propagates its I/O error; a successful terminal event is never claimed.
             if (run?.Writer.Status == AefRunStatus.Running)
                 try { Seal(run, null, "The job encountered an I/O failure"); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            _events!.Emit("job.failed", _clock, new JsonObject
+            if (run is not null) await CloseResourcesAsync(run).ConfigureAwait(false);
+            return Fail("The job encountered an I/O failure");
+        }
+
+        private AefJobResult Fail(string reason, string? limit = null)
+        {
+            var failure = new JsonObject { ["reason"] = Cut(reason) };
+            if (limit is not null) failure["limit"] = limit;
+            failure["runs"] = new JsonArray([.. _sealed.Select(r => (JsonNode?)JsonValue.Create(r))]);
+            _events!.Emit("job.failed", _clock, failure);
+            return new AefJobResult(_jobId, _events.Count, "job.failed", limit, reason, [.. _sealed], _clock);
+        }
+
+        private bool TimeoutExceeded => TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout)) > 0;
+
+        private async ValueTask<string?> CloseResourcesAsync(OpenRun run)
+        {
+            if (run.CleanupAttempted) return null;
+            run.CleanupAttempted = true;
+            var started = run.CloseStarted ?? _clock;
+            var deadlineAt = started.AddSeconds(_target.CloseSeconds);
+            using var deadline = new CancellationTokenSource();
+            var now = _clock;
+            var remaining = Math.Max(0, deadlineAt.Seconds - now.Seconds
+                + (deadlineAt.Nanoseconds - now.Nanoseconds) / 1_000_000_000d);
+            if (_target.TargetMode != AefTargetMode.Scripted && remaining > 0)
+                deadline.CancelAfter(TimeSpan.FromSeconds(remaining));
+            try
             {
-                ["reason"] = "The job encountered an I/O failure",
-                ["runs"] = new JsonArray([.. _sealed.Select(r => (JsonNode?)JsonValue.Create(r))]),
-            });
-            return new AefJobResult(_jobId, _events.Count, "job.failed", null, "The job encountered an I/O failure", [.. _sealed], _clock);
+                var cleanup = run.Suite.CloseAsync(deadline.Token);
+                if (remaining == 0 && !cleanup.IsCompleted) deadline.Cancel();
+                await cleanup.ConfigureAwait(false);
+                return deadline.IsCancellationRequested || _clock.CompareTo(deadlineAt) > 0
+                    ? "Closing the run exceeded its reserved time" : null;
+            }
+            catch (Exception ex)
+            {
+                return deadline.IsCancellationRequested ? "Closing the run exceeded its reserved time"
+                    : $"Run cleanup threw {ex.GetType().Name}";
+            }
         }
 
         // [PLAN-7], [PLAN-8], [PLAN-3]: whether this runner takes the plan, and, when it does, the plan's suites resolved
@@ -569,6 +625,7 @@ public static class AefJobRunner
         // closeSeconds have passed, and announces it.
         private void Seal(OpenRun run, string? limit, string? why)
         {
+            run.CloseStarted ??= _clock;
             // The suite's lane, when the plan gives one ([PLAN-8]): pass-rate at the cases' root path (§9.2.1).
             var total = AefSummaryCalculator.ExactSum(run.Usd);
             run.Writer.SetSummary(new AefSummary
@@ -579,9 +636,9 @@ public static class AefJobRunner
             run.Writer.Close(why is null ? AefRunStatus.Completed : AefRunStatus.Aborted, _clock, why is null ? null : Cut(why));
             _jobClock.Advance(_target.CloseSeconds);
             var seal = AefSealer.Seal(run.Directory, new AefSealOptions { SealedAt = _clock.ToString() });
-            _events!.Emit("evidence.produced", _clock, new JsonObject { ["runId"] = run.RunId, ["runHash"] = seal.RunHash });
             _sealed.Add(run.RunId);
             _totals.Add(total);
+            _events!.Emit("evidence.produced", _clock, new JsonObject { ["runId"] = run.RunId, ["runHash"] = seal.RunHash });
         }
 
         private static string Cut(string reason) => CutReason(reason);
@@ -617,6 +674,8 @@ public static class AefJobRunner
 
     private sealed record OpenRun(string RunId, string Directory, AefRunWriter Writer, string? Lane, IAefJobSuite Suite)
     {
+        public bool CleanupAttempted { get; set; }
+        public AefTime? CloseStarted { get; set; }
         public List<double> Usd { get; } = [];
         public Dictionary<string, AefJudge> Judges { get; } = new(StringComparer.Ordinal);
     }
