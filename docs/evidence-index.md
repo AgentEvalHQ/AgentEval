@@ -172,3 +172,9 @@ absence; reappearing markers and changed checkpoints report issues. Pruning is
 disabled by default, never removes other evidence kinds, and never deletes source
 files. Root IDs must be stable namespaces for the configured root; reusing one
 for an unrelated directory changes the meaning of reconciliation.
+
+### Configured root planning
+
+`IEvidenceIndexRootPlanner` validates a bounded list of absolute, ordinary source directories (default 256, maximum 4096). Root IDs are unique across formats. Same-format nested roots are covered by the outermost configured root; equal-directory aliases select the ordinally smallest root ID. Decisions are returned explicitly in `CoveredRoots`. Path comparison follows Windows case-insensitivity and Unix case-sensitivity, and checks directory boundaries so `runs-other` is not covered by `runs`.
+
+Different evidence formats retain separate scans. The planner does not import or remove rows. Hosts must reconcile previously indexed namespaces when configuration changes, and must keep root IDs bound to stable locations. Source ownership remains trusted: path validation is not protection against a concurrent hostile filesystem owner. Integration with legacy imports is in progress.
