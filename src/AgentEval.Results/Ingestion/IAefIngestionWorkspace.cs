@@ -26,6 +26,12 @@ public interface IAefIngestionWorkspace : IDisposable
     string OpenAcceptedRun(string runHash);
 
     /// <summary>
+    /// Archives a completed control-only stage outside pending capacity. The caller owns the stage lease;
+    /// this method releases it under workspace ownership before the directory move. Evidence is not deleted.
+    /// </summary>
+    bool ArchiveReceipt(string stageId, IDisposable stageLease);
+
+    /// <summary>
     /// Atomically moves stage/content into runs/runHash without overwriting. The trusted caller must first verify
     /// the stage against this hash. This filesystem primitive does not perform protocol verification itself.
     /// </summary>
@@ -48,4 +54,7 @@ public sealed class AefIngestionWorkspaceOptions
 
     /// <summary>Maximum accepted run directories, 1..100000. Default 1000. Existing entries count toward capacity.</summary>
     public int MaxAcceptedRuns { get; init; } = 1_000;
+
+    /// <summary>Maximum archived receipt directories, 1..100000. Default 10000; receipts are never silently evicted.</summary>
+    public int MaxArchivedReceipts { get; init; } = 10_000;
 }

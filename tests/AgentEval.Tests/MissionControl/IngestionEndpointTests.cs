@@ -311,6 +311,49 @@ public sealed class IngestionEndpointTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Recovery_ExplicitFailedDiscard_ArchivesTombstoneAndOmitsLocalPaths()
+    {
+        await using var app = await Start(fileBytes: 3);
+        using var client = Client(app);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge,
+            (await client.PostAsync("/api/v1/ingestion/runs", Files(("run.json", "too long")))).StatusCode);
+        var listed = await client.GetAsync("/api/v1/ingestion/stages?limit=1");
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
+        var text = await listed.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(_root, text);
+        using var inspection = JsonDocument.Parse(text);
+        var item = inspection.RootElement.GetProperty("stages")[0];
+        Assert.Equal("failed", item.GetProperty("status").GetString());
+        var id = item.GetProperty("stageId").GetString();
+        var route = $"/api/v1/ingestion/stages/{id}";
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync(route + "/recover", null)).StatusCode);
+        var discarded = await client.DeleteAsync(route);
+        Assert.Equal(HttpStatusCode.OK, discarded.StatusCode);
+        using var receipt = JsonDocument.Parse(await discarded.Content.ReadAsStringAsync());
+        Assert.Equal("discarded", receipt.RootElement.GetProperty("status").GetString());
+        Assert.True(receipt.RootElement.GetProperty("receiptArchived").GetBoolean());
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Staging));
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync(route)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync($"/api/v1/ingestion/runs/{id}/finalize", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Recovery_AccessBoundsAndReadyStage_RequiresOwnerAndAllowsExplicitDiscard()
+    {
+        await using var app = await Start();
+        using var client = Client(app, false);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/ingestion/stages")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync("/api/v1/ingestion/stages/unknown")).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", Key);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/v1/ingestion/stages?limit=1025")).StatusCode);
+        var uploaded = await client.PostAsync("/api/v1/ingestion/runs", Files(("run.json", "{}")));
+        using var stage = JsonDocument.Parse(await uploaded.Content.ReadAsStringAsync());
+        var id = stage.RootElement.GetProperty("stageId").GetString();
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"/api/v1/ingestion/stages/{id}")).StatusCode);
+        Assert.False(Directory.Exists(Path.Combine(Staging, id!)));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);

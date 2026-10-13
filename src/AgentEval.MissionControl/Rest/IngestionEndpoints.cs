@@ -22,6 +22,31 @@ internal static class IngestionEndpoints
         if (!app.Configuration.GetValue<bool>("AgentEval:Ingestion:Enabled")) return;
         app.MapPost("/api/v1/ingestion/runs", UploadAsync);
         app.MapPost("/api/v1/ingestion/runs/{stageId}/finalize", FinalizeAsync);
+        app.MapGet("/api/v1/ingestion/stages", (HttpContext context, IAefIngestionRecovery recovery, IngestionHttpOptions options, int? limit) =>
+            RecoveryRequest(context, options, ct => recovery.Inspect(limit ?? 64, ct)));
+        app.MapPost("/api/v1/ingestion/stages/{stageId}/recover", (HttpContext context, string stageId, IAefIngestionRecovery recovery, IngestionHttpOptions options) =>
+            RecoveryRequest(context, options, ct => recovery.Recover(stageId, ct)));
+        app.MapDelete("/api/v1/ingestion/stages/{stageId}", (HttpContext context, string stageId, IAefIngestionRecovery recovery, IngestionHttpOptions options) =>
+            RecoveryRequest(context, options, ct => recovery.DiscardStage(stageId, ct)));
+    }
+
+    private static async Task<IResult> RecoveryRequest(HttpContext context, IngestionHttpOptions options, Func<CancellationToken, object> operation)
+    {
+        if (CheckAccess(context, options) is { } denied) return denied;
+        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+            return HttpResults.BadRequest(new { error = "unexpected-body" });
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+        try { return HttpResults.Ok(await Task.Run(() => operation(timeout.Token), timeout.Token)); }
+        catch (AefFinalizationException error)
+        { return HttpResults.Json(new { error = error.Code }, statusCode: error.Code == "path" ? 400 : error.Code == "busy" ? 429 : 409); }
+        catch (AefStagingException error) { return HttpResults.Json(new { error = error.Code }, statusCode: 409); }
+        catch (ArgumentOutOfRangeException) { return HttpResults.BadRequest(new { error = "invalid-limit" }); }
+        catch (DirectoryNotFoundException) { return HttpResults.NotFound(new { error = "stage-not-found" }); }
+        catch (FileNotFoundException) { return HttpResults.Conflict(new { error = "stage-state-missing" }); }
+        catch (OperationCanceledException) { return HttpResults.StatusCode(StatusCodes.Status408RequestTimeout); }
+        catch (IOException) { return HttpResults.Json(new { error = "recovery-unavailable" }, statusCode: 503); }
+        catch (UnauthorizedAccessException) { return HttpResults.Json(new { error = "recovery-unavailable" }, statusCode: 503); }
     }
 
     private static async Task<IResult> UploadAsync(HttpContext context, IAefRunStager stager, IngestionHttpOptions options)
@@ -56,7 +81,7 @@ internal static class IngestionEndpoints
             var accepted = await Task.Run(() => finalizer.FinalizeStage(stageId, timeout.Token), timeout.Token);
             return HttpResults.Ok(new { stageId = accepted.StageId, status = "accepted", verified = true,
                 integrity = "intact", runHash = accepted.RunHash, receiptPersisted = accepted.ReceiptPersisted,
-                alreadyAccepted = accepted.AlreadyAccepted });
+                alreadyAccepted = accepted.AlreadyAccepted, receiptArchived = accepted.ReceiptArchived });
         }
         catch (AefFinalizationException error)
         {

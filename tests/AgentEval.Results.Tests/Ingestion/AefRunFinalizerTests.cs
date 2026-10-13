@@ -27,7 +27,7 @@ public sealed class AefRunFinalizerTests : IDisposable
     }
     private string State(AefStagedRun stage)
     {
-        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(Path.GetDirectoryName(stage.Directory)!, "state.json")));
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(_workspace.OpenStage(stage.Id).Directory, "state.json")));
         return json.RootElement.GetProperty("status").GetString()!;
     }
     private AefFinalizationException Refused(AefStagedRun stage) =>
@@ -133,7 +133,8 @@ public sealed class AefRunFinalizerTests : IDisposable
         Assert.True(retry.AlreadyAccepted);
         Assert.Equal(accepted.Directory, retry.Directory);
         Assert.Equal("accepted", State(duplicate));
-        Assert.True(Directory.Exists(duplicate.Directory));
+        Assert.False(Directory.Exists(duplicate.Directory));
+        Assert.True(retry.ReceiptArchived);
         Assert.Equal(seal, File.ReadAllBytes(Path.Combine(accepted.Directory, "seal.json")));
     }
 
@@ -370,13 +371,38 @@ public sealed class AefRunFinalizerTests : IDisposable
         await Assert.ThrowsAsync<IOException>(() => new AefLocalRunImporter(new AefRunStager(_workspace)).StageDirectoryAsync(source.Dir));
     }
 
-    private sealed class CommitHook(IAefIngestionWorkspace inner, Action? before = null, Action? after = null) : IAefIngestionWorkspace
+    [Fact]
+    public async Task FinalizeStage_ArchiveStorageFailure_PreservesAcceptanceAndRetriesArchival()
+    {
+        using var source = new TestRun().Write().Seal();
+        var stage = await Stage(source);
+        var failing = new CommitHook(_workspace, archive: () => throw new IOException("Injected archive failure"));
+        var accepted = new AefRunFinalizer(failing).FinalizeStage(stage.Id);
+        Assert.True(accepted.ReceiptPersisted);
+        Assert.False(accepted.ReceiptArchived);
+        Assert.Equal("accepted", State(stage));
+        Assert.True(Directory.Exists(Path.Combine(_root, ".staging", stage.Id)));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(accepted.Directory).Outcome);
+        var retry = new AefRunFinalizer(_workspace).FinalizeStage(stage.Id);
+        Assert.True(retry.AlreadyAccepted);
+        Assert.True(retry.ReceiptArchived);
+        Assert.False(Directory.Exists(Path.Combine(_root, ".staging", stage.Id)));
+        Assert.Equal(accepted.RunHash, retry.RunHash);
+        Assert.Single(Directory.EnumerateDirectories(_workspace.RunsDirectory));
+    }
+
+    private sealed class CommitHook(IAefIngestionWorkspace inner, Action? before = null, Action? after = null, Action? archive = null) : IAefIngestionWorkspace
     {
         public string Root => inner.Root;
         public string RunsDirectory => inner.RunsDirectory;
         public AefIngestionStage BeginStage(CancellationToken cancellationToken = default) => inner.BeginStage(cancellationToken);
         public AefIngestionStage OpenStage(string id) => inner.OpenStage(id);
         public string OpenAcceptedRun(string hash) => inner.OpenAcceptedRun(hash);
+        public bool ArchiveReceipt(string id, IDisposable lease)
+        {
+            archive?.Invoke();
+            return inner.ArchiveReceipt(id, lease);
+        }
         public string PublishVerifiedStage(string id, string hash, CancellationToken cancellationToken = default)
         {
             before?.Invoke();

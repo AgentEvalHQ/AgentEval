@@ -56,7 +56,7 @@ public sealed class AefRunFinalizer : IAefRunFinalizer
                     { throw new AefFinalizationException("state", "recorded accepted evidence is missing"); }
                     var accepted = VerifySnapshot(acceptedPath, state, cancellationToken);
                     RequireReceiptMatch(state, accepted);
-                    return RecordAccepted(stage, state, accepted, acceptedPath, alreadyAccepted: true);
+                    return RecordAccepted(stage, lease, state, accepted, acceptedPath, alreadyAccepted: true);
                 }
             }
 
@@ -73,7 +73,7 @@ public sealed class AefRunFinalizer : IAefRunFinalizer
                 if (existing != snapshot)
                     throw new AefFinalizationException("conflict", "accepted hash has different evidence bytes");
                 cancellationToken.ThrowIfCancellationRequested();
-                return RecordAccepted(stage, state, snapshot, existingPath, alreadyAccepted: true);
+                return RecordAccepted(stage, lease, state, snapshot, existingPath, alreadyAccepted: true);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -88,7 +88,7 @@ public sealed class AefRunFinalizer : IAefRunFinalizer
                 throw;
             }
             // The rename is the commit point. A late cancellation or failed receipt write cannot unpublish evidence.
-            return RecordAccepted(stage, state, snapshot, destination, alreadyAccepted: false);
+            return RecordAccepted(stage, lease, state, snapshot, destination, alreadyAccepted: false);
         }
         finally { Volatile.Write(ref _active, 0); }
     }
@@ -135,12 +135,34 @@ public sealed class AefRunFinalizer : IAefRunFinalizer
             throw new AefFinalizationException("conflict", "evidence differs from the recorded publication snapshot");
     }
 
-    private static AefAcceptedRun RecordAccepted(AefIngestionStage stage, AefStageState state,
+    private AefAcceptedRun RecordAccepted(AefIngestionStage stage, IDisposable lease, AefStageState state,
         VerifiedSnapshot snapshot, string destination, bool alreadyAccepted)
     {
         var persisted = true;
         try { AefStageState.Write(stage, "accepted", state.Files, state.Bytes, snapshot.RunHash, snapshot.Digest); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { persisted = false; }
-        return new(stage.Id, snapshot.RunHash, destination, persisted, alreadyAccepted);
+        var archived = false;
+        if (persisted)
+        {
+            try
+            {
+                var content = Path.Combine(stage.Directory, "content");
+                if (Path.Exists(content))
+                {
+                    // Only an accepted receipt whose destination was freshly verified reaches here. Remaining
+                    // content is an expendable duplicate copy, including a partly cleaned copy after a crash.
+                    // Recheck every entry and bound the walk before deleting this server-owned content subtree.
+                    AefIngestionInventory.Scan(content, _limits, CancellationToken.None);
+                    var expected = Path.Combine(_workspace.Root, ".staging", stage.Id, "content");
+                    if (!string.Equals(Path.GetFullPath(content), Path.GetFullPath(expected),
+                        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                        throw new AefFinalizationException("path", "cleanup is outside the pending stage");
+                    Directory.Delete(content, recursive: true);
+                }
+                archived = _workspace.ArchiveReceipt(stage.Id, lease);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+        }
+        return new(stage.Id, snapshot.RunHash, destination, persisted, alreadyAccepted, archived);
     }
 }

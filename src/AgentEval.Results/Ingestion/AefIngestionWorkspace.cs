@@ -20,8 +20,10 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
     private readonly object _gate = new();
     private readonly FileStream _lease;
     private readonly string _staging;
+    private readonly string _receipts;
     private readonly int _capacity;
     private readonly int _acceptedCapacity;
+    private readonly int _receiptCapacity;
     private bool _disposed;
 
     /// <summary>
@@ -40,14 +42,19 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
         if (options.MaxAcceptedRuns is < 1 or > 100_000)
             throw new ArgumentOutOfRangeException(nameof(options), "Expected: 1..100000 accepted runs. Actual: invalid capacity. " +
                 "Suggestions: configure bounded accepted storage. Because: publication consumes disk space.");
+        if (options.MaxArchivedReceipts is < 1 or > 100_000)
+            throw new ArgumentOutOfRangeException(nameof(options), "Expected: 1..100000 archived receipts. Actual: invalid capacity. " +
+                "Suggestions: configure bounded receipt storage. Because: retry records consume disk space.");
 
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.Root));
         if (Root == Path.GetPathRoot(Root))
             throw Failure("a dedicated subdirectory", "filesystem root", "choose application storage below the filesystem root");
         _capacity = options.MaxPendingStages;
         _acceptedCapacity = options.MaxAcceptedRuns;
+        _receiptCapacity = options.MaxArchivedReceipts;
         EnsureDirectory(Root);
         _staging = Path.Combine(Root, ".staging");
+        _receipts = Path.Combine(Root, ".receipts");
         RunsDirectory = Path.Combine(Root, "runs");
         var lockPath = Path.Combine(Root, LockName);
         RejectLinks(lockPath);
@@ -71,6 +78,7 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
                     throw Failure("workspace version 1", "unsupported version marker", "use storage initialized by a compatible ingestion service");
             }
             EnsureDirectory(_staging);
+            EnsureDirectory(_receipts);
             EnsureDirectory(RunsDirectory);
         }
         catch
@@ -94,6 +102,7 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
             ObjectDisposedException.ThrowIf(_disposed, this);
             cancellationToken.ThrowIfCancellationRequested();
             RejectLinks(_staging);
+            RejectLinks(_receipts);
             RejectLinks(RunsDirectory);
             // Count all entries conservatively. Never traverse a retained stage to reserve another.
             // Take bounds enumeration even if the directory was populated outside this service.
@@ -106,7 +115,7 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
             {
                 id = Guid.NewGuid().ToString("N");
                 directory = Path.Combine(_staging, id);
-            } while (Path.Exists(directory));
+            } while (Path.Exists(directory) || Path.Exists(Path.Combine(_receipts, id)));
             cancellationToken.ThrowIfCancellationRequested();
             EnsureDirectory(directory);
             return new AefIngestionStage(id, directory);
@@ -122,9 +131,14 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
             if (stageId is null || stageId.Length != 32 || !stageId.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
                 throw new AefFinalizationException("path", "invalid stage ID");
             var directory = Path.Combine(_staging, stageId);
+            var archived = Path.Combine(_receipts, stageId);
             RejectLinks(directory);
-            if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("Ingestion stage not found.");
-            return new(stageId, directory);
+            RejectLinks(archived);
+            if (Path.Exists(directory) && Path.Exists(archived))
+                throw new AefFinalizationException("state", "ambiguous pending and archived receipt identity");
+            if (Directory.Exists(directory)) return new(stageId, directory);
+            if (Directory.Exists(archived)) return new(stageId, archived);
+            throw new DirectoryNotFoundException("Ingestion stage not found.");
         }
     }
 
@@ -134,6 +148,8 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
         lock (_gate)
         {
             var stage = OpenStage(stageId);
+            if (stage.Directory != Path.Combine(_staging, stageId))
+                throw new AefFinalizationException("state", "an archived receipt cannot publish new evidence");
             if (runHash is null || runHash.Length != 64 || !runHash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
                 throw new AefFinalizationException("path", "invalid verified run hash");
             var source = Path.Combine(stage.Directory, "content");
@@ -161,6 +177,40 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
             RejectLinks(path);
             if (!Directory.Exists(path)) throw new DirectoryNotFoundException("Accepted evidence not found.");
             return path;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool ArchiveReceipt(string stageId, IDisposable stageLease)
+    {
+        ArgumentNullException.ThrowIfNull(stageLease);
+        lock (_gate)
+        {
+            var stage = OpenStage(stageId);
+            var destination = Path.Combine(_receipts, stageId);
+            if (stage.Directory == destination) return true;
+            var state = AefStageState.Read(stage);
+            if (state.Status is not ("accepted" or "discarded"))
+                throw new AefFinalizationException("state", "only terminal receipts can be archived");
+            // Control-only directories prevent duplicate payloads or unexpected files from escaping staging limits.
+            var entries = Directory.EnumerateFileSystemEntries(stage.Directory).Take(4).ToArray();
+            if (entries.Length > 3) throw new AefFinalizationException("state", "unexpected receipt contents");
+            foreach (var entry in entries)
+            {
+                var name = Path.GetFileName(entry);
+                if (name is not ("state.json" or "state.tmp" or "finalize.lock")
+                    || Runs.AefFolder.KindOf(entry) != Runs.AefEntryKind.File
+                    || new FileInfo(entry).Length > (name == "finalize.lock" ? 0 : 4096))
+                    throw new AefFinalizationException("state", "receipt is not a bounded control-only directory");
+            }
+            RejectLinks(_receipts);
+            if (Directory.EnumerateFileSystemEntries(_receipts).Take(_receiptCapacity).Count() >= _receiptCapacity) return false;
+            // FileShare.None cannot stay open during a Windows directory rename. Workspace ownership keeps
+            // new lookups/reservations out of this transition. A previously resolved competing lease can make
+            // the move fail; in that case the receipt remains pending and retryable, without deleting proof.
+            stageLease.Dispose();
+            Directory.Move(stage.Directory, destination);
+            return true;
         }
     }
 

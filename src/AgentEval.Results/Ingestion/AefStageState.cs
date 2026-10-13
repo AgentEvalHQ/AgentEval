@@ -23,6 +23,7 @@ internal sealed record AefStageState(string Status, int Files, long Bytes, strin
     internal static AefStageState Read(AefIngestionStage stage)
     {
         var path = Path.Combine(stage.Directory, "state.json");
+        if (!Path.Exists(path)) throw new FileNotFoundException("Ingestion stage metadata is missing.");
         if (AefFolder.KindOf(path) != AefEntryKind.File)
             throw new AefFinalizationException("state", "non-regular stage metadata");
         using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);

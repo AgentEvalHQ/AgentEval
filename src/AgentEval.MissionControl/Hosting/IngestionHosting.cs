@@ -22,6 +22,9 @@ internal static class IngestionHosting
             sp.GetRequiredService<IAefIngestionWorkspace>(), sp.GetRequiredService<IngestionHttpOptions>().Staging));
         builder.Services.AddSingleton<IAefLocalRunImporter>(sp => new AefLocalRunImporter(
             sp.GetRequiredService<IAefRunStager>(), sp.GetRequiredService<IngestionHttpOptions>().Staging));
+        builder.Services.AddSingleton<IAefIngestionRecovery>(sp => new AefIngestionRecovery(
+            sp.GetRequiredService<IAefIngestionWorkspace>(), sp.GetRequiredService<IAefRunFinalizer>(),
+            sp.GetRequiredService<IngestionHttpOptions>().Staging));
         builder.Services.AddSingleton<IAefIngestionWorkspace>(_ =>
         {
             var root = configuration["AgentEval:Ingestion:Root"];
@@ -42,7 +45,8 @@ internal static class IngestionHosting
             {
                 Root = root,
                 MaxPendingStages = configuration.GetValue("AgentEval:Ingestion:MaxPendingStages", 64),
-                MaxAcceptedRuns = configuration.GetValue("AgentEval:Ingestion:MaxAcceptedRuns", 1_000)
+                MaxAcceptedRuns = configuration.GetValue("AgentEval:Ingestion:MaxAcceptedRuns", 1_000),
+                MaxArchivedReceipts = configuration.GetValue("AgentEval:Ingestion:MaxArchivedReceipts", 10_000)
             });
         });
         // Force validation and ownership acquisition at startup, before requests can reach the host.

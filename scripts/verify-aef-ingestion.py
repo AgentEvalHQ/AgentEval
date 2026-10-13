@@ -104,6 +104,7 @@ def main():
                 response.read()
                 state = json.loads((next(iter(new_stages)) / "state.json").read_text())
                 assert state["status"] == "interrupted", state
+                interrupted_id = next(iter(new_stages)).name
             finally:
                 slow.close()
             assert not list((storage / "runs").iterdir()), "Staging published unverified evidence"
@@ -129,6 +130,7 @@ def main():
             assert status == 200, (status, body)
             accepted = json.loads(body)
             assert accepted["verified"] and accepted["status"] == "accepted"
+            assert accepted["receiptArchived"]
             assert str(root).encode() not in body
             destination = storage / "runs" / accepted["runHash"]
             for name, data in source_files.items():
@@ -139,16 +141,19 @@ def main():
             status, retry_body = post(b"", route=route)
             assert status == 200 and json.loads(retry_body)["alreadyAccepted"], (status, retry_body)
             # Simulate the durable state left when the rename committed but the final receipt did not.
+            (storage / ".receipts" / stage_id).rename(storage / ".staging" / stage_id)
             receipt_path = storage / ".staging" / stage_id / "state.json"
             receipt = json.loads(receipt_path.read_text())
             receipt["status"] = "publishing"
             receipt_path.write_text(json.dumps(receipt))
             status, recovered_body = post(b"", route=route)
             assert status == 200 and json.loads(recovered_body)["alreadyAccepted"], (status, recovered_body)
-            assert json.loads(receipt_path.read_text())["status"] == "accepted"
+            assert json.loads((storage / ".receipts" / stage_id / "state.json").read_text())["status"] == "accepted"
             duplicate_id = upload_files(source_files)
             status, duplicate_body = post(b"", route=f"/api/v1/ingestion/runs/{duplicate_id}/finalize")
             assert status == 200 and json.loads(duplicate_body)["alreadyAccepted"], (status, duplicate_body)
+            assert json.loads(duplicate_body)["receiptArchived"]
+            assert not (storage / ".staging" / duplicate_id).exists()
             unsealed_id = upload_files({p: b for p, b in source_files.items() if p != "seal.json"})
             assert post(b"", route=f"/api/v1/ingestion/runs/{unsealed_id}/finalize")[0] == 422
             tampered = dict(source_files)
@@ -156,7 +161,28 @@ def main():
             tampered_id = upload_files(tampered)
             assert post(b"", route=f"/api/v1/ingestion/runs/{tampered_id}/finalize")[0] == 422
             assert len(list((storage / "runs").iterdir())) == 1
-            print("PASS: Kestrel staging/access/limits/timeout; independently verified publication; exact duplicate/retry/crash recovery; unsealed/tampered refused")
+
+            def recovery_call(method, route):
+                connection = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
+                try:
+                    connection.request(method, route, headers={"Authorization": "Bearer " + key})
+                    response = connection.getresponse()
+                    return response.status, response.read()
+                finally:
+                    connection.close()
+
+            status, body = recovery_call("GET", "/api/v1/ingestion/stages?limit=64")
+            assert status == 200 and json.loads(body)["complete"], (status, body)
+            assert any(s["stageId"] == interrupted_id for s in json.loads(body)["stages"])
+            status, body = recovery_call("DELETE", f"/api/v1/ingestion/stages/{interrupted_id}")
+            assert status == 200 and json.loads(body)["receiptArchived"], (status, body)
+            assert json.loads(body)["status"] == "discarded"
+            assert recovery_call("DELETE", f"/api/v1/ingestion/stages/{interrupted_id}")[0] == 200
+            assert recovery_call("DELETE", f"/api/v1/ingestion/stages/{stage_id}")[0] == 409
+            # A completed upload rejected by validation is still unaccepted and may be explicitly discarded.
+            assert recovery_call("DELETE", f"/api/v1/ingestion/stages/{tampered_id}")[0] == 200
+            assert destination.exists()
+            print("PASS: Kestrel bounded ingestion, independent verification, archived retries, publication recovery and explicit unaccepted-stage discard")
         finally:
             process.terminate()
             try:

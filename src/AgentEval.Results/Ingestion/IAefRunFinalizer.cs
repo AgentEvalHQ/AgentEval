@@ -20,7 +20,8 @@ public interface IAefRunFinalizer
 /// <param name="Directory">Accepted local path; do not expose over HTTP.</param>
 /// <param name="ReceiptPersisted">Whether accepted state was persisted after publication. False requires receipt recovery.</param>
 /// <param name="AlreadyAccepted">True when the verified evidence already existed, including recovery and exact duplicate uploads.</param>
-public sealed record AefAcceptedRun(string StageId, string RunHash, string Directory, bool ReceiptPersisted, bool AlreadyAccepted = false);
+/// <param name="ReceiptArchived">True when the receipt no longer occupies pending-stage capacity.</param>
+public sealed record AefAcceptedRun(string StageId, string RunHash, string Directory, bool ReceiptPersisted, bool AlreadyAccepted = false, bool ReceiptArchived = false);
 
 /// <summary>A bounded, content-free refusal to finalize an upload.</summary>
 public sealed class AefFinalizationException : IOException
