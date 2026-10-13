@@ -29,6 +29,23 @@ public sealed class RootIndexerTests : IDisposable
     private EvidenceIndexRoot[] Roots => [new("parent", Sources, IndexedEvidenceKind.Legacy), new("child", Nested, IndexedEvidenceKind.Legacy)];
 
     [Fact]
+    public void Prepare_ActualRootImport_RebuildsSourcesAndRefusesIncompleteCoverage()
+    {
+        Run(Path.Combine(Nested, "run"), "one");
+        var target = new EvidenceIndexOptions { DatabasePath = Path.Combine(_root, "index.sqlite") };
+        var service = new EvidenceIndexRebuildPreparation(new SqliteEvidenceIndexSchema());
+        var prepared = service.Prepare(target, (writer, token) => Indexer(writer).Import(Roots, cancellationToken: token).Complete);
+        using (var candidate = new SqliteEvidenceIndexWriter(new() { DatabasePath = prepared.DatabasePath }, new SqliteEvidenceIndexSchema()))
+            Assert.NotNull(candidate.Find("parent", "nested/run"));
+        var error = Assert.Throws<EvidenceIndexException>(() => service.Prepare(target,
+            (writer, token) => Indexer(writer).Import(Roots, new() { MaxDepth = 0 }, cancellationToken: token).Complete));
+        Assert.Equal("incomplete-rebuild", error.Code);
+        Assert.Single(Directory.EnumerateDirectories(_root, ".ae-index-rebuild-*"));
+        Assert.True(File.Exists(Path.Combine(Nested, "run/manifest.json")));
+        Assert.False(File.Exists(target.DatabasePath));
+    }
+
+    [Fact]
     public void Import_MixedFormatsUnderSameDirectory_KeepsEvidenceClassesSeparate()
     {
         Run(Path.Combine(Nested, "legacy-run"), "legacy");
