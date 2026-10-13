@@ -3,8 +3,9 @@
 The OTLP observation receiver is under implementation. No `/v1/traces`
 endpoint is enabled by this change. Delivered components in `AgentEval.Results.Observations` are the bounded
 `IOtlpPayloadReader`, validated `OtlpIngestionLimits`, an immutable trace model
-and both `OtlpJsonTraceDecoder` and `OtlpProtobufTraceDecoder`. Payload reading
-and decoding do not persist observations or establish evaluation results.
+and both `OtlpJsonTraceDecoder` and `OtlpProtobufTraceDecoder`, normalization,
+content policy, session grouping and the separate `IOtlpObservationStore`.
+Payload reading and decoding alone do not persist observations or establish evaluation results.
 
 ## Transport contract
 
@@ -151,8 +152,8 @@ This boundary is an allowlist, not secret detection: retained service/session
 identifiers, model/tool names, scope metadata and schema URLs are producer-controlled
 strings and can contain sensitive information. Producers must configure these
 metadata fields appropriately. The policy service does not replace decoder
-validation or budgets. Durable storage and HTTP integration are still pending;
-their acceptance path must apply this policy before writing observations.
+validation or budgets. The observation store applies this policy before writing;
+HTTP integration is still pending.
 
 ## Observed-session grouping
 
@@ -180,6 +181,59 @@ is applied. Scope and source evidence remain available through normalized member
 Input ordering does not affect group IDs. Members sort by start time, trace and
 span ID, with original positions retained for joining to the filtered batch.
 Duplicate and conflicting reports remain separate members; the grouper never
-chooses an arrival-order winner or infers telemetry completeness. Durable
-acceptance, retry handling and cross-batch query reconciliation remain subsequent
-storage/index responsibilities.
+chooses an arrival-order winner or infers telemetry completeness. The observation
+store handles record-level retries; cross-batch query reconciliation remains an
+index/query responsibility.
+
+## Durable observation records
+
+`OtlpObservationStore` owns an explicitly configured absolute directory with an
+exclusive process lease and version marker. It refuses nonempty unrecognized
+roots, unsupported markers, unexpected layout entries and linked/special files.
+Unix requires the existing native regular-file classifier. The operating-system
+owner must prevent other processes from replacing paths while the store is open.
+Host integration must enforce separation from viewer and AEF roots before opening
+the store; the standalone service cannot discover other services' configured paths.
+
+`Accept` takes decoder-validated input, applies the configured content policy and
+groups the filtered batch. A versioned record stores the filtered snapshot,
+removal report, source and normalized grouping provenance. No raw request bytes
+are written. Type discriminators preserve all AnyValue types, including exact
+integers, bytes and non-finite doubles when capture is explicitly enabled.
+
+Serialization writes through a byte-limited stream into one scratch file. The
+file is flushed to disk before a same-directory-filesystem move publishes it
+under a SHA-256 `batch-` identifier. Publication is the commit point; cancellation
+after publication does not turn accepted evidence into a reported cancellation.
+This supports process-restart recovery; directory-entry survival across power
+loss depends on the filesystem and is not a portable transactional guarantee.
+
+An identical serialized **filtered record** is a retry. The store verifies the
+existing record's bytes before accepting that retry, including after restart and
+at full capacity. Sorted normalized-field serialization avoids process-randomized
+dictionary ordering. Differences only in omitted content can produce identical
+filtered evidence; request-byte identity is neither retained nor promised.
+Different ordering, batching or retained metadata may produce different records.
+Duplicate spans and conflicting variants in those records remain available for
+explicit query reconciliation rather than being overwritten.
+
+Defaults are 4096 records (maximum 100000), 16 MiB per record (maximum 64 MiB),
+and 512 MiB accepted bytes (maximum 64 GiB). One extra bounded scratch file may
+exist. Capacity exhaustion refuses new records and never evicts accepted data.
+Concurrent operations are refused as busy rather than queued. Interrupted known
+scratch is removed under the exclusive lease at startup; unknown or oversized
+scratch causes refusal. Startup inventories bounded names and sizes; `Read`
+verifies the selected record's digest before deserializing. These digests detect
+changed bytes, not malicious replacement by the filesystem owner or authenticity.
+
+Cancellation is checked between bounded operations and serialized writes.
+Synchronous serialization tokens, reads, deserialization and the final flush/move
+are not individually preemptible. Decoder limits, receiver concurrency and timeout
+limits must still apply; the record byte cap is not an exact process-memory cap.
+Changing capture from On to Off affects new records and does not redact history.
+
+The independent fixture `scripts/verify-observation-store.ps1 -AssemblyPath
+<AgentEval.Results.dll>` uses separate native writer and retry processes to
+verify publication, cross-process identity, default filtering, integer precision
+and scratch recovery. HTTP acknowledgement and transport failure tests remain
+W06 receiver integration work.
