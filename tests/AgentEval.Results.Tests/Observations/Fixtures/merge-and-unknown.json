@@ -1,0 +1,54 @@
+{
+  "resourceSpans": [
+    {
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "first",
+            "version": "merged-version"
+          },
+          "spans": [
+            {
+              "traceId": "0123456789abcdef0123456789abcdef",
+              "spanId": "0123456789abcdef",
+              "name": "final-name",
+              "attributes": [
+                {
+                  "key": "merge",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "final"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "array-merge",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "old"
+                        },
+                        {
+                          "stringValue": "append"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "status": {
+                "message": "merged-status",
+                "code": 2
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,8 +3,8 @@
 The OTLP observation receiver is under implementation. No `/v1/traces`
 endpoint is enabled by this change. Delivered components in `AgentEval.Results.Observations` are the bounded
 `IOtlpPayloadReader`, validated `OtlpIngestionLimits`, an immutable trace model
-and `OtlpJsonTraceDecoder`. Payload reading and JSON decoding do not persist
-observations or establish evaluation results. Protobuf decoding is pending.
+and both `OtlpJsonTraceDecoder` and `OtlpProtobufTraceDecoder`. Payload reading
+and decoding do not persist observations or establish evaluation results.
 
 ## Transport contract
 
@@ -31,11 +31,11 @@ observation acceptance; reading or decoding a payload is insufficient.
 | --- | --- | --- | --- |
 | Transport bytes | 4 MiB | 1 byte–64 MiB | Delivered payload reader |
 | Decoded bytes | 4 MiB | 1 byte–64 MiB | Delivered payload reader |
-| Spans/request | 4,096 | 1–100,000 | Delivered JSON decoder; protobuf pending |
-| Attributes/owner | 128 | 1–1,024 | Delivered JSON decoder; protobuf pending |
-| Total collection items/request | 100,000 | 1–1,000,000 | Delivered JSON decoder; protobuf pending |
-| Nested message/value depth | 32 | 8–64 | Delivered JSON decoder; protobuf pending |
-| UTF-8 string or bytes value | 16 KiB | 1 byte–1 MiB | Delivered JSON decoder; protobuf pending |
+| Spans/request | 4,096 | 1–100,000 | Delivered JSON and protobuf decoders |
+| Attributes/owner | 128 | 1–1,024 | Delivered JSON and protobuf decoders |
+| Total collection items/request | 100,000 | 1–1,000,000 | Delivered JSON and protobuf decoders |
+| Nested message/value depth | 32 | 8–64 | Delivered JSON and protobuf decoders |
+| UTF-8 string or bytes value | 16 KiB | 1 byte–1 MiB | Delivered JSON and protobuf decoders |
 | Active receiver requests | 2 | 1–16 | Receiver lifetime, pending |
 | Timeout | 30 seconds | 1–600 seconds | Receiver lifetime, pending |
 
@@ -65,9 +65,9 @@ separate. A later SQLite index is derived from those authoritative files.
 
 Content capture will default to off. Structural metadata must be allowlisted;
 prompt, completion and tool payload content cannot be persisted by default.
-Protobuf decoding, versioned dialect normalization, grouping, retention and this
+Versioned dialect normalization, grouping, retention and this
 content policy remain the next implementation slices. Tests prove the payload
-boundary and JSON decoder, not a completed receiver.
+boundary and both decoders, not a completed receiver.
 
 ## JSON trace decoding
 
@@ -98,3 +98,31 @@ payload is parsed into a bounded JsonDocument before model construction; parsing
 is synchronous, with cancellation checked before parsing and during traversal.
 The returned model owns its strings and immutable collections after that document
 is disposed. No raw JSON is retained by the decoder.
+
+## Protobuf trace decoding
+
+`OtlpProtobufTraceDecoder` uses the same immutable model and limits, without an
+intermediate JSON representation. It implements the pinned schema's complete
+trace field mapping and keeps unknown fields out of the model. Singular messages
+merge, repeated messages append, scalar values replace earlier values, and
+AnyValue alternatives follow protobuf oneof replacement/merge semantics.
+Unknown fields are skipped for all wire types, including matched, depth-bounded
+groups. Known field numbers with incompatible wire types are skipped as unknown,
+matching generated protobuf parsers.
+
+Every wire field consumes the aggregate item budget, including unknown and
+superseded fields. Nested messages/groups consume the depth budget. Byte lengths,
+varint termination/overflow, tags, fixed-width reads and UTF-8 strings are checked
+before conversion. The typed model applies ID and duplicate-attribute checks too.
+Unsigned 32-bit and enum fields use protobuf's low-32-bit conversion semantics;
+nonzero varint booleans become true. These wire conversion rules are verified
+against Google's parser, rather than inferred from JSON numeric rules.
+
+The fixtures under `tests/AgentEval.Results.Tests/Observations/Fixtures` are
+produced with Google's protobuf runtime from the vendored upstream schemas.
+They cover full typed traces, message/oneof merging, all unknown wire types and
+scalar edge cases. Each binary fixture has an independently decoded JSON pair.
+See [fixture provenance and regeneration](../scripts/otlp-fixtures/README.md).
+Tests compare the complete models from both encodings and exercise malformed
+wire data, resource budgets, ownership and deterministic mutations. The decoder
+is a bounded schema implementation, not a claim of general protobuf conformance.
