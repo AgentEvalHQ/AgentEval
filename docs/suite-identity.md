@@ -123,7 +123,11 @@ Safety and adversarial capture hash applied static policy, compiled custom patte
 entries, effective regex settings, scan limits and thresholds, with nested judge declarations. Dynamic
 policy resolvers, external content classifiers and overridden matcher delegates remain unclassified;
 capture never calls those dependencies. All twelve built-in agentic CLI presets now have capture support
-when their judge is identified. Composite mock and other producer capture remain in progress;
+when their judge is identified. Explicit composite mock exports also capture their declared graph before
+execution and retain it on cancellation. Their built-in judge is identified as `fixed-placeholder` by
+its exact implementation type, with no claimed LLM prompt. They retain `mocked` target mode and one
+actual trial regardless of an ignored mock `--runs` option. Interrupted snapshots expand configured
+wrappers with bounded traversal so missing nested checks retain their planned shape. Other producer capture remains in progress;
 unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
 
 ## Red-team scan capture

@@ -119,11 +119,14 @@ internal static class MockTarget
     {
         var started = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
+        var definition = aef is not null && !noAef
+            ? AgentEval.Cli.Infrastructure.CompositeSuiteDefinition.TryCreate($"bench:{family}/{preset}", benchmark, input, 1)
+            : null;
         bool Write(EvalResult result, string? abortReason = null) => aef is not null && !noAef &&
             BenchAef.Write(aef, agentEvalDir, family, preset, subject, subjectVersion, AefTargetMode.Mocked,
                 benchmark, placeholderJudge ? CodeJudged(result) : result, started, DateTimeOffset.UtcNow,
                 exitCode: abortReason is null ? ExitCodes.GateIndeterminate : 1, abortReason: abortReason,
-                emptyResults: abortReason is not null && !progress.HasCompletedResults, budgetTier: budgetTier);
+                emptyResults: abortReason is not null && !progress.HasCompletedResults, budgetTier: budgetTier, definition: definition);
         EvalResult result;
         try
         {

@@ -34,14 +34,23 @@ internal sealed class CompositeProgress(CompositeEval benchmark)
         lock (_sync) return Visit(benchmark, "");
     }
 
-    private EvalResult Visit(IEval eval, string path)
+    private EvalResult Visit(IEval eval, string path, int depth = 0)
     {
         if (_completed.TryGetValue(path, out var result)) return result;
-        var composite = eval as CompositeEval;
+        var instrument = eval;
+        while (instrument is IEvalDefinitionWrapper wrapper)
+        {
+            if (++depth > EvalTreeLimits.MaxTreeWalkDepth)
+                throw new ArgumentException("Expected: a bounded evaluation tree. Actual: wrapper depth exceeded. Suggestions: remove cycles or flatten the tree. Because: interrupted evidence must preserve a finite planned shape.");
+            instrument = wrapper.DefinitionInner;
+        }
+        if (depth > EvalTreeLimits.MaxTreeWalkDepth)
+            throw new ArgumentException("Expected: a bounded evaluation tree. Actual: composite depth exceeded. Suggestions: flatten the tree. Because: interrupted evidence must preserve a finite planned shape.");
+        var composite = instrument as CompositeEval;
         var children = composite?.Components.Select((c, i) =>
         {
             var index = i.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return Visit(c.Eval, path.Length == 0 ? index : path + "/" + index);
+            return Visit(c.Eval, path.Length == 0 ? index : path + "/" + index, depth + 1);
         }).ToList();
         return new EvalResult(new(eval.Key, eval.Name, eval.Category, eval.Version),
             new EvalScore(0, null, _started.Contains(path) ? "error" : "skipped", false, composite?.Threshold, "none", null)

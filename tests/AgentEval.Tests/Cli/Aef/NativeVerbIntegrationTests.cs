@@ -196,7 +196,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             "nist" => await BenchNistCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct),
             "gdpr" => (await BenchCommand.RunGdprAsync("standard", "mock-subject", _root, "test input", null,
-                mock: true, aef: aef, noAef: noAef, ct: ct), null),
+                mock: true, aef: aef, noAef: noAef, ct: ct, runs: 5), null),
             "eu-ai-act" => (await BenchEuAiActCommand.RunAsync("standard", "mock-subject", _root, "test input", null,
                 mock: true, aef: aef, noAef: noAef, ct: ct), null),
             "perf" => (await BenchPerfCommand.RunAsync("latency", "mock-subject", "test input", _root, null,
@@ -232,6 +232,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(aborted);
         var abortedHeader = Document(aborted, "run.json");
         Assert.Equal("mocked", (string?)abortedHeader["execution"]!["targetMode"]);
+        if (family is "gdpr" or "eu-ai-act" or "agentic")
+        {
+            Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+            Assert.Equal((string?)header["suite"]!["digest"], (string?)abortedHeader["suite"]!["digest"]);
+            var manifestPath = Path.Combine("ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile);
+            var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(run, manifestPath)));
+            Assert.Equal(File.ReadAllBytes(Path.Combine(run, manifestPath)), File.ReadAllBytes(Path.Combine(aborted, manifestPath)));
+            Assert.Equal(1, (int)manifest.ToJson()["definition"]!["trialsPerCase"]!);
+            Assert.Contains("fixed-placeholder", manifest.ToJson().ToJsonString());
+        }
+
         Assert.Equal("aborted", (string?)abortedHeader["status"]);
         Assert.False(File.Exists(Path.Combine(aborted, "gates.ndjson")));
 

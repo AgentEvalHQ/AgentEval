@@ -231,6 +231,17 @@ public sealed class CompositeSuiteDefinitionTests
         Assert.Equal(0, judge.Calls);
     }
 
+    [Fact]
+    public void Capture_BuiltInMockJudge_DeclaresFixedImplementationWithoutInventingAPrompt()
+    {
+        var judge = new AgentEval.Cli.Commands.MockTarget.Judge();
+        var graph = AgentEval.Cli.Commands.BenchAgenticCommand.ResolvePreset("rag-quality", judge);
+        var manifest = CompositeSuiteDefinition.TryCreate("bench:agentic/rag-quality", graph, new EvalInput("q", "r"), 1)!;
+        Assert.NotNull(manifest);
+        Assert.Contains("fixed-placeholder", manifest.ToJson().ToJsonString());
+        Assert.DoesNotContain("prompt-identified", manifest.ToJson().ToJsonString());
+    }
+
     private sealed class UnidentifiedJudge : IEvaluator
     {
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)

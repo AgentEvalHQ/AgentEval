@@ -44,7 +44,9 @@ internal static class CompositeSuiteDefinition
                     return node;
                 case AtomicLlmEval atomic:
                     var declaration = atomic.CaptureDefinition();
-                    if (!declaration.PromptIdentified) return null;
+                    var fixedPlaceholder = declaration.EvaluatorType == typeof(AgentEval.Cli.Commands.MockTarget.Judge);
+                    if (!declaration.PromptIdentified && !fixedPlaceholder) return null;
+                    node["judgeKind"] = fixedPlaceholder ? "fixed-placeholder" : "prompt-identified";
                     Implementation(declaration.EvaluatorType);
                     node["rubric"] = declaration.RubricDigest;
                     node["scorePolicy"] = declaration.ScorePolicyDigest;
