@@ -4,7 +4,8 @@
 index. It targets .NET 8, 9 and 10 and keeps SQLite dependencies outside the
 BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
-Source import, rebuild orchestration and query pagination are subsequent slices.
+Transactional source projection and verified observation imports are implemented.
+AEF/legacy adapters, rebuild orchestration and query pagination are subsequent slices.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -47,7 +48,7 @@ an attacker who controls its files.
 
 Startup checks the database file/page size against `MaxDatabaseBytes` (default
 512 MiB, allowed 64 KiB–64 GiB). This is currently a startup/migration budget;
-future mutation services must also enforce it on writes. It excludes journal
+the writer also enforces it through SQLite's page cap and before commit. It excludes journal
 and sidecar bytes. SQLite lock waits default to two seconds, configurable from
 one to thirty. Cancellation is checked between synchronous SQLite operations;
 individual database integrity scans are not preemptible.
@@ -77,3 +78,51 @@ Adapters must validate their unsigned range before insertion.
 Indexes cover source discovery, subjects, suites, cases, metrics, trace identity
 and ordered group members. These are the schema foundations for stable queries;
 they do not yet constitute a pagination API or a measured scale guarantee.
+
+## Atomic initial and incremental writes
+
+`IEvidenceIndexWriter` accepts immutable `EvidenceIndexSource` projections from
+trusted adapters. Its `Upsert` transaction replaces all rows belonging to one
+root-relative source and updates its checkpoint and the global generation
+together. Constraints, budget failures and cancellation before commit roll back
+the entire replacement, preserving the previous indexed snapshot. A projection
+is not a verifier: only an adapter that actually verifies evidence may set AEF
+integrity to `Intact`. The writer rejects that state for legacy/observation input.
+
+Source identity hashes an unambiguous root-namespace/relative-path tuple. The
+`sources.content_digest` checkpoint is a **projection fingerprint**, combining
+the consumed source snapshot's digest, kind, verification and actual projected
+rows. It is not the original AEF seal or observation-batch hash. This prevents
+changed projections from being skipped when adapter behavior changes but source
+bytes do not. Result/metric ordering is canonicalized; observation report order
+and source positions remain evidence. Identical projections retain the current
+generation; changed projections advance it once. Reopening the writer preserves
+idempotence.
+
+`Remove` requires the last observed checkpoint fingerprint and refuses a stale
+one. It deletes only derived rows. Scan coordinators must establish complete
+source coverage before deciding a source disappeared; a partial or failed scan
+must never authorize deletion. A retained previous projection means “last indexed
+snapshot,” not a guarantee that current source files still match it.
+
+The writer holds the sidecar ownership lease for its lifetime and refuses
+concurrent operations rather than queueing. Defaults are 100000 rows per source
+(including the source row), 16 MiB aggregate projection text, 100000 retained
+sources, and 1000000 total source-owned rows. Configurable maxima are respectively
+1000000, 64 MiB, 1000000 and 10000000. The byte limit bounds projected text; it is
+not an exact managed-memory ceiling. Text/provenance serialization and synchronous
+SQL commands are bounded work, with cancellation checks between operations.
+
+`IOtlpObservationIndexer` takes a captured inventory from an existing
+`IOtlpObservationStore`, reads each selected record through its digest verifier,
+and commits each projection independently. It uses the stored normalized
+provenance rather than silently re-normalizing old observations. Token integers,
+conflicting alias candidates, omission reports and separate span reports survive
+projection. Prompt/output content is not copied into index rows.
+
+Imports default to 4096 records per call (maximum 100000). The result reports
+inventory count, processed/changed/unchanged counts, completeness and path-free
+per-record issues. Corrupt/unavailable records leave prior indexed rows intact;
+capacity or busy failures stop further work and report incomplete coverage.
+Earlier per-source commits survive a later failure or cancellation. No pruning
+or source-file deletion is performed by this importer.
