@@ -14,6 +14,9 @@ try
 {
     switch (args[0])
     {
+        case "observation-scale":
+            Print(ObservationScaleFixture.Run(options, args.Length > 2 ? int.Parse(args[2]) : 1000));
+            break;
         case "scale":
             Print(IndexScaleFixture.Run(options, args.Length > 2 ? int.Parse(args[2]) : 1000,
                 args.Length > 3 ? int.Parse(args[3]) : 20));

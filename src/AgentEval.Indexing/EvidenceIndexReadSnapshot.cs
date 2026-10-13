@@ -32,14 +32,11 @@ internal sealed class EvidenceIndexReadSnapshot(FileStream lease, SqliteConnecti
         SqliteConnection? connection = null; SqliteTransaction? transaction = null;
         try
         {
-            new SqliteEvidenceIndexSchema().InspectReadOnlyWhileOwned(options, cancellationToken);
+            SqliteEvidenceIndexSchema.CheckReadFiles(options);
             connection = SqliteEvidenceIndexSchema.Open(path, options.BusyTimeoutSeconds, readOnly: true);
             transaction = connection.BeginTransaction(deferred: true);
-            using var metadata = connection.CreateCommand(); metadata.Transaction = transaction;
-            metadata.CommandText = "SELECT instance_id,generation FROM index_metadata WHERE singleton=1";
-            using var read = metadata.ExecuteReader();
-            if (!read.Read()) throw new EvidenceIndexException("missing-metadata");
-            return new(lease, connection, transaction, read.GetString(0), read.GetInt64(1));
+            var info = SqliteEvidenceIndexSchema.InspectReadSnapshot(options, connection, transaction, cancellationToken);
+            return new(lease, connection, transaction, info.InstanceId, info.Generation);
         }
         catch { transaction?.Dispose(); connection?.Dispose(); lease.Dispose(); throw; }
     }

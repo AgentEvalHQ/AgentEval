@@ -56,8 +56,26 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
     internal EvidenceIndexSchemaInfo InspectWhileOwned(EvidenceIndexOptions options, CancellationToken cancellationToken)
         => EnsureCore(options, leaseHeld: true, allowInitialize: false, cancellationToken);
 
-    internal EvidenceIndexSchemaInfo InspectReadOnlyWhileOwned(EvidenceIndexOptions options, CancellationToken cancellationToken)
-        => EnsureCore(options, leaseHeld: true, allowInitialize: false, cancellationToken, readOnly: true);
+    // The reader already owns the shared replacement lease; validate the exact snapshot it will query.
+    internal static void CheckReadFiles(EvidenceIndexOptions options)
+    {
+        if (!OperatingSystem.IsWindows() && !AefFolder.NativeInUse) throw new EvidenceIndexException("unsupported-file-classifier");
+        var path = Path.GetFullPath(options.DatabasePath);
+        CheckDirectories(Path.GetDirectoryName(path)!);
+        CheckFile(path); CheckFile(path + ".lock"); CheckFile(path + ".writer.lock");
+        foreach (var suffix in new[] { "-journal", "-wal", "-shm" }) CheckFile(path + suffix);
+        if (new FileInfo(path).Length > options.MaxDatabaseBytes) throw new EvidenceIndexException("size-limit");
+    }
+
+    internal static EvidenceIndexSchemaInfo InspectReadSnapshot(EvidenceIndexOptions options,
+        SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        var application = ScalarLong(connection, transaction, "PRAGMA application_id");
+        var version = ScalarLong(connection, transaction, "PRAGMA user_version");
+        if (application != ApplicationId || version is < 1 or > CurrentVersion) throw new EvidenceIndexException("unsupported-schema");
+        if (version != CurrentVersion) throw new EvidenceIndexException("rebuild-schema-upgrade-required");
+        return VerifyCurrentSnapshot(options, connection, transaction, cancellationToken);
+    }
 
     private EvidenceIndexSchemaInfo EnsureCore(EvidenceIndexOptions options, bool leaseHeld, bool allowInitialize, CancellationToken cancellationToken, bool readOnly = false)
     {
@@ -119,36 +137,43 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
                 }
                 Execute(connection, transaction, "PRAGMA user_version=2");
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            if (SchemaDigest(connection, transaction) != ExpectedSchema.Value) throw new EvidenceIndexException("schema-drift");
-            VerifyMigrations(connection, transaction, CurrentVersion);
-            using (var check = connection.CreateCommand())
-            {
-                check.Transaction = transaction;
-                check.CommandText = "PRAGMA quick_check(1)";
-                if (!Equals(check.ExecuteScalar(), "ok")) throw new EvidenceIndexException("corrupt-index");
-                check.CommandText = "PRAGMA foreign_key_check";
-                using var reader = check.ExecuteReader();
-                if (reader.Read()) throw new EvidenceIndexException("broken-references");
-            }
-            EvidenceIndexSchemaInfo info;
-            using (var metadata = connection.CreateCommand())
-            {
-                metadata.Transaction = transaction;
-                metadata.CommandText = "SELECT instance_id, generation FROM index_metadata WHERE singleton=1";
-                using var reader = metadata.ExecuteReader();
-                if (!reader.Read()) throw new EvidenceIndexException("missing-metadata");
-                info = new(CurrentVersion, reader.GetString(0), reader.GetInt64(1));
-                if (!Guid.TryParseExact(info.InstanceId, "N", out _) || info.Generation < 0) throw new EvidenceIndexException("invalid-metadata");
-            }
-            var pageSize = ScalarLong(connection, transaction, "PRAGMA page_size");
-            if (ScalarLong(connection, transaction, "PRAGMA page_count") > options.MaxDatabaseBytes / pageSize)
-                throw new EvidenceIndexException("size-limit");
-            cancellationToken.ThrowIfCancellationRequested();
+            var info = VerifyCurrentSnapshot(options, connection, transaction, cancellationToken);
             transaction.Commit();
             return info;
         }
         catch (SqliteException error) { throw new EvidenceIndexException(error.SqliteErrorCode is 5 or 6 ? "busy" : "invalid-database"); }
+    }
+
+    private static EvidenceIndexSchemaInfo VerifyCurrentSnapshot(EvidenceIndexOptions options,
+        SqliteConnection connection, SqliteTransaction transaction, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (SchemaDigest(connection, transaction) != ExpectedSchema.Value) throw new EvidenceIndexException("schema-drift");
+        VerifyMigrations(connection, transaction, CurrentVersion);
+        using (var check = connection.CreateCommand())
+        {
+            check.Transaction = transaction;
+            check.CommandText = "PRAGMA quick_check(1)";
+            if (!Equals(check.ExecuteScalar(), "ok")) throw new EvidenceIndexException("corrupt-index");
+            check.CommandText = "PRAGMA foreign_key_check";
+            using var reader = check.ExecuteReader();
+            if (reader.Read()) throw new EvidenceIndexException("broken-references");
+        }
+        EvidenceIndexSchemaInfo info;
+        using (var metadata = connection.CreateCommand())
+        {
+            metadata.Transaction = transaction;
+            metadata.CommandText = "SELECT instance_id, generation FROM index_metadata WHERE singleton=1";
+            using var reader = metadata.ExecuteReader();
+            if (!reader.Read()) throw new EvidenceIndexException("missing-metadata");
+            info = new(CurrentVersion, reader.GetString(0), reader.GetInt64(1));
+            if (!Guid.TryParseExact(info.InstanceId, "N", out _) || info.Generation < 0) throw new EvidenceIndexException("invalid-metadata");
+        }
+        var pageSize = ScalarLong(connection, transaction, "PRAGMA page_size");
+        if (ScalarLong(connection, transaction, "PRAGMA page_count") > options.MaxDatabaseBytes / pageSize)
+            throw new EvidenceIndexException("size-limit");
+        cancellationToken.ThrowIfCancellationRequested();
+        return info;
     }
 
     internal static SqliteConnection Open(string path, int timeout, bool readOnly = false)
