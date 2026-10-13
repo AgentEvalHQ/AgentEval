@@ -109,7 +109,7 @@ reference, and path-distance includes its threshold. Capture and evidence shape 
 The agentic CLI captures supported graphs before evaluation, including a hash of the supplied
 ground-truth reference and declared system message, expected actions and tool definitions. Observed
 responses/tool calls remain subject evidence. Current coverage includes agentic execution, tool-call accuracy, RAG quality,
-conversational, reasoning, user-experience, telemetry, stochastic-stability, judge-quality and glass-box-diagnostics presets. Operational
+conversational, reasoning, user-experience, telemetry, stochastic-stability, judge-quality, glass-box-diagnostics, safety and adversarial-direct presets. Operational
 checks declare thresholds and budgets; constructor-supplied telemetry and prior run results remain
 subject observations and do not change suite identity. Judge-quality captures its thresholds and hashes
 ordered expected calibration labels; actual verdicts remain observations. Producers use the input-aware
@@ -119,8 +119,12 @@ Diagnostic capture hashes the trusted system-prompt baseline and regex pattern/o
 optional judges through `IEvalInstrumentSource`. Nested instruments contribute identity without adding
 emitted result cases. Culture-dependent or custom regex implementations remain unclassified because
 construction culture and subclass behavior cannot be reconstructed safely.
-Other presets and composite mock capture remain
-in progress; unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
+Safety and adversarial capture hash applied static policy, compiled custom patterns and ordered library
+entries, effective regex settings, scan limits and thresholds, with nested judge declarations. Dynamic
+policy resolvers, external content classifiers and overridden matcher delegates remain unclassified;
+capture never calls those dependencies. All twelve built-in agentic CLI presets now have capture support
+when their judge is identified. Composite mock and other producer capture remain in progress;
+unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
 
 ## Red-team scan capture
 

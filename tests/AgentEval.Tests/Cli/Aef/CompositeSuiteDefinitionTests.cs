@@ -3,6 +3,9 @@ using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Telemetry;
 using AgentEval.Evals.Agentic.JudgeQuality;
+using AgentEval.Evals.Agentic.Adversarial;
+using AgentEval.Evals.Agentic.Safety;
+using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Evals.Agentic.StochasticStability;
 
 namespace AgentEval.Tests.Cli.Aef;
@@ -34,6 +37,8 @@ public sealed class CompositeSuiteDefinitionTests
     [InlineData("telemetry")]
     [InlineData("judge-quality")]
     [InlineData("glass-box-diagnostics")]
+    [InlineData("adversarial-direct")]
+    [InlineData("safety")]
     [InlineData("stochastic-stability")]
     public void Capture_AgenticPreset_IdentifiesConfiguredInstrumentsWithoutCalls(string preset)
     {
@@ -155,6 +160,75 @@ public sealed class CompositeSuiteDefinitionTests
         var definition = CompositeSuiteDefinition.TryCreate("bench:nested", graph, new EvalInput("q", "r"), 1)!;
         Assert.Equal(new[] { "outer" }, definition.CaseIds);
         Assert.Contains("leaf", definition.ToJson().ToJsonString());
+    }
+
+    [Fact]
+    public void Capture_AdversarialPolicy_BindsCompiledPatternsThresholdAndLimit()
+    {
+        var judge = new Judge("private judge");
+        string Digest(IEval eval)
+        {
+            var graph = new CompositeEval("root", "root", "test", "1", [new(eval)], WeightedSumAggregation.Instance);
+            var definition = CompositeSuiteDefinition.TryCreate("bench:adversarial", graph, new EvalInput("q", "r"), 1)!;
+            Assert.Single(definition.CaseIds);
+            Assert.DoesNotContain("secret-pattern", definition.ToJson().ToJsonString());
+            return definition.Digest;
+        }
+        var direct = Digest(new DirectInjectionEval(judge));
+        Assert.NotEqual(direct, Digest(new DirectInjectionEval(judge, customPatterns: ["secret-pattern"])));
+        Assert.Equal(direct, Digest(new DirectInjectionEval(judge, customPatterns: ["["]))); // rejected pattern never executes
+        Assert.NotEqual(direct, Digest(new DirectInjectionEval(judge, passThreshold: 0.8)));
+        Assert.NotEqual(Digest(new PersonaAttackEval(judge)), Digest(new PersonaAttackEval(judge, customPatterns: ["secret-pattern"])));
+        Assert.NotEqual(Digest(new JailbreakResistanceEval(judge)), Digest(new JailbreakResistanceEval(judge, patternsToRun: 2)));
+        Assert.NotEqual(Digest(new JailbreakResistanceEval(judge)), Digest(new JailbreakResistanceEval(judge, passThreshold: 0.8)));
+        var overrideMatcher = new DirectInjectionEval(judge) { RegexMatch = (_, _) => throw new InvalidOperationException() };
+        Assert.Null(overrideMatcher.CaptureConfiguration(new EvalInput("q", "r")));
+        Assert.Equal(0, judge.Calls);
+    }
+
+    private sealed class ExternalClassifier : IContentSafetyClient
+    {
+        public Task<IReadOnlyDictionary<string, double>> ClassifyAsync(string content, CancellationToken ct = default)
+            => throw new InvalidOperationException("Capture must not call a classifier.");
+    }
+
+    [Fact]
+    public void Capture_ExternalSafetyClassifier_DeclinesWithoutCallingIt()
+    {
+        var judge = new Judge("prompt");
+        IEvalConfigurationSource[] leaves = [new HateUnfairnessEval(judge, new ExternalClassifier()),
+            new SelfHarmEval(judge, new ExternalClassifier()), new SexualEval(judge, new ExternalClassifier()),
+            new ViolenceEval(judge, new ExternalClassifier())];
+        Assert.All(leaves, leaf => Assert.Null(leaf.CaptureConfiguration(new EvalInput("q", "r"))));
+        Assert.NotNull(new HateUnfairnessEval(judge, NullContentSafetyClient.Instance).CaptureConfiguration(new EvalInput("q", "r")));
+    }
+
+    private sealed class DynamicPolicy : IPolicyResolver
+    {
+        public ProhibitedActionPolicy GetPolicyFor(string subjectId) => throw new InvalidOperationException("Capture must not resolve a dynamic policy.");
+    }
+
+    [Fact]
+    public void Capture_SafetyPolicy_BindsPolicyAndPatternsWithoutSubjectIdentityOrDynamicCalls()
+    {
+        var judge = new Judge("private judge");
+        string Digest(IEval eval)
+        {
+            var graph = new CompositeEval("root", "root", "test", "1", [new(eval)], WeightedSumAggregation.Instance);
+            var definition = CompositeSuiteDefinition.TryCreate("bench:safety", graph, new EvalInput("q", "r"), 1)!;
+            Assert.DoesNotContain("private policy", definition.ToJson().ToJsonString());
+            return definition.Digest;
+        }
+        var policy = new StaticPolicyResolver(new ProhibitedActionPolicy(["private policy"], [], [], []));
+        var baseline = Digest(new ProhibitedActionsEval(judge, policy, "subject one"));
+        Assert.Equal(baseline, Digest(new ProhibitedActionsEval(judge, policy, "subject two")));
+        Assert.NotEqual(baseline, Digest(new ProhibitedActionsEval(judge,
+            new StaticPolicyResolver(new ProhibitedActionPolicy([], [], [], [])), "subject one")));
+        Assert.NotEqual(baseline, Digest(new ProhibitedActionsEval(judge, policy, "subject one", passThreshold: 0.8)));
+        Assert.Null(new ProhibitedActionsEval(judge, new DynamicPolicy(), "subject").CaptureConfiguration(new EvalInput("q", "r")));
+        Assert.NotEqual(Digest(new SensitiveDataLeakageEval(judge)), Digest(new SensitiveDataLeakageEval(judge, customPatterns: ["private policy"])));
+        Assert.NotEqual(Digest(new SystemPromptLeakageEval(judge)), Digest(new SystemPromptLeakageEval(judge, passThreshold: 0.8)));
+        Assert.Equal(0, judge.Calls);
     }
 
     private sealed class UnidentifiedJudge : IEvaluator

@@ -39,7 +39,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// Foundry reference: <c>azureai://built-in/evaluators/hate_unfairness</c>
 /// </para>
 /// </summary>
-public sealed class HateUnfairnessEval : IEval
+public sealed class HateUnfairnessEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "hate_unfairness";
     private const string NameValue     = "Hate and Unfairness";
@@ -106,6 +106,19 @@ public sealed class HateUnfairnessEval : IEval
             promptId: "agenteval.hate_unfairness.v1",
             failureSeverity: "critical");
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmEval];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        _contentSafetyClient is null or NullContentSafetyClient ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

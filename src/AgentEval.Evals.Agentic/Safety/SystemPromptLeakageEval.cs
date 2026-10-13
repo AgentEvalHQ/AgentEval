@@ -41,7 +41,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// described in master analysis §5.4 using the AgentEval hybrid pattern.
 /// </para>
 /// </summary>
-public sealed class SystemPromptLeakageEval : IEval
+public sealed class SystemPromptLeakageEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "system_prompt_leakage";
     private const string NameValue     = "System Prompt Leakage";
@@ -107,6 +107,15 @@ public sealed class SystemPromptLeakageEval : IEval
             promptId: "agenteval.system_prompt_leakage.v1",
             failureSeverity: "high");
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmEval];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

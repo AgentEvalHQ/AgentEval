@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hashed references. Telemetry and stochastic-stability checks bind budgets and thresholds without
   binding measured telemetry or prior results into the suite identity. Judge-quality capture binds thresholds
   and expected calibration labels, excluding observed verdicts and refusing to consume lazy reference inputs. Glass-box diagnostics bind baseline/regex policy and optional judges without
-  adding internal instrument nodes to the planned result roster. Other composite producer capture remains in progress.
+  adding internal instrument nodes to the planned result roster. Safety/adversarial capture also binds static policies, compiled patterns,
+  scan limits and nested judges; dynamic external dependencies remain unclassified. Other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

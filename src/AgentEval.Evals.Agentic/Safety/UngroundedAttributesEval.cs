@@ -39,9 +39,12 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// <c>Resources/Prompts/</c> is AgentEval's own text, sent to the judge as its system prompt.
 /// </para>
 /// </summary>
-public sealed class UngroundedAttributesEval : IEval
+public sealed class UngroundedAttributesEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key      => _inner.Key;

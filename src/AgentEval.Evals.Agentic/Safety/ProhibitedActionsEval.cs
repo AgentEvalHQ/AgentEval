@@ -54,7 +54,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// AgentEval promotes policy to code-first; the LLM handles only the residual ambiguity.
 /// </para>
 /// </summary>
-public sealed class ProhibitedActionsEval : IEval
+public sealed class ProhibitedActionsEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "prohibited_actions";
     private const string NameValue     = "Prohibited Actions";
@@ -71,7 +71,8 @@ public sealed class ProhibitedActionsEval : IEval
     /// matcher that throws <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised
     /// deterministically instead of depending on machine load. Production code never sets it.
     /// </summary>
-    internal Func<Regex, string, bool> RegexIsMatch { get; init; } = static (regex, input) => regex.IsMatch(input);
+    private static readonly Func<Regex, string, bool> DefaultRegexIsMatch = static (regex, input) => regex.IsMatch(input);
+    internal Func<Regex, string, bool> RegexIsMatch { get; init; } = DefaultRegexIsMatch;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;
@@ -136,6 +137,26 @@ public sealed class ProhibitedActionsEval : IEval
             judgeModel: judgeModel,
             promptId: "agenteval.prohibited_actions.v1",
             failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmFallback];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input)
+    {
+        // Dynamic resolvers may perform I/O or return a different policy when execution begins.
+        if (_policyResolver is not StaticPolicyResolver || RegexIsMatch != DefaultRegexIsMatch) return null;
+        var configuration = CaptureConfiguration();
+        configuration["policyDigest"] = "sha256:" + Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(
+            global::System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_policyResolver.GetPolicyFor(_subjectId)))).ToLowerInvariant();
+        return configuration;
     }
 
     /// <inheritdoc/>
