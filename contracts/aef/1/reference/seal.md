@@ -24,7 +24,7 @@ An in-toto Statement v1 over every file of the run except seal.json, attestation
 | `predicate.subject.version` | [exactVersion](common.md#exactversion) |  |  | run.json's subject.version, when it has one (SEAL-5). |
 | `predicate.deployment` | null or object | yes |  | The deployment, as run.json gives it, or null (SEAL-5). |
 | `predicate.suite` | null or object | yes |  | The suite, as run.json gives it, or null (SEAL-5). |
-| `predicate.judges` | array of object | yes | ≤ 64 items | The judges, as run.json gives them and in the same order (SEAL-5). |
+| `predicate.judges` | array of object | yes | ≤ 4096 items | The judges, as run.json gives them and in the same order (SEAL-5). |
 | `predicate.judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | The judge's model, as in run.json (SEAL-5). |
 | `predicate.judges[].rubricDigest` | [sha256Uri](common.md#sha256uri) |  |  | The judge's rubric digest, as in run.json (SEAL-5). |
 | `predicate.closedAt` | [timestamp](common.md#timestamp) | yes |  | When the run closed: run.json's endedAt (SEAL-5). |

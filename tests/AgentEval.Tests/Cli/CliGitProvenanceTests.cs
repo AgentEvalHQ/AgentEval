@@ -10,7 +10,13 @@ public sealed class CliGitProvenanceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "cli-git-" + Guid.NewGuid().ToString("N"));
     public CliGitProvenanceTests() => Directory.CreateDirectory(_root);
-    public void Dispose() => Directory.Delete(_root, true);
+    public void Dispose()
+    {
+        // Git marks object files read-only on Windows. Clear that flag only within this fixture.
+        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
+        Directory.Delete(_root, true);
+    }
 
     [Fact]
     public async Task Capture_Repository_ReportsCleanDirtyAndDetachedWithoutPaths()

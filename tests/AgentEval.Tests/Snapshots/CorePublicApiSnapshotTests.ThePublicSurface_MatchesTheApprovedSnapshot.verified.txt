@@ -304,6 +304,7 @@ static class AgentEval.Benchmarks.AutoAuditDemo
     const System.String LeakEndpoint
     const System.String RetryEndpoint
     static System.Threading.Tasks.Task<AgentEval.Benchmarks.AutoAuditReport> BuildOfflineReportAsync(System.Threading.CancellationToken cancellationToken = default)
+    static System.Threading.Tasks.Task<AgentEval.Benchmarks.AutoAuditReport> BuildOfflineReportWithProgressAsync(System.Action<System.String> onStarted, System.Action<AgentEval.Benchmarks.AutoAuditEndpointResult> onCompleted, System.Threading.CancellationToken cancellationToken = default)
 sealed class AgentEval.Benchmarks.AutoAuditEndpointResult : System.IEquatable<AgentEval.Benchmarks.AutoAuditEndpointResult>
     AgentEval.Benchmarks.AutoAuditEndpointResult <Clone>$()
     System.Boolean Completed { get; init; }
@@ -703,9 +704,10 @@ class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Core.IAnswerSamplingConf
     static AgentEval.Core.ChatClientAgentAdapter Create(Microsoft.Extensions.AI.IChatClient chatClient, System.String name = null, System.String systemPrompt = null, System.Single? temperature = null, System.Int32? maxTokens = null)
     static System.String QueryTimeSystemMessage(System.DateTimeOffset queryTime)
     static System.String Stamp(System.DateTimeOffset timestamp, System.String text)
-class AgentEval.Core.ChatClientEvaluator : AgentEval.Core.IEvaluator, AgentEval.Core.IJudgePromptSource, AgentEval.Core.IRubricBindable
+class AgentEval.Core.ChatClientEvaluator : AgentEval.Core.IEvaluator, AgentEval.Core.IJudgePromptSource, AgentEval.Core.IJudgeProviderSource, AgentEval.Core.IRubricBindable
     AgentEval.Core.IEvaluator WithRubric(AgentEval.Core.EvalRubric rubric, System.String dimension)
     System.String PromptMaterial { get; }
+    System.String ProviderName { get; init; }
     System.String SystemPromptId { get; }
     System.Threading.Tasks.Task<AgentEval.Core.EvaluationResult> EvaluateAsync(System.String input, System.String output, System.Collections.Generic.IEnumerable<System.String> criteria, System.Threading.CancellationToken cancellationToken = default)
     const System.String DefaultSystemPromptId
@@ -876,7 +878,7 @@ sealed class AgentEval.Decisions.SystemOneClientOptions [Experimental(AGENTEVAL_
     ctor()
     static AgentEval.Decisions.SystemOneClientOptions ForOpenRouter(System.String apiKey, System.String model = "typesafe/jev-1.13")
     static AgentEval.Decisions.SystemOneClientOptions ForTypeSafe(System.String apiKey, System.String model = "jev-1.13.0")
-sealed class AgentEval.Decisions.SystemOneDecisionClient : AgentEval.Decisions.IDecisionClient, System.IDisposable [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.SystemOneDecisionClient : AgentEval.Core.IJudgeProviderSource, AgentEval.Decisions.IDecisionClient, System.IDisposable [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.String Model { get; }
     System.String ProviderName { get; }
     System.Threading.Tasks.Task<AgentEval.Decisions.DecisionResponse> DecideAsync(AgentEval.Decisions.DecisionRequest request, System.Threading.CancellationToken cancellationToken = default)
@@ -981,6 +983,7 @@ sealed class AgentEval.Evals.CompositeEval : AgentEval.Evals.IEval
     System.String Name { get; }
     System.String Version { get; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
+    System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateWithProgressAsync(AgentEval.Evals.EvalInput input, System.Action<System.Collections.Generic.IReadOnlyList<System.Int32>, AgentEval.Evals.EvalResult> onCompleted, System.Threading.CancellationToken ct = default, System.Action<System.Collections.Generic.IReadOnlyList<System.Int32>> onStarted = null)
     ctor(System.String key, System.String name, System.String category, System.String version, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components, AgentEval.Evals.IAggregationStrategy aggregation, System.Double? threshold = null)
 static class AgentEval.Evals.CompositeEvalsServiceExtensions
     static Microsoft.Extensions.DependencyInjection.IServiceCollection AddCompositeEvals(Microsoft.Extensions.DependencyInjection.IServiceCollection services)

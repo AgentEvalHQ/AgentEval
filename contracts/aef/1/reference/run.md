@@ -40,7 +40,7 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `suite.executionPolicy.requirePasses` | integer |  | ≥ 1; ≤ 1000 | How many of a case's trials must pass for the case to pass, from 1 to 1000. |
 | `suite.executionPolicy.aggregation` | one of `"MajorityVote"`, `"AllPass"`, `"AnyPass"`, `"Mean"`, `"Median"`, `"Max"`, `"PassAtK"`, `"AtLeast"` |  |  | How a case's trials are combined (RES-8): the same vocabulary as a rollup line's trials.aggregation. AtLeast: the case passes when at least requirePasses of its trials pass, which it then requires. |
 | `suite.executionPolicy.k` | integer |  | ≥ 1; ≤ 9007199254740991 | k, for PassAtK. |
-| `judges` | array of object |  | ≤ 64 items | The models that graded results, in order. The judges and rubrics comparability axes compare this list in order (RUN-9, LANE-6). |
+| `judges` | array of object |  | ≤ 4096 items | The models that graded results, in order. The judges and rubrics comparability axes compare this list in order (RUN-9, LANE-6). |
 | `judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | The judge model, as its provider names it. Part of the judges comparability axis (RUN-9, LANE-6). |
 | `judges[].provider` | string |  | ≥ 1 chars; ≤ 128 chars | Who served the judge model (RUN-9); absent when the producer does not know. Never empty. |
 | `judges[].mode` | one of `"single"`, `"panel"`, `"primary"`, `"shadow"`, `"other"` |  |  | How the judge was used: single (alone), panel (one judge of a panel), primary (its grade counts) or shadow (it grades alongside, without counting). A reader shows a mode it does not know as written (RUN-9, VER-3). |

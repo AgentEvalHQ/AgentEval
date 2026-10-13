@@ -202,7 +202,8 @@ public sealed class StoreV1ExporterTests : IDisposable
         Directory.CreateDirectory(_out);
         File.WriteAllText(Path.Combine(_out, "notes.txt"), "mine");
 
-        await Assert.ThrowsAsync<ArgumentException>(() => StoreV1Exporter.ExportAsync(store.Store, store.RunId, _out));
+        var refusal = await Assert.ThrowsAsync<AefInputException>(() => StoreV1Exporter.ExportAsync(store.Store, store.RunId, _out));
+        Assert.Equal("directory", refusal.ParamName);
         Assert.True(File.Exists(Path.Combine(_out, "notes.txt")));
         await Assert.ThrowsAsync<InvalidDataException>(() => StoreV1Exporter.ExportAsync(store.Store, "2020-01-01_00-00-00_deadbeef", _out + "-x"));
     }

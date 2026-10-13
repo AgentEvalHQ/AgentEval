@@ -192,7 +192,7 @@ public sealed class AefJobRunnerTests : IDisposable
     {
         var testCase = new Case(_ => ValueTask.FromResult(Passed()));
         var suite = new Suite(testCase, close: async ct => await Task.Delay(Timeout.InfiniteTimeSpan, ct));
-        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite), _output,
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase, suite, closeSeconds: 1), _output,
             new AefJobOptions { At = Start }).WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal("job.failed", result.Terminal);
         Assert.Null(result.Limit);
@@ -635,7 +635,7 @@ public sealed class AefJobRunnerTests : IDisposable
         public ValueTask<AefJobCaseResult> RunAsync(CancellationToken cancellationToken) => run(cancellationToken);
     }
 
-    private sealed class Target(IAefJobCase testCase, IAefJobSuite? suite = null) : IAefJobTarget
+    private sealed class Target(IAefJobCase testCase, IAefJobSuite? suite = null, long closeSeconds = 30) : IAefJobTarget
     {
         public AefJobCredentials? Credentials { get; private set; }
         public IReadOnlyCollection<string> CredentialPurposes => ["subject", "judge"];
@@ -644,7 +644,9 @@ public sealed class AefJobRunnerTests : IDisposable
         public string Isolation => "process";
         public string PriceTable => "unit-prices";
         public string Fingerprint => "unit-target";
-        public long CloseSeconds => 1;
+        // Evidence sealing shares this allowance. Non-timing tests must tolerate busy CI disks;
+        // the cooperative-deadline test explicitly selects one second.
+        public long CloseSeconds => closeSeconds;
         public IReadOnlyList<IAefJobSuite> Suites => [suite ?? new Suite(testCase)];
     }
 
