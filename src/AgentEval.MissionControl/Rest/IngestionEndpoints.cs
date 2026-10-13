@@ -2,10 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Net;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
-using System.Text;
 using AgentEval.MissionControl.Hosting;
 using AgentEval.Results.Ingestion;
 using Microsoft.AspNetCore.Http.Features;
@@ -61,17 +58,8 @@ internal static class IngestionEndpoints
         return await UploadAuthorizedAsync(context, stager, options);
     }
 
-    private static IResult? CheckAccess(HttpContext context, IngestionHttpOptions options)
-    {
-        context.Response.Headers.CacheControl = "no-store";
-        if (!Authorized(context, options)) return HttpResults.StatusCode(StatusCodes.Status401Unauthorized);
-        if (context.Request.Headers.ContainsKey("Origin") || context.Request.Headers.ContainsKey("Sec-Fetch-Site"))
-            return HttpResults.StatusCode(StatusCodes.Status403Forbidden);
-        var remote = context.Connection.RemoteIpAddress;
-        if (!context.Request.IsHttps && (remote is null || !IPAddress.IsLoopback(remote.IsIPv4MappedToIPv6 ? remote.MapToIPv4() : remote)))
-            return HttpResults.StatusCode(StatusCodes.Status403Forbidden);
-        return null;
-    }
+    private static IResult? CheckAccess(HttpContext context, IngestionHttpOptions options) =>
+        IngestionAccessPolicy.Check(context, options.KeyHash);
 
     private static async Task<IResult> FinalizeAsync(HttpContext context, string stageId, IAefRunFinalizer finalizer, IngestionHttpOptions options)
     {
@@ -139,17 +127,6 @@ internal static class IngestionEndpoints
         catch (BadHttpRequestException error) { return HttpResults.StatusCode(error.StatusCode); }
         catch (IOException) { return HttpResults.Json(new { error = "staging-unavailable" }, statusCode: 503); }
         catch (UnauthorizedAccessException) { return HttpResults.Json(new { error = "staging-unavailable" }, statusCode: 503); }
-    }
-
-    private static bool Authorized(HttpContext context, IngestionHttpOptions options)
-    {
-        var values = context.Request.Headers.Authorization;
-        if (values.Count != 1) return false;
-        var value = values[0];
-        if (value is null || !value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) || value.Length is < 39 or > 263) return false;
-        var key = value[7..];
-        if (key.Any(c => c < '!' || c > '~')) return false;
-        return CryptographicOperations.FixedTimeEquals(options.KeyHash, SHA256.HashData(Encoding.ASCII.GetBytes(key)));
     }
 
     private static async IAsyncEnumerable<AefUploadFile> ReadFiles(MultipartReader reader, Stream body,

@@ -1,7 +1,7 @@
 # OTLP observations
 
-The OTLP observation receiver is under implementation. No `/v1/traces`
-endpoint is enabled by this change. Delivered components in `AgentEval.Results.Observations` are the bounded
+The OTLP observation receiver exposes opt-in `POST /v1/traces` in Mission Control.
+It is disabled by default. Delivered components in `AgentEval.Results.Observations` are the bounded
 `IOtlpPayloadReader`, validated `OtlpIngestionLimits`, an immutable trace model
 and both `OtlpJsonTraceDecoder` and `OtlpProtobufTraceDecoder`, normalization,
 content policy, session grouping and the separate `IOtlpObservationStore`.
@@ -152,8 +152,8 @@ This boundary is an allowlist, not secret detection: retained service/session
 identifiers, model/tool names, scope metadata and schema URLs are producer-controlled
 strings and can contain sensitive information. Producers must configure these
 metadata fields appropriately. The policy service does not replace decoder
-validation or budgets. The observation store applies this policy before writing;
-HTTP integration is still pending.
+validation or budgets. The observation store applies this policy before writing,
+including requests received through the HTTP endpoint.
 
 ## Observed-session grouping
 
@@ -192,8 +192,8 @@ exclusive process lease and version marker. It refuses nonempty unrecognized
 roots, unsupported markers, unexpected layout entries and linked/special files.
 Unix requires the existing native regular-file classifier. The operating-system
 owner must prevent other processes from replacing paths while the store is open.
-Host integration must enforce separation from viewer and AEF roots before opening
-the store; the standalone service cannot discover other services' configured paths.
+Host integration enforces separation from viewer and configured AEF roots before
+opening the store; the standalone service cannot discover other services' configured paths.
 
 `Accept` takes decoder-validated input, applies the configured content policy and
 groups the filtered batch. A versioned record stores the filtered snapshot,
@@ -235,5 +235,36 @@ Changing capture from On to Off affects new records and does not redact history.
 The independent fixture `scripts/verify-observation-store.ps1 -AssemblyPath
 <AgentEval.Results.dll>` uses separate native writer and retry processes to
 verify publication, cross-process identity, default filtering, integer precision
-and scratch recovery. HTTP acknowledgement and transport failure tests remain
-W06 receiver integration work.
+and scratch recovery. HTTP test-host checks cover both formats, compression,
+access refusal, limits, default-off persistence and unavailable storage. Actual
+Kestrel transport failure fixtures remain the next validation step.
+
+## Mission Control configuration
+
+Set these configuration values explicitly (environment-variable equivalents use
+double underscores, for example `AgentEval__Otlp__Enabled`):
+
+| Setting under `AgentEval:Otlp` | Value / default |
+| --- | --- |
+| `Enabled` | `false`; set `true` to register the receiver |
+| `Root` | Required absolute dedicated observation directory |
+| `Source` | Required stable receiver namespace, at most 256 UTF-8 bytes |
+| `ApiKey` | Required secret: 32–256 printable ASCII characters, no spaces |
+| `Capture` | `Off`; only explicit `On` retains content |
+| Request limits | Names and defaults from the resource-budget table above |
+| `MaxRecords`, `MaxRecordBytes`, `MaxStoredBytes` | Store limits described above |
+
+Enabling OTLP does not require enabling AEF uploads. Both receivers share the
+same access-policy implementation, with independently configured keys. Send
+`Authorization: Bearer <key>`. Browser-origin/fetch-site headers are refused.
+Direct non-loopback connections require HTTPS; forwarded headers do not bypass
+that requirement. Authentication is checked before reading the request body.
+
+The receiver accepts `application/json` and `application/x-protobuf`, with optional
+gzip compression. It holds a bounded concurrency slot through payload reading,
+decoding and durable acceptance. JSON success is `{}`; protobuf success is the
+empty `ExportTraceServiceResponse`. Errors carry a path-free `Status.message`
+in the matching encoding. Malformed payloads return 400, access failures 401/403,
+byte/structure limits 413, unsupported media/compression 415, overload 429 and
+timeout/storage failures 503. Retryable refusals include `Retry-After: 1`.
+No successful response is sent before the store commits or verifies a retry.

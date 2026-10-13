@@ -38,6 +38,7 @@ public static class McHost
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
         Hosting.IngestionHosting.Configure(builder);
+        Hosting.OtlpHosting.Configure(builder);
 
         // Evaluator-card registry: loads all EvaluatorCard JSON files at startup
         // from AgentEval.Evals.Agentic's embedded resources. Drives
@@ -286,6 +287,7 @@ public static class McHost
         // Reports, traces, PDFs are byte streams — REST not GraphQL.
         app.MapBinaryEndpoints();
         app.MapIngestionEndpoints();
+        app.MapOtlpEndpoints();
 
         // Plan-08 MC1.8.1: serve the React SPA from wwwroot/ so a single
         // `dotnet run --project src/AgentEval.MissionControl` boots the whole
