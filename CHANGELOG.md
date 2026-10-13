@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adding internal instrument nodes to the planned result roster. Safety/adversarial capture also binds static policies, compiled patterns,
   scan limits and nested judges; dynamic external dependencies remain unclassified. Explicit composite mocks retain a pre-execution
   manifest through cancellation, identifying their fixed placeholder judge without claiming an LLM prompt. Interrupted snapshots expand configured wrappers to preserve
-  the same planned tree shape as the evidence writer. Other composite producer capture remains in progress.
+  the same planned tree shape as the evidence writer. Trace-fidelity and workflow-trace-fidelity also bind pre-reconciliation policy and planned checks,
+  excluding observed trace values from suite identity. Other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

@@ -1394,6 +1394,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(workflow ? 1 : 6, definition.CaseIds.Count);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));

@@ -80,7 +80,9 @@ public static class BenchTraceFidelityCommand
             return 1;
         }
 
-        var result = new TraceFidelityRunner(ParsePreset(preset)).ReconcileToEvalResult(agentTrace, chatTrace);
+        var resolvedPreset = ParsePreset(preset);
+        var definition = AgentEval.Cli.Infrastructure.TraceSuiteDefinition.Create(preset, resolvedPreset);
+        var result = new TraceFidelityRunner(resolvedPreset).ReconcileToEvalResult(agentTrace, chatTrace);
 
         // ── Persist via the canonical output store (manifest + native report) ──
         string? storeRunId = null;
@@ -89,7 +91,7 @@ public static class BenchTraceFidelityCommand
             aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
             subjectKind: "agent", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, storeV1: StoreLink());
+            abortReason: reason, storeV1: StoreLink(), definition: definition);
         try
         {
             var store = new FileSystemOutputStore(agentEvalDir);

@@ -76,9 +76,9 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
-        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
+        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>

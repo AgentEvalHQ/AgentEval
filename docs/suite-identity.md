@@ -146,3 +146,12 @@ unclassified. `AttackPipeline.OnPlanPrepared` forwards the same callback for pip
 OWASP, MITRE and NIST commands bind the prepared plan together with the resolved preset and verdict
 implementation. Their fixed verdict rules are covered by the implementation assembly digest.
 Completed, interrupted and explicitly requested mock scan exports retain this declaration.
+
+## Trace reconciliation producers
+
+Trace-fidelity commands capture their policy and planned checks before reconciliation. Standard trace
+fidelity declares six discrepancy checks. Workflow trace fidelity groups executor IDs case-insensitively,
+retaining the first spelling as execution does; an empty workflow declares the existing root-only check.
+The manifest binds the resolved preset, token tolerance and implementation assemblies. Trace contents,
+reported token counts and finish reasons are subject observations, so changing them does not redefine
+the suite. Completed and interrupted exports seal the same pre-reconciliation definition.
