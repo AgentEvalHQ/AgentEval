@@ -25,6 +25,7 @@ public sealed class IngestionHostingTests : IDisposable
         {
             ["AgentEval:Root"] = Path.Combine(_base, "viewer"),
             ["AgentEval:Ingestion:Enabled"] = enabled.ToString(),
+            ["AgentEval:Ingestion:ApiKey"] = new string('k', 32),
             ["AgentEval:Ingestion:Root"] = root,
             ["AgentEval:Ingestion:MaxPendingStages"] = capacity.ToString()
         });
@@ -33,6 +34,8 @@ public sealed class IngestionHostingTests : IDisposable
         IServiceCollection services = new ServiceCollection();
         foreach (var descriptor in builder.Services.Where(d => d.ServiceType == typeof(IAefIngestionWorkspace)
             || d.ServiceType == typeof(IAefRunDiscovery)
+            || d.ServiceType == typeof(IAefRunStager)
+            || d.ServiceType == typeof(IngestionHttpOptions)
             || d.ImplementationType?.Name == "IngestionLifetime"))
             services.Add(descriptor);
         return services.BuildServiceProvider();

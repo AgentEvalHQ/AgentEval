@@ -285,6 +285,7 @@ public static class McHost
         // REST binary + streaming endpoints (plan-07 §8.2; plan-08 MC1.3.2-6).
         // Reports, traces, PDFs are byte streams — REST not GraphQL.
         app.MapBinaryEndpoints();
+        app.MapIngestionEndpoints();
 
         // Plan-08 MC1.8.1: serve the React SPA from wwwroot/ so a single
         // `dotnet run --project src/AgentEval.MissionControl` boots the whole

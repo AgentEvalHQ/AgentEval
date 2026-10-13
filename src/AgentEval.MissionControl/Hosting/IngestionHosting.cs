@@ -15,6 +15,9 @@ internal static class IngestionHosting
         if (!configuration.GetValue<bool>("AgentEval:Ingestion:Enabled")) return;
 
         builder.Services.AddSingleton<IAefRunDiscovery, AefRunDiscovery>();
+        builder.Services.AddSingleton(_ => IngestionHttpOptions.Read(configuration));
+        builder.Services.AddSingleton<IAefRunStager>(sp => new AefRunStager(
+            sp.GetRequiredService<IAefIngestionWorkspace>(), sp.GetRequiredService<IngestionHttpOptions>().Staging));
         builder.Services.AddSingleton<IAefIngestionWorkspace>(_ =>
         {
             var root = configuration["AgentEval:Ingestion:Root"];
@@ -49,11 +52,13 @@ internal static class IngestionHosting
             Path.EndsInDirectorySeparator(parent) ? parent : parent + Path.DirectorySeparatorChar, comparison);
     }
 
-    private sealed class IngestionLifetime(IAefIngestionWorkspace workspace) : IHostedService
+    private sealed class IngestionLifetime(IngestionHttpOptions options, IAefRunStager stager, IAefIngestionWorkspace workspace) : IHostedService
     {
         public Task StartAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _ = options.TimeoutSeconds;
+            _ = stager;
             _ = workspace.Root;
             return Task.CompletedTask;
         }
