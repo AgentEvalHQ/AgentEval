@@ -84,6 +84,9 @@ public sealed record AefCompositeRunOptions
     /// (TypedMemEval's typed outcome, say). Never content.
     /// </summary>
     public IReadOnlyDictionary<string, JsonObject>? CaseExt { get; init; }
+
+    /// <summary>Content-free aggregate diagnostics in summary.json.ext; cannot replace the writer's agenteval.bench field.</summary>
+    public JsonObject? SummaryExt { get; init; }
 }
 
 /// <summary>
@@ -172,6 +175,9 @@ public static class AefCompositeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        var summaryExtension = options.SummaryExt?.DeepClone().AsObject() ?? new JsonObject();
+        if (summaryExtension.ContainsKey("agenteval.bench"))
+            throw new ArgumentException("Expected: producer diagnostics outside agenteval.bench. Actual: reserved summary extension supplied. Suggestions: use a distinct namespaced key. Because: diagnostics must not replace the benchmark verdict.");
         var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
         var binding = AefNativeSuiteDefinition.Bind("composite", options.SuiteRef, preset.Metric.Version,
             cases.SelectMany(c => Keys(c).Prepend(c.Metric.Key)), options.Definition, storeExtension,
@@ -256,6 +262,14 @@ public static class AefCompositeRunWriter
             if (options.AbortReason is null)
                 options.Gate?.Write(writer, runId, endedAt, cases.Select(c => writer.ResultIdOf(c.Metric.Key, CasePath)).ToList());
 
+            summaryExtension["agenteval.bench"] = new JsonObject
+            {
+                ["preset"] = preset.Metric.Key,
+                ["label"] = preset.Score.Label,
+                ["score"] = presetMeasured ? preset.Score.Value : null,
+                ["strategy"] = preset.Details.AggregationStrategy,
+                ["rulePath"] = preset.Details.Lineage?.RulePath,
+            };
             writer.SetSummary(new AefSummary
             {
                 Usage = options.Usage,
@@ -281,17 +295,7 @@ public static class AefCompositeRunWriter
                     },
                 ])],
                 // The preset's own verdict, which no lane recomputes ([RES-6]): its label, score and the rule that decided it.
-                Ext = new JsonObject
-                {
-                    ["agenteval.bench"] = new JsonObject
-                    {
-                        ["preset"] = preset.Metric.Key,
-                        ["label"] = preset.Score.Label,
-                        ["score"] = presetMeasured ? preset.Score.Value : null,
-                        ["strategy"] = preset.Details.AggregationStrategy,
-                        ["rulePath"] = preset.Details.Lineage?.RulePath,
-                    },
-                },
+                Ext = summaryExtension,
             });
             writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);

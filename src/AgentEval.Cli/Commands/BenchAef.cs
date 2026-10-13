@@ -76,9 +76,10 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
-        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
+        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
+        System.Text.Json.Nodes.JsonObject? summaryExt = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -207,7 +208,8 @@ internal static class BenchAef
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
+        System.Text.Json.Nodes.JsonObject? summaryExt = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -232,6 +234,7 @@ internal static class BenchAef
                 Lane = family,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
                 CaseExt = caseExt,
+                SummaryExt = summaryExt,
                 Gate = exitCode is { } code ? Gate(result.Score.Label, code) : null,
                 AbortReason = abortReason,
                 ExecutionPolicy = requestedTrials is not null || trials is not null

@@ -206,7 +206,9 @@ public static class BenchTypedMemEvalCommand
             return BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", verticalName, subject!, subjectVersion,
                 chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
-                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition);
+                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition,
+                summaryExt: AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.Create(result?.QuestionResults ?? completed,
+                    verticalName, complete: reason is null && result?.TypedOutcomes is not null));
         }
         try
         {

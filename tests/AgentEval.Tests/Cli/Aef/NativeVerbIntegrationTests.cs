@@ -1513,13 +1513,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(bool cancelBeforeQuestions)
+    [InlineData("Episodic", false)]
+    [InlineData("Episodic", true)]
+    [InlineData("WorkingMemory", false)]
+    [InlineData("WorkingMemory", true)]
+    [InlineData("Forgetting", false)]
+    [InlineData("Forgetting", true)]
+    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions)
     {
         await InitCommand.RunAsync("typed-definition", _root);
         var descriptor = AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
-            AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical.Episodic);
+            Enum.Parse<AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical>(vertical));
         using var client = new AgentEval.Testing.ScriptedChatClient();
         for (var i = 0; i < descriptor.QuestionCount; i++)
             client.AddText("test answer").AddText("{\"outcome\":\"correct\",\"reasoning\":\"test judge\"}");
@@ -1531,7 +1535,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeQuestions) Console.SetOut(output);
-            exit = await BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token, destination);
+            exit = await BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination);
         }
         finally { Console.SetOut(previous); }
         Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
@@ -1540,13 +1544,28 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
             directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
         var options = new AgentEval.Memory.External.TypedMemEval.TypedMemEvalOptions().ToExternalOptions(descriptor);
-        var expected = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create("typedmemeval", "episodic",
+        var expected = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create("typedmemeval", vertical.ToLowerInvariant(),
             new AgentEval.Memory.External.Models.ExternalBenchmarkPlan(options,
                 AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.Load(descriptor.Vertical, options),
                 AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.ReadJson(descriptor.Vertical)), null, "override");
         Assert.Equal(expected.Digest, manifest.Digest);
         Assert.Equal(descriptor.QuestionCount, manifest.CaseIds.Count);
         Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
+        var diagnostics = Document(directory, "summary.json")["ext"]![AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.ExtensionKey]!;
+        Assert.Equal(!cancelBeforeQuestions, (bool)diagnostics["complete"]!);
+        Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["observedQuestions"]!);
+        Assert.False((bool)diagnostics["gating"]!);
+        Assert.False(File.Exists(Path.Combine(directory, "gates.ndjson")));
+        if (vertical == "WorkingMemory")
+        {
+            var buckets = diagnostics["byDistanceSessions"]!.AsObject();
+            Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, buckets.Sum(p => (int)p.Value!["n"]!));
+        }
+        if (vertical == "Forgetting")
+        {
+            Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["forgetting"]!["n"]!);
+            Assert.Equal(0, (int)diagnostics["forgetting"]!["staleRecall"]!);
+        }
     }
 
     private sealed class MemoryReplyClient : Microsoft.Extensions.AI.IChatClient
@@ -1609,6 +1628,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
             AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical.Episodic).QuestionCount, manifest.CaseIds.Count);
         Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+        var diagnostics = Document(dir, "summary.json")["ext"]![AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.ExtensionKey]!;
+        Assert.False((bool)diagnostics["complete"]!);
+        Assert.Equal(1, (int)diagnostics["observedQuestions"]!);
+        Assert.Equal(1, (int)diagnostics["outcomes"]!["correct"]!);
+
     }
 
     [Theory]

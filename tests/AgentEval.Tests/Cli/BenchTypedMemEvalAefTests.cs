@@ -123,6 +123,7 @@ public sealed class BenchTypedMemEvalAefTests : IDisposable
         {
             SubjectRef = "agent:memory", TargetMode = AefTargetMode.Mocked, Lane = "typedmemeval",
             SuiteRef = "bench:typedmemeval/" + vertical, CaseExt = ext,
+            SummaryExt = AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.Create(questions, vertical, true),
         }, start, start.AddSeconds(1));
         var diagnostics = File.ReadAllLines(Path.Combine(dir, "results.ndjson"))
             .Select(l => JsonNode.Parse(l)!["ext"]!["agenteval.typedmemeval"]!).ToArray();
@@ -137,12 +138,24 @@ public sealed class BenchTypedMemEvalAefTests : IDisposable
         var rung = diagnostics.Where(d => (int?)d["distanceSessions"] == 4).ToArray();
         Assert.Equal(2, rung.Length);
         Assert.All(rung, d => Assert.Equal("wrong", (string?)d["outcome"]));
+        var aggregate = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "summary.json")))!["ext"]![
+            AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.ExtensionKey]!;
+        Assert.Equal(diagnostics.Length, (int)aggregate["outcomes"]!["n"]!);
         if (vertical == "forgetting")
         {
             foreach (var flag in new[] { "isStaleRecall", "isOverForgetting", "isMisattributedForgetting" })
                 Assert.Single(diagnostics, d => (bool)d[flag]!);
+            Assert.Equal(diagnostics.Count(d => (bool)d["isStaleRecall"]!), (int)aggregate["forgetting"]!["staleRecall"]!);
+            Assert.Equal(diagnostics.Count(d => (bool)d["isOverForgetting"]!), (int)aggregate["forgetting"]!["overForgetting"]!);
+            Assert.Equal(diagnostics.Count(d => (bool)d["isMisattributedForgetting"]!), (int)aggregate["forgetting"]!["misattributedForgetting"]!);
         }
-        else Assert.All(diagnostics, d => Assert.Null(d["isStaleRecall"]));
+        else
+        {
+            Assert.All(diagnostics, d => Assert.Null(d["isStaleRecall"]));
+            Assert.Equal(rung.Length, (int)aggregate["byDistanceSessions"]!["4"]!["n"]!);
+            Assert.Equal(2, (int)aggregate["byDistanceSessions"]!["4"]!["wrong"]!);
+            Assert.Equal(1, (int)aggregate["missingDistanceQuestions"]!);
+        }
         Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
         var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.DoesNotContain("secret", all, StringComparison.Ordinal);

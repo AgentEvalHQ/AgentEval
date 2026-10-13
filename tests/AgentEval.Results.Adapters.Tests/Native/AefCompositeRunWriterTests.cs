@@ -21,6 +21,44 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Write_SummaryDiagnostics_SealsDetachedExtensionWithoutChangingVerdict(bool aborted)
+    {
+        var ext = new JsonObject { ["example.diagnostics"] = new JsonObject { ["n"] = aborted ? 0 : 1 } };
+        var preset = Leaf("case", "scored", 0.7);
+        var options = new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+            SummaryExt = ext, AbortReason = aborted ? "cancelled" : null,
+        };
+        var (dir, _) = aborted
+            ? AefCompositeRunWriter.WriteAbortedEmpty(_out, preset, options, Start, Start.AddSeconds(1))
+            : AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed, options, Start, Start.AddSeconds(1));
+        Assert.Null(ext.Parent);
+        Assert.False(ext.ContainsKey("agenteval.bench"));
+        ext["example.diagnostics"]!["n"] = 999;
+        var summary = AefTestRuns.Document(dir, "summary.json");
+        Assert.Equal(aborted ? 0 : 1, (int)summary["ext"]!["example.diagnostics"]!["n"]!);
+        Assert.Equal("scored", (string?)summary["ext"]!["agenteval.bench"]!["label"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+    }
+
+    [Fact]
+    public void Write_ReservedSummaryExtension_RefusesBeforeCreatingRun()
+    {
+        Assert.Throws<ArgumentException>(() => AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1),
+            AefCompositeRunWriter.Undescribed, new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+                SummaryExt = new JsonObject { ["agenteval.bench"] = new JsonObject() },
+            }, Start, Start.AddSeconds(1)));
+        Assert.False(Directory.Exists(_out));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Write_DeclaredNestedDefinition_SealsManifestEvenWhenInterrupted(bool empty)
     {
         var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(System.Text.Encoding.UTF8.GetBytes("""
