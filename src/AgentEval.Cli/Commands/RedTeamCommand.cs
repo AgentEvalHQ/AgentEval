@@ -1051,6 +1051,7 @@ internal static class RedTeamCommand
             IncludeEvidence = includeEvidence,
             OnProgress = onProgress,
             OnProbeCompleted = onProbeCompleted,
+            BeginProbeScope = RedTeamAef.BeginProbeScope,
             // L21: throttle / timeout escape hatches. TimeoutPerTurn falls back to TimeoutPerProbe when --max-turn-timeout
             // is 0 (set it equal here — same as ScanOptions' own get-fallback).
             DelayBetweenProbes = TimeSpan.FromSeconds(opts.DelaySeconds),

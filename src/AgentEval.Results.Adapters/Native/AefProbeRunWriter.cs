@@ -41,6 +41,9 @@ public sealed record AefProbeLine
     /// <summary>How long the probe took.</summary>
     public double? DurationMs { get; init; }
 
+    /// <summary>Observed calls belonging to this probe; absent when not captured.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
     /// <summary>Who graded it: <c>CODE</c> (an oracle) or <c>LLM</c> (the judge, named in run.json's judges).</summary>
     public AefAnnotatorKind? Annotator { get; init; }
 
@@ -282,6 +285,7 @@ public static class AefProbeRunWriter
             Attack = line.Attack,
             Turns = line.Turns,
             DurationMs = line.DurationMs,
+            Usage = line.Usage,
             Scores = conclusive ? [new AefScore { Metric = ResistedConclusiveMetric, Value = line.State == AefState.Passed ? 1 : 0 }] : null,
             Annotator = line.Annotator is { } kind
                 ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null,

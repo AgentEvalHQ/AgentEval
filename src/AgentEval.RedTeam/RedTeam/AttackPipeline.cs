@@ -38,6 +38,16 @@ public sealed class AttackPipeline
     private TimeSpan _maxConversationDuration = TimeSpan.Zero;
     private int _parallelism = 1;
     private Action<IAttackType, ProbeResult, bool>? _onProbeCompleted;
+    private Func<IAttackType, AttackProbe, bool, IDisposable?>? _beginProbeScope;
+
+    /// <summary>Creates an observation scope around each probe's execution and grading, including benign controls.</summary>
+    public AttackPipeline BeginProbeScope(Func<IAttackType, AttackProbe, bool, IDisposable?> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        _beginProbeScope = factory;
+        return this;
+    }
+
 
     private AttackPipeline() { }
 
@@ -311,6 +321,7 @@ public sealed class AttackPipeline
             MaxConversationDuration = _maxConversationDuration,
             Parallelism = _parallelism,
             OnProbeCompleted = _onProbeCompleted,
+            BeginProbeScope = _beginProbeScope,
             // The runner applies this as an internal deadline and returns a truncated result when
             // it fires (vs. an external cancel via cancellationToken, which still throws).
             OverallTimeout = _timeout,

@@ -402,6 +402,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
         bool allowExplain,
         CancellationToken cancellationToken)
     {
+        using var scope = options.BeginProbeScope?.Invoke(attack, probe, !allowExplain);
         var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, cancellationToken);
 
         // One stamp for every exit path below (not exercised, not deliverable, folded, scored, timed out, errored),

@@ -11,6 +11,36 @@ namespace AgentEval.Tests.RedTeam;
 
 public class RedTeamRunnerTests
 {
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(3, false)]
+    [InlineData(1, true)]
+    [InlineData(3, true)]
+    public async Task ScanAsync_ProbeScopes_DisposesEveryStartedScope(int parallelism, bool fatal)
+    {
+        var started = 0;
+        var disposed = 0;
+        var options = new ScanOptions
+        {
+            Intensity = Intensity.Quick, AttackTypes = [Attack.PromptInjection], Parallelism = parallelism,
+            BeginProbeScope = (_, _, _) =>
+            {
+                Interlocked.Increment(ref started);
+                return new ObservationScope(() => Interlocked.Increment(ref disposed));
+            },
+        };
+        IEvaluableAgent agent = fatal ? new FatalThrowingAgent() : new FakeResistantAgent();
+        if (fatal) await Assert.ThrowsAsync<CopilotStudioBudgetExceededException>(() => new RedTeamRunner().ScanAsync(agent, options));
+        else await new RedTeamRunner().ScanAsync(agent, options);
+        Assert.True(started > 0);
+        Assert.Equal(started, disposed);
+    }
+
+    private sealed class ObservationScope(Action dispose) : IDisposable
+    {
+        public void Dispose() => dispose();
+    }
+
     [Fact]
     public async Task ScanAsync_WithQuickIntensity_RunsProbes()
     {

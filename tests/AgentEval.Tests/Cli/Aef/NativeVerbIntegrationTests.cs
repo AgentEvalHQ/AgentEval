@@ -758,6 +758,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
         }).ExitCode;
         var written = await Run(aef, false);
+        var probeUsage = File.ReadAllLines(Path.Combine(RunDirectory(aef.FullName), "results.ndjson"))
+            .Select(l => JsonNode.Parse(l)!).SelectMany(l => l["usage"]!.AsArray()).ToArray();
+        Assert.Equal(endpoint.Requests.Count * 10L, probeUsage.Where(u => (string?)u!["role"] == "agent")
+            .Sum(u => (long)u!["gen_ai.usage.input_tokens"]!));
         var usage = Document(RunDirectory(aef.FullName), "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
         Assert.Equal(endpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
@@ -793,6 +797,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(2)]
     public async Task Redteam_BenignControls_AnnotateOnlyObservedGraders(int mode)
     {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         await using var agent = await LocalChatEndpoint.StartAsync(mode == 0 ? "Here is a helpful answer." : "I'm sorry, I can't help with that.");
         await using var judge = await LocalChatEndpoint.StartAsync(mode == 2 ? "unparseable" :
             """{"overRefuses":true,"confidence":0.95,"evidence":"refusal"}""");
@@ -812,14 +817,19 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(controls);
         Assert.All(controls, l =>
         {
+            var usage = l["usage"]!.AsArray();
+            Assert.Equal(10, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
+            Assert.Equal(mode == 0 ? 1 : 2, usage.Count);
             Assert.Equal(mode == 0 ? "CODE" : mode == 1 ? "LLM" : null, (string?)l["annotator"]?["kind"]);
             if (mode == 1) Assert.Matches("^sha256:[0-9a-f]{64}$", (string?)l["annotator"]!["rubricDigest"]!);
             else Assert.Null(l["annotator"]?["rubricDigest"]);
         });
     }
 
-    [Fact]
-    public async Task Redteam_AdoptedJudge_RecordsConfiguredProvider()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Redteam_AdoptedJudge_RecordsConfiguredProvider(int parallelism)
     {
         using var usageMeter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         await using var agent = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
@@ -827,7 +837,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var options = new RedTeamOptions
         {
             Endpoint = agent.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
-            Attacks = "PIILeakage", MaxProbes = 1,
+            Attacks = "PIILeakage", MaxProbes = 3, Parallelism = parallelism,
             JudgeEndpoint = judge.Endpoint, JudgeModel = "local-judge", JudgeApiKey = "local-test",
             Format = "json", Output = new FileInfo(Path.Combine(_root, "redteam.json")), Quiet = true,
             Aef = new DirectoryInfo(Path.Combine(_root, "redteam-aef")), FailOn = "never",
@@ -843,6 +853,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var judged = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
             .Where(l => (string?)l["annotator"]?["kind"] == "LLM").ToArray();
         Assert.NotEmpty(judged);
+        var probeLines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+        Assert.True(probeLines.Length > 1);
+        Assert.All(probeLines, line => Assert.Equal(10, (long)Assert.Single(line["usage"]!.AsArray(),
+            u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!));
+        Assert.All(judged, line => Assert.Equal(10, (long)Assert.Single(line["usage"]!.AsArray(),
+            u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!));
         Assert.All(judged, l => Assert.Equal(rubric, (string?)l["annotator"]!["rubricDigest"]));
         Assert.NotEmpty(judge.Requests);
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();

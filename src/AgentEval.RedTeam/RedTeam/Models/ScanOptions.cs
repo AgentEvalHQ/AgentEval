@@ -234,6 +234,13 @@ public class ScanOptions
     public Action<IAttackType, ProbeResult, bool>? OnProbeCompleted { get; init; }
 
     /// <summary>
+    /// Creates an observation scope around probe execution and grading. The final argument identifies benign controls.
+    /// Scopes are disposed on success, failure or cancellation; parallel probes may invoke the factory concurrently.
+    /// </summary>
+    public Func<IAttackType, AttackProbe, bool, IDisposable?>? BeginProbeScope { get; init; }
+
+
+    /// <summary>
     /// How often to report progress. 1 = every probe, 5 = every 5th probe.
     /// Values &lt;= 0 are treated as 1 (report on every probe) to avoid a divide-by-zero
     /// in the scan loop. Default: 1.

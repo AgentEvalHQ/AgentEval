@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Red-team probe usage:** direct red-team and OWASP/MITRE/NIST scan evidence attributes calls to
+  individual probes and benign controls, including parallel execution and grading. Preflight calls remain
+  run-level usage. Optional probe observation scopes are disposed on completion, failure and cancellation.
+
 - **Stochastic eval usage:** each completed trial records its own agent and judge usage; rollups do not
   repeat these totals. Cancelled runs preserve completed trial counts and leave incomplete run usage unknown.
 

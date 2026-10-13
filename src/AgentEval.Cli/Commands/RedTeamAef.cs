@@ -16,6 +16,9 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 internal static class RedTeamAef
 {
+    internal static IDisposable BeginProbeScope(IAttackType attack, AttackProbe probe, bool control) =>
+        AgentEval.Cli.Infrastructure.CliUsageMeter.Attribute(caseId: control ? $"benign/{probe.Id}" : $"{attack.Name}/{probe.Id}");
+
     /// <summary>Thread-safe capture of completed probes, including an attack interrupted before it could return.</summary>
     internal sealed class PartialScan(string agentName)
     {
@@ -82,6 +85,7 @@ internal static class RedTeamAef
                 lines.Add(new AefProbeLine
                 {
                     CaseId = $"{attack.AttackName}/{probe.ProbeId}",
+                    Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase($"{attack.AttackName}/{probe.ProbeId}"),
                     Content = captureContent ? Content(probe) : null,
                     State = state,
                     Reason = state switch
@@ -118,6 +122,7 @@ internal static class RedTeamAef
             lines.Add(new AefProbeLine
             {
                 CaseId = $"benign/{control.ProbeId}",
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase($"benign/{control.ProbeId}"),
                 Content = captureContent ? Content(control, judgeGraded: control.GradedBy == GradingProvenanceKind.Judge) : null,
                 Control = true,
                 State = state,

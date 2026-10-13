@@ -177,7 +177,7 @@ public static class BenchNistCommand
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
-        benchmark.Pipeline.OnProbeCompleted(partialScan.Add);
+        benchmark.Pipeline.OnProbeCompleted(partialScan.Add).BeginProbeScope(RedTeamAef.BeginProbeScope);
         try
         {
             redTeamResult = await benchmark.ScanAsync(agent, ct);

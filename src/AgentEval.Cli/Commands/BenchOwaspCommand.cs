@@ -197,7 +197,7 @@ public static class BenchOwaspCommand
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
-        benchmark.Pipeline.OnProbeCompleted(partialScan.Add);
+        benchmark.Pipeline.OnProbeCompleted(partialScan.Add).BeginProbeScope(RedTeamAef.BeginProbeScope);
         try
         {
             // Run the scan exactly once. The Phase-6 BuildEvalResult(RedTeamResult)

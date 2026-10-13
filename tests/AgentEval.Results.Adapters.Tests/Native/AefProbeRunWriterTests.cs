@@ -26,8 +26,11 @@ public sealed class AefProbeRunWriterTests : IDisposable
         AefUsage[] observed = [new() { Role = AefUsageRole.Judge, Model = "reported-model",
             InputTokens = unknown ? null : 10, CostUsd = unknown ? null : 0.1, CostSource = unknown ? null : "fixture" }];
         var (dir, _) = AefProbeRunWriter.Write(_out,
-            [new() { CaseId = "case", State = AefState.Passed, Annotator = AefAnnotatorKind.Code }],
+            [new() { CaseId = "case", State = AefState.Passed, Annotator = AefAnnotatorKind.Code, Usage = observed }],
             Options() with { JudgeUsage = legacy, Usage = observed }, Start, Start.AddSeconds(1));
+        var lineUsage = Assert.Single(Assert.Single(AefTestRuns.Results(dir))["usage"]!.AsArray())!;
+        Assert.Equal("reported-model", (string?)lineUsage["model"]);
+        Assert.Equal(unknown ? (long?)null : 10, (long?)lineUsage["gen_ai.usage.input_tokens"]);
         var summary = AefTestRuns.Document(dir, "summary.json");
         var usage = Assert.Single(summary["usage"]!.AsArray())!;
         Assert.Equal("reported-model", (string?)usage["model"]);
