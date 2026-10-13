@@ -87,5 +87,14 @@ interrupted exports. These scopes do not prove evaluation-definition equivalence
 without a frozen declaration have no suite content digest and report `frozen: false`; a supplied
 dynamic manifest identifies the recipe without claiming fixed generated stimuli.
 
-CLI probe/composite producers do not yet supply these manifests. Their existing evidence remains
-explicitly roster-scoped until producer capture is integrated.
+GDPR and EU AI Act commands capture supported composite graphs before execution and pass that same
+manifest to successful and interrupted exports. Capture covers the complete nested roster, component
+weights/required/failure effects, aggregation, thresholds, minimum measured share, severity policy,
+judge identity, hashed prompts/criteria/scenario inputs, query/context and requested trials. Implementation
+assemblies are hashed once per capture. Subject responses and identities are kept separate.
+
+`AtomicLlmEval.CaptureDefinition()` exposes an immutable, content-free leaf snapshot, including whether
+the evaluator identifies its prompt. `AgentScenarioEval` exposes its inner judge and scenario input digest.
+Unknown evaluator kinds, unidentified prompts and custom aggregation strategies keep legacy identity
+scope; they are not guessed from result trees. Probe, agentic and other composite producer capture is
+still in progress. Explicit mock benchmark paths also retain their existing identity scope.

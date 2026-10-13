@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
   or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite
-  digests are preserved. CLI capture of probe/composite definitions is still in progress.
+  digests are preserved. GDPR/EU AI Act capture supported composite graphs before execution and retain
+  their manifests on cancellation. Probe and other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

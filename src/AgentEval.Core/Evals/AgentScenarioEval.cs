@@ -52,6 +52,13 @@ public sealed class AgentScenarioEval : IEval
     /// <inheritdoc/>
     public string Version => _inner.Version;
 
+    /// <summary>The configured judging eval, exposed for pre-execution definition capture.</summary>
+    public IEval Inner => _inner;
+
+    /// <summary>SHA-256 of the exact UTF-8 scenario input; excludes subject identity and responses.</summary>
+    public string ScenarioInputDigest => "sha256:" + Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(_scenarioInput))).ToLowerInvariant();
+
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
     {

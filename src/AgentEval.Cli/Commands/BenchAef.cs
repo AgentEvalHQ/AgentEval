@@ -92,8 +92,8 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -196,7 +196,7 @@ internal static class BenchAef
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -205,6 +205,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
+                Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
                 Config = new AefRunConfig { Settings = settings },
