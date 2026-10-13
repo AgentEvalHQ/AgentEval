@@ -11,5 +11,6 @@
     <PackageReference Include="coverlet.collector" />
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/AgentEval.Indexing/AgentEval.Indexing.csproj" />
+    <ProjectReference Include="../../src/AgentEval.DataLoaders/AgentEval.DataLoaders.csproj" />
   </ItemGroup>
 </Project>
