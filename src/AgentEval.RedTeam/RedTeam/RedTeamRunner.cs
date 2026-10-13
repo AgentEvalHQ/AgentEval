@@ -71,6 +71,12 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ? "over-refusal needs a judge (ScanOptions.JudgeClient, --judge); the benign controls were not run"
             : null;
         var benignProbes = benignArm?.GetProbes(options.Intensity) ?? [];
+        if (options.OnPlanPrepared is { } prepared)
+        {
+            var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())).ToList();
+            if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true));
+            prepared(new ScanPlan(options, arms.AsReadOnly()));
+        }
         var progressTotal = plannedProbes + benignProbes.Count;
         // Empty, not null, once the caller opted in: a scan that stops before the arm runs reports "not measured,
         // stopped early", never "not run".

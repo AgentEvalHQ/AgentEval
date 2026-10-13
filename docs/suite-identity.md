@@ -96,5 +96,19 @@ assemblies are hashed once per capture. Subject responses and identities are kep
 `AtomicLlmEval.CaptureDefinition()` exposes an immutable, content-free leaf snapshot, including whether
 the evaluator identifies its prompt. `AgentScenarioEval` exposes its inner judge and scenario input digest.
 Unknown evaluator kinds, unidentified prompts and custom aggregation strategies keep legacy identity
-scope; they are not guessed from result trees. Probe, agentic and other composite producer capture is
+scope; they are not guessed from result trees. Agentic and other composite producer capture is
 still in progress. Explicit mock benchmark paths also retain their existing identity scope.
+
+## Red-team scan capture
+
+`ScanOptions.OnPlanPrepared` observes the runner's ordered, materialized attack arms after transforms
+and probe limits, including enabled benign controls. It runs before subject/judge calls. Capture reuses
+the probes selected for execution and does not call generators again. Callbacks must not mutate the plan.
+
+The `redteam` CLI hashes those probe declarations (including prompt, expected tokens and metadata),
+implementation assemblies and applied scan policy. Only hashes of probe content enter the manifest;
+endpoints, credentials and observed responses are excluded. The full planned roster survives fail-fast
+and cancellation, with missing probes reported separately, including benign controls that did not run.
+Attacker-driven scans retain a recipe manifest with `frozen: false` and no suite content digest.
+Capture supports the CLI's shipped attack factory; arbitrary external attack instances remain
+unclassified. Benchmark-family scan commands still need this integration.

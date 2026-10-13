@@ -600,11 +600,29 @@ public class RedTeamRunnerTests
         // progress total and execution. GetProbes was previously called twice (count + execute).
         var attack = new CountingAttack();
         var runner = new RedTeamRunner();
-        var options = new ScanOptions { AttackTypes = [attack], Intensity = Intensity.Quick };
+        ScanPlan? captured = null;
+        var options = new ScanOptions
+        {
+            AttackTypes = [attack], Intensity = Intensity.Quick, MaxProbesPerAttack = 1,
+            OnPlanPrepared = plan =>
+            {
+                Assert.Null(captured);
+                Assert.Equal(1, attack.GetProbesCallCount);
+                captured = plan;
+                Assert.Equal("P1", Assert.Single(Assert.Single(plan.Attacks).Probes).Id);
+            },
+            BeginProbeScope = (_, probe, _) =>
+            {
+                Assert.NotNull(captured);
+                Assert.Same(Assert.Single(captured.Attacks).Probes[0], probe);
+                return null;
+            },
+        };
 
         await runner.ScanAsync(new FakeResistantAgent(), options);
 
         Assert.Equal(1, attack.GetProbesCallCount);
+        Assert.NotNull(captured);
     }
 
     // === Test Helper Classes ===

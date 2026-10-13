@@ -1023,6 +1023,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(attacker.Requests);
         var header = Document(dir, "run.json");
         Assert.Equal("generated", (string?)header["execution"]!["stimulus"]);
+        Assert.False((bool)header["suite"]!["frozen"]!);
+        Assert.Null(header["suite"]!["digest"]);
+        var recipe = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.False(recipe.Frozen);
+        Assert.Equal(recipe.Digest, (string?)header["ext"]!["agenteval.suiteIdentity"]!["digest"]);
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
         var agentUsage = Assert.Single(usage, u => (string?)u!["role"] == "agent")!;
@@ -1083,6 +1089,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal(completedProbes, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(completedProbes + 1, definition.CaseIds.Count);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.All(File.ReadAllLines(Path.Combine(dir, "results.ndjson")), line =>
             Assert.Equal(10, (long)JsonNode.Parse(line)!["usage"]![0]!["gen_ai.usage.input_tokens"]!));
         Assert.Null(Document(dir, "summary.json")["usage"]![0]!["gen_ai.usage.input_tokens"]);
