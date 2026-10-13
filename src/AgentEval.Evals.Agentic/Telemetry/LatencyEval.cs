@@ -28,7 +28,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// Foundry reference: no direct equivalent — AgentEval-original operational metric.
 /// </para>
 /// </summary>
-public sealed class LatencyEval : IEval
+public sealed class LatencyEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "latency";
     private const string NameValue     = "Latency";
@@ -84,6 +84,14 @@ public sealed class LatencyEval : IEval
         _p99ThresholdMs = p99ThresholdMs;
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["p95ThresholdMs"] = _p95ThresholdMs,
+        ["p99ThresholdMs"] = _p99ThresholdMs,
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

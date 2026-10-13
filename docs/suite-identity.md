@@ -109,7 +109,9 @@ reference, and path-distance includes its threshold. Capture and evidence shape 
 The agentic CLI captures supported graphs before evaluation, including a hash of the supplied
 ground-truth reference and declared system message, expected actions and tool definitions. Observed
 responses/tool calls remain subject evidence. Current coverage includes agentic execution, tool-call accuracy, RAG quality,
-conversational, reasoning and user-experience presets. Other presets and composite mock capture remain
+conversational, reasoning, user-experience, telemetry and stochastic-stability presets. Operational
+checks declare thresholds and budgets; constructor-supplied telemetry and prior run results remain
+subject observations and do not change suite identity. Other presets and composite mock capture remain
 in progress; unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
 
 ## Red-team scan capture

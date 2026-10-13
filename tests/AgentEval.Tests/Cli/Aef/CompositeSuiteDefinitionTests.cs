@@ -1,6 +1,8 @@
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Telemetry;
+using AgentEval.Evals.Agentic.StochasticStability;
 
 namespace AgentEval.Tests.Cli.Aef;
 
@@ -28,6 +30,8 @@ public sealed class CompositeSuiteDefinitionTests
     [InlineData("conversational")]
     [InlineData("reasoning")]
     [InlineData("user-experience")]
+    [InlineData("telemetry")]
+    [InlineData("stochastic-stability")]
     public void Capture_AgenticPreset_IdentifiesConfiguredInstrumentsWithoutCalls(string preset)
     {
         var judge = new Judge("private instrument");
@@ -40,6 +44,40 @@ public sealed class CompositeSuiteDefinitionTests
         var changed = CompositeSuiteDefinition.TryCreate("bench:agentic/" + preset, graph, new EvalInput("q", "r", GroundTruth: "different reference"), 1);
         Assert.NotEqual(definition.Digest, changed!.Digest);
     }
+    [Fact]
+    public void Capture_OperationalPolicies_BindSettingsButExcludeMeasurements()
+    {
+        var observations = new AgenticTelemetry(1, 2, 3, 4, 5, 6, 7, 8, new Dictionary<string, double> { ["private-tool"] = 9 });
+        var changed = observations with { EstimatedCostUsd = 100, LatencyMsP99 = 999, TokensUsed = 999 };
+        string Digest(IEval leaf)
+        {
+            var graph = new CompositeEval("root", "root", "test", "1", [new(leaf)], WeightedSumAggregation.Instance);
+            var definition = CompositeSuiteDefinition.TryCreate("bench:operational", graph, new EvalInput("q", "r"), 1)!;
+            Assert.NotNull(definition);
+            Assert.DoesNotContain("private-tool", definition.ToJson().ToJsonString());
+            return definition.Digest;
+        }
+        IEval[] baseline = [new CostEval(observations), new LatencyEval(observations), new TokenUsageEval(observations),
+            new ToolLatencyEval(observations), new ErrorRateEval(observations), new RetryRateEval(observations), new StochasticStabilityEval()];
+        IEval[] outcomes = [new CostEval(changed), new LatencyEval(changed), new TokenUsageEval(changed),
+            new ToolLatencyEval(changed), new ErrorRateEval(changed), new RetryRateEval(changed), new StochasticStabilityEval()];
+        IEval[] policies = [new CostEval(budgetUsd: 2), new LatencyEval(p99ThresholdMs: 20000), new TokenUsageEval(budgetTokens: 123),
+            new ToolLatencyEval(perToolBudgetMs: 123), new ErrorRateEval(passThreshold: 0.9), new RetryRateEval(passThreshold: 0.91), new StochasticStabilityEval(0.9)];
+        for (var i = 0; i < baseline.Length; i++)
+        {
+            Assert.Equal(Digest(baseline[i]), Digest(outcomes[i]));
+            Assert.NotEqual(Digest(baseline[i]), Digest(policies[i]));
+            var source = (IEvalConfigurationSource)baseline[i];
+            var declaration = source.CaptureConfiguration();
+            declaration.Clear();
+            Assert.NotEmpty(source.CaptureConfiguration());
+        }
+        Assert.NotEqual(Digest(new LatencyEval()), Digest(new LatencyEval(p95ThresholdMs: 123)));
+        Assert.NotEqual(Digest(new LatencyEval()), Digest(new LatencyEval(passThreshold: 0.9)));
+        Assert.NotEqual(Digest(new CostEval()), Digest(new CostEval(passThreshold: 0.9)));
+        Assert.NotEqual(Digest(new TokenUsageEval()), Digest(new TokenUsageEval(passThreshold: 0.9)));
+    }
+
     private sealed class UnidentifiedJudge : IEvaluator
     {
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)

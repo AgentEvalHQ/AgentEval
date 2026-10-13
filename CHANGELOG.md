@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exports also bind prepared probes and resolved verdict presets, including explicit mocks and
   interrupted runs. Agentic execution, tool-call accuracy, RAG quality, conversational, reasoning and
   user-experience graphs now expose configured instruments for pre-execution capture, including
-  hashed references. Other composite producer capture remains in progress.
+  hashed references. Telemetry and stochastic-stability checks bind budgets and thresholds without
+  binding measured telemetry or prior results into the suite identity. Other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

@@ -50,7 +50,7 @@ namespace AgentEval.Evals.Agentic.StochasticStability;
 /// improvement, making evaluation results unreliable for CI gates or compliance evidence.
 /// </para>
 /// </summary>
-public sealed class StochasticStabilityEval : IEval
+public sealed class StochasticStabilityEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "stochastic_stability";
     private const string NameValue     = "Stochastic Stability";
@@ -92,6 +92,12 @@ public sealed class StochasticStabilityEval : IEval
                 nameof(passThreshold), passThreshold, "Pass threshold must be in [0, 1].");
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

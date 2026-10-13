@@ -27,7 +27,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// to avoid division by zero.
 /// </para>
 /// </summary>
-public sealed class ErrorRateEval : IEval
+public sealed class ErrorRateEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "error_rate";
     private const string NameValue     = "Error Rate";
@@ -73,6 +73,12 @@ public sealed class ErrorRateEval : IEval
         _data          = data;
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

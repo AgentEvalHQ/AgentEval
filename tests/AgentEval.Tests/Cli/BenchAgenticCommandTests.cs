@@ -407,6 +407,18 @@ public class BenchAgenticCommandTests : IDisposable
             .ToList();
         Assert.NotEmpty(recorded);
         Assert.All(recorded, t => Assert.Matches(@"""judgeMode""\s*:\s*""none""", t));
+        if (preset != "judge-quality")
+        {
+            var manifest = Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval"),
+                "suite-definition.json", SearchOption.AllDirectories));
+            var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(manifest));
+            Assert.True(definition.Frozen);
+            Assert.Equal(preset == "telemetry" ? 6 : 1, definition.CaseIds.Count);
+            var runDir = Directory.GetParent(manifest)!.Parent!.Parent!.FullName;
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+                AgentEval.Results.Integrity.AefRunVerifier.Verify(runDir).Outcome);
+        }
+
     }
 
     [Fact]

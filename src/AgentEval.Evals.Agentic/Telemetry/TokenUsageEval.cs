@@ -23,7 +23,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
 /// </para>
 /// </summary>
-public sealed class TokenUsageEval : IEval
+public sealed class TokenUsageEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "token_usage";
     private const string NameValue     = "Token Usage";
@@ -69,6 +69,13 @@ public sealed class TokenUsageEval : IEval
         _budgetTokens  = budgetTokens;
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["budgetTokens"] = _budgetTokens,
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
