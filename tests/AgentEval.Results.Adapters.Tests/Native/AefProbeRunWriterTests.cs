@@ -18,6 +18,24 @@ public sealed class AefProbeRunWriterTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData(AefStimulus.Suite, "suite")]
+    [InlineData(AefStimulus.Generated, "generated")]
+    [InlineData(AefStimulus.External, "external")]
+    public void Write_Stimulus_RetainsDeclaredSource(AefStimulus stimulus, string wire)
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new() { CaseId = "case", State = AefState.Passed }],
+            Options() with { Stimulus = stimulus }, Start, Start.AddSeconds(1));
+        Assert.Equal(wire, (string?)AefTestRuns.Document(dir, "run.json")["execution"]!["stimulus"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Write_ObservedUsage_ReplacesLegacyRoleWithoutDoubleCounting(bool unknown)

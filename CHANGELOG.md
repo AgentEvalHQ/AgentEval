@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Red-team stimulus provenance:** attacker-configured runs now declare generated stimuli, and imported
+  probes/packs declare external stimuli. Fixed suites retain the default. Multi-turn attacker usage and
+  cancellation accounting are covered by loopback HTTP regression tests.
+
 - **Red-team probe usage:** direct red-team and OWASP/MITRE/NIST scan evidence attributes calls to
   individual probes and benign controls, including parallel execution and grading. Preflight calls remain
   run-level usage. Optional probe observation scopes are disposed on completion, failure and cancellation.

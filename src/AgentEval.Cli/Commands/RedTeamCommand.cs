@@ -888,6 +888,8 @@ internal static class RedTeamCommand
                 Gate = gate,
                 AbortReason = abortReason,
                 TargetMode = targetMode,
+                Stimulus = opts.AttackerEndpoint is not null ? AefStimulus.Generated
+                    : opts.ImportProbes is not null || opts.Pack is not null ? AefStimulus.External : AefStimulus.Suite,
                 SuiteRef = AefEvalWriter.Ref("redteam", $"{opts.Attacks ?? "default"}/{opts.Intensity}"),
                 ProbesNotRun = result.SkippedProbes,
             }, result.StartedAt, DateTimeOffset.UtcNow);

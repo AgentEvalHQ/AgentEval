@@ -900,10 +900,74 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Redteam_PairAttacker_AccountsForCompletedAndInterruptedCalls(bool interrupt)
+    {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
+        using var cancel = new CancellationTokenSource();
+        await using var agent = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
+        await using var attacker = await LocalChatEndpoint.StartAsync(async (_, requestCancelled) =>
+        {
+            if (interrupt)
+            {
+                cancel.Cancel();
+                await Task.Delay(Timeout.InfiniteTimeSpan, requestCancelled);
+            }
+            return "Try a different harmless prompt.";
+        });
+        var options = new RedTeamOptions
+        {
+            Endpoint = agent.Endpoint, Model = "local-subject", ApiKey = "local-test", Intensity = "quick",
+            AttackerEndpoint = attacker.Endpoint, AttackerModel = "local-attacker", AttackerApiKey = "local-test",
+            Attacks = "PAIR", MaxProbes = 1, Quiet = true, FailOn = "never",
+            Format = "json", Output = new FileInfo(Path.Combine(_root, "pair.json")),
+            Aef = new DirectoryInfo(Path.Combine(_root, "pair-aef")),
+        };
+        if (interrupt)
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RedTeamCommand.ExecuteAsync(options, cancel.Token));
+        else Assert.Equal(0, await RedTeamCommand.ExecuteAsync(options, cancel.Token));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        Assert.NotEmpty(attacker.Requests);
+        var header = Document(dir, "run.json");
+        Assert.Equal("generated", (string?)header["execution"]!["stimulus"]);
+        var usage = Document(dir, "summary.json")["usage"]!.AsArray();
+        Assert.Equal(2, usage.Count);
+        var agentUsage = Assert.Single(usage, u => (string?)u!["role"] == "agent")!;
+        var attackerUsage = Assert.Single(usage, u => (string?)u!["role"] == "attacker")!;
+        Assert.Equal(agent.Requests.Count * 10L, (long)agentUsage["gen_ai.usage.input_tokens"]!);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson"));
+        if (interrupt)
+        {
+            Assert.Equal("aborted", (string?)header["status"]);
+            Assert.Null(attackerUsage["gen_ai.usage.input_tokens"]);
+            Assert.Null(attackerUsage["costUsd"]);
+            Assert.Empty(lines);
+            Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        }
+        else
+        {
+            Assert.True(agent.Requests.Count > 1);
+            Assert.Equal(attacker.Requests.Count * 10L, (long)attackerUsage["gen_ai.usage.input_tokens"]!);
+            var line = JsonNode.Parse(Assert.Single(lines))!;
+            Assert.Equal(agent.Requests.Count, (int)line["turns"]!);
+            Assert.Equal(2, line["usage"]!.AsArray().Count);
+            foreach (var role in new[] { "agent", "attacker" })
+            {
+                var expected = Assert.Single(usage, u => (string?)u!["role"] == role)!;
+                var actual = Assert.Single(line["usage"]!.AsArray(), u => (string?)u!["role"] == role)!;
+                Assert.Equal((long)expected["gen_ai.usage.input_tokens"]!, (long)actual["gen_ai.usage.input_tokens"]!);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     public async Task Redteam_CancelDuringAttack_PreservesCompletedProbes(int completedProbes)
     {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         using var cancel = new CancellationTokenSource();
         var count = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync(async (_, requestCancelled) =>
@@ -928,6 +992,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal(completedProbes, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+        Assert.All(File.ReadAllLines(Path.Combine(dir, "results.ndjson")), line =>
+            Assert.Equal(10, (long)JsonNode.Parse(line)!["usage"]![0]!["gen_ai.usage.input_tokens"]!));
+        Assert.Null(Document(dir, "summary.json")["usage"]![0]!["gen_ai.usage.input_tokens"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 

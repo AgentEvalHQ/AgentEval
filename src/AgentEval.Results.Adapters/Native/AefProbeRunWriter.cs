@@ -55,6 +55,8 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Source of the probe stimuli; a fixed suite unless the caller identifies generation or import.</summary>
+    public AefStimulus Stimulus { get; init; } = AefStimulus.Suite;
     /// <summary>Content-free configuration actually applied by the producer.</summary>
     public AefRunConfig? Config { get; init; }
 
@@ -179,7 +181,7 @@ public static class AefProbeRunWriter
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
             ContentCapture = options.ContentCapture,
-            Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
+            Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = options.Stimulus },
         };
 
         var writer = AefRunWriter.Create(directory, header);
