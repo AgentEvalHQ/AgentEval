@@ -485,6 +485,9 @@ Eval uses `config.thresholds.case` when every dataset case has the same passing 
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
 come from the evaluation definition, so they remain distinct from the producer package version.
+Probe and composite suite digests identify their case/component-key roster, including the sole key for a
+single-case benchmark. They do not fingerprint the complete prompt, weight or threshold definition;
+compare configuration and definition versions as well. Eval dataset digests cover the input dataset bytes.
 Agentic runs also record the applied `config.budgetTier`, normalized from the validated filter (`all` for no
 filter), including mocks and aborted evidence. Other benchmark families do not invent a budget tier.
 The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending

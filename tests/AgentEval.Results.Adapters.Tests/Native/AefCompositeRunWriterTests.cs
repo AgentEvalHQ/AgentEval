@@ -19,6 +19,35 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData("a", "pass", 1)]
+    [InlineData("a", "fail", 0)]
+    [InlineData("b", "pass", 1)]
+    public void Write_SingleCase_DigestIncludesItsKeyAndIgnoresMeasuredOutcome(string key, string label, double value)
+    {
+        var (dir, _) = AefCompositeRunWriter.Write(_out, Leaf(key, label, value), AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test" },
+            Start, Start.AddMinutes(1));
+        var suite = AefTestRuns.Document(dir, "run.json")["suite"]!;
+        var expected = "sha256:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key + "\n"))).ToLowerInvariant();
+        Assert.Equal(expected, (string?)suite["digest"]);
+        Assert.Equal("1.0.0", (string?)suite["version"]);
+        Assert.True((bool)suite["frozen"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+    }
+
+    [Fact]
+    public void Write_MultipleCases_PreservesExistingComponentRosterDigest()
+    {
+        var preset = Composite("p", "pass", 1, 0.5, new EvalLineage("threshold", []), Leaf("a", "pass", 1), Leaf("b", "pass", 1));
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test" },
+            Start, Start.AddMinutes(1));
+        Assert.Equal(AefProbeRunWriter.RosterDigest(["a", "b"]), (string?)AefTestRuns.Document(dir, "run.json")["suite"]!["digest"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

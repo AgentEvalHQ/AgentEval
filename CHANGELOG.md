@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Single-case benchmark identity:** composite AEF exports now include the sole case key in the suite roster
+  digest. Previously all no-child benchmark results hashed an empty roster. Multi-component digests are unchanged.
+
 - **Run review decisions:** `agenteval decide <run-dir> --kind approve|reject --by <identity> --reason <text>`
   appends and seals a self-attested review of an intact sealed AEF run, or one result with `--result <id>`.
   Unknown result IDs are refused before mutation. Original results and gates remain

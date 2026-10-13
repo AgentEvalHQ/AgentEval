@@ -188,7 +188,7 @@ public static class AefCompositeRunWriter
             {
                 Ref = options.SuiteRef,
                 Version = preset.Metric.Version,
-                Digest = AefProbeRunWriter.RosterDigest(Keys(preset)),
+                Digest = AefProbeRunWriter.RosterDigest(single ? [preset.Metric.Key] : Keys(preset)),
                 Frozen = true,
                 ExecutionPolicy = options.ExecutionPolicy,
             },
