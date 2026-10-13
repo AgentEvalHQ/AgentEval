@@ -153,3 +153,33 @@ strings and can contain sensitive information. Producers must configure these
 metadata fields appropriately. The policy service does not replace decoder
 validation or budgets. Durable storage and HTTP integration are still pending;
 their acceptance path must apply this policy before writing observations.
+
+## Observed-session grouping
+
+`IOtlpSessionGrouper` groups filtered batches using a receiver-configured source
+namespace, resource `service.namespace` / `service.name` / `service.instance.id`,
+and a valid consensus session ID. Service name is required for grouping across
+traces; optional service fields may be absent but must not be invalid or conflict.
+Different resource instances remain separate, even when they report the same
+session. Instrumentation scopes do not split a session.
+
+Missing, invalid or conflicting session fields fall back to trace ID with an
+explicit reason per member. Missing or invalid service identity also prevents
+grouping across traces. Trace fallback can only distinguish the metadata actually
+reported: producers sharing a source and identical incomplete resource identity
+cannot be distinguished within the same trace. A later session-bearing report
+does not retroactively assign earlier sessionless reports to that session.
+
+Group IDs use a versioned, unambiguous JSON identity tuple hashed with SHA-256
+and an `obs-` prefix. They are observation keys, not AEF run hashes, signatures,
+tenant authentication or evaluation results. Source must come from receiver
+configuration, not an untrusted request attribute. Exact string values and
+presence states matter; no Unicode normalization or heuristic identity repair
+is applied. Scope and source evidence remain available through normalized members.
+
+Input ordering does not affect group IDs. Members sort by start time, trace and
+span ID, with original positions retained for joining to the filtered batch.
+Duplicate and conflicting reports remain separate members; the grouper never
+chooses an arrival-order winner or infers telemetry completeness. Durable
+acceptance, retry handling and cross-batch query reconciliation remain subsequent
+storage/index responsibilities.
