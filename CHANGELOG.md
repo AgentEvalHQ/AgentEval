@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged; unsealed overlay events are refused instead of being adopted into the reviewer's batch.
   `--kind waive` requires one result or external requirement target, a reason and a future UTC `--expires`;
   effective views retain expired waivers without changing sealed outcomes.
+  `override` and `adjudicate` require a result, explicit non-pending `--state` and reason; views show the original
+  and effective states without recomputing parents, summaries or gates.
 
 - **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
   servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials

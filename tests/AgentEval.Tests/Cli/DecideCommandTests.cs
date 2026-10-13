@@ -39,11 +39,11 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence", string? result = null,
-        string? requirement = null, string? expires = null)
+        string? requirement = null, string? expires = null, string? state = null)
     {
         var output = new StringWriter();
         var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null,
-            new DecisionClock(), result, requirement, expires);
+            new DecisionClock(), result, requirement, expires, state);
         return (exit, output.ToString());
     }
 
@@ -193,11 +193,59 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     [Fact]
+    public void Run_StateDecisions_LastDecisionWinsWithoutChangingSealedStates()
+    {
+        CreateRun();
+        var before = Snapshot();
+        var original = File.ReadLines(Path.Combine(_directory, "results.ndjson")).Select(line => JsonNode.Parse(line)!).ToArray();
+        var target = original.First(r => r["parentResultId"] is not null);
+        var id = (string)target["resultId"]!;
+        foreach (var kind in new[] { "override", "adjudicate" })
+        foreach (var state in new[] { "failed", "passed", "warn", "inconclusive", "scored", "not_measured", "not_applicable", "skipped", "error" })
+        {
+            var (exit, output) = Decide(kind, result: id, state: state);
+            Assert.Equal(ExitCodes.Success, exit);
+            var report = JsonNode.Parse(output)!;
+            Assert.Equal(state, (string?)report["state"]);
+            var view = EffectiveView.Compute(_directory, DecisionTime, null);
+            var effective = Assert.Single(view.Results);
+            Assert.Equal(id, effective.ResultId);
+            Assert.Equal((string?)target["state"], effective.SealedState);
+            Assert.Equal(state, effective.EffectiveState);
+            Assert.Equal((string?)report["eventId"], effective.Event);
+            Assert.Empty(view.Reviews);
+            Assert.Empty(view.Waivers);
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(_directory).Outcome);
+        var after = Snapshot();
+        foreach (var entry in before) Assert.Equal(entry.Value, after[entry.Key]);
+    }
+
+    [Theory]
+    [InlineData("override", null, "passed", "reason")]
+    [InlineData("override", "missing", "passed", "reason")]
+    [InlineData("adjudicate", "first", null, "reason")]
+    [InlineData("override", "first", "pending", "reason")]
+    [InlineData("adjudicate", "first", "Passed", "reason")]
+    [InlineData("override", "first", "0", "reason")]
+    [InlineData("override", "first", "passed", " ")]
+    [InlineData("approve", "first", "passed", "reason")]
+    public void Run_InvalidStateDecision_RefusesWithoutMutation(string kind, string? result, string? state, string reason)
+    {
+        CreateRun();
+        if (result == "first") result = (string)JsonNode.Parse(File.ReadLines(Path.Combine(_directory, "results.ndjson")).First())!["resultId"]!;
+        var before = Snapshot();
+        Assert.Equal(ExitCodes.UsageError, Decide(kind, result: result, state: state, reason: reason).Exit);
+        Assert.Equal(before.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
+    }
+
+    [Fact]
     public void Create_RequiredOptionsAndSupportedInvocation_ParseAsExpected()
     {
         Assert.NotEmpty(DecideCommand.Create().Parse([_directory]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "approve", "--by", "reviewer", "--reason", "Reviewed", "--json"]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "reject", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1"]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "waive", "--by", "reviewer", "--reason", "Reviewed", "--requirement", "REQ-42", "--expires", "2026-10-14T12:00:00Z"]).Errors);
+        Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "adjudicate", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1", "--state", "failed"]).Errors);
     }
 }

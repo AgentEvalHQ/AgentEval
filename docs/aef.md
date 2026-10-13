@@ -57,6 +57,13 @@ The waiver is active from its decision time up to, but excluding, its expiry. `a
 as inactive history. Waivers leave sealed result states and gate outcomes unchanged; `--requirement` and
 `--expires` are refused for approval and rejection.
 
+To change a result's **effective** state, use `--kind override` or `--kind adjudicate` with `--result <id>`,
+`--state <state>` and a reason. Accepted states are `passed`, `failed`, `warn`, `inconclusive`, `scored`,
+`not_measured`, `not_applicable`, `skipped` and `error`; `pending` is refused on a closed run.
+The last sealed state decision for that result wins in file order. `aef view` shows both its original sealed
+state and effective state. Parents, summaries, gates and checkpoint outcomes are not recomputed.
+`--state` is refused for other decision kinds.
+
 ## What a run looks like
 
 ```text
