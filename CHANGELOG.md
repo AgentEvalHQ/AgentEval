@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and effective states without recomputing parents, summaries or gates.
   Optional `--key` signs only the new batch after key preflight; readers verify the claimed identity using
   their own trust policy. Missing or mismatched trust does not display verified signing assurance.
+  Incomplete event tails are refused by byte count; failures after writing begins warn that journal recovery
+  may be needed and never report success.
 
 - **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
   servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials

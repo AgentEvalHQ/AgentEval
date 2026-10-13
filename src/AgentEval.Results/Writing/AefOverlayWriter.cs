@@ -195,6 +195,7 @@ public sealed class AefOverlayWriter
         _tail.Write(events.AsSpan((int)_sealedEnd));
         _lines = chain.Events.Count;
         UnsealedAtOpen = chain.UnsealedEvents;
+        UnsealedBytesAtOpen = _tail.Length;
     }
 
     /// <summary>The run's <c>runId</c>: every event targets it ([OVL-2]).</summary>
@@ -208,6 +209,9 @@ public sealed class AefOverlayWriter
 
     /// <summary>Events after the last batch when the writer opened the run: the next batch seals them too.</summary>
     public int UnsealedAtOpen { get; }
+
+    /// <summary>Bytes after the last verified batch when opened, including an unfinished last line.</summary>
+    public long UnsealedBytesAtOpen { get; }
 
     /// <summary>
     /// Opens a closed run for overlays. Its overlay chain, if any, must verify up to its last batch (events after it,

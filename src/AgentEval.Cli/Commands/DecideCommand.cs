@@ -40,6 +40,7 @@ internal static class DecideCommand
         TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, string? result = null,
         string? requirement = null, string? expires = null, string? state = null, string? keyPath = null)
     {
+        var writeAttempted = false;
         try
         {
             var decision = kind switch
@@ -89,11 +90,12 @@ internal static class DecideCommand
             var assurance = signer is null ? AefAssurance.SelfAttested : AefAssurance.Signed;
             var writer = AefOverlayWriter.Open(directory);
             // Do not silently claim earlier events in this reviewer's batch.
-            if (writer.UnsealedAtOpen != 0 || writer.Batches >= AefOverlayWriter.MaxBatches)
+            if (writer.UnsealedBytesAtOpen != 0 || writer.Batches >= AefOverlayWriter.MaxBatches)
             {
                 stderr.WriteLine("Decision refused: expected no unsealed overlay events and room for another batch. Inspect the overlay journal first.");
                 return ExitCodes.TestFailure;
             }
+            writeAttempted = true;
             var eventId = writer.Append(new AefOverlayEvent
             {
                 Kind = decision, Target = new AefOverlayTarget { Result = result, Requirement = requirement }, Reason = reason,
@@ -116,6 +118,11 @@ internal static class DecideCommand
         }
         catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or FormatException or NotSupportedException or CryptographicException)
         {
+            if (writeAttempted && error is IOException or UnauthorizedAccessException or CryptographicException)
+            {
+                stderr.WriteLine("Decision storage or signing failed after writing started. Inspect and verify the overlay journal before retrying; an unsealed event or sealed batch may remain.");
+                return ExitCodes.TestFailure;
+            }
             stderr.WriteLine($"Decision input or storage error: {error.Message}");
             return ExitCodes.UsageError;
         }

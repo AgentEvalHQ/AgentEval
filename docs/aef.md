@@ -39,9 +39,9 @@ nonblank reason. Without `--key`, identity is **self-attested**, not authenticat
 appends one overlay event and seals its batch; approval does not change the original results, summaries, gates
 or checkpoint outcome. Inspect the effective review status with `aef view`.
 
-Only intact sealed runs are accepted. Existing unsealed overlay events are refused so a review never silently
+Only intact sealed runs are accepted. Existing unsealed overlay bytes, including unfinished event lines, are refused so a review never silently
 adopts another writer's work. Exit 0 means the decision batch was sealed; 1 means integrity or sealing refused
-the decision; 2 means an input or storage error. If writing is interrupted, inspect and verify the journal before
+the decision (including storage/signing failures after writing starts); 2 means an input or preflight storage error. If writing is interrupted, inspect and verify the journal before
 retrying: an event may remain unsealed and has no effective decision status until its batch is sealed.
 
 For a bounded waiver, use `--kind waive` with exactly one `--result <id>` or `--requirement <external-id>`,

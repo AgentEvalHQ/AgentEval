@@ -243,6 +243,46 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     [Fact]
+    public void Run_IncompleteTail_RefusesWithoutAdoptingBytes()
+    {
+        CreateRun();
+        Assert.Equal(ExitCodes.Success, Decide().Exit);
+        File.AppendAllText(Path.Combine(_directory, "overlays", "events.ndjson"), "{\"unfinished\":");
+        var before = Snapshot();
+        Assert.Equal(ExitCodes.TestFailure, Decide().Exit);
+        Assert.Equal(before.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
+        Assert.Single(EffectiveView.Compute(_directory, DecisionTime, null).Reviews);
+    }
+
+    [Fact]
+    public void Run_SealWriteFailure_ReportsRecoverableTailAndRefusesBlindRetry()
+    {
+        CreateRun();
+        var original = Snapshot();
+        var blocker = Path.Combine(_directory, "overlays", "seal-0001.json");
+        Directory.CreateDirectory(blocker);
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exit = DecideCommand.Run(_directory, "approve", "reviewer-1", "Reviewed", true, output, error, new DecisionClock());
+        Assert.Equal(ExitCodes.TestFailure, exit);
+        Assert.Empty(output.ToString());
+        Assert.Contains("journal", error.ToString());
+        Assert.True(File.Exists(Path.Combine(_directory, "overlays", "events.ndjson")));
+        Assert.Empty(EffectiveView.Compute(_directory, DecisionTime, null).Reviews);
+        var failed = Snapshot();
+        Assert.Equal(ExitCodes.TestFailure, Decide().Exit);
+        Assert.Equal(failed.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
+
+        // Explicit operator recovery, not automatic adoption by the CLI.
+        Directory.Delete(blocker);
+        Assert.Equal(1, AefOverlayWriter.Open(_directory).SealBatch().Events);
+        Assert.Equal(ExitCodes.Success, Decide("reject").Exit);
+        Assert.Equal("reject", Assert.Single(EffectiveView.Compute(_directory, DecisionTime, null).Reviews).Status);
+        var after = Snapshot();
+        foreach (var entry in original) Assert.Equal(entry.Value, after[entry.Key]);
+    }
+
+    [Fact]
     public void Run_SignedDecision_SignsOnlyNewBatchAndRequiresMatchingReaderTrust()
     {
         CreateRun();
