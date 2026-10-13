@@ -65,8 +65,9 @@ separate. A later SQLite index is derived from those authoritative files.
 
 Content capture will default to off. Structural metadata must be allowlisted;
 prompt, completion and tool payload content cannot be persisted by default.
-Versioned dialect normalization, grouping, retention and this
-content policy remain the next implementation slices. Tests prove the payload
+Versioned structural normalization is implemented; see
+[the dialect mappings](otlp-dialects.md). Grouping, retention and the content
+policy remain the next implementation slices. Tests prove the payload
 boundary and both decoders, not a completed receiver.
 
 ## JSON trace decoding
