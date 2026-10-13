@@ -16,7 +16,6 @@ public class StochasticOptionsTests
         
         Assert.Equal(10, options.Runs);
         Assert.Equal(0.8, options.SuccessRateThreshold);
-        Assert.Null(options.Seed);
         Assert.Equal(1, options.MaxParallelism);
         Assert.Null(options.DelayBetweenRuns);
         Assert.True(options.EnableStatisticalAnalysis);
@@ -93,7 +92,6 @@ public class StochasticOptionsTests
         var options = new StochasticOptions(
             Runs: 10,
             SuccessRateThreshold: 0.8,
-            Seed: 42,
             MaxParallelism: 4,
             DelayBetweenRuns: TimeSpan.FromMilliseconds(100),
             EnableStatisticalAnalysis: true,

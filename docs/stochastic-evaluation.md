@@ -114,6 +114,13 @@ Console.WriteLine($"Successes: {stats.SuccessCount}");
 
 ## StochasticOptions Reference
 
+`StochasticOptions` controls repetition, concurrency and statistical analysis. It does not configure model
+sampling. The pre-release `Seed` parameter/property was removed because the runner never used it. Remove
+`Seed:` arguments and use named constructor arguments when updating positional calls; the constructor and
+record deconstruction signatures have changed. Configure any supported sampling seed on your agent/client
+itself. A provider seed alone does not guarantee repeatable model responses; use trace replay when you need
+deterministic regression inputs.
+
 ```csharp
 var options = new StochasticOptions(
     Runs: 10,                         // Number of evaluation iterations

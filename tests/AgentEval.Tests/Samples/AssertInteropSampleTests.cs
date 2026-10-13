@@ -11,6 +11,7 @@ using Xunit;
 namespace AgentEval.Tests.Samples;
 
 /// <summary>Sample P1 end to end, offline: the same code the sample runs (<c>01_AssertInterop.Run.cs</c> is linked in).</summary>
+[Collection(AgentEval.Tests.Interop.AssertAi.AssertHttpServerCollection.Name)]
 public class AssertInteropSampleTests : IDisposable
 {
     private readonly string _out = Path.Combine(Path.GetTempPath(), "p1-" + Guid.NewGuid().ToString("N"));

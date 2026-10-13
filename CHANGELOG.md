@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **HTTP test isolation:** the ASSERT sample/server tests share a non-parallel xUnit collection to
+  isolate their ephemeral-port and wildcard-listener setup from concurrent suite load.
+
+- **Inspect import diagnostics:** removed internal review identifiers from five refusals; public IN rule
+  identifiers and validation behavior are unchanged.
+
+- **Pre-release API change:** removed the unused `StochasticOptions.Seed` parameter/property, which
+  incorrectly promised reproducibility. Update constructor/deconstruction calls and configure provider
+  sampling through the agent/client instead. Repetition and statistical behavior are unchanged.
+
 - **Native export notice:** `aef export` warns when a workspace native AEF header already links the
   exported store run or trial, while preserving export results and JSON stdout. New workspace
   ignore templates exclude generated AEF run and job folders.

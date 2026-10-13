@@ -601,7 +601,7 @@ public static partial class AefInspectImporter
             null => "0",   // Inspect's default
             JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(v) => v.GetValue<string>(),
             JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)   // an integer of at most 2^53 − 1, in decimal digits (R9-2)
-                ?? throw Refuse("IN-6", $"The log's task_version {v.ToJsonString()} is a number that is no integer of at most 2^53 − 1 in magnitude (R9-2)"),
+                ?? throw Refuse("IN-6", $"The log's task_version {v.ToJsonString()} is a number that is no integer of at most 2^53 − 1 in magnitude"),
             _ => throw Refuse("IN-6", "The log's task_version is neither a number nor a string"),
         };
         if (!AefConverter.IsExactVersion(taskVersion))
@@ -714,11 +714,11 @@ public static partial class AefInspectImporter
             string? errorReason = null;
             if (sample["error"] is { } error)
             {
-                errorReason = (error as JsonObject ?? throw Refuse("IN-8", $"{where}.error is {error.ToJsonString()}, not an object as Inspect writes one (R9-2)"))["message"] switch
+                errorReason = (error as JsonObject ?? throw Refuse("IN-8", $"{where}.error is {error.ToJsonString()}, not an object as Inspect writes one"))["message"] switch
                 {
                     null => NoMessage,
                     JsonValue said when said.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(said) => said.GetValue<string>() is { Length: > 0 } message ? Cut(message) : NoMessage,
-                    _ => throw Refuse("IN-8", $"{where}.error.message is not text (R9-2)"),
+                    _ => throw Refuse("IN-8", $"{where}.error.message is not text"),
                 };
             }
 
@@ -729,7 +729,7 @@ public static partial class AefInspectImporter
             {
                 limitReason = limit is JsonObject l && Text(l["type"]) is { Length: > 0 } type && l["limit"] is JsonValue value && value.GetValueKind() == JsonValueKind.Number
                     ? Cut($"{type} limit {InspectJson.Shortest(value.GetValue<double>())}")
-                    : throw Refuse("IN-8", $"{where}.limit is {InspectJson.Indented(limit).ReplaceLineEndings(" ")}: a limit is {{type, limit}} with a type and a finite number, and the line's reason is \"<type> limit <limit>\" (R8-4, R9-2)");
+                    : throw Refuse("IN-8", $"{where}.limit is {InspectJson.Indented(limit).ReplaceLineEndings(" ")}: a limit is {{type, limit}} with a type and a finite number, and the line's reason is \"<type> limit <limit>\"");
             }
 
             if ((errorReason ?? limitReason) is { } reason)
@@ -1410,7 +1410,7 @@ public static partial class AefInspectImporter
         {
             JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(v) => v.GetValue<string>(),
             JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)
-                ?? throw Refuse("IN-8", $"{where} is {v.ToJsonString()}, a number that is no integer of at most 2^53 − 1 in magnitude, so it gives no caseId (R9-2)"),
+                ?? throw Refuse("IN-8", $"{where} is {v.ToJsonString()}, a number that is no integer of at most 2^53 − 1 in magnitude, so it gives no caseId"),
             _ => throw Refuse("IN-8", $"{where} is neither an integer nor a string"),
         };
         return AefConverter.IsResultText(text, 256)
