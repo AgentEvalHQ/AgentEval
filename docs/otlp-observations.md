@@ -127,3 +127,29 @@ See [fixture provenance and regeneration](../scripts/otlp-fixtures/README.md).
 Tests compare the complete models from both encodings and exercise malformed
 wire data, resource budgets, ownership and deterministic mutations. The decoder
 is a bounded schema implementation, not a claim of general protobuf conformance.
+
+## Content policy before persistence
+
+`IOtlpContentPolicy` consumes a batch already validated by a bounded decoder.
+The default `Off` mode retains only the resource and span attribute allowlists
+shared with normalization. It removes span names, trace state, status messages,
+events, scope/link attributes and resource entity references. Link topology,
+numeric status, timestamps, flags and producer loss counters remain intact.
+Recognized attributes with invalid values become empty typed placeholders;
+normalization still reports them as invalid instead of treating them as missing
+or silently accepting another alias. The original invalid payload is discarded.
+
+The returned snapshot records `otlp-content/1`, the capture mode and numeric
+removal counts. Receiver removals never inflate producer-reported dropped
+counts. Removed events and entity references count as whole objects, without
+counting their nested values again. Reports contain no removed keys or values.
+`On` is explicit opt-in and retains the immutable decoded batch; neither mode
+persists the original request bytes. These are per-application reports, not
+cumulative reports if a caller filters an already filtered batch again.
+
+This boundary is an allowlist, not secret detection: retained service/session
+identifiers, model/tool names, scope metadata and schema URLs are producer-controlled
+strings and can contain sensitive information. Producers must configure these
+metadata fields appropriately. The policy service does not replace decoder
+validation or budgets. Durable storage and HTTP integration are still pending;
+their acceptance path must apply this policy before writing observations.
