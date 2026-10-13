@@ -341,11 +341,54 @@ The standalone fixture also uploads a sealed interop example, finalizes it,
 compares every original file byte, verifies the published folder with the
 independent Python reader, and checks rejection of unsealed/tampered imports.
 
-## Remaining lifecycle integration
+## Access and resource audit
 
-The remaining ingestion slice is a complete access/resource audit. Invalid,
-unsealed, or incomplete uploads must never become query-visible accepted
-evidence. These operations build on the same directories and commit point.
+All five ingestion routes share the bearer-key, browser-origin and direct-peer
+transport checks. Access refusal precedes stage lookup or mutation and returns
+`Cache-Control: no-store`. Forwarding headers alone cannot make a remote HTTP
+connection trusted. Control routes reject bodies using the server body-detection
+feature as well as framing headers: HTTP/2 or HTTP/3 does not require
+`Content-Length` or `Transfer-Encoding` for a body.
 
-Sealed evidence files remain authoritative. The later SQLite index is
-derived and rebuildable; it is not a prerequisite for ingestion ownership.
+| Boundary | Enforcement and evidence |
+| --- | --- |
+| Access | 30 route/scenario checks cover missing/wrong key, Origin, Sec-Fetch-Site, remote HTTP and spoofed forwarding headers; storage stays unchanged |
+| Body-free controls | Four HTTP/2 unknown-length regression cases cover inspect, recover, discard and finalize |
+| Upload memory and disk | 64 KiB copy buffer; bounded payload, file count, path length, concurrency and raw multipart request bytes, including chunked epilogues |
+| Retained capacity | Pending, accepted and archived entry counts are separate; no automatic eviction or overwrite |
+| Verification | One finalizer at a time; bounded preflight, metadata, full-file fingerprint and sealed evidence verification before publication |
+| Recovery | One operation at a time; competing operations refuse without mutation and failure releases capacity; exclusive per-stage lease excludes active upload/finalization |
+| Filesystem | Dedicated root/process ownership, strict server IDs, ordinary entries, no linked ancestry or scratch; Unix verification/recovery fails closed without a working classifier |
+| Failure | Partial uploads remain unaccepted; publishing receipts reconcile either side of rename; archive failure preserves acceptance and retry proof |
+
+The focused ingestion suite covers these bounds and failure cases on .NET 8,
+9 and 10. HTTP checks run on .NET 10. The standalone Kestrel fixture verifies
+actual request streaming, disconnect/timeout behavior, duplicate/recovery flows
+and independent verification of accepted bytes. The native Windows script
+checks actual receipt directory moves with the production assembly.
+
+### Operational limits
+
+These are application bounds, not a filesystem quota or a guarantee against
+storage exhaustion. At defaults, 1,000 accepted runs can retain about 62.5 GiB
+of payload and 64 pending stages about 4 GiB, plus filesystem/control overhead.
+Configure lower limits and provision/monitor the dedicated volume accordingly.
+Changing limits after restart does not shrink existing data; lower verification
+bounds can refuse retries of earlier larger runs. Archived receipts are never
+evicted automatically, so operators must plan their retention/capacity.
+
+Concurrency limits apply per service instance; the host registers singleton
+services. Trusted in-process callers must preserve that lifetime. Synchronous
+verification, filesystem deletion and operating-system IO are not preemptible
+mid-operation. Cancellation is checked between bounded phases; it cannot undo
+publication or durable discard intent. Atomic rename and flushed receipt bytes
+support process-crash recovery; this is not a cross-platform guarantee against
+power loss without filesystem and directory durability guarantees.
+
+The storage owner must prevent hostile same-owner/privileged filesystem
+replacement. Ingestion uses one configured owner key, not tenant-level roles,
+per-principal quotas or an Internet-facing rate limiter. Deployments exposing
+it beyond a trusted service boundary need suitable host/network controls.
+
+Sealed evidence files remain authoritative. The later SQLite index is derived
+and rebuildable; indexing/query visibility is a separate integration wave.

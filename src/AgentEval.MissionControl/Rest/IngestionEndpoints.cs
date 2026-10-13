@@ -33,7 +33,7 @@ internal static class IngestionEndpoints
     private static async Task<IResult> RecoveryRequest(HttpContext context, IngestionHttpOptions options, Func<CancellationToken, object> operation)
     {
         if (CheckAccess(context, options) is { } denied) return denied;
-        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+        if (HasRequestBody(context))
             return HttpResults.BadRequest(new { error = "unexpected-body" });
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
@@ -48,6 +48,12 @@ internal static class IngestionEndpoints
         catch (IOException) { return HttpResults.Json(new { error = "recovery-unavailable" }, statusCode: 503); }
         catch (UnauthorizedAccessException) { return HttpResults.Json(new { error = "recovery-unavailable" }, statusCode: 503); }
     }
+
+    // HTTP/2 and HTTP/3 bodies need neither Content-Length nor Transfer-Encoding.
+    private static bool HasRequestBody(HttpContext context) =>
+        context.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true
+        || context.Request.ContentLength is > 0
+        || context.Request.Headers.ContainsKey("Transfer-Encoding");
 
     private static async Task<IResult> UploadAsync(HttpContext context, IAefRunStager stager, IngestionHttpOptions options)
     {
@@ -70,7 +76,7 @@ internal static class IngestionEndpoints
     private static async Task<IResult> FinalizeAsync(HttpContext context, string stageId, IAefRunFinalizer finalizer, IngestionHttpOptions options)
     {
         if (CheckAccess(context, options) is { } denied) return denied;
-        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+        if (HasRequestBody(context))
             return HttpResults.BadRequest(new { error = "unexpected-body" });
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));

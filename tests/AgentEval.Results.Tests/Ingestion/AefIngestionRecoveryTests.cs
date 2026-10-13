@@ -163,6 +163,42 @@ public sealed class AefIngestionRecoveryTests : IDisposable
         Assert.Equal("failed", AefStageState.Read(stage).Status);
     }
 
+    [Fact]
+    public async Task Recovery_ConcurrentOperations_RefuseWithoutMutationAndReleaseCapacityAfterFailure()
+    {
+        var stage = Pending("publishing");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var recovery = new AefIngestionRecovery(_workspace, new BlockingFinalizer(() =>
+        {
+            entered.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(20))) throw new TimeoutException("Test release missing.");
+            throw new IOException("Injected verification failure");
+        }));
+        var operation = Task.Run(() => recovery.Recover(stage.Id));
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal("busy", Assert.Throws<AefFinalizationException>(() => recovery.Inspect()).Code);
+            Assert.Equal("busy", Assert.Throws<AefFinalizationException>(() => recovery.Recover(stage.Id)).Code);
+            Assert.Equal("busy", Assert.Throws<AefFinalizationException>(() => recovery.DiscardStage(stage.Id)).Code);
+            Assert.Equal("publishing", AefStageState.Read(stage).Status);
+            Assert.True(File.Exists(Path.Combine(stage.Directory, "content", "partial")));
+        }
+        finally { release.Set(); }
+        await Assert.ThrowsAsync<IOException>(async () => await operation);
+        Assert.Equal("publishing", Assert.Single(recovery.Inspect().Stages).Status);
+    }
+
+    private sealed class BlockingFinalizer(Action action) : IAefRunFinalizer
+    {
+        public AefAcceptedRun FinalizeStage(string stageId, CancellationToken cancellationToken = default)
+        {
+            action();
+            throw new InvalidOperationException("Test action must throw.");
+        }
+    }
+
     public void Dispose()
     {
         _workspace.Dispose();

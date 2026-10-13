@@ -354,6 +354,65 @@ public sealed class IngestionEndpointTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(Staging, id!)));
     }
 
+    [Theory]
+    [InlineData("POST", "/api/v1/ingestion/runs/00000000000000000000000000000000/finalize")]
+    [InlineData("GET", "/api/v1/ingestion/stages")]
+    [InlineData("POST", "/api/v1/ingestion/stages/00000000000000000000000000000000/recover")]
+    [InlineData("DELETE", "/api/v1/ingestion/stages/00000000000000000000000000000000")]
+    public async Task ControlRoute_Http2UnknownLengthBody_RefusesBeforeOperation(string method, string route)
+    {
+        await using var app = await Start();
+        using var client = Client(app);
+        using var request = new HttpRequestMessage(new HttpMethod(method), route)
+        {
+            Version = HttpVersion.Version20,
+            Content = new UnknownLengthContent(new StringContent("unexpected body"))
+        };
+        var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Staging));
+    }
+
+    public static IEnumerable<object[]> AccessCases()
+    {
+        var routes = new[]
+        {
+            ("POST", "/api/v1/ingestion/runs"),
+            ("POST", "/api/v1/ingestion/runs/00000000000000000000000000000000/finalize"),
+            ("GET", "/api/v1/ingestion/stages"),
+            ("POST", "/api/v1/ingestion/stages/00000000000000000000000000000000/recover"),
+            ("DELETE", "/api/v1/ingestion/stages/00000000000000000000000000000000")
+        };
+        foreach (var (method, route) in routes)
+            foreach (var scenario in new[] { "missing", "wrong", "origin", "fetch", "remote", "forwarded" })
+                yield return new object[] { method, route, scenario };
+    }
+
+    [Theory]
+    [MemberData(nameof(AccessCases))]
+    public async Task EveryRoute_DeniedAccess_DoesNotExposeOrMutateStorage(string method, string route, string scenario)
+    {
+        await using var app = await Start(remote: scenario is "remote" or "forwarded" ? "192.0.2.9" : "127.0.0.1");
+        using var client = Client(app, scenario != "missing");
+        if (scenario == "wrong") client.DefaultRequestHeaders.Authorization = new("Bearer", "incorrect-secret-with-sufficient-length");
+        if (scenario == "origin") client.DefaultRequestHeaders.Add("Origin", "https://example.invalid");
+        if (scenario == "fetch") client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-origin");
+        if (scenario == "forwarded")
+        {
+            client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+            client.DefaultRequestHeaders.Add("X-Forwarded-For", "127.0.0.1");
+            client.DefaultRequestHeaders.Add("Forwarded", "for=127.0.0.1;proto=https");
+        }
+        using var request = new HttpRequestMessage(new HttpMethod(method), route);
+        using var response = await client.SendAsync(request);
+        Assert.Equal(scenario is "missing" or "wrong" ? HttpStatusCode.Unauthorized : HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.DoesNotContain(_root, await response.Content.ReadAsStringAsync());
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Staging));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(_root, "ingestion", "runs")));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(_root, "ingestion", ".receipts")));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
