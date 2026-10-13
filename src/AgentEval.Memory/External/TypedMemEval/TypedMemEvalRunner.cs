@@ -77,12 +77,18 @@ public sealed class TypedMemEvalRunner
         => RunWithProgressAsync(agent, vertical, options, null, ct);
 
     /// <summary>Runs a vertical and synchronously reports each completed question, including typed absences.</summary>
-    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+    public Task<ExternalBenchmarkResult> RunWithProgressAsync(
         IEvaluableAgent agent, TypedMemEvalVertical vertical, TypedMemEvalOptions? options,
         Action<QuestionResult>? onCompleted, CancellationToken ct = default)
+        => RunWithProgressAsync(agent, vertical, options, onCompleted, onPrepared: null, ct);
+
+    /// <summary>Runs a vertical, capturing the resolved configuration and selected questions before provider calls.</summary>
+    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+        IEvaluableAgent agent, TypedMemEvalVertical vertical, TypedMemEvalOptions? options,
+        Action<QuestionResult>? onCompleted, Action<ExternalBenchmarkPlan>? onPrepared, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(agent);
-        return await RunCoreAsync(agent, vertical, options, oracleOptions: null, executionLabel: null, ct, onCompleted)
+        return await RunCoreAsync(agent, vertical, options, oracleOptions: null, executionLabel: null, ct, onCompleted, onPrepared)
             .ConfigureAwait(false);
     }
 
@@ -121,7 +127,7 @@ public sealed class TypedMemEvalRunner
         LongMemEvalOracleOptions? oracleOptions,
         string? executionLabel,
         CancellationToken ct,
-        Action<QuestionResult>? onCompleted = null)
+        Action<QuestionResult>? onCompleted = null, Action<ExternalBenchmarkPlan>? onPrepared = null)
     {
         var descriptor = TypedMemEvalVerticals.For(vertical);
         facade ??= new TypedMemEvalOptions();
@@ -167,6 +173,7 @@ public sealed class TypedMemEvalRunner
                                    !options.IncludeTimestamps &&
                                    options.TemporalGrounding == TemporalGroundingMode.None;
 
+        onPrepared?.Invoke(new ExternalBenchmarkPlan(options, entries, corpusJson));
         var judge = new TypedMemEvalJudge(_judgeClient, NullLogger<TypedMemEvalJudge>.Instance);
         var answerSampling = AnswerSamplingCoordinator.Create(options);
         var results = new List<QuestionResult>(entries.Count);

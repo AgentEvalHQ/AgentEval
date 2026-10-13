@@ -101,9 +101,15 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         => RunWithProgressAsync(agent, config, options, null, ct);
 
     /// <summary>Runs the benchmark, synchronously reporting each completed question before continuing.</summary>
-    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+    public Task<ExternalBenchmarkResult> RunWithProgressAsync(
         IEvaluableAgent agent, AgentBenchmarkConfig config, ExternalBenchmarkOptions options,
         Action<QuestionResult>? onCompleted, CancellationToken ct = default)
+        => RunWithProgressAsync(agent, config, options, onCompleted, onPrepared: null, ct);
+
+    /// <summary>Runs the selected questions, capturing their declaration before any agent or judge calls.</summary>
+    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+        IEvaluableAgent agent, AgentBenchmarkConfig config, ExternalBenchmarkOptions options,
+        Action<QuestionResult>? onCompleted, Action<ExternalBenchmarkPlan>? onPrepared, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(config);
@@ -112,6 +118,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 
         // 1. Load data
         var loaded = LoadEntries(options);
+        onPrepared?.Invoke(new ExternalBenchmarkPlan(options, loaded.Entries));
         return await RunSelectedAsync(agent, options, loaded.Entries, executionLabel: null, ct, loaded, onCompleted: onCompleted);
     }
 

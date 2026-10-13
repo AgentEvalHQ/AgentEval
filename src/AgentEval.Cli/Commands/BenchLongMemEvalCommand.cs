@@ -170,6 +170,7 @@ public static class BenchLongMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult? result = null;
+        AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string? storeRunId = null;
@@ -188,7 +189,8 @@ public static class BenchLongMemEvalCommand
                 BenchAef.QuestionTree(observed, "longmemeval", preset,
                     result is null ? "INCONCLUSIVE" : LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
                     chatClientOverride is null ? deployment : null), startedAt, DateTimeOffset.UtcNow,
-                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint);
+                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint,
+                definition: suiteDefinition);
         }
         try
         {
@@ -196,7 +198,9 @@ public static class BenchLongMemEvalCommand
             {
                 completed.Add(question);
                 onQuestionCompleted?.Invoke(question);
-            }, ct);
+            }, onPrepared: noAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create(
+                "longmemeval", preset, plan, chatClientOverride is null ? deployment : null,
+                chatClientOverride is null ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override"), ct: ct);
             ct.ThrowIfCancellationRequested();
         }
         catch (LongMemEvalDatasetNotFoundException ex)
@@ -232,7 +236,6 @@ public static class BenchLongMemEvalCommand
             // Skip per-scenario writes; persist the native result as report-native.json beside
             // the manifest below. The summary still captures pass/fail totals.
 
-            const double passThresholdPercent = 50.0;
             // A pass on part of the questions is a warn (#203 review, B6c-9): accuracy is over the SCORED questions only,
             // and the default RetryThenInconclusive policy leaves judge failures and agent errors unscored, so 1 scored
             // question and 499 inconclusive passed. A fail stays a fail.

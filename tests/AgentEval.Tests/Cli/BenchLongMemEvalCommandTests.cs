@@ -64,6 +64,7 @@ public sealed class BenchLongMemEvalCommandTests
         var aefDir = Path.GetDirectoryName(aefRun)!;
         Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(aefDir).Outcome);
         Assert.Contains("\"mocked\"", File.ReadAllText(aefRun));
+        AssertDefinition(aefDir, ["q-empty", "q-no", "q-yes"]);
         var states = File.ReadAllLines(Path.Combine(aefDir, "results.ndjson"))
             .Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]).Order().ToList();
         Assert.Equal(["failed", "not_measured", "passed"], states);
@@ -160,12 +161,23 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
         Assert.Equal(observed, (string?)line["caseId"]);
+        AssertDefinition(dir, ["first", "second"]);
         if (Environment.GetEnvironmentVariable("AEF_VERB_FIXTURES") is { Length: > 0 } retained)
         {
             var destination = Path.Combine(retained, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(destination);
             foreach (var file in Directory.GetFiles(dir)) File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
         }
+    }
+
+    private static void AssertDefinition(string directory, string[] cases)
+    {
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!;
+        Assert.True(manifest.Frozen);
+        Assert.Equal(cases, manifest.CaseIds);
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
     }
 
     private static object Question(string id) => new

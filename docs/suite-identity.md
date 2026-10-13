@@ -190,3 +190,17 @@ This producer uses runtime UTC values for unanchored temporal inputs and code-ge
 scenarios. Its declaration is therefore `frozen: false`, with a recipe digest in the extension and no
 suite content digest. It must not be treated as identical frozen evaluation content in comparisons.
 Changing the recipe's configuration still changes its digest; no prompts or corpus text are exported.
+
+## External memory producers
+
+LongMemEval and TypedMemEval capture the actual selected entries and applied configuration after loading
+and sampling, before agent or judge calls. `ExternalBenchmarkPlan` exposes an immutable, content-free
+snapshot: ordered question IDs, a hash of selected questions/history/expected answers, and detached
+configuration without the local dataset path. TypedMemEval additionally binds the source corpus,
+including judge extension data that is deliberately absent from the agent-facing entries.
+
+The CLI seals a frozen definition for this materialized selection, even when the selection originally
+used an unspecified random seed. It does not sample a second time or re-read a changed dataset to derive
+identity. Full planned rosters survive interruption; observations remain separate. Empty selections
+declare the existing root-only case. Existing runner overloads retain their behavior; new progress
+overloads accept an optional preparation callback. Oracle and paired export integration follows in W04.

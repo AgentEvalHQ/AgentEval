@@ -1512,6 +1512,43 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(new[] { "memory.quick" }, manifest.CaseIds);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(bool cancelBeforeQuestions)
+    {
+        await InitCommand.RunAsync("typed-definition", _root);
+        var descriptor = AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
+            AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical.Episodic);
+        using var client = new AgentEval.Testing.ScriptedChatClient();
+        for (var i = 0; i < descriptor.QuestionCount; i++)
+            client.AddText("test answer").AddText("{\"outcome\":\"correct\",\"reasoning\":\"test judge\"}");
+        using var cancel = new CancellationTokenSource();
+        using var output = new CancelOnPersistenceWriter(cancel, "Running ");
+        var previous = Console.Out;
+        var destination = new DirectoryInfo(Path.Combine(_root, "typed-definition"));
+        int exit;
+        try
+        {
+            if (cancelBeforeQuestions) Console.SetOut(output);
+            exit = await BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token, destination);
+        }
+        finally { Console.SetOut(previous); }
+        Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
+        var directory = RunDirectory(destination.FullName);
+        AssertIntact(directory);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        var options = new AgentEval.Memory.External.TypedMemEval.TypedMemEvalOptions().ToExternalOptions(descriptor);
+        var expected = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create("typedmemeval", "episodic",
+            new AgentEval.Memory.External.Models.ExternalBenchmarkPlan(options,
+                AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.Load(descriptor.Vertical, options),
+                AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.ReadJson(descriptor.Vertical)), null, "override");
+        Assert.Equal(expected.Digest, manifest.Digest);
+        Assert.Equal(descriptor.QuestionCount, manifest.CaseIds.Count);
+        Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
+    }
+
     private sealed class MemoryReplyClient : Microsoft.Extensions.AI.IChatClient
     {
         public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
@@ -1564,6 +1601,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(observed, (string?)line["caseId"]);
         Assert.Equal("scored", (string?)line["state"]);
         Assert.Equal("correct", (string?)line["ext"]!["agenteval.typedmemeval"]!["outcome"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.True(manifest.Frozen);
+        Assert.Equal(manifest.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
+        Assert.Contains(observed!, manifest.CaseIds);
+        Assert.Equal(AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
+            AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical.Episodic).QuestionCount, manifest.CaseIds.Count);
         Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
     }
 
