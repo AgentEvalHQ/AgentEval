@@ -502,22 +502,25 @@ public sealed class AefJobRunnerTests : IDisposable
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // This test inspects evidence while the case is paused; scheduler/disk contention
+        // must not turn that inspection into the separate one-second deadline test.
         var execution = Run(new Case(async ct =>
         {
             entered.SetResult();
             await release.Task.WaitAsync(ct);
             return Passed();
-        }));
+        }, secondsBound: 60));
         try
         {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
             Assert.False(execution.IsCompleted);
             var dir = RunDirectory();
             Assert.Equal("running", (string?)Json(dir, "run.json")["status"]);
             Assert.Empty(File.ReadAllText(Path.Combine(dir, "results.ndjson")));
         }
         finally { release.TrySetResult(); }
-        var result = await execution;
+        var result = await execution.WaitAsync(TimeSpan.FromSeconds(90));
+        Assert.Null(result.Reason);
         Assert.Equal("job.sealed", result.Terminal);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
         Assert.Equal("live", (string?)Json(RunDirectory(), "run.json")["execution"]!["targetMode"]);
