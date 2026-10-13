@@ -34,7 +34,7 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
     public IReadOnlyList<string> ApiKeyHeaders => _apiKeyHeaders.ToArray();
 
     public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply,
-        int statusCode = StatusCodes.Status200OK, Func<JsonObject, (long? Input, long? Output)?>? usage = null)
+        int statusCode = StatusCodes.Status200OK, Func<JsonObject, (long? Input, long? Output)?>? usage = null, string? probePack = null)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
         builder.Logging.ClearProviders();
@@ -68,6 +68,8 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
                 { prompt_tokens = counts.Input, completion_tokens = counts.Output, total_tokens = counts.Input + counts.Output } : null,
             }, context.RequestAborted);
         }
+        if (probePack is not null)
+            app.MapGet("/probes.json", () => Microsoft.AspNetCore.Http.Results.Text(probePack, "application/json"));
         app.MapPost("/v1/chat/completions", HandleChat);
         app.MapPost("/openai/deployments/{deployment}/chat/completions", HandleChat);
         try

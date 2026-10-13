@@ -18,6 +18,36 @@ namespace AgentEval.Tests.Cli.Gatekeeper;
 [Collection("EnvVarTests")]
 public sealed class GatekeeperModelResolverProviderTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Resolve_CancelledCall_RetainsConfiguredModelWithoutInventingUsage(int source)
+    {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
+        await using var endpoint = await AgentEval.Tests.TestHelpers.LocalChatEndpoint.StartAsync();
+        using var env = new ProviderEnvironmentScope(
+            ("AI_INFERENCE_PROVIDER", "openai-compatible"), ("OPENAI_COMPATIBLE_ENDPOINT", endpoint.Endpoint),
+            ("OPENAI_COMPATIBLE_MODEL", "configured-model"), ("OPENAI_COMPATIBLE_API_KEY", "local-test"));
+        using var client = source == 3
+            ? AgentEval.Cli.Commands.LogFileCommand.ResolveAgainst(endpoint.Endpoint, "configured-model", "local-test", false).Client
+            : GatekeeperModelResolver.Resolve(source == 1, source == 2 ? null : endpoint.Endpoint,
+                source == 1 ? "configured-model" : null, "configured-model", "local-test", new StringWriter()).Client;
+        Assert.NotNull(client);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetResponseAsync(
+            [new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.User, "question")],
+            cancellationToken: cancellation.Token));
+        var usage = Assert.Single(meter.Snapshot()!);
+        Assert.Equal("configured-model", usage.Model);
+        Assert.Equal(source == 3 ? AgentEval.Results.Writing.AefUsageRole.Agent : AgentEval.Results.Writing.AefUsageRole.Judge, usage.Role);
+        Assert.Null(usage.InputTokens);
+        Assert.Null(usage.CostUsd);
+        Assert.Empty(endpoint.Requests);
+    }
+
     private static ModelResolution ResolveFromEnvironment(out string stderr)
     {
         var err = new StringWriter();

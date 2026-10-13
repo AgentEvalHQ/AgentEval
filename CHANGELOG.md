@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Usage model identity:** replay, memory-poisoning, Gatekeeper and Runner client wrappers retain the
+  configured model when a call ends before the provider reports its model. Missing usage remains unknown.
+
 - **Red-team stimulus provenance:** attacker-configured runs now declare generated stimuli, and imported
   probes/packs declare external stimuli. Fixed suites retain the default. Multi-turn attacker usage and
   cancellation accounting are covered by loopback HTTP regression tests.

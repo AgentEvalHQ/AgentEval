@@ -902,6 +902,32 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Redteam_ExternalProbes_RecordsImportedStimulusWithoutCapturingContent(bool pack)
+    {
+        const string seeds = """[{"id":"external-one","prompt":"secret imported prompt","expectedTokens":["PWNED"]}]""";
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("I cannot assist with that request."), probePack: seeds);
+        var input = new FileInfo(Path.Combine(_root, "seeds.json"));
+        File.WriteAllText(input.FullName, seeds);
+        var options = new RedTeamOptions
+        {
+            Endpoint = endpoint.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
+            Attacks = "PromptInjection", MaxProbes = 1, Quiet = true, FailOn = "never",
+            ImportProbes = pack ? null : input,
+            Pack = pack ? new Uri(endpoint.Endpoint).GetLeftPart(UriPartial.Authority) + "/probes.json" : null,
+            Format = "json", Output = new FileInfo(Path.Combine(_root, "external-report.json")),
+            Aef = new DirectoryInfo(Path.Combine(_root, "external-aef")),
+        };
+        Assert.Equal(0, await RedTeamCommand.ExecuteAsync(options, CancellationToken.None));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        Assert.Equal("external", (string?)Document(dir, "run.json")["execution"]!["stimulus"]);
+        Assert.Contains(endpoint.Requests, request => request.ToJsonString().Contains("secret imported prompt", StringComparison.Ordinal));
+        Assert.DoesNotContain("secret imported prompt", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Redteam_PairAttacker_AccountsForCompletedAndInterruptedCalls(bool interrupt)
     {
         using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();

@@ -199,7 +199,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         var endpoint = EndpointFactory.CreateForRunner(role.Endpoint, role.Deployment, key, role.Azure);
         try
         {
-            return new BudgetedChatClient(CliChatClientDiagnostics.Wrap(endpoint, role.Purpose), role.Deployment,
+            return new BudgetedChatClient(CliChatClientDiagnostics.Wrap(endpoint, role.Purpose, role.Deployment), role.Deployment,
                 role.InputCap, readiness ? Math.Min(16, role.OutputCap) : role.OutputCap,
                 readiness ? 1 : role.MaxCalls, role.InputPrice, role.OutputPrice);
         }

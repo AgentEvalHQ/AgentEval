@@ -212,7 +212,7 @@ internal static class LogFileCommand
             // Wrapped through CliChatClientDiagnostics like every other endpoint-resolution call site in the
             // CLI (EvalCommand/RedTeamCommand/BenchTier1SutResolver/GatekeeperModelResolver) — without it,
             // replay's target calls silently skip --verbose logging and --capture-fixture composition.
-            return (CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "replay-target"), $"{endpoint} ({model})", null);
+            return (CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "replay-target", model), $"{endpoint} ({model})", null);
         }
 
         return (null, string.Empty, "log-file replay needs a target: pass --from-env, or --endpoint/--model.");
