@@ -61,7 +61,8 @@ agenteval run --plan ./plans/eval.json --runner-id local-eval --progress ndjson 
 ```
 
 The local runner supports text-only dataset plans against existing OpenAI-compatible or Azure endpoints.
-It requires exact known model prices, explicit dataset case IDs and purpose-scoped credential references.
+It requires exact known model prices and explicit dataset case IDs. Authenticated endpoints require
+purpose-scoped credential references (always required for Azure); keyless OpenAI-compatible endpoints do not.
 Jobs save their plan, manifest, events and sealed runs under `.agenteval/aef/jobs/<jobId>/`.
 See [AEF runner configuration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md#local-dataset-runner)
 for plan settings and exit codes. `--aef-key` signs produced runs, including aborted runs; credentials and private
