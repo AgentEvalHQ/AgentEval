@@ -108,6 +108,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var dir = RunDirectory(options.Aef!.FullName);
             AssertIntact(dir);
             Assert.Equal(version, (string?)Document(dir, "run.json")["subject"]!["version"]);
+            Assert.Equal("eval", (string?)Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         }
         else Assert.False(options.Aef!.Exists);
     }
@@ -786,6 +787,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
         }).ExitCode;
         var written = await Run(aef, false);
+        Assert.Equal("bench " + family, (string?)Document(RunDirectory(aef.FullName), "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         var probeUsage = File.ReadAllLines(Path.Combine(RunDirectory(aef.FullName), "results.ndjson"))
             .Select(l => JsonNode.Parse(l)!).SelectMany(l => l["usage"]!.AsArray()).ToArray();
         Assert.Equal(endpoint.Requests.Count * 10L, probeUsage.Where(u => (string?)u!["role"] == "agent")
@@ -949,6 +951,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         Assert.Equal("external", (string?)Document(dir, "run.json")["execution"]!["stimulus"]);
+        Assert.Equal("redteam", (string?)Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         Assert.Contains(endpoint.Requests, request => request.ToJsonString().Contains("secret imported prompt", StringComparison.Ordinal));
         Assert.DoesNotContain("secret imported prompt", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }

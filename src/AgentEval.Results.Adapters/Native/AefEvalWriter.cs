@@ -13,6 +13,9 @@ namespace AgentEval.Results.Adapters.Native;
 /// <summary>What <c>agenteval eval</c> knows about its run that its results do not hold (S1 #5a).</summary>
 public sealed record AefEvalRunOptions
 {
+    /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
+    public AefCliProvenance? Cli { get; init; }
+
     /// <summary>Content-free configuration actually applied by the producer.</summary>
     public AefRunConfig? Config { get; init; }
 

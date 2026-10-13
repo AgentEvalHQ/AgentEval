@@ -644,6 +644,7 @@ internal static class EvalCommand
         }
         return new AefEvalRunOptions
         {
+            Cli = AefCliOptions.Provenance ?? new() { Verb = "eval" },
             Config = new AefRunConfig { Settings = settings, Thresholds = thresholds },
             Seal = AefCliOptions.Seal,
             Signer = AefCliOptions.Signer,

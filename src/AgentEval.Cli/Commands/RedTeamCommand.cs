@@ -864,6 +864,7 @@ internal static class RedTeamCommand
             var lines = RedTeamAef.Lines(result, AefCliOptions.ContentCapture == AefContentCapture.On);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
+                Cli = AefCliOptions.Provenance ?? new() { Verb = "redteam" },
                 Config = new AefRunConfig
                 {
                     Settings = new System.Text.Json.Nodes.JsonObject

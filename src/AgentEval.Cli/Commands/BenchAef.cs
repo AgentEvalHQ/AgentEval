@@ -31,6 +31,7 @@ internal static class BenchAef
         {
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
             {
+                Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
@@ -205,6 +206,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
+                Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
                 Config = new AefRunConfig { Settings = settings },
                 StoreV1 = storeV1,

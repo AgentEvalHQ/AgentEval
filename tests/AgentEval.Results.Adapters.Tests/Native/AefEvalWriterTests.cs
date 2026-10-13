@@ -27,9 +27,10 @@ public sealed class AefEvalWriterTests : IDisposable
         var legacy = new AefUsage { Role = AefUsageRole.Judge, Model = "deployment", InputTokens = 999, CostUsd = 5 };
         AefUsage[] observed = [new() { Role = AefUsageRole.Judge, Model = "reported-model",
             InputTokens = unknown ? null : 10, CostUsd = unknown ? null : 0.1, CostSource = unknown ? null : "fixture" }];
-        using var session = AefEvalWriter.Start(_out, Options() with { JudgeUsage = legacy }, Start);
+        using var session = AefEvalWriter.Start(_out, Options() with { JudgeUsage = legacy, Cli = new() { Verb = "eval" } }, Start);
         session.Add(new TestResult { TestName = "case", Passed = true, Score = 100 }, "case");
         var (dir, _) = session.Complete(Start.AddSeconds(1), null, null, null, observed);
+        Assert.Equal("eval", (string?)AefTestRuns.Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         var summary = AefTestRuns.Document(dir, "summary.json");
         var usage = Assert.Single(summary["usage"]!.AsArray())!;
         Assert.Equal("reported-model", (string?)usage["model"]);

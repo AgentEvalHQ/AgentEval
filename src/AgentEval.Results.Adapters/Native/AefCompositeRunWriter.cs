@@ -24,6 +24,9 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
+    public AefCliProvenance? Cli { get; init; }
+
     /// <summary>Observed invocation totals, already grouped by role and model; null when unknown.</summary>
     public IReadOnlyList<AefUsage>? Usage { get; init; }
 
@@ -165,7 +168,7 @@ public static class AefCompositeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
-        var storeExtension = options.StoreV1?.ToExtension();
+        var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
         var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "bench");
         var runId = folder.RunId;

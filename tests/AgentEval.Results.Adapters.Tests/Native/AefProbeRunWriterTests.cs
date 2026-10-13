@@ -115,10 +115,12 @@ public sealed class AefProbeRunWriterTests : IDisposable
         {
             SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, SuiteRef = "bench:test",
             AbortReason = "cancelled", StoreV1 = new() { TrialRunIds = ["trial-1"] },
+                Cli = new() { Verb = "redteam", GitCommit = new string('a', 40), GitBranch = "feature/test", GitDirty = true },
         }, Start, Start.AddSeconds(1));
         var link = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["ext"]!["agenteval.store-v1"]!;
         Assert.Null(link["runId"]);
         Assert.Equal("trial-1", (string?)link["trialRunIds"]![0]);
+        Assert.Equal("redteam", (string?)AefTestRuns.Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
     }
 

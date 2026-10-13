@@ -48,6 +48,7 @@ public sealed class AefCliOptionsTests
         Assert.False(invoked);
         Assert.True(AefCliOptions.Seal);
         Assert.Null(AefCliOptions.Signer);
+        Assert.Null(AefCliOptions.Provenance);
     }
 
     [Fact]
@@ -58,10 +59,12 @@ public sealed class AefCliOptionsTests
         {
             await Task.Yield();
             Assert.False(AefCliOptions.Seal);
+            Assert.Equal("native", AefCliOptions.Provenance!.Verb);
             throw new InvalidOperationException("test");
         }));
         Assert.True(AefCliOptions.Seal);
         Assert.Null(AefCliOptions.Signer);
+        Assert.Null(AefCliOptions.Provenance);
     }
 
     [Fact]

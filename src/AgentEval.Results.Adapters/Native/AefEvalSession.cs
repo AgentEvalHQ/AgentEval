@@ -56,6 +56,7 @@ public static partial class AefEvalWriter
                 var header = new AefRunHeader
                 {
                     RunId = runId,
+                    Ext = AefCliProvenance.Extension(options.Cli),
                     Producer = AefConverter.DefaultProducer,
                     Config = options.Config,
                     CostPolicy = options.CostPolicy,

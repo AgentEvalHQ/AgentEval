@@ -86,6 +86,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
             {
                 SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
                 StoreV1 = new() { RunId = "aggregate-1", TrialRunIds = ["trial-1", "trial-2"] },
+                Cli = new() { Verb = "bench test", GitCommit = new string('a', 40), GitBranch = "feature/test", GitDirty = true },
             }, Start, Start.AddSeconds(1));
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
         Assert.Equal("1.0.0", (string?)header["suite"]!["version"]);
@@ -93,6 +94,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Assert.Equal("aggregate-1", (string?)link["runId"]);
         Assert.Equal(new[] { "trial-1", "trial-2" }, link["trialRunIds"]!.AsArray().Select(n => (string)n!));
         Assert.NotEqual("aggregate-1", (string?)header["runId"]);
+        Assert.Equal("bench test", (string?)AefTestRuns.Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
     }
 

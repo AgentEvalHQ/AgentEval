@@ -55,6 +55,9 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
+    public AefCliProvenance? Cli { get; init; }
+
     /// <summary>Source of the probe stimuli; a fixed suite unless the caller identifies generation or import.</summary>
     public AefStimulus Stimulus { get; init; } = AefStimulus.Suite;
     /// <summary>Content-free configuration actually applied by the producer.</summary>
@@ -151,7 +154,7 @@ public static class AefProbeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
-        var storeExtension = options.StoreV1?.ToExtension();
+        var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "redteam");
         var runId = folder.RunId;
         var directory = folder.Directory;

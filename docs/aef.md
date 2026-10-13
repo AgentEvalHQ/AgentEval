@@ -208,6 +208,10 @@ exported run is never passed off as live evidence unless you say it was. The ful
 
 ## Runs from eval, redteam and bench
 
+Native CLI runs include `ext.agenteval.cli` with the registered command (`verb`) and, when Git inspection succeeds,
+`gitCommit`, `gitBranch` and `gitDirty` observed in the invocation directory. Unknown Git fields are omitted.
+The extension contains no command arguments, working-directory path or status filenames and coexists with store-v1 links.
+
 `agenteval eval`, `agenteval redteam` and the `agenteval bench` families write each run they make as a sealed AEF
 run. Nothing to switch on: in a workspace (a folder with `.agenteval/`, see `agenteval init-workspace`) every run lands
 in `.agenteval/aef/runs/<yyyy>/<MM>/<runId>/`, and the command prints its folder and run hash.
