@@ -310,11 +310,28 @@ internal static class BenchAef
                 : q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed ? "error"
                 : outcome is null or AgentEval.Memory.External.Models.TypedMemEvalOutcome.Inconclusive ? "inconclusive"
                 : "scored";
-            if (label == "scored")
+            if (q.TypedOutcome is { } detail)
             {
+                // Keep observed diagnostics even for an inconclusive or unrun question. Never copy answer/evidence text.
+                var diagnostic = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["outcome"] = detail.Outcome.ToString().ToLowerInvariant(),
+                    ["attribution"] = detail.Attribution.ToString().ToLowerInvariant(),
+                    ["attributionLevel"] = detail.AttributionLevel.ToString().ToLowerInvariant(),
+                    ["coverageSource"] = detail.CoverageSource.ToString().ToLowerInvariant(),
+                    ["hasGold"] = detail.HasGold,
+                };
+                if (detail.RealisedGoldCoverage is { } coverage) diagnostic["realisedGoldCoverage"] = coverage;
+                if (detail.DistanceSessions is { } distance) diagnostic["distanceSessions"] = distance;
+                if (string.Equals(vertical, "forgetting", StringComparison.OrdinalIgnoreCase))
+                {
+                    diagnostic["isStaleRecall"] = detail.IsStaleRecall;
+                    diagnostic["isOverForgetting"] = detail.IsOverForgetting;
+                    diagnostic["isMisattributedForgetting"] = detail.IsMisattributedForgetting;
+                }
                 ext[q.QuestionId] = new System.Text.Json.Nodes.JsonObject
                 {
-                    ["agenteval.typedmemeval"] = new System.Text.Json.Nodes.JsonObject { ["outcome"] = outcome!.Value.ToString().ToLowerInvariant() },
+                    ["agenteval.typedmemeval"] = diagnostic,
                 };
             }
 

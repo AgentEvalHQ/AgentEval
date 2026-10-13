@@ -420,7 +420,7 @@ preflight/help side effects and verifies signed identity and unsealed evidence w
 | `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
 | `bench perf`, `trace-fidelity`, `workflow-trace-fidelity` | the family | part of the result (`case`) | Each part beside its own verdict. |
 | `bench longmemeval` | `longmemeval` | question (`case`, its id) | Correct `passed`, wrong `failed`, unscored `not_measured`, unanswered `error`; no question or answer text. |
-| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; the typed outcome (`abstained`, `missed`, …) in `ext`. |
+| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; typed outcomes and structured diagnostics in `ext`. |
 | `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
 
@@ -435,6 +435,14 @@ summary entry per lane, metric and path.
 
 Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
+
+TypedMemEval's `agenteval.typedmemeval` per-question extension retains `outcome`, `attribution`,
+`attributionLevel`, `coverageSource` and `hasGold`. Enum values use lowercase names such as `evidenceabsent`
+and `answercontext`. `realisedGoldCoverage` and `distanceSessions` are present only when supplied;
+unobserved coverage is distinct from observed zero. Forgetting runs also retain `isStaleRecall`,
+`isOverForgetting` and `isMisattributedForgetting`. These diagnostics support grouping questions by distance
+and counting forgetting outcomes; they are not separate aggregate AEF metrics. Inconclusive and unrun outcomes
+remain visible without converting absent measurements into scores. Question, answer and evidence text are excluded.
 Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
 Saved-run notices are best-effort: a broken or closed diagnostic stream does not turn successful publication
 into an AEF write failure. If final benchmark console reporting fails after publication, the command can return

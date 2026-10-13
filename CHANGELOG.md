@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **TypedMemEval AEF diagnostics:** per-question extensions retain attribution and its observation level,
+  optional gold coverage and distance, and forgetting flags. Inconclusive/unrun typed outcomes remain visible
+  beside their absent measurement states. Missing coverage is not zero; scoring and gates are unchanged.
+
 - **Single-case benchmark identity:** composite AEF exports now include the sole case key in the suite roster
   digest. Previously all no-child benchmark results hashed an empty roster. Multi-component digests are unchanged.
 
