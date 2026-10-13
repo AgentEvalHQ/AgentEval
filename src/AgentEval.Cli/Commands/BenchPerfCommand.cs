@@ -143,6 +143,11 @@ public static class BenchPerfCommand
             Query: resolvedPrompt,
             Metadata: metadata);
 
+        AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
+        if (!noAef && (agent is not MockTarget.EchoingAgent || aef is not null))
+            metadata[PerformanceBenchmark.PlanPreparedMetadataKey] = (Action<PerformanceEvaluationPlan>)(plan =>
+                suiteDefinition = AgentEval.Cli.Infrastructure.PerformanceSuiteDefinition.Create(preset, plan));
+
         // ── Run via the registry's EvaluateAsync adapter ─────────────────────
         if (agent is MockTarget.EchoingAgent)
         {
@@ -151,7 +156,8 @@ public static class BenchPerfCommand
             bool WriteMock(string? reason = null) => aef is not null && !noAef && BenchAef.WriteResult(
                 aef, agentEvalDir, "perf", preset, subject, subjectVersion, AgentEval.Results.Writing.AefTargetMode.Mocked,
                 mockResult ?? MockTarget.UnmeasuredResult($"perf.{preset}"), mockStarted, DateTimeOffset.UtcNow,
-                exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason, emptyResults: mockResult is null);
+                exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason, emptyResults: mockResult is null,
+                definition: suiteDefinition);
             try
             {
                 mockResult = await family.EvaluateAsync!(input, null, ct);
@@ -185,7 +191,8 @@ public static class BenchPerfCommand
             agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null);
+            abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null,
+            definition: suiteDefinition);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);

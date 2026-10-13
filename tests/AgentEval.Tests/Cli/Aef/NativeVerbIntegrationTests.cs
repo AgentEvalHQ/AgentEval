@@ -232,7 +232,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(aborted);
         var abortedHeader = Document(aborted, "run.json");
         Assert.Equal("mocked", (string?)abortedHeader["execution"]!["targetMode"]);
-        if (family is "gdpr" or "eu-ai-act" or "agentic")
+        if (family is "gdpr" or "eu-ai-act" or "agentic" or "perf")
         {
             Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
             Assert.Equal((string?)header["suite"]!["digest"], (string?)abortedHeader["suite"]!["digest"]);
@@ -240,7 +240,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(run, manifestPath)));
             Assert.Equal(File.ReadAllBytes(Path.Combine(run, manifestPath)), File.ReadAllBytes(Path.Combine(aborted, manifestPath)));
             Assert.Equal(1, (int)manifest.ToJson()["definition"]!["trialsPerCase"]!);
-            Assert.Contains("fixed-placeholder", manifest.ToJson().ToJsonString());
+            if (family != "perf") Assert.Contains("fixed-placeholder", manifest.ToJson().ToJsonString());
         }
 
         Assert.Equal("aborted", (string?)abortedHeader["status"]);
@@ -268,6 +268,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var run = Path.GetDirectoryName(file)!;
             AssertIntact(run);
             Assert.Equal("mocked", (string?)Document(run, "run.json")["execution"]!["targetMode"]);
+            AssertAutoAuditDefinition(run, scripted: true);
             var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
             Assert.Equal("inconclusive", (string?)gate["outcome"]);
             Assert.Equal(11, (int)gate["exitCode"]!);
@@ -305,6 +306,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
             var lines = File.Exists(Path.Combine(run, "results.ndjson")) ? File.ReadAllLines(Path.Combine(run, "results.ndjson")) : [];
             Assert.Equal(afterReport, lines.Length > 0);
+            AssertAutoAuditDefinition(run, scripted: true);
         }
     }
 
@@ -328,6 +330,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var dir = Path.GetDirectoryName(header)!;
             AssertIntact(dir);
             Assert.Equal(version, (string?)Document(dir, "run.json")["subject"]!["version"]);
+            AssertAutoAuditDefinition(dir, scripted: mock);
         }
     }
 
@@ -1275,6 +1278,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(defaultOutput ? Path.Combine(_root, ".agenteval", "aef") : outputRoot);
         AssertIntact(dir);
+        Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(new[] { "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
@@ -1345,8 +1353,20 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
             Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
             if (File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length > 0) populated++;
+            AssertAutoAuditDefinition(dir, scripted: false);
         }
         Assert.Equal(1, populated);
+    }
+
+    private static void AssertAutoAuditDefinition(string directory, bool scripted)
+    {
+        var header = Document(directory, "run.json");
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var expected = AgentEval.Cli.Infrastructure.AutoAuditSuiteDefinition.Create(scripted);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(expected.Digest, manifest.Digest);
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
     }
 
     [Theory]

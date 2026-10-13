@@ -155,3 +155,25 @@ retaining the first spelling as execution does; an empty workflow declares the e
 The manifest binds the resolved preset, token tolerance and implementation assemblies. Trace contents,
 reported token counts and finish reasons are subject observations, so changing them does not redefine
 the suite. Completed and interrupted exports seal the same pre-reconciliation definition.
+
+## Performance producer
+
+Performance evaluations prepare an immutable workload, threshold, iteration/concurrency policy and
+pricing snapshot before agent calls. The CLI hashes ordered prompts, the initial pricing key and the
+captured rates; it declares latency, throughput and cost checks for every preset. Observed timings,
+token counts, responses and reported model IDs do not redefine the suite. Reported model IDs remain
+inputs to the declared pricing fallback policy. Missing pricing still leaves cost unmeasured.
+
+Execution uses the captured options and rates even if callers change the original options or global
+pricing during a run. Pricing uses exact matches, then the longest substring; equal-length matches
+use ordinal, case-insensitive key order so process/dictionary order cannot change the result. The
+shared judge-cost lookup uses the same tie rule. Completed, interrupted and explicit mock exports
+retain the prepared definition; custom registry adapters that do not prepare a plan retain legacy scope.
+
+## Auto-audit producer
+
+Auto-audit declares its fixed fidelity and safety checks before starting any endpoint. The real support
+task binds the instruction/request hashes, tool-loop limit, gate policy, trace tolerance and implementation
+assemblies. The scripted showcase declares a distinct instrument and retains mocked target mode.
+Endpoint names and measured behavior are observations, so all endpoints within the same instrument
+share a definition. Completion, client-factory failures, cancellation and report-write failures retain it.

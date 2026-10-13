@@ -27,6 +27,17 @@ public class ModelKeyMatcherTests
         Assert.Equal(2, v);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EqualLengthSubstrings_ReversedInsertionOrder_UsesSameOrdinalKey(bool reverse)
+    {
+        var pairs = new[] { KeyValuePair.Create("aaa", 1), KeyValuePair.Create("bbb", 2) };
+        var table = (reverse ? Enumerable.Reverse(pairs) : pairs).ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
+        Assert.True(ModelKeyMatcher.TryMatchLongestFirst(table, "BBB-AAA", out var value));
+        Assert.Equal(1, value);
+    }
+
     [Fact]
     public void DeploymentName_ResolvesToLongestSubstringKey()
     {

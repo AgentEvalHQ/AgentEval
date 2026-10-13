@@ -13,6 +13,8 @@ namespace AgentEval.Benchmarks;
 /// </summary>
 public class PerformanceBenchmark
 {
+    /// <summary>Optional EvalInput metadata key for an Action&lt;PerformanceEvaluationPlan&gt; called before agent execution.</summary>
+    public const string PlanPreparedMetadataKey = "performance.onPlanPrepared";
     private readonly IEvaluableAgent _agent;
     private readonly PerformanceBenchmarkOptions _options;
     private readonly IAgentEvalLogger? _logger;
@@ -331,14 +333,19 @@ public class PerformanceBenchmark
     /// pricing entry matches and any agent response carried a non-null
     /// <see cref="AgentResponse.ModelId"/>, the lookup is retried using the
     /// first successful response's reported <c>ModelId</c>. This protects the
-    /// cost-leaf from a silent $0 / PASS when the caller passes the agent's
-    /// display name rather than a real deployment id.
+    /// cost-leaf from remaining unmeasured when the caller passes the agent's
+    /// display name rather than a real deployment id. Rates are captured before calls begin.
     /// </para>
     /// </remarks>
-    public async Task<CostBenchmarkResult> RunCostBenchmarkAsync(
+    public Task<CostBenchmarkResult> RunCostBenchmarkAsync(
         IEnumerable<string> prompts,
         string modelName,
         CancellationToken cancellationToken = default)
+        => RunCostBenchmarkAsync(prompts, modelName, ModelPricing.CaptureSnapshot(), cancellationToken);
+
+    private async Task<CostBenchmarkResult> RunCostBenchmarkAsync(
+        IEnumerable<string> prompts, string modelName, ModelPricingSnapshot pricingSnapshot,
+        CancellationToken cancellationToken)
     {
         var results = new List<(string Prompt, AgentResponse Response)>();
         var totalInputTokens = 0;
@@ -364,13 +371,10 @@ public class PerformanceBenchmark
             }
         }
 
-        // P0-1: priority chain for pricing resolution.
-        //   1. modelName (operator-supplied; usually opts.CostModelName)
-        //   2. first successful response.ModelId (when the framework surfaces it)
-        //   3. agent.Name — last resort, with a warning, because agent display
-        //      names rarely match a pricing-table key and lead to silent $0 / PASS.
+        // Try the initial key (explicit model or agent name), then the first reported model ID.
+        // Both lookups use the same rates captured before execution.
         var resolvedModelName = modelName;
-        var pricing = ModelPricing.GetPricing(resolvedModelName);
+        var pricing = pricingSnapshot.GetPricing(resolvedModelName);
 
         if (pricing == null)
         {
@@ -379,7 +383,7 @@ public class PerformanceBenchmark
                 .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
             if (!string.IsNullOrWhiteSpace(firstResponseModelId))
             {
-                var fallbackPricing = ModelPricing.GetPricing(firstResponseModelId);
+                var fallbackPricing = pricingSnapshot.GetPricing(firstResponseModelId);
                 if (fallbackPricing != null)
                 {
                     resolvedModelName = firstResponseModelId!;
@@ -390,8 +394,7 @@ public class PerformanceBenchmark
 
         // Warn whenever pricing could not be resolved, NOT only when the operator passed
         // nothing (resolvedModelName == agent name). A typo'd/unrecognised CostModelName
-        // ('gpt4o' vs 'gpt-4o') also yields null pricing, and the cost leaf then passes at $0 —
-        // so the operator's most-likely mistake must still surface this diagnostic (BUG-29).
+        // ('gpt4o' vs 'gpt-4o') also yields null pricing and leaves cost unmeasured.
         if (pricing == null)
         {
             LogWarning(
@@ -484,21 +487,30 @@ public class PerformanceBenchmark
                 "Provide prompts via EvalInput.Query or EvalInput.Metadata[\"prompts\"].");
         }
 
-        var opts = _options.EvaluateOptions ?? PerformanceBenchmarkEvaluateOptions.Default;
+        var plan = new PerformanceEvaluationPlan(prompts, _options, _agent.Name);
+        var opts = plan.ToOptions();
+        var runner = new PerformanceBenchmark(_agent, new PerformanceBenchmarkOptions
+        {
+            Verbose = _options.Verbose, Logger = _logger, DelayBetweenIterations = plan.DelayBetweenIterations,
+            EvaluateOptions = opts,
+        });
+        if (input.Metadata?.TryGetValue(PlanPreparedMetadataKey, out var callback) == true
+            && callback is Action<PerformanceEvaluationPlan> prepared)
+            prepared(plan);
 
         // ── Run all three measurements (sequentially to avoid resource contention) ─
-        var latencyResult = await RunLatencyBenchmarkAsync(
+        var latencyResult = await runner.RunLatencyBenchmarkAsync(
             prompts, iterationsPerPrompt: opts.LatencyIterationsPerPrompt,
             warmupIterations: opts.WarmupIterations, cancellationToken: ct);
 
-        var throughputResult = await RunThroughputBenchmarkAsync(
+        var throughputResult = await runner.RunThroughputBenchmarkAsync(
             prompts[0],
             concurrentRequests: opts.ThroughputConcurrentRequests,
             duration: opts.ThroughputDuration,
             cancellationToken: ct);
 
-        var costResult = await RunCostBenchmarkAsync(
-            prompts, opts.CostModelName ?? _agent.Name, ct);
+        var costResult = await runner.RunCostBenchmarkAsync(
+            prompts, plan.CostModelName, plan.Pricing, ct);
 
         // ── Build the three leaf EvalResults ─────────────────────────────────
         var latencyLeaf  = BuildLatencyLeaf(latencyResult,    opts);

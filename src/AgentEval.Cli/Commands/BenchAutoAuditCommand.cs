@@ -87,6 +87,7 @@ public static class BenchAutoAuditCommand
         Console.WriteLine();
 
         var results = new List<AutoAuditEndpointResult>();
+        var suiteDefinition = noAef ? null : AgentEval.Cli.Infrastructure.AutoAuditSuiteDefinition.Create(scripted: false);
         var deploymentEndpoints = new List<string?>();
         string? activeEndpoint = null;
         var times = new List<(DateTimeOffset Start, DateTimeOffset End)>();   // each model's own audit, for its AEF run
@@ -107,12 +108,13 @@ public static class BenchAutoAuditCommand
             {
                 var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
                 failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], subjectVersion,
-                    mode, tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt, abortReason: reason, endpoint: deploymentEndpoints[i]);
+                    mode, tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt, abortReason: reason, endpoint: deploymentEndpoints[i],
+                    definition: suiteDefinition);
             }
             if (active is not null)
                 failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", active, subjectVersion,
                     mode, MockTarget.UnmeasuredResult("autoaudit"), modelStart, DateTimeOffset.UtcNow,
-                    subjectKind: "model", abortReason: reason, emptyResults: true, endpoint: activeEndpoint);
+                    subjectKind: "model", abortReason: reason, emptyResults: true, endpoint: activeEndpoint, definition: suiteDefinition);
             return failed;
         }
         try
@@ -202,6 +204,7 @@ public static class BenchAutoAuditCommand
         MockTarget.PrintBanner(Command, "three scripted endpoints (clean, silent retry, PII leak)",
             aefRequested: aef is not null && !noAef);
         var completed = new List<(AutoAuditEndpointResult Result, DateTimeOffset Start, DateTimeOffset End)>();
+        var suiteDefinition = aef is null || noAef ? null : AgentEval.Cli.Infrastructure.AutoAuditSuiteDefinition.Create(scripted: true);
         string? active = null;
         var started = DateTimeOffset.UtcNow;
         bool Write(string? reason = null)
@@ -212,12 +215,12 @@ public static class BenchAutoAuditCommand
                 var (tree, ext) = BenchAef.AutoAuditTree(entry.Result);
                 if (BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", entry.Result.Endpoint, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, tree, entry.Start, entry.End, subjectKind: "model",
-                    caseExt: ext, exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason))
+                    caseExt: ext, exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason, definition: suiteDefinition))
                     return true;
             }
             return active is not null && BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", active, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Mocked, MockTarget.UnmeasuredResult("autoaudit"), started,
-                DateTimeOffset.UtcNow, subjectKind: "model", abortReason: reason, emptyResults: true);
+                DateTimeOffset.UtcNow, subjectKind: "model", abortReason: reason, emptyResults: true, definition: suiteDefinition);
         }
         AutoAuditReport demo;
         try
