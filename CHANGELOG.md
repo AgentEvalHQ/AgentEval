@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Run review decisions:** `agenteval decide <run-dir> --kind approve|reject --by <identity> --reason <text>`
+  appends and seals a self-attested review of an intact sealed AEF run. Original results and gates remain
+  unchanged; unsealed overlay events are refused instead of being adopted into the reviewer's batch.
+
 - **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
   servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials
   can be sent in cleartext.

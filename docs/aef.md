@@ -25,6 +25,23 @@ AgentEval. AEF is made for whoever has to rely on a result:
 | May this version ship? | A **checkpoint**: lanes of evidence with rules. A pure decision function recomputes its outcome from the sealed runs. |
 | Did a reviewer override a result? | **Overlays**: append-only, sealed batches of human decisions on a closed run. The sealed files never change. |
 
+## Record a review decision
+
+```bash
+agenteval decide ./my-run --kind approve --by reviewer-42 --reason "Reviewed the sealed evidence" --json
+agenteval aef view ./my-run --json
+```
+
+`decide` currently supports run-level `approve` and `reject`. Both require an explicit opaque identity and a
+nonblank reason. Identity is **self-attested**, not authenticated or cryptographically signed. The command
+appends one overlay event and seals its batch; approval does not change the original results, summaries, gates
+or checkpoint outcome. Inspect the effective review status with `aef view`.
+
+Only intact sealed runs are accepted. Existing unsealed overlay events are refused so a review never silently
+adopts another writer's work. Exit 0 means the decision batch was sealed; 1 means integrity or sealing refused
+the decision; 2 means an input or storage error. If writing is interrupted, inspect and verify the journal before
+retrying: an event may remain unsealed and has no effective decision status until its batch is sealed.
+
 ## What a run looks like
 
 ```text
