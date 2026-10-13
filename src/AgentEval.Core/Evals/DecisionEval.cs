@@ -134,9 +134,8 @@ public sealed class DecisionEval : AtomicEval
         _stateProjector = stateProjector;
         _rateResolver = rateResolver;
         _reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
-        var instrumentHash = HashPrompt(instructions, trueCriteria, falseCriteria, _reference);
-        _promptHash = instrumentHash[..16];
-        _rubricDigest = "sha256:" + instrumentHash;
+        _promptHash = HashPrompt(instructions, trueCriteria, falseCriteria, _reference)[..16];
+        _rubricDigest = RubricIdentity.Digest("atomic-decision-v1", instructions, trueCriteria, falseCriteria, _reference);
     }
 
     /// <summary>The yes/no question this eval asks.</summary>

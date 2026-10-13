@@ -134,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code checks, aggregates and unmeasured results do not gain model annotations.
 
 - **Judge rubric identity:** atomic LLM and decision evaluations retain a full SHA-256 rubric digest alongside
-  the unchanged short prompt fingerprint. Native composite headers preserve distinct rubrics for the same model;
+  the unchanged short prompt fingerprint. Structured full-digest encoding prevents delimiter collisions between
+  caller-supplied fields and criteria. Native composite headers preserve distinct rubrics for the same model;
   legacy results without a full digest leave it absent. Mock placeholder provenance clears the digest.
 
 - **Agentic budget metadata:** AEF configuration records the applied, normalized budget tier (`all` when no

@@ -63,7 +63,6 @@ public class AtomicLlmEvalPromptFingerprintTests
         Assert.NotNull(provenance.PromptHash);
         Assert.Equal(16, provenance.PromptHash!.Length);
         Assert.Matches("^sha256:[0-9a-f]{64}$", provenance.RubricDigest!);
-        Assert.Equal(provenance.PromptHash, provenance.RubricDigest![7..23]);
     }
 
     [Fact]
@@ -94,6 +93,7 @@ public class AtomicLlmEvalPromptFingerprintTests
 
         // A fingerprint of the INSTRUMENT, not of the case: per-case inputs must not move it.
         Assert.Equal(first.Provenance.PromptHash, second.Provenance.PromptHash);
+        Assert.Equal(first.Provenance.RubricDigest, second.Provenance.RubricDigest);
     }
 
     [Fact]
@@ -105,6 +105,31 @@ public class AtomicLlmEvalPromptFingerprintTests
         var lf = await ProvenanceOf(Leaf(new NamedPromptEvaluator("p", "line one\nline two"), ["Is safe."]));
 
         Assert.Equal(lf.PromptHash, crlf.PromptHash);
+        Assert.Equal(lf.RubricDigest, crlf.RubricDigest);
+    }
+
+    [Theory]
+    [InlineData("criteria")]
+    [InlineData("material")]
+    [InlineData("tools")]
+    [InlineData("empty")]
+    public async Task EvaluateAsync_LegacyDelimiterCollision_RetainsDistinctRubricDigests(string boundary)
+    {
+        var (first, second) = boundary switch
+        {
+            "criteria" => (Leaf(new NamedPromptEvaluator("p", "m"), ["a\u001eb", "c"]),
+                Leaf(new NamedPromptEvaluator("p", "m"), ["a", "b\u001ec"])),
+            "material" => (Leaf(new NamedPromptEvaluator("p", "m\u001fx"), ["y"]),
+                Leaf(new NamedPromptEvaluator("p", "m"), ["x\u001fy"])),
+            "tools" => (Leaf(new NamedPromptEvaluator("p", "m\u001fjudge-sees-tool-data:ToolCalls"), ["y"]),
+                new AtomicLlmEval(new NamedPromptEvaluator("p", "m"), "k", "n", "c", "1.0.0", ["y"])
+                    { JudgeSeesToolData = JudgeToolData.ToolCalls }),
+            _ => (Leaf(new NamedPromptEvaluator("p", "m"), []), Leaf(new NamedPromptEvaluator("p", "m"), [""])),
+        };
+        var a = await ProvenanceOf(first);
+        var b = await ProvenanceOf(second);
+        Assert.Equal(a.PromptHash, b.PromptHash); // Historical fingerprint remains compatible.
+        Assert.NotEqual(a.RubricDigest, b.RubricDigest);
     }
 
     private sealed class CriteriaCapturingEvaluator : IEvaluator

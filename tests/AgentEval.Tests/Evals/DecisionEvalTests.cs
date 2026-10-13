@@ -150,8 +150,38 @@ public class DecisionEvalTests
         Assert.NotNull(result.Provenance.PromptHash);
         Assert.Equal(16, result.Provenance.PromptHash!.Length);
         Assert.Matches("^sha256:[0-9a-f]{64}$", result.Provenance.RubricDigest!);
-        Assert.Equal(result.Provenance.PromptHash, result.Provenance.RubricDigest![7..23]);
         Assert.False(result.Provenance.CacheHit);
+    }
+
+    [Theory]
+    [InlineData("a\u001fb", "c", "d", null, "a", "b\u001fc", "d", null)]
+    [InlineData("a", "b\u001fc", "d", null, "a", "b", "c\u001fd", null)]
+    [InlineData("a", "b", "c\u001fd", null, "a", "b", "c", "d")]
+    [InlineData("a", null, "c", null, "a", "", "c", null)]
+    public async Task EvaluateAsync_LegacyDelimiterCollision_RetainsDistinctRubricDigests(
+        string instructionsA, string? trueA, string? falseA, string? referenceA,
+        string instructionsB, string? trueB, string? falseB, string? referenceB)
+    {
+        async Task<EvalProvenance> Run(string instructions, string? whenTrue, string? whenFalse, string? reference) =>
+            (await new DecisionEval(new FakeDecisionClient(), "k", "n", "c", "1", instructions,
+                trueCriteria: whenTrue, falseCriteria: whenFalse, reference: reference).EvaluateAsync(MakeInput())).Provenance;
+        var a = await Run(instructionsA, trueA, falseA, referenceA);
+        var b = await Run(instructionsB, trueB, falseB, referenceB);
+        Assert.Equal(a.PromptHash, b.PromptHash); // Historical fingerprint remains compatible.
+        Assert.NotEqual(a.RubricDigest, b.RubricDigest);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_SameRubricWithDifferentLineEndingsAndCase_RetainsDigest()
+    {
+        async Task<EvalProvenance> Run(string newline, string response) =>
+            (await new DecisionEval(new FakeDecisionClient(), "k", "n", "c", "1", "a" + newline + "b",
+                trueCriteria: "c" + newline + "d", falseCriteria: "e" + newline + "f",
+                reference: "g" + newline + "h").EvaluateAsync(MakeInput(response))).Provenance;
+        var a = await Run("\r\n", "first case");
+        var b = await Run("\n", "second case");
+        Assert.Equal(a.PromptHash, b.PromptHash);
+        Assert.Equal(a.RubricDigest, b.RubricDigest);
     }
 
     [Fact]

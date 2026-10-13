@@ -301,8 +301,9 @@ over partial fallback counts. Cost is the sum of recorded usage costs only when 
 Exporting per-case totals and the remaining native client/role coverage are still being completed.
 
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
-decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
-`PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints
+decision evaluations hash a structured array of instrument fields, preserving field/criterion boundaries and
+normalizing CRLF to LF. The legacy 16-character `PromptHash` remains unchanged; it is not a prefix of the new
+full digest. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints
 are not promoted to full digests, and placeholder mock judges do not claim rubric identity. Individual measured LLM
 and decision-model leaves also carry the model and rubric digest in their annotator. Decision-model leaves
 use the `LLM` annotator kind; code checks remain `CODE`. Rubric identity is available with content capture off;
