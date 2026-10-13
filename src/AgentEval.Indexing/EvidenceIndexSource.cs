@@ -40,6 +40,8 @@ public sealed class EvidenceIndexWriteLimits
 }
 /// <summary>Checkpoint of the indexed projection, not a source authenticity claim.</summary>
 public sealed record EvidenceIndexCheckpoint(string SourceId, string Fingerprint, long IndexedGeneration, string Kind);
+/// <summary>A root-relative source and its last indexed checkpoint, used for guarded reconciliation.</summary>
+public sealed record EvidenceIndexSourceCheckpoint(string RelativePath, EvidenceIndexCheckpoint Checkpoint);
 /// <summary>Committed mutation result. No-op operations retain the global generation.</summary>
 public sealed record EvidenceIndexMutation(string SourceId, string Fingerprint, long Generation, bool Changed);
 /// <summary>Atomic source replacement and guarded deletion in a rebuildable index.</summary>
@@ -49,6 +51,8 @@ public interface IEvidenceIndexWriter : IDisposable
     EvidenceIndexMutation Upsert(EvidenceIndexSource source, CancellationToken cancellationToken = default);
     /// <summary>Reads one source checkpoint by its stable root-relative identity.</summary>
     EvidenceIndexCheckpoint? Find(string rootId, string relativePath, CancellationToken cancellationToken = default);
+    /// <summary>Lists a bounded root-scoped checkpoint inventory for reconciliation; not a public query pagination API.</summary>
+    ImmutableArray<EvidenceIndexSourceCheckpoint> ListSources(string rootId, CancellationToken cancellationToken = default);
     /// <summary>Deletes only when the caller's checkpoint still matches. Never deletes source files.</summary>
     EvidenceIndexMutation Remove(string rootId, string relativePath, string expectedFingerprint, CancellationToken cancellationToken = default);
 }

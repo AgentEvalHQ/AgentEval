@@ -4,8 +4,9 @@
 index. It targets .NET 8, 9 and 10 and keeps SQLite dependencies outside the
 BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
-Transactional source projection and verified observation imports are implemented.
-AEF/legacy adapters, rebuild orchestration and query pagination are subsequent slices.
+Transactional source projection, AEF snapshot imports and verified observation
+imports are implemented. Legacy adapters, rebuild orchestration and query
+pagination are subsequent slices.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -126,3 +127,48 @@ per-record issues. Corrupt/unavailable records leave prior indexed rows intact;
 capacity or busy failures stop further work and report incomplete coverage.
 Earlier per-source commits survive a later failure or cancellation. No pruning
 or source-file deletion is performed by this importer.
+
+## AEF snapshots and scan coordination
+
+`IAefIndexSourceReader` captures a candidate run into a private temporary
+directory under finite file/byte limits, then runs the existing AEF and overlay
+chain verifiers against that copy. Projection reads the same owned copy, never
+the original files after verification. Captured files are copied as regular
+files, with exact-size checks; temporary storage is removed after projection or
+failure. The source filesystem owner must prevent hostile path replacement.
+This is a detached verified byte set, not a filesystem-wide point-in-time snapshot.
+
+The reader uses the existing staging defaults: at most 1000 files, 64 MiB total
+and 64 MiB per file, configurable through `AefStagingOptions`. Preflight/copy and
+projection observe cancellation between bounded operations. The protocol verifier
+is synchronous and must finish its current verification phase before cancellation
+can be reported. Scratch bytes are additional to the derived database budget.
+
+Sealed intact runs retain the verified run hash. Valid unsealed runs remain AEF
+sources with `Unverified` integrity and no sealed hash. Invalid runs and invalid
+overlay chains are refused. Snapshot fingerprints cover every captured file,
+including signatures and overlays; intact base integrity does not establish
+trusted signer identity or authorized overlay effects.
+
+Result states, case/trial IDs, metric values and annotator provenance are copied
+as reported. The scalar index does not invent metric pass flags or a global run
+verdict. Producer `running`/`aborted` runs are partial; `completed` remains unknown
+for benchmark completeness. Verified suite-definition digests are lookup fields,
+not proof of frozen-suite comparability: callers must still apply the suite
+compatibility service. Hierarchy, labels, lane summaries and effective overlay
+decisions remain in authoritative source documents for detailed queries.
+
+`IAefEvidenceIndexer` combines bounded `IAefRunDiscovery`, snapshot projection and
+the transactional writer. The result records changed/unchanged counts and relative
+path issues, and reports incomplete coverage if discovery omitted entries or any
+candidate failed. Previously indexed snapshots remain available after failures,
+but do not claim that the current source is valid or fresh.
+
+Optional `pruneMissing: true` reconciles deleted AEF sources only after a complete,
+successful discovery/import pass. It uses checkpoints captured before scanning,
+rechecks that each absent source's `run.json` is truly missing, and performs
+fingerprint-guarded removal of derived rows. Permission errors are not treated as
+absence; reappearing markers and changed checkpoints report issues. Pruning is
+disabled by default, never removes other evidence kinds, and never deletes source
+files. Root IDs must be stable namespaces for the configured root; reusing one
+for an unrelated directory changes the meaning of reconciliation.

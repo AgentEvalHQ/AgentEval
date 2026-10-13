@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -120,6 +121,30 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
     {
         Enter(cancellationToken);
         try { return FindCore(Identity(rootId, relativePath), null); }
+        catch (SqliteException error) { throw SqlFailure(error); }
+        finally { Monitor.Exit(_gate); }
+    }
+
+    /// <inheritdoc />
+    public ImmutableArray<EvidenceIndexSourceCheckpoint> ListSources(string rootId, CancellationToken cancellationToken = default)
+    {
+        Enter(cancellationToken);
+        try
+        {
+            _ = Identity(rootId, ".");
+            using var command = _connection.CreateCommand();
+            command.CommandText = "SELECT relative_path,source_id,content_digest,indexed_generation,kind FROM sources WHERE root_id=$root ORDER BY relative_path COLLATE BINARY LIMIT $limit";
+            command.Parameters.AddWithValue("$root", rootId); command.Parameters.AddWithValue("$limit", _limits.MaxSources + 1);
+            using var reader = command.ExecuteReader();
+            var result = ImmutableArray.CreateBuilder<EvidenceIndexSourceCheckpoint>();
+            while (reader.Read())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (result.Count == _limits.MaxSources) throw new EvidenceIndexException("source-limit");
+                result.Add(new(reader.GetString(0), new(reader.GetString(1), reader.GetString(2), reader.GetInt64(3), reader.GetString(4))));
+            }
+            return result.ToImmutable();
+        }
         catch (SqliteException error) { throw SqlFailure(error); }
         finally { Monitor.Exit(_gate); }
     }
