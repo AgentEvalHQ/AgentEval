@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   effective views retain expired waivers without changing sealed outcomes.
   `override` and `adjudicate` require a result, explicit non-pending `--state` and reason; views show the original
   and effective states without recomputing parents, summaries or gates.
+  Optional `--key` signs only the new batch after key preflight; readers verify the claimed identity using
+  their own trust policy. Missing or mismatched trust does not display verified signing assurance.
 
 - **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
   servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials

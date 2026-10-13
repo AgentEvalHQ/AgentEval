@@ -8,6 +8,7 @@ using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Results;
 using AgentEval.Results.Integrity;
+using AgentEval.Results.Signatures;
 using AgentEval.Results.Writing;
 using AgentEval.Tests.Contracts;
 
@@ -16,10 +17,12 @@ namespace AgentEval.Tests.Cli;
 public sealed class DecideCommandTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "aef-decide-" + Guid.NewGuid().ToString("N"));
+    private string KeyPath => _directory + ".pem";
 
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+        File.Delete(KeyPath);
     }
 
     private void CreateRun(bool seal = true)
@@ -39,11 +42,11 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence", string? result = null,
-        string? requirement = null, string? expires = null, string? state = null)
+        string? requirement = null, string? expires = null, string? state = null, string? keyPath = null)
     {
         var output = new StringWriter();
         var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null,
-            new DecisionClock(), result, requirement, expires, state);
+            new DecisionClock(), result, requirement, expires, state, keyPath);
         return (exit, output.ToString());
     }
 
@@ -240,6 +243,57 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     [Fact]
+    public void Run_SignedDecision_SignsOnlyNewBatchAndRequiresMatchingReaderTrust()
+    {
+        CreateRun();
+        Assert.Equal(ExitCodes.Success, Decide().Exit);
+        var before = Snapshot();
+        var oldEvents = File.ReadAllBytes(Path.Combine(_directory, "overlays", "events.ndjson"));
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — AEF signing curve
+        File.WriteAllText(KeyPath, key.ExportPkcs8PrivateKeyPem());
+        var (exit, output) = Decide("reject", keyPath: KeyPath);
+        Assert.Equal(ExitCodes.Success, exit);
+        var report = JsonNode.Parse(output)!;
+        Assert.Equal("signed", (string?)report["assurance"]);
+        Assert.False((bool)report["identityVerified"]!);
+        Assert.False(File.Exists(Path.Combine(_directory, "overlays", "seal-0001.dsse.json")));
+        Assert.True(File.Exists(Path.Combine(_directory, "overlays", "seal-0002.dsse.json")));
+        var publicKey = PublicKeyInfo.FromPem(key.ExportSubjectPublicKeyInfoPem());
+        foreach (var identity in new[] { "reviewer-1", "someone-else" })
+        {
+            var policy = new TrustPolicy([new TrustedKey(identity, publicKey)]);
+            var view = EffectiveView.Compute(_directory, DecisionTime, policy);
+            Assert.Equal("self-attested", view.Assurance[0].Shown);
+            Assert.Equal(identity == "reviewer-1" ? "signed" : "self-attested", view.Assurance[1].Shown);
+            Assert.Equal("reject", Assert.Single(view.Reviews).Status);
+        }
+        Assert.All(EffectiveView.Compute(_directory, DecisionTime, null).Assurance, a => Assert.Equal("self-attested", a.Shown));
+        var after = Snapshot();
+        foreach (var entry in before.Where(e => e.Key != Path.Combine("overlays", "events.ndjson")))
+            Assert.Equal(entry.Value, after[entry.Key]);
+        Assert.Equal(oldEvents, File.ReadAllBytes(Path.Combine(_directory, "overlays", "events.ndjson"))[..oldEvents.Length]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(_directory).Outcome);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("malformed")]
+    [InlineData("unsupported")]
+    public void Run_InvalidSigningKey_RefusesBeforeAppending(string input)
+    {
+        CreateRun();
+        if (input == "malformed") File.WriteAllText(KeyPath, "not a private key");
+        if (input == "unsupported")
+        {
+            using var key = RSA.Create(2048);
+            File.WriteAllText(KeyPath, key.ExportPkcs8PrivateKeyPem());
+        }
+        var before = Snapshot();
+        Assert.Equal(ExitCodes.UsageError, Decide(keyPath: KeyPath).Exit);
+        Assert.Equal(before.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
+    }
+
+    [Fact]
     public void Create_RequiredOptionsAndSupportedInvocation_ParseAsExpected()
     {
         Assert.NotEmpty(DecideCommand.Create().Parse([_directory]).Errors);
@@ -247,5 +301,6 @@ public sealed class DecideCommandTests : IDisposable
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "reject", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1"]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "waive", "--by", "reviewer", "--reason", "Reviewed", "--requirement", "REQ-42", "--expires", "2026-10-14T12:00:00Z"]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "adjudicate", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1", "--state", "failed"]).Errors);
+        Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "approve", "--by", "reviewer", "--reason", "Reviewed", "--key", "key.pem"]).Errors);
     }
 }

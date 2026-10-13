@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.CommandLine;
+using System.Security.Cryptography;
 using System.Text.Json;
 using AgentEval.Results;
 using AgentEval.Results.Integrity;
@@ -10,33 +11,34 @@ using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Commands;
 
-/// <summary>Records an explicit, self-attested review of a sealed run without changing its results.</summary>
+/// <summary>Records an explicit human decision on a sealed run without changing its results.</summary>
 internal static class DecideCommand
 {
     internal static Command Create()
     {
         var directory = new Argument<string>("run-dir") { Description = "A verified, sealed AEF run folder." };
         var kind = new Option<string>("--kind") { Required = true, Description = "Decision: approve, reject, waive, override or adjudicate. Does not change sealed results or gates." };
-        var identity = new Option<string>("--by") { Required = true, Description = "Your stable opaque identity; recorded as self-attested, not authenticated." };
+        var identity = new Option<string>("--by") { Required = true, Description = "Your stable opaque identity. Self-attested without --key; readers verify signed identity with their own trust policy." };
         var reason = new Option<string>("--reason") { Required = true, Description = "Why you are recording this decision." };
         var json = new Option<bool>("--json") { Description = "Print the event and sealed batch identifiers as JSON." };
         var result = new Option<string?>("--result") { Description = "Review this result ID instead of the whole run." };
         var requirement = new Option<string?>("--requirement") { Description = "External requirement ID to waive; use instead of --result." };
         var expires = new Option<string?>("--expires") { Description = "Required for waive: future RFC 3339 UTC time ending in Z." };
         var state = new Option<string?>("--state") { Description = "Required for override/adjudicate: effective AEF state (pending is not allowed)." };
+        var key = new Option<string?>("--key") { Description = "Unencrypted PKCS#8 PEM ECDSA P-256 private key to sign this decision's batch." };
         var command = new Command("decide", "Append and seal a human decision on an AEF run.");
         command.Add(directory);
-        foreach (var option in new Option[] { kind, identity, reason, json, result, requirement, expires, state }) command.Add(option);
+        foreach (var option in new Option[] { kind, identity, reason, json, result, requirement, expires, state, key }) command.Add(option);
         command.SetAction((ParseResult parsed, CancellationToken _) => Task.FromResult(Run(
             parsed.GetValue(directory)!, parsed.GetValue(kind)!, parsed.GetValue(identity)!, parsed.GetValue(reason)!,
             parsed.GetValue(json), Console.Out, Console.Error, result: parsed.GetValue(result),
-            requirement: parsed.GetValue(requirement), expires: parsed.GetValue(expires), state: parsed.GetValue(state))));
+            requirement: parsed.GetValue(requirement), expires: parsed.GetValue(expires), state: parsed.GetValue(state), keyPath: parsed.GetValue(key))));
         return command;
     }
 
     internal static int Run(string directory, string kind, string identity, string reason, bool json,
         TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, string? result = null,
-        string? requirement = null, string? expires = null, string? state = null)
+        string? requirement = null, string? expires = null, string? state = null, string? keyPath = null)
     {
         try
         {
@@ -82,6 +84,9 @@ internal static class DecideCommand
                 return ExitCodes.TestFailure;
             }
 
+            // Load and validate the key before appending anything; private material never enters the run.
+            using var signer = keyPath is null ? null : AefSigningKey.Load(keyPath);
+            var assurance = signer is null ? AefAssurance.SelfAttested : AefAssurance.Signed;
             var writer = AefOverlayWriter.Open(directory);
             // Do not silently claim earlier events in this reviewer's batch.
             if (writer.UnsealedAtOpen != 0 || writer.Batches >= AefOverlayWriter.MaxBatches)
@@ -92,16 +97,16 @@ internal static class DecideCommand
             var eventId = writer.Append(new AefOverlayEvent
             {
                 Kind = decision, Target = new AefOverlayTarget { Result = result, Requirement = requirement }, Reason = reason,
-                By = new AefIdentity(identity, AefAssurance.SelfAttested),
+                By = new AefIdentity(identity, assurance),
                 At = at, Expires = until, State = effectiveState,
             });
-            var batch = writer.SealBatch();
+            var batch = writer.SealBatch(signer);
             if (json)
                 stdout.WriteLine(JsonSerializer.Serialize(new { eventId, runId = writer.RunId, resultId = result,
                     requirementId = requirement, expires = until?.ToString(), state, kind,
-                    assurance = "self-attested", batch = batch.Number, sealPath = batch.SealPath }));
+                    assurance = AefNames.Of(assurance), identityVerified = false, batch = batch.Number, sealPath = batch.SealPath }));
             else
-                stdout.WriteLine($"Recorded {kind} for {result ?? requirement ?? "the run"} as {eventId}, batch {batch.Number} (self-attested). Sealed results and gates are unchanged.");
+                stdout.WriteLine($"Recorded {kind} for {result ?? requirement ?? "the run"} as {eventId}, batch {batch.Number} ({AefNames.Of(assurance)}; identity trust not checked). Sealed results and gates are unchanged.");
             return ExitCodes.Success;
         }
         catch (AefWriteException)
@@ -109,7 +114,7 @@ internal static class DecideCommand
             stderr.WriteLine("Decision could not be sealed. Inspect the run and overlay journal before retrying; an unsealed event may remain.");
             return ExitCodes.TestFailure;
         }
-        catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or FormatException)
+        catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException or FormatException or NotSupportedException or CryptographicException)
         {
             stderr.WriteLine($"Decision input or storage error: {error.Message}");
             return ExitCodes.UsageError;

@@ -35,7 +35,7 @@ agenteval aef view ./my-run --json
 `decide` supports `approve` and `reject` for the run, or for one result with `--result <result-id>`.
 The result ID must belong to this run; reviewing it leaves the run's review status unchanged.
 Both require an explicit opaque identity and a
-nonblank reason. Identity is **self-attested**, not authenticated or cryptographically signed. The command
+nonblank reason. Without `--key`, identity is **self-attested**, not authenticated or cryptographically signed. The command
 appends one overlay event and seals its batch; approval does not change the original results, summaries, gates
 or checkpoint outcome. Inspect the effective review status with `aef view`.
 
@@ -63,6 +63,15 @@ To change a result's **effective** state, use `--kind override` or `--kind adjud
 The last sealed state decision for that result wins in file order. `aef view` shows both its original sealed
 state and effective state. Parents, summaries, gates and checkpoint outcomes are not recomputed.
 `--state` is refused for other decision kinds.
+
+Add `--key <private-key.pem>` to sign the new decision's batch with an unencrypted PKCS#8 ECDSA P-256 key.
+The key is loaded before any event is appended; missing, malformed and unsupported keys cause no mutation.
+Earlier batches are left untouched. Keep the key outside the run folder.
+
+Signing records a claimed `signed` assurance; it does not authenticate `--by`. The JSON response reports
+`identityVerified: false`. Use `agenteval aef view ./my-run --policy trust-policy.json --json` to verify the
+batch's key against the policy's identity mapping. Without a matching policy, the reader shows the decision
+as self-attested. The private key is never copied into evidence.
 
 ## What a run looks like
 
