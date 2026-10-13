@@ -1,0 +1,30 @@
+schemaVersion: "1.0"
+requirements:
+  - id: example:quality
+    description: Illustrative threshold; replace with your own acceptance policy.
+    selector:
+      lane: quality
+      metric: accuracy
+      path: accuracy
+    acceptance:
+      kind: threshold
+      operator: ">="
+      value: 0.8
+    aggregation:
+      kind: all
+      missing: not_measured
+    freshnessSeconds: 86400
+  - id: example:safety
+    description: Every selected measured safety result must pass.
+    selector:
+      lane: safety
+      metric: safety
+      path: safety
+    acceptance:
+      kind: state
+      states: [passed]
+    aggregation:
+      kind: all
+      missing: not_measured
+    freshnessSeconds: 86400
+    allowEffectiveOverrides: false

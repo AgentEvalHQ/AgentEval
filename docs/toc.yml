@@ -209,6 +209,8 @@
     href: export.md
   - name: AEF Evidence Format
     href: aef.md
+  - name: Requirement Catalogues
+    href: requirements.md
   - name: Local AEF Runner
     href: aef.md#local-dataset-runner
   - name: Signed Native Checkpoint

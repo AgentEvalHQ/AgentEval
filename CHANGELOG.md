@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Requirement catalogues:** `requirements validate` checks an external versioned YAML/JSON catalogue,
+  including explicit selectors, acceptance, aggregation and freshness. Loading is bounded, ambiguous input
+  is refused, and JSON output names the exact source digest. No evidence is modified or agent invoked.
+- **Requirement status:** `requirements status` evaluates explicitly hash-selected sealed AEF runs with
+  exact subject/version binding, declared aggregation and freshness. Reports preserve sealed and opted-in
+  effective status, reviews, scoped signed waiver history, and catalogue/policy/overlay identities.
+
 - **TypedMemEval AEF diagnostics:** per-question extensions retain attribution and its observation level,
   optional gold coverage and distance, and forgetting flags. Inconclusive/unrun typed outcomes remain visible
   beside their absent measurement states. Missing coverage is not zero; scoring and gates are unchanged.

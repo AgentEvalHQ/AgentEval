@@ -1049,6 +1049,7 @@ rootCmd.Add(LogFileCommand.Create());
 rootCmd.Add(AssertAiCommand.Create());             // assert-ai — serve/import/export/calibrate with Microsoft's ASSERT (assert-ai 0.3)
 rootCmd.Add(AefCommand.Create());                  // aef — verify/seal/view/checkpoint AEF 1.0 runs; export store v1, import ASSERT
 rootCmd.Add(DecideCommand.Create());               // decide — append a self-attested review without changing sealed results
+rootCmd.Add(RequirementsCommand.Create());         // requirements — external catalogue validation and evidence status
 rootCmd.Add(AgentEval.Cli.Runner.RunnerManifest.Create());
 var aefRunCommand = AgentEval.Cli.Runner.RunCommand.Create();
 rootCmd.Add(aefRunCommand);
