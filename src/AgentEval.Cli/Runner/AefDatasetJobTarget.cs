@@ -16,6 +16,7 @@ using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Json;
 using AgentEval.Results.Runner;
 using AgentEval.Results.Schemas;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 using Microsoft.Extensions.AI;
 
@@ -172,7 +173,19 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
                 if (instruments > slots)
                     throw Refuse("Each distinct criteria list in a dataset suite requires a matching judge entry in the plan; repeat the judge entry to authorize multiple rubric instruments.");
             }
-            suites.Add(new Suite(this, reference, descriptor["version"]!.GetValue<string>(), AefEvalWriter.DatasetDigest(bytes), cases));
+            var version = descriptor["version"]!.GetValue<string>();
+            var definition = DatasetSuiteDefinition.Create(reference, version, bytes, cases.Select(c => c.Id!), new JsonObject
+            {
+                ["pipeline"] = "dataset-job", ["trialsPerCase"] = 1,
+                ["caseSeconds"] = _caseSeconds,
+                ["subjectLimits"] = new JsonObject { ["inputCap"] = _subject!.InputCap, ["outputCap"] = _subject.OutputCap, ["maxCalls"] = _subject.MaxCalls },
+                ["judge"] = _judge is null ? null : new JsonObject
+                {
+                    ["model"] = _judge.Model, ["provider"] = _judge.Provider,
+                    ["inputCap"] = _judge.InputCap, ["outputCap"] = _judge.OutputCap, ["maxCalls"] = _judge.MaxCalls,
+                },
+            });
+            suites.Add(new Suite(this, definition, cases));
         }
         Suites = suites;
         var prices = JsonSerializer.SerializeToUtf8Bytes(Roles().Select(r => new { r.Model, r.InputPrice, r.OutputPrice }));
@@ -232,14 +245,15 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         private readonly AefDatasetJobTarget _owner;
         private readonly List<(Role Role, BudgetedChatClient Client, bool Readiness)> _clients = [];
         private bool _prepared, _closed;
-        public Suite(AefDatasetJobTarget owner, string reference, string version, string digest, IReadOnlyList<DatasetTestCase> cases)
+        public Suite(AefDatasetJobTarget owner, SuiteDefinitionManifest definition, IReadOnlyList<DatasetTestCase> cases)
         {
-            _owner = owner; Ref = reference; Version = version; Digest = digest;
+            _owner = owner; Definition = definition; Ref = definition.SuiteRef; Version = definition.DefinitionVersion; Digest = definition.Digest;
             Cases = cases.Select(c => (IAefJobCase)new Case(this, c)).ToArray();
         }
         public string Ref { get; }
         public string Version { get; }
         public string Digest { get; }
+        public SuiteDefinitionManifest Definition { get; }
         public string CasePath => AefEvalWriter.CasePath;
         public IReadOnlyList<IAefJobCase> Cases { get; }
         public IReadOnlyList<AefMetric> Metrics =>

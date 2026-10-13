@@ -6,6 +6,7 @@ using System.Text;
 using AgentEval.Models;
 using AgentEval.Output;
 using AgentEval.Results.Signatures;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Native;
@@ -80,8 +81,11 @@ public sealed record AefEvalRunOptions
     /// <summary>The dataset's name as the suite's ref (a path relative to the workspace, say).</summary>
     public required string DatasetName { get; init; }
 
-    /// <summary>The dataset's bytes: its digest, over LF-normalised text, is the suite's digest (allowed under <c>off</c>).</summary>
+    /// <summary>The exact captured dataset bytes. Full definitions bind these bytes; legacy callers without Definition retain the LF-normalized dataset-only digest.</summary>
     public required byte[] DatasetBytes { get; init; }
+
+    /// <summary>Declared full suite definition captured before execution. Without one the digest retains its legacy dataset-only scope.</summary>
+    public SuiteDefinitionManifest? Definition { get; init; }
 
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }

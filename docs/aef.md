@@ -199,8 +199,12 @@ Endpoint validation happens during plan loading, before credentials or provider 
 
 Suites use `dataset:<relative-path>` with forward slashes, resolved from the plan's directory. JSON, JSONL,
 YAML, CSV and TSV snapshots require explicit unique case IDs; IDs are never trimmed or replaced. The digest
-uses the same LF-normalised bytes as native eval. A supplied plan digest must match; an omitted digest remains
-omitted in the run. Case fields use the ordinary harness's input, expected substring and evaluation criteria.
+now identifies a full [suite definition](suite-identity.md): exact snapshot bytes, planned cases, evaluator
+implementation and applied evaluation policy. `run --dry-run --json` reports each resolved suite digest without
+making requests. Pin that digest in the plan when required. Old dataset-only digests no longer match the dataset
+target's full definition; refresh them through dry-run. A native dataset run records the resolved full digest even
+when the plan leaves it unspecified. Scripted conformance targets retain their existing digest behavior.
+Case fields use the ordinary harness's input, expected substring and evaluation criteria.
 Tool expectations are refused because this adapter cannot enforce them. Criteria require a plan judge.
 The first judge uses the existing default harness prompt; custom rubric digests are refused. A requested judge
 provider must match `openai-compatible` or `azure`, according to its adapter.

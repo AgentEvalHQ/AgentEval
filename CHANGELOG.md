@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
+  persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run
+  reports the full digests for plan pinning; old dataset-only pins must be refreshed. Eval parses and identifies
+  one captured snapshot, avoiding a later file reread. Legacy adapter calls remain explicitly dataset-scoped.
+
 - **Requirement catalogues:** `requirements validate` checks an external versioned YAML/JSON catalogue,
   including explicit selectors, acceptance, aggregation and freshness. Loading is bounded, ambiguous input
   is refused, and JSON output names the exact source digest. No evidence is modified or agent invoked.

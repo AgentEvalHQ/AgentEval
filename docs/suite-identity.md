@@ -4,9 +4,9 @@ A case roster identifies which cases were observed. It does not identify the pro
 weights, aggregation or configuration that defined their evaluation. AgentEval's external
 [suite manifest](../schemas/suites/1/definition.schema.json) separates these concepts.
 
-The manifest reader and deterministic hashing contract are implemented. Native producer and
-dataset-runner bindings are still being implemented; existing run digests are not silently
-reclassified as full-definition identities.
+The manifest reader, deterministic hashing, native eval and dataset-runner bindings are implemented.
+Probe/composite bindings and comparison compatibility are still being implemented; existing
+dataset-only or roster-only identities are not silently reclassified as full definitions.
 
 ## Manifest 1.0
 
@@ -45,3 +45,29 @@ change its digest. Keep the observed roster separate, so a partial run cannot ma
 different frozen definition. Caller-supplied declarations still require producer integration:
 the manifest reader cannot infer a hidden prompt or prove that arbitrary configuration describes
 what a producer actually executed.
+
+## Dataset producers
+
+Native CLI eval parses and identifies the same captured dataset byte snapshot. Its full definition
+includes the planned case IDs, trial policy, optional harness/named-metric judge configuration and
+content digests of the implementation assemblies that supply parsing, default criteria, harness
+logic and embedded prompts. Hashing those assemblies is conservative: rebuilding or changing a
+framework-specific assembly can change identity even if an unrelated method changed. No raw dataset
+or prompt text is copied into the definition. Subject model identity is not the evaluator identity;
+changing the subject alone does not change the suite, while changing an LLM metric's judge does.
+
+Native eval and dataset jobs persist the normalized manifest at
+`ext/agenteval/suite-definition.json`, covered by the run seal, with a compact
+`agenteval.suiteIdentity` extension pointing to it. The complete planned definition is present even
+before cases finish. An interrupted run retains it; eval summaries record the observed roster separately.
+Adding a case outside a frozen planned roster is refused.
+
+Adapter callers can supply `AefEvalRunOptions.Definition`. Its suite reference and exact dataset
+digest must match the supplied snapshot. Callers omitting it keep the earlier dataset-only digest,
+explicitly labelled `scope: dataset`. This compatibility path does not claim full definition identity.
+
+Dataset-job dry runs report resolved suite digests for pinning in the plan. A supplied digest must
+match the full definition; old dataset-byte digests are refused. Limits that control evaluation
+(case deadline and role input/output/call caps) are included. Job interruption, observed costs and
+which planned cases finished are not used to build a new definition. Runner validation checks that
+the declared definition, suite reference/version, content digest and actual planned roster agree.

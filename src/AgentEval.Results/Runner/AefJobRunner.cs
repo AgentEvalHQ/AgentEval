@@ -407,6 +407,10 @@ public static class AefJobRunner
                 {
                     return ($"the content of the suite {suiteRef} version {version} does not have the plan's digest ([PLAN-8])", []);
                 }
+                if (suite.Definition is { } definition && (definition.SuiteRef != suite.Ref
+                    || definition.DefinitionVersion != suite.Version || definition.SuiteContentDigest != suite.Digest
+                    || !definition.CaseIds.ToHashSet(StringComparer.Ordinal).SetEquals(suite.Cases.Select(c => c.CaseId))))
+                    return ("the resolved suite definition does not bind the frozen content, version and complete planned roster", []);
 
                 resolved.Add((planSuite, suite));
             }
@@ -533,7 +537,10 @@ public static class AefJobRunner
                     Version = AefNode.String(subject["version"]),
                 },
                 Deployment = deployment is null ? null : new AefDeployment { Ref = deployment, Endpoint = AefNode.String(subject["endpoint"]) },
-                Suite = new AefSuite { Ref = suite.Ref, Version = suite.Version, Digest = AefNode.String(planSuite["digest"]) },
+                Suite = new AefSuite { Ref = suite.Ref, Version = suite.Version,
+                    Digest = suite.Definition?.SuiteContentDigest ?? AefNode.String(planSuite["digest"]), Frozen = suite.Definition?.Frozen },
+                Ext = suite.Definition is { } definition
+                    ? new JsonObject { ["agenteval.suiteIdentity"] = definition.Metadata() } : null,
 
                 // No judges: a scripted target grades with no model, and a run names the models that graded it ([RUN-9];
                 // §9.2.1, round 8). The plan's judges bound which may; none is within them ([STRM-4]).
@@ -545,6 +552,8 @@ public static class AefJobRunner
             };
             var directory = Path.Combine(output, RunsFolder, runId);
             var writer = AefRunWriter.Create(directory, header);
+            if (suite.Definition is { } manifest)
+                writer.PutExtFile(Suites.SuiteDefinitionManifest.ExtensionFile, manifest.ToBytes());
             writer.SetMetrics(suite.Metrics);
             return new OpenRun(runId, directory, writer, AefNode.String(planSuite["lane"]), suite);
         }

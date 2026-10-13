@@ -11,6 +11,8 @@ namespace AgentEval.Results.Suites;
 /// <summary>A validated external suite definition, distinct from any run's observed case roster.</summary>
 public sealed class SuiteDefinitionManifest
 {
+    /// <summary>Relative producer-extension path passed to AefRunWriter.PutExtFile; included in the run seal.</summary>
+    public const string ExtensionFile = "agenteval/suite-definition.json";
     private readonly byte[] _bytes;
 
     internal SuiteDefinitionManifest(JsonObject normalized, byte[] bytes)
@@ -44,6 +46,13 @@ public sealed class SuiteDefinitionManifest
     public JsonObject ToJson() => AefJsonReader.ParseDocument(_bytes);
     /// <summary>A detached copy of the canonical manifest bytes, suitable for retaining as producer metadata.</summary>
     public byte[] ToBytes() => (byte[])_bytes.Clone();
+
+    /// <summary>Compact provenance pointing at the sealed manifest, without duplicating its potentially large roster.</summary>
+    public JsonObject Metadata() => new()
+    {
+        ["scope"] = "definition", ["schemaVersion"] = SchemaVersion, ["digest"] = Digest,
+        ["path"] = "ext/" + ExtensionFile, ["frozen"] = Frozen, ["plannedCases"] = CaseIds.Count,
+    };
 
     /// <summary>Exact byte identity for an input artifact. No newline or Unicode normalization is implicit.</summary>
     public static string Hash(ReadOnlySpan<byte> bytes) => "sha256:" + Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
