@@ -73,6 +73,11 @@ Signing records a claimed `signed` assurance; it does not authenticate `--by`. T
 batch's key against the policy's identity mapping. Without a matching policy, the reader shows the decision
 as self-attested. The private key is never copied into evidence.
 
+For an offline cross-language check after building the CLI, run
+`python scripts/verify-aef-decisions.py --cli src/AgentEval.Cli/bin/Debug/net10.0/AgentEval.Cli.dll`.
+It requires OpenSSL and compares all decision kinds, waiver boundaries and signature trust with the independent
+Python reader, using temporary evidence and a temporary signing key.
+
 ## What a run looks like
 
 ```text
