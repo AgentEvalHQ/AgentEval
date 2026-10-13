@@ -60,6 +60,22 @@ public sealed class AefEvalDefinitionTests : IDisposable
     }
 
     [Fact]
+    public void Complete_InterruptedBeforeFirstCase_RetainsFrozenPlannedIdentity()
+    {
+        using var session = AefEvalWriter.Start(_root, Options(), Start);
+        var (directory, _) = session.Complete(Start.AddSeconds(1), abortReason: "cancelled");
+        var header = AefTestRuns.Document(directory, "run.json");
+        Assert.Equal(Definition().Digest, (string?)header["suite"]!["digest"]);
+        Assert.Equal(2, (int)header["ext"]!["agenteval.suiteIdentity"]!["plannedCases"]!);
+        var summary = AefTestRuns.Document(directory, "summary.json");
+        Assert.Equal(0, (int)summary["ext"]!["agenteval.observedRoster"]!["count"]!);
+        Assert.Equal(Definition().ToBytes(), File.ReadAllBytes(Path.Combine(directory, "ext", SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Empty(File.ReadAllBytes(Path.Combine(directory, "results.ndjson")));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        if (AefTestRuns.ReferenceVerify(directory) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+    }
+
+    [Fact]
     public void Add_UndeclaredCase_RefusesBeforeWritingResult()
     {
         using var session = AefEvalWriter.Start(_root, Options(), Start);

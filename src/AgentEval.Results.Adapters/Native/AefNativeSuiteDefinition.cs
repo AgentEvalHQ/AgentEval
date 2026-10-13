@@ -29,6 +29,8 @@ internal static class AefNativeSuiteDefinition
         {
             if (definition.Kind != kind || definition.SuiteRef != reference)
                 throw Bad("definition kind or suite reference differs");
+            if (generated && definition.Frozen)
+                throw Bad("generated stimuli cannot bind a frozen suite definition");
             if (definition.Frozen)
             {
                 var planned = definition.CaseIds.ToHashSet(StringComparer.Ordinal);

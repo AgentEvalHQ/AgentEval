@@ -84,8 +84,12 @@ nested component IDs. `run.json` records the observed roster separately in `agen
 Without a manifest, probe adapters label their identity `observed-roster` and composite adapters
 label theirs `legacy-roster`. Existing composite roster digests remain unchanged, including empty
 interrupted exports. These scopes do not prove evaluation-definition equivalence. Generated probes
-without a frozen declaration have no suite content digest and report `frozen: false`; a supplied
-dynamic manifest identifies the recipe without claiming fixed generated stimuli.
+have no suite content digest and report `frozen: false`; a supplied dynamic manifest identifies
+the recipe without claiming fixed generated stimuli. A probe writer rejects a frozen declaration
+when its stimulus mode is `generated`, before creating the run. Producers that materialize all
+stimuli before execution must declare that fixed suite using the `suite` stimulus mode.
+Cancellation before the first result still preserves the declared manifest and planned roster;
+the separately recorded observed roster is empty. This applies to frozen suites and dynamic recipes.
 
 GDPR and EU AI Act commands capture supported composite graphs before execution and pass that same
 manifest to successful and interrupted exports. Capture covers the complete nested roster, component
