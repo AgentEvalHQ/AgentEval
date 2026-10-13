@@ -6,6 +6,40 @@ namespace AgentEval.Tests.Cli.Aef;
 
 public sealed class CompositeSuiteDefinitionTests
 {
+    private sealed class CyclicWrapper : IEvalDefinitionWrapper
+    {
+        public string Key => "cycle";
+        public string Name => "cycle";
+        public string Category => "test";
+        public string Version => "1";
+        public IEval DefinitionInner => this;
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void Shape_CyclicWrapper_RefusesBoundedly()
+    {
+        Assert.Throws<ArgumentException>(() => AgentEval.Cli.Commands.BenchAef.Shape(new CyclicWrapper()));
+    }
+    [Theory]
+    [InlineData("agentic-execution")]
+    [InlineData("tool-call-accuracy")]
+    [InlineData("rag-quality")]
+    [InlineData("conversational")]
+    [InlineData("reasoning")]
+    [InlineData("user-experience")]
+    public void Capture_AgenticPreset_IdentifiesConfiguredInstrumentsWithoutCalls(string preset)
+    {
+        var judge = new Judge("private instrument");
+        var graph = AgentEval.Cli.Commands.BenchAgenticCommand.ResolvePreset(preset, judge, "subject", "judge");
+        var definition = CompositeSuiteDefinition.TryCreate("bench:agentic/" + preset, graph, new EvalInput("q", "r", GroundTruth: "secret reference"), 1);
+        Assert.NotNull(definition);
+        Assert.NotEmpty(definition.CaseIds);
+        Assert.Equal(0, judge.Calls);
+        Assert.DoesNotContain("secret reference", definition.ToJson().ToJsonString());
+        var changed = CompositeSuiteDefinition.TryCreate("bench:agentic/" + preset, graph, new EvalInput("q", "r", GroundTruth: "different reference"), 1);
+        Assert.NotEqual(definition.Digest, changed!.Digest);
+    }
     private sealed class UnidentifiedJudge : IEvaluator
     {
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
@@ -60,6 +94,10 @@ public sealed class CompositeSuiteDefinitionTests
         Assert.NotEqual(baseline, Digest(Build(new Judge("prompt"), weight: 2)));
         Assert.NotEqual(baseline, Digest(Build(new Judge("prompt"), criterion: "changed")));
         Assert.NotEqual(baseline, Digest(Build(new Judge("prompt")), runs: 3));
+        var declaredPolicy = CompositeSuiteDefinition.TryCreate("bench:test", Build(new Judge("prompt")),
+            input with { SystemMessage = "private policy" }, 1)!;
+        Assert.NotEqual(baseline, declaredPolicy.Digest);
+        Assert.DoesNotContain("private policy", declaredPolicy.ToJson().ToJsonString());
     }
 
     [Fact]

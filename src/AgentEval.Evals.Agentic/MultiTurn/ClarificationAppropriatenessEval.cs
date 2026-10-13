@@ -23,9 +23,12 @@ namespace AgentEval.Evals.Agentic.MultiTurn;
 /// See <see cref="EvaluatorCostMap.GetTier(string)"/> with key <c>"clarification_appropriateness"</c>.
 /// </para>
 /// </summary>
-public sealed class ClarificationAppropriatenessEval : IEval
+public sealed class ClarificationAppropriatenessEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

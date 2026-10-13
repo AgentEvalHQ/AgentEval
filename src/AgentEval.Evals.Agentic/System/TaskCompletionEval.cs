@@ -24,9 +24,12 @@ namespace AgentEval.Evals.Agentic.System;
 /// <c>Resources/Prompts/system/task-completion.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
-public sealed class TaskCompletionEval : IEval
+public sealed class TaskCompletionEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

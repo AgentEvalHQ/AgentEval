@@ -40,9 +40,12 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
-public sealed class GroundednessEval : IEval
+public sealed class GroundednessEval : IEvalDefinitionWrapper
 {
     private readonly CompositeEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

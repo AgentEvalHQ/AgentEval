@@ -82,9 +82,17 @@ internal static class BenchAef
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
-        new(weight, required, onFailure.ToString(), eval is CompositeEval composite
-            ? composite.Components.Select(c => Shape(c.Eval, c.Weight, c.Required, c.OnFailure)).ToList()
-            : []);
+        ShapeCore(eval, weight, required, onFailure, 0);
+
+    private static AefComponentShape ShapeCore(IEval eval, double weight, bool required, ComponentFailureEffect onFailure, int depth)
+    {
+        if (depth > EvalTreeLimits.MaxTreeWalkDepth)
+            throw new ArgumentException("Expected: a bounded evaluation tree. Actual: definition nesting exceeds the limit. Suggestions: remove wrapper cycles or reduce nesting. Because: evidence capture must not overflow the stack.");
+        return eval is IEvalDefinitionWrapper wrapper ? ShapeCore(wrapper.DefinitionInner, weight, required, onFailure, depth + 1)
+            : new(weight, required, onFailure.ToString(), eval is CompositeEval composite
+                ? composite.Components.Select(c => ShapeCore(c.Eval, c.Weight, c.Required, c.OnFailure, depth + 1)).ToList()
+                : []);
+    }
 
     /// <summary>
     /// Writes the run; returns true only when an explicit <paramref name="aef"/> could not be written (the command then

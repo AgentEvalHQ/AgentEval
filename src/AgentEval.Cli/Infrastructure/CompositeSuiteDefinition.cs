@@ -30,6 +30,12 @@ internal static class CompositeSuiteDefinition
             var node = new JsonObject { ["key"] = eval.Key, ["version"] = eval.Version, ["type"] = eval.GetType().FullName };
             switch (eval)
             {
+                case IEvalDefinitionWrapper wrapper:
+                    if (wrapper.Key != wrapper.DefinitionInner.Key) return null;
+                    var wrapped = Capture(wrapper.DefinitionInner, emitted, depth + 1);
+                    if (wrapped is null) return null;
+                    node["inner"] = wrapped;
+                    return node;
                 case AgentScenarioEval scenario:
                     var inner = Capture(scenario.Inner, emitted, depth + 1);
                     if (inner is null) return null;
@@ -73,6 +79,9 @@ internal static class CompositeSuiteDefinition
                     }
                     node["components"] = components;
                     return node;
+                case IEvalConfigurationSource configured:
+                    node["configuration"] = configured.CaptureConfiguration().DeepClone();
+                    return node;
                 default: return null;
             }
         }
@@ -85,6 +94,12 @@ internal static class CompositeSuiteDefinition
         inputs["query"] = SuiteDefinitionManifest.Hash(Encoding.UTF8.GetBytes(input.Query));
         // Context influences the judge; responses belong to the subject evidence, not the suite definition.
         inputs["context"] = SuiteDefinitionManifest.Hash(Encoding.UTF8.GetBytes(input.Context ?? ""));
+        inputs["groundTruth"] = SuiteDefinitionManifest.Hash(Encoding.UTF8.GetBytes(input.GroundTruth ?? ""));
+        inputs["inputDeclarations"] = SuiteDefinitionManifest.Hash(AefJsonWriter.Document(
+            System.Text.Json.JsonSerializer.SerializeToNode(new
+            {
+                input.SystemMessage, input.ExpectedActions, input.ToolDefinitions,
+            })!.AsObject()));
         return new SuiteDefinitionReader().Read(AefJsonWriter.Document(new JsonObject
         {
             ["schemaVersion"] = "1.0", ["kind"] = "composite", ["suiteRef"] = suiteRef,

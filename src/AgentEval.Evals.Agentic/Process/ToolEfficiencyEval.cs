@@ -31,9 +31,12 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_call_accuracy</c> (efficiency sub-dimension)
 /// </para>
 /// </summary>
-public sealed class ToolEfficiencyEval : IEval
+public sealed class ToolEfficiencyEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

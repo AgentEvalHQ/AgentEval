@@ -25,9 +25,12 @@ namespace AgentEval.Evals.Agentic.MultiTurn;
 /// See <see cref="EvaluatorCostMap.GetTier(string)"/> with key <c>"turn_coherence"</c>.
 /// </para>
 /// </summary>
-public sealed class TurnCoherenceEval : IEval
+public sealed class TurnCoherenceEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

@@ -19,9 +19,12 @@ namespace AgentEval.Evals.Agentic.UX;
 /// <b>Cost tier: LOW</b> — single-turn LLM judge (~$0.005-0.01 per scenario).
 /// </para>
 /// </summary>
-public sealed class ToneAppropriatenessEval : IEval
+public sealed class ToneAppropriatenessEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

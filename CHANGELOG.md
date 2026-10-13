@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their manifests on cancellation. The redteam CLI captures exact prepared probes without regenerating
   them and separates attacker-driven recipe identity from frozen content. OWASP/MITRE/NIST scan
   exports also bind prepared probes and resolved verdict presets, including explicit mocks and
-  interrupted runs. Other composite producer capture remains in progress.
+  interrupted runs. Agentic execution, tool-call accuracy, RAG quality, conversational, reasoning and
+  user-experience graphs now expose configured instruments for pre-execution capture, including
+  hashed references. Other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

@@ -24,9 +24,12 @@ namespace AgentEval.Evals.Agentic.Memory;
 /// See <see cref="EvaluatorCostMap.GetTier(string)"/> with key <c>"memory_recall_accuracy"</c>.
 /// </para>
 /// </summary>
-public sealed class MemoryRecallAccuracyEval : IEval
+public sealed class MemoryRecallAccuracyEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

@@ -99,6 +99,19 @@ Unknown evaluator kinds, unidentified prompts and custom aggregation strategies 
 scope; they are not guessed from result trees. Agentic and other composite producer capture is
 still in progress. Explicit mock benchmark paths also retain their existing identity scope.
 
+Agentic wrappers can expose their configured inner instrument through `IEvalDefinitionWrapper`.
+The wrapper implementation is still hashed, including its input framing and fixed decision logic.
+The contract is only suitable when all configurable settings reside in the inner instrument and
+the result key/tree structure is preserved. Leaf evaluators can provide a detached, content-free
+configuration through `IEvalConfigurationSource`; F1 includes its threshold and hashed fallback
+reference, and path-distance includes its threshold. Capture and evidence shape traversal are bounded.
+
+The agentic CLI captures supported graphs before evaluation, including a hash of the supplied
+ground-truth reference and declared system message, expected actions and tool definitions. Observed
+responses/tool calls remain subject evidence. Current coverage includes agentic execution, tool-call accuracy, RAG quality,
+conversational, reasoning and user-experience presets. Other presets and composite mock capture remain
+in progress; unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
+
 ## Red-team scan capture
 
 `ScanOptions.OnPlanPrepared` observes the runner's ordered, materialized attack arms after transforms

@@ -26,9 +26,12 @@ namespace AgentEval.Evals.Agentic.MultiTurn;
 /// See <see cref="EvaluatorCostMap.GetTier(string)"/> with key <c>"goal_tracking"</c>.
 /// </para>
 /// </summary>
-public sealed class GoalTrackingEval : IEval
+public sealed class GoalTrackingEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

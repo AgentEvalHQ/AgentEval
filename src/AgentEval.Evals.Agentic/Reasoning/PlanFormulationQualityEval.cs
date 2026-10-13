@@ -40,7 +40,7 @@ namespace AgentEval.Evals.Agentic.Reasoning;
 /// Source: AgentEval-original. Plan 06 §3.3 B3.1.
 /// </para>
 /// </summary>
-public sealed class PlanFormulationQualityEval : IEval
+public sealed class PlanFormulationQualityEval : IEvalDefinitionWrapper
 {
     /// <summary>
     /// Metadata key holding the agent's explicit plan text. When present and non-empty,
@@ -56,6 +56,9 @@ public sealed class PlanFormulationQualityEval : IEval
     ];
 
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

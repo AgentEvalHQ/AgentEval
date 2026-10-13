@@ -38,9 +38,12 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class QaCompositeEval : IEval
+public sealed class QaCompositeEval : IEvalDefinitionWrapper
 {
     private readonly CompositeEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

@@ -22,9 +22,12 @@ namespace AgentEval.Evals.Agentic.Calibration;
 /// <b>Cost tier: LOW</b> — single-turn LLM judge (~$0.005-0.01 per scenario).
 /// </para>
 /// </summary>
-public sealed class UncertaintyAcknowledgmentEval : IEval
+public sealed class UncertaintyAcknowledgmentEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

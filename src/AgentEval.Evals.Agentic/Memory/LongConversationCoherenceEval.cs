@@ -24,9 +24,12 @@ namespace AgentEval.Evals.Agentic.Memory;
 /// See <see cref="EvaluatorCostMap.GetTier(string)"/> with key <c>"long_conversation_coherence"</c>.
 /// </para>
 /// </summary>
-public sealed class LongConversationCoherenceEval : IEval
+public sealed class LongConversationCoherenceEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;
