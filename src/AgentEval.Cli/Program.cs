@@ -606,11 +606,13 @@ benchCmd.Add(benchNistCmd);
         var benchLmePresetOpt = new Option<string?>("--preset") { Description = "subset | full. Default: subset. 'full' requires LONGMEMEVAL_DATASET_PATH." };
         var benchLmeSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent under evaluation). REQUIRED." };
         var benchLmeRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
+        var benchLmePairedOpt = new Option<bool>("--paired-oracle") { Description = "Run normal evaluation then a gold-only oracle over the same selection; approximately doubles calls. Writes separate paired evidence; exit status follows the normal arm." };
 
         var benchLmeCmd = new Command("longmemeval", "Run the LongMemEval ICLR 2025 memory benchmark. Uses the provider AI_INFERENCE_PROVIDER selects (azure | bitdeer | openai | foundry | openai-compatible) — there is no stub fallback (the runner makes ~2 LLM calls per question; the LLM round-trip IS the correctness signal).");
         benchLmeCmd.Add(benchLmePresetOpt);
         benchLmeCmd.Add(benchLmeSubjectOpt);
         benchLmeCmd.Add(benchLmeRootOpt);
+        benchLmeCmd.Add(benchLmePairedOpt);
         var benchLmeAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
         var benchLmeNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
         var benchLmeSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
@@ -627,6 +629,9 @@ benchCmd.Add(benchNistCmd);
                 return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchLmeRootOpt);
+            if (parseResult.GetValue(benchLmePairedOpt))
+                return await BenchLongMemEvalCommand.RunPairedAsync(preset, subject, root, ct,
+                    parseResult.GetValue(benchLmeAefOpt), parseResult.GetValue(benchLmeNoAefOpt), parseResult.GetValue(benchLmeSubjectVersionOpt));
             return await BenchLongMemEvalCommand.RunAsync(preset, subject, root, ct,
                 parseResult.GetValue(benchLmeAefOpt), parseResult.GetValue(benchLmeNoAefOpt), parseResult.GetValue(benchLmeSubjectVersionOpt));
         });

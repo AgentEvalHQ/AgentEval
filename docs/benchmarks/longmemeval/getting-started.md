@@ -324,6 +324,9 @@ Interpretation:
 
 ## Capturing paired identity and progress
 
+The CLI exposes the same evaluation as `bench longmemeval --paired-oracle`. See
+[paired AEF evidence](paired-evidence.md) for the two-run format, linking and interruption behavior.
+
 Paired results also retain a content-free `Plan`: a unique `PairId`, the selected source input
 digest and ordered question IDs, detached options, and declared answer-model identities. The pair
 ID associates one execution; it is not a content digest and changes on every repeated run.

@@ -207,7 +207,8 @@ The CLI seals a frozen definition for this materialized selection, even when the
 used an unspecified random seed. It does not sample a second time or re-read a changed dataset to derive
 identity. Full planned rosters survive interruption; observations remain separate. Empty selections
 declare the existing root-only case. Existing runner overloads retain their behavior; new progress
-overloads accept an optional preparation callback. Oracle and paired export integration follows in W04.
+overloads accept an optional preparation callback. [Paired exports](benchmarks/longmemeval/paired-evidence.md)
+retain separate normal and oracle definitions and link the oracle to the normal seal.
 
 The paired runner captures a single `LongMemEvalPairedPlan` before calls, then reports preparation
 and observed progress separately for normal and oracle arms. Its source input digest binds the
@@ -215,7 +216,7 @@ selected workload; its unique pair ID groups one execution and does not enter co
 Normal and oracle suite definitions have distinct role references and retain their own materialized
 input digests, the shared source digest, matching declared answer-model settings and gold-only
 projection policy. Oracle preparation happens only after normal completion. These definitions
-support paired export; sharing source questions does not make the two arms equivalent under the
+are used by paired export; sharing source questions does not make the two arms equivalent under the
 strict full-definition comparison policy.
 
 ## Comparing suite identities

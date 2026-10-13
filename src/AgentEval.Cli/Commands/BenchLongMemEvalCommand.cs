@@ -48,6 +48,11 @@ public static class BenchLongMemEvalCommand
         DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
         => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct, aef, noAef, subjectVersion);
 
+    /// <summary>Runs normal evaluation followed by the diagnostic oracle over the same selected questions.</summary>
+    public static Task<int> RunPairedAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default,
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null) =>
+        RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct, aef, noAef, subjectVersion, pairedOracle: true);
+
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
         string preset,
@@ -58,7 +63,8 @@ public static class BenchLongMemEvalCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        Action<QuestionResult>? onQuestionCompleted = null)
+        Action<QuestionResult>? onQuestionCompleted = null, bool pairedOracle = false,
+        Action<LongMemEvalArm, QuestionResult>? onPairedQuestionCompleted = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -155,6 +161,10 @@ public static class BenchLongMemEvalCommand
             ReducerStrategy = "None",
             MemoryProvider = "InMemoryChatHistory (history injection)"
         };
+
+        if (pairedOracle)
+            return await RunPairedCoreAsync(runner, agent, benchmarkConfig, chatClient, options, preset, subject,
+                subjectVersion, agentEvalDir, aef, noAef, chatClientOverride is null, agentEndpoint, ct, onPairedQuestionCompleted);
 
         // ── Persist setup ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);
@@ -294,13 +304,7 @@ public static class BenchLongMemEvalCommand
             return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
-        var finalExit = LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
-        {
-            "INCONCLUSIVE" => ExitCodes.GateInconclusive,
-            "WARN" => ExitCodes.GateWarning,
-            "PASS" => ExitCodes.Success,
-            _ => ExitCodes.GateFailed,
-        };
+        var finalExit = VerdictExit(LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions));
         // AEF: a case per question. The environment's provider is live; a client passed in (tests) is a stand-in.
         if (WriteEvidence(exitCode: finalExit))
             return ExitCodes.RuntimeError;   // an explicit --aef could not be written
@@ -319,6 +323,71 @@ public static class BenchLongMemEvalCommand
         >= 50.0 => "PASS",
         _ => "FAIL",
     };
+
+    internal static int VerdictExit(string verdict) => verdict switch
+    {
+        "INCONCLUSIVE" => ExitCodes.GateInconclusive,
+        "WARN" => ExitCodes.GateWarning,
+        "PASS" => ExitCodes.Success,
+        _ => ExitCodes.GateFailed,
+    };
+
+    private static async Task<int> RunPairedCoreAsync(LongMemEvalBenchmarkRunner runner, IEvaluableAgent agent,
+        AgentBenchmarkConfig config, Microsoft.Extensions.AI.IChatClient client, ExternalBenchmarkOptions options,
+        string preset, string subject, string? subjectVersion, string agentEvalDir, DirectoryInfo? aef, bool noAef,
+        bool live, string? endpoint, CancellationToken ct, Action<LongMemEvalArm, QuestionResult>? onQuestion)
+    {
+        Console.WriteLine($"Running paired LongMemEval ({preset}) for subject '{subject}': normal, then gold-only oracle.");
+        var oracleConfig = new AgentBenchmarkConfig
+        {
+            AgentName = "LongMemEval oracle reader", ModelId = config.ModelId, ModelVersion = config.ModelVersion,
+            Temperature = config.Temperature, MaxTokens = config.MaxTokens,
+        };
+        try
+        {
+            LongMemEvalPairedResult paired;
+            if (noAef)
+                paired = await runner.RunPairedWithProgressAsync(agent, config, client, oracleConfig, options,
+                    new() { OnQuestionCompleted = onQuestion }, ct);
+            else
+            {
+                var session = new AgentEval.Cli.Infrastructure.PairedMemoryAefSession(
+                    Path.Combine(aef?.FullName ?? Path.Combine(agentEvalDir, "aef"), "runs"), preset,
+                    new AgentEval.Results.Adapters.Native.AefCompositeRunOptions
+                    {
+                        SubjectRef = AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("agent", subject),
+                        SubjectVersion = subjectVersion, Endpoint = endpoint,
+                        TargetMode = live ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                        SuiteRef = "bench:longmemeval/" + preset, Lane = "longmemeval",
+                        Seal = AefCliOptions.Seal, Signer = AefCliOptions.Signer, ContentCapture = AefCliOptions.ContentCapture,
+                        Cli = AefCliOptions.Provenance ?? new() { Verb = "bench longmemeval" },
+                        Config = new AgentEval.Results.Writing.AefRunConfig
+                        {
+                            Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["pairedOracle"] = true, ["runs"] = 1 },
+                        },
+                    }, live ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override");
+                paired = await session.RunAsync(runner, agent, config, client, oracleConfig, options, ct, onQuestion,
+                    artifact => AefCliOptions.ReportSaved(artifact.Directory, artifact.RunHash, subjectVersion));
+            }
+            ct.ThrowIfCancellationRequested();
+            Console.WriteLine($"   Pair:             {paired.Plan!.PairId}");
+            Console.WriteLine($"   Normal accuracy:  {FormatPercent(paired.Normal.OverallAccuracy)}");
+            Console.WriteLine($"   Oracle accuracy:  {FormatPercent(paired.Oracle.OverallAccuracy)} (diagnostic only)");
+            Console.WriteLine($"   Oracle gap:       {(paired.OracleGapPercentagePoints is { } gap ? gap.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " percentage points" : "n/a")}");
+            return VerdictExit(LongMemEvalVerdict(paired.Normal.OverallAccuracy,
+                paired.Normal.QuestionResults.Count - paired.Normal.ScoredQuestions));
+        }
+        catch (AgentEval.Cli.Infrastructure.PairedMemoryEvidenceException ex)
+        {
+            Console.Error.WriteLine($"Paired evidence failed: {ex.Message}");
+            return ExitCodes.RuntimeError;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Paired LongMemEval failed: {ex.GetType().Name}: {ex.Message}");
+            return 1;
+        }
+    }
 
     private static string FormatPercent(double? value) => value is { } score ? $"{score:F1}%" : "n/a";
 }
