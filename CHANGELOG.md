@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Unversioned evidence guidance:** native eval, red-team and benchmark commands explain that a saved run
+  without an exact subject version cannot satisfy a checkpoint lane. Eval/red-team quiet mode suppresses the note.
+
 - **Usage model identity:** replay, memory-poisoning, Gatekeeper and Runner client wrappers retain the
   configured model when a call ends before the provider reports its model. Missing usage remains unknown.
 

@@ -69,7 +69,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Directory.Delete(_root, recursive: true);
     }
 
-    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null, float? temperature = null, int? maxTokens = null, bool azure = false, string? judgeEndpoint = null)
+    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null, float? temperature = null, int? maxTokens = null, bool azure = false, string? judgeEndpoint = null, bool quiet = true, string? subjectVersion = "1", bool noAef = false)
     {
         var dataset = Path.Combine(_root, "dataset.yaml");
         File.WriteAllText(dataset, string.Concat(Enumerable.Range(0, count).Select(i => $"- id: c{i}\n  input: secret-prompt-{i}\n  expected: Hi\n")));
@@ -77,11 +77,39 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         {
             Dataset = new FileInfo(dataset), Endpoint = azure ? new Uri(endpoint).GetLeftPart(UriPartial.Authority) : endpoint,
             Azure = azure, DeploymentName = azure ? "local-model" : null, Model = "local-model", ApiKey = "local-test",
-            Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")), Quiet = true,
-            Aef = new DirectoryInfo(Path.Combine(_root, "aef")), SubjectVersion = "1",
+            Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")), Quiet = quiet, NoAef = noAef,
+            Aef = new DirectoryInfo(Path.Combine(_root, "aef")), SubjectVersion = subjectVersion,
             Runs = runs, JudgeEndpoint = judgeEndpoint, JudgeModel = judgeEndpoint is null ? null : "local-judge",
             Metrics = metrics, Temperature = temperature, MaxTokens = maxTokens,
         };
+    }
+
+    [Theory]
+    [InlineData(null, false, false, true)]
+    [InlineData("1", false, false, false)]
+    [InlineData(null, true, false, false)]
+    [InlineData(null, false, true, false)]
+    public async Task Eval_SubjectVersionNote_OnlyForWrittenUnversionedEvidence(string? version, bool quiet, bool noAef, bool expectNote)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync();
+        var options = Options(endpoint.Endpoint, quiet: quiet, subjectVersion: version, noAef: noAef);
+        var previous = Console.Error;
+        using var stderr = new StringWriter();
+        try
+        {
+            Console.SetError(stderr);
+            Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        }
+        finally { Console.SetError(previous); }
+        Assert.Equal(expectNote, stderr.ToString().Contains("cannot satisfy a checkpoint lane", StringComparison.Ordinal));
+        Assert.Single(endpoint.Requests);
+        if (!noAef)
+        {
+            var dir = RunDirectory(options.Aef!.FullName);
+            AssertIntact(dir);
+            Assert.Equal(version, (string?)Document(dir, "run.json")["subject"]!["version"]);
+        }
+        else Assert.False(options.Aef!.Exists);
     }
 
     [Theory]

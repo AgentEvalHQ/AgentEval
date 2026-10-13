@@ -95,6 +95,12 @@ internal sealed class AefCliOptions
         }
     }
 
+    internal static void NoteMissingSubjectVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            Console.Error.WriteLine("  AEF note: no exact subject version was recorded; this run cannot satisfy a checkpoint lane. Record an exact subject version when producing checkpoint evidence.");
+    }
+
     private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content);
     private static bool IsRunner(Command command) => command.Name == "run" && command.Options.Any(o => o.Name == "--plan");
     private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture, AefContentCapture? RequestedContentCapture);

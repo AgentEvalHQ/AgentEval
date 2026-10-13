@@ -55,6 +55,7 @@ internal static class BenchAef
                     : null,
             }, scan.StartedAt, DateTimeOffset.UtcNow);
             Console.Error.WriteLine($"AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
+            AefCliOptions.NoteMissingSubjectVersion(subjectVersion);
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -233,6 +234,7 @@ internal static class BenchAef
                     : AefCompositeRunWriter.WriteTrials(Path.Combine(root, "runs"), result, trials,
                         shape, options, startedAt, endedAt);
             Console.Error.WriteLine($"AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
+            AefCliOptions.NoteMissingSubjectVersion(subjectVersion);
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
