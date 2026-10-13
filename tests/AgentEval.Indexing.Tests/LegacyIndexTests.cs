@@ -27,6 +27,31 @@ public sealed class LegacyIndexTests : IDisposable
     private EvidenceIndexSource Read(LegacyIndexReadLimits? limits = null) => new LegacyIndexSourceReader(limits).Read("legacy", "run", _root);
 
     [Fact]
+    public void Import_ChangedInvalidAndMissingSources_PreservesRowsUntilCompletePruning()
+    {
+        Fixture();
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Path.Combine(_root, "derived.sqlite") }, new SqliteEvidenceIndexSchema());
+        var indexer = new LegacyEvidenceIndexer(new LegacyIndexSourceReader(), writer);
+        var initial = indexer.Import("root", _root);
+        Assert.True(initial.Complete); Assert.Equal(1, initial.Changed);
+        Assert.Equal(1, indexer.Import("root", _root).Unchanged);
+        var checkpoint = writer.Find("root", ".")!;
+        File.WriteAllText(Path.Combine(_root, "manifest.json"), "{");
+        var invalid = indexer.Import("root", _root, pruneMissing: true);
+        Assert.False(invalid.Complete); Assert.Single(invalid.Issues);
+        Assert.Equal(checkpoint, writer.Find("root", "."));
+        File.Delete(Path.Combine(_root, "manifest.json"));
+        var limited = indexer.Import("root", _root, new() { MaxEntries = 1 }, pruneMissing: true);
+        Assert.False(limited.Complete); Assert.Equal(0, limited.Removed);
+        Assert.NotNull(writer.Find("root", "."));
+        Assert.Equal(0, indexer.Import("root", _root).Removed);
+        var pruned = indexer.Import("root", _root, pruneMissing: true);
+        Assert.True(pruned.Complete); Assert.Equal(1, pruned.Removed);
+        Assert.Null(writer.Find("root", "."));
+        Assert.True(File.Exists(Path.Combine(_root, "scenarios/case.json")));
+    }
+
+    [Fact]
     public async Task Read_ActualOutputStoreLifecycle_ProjectsPendingThenCompletedRun()
     {
         Write("solution.json", new { schemaVersion = "1.0", id = Guid.NewGuid(), name = "IndexFixture" });

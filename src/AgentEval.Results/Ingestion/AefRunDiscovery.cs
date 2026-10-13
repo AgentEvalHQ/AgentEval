@@ -19,6 +19,10 @@ public sealed class AefRunDiscovery : IAefRunDiscovery
 {
     /// <inheritdoc />
     public AefDiscoveryResult Discover(string root, AefDiscoveryOptions? options = null, CancellationToken cancellationToken = default)
+        => DiscoverByMarker(root, "run.json", options, cancellationToken);
+
+    // Shared bounded traversal for the indexing adapter. The public AEF surface remains run.json-only.
+    internal static AefDiscoveryResult DiscoverByMarker(string root, string marker, AefDiscoveryOptions? options, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(root) || !Path.IsPathFullyQualified(root))
             throw new ArgumentException("Expected: an absolute discovery root. Actual: missing or relative root. " +
@@ -76,7 +80,7 @@ public sealed class AefRunDiscovery : IAefRunDiscovery
                         {
                             case AefEntryKind.Folder: children.Add(entry); break;
                             case AefEntryKind.File:
-                                if (Path.GetFileName(entry) == "run.json") candidate = true;
+                                if (Path.GetFileName(entry) == marker) candidate = true;
                                 break;
                             case AefEntryKind.Link: issues.Add(new(Relative(entry), AefDiscoveryIssueKind.LinkSkipped)); break;
                             default: issues.Add(new(Relative(entry), AefDiscoveryIssueKind.SpecialEntrySkipped)); break;
@@ -101,7 +105,7 @@ public sealed class AefRunDiscovery : IAefRunDiscovery
                     stop = true;
                 }
                 else candidates.Add(new(current.Directory));
-                // A run can contain extension folders with their own run.json. They are not separate imports.
+                // A candidate's nested evidence is not a separate import.
                 continue;
             }
             if (stop) continue;
