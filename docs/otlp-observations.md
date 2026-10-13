@@ -236,8 +236,16 @@ The independent fixture `scripts/verify-observation-store.ps1 -AssemblyPath
 <AgentEval.Results.dll>` uses separate native writer and retry processes to
 verify publication, cross-process identity, default filtering, integer precision
 and scratch recovery. HTTP test-host checks cover both formats, compression,
-access refusal, limits, default-off persistence and unavailable storage. Actual
-Kestrel transport failure fixtures remain the next validation step.
+access refusal, limits, default-off persistence and unavailable storage.
+
+`python scripts/verify-otlp-ingestion.py --server <AgentEval.MissionControl.dll>`
+exercises production Kestrel on an ephemeral loopback port, using only temporary
+fixture-owned storage. It checks all three independent JSON/protobuf fixture
+pairs, gzip and chunked requests, matching response encodings, persisted digests,
+cross-encoding retries, invalid/oversized bodies, slow-body timeout, concurrent
+overload, default-off filtering, process restart, interrupted scratch recovery
+and capacity refusal/recovery without accepted-record eviction. It starts and
+stops its own server processes and makes no provider calls.
 
 ## Mission Control configuration
 
