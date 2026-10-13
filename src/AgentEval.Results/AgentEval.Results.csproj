@@ -10,6 +10,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval.Tests" />
     <InternalsVisibleTo Include="AgentEval.Results.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Indexing" />
   </ItemGroup>
 
   <!-- The AEF 1.0 writer and reader schemas, embedded from contracts/aef/1/schemas (linked, never copied, so there is
