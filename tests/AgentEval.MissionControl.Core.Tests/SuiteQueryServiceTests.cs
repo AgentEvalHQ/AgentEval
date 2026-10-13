@@ -4,6 +4,9 @@
 
 using AgentEval.Indexing;
 using AgentEval.Results.Suites;
+using AgentEval.Results.Writing;
+using System.Text;
+using System.Text.Json.Nodes;
 
 namespace AgentEval.MissionControl.Core.Tests;
 
@@ -49,6 +52,63 @@ public sealed class SuiteQueryServiceTests : IDisposable
         Assert.False(compared.Data!.Compatibility.Compatible);
         Assert.Equal("definition-required", compared.Data.Compatibility.Reason);
         Assert.Equal(compared.Data.Baseline.IndexGeneration, compared.Data.Candidate.IndexGeneration);
+    }
+
+    [Fact]
+    public void Compare_CompletedAndAbortedFrozenDefinition_CompatibleWithoutClaimingCompleteness()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var baseline = WriteDefinition(writer, "complete", frozen: true, aborted: false);
+        var candidate = WriteDefinition(writer, "aborted", frozen: true, aborted: true);
+        var outcome = Service(Root).Compare(baseline, candidate);
+        Assert.Equal(QueryState.Available, outcome.State);
+        Assert.True(outcome.Data!.Compatibility.Compatible);
+        Assert.Equal("same-definition", outcome.Data.Compatibility.Reason);
+        Assert.Equal("completed", outcome.Data.Baseline.Identity.RunStatus);
+        Assert.Equal("aborted", outcome.Data.Candidate.Identity.RunStatus);
+        Assert.NotEqual(outcome.Data.Baseline.Identity.RunHash, outcome.Data.Candidate.Identity.RunHash);
+    }
+
+    [Theory]
+    [InlineData(true, 0.9, "definition-mismatch")]
+    [InlineData(false, 0.8, "generated-content")]
+    public void Compare_ChangedDefinitionOrUnfrozenRecipe_RemainsIncompatible(bool frozen, double threshold, string reason)
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var baseline = WriteDefinition(writer, "baseline", frozen: true, aborted: false);
+        var candidate = WriteDefinition(writer, "candidate", frozen, aborted: false, threshold);
+        var outcome = Service(Root).Compare(baseline, candidate);
+        Assert.Equal(QueryState.Available, outcome.State);
+        Assert.False(outcome.Data!.Compatibility.Compatible); Assert.Equal(reason, outcome.Data.Compatibility.Reason);
+    }
+
+    private string WriteDefinition(SqliteEvidenceIndexWriter index, string name, bool frozen, bool aborted, double threshold = 0.8)
+    {
+        var manifest = new SuiteDefinitionReader().Read(Encoding.UTF8.GetBytes(new JsonObject
+        {
+            ["schemaVersion"] = "1.0", ["kind"] = "composite", ["suiteRef"] = "bench:query",
+            ["definitionVersion"] = "1", ["frozen"] = frozen,
+            ["inputs"] = new JsonObject { ["rubric"] = SuiteDefinitionManifest.Hash("fixture"u8) },
+            ["definition"] = new JsonObject { ["threshold"] = threshold }, ["caseIds"] = new JsonArray("case-a")
+        }.ToJsonString()));
+        var directory = Path.Combine(Root.Directory, name);
+        var started = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+        var run = AefRunWriter.Create(directory, new AefRunHeader
+        {
+            RunId = name, Producer = new() { Name = "query-fixture", Version = "1" },
+            Subject = new() { Ref = "agent:query", Kind = AefSubjectKind.Agent, Version = "1" },
+            StartedAt = started, ContentCapture = AefContentCapture.Off,
+            Execution = new() { TargetMode = AefTargetMode.Live, Stimulus = frozen ? AefStimulus.Suite : AefStimulus.Generated },
+            Suite = new() { Ref = manifest.SuiteRef, Version = manifest.DefinitionVersion, Frozen = frozen, Digest = manifest.SuiteContentDigest },
+            Ext = new JsonObject { ["agenteval.suiteIdentity"] = manifest.Metadata() }
+        });
+        run.SetMetrics([new() { Id = "quality", Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 1) }]);
+        run.PutExtFile(SuiteDefinitionManifest.ExtensionFile, manifest.ToBytes());
+        if (!aborted) run.AddResult(new() { CaseId = "case-a", Path = "quality", Evaluator = new("code:quality"),
+            State = AefState.Passed, Scores = [new() { Metric = "quality", Value = 0.9 }] });
+        run.Close(aborted ? AefRunStatus.Aborted : AefRunStatus.Completed, started.AddSeconds(1), aborted ? "cancelled" : null);
+        AefSealer.Seal(directory);
+        return index.Upsert(new AefIndexSourceReader(new SuiteIdentityReader()).Read("root", name, directory)).SourceId;
     }
 
     [Fact]
