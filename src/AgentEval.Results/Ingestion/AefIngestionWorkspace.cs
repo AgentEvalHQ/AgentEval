@@ -21,6 +21,7 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
     private readonly FileStream _lease;
     private readonly string _staging;
     private readonly int _capacity;
+    private readonly int _acceptedCapacity;
     private bool _disposed;
 
     /// <summary>
@@ -36,11 +37,15 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
         if (options.MaxPendingStages is < 1 or > 1024)
             throw new ArgumentOutOfRangeException(nameof(options), "Expected: 1..1024 pending stages. Actual: " +
                 options.MaxPendingStages + ". Suggestions: configure a bounded capacity. Because: interrupted stages consume storage.");
+        if (options.MaxAcceptedRuns is < 1 or > 100_000)
+            throw new ArgumentOutOfRangeException(nameof(options), "Expected: 1..100000 accepted runs. Actual: invalid capacity. " +
+                "Suggestions: configure bounded accepted storage. Because: publication consumes disk space.");
 
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.Root));
         if (Root == Path.GetPathRoot(Root))
             throw Failure("a dedicated subdirectory", "filesystem root", "choose application storage below the filesystem root");
         _capacity = options.MaxPendingStages;
+        _acceptedCapacity = options.MaxAcceptedRuns;
         EnsureDirectory(Root);
         _staging = Path.Combine(Root, ".staging");
         RunsDirectory = Path.Combine(Root, "runs");
@@ -105,6 +110,42 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
             cancellationToken.ThrowIfCancellationRequested();
             EnsureDirectory(directory);
             return new AefIngestionStage(id, directory);
+        }
+    }
+
+    /// <inheritdoc />
+    public AefIngestionStage OpenStage(string stageId)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (stageId is null || stageId.Length != 32 || !stageId.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
+                throw new AefFinalizationException("path", "invalid stage ID");
+            var directory = Path.Combine(_staging, stageId);
+            RejectLinks(directory);
+            if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("Ingestion stage not found.");
+            return new(stageId, directory);
+        }
+    }
+
+    /// <inheritdoc />
+    public string PublishVerifiedStage(string stageId, string runHash, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            var stage = OpenStage(stageId);
+            if (runHash is null || runHash.Length != 64 || !runHash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
+                throw new AefFinalizationException("path", "invalid verified run hash");
+            var source = Path.Combine(stage.Directory, "content");
+            var destination = Path.Combine(RunsDirectory, runHash);
+            RejectLinks(source);
+            RejectLinks(destination);
+            if (Path.Exists(destination)) throw new AefFinalizationException("conflict", "accepted hash already exists");
+            if (Directory.EnumerateFileSystemEntries(RunsDirectory).Take(_acceptedCapacity).Count() >= _acceptedCapacity)
+                throw new AefFinalizationException("capacity", "accepted storage capacity reached");
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.Move(source, destination);
+            return destination;
         }
     }
 

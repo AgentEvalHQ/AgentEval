@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.Json;
 using AgentEval.Results.Runs;
 
 namespace AgentEval.Results.Ingestion;
@@ -43,7 +42,7 @@ public sealed class AefRunStager : IAefRunStager
             stage = _workspace.BeginStage(cancellationToken);
             var content = Path.Combine(stage.Directory, "content");
             Directory.CreateDirectory(content);
-            WriteState(stage, "receiving", count, bytes);
+            AefStageState.Write(stage, "receiving", count, bytes);
             var paths = new Dictionary<string, (string Spelling, bool File)>(StringComparer.OrdinalIgnoreCase);
             var buffer = new byte[64 * 1024];
             await foreach (var file in files.WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -77,7 +76,7 @@ public sealed class AefRunStager : IAefRunStager
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (count == 0) throw new AefStagingException("empty", "no files supplied");
-            WriteState(stage, "staged", count, bytes);
+            AefStageState.Write(stage, "staged", count, bytes);
             return new(stage.Id, content, count, bytes);
         }
         catch (Exception error)
@@ -85,7 +84,7 @@ public sealed class AefRunStager : IAefRunStager
             if (stage is not null)
             {
                 // If state persistence fails, retain receiving/absent state. Recovery must treat it as incomplete.
-                try { WriteState(stage, error is OperationCanceledException ? "interrupted" : "failed", count, bytes); }
+                try { AefStageState.Write(stage, error is OperationCanceledException ? "interrupted" : "failed", count, bytes); }
                 catch (Exception stateError) when (stateError is IOException or UnauthorizedAccessException) { }
             }
             throw;
@@ -110,14 +109,4 @@ public sealed class AefRunStager : IAefRunStager
         }
     }
 
-    private static void WriteState(AefIngestionStage stage, string status, int files, long bytes)
-    {
-        var temporary = Path.Combine(stage.Directory, "state.tmp");
-        using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            JsonSerializer.Serialize(output, new { schemaVersion = "1.0", id = stage.Id, status, files, bytes });
-            output.Flush(flushToDisk: true);
-        }
-        File.Move(temporary, Path.Combine(stage.Directory, "state.json"), overwrite: true);
-    }
 }

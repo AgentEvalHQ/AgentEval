@@ -18,6 +18,15 @@ public interface IAefIngestionWorkspace : IDisposable
     /// count toward capacity. This does not accept, verify, or index evidence.
     /// </summary>
     AefIngestionStage BeginStage(CancellationToken cancellationToken = default);
+
+    /// <summary>Resolves an existing ordinary stage by its server-generated ID; refuses disposed ownership and links.</summary>
+    AefIngestionStage OpenStage(string stageId);
+
+    /// <summary>
+    /// Atomically moves stage/content into runs/runHash without overwriting. The trusted caller must first verify
+    /// the stage against this hash. This filesystem primitive does not perform protocol verification itself.
+    /// </summary>
+    string PublishVerifiedStage(string stageId, string runHash, CancellationToken cancellationToken = default);
 }
 
 /// <summary>A server-generated staging identity and its local directory; do not expose the path over HTTP.</summary>
@@ -33,4 +42,7 @@ public sealed class AefIngestionWorkspaceOptions
 
     /// <summary>Maximum retained stages, including interrupted ones. Must be between 1 and 1024.</summary>
     public int MaxPendingStages { get; init; } = 64;
+
+    /// <summary>Maximum accepted run directories, 1..100000. Default 1000. Existing entries count toward capacity.</summary>
+    public int MaxAcceptedRuns { get; init; } = 1_000;
 }

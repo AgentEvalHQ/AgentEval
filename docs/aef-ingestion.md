@@ -186,14 +186,85 @@ chunked staging, path and byte refusals, concurrency, timeout retention, and
 subsequent upload capacity. The fixture starts and stops its own server and
 uses no external provider.
 
+## Verification and atomic publication
+
+After a complete upload, send an empty authenticated request to
+`POST /api/v1/ingestion/runs/<stageId>/finalize`. It uses the same key,
+origin, and transport checks as upload. It accepts no filesystem path or
+request body.
+
+The finalizer reads at most 4 KiB of stage metadata and requires `staged`
+state. Before invoking the protocol reader, it checks the content tree for
+valid paths, ordinary entry types, bounded file/byte counts, and agreement
+with the completed upload inventory. Tree entries are bounded by
+`MaxFiles * 128`, covering the maximum component count of a 255-byte AEF path
+and bounding unexpected empty directories. On Unix, finalization and local
+copying fail closed if the native regular-file classifier is unavailable.
+
+The existing AEF verifier must report an intact sealed run. Overlay-chain
+problems are also refused, independently of the base seal. Accepted evidence
+can still describe an aborted benchmark or failing evaluation. Integrity
+does not establish a trusted signer, a passing verdict, or complete benchmark
+coverage. The default HTTP finalizer supplies no signer trust policy; trusted
+in-process callers can supply one through `AefRunFinalizer`.
+
+Successful verification writes a `publishing` receipt with the verified hash,
+then moves the original `content/` directory to `runs/<runHash>` with one
+no-overwrite rename. The files, signatures, and overlays are not rewritten.
+This rename is the commit point. The workspace checks cancellation while
+holding its ownership lock immediately before the rename, so disposal cannot
+release ownership during publication. A final `accepted` receipt follows.
+
+HTTP 200 returns `stageId`, `status: accepted`, `verified: true`,
+`integrity: intact`, `runHash`, and `receiptPersisted`. Local paths are omitted.
+If the final receipt cannot be saved after publication, `receiptPersisted`
+is false; the verified evidence remains published and requires receipt
+recovery. A late cancellation or lost response cannot undo the rename.
+
+Only one verification runs at a time per finalizer service; a stage file
+lease also prevents simultaneous finalization by another service instance.
+Cancellation and the configured timeout are checked during preflight and
+between verification phases. The existing protocol verifier is synchronous
+and cannot be interrupted mid-phase: a timeout response can wait for that
+phase to finish, and verification capacity remains occupied until then.
+Cancellation before the commit check prevents publication.
+
+Finalization returns 422 for invalid/unsealed evidence, 409 for an incomplete
+or already-finalized stage or an existing accepted hash, 404 for an unknown
+stage, 413 for content bounds, 429 for a busy verifier, and 503 for unavailable
+storage/capacity. It does not overwrite an existing hash, even for apparently
+identical uploads. Duplicate reconciliation is the next lifecycle slice.
+
+`AgentEval:Ingestion:MaxAcceptedRuns` defaults to 1,000 and accepts 1..100,000.
+All existing entries directly under `runs/` count against this budget. Failed
+publication restores `staged` state when possible; if recording that rollback
+fails, `publishing` remains for recovery. Receipts currently remain under
+`.staging`, including after successful publication, and therefore still count
+toward `MaxPendingStages`. Receipt archival and interrupted-commit recovery
+are pending work, not implied by successful publication.
+
+## Importing discovered local runs
+
+`IAefLocalRunImporter.StageDirectoryAsync(candidate.Directory)` copies an
+explicit local candidate through `IAefRunStager`. It inventories the source
+under the same limits, refuses linked ancestry and special entries, rechecks
+file type before opening, and detects file-length changes during copying.
+Source files are not deleted or rewritten. The resulting stage is finalized
+with `IAefRunFinalizer.FinalizeStage(stage.Id)` just like an HTTP upload.
+No HTTP endpoint accepts local source roots. Hostile concurrent source path
+replacement remains outside the trusted-local-filesystem boundary; staged
+bytes must always be verified before acceptance.
+
+The standalone fixture also uploads a sealed interop example, finalizes it,
+compares every original file byte, verifies the published folder with the
+independent Python reader, and checks rejection of unsealed/tampered imports.
+
 ## Remaining lifecycle integration
 
-The next ingestion slices will connect discovered local candidates to copying,
-verify staged snapshots with the existing AEF verifier, and publish accepted
-runs atomically. Invalid,
-unsealed, or interrupted imports must never become query-visible accepted
-evidence. Duplicate handling and explicit recovery will operate on these
-same directories. Those operations are not implemented by `BeginStage`.
+The next ingestion slices add duplicate reconciliation, interrupted-commit
+recovery, receipt archival, and a complete access/resource audit. Invalid,
+unsealed, or incomplete uploads must never become query-visible accepted
+evidence. These operations build on the same directories and commit point.
 
 Sealed evidence files remain authoritative. The later SQLite index is
 derived and rebuildable; it is not a prerequisite for ingestion ownership.

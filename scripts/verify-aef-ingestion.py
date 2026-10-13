@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -28,8 +29,8 @@ def main():
             "AgentEval__Ingestion__Enabled": "true",
             "AgentEval__Ingestion__Root": str(storage),
             "AgentEval__Ingestion__ApiKey": key,
-            "AgentEval__Ingestion__MaxBytes": "4096",
-            "AgentEval__Ingestion__MaxFileBytes": "1024",
+            "AgentEval__Ingestion__MaxBytes": "65536",
+            "AgentEval__Ingestion__MaxFileBytes": "16384",
             "AgentEval__Ingestion__MaxConcurrentUploads": "1",
             "AgentEval__Ingestion__TimeoutSeconds": "2",
         })
@@ -52,14 +53,14 @@ def main():
                 return (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{path}"\r\n\r\n'.encode()
                         + value + f"\r\n--{boundary}--\r\n".encode())
 
-            def post(body, authenticated=True, chunked=False):
+            def post(body, authenticated=True, chunked=False, route="/api/v1/ingestion/runs"):
                 connection = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
                 headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
                 if authenticated:
                     headers["Authorization"] = "Bearer " + key
                 try:
                     payload = (body[i:i + 257] for i in range(0, len(body), 257)) if chunked else body
-                    connection.request("POST", "/api/v1/ingestion/runs", payload, headers, encode_chunked=chunked)
+                    connection.request("POST", route, payload, headers, encode_chunked=chunked)
                     response = connection.getresponse()
                     return response.status, response.read()
                 finally:
@@ -75,8 +76,8 @@ def main():
             assert str(root).encode() not in body
             assert (storage / ".staging" / staged["stageId"] / "content/run.json").read_bytes() == b"raw unverified evidence"
             assert post(multipart("../outside"))[0] == 400
-            assert post(multipart(value=b"x" * 1025))[0] == 413
-            status, body = post(multipart(value=b"x" * 5000), chunked=True)
+            assert post(multipart(value=b"x" * 16385))[0] == 413
+            status, body = post(multipart(value=b"x" * 65537), chunked=True)
             assert status == 413, (status, body)
 
             before = set((storage / ".staging").iterdir())
@@ -107,7 +108,43 @@ def main():
                 slow.close()
             assert not list((storage / "runs").iterdir()), "Staging published unverified evidence"
             assert post(multipart())[0] == 202, "Timeout did not release upload capacity"
-            print("PASS: actual Kestrel auth, chunked staging, path/byte refusals, concurrency, timeout retention and capacity recovery")
+
+            repository = Path(__file__).resolve().parent.parent
+            fixture = repository / "contracts/aef/1/interop/examples/otel-aef/run"
+            source_files = {p.relative_to(fixture).as_posix(): p.read_bytes() for p in fixture.rglob("*") if p.is_file()}
+            def upload_files(files):
+                parts = []
+                for name, data in files.items():
+                    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n\r\n'.encode()
+                                 + data + b"\r\n")
+                parts.append(f"--{boundary}--\r\n".encode())
+                status, body = post(b"".join(parts), chunked=True)
+                assert status == 202, (status, body)
+                return json.loads(body)["stageId"]
+
+            stage_id = upload_files(source_files)
+            route = f"/api/v1/ingestion/runs/{stage_id}/finalize"
+            assert post(b"", authenticated=False, route=route)[0] == 401
+            status, body = post(b"", route=route)
+            assert status == 200, (status, body)
+            accepted = json.loads(body)
+            assert accepted["verified"] and accepted["status"] == "accepted"
+            assert str(root).encode() not in body
+            destination = storage / "runs" / accepted["runHash"]
+            for name, data in source_files.items():
+                assert (destination / name).read_bytes() == data, name
+            verified = subprocess.run([sys.executable, str(repository / "contracts/aef/tools/aef_verify.py"), "run", str(destination)],
+                                      capture_output=True, text=True, timeout=30)
+            assert verified.returncode == 0 and json.loads(verified.stdout)["outcome"] == "intact", verified.stdout
+            assert post(b"", route=route)[0] == 409
+            unsealed_id = upload_files({p: b for p, b in source_files.items() if p != "seal.json"})
+            assert post(b"", route=f"/api/v1/ingestion/runs/{unsealed_id}/finalize")[0] == 422
+            tampered = dict(source_files)
+            tampered["run.json"] += b" "
+            tampered_id = upload_files(tampered)
+            assert post(b"", route=f"/api/v1/ingestion/runs/{tampered_id}/finalize")[0] == 422
+            assert len(list((storage / "runs").iterdir())) == 1
+            print("PASS: Kestrel staging/access/limits/timeout; sealed finalization preserves bytes and passes independent verifier; unsealed/tampered refused")
         finally:
             process.terminate()
             try:

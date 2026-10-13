@@ -21,9 +21,16 @@ internal static class IngestionEndpoints
     {
         if (!app.Configuration.GetValue<bool>("AgentEval:Ingestion:Enabled")) return;
         app.MapPost("/api/v1/ingestion/runs", UploadAsync);
+        app.MapPost("/api/v1/ingestion/runs/{stageId}/finalize", FinalizeAsync);
     }
 
     private static async Task<IResult> UploadAsync(HttpContext context, IAefRunStager stager, IngestionHttpOptions options)
+    {
+        if (CheckAccess(context, options) is { } denied) return denied;
+        return await UploadAuthorizedAsync(context, stager, options);
+    }
+
+    private static IResult? CheckAccess(HttpContext context, IngestionHttpOptions options)
     {
         context.Response.Headers.CacheControl = "no-store";
         if (!Authorized(context, options)) return HttpResults.StatusCode(StatusCodes.Status401Unauthorized);
@@ -32,6 +39,39 @@ internal static class IngestionEndpoints
         var remote = context.Connection.RemoteIpAddress;
         if (!context.Request.IsHttps && (remote is null || !IPAddress.IsLoopback(remote.IsIPv4MappedToIPv6 ? remote.MapToIPv4() : remote)))
             return HttpResults.StatusCode(StatusCodes.Status403Forbidden);
+        return null;
+    }
+
+    private static async Task<IResult> FinalizeAsync(HttpContext context, string stageId, IAefRunFinalizer finalizer, IngestionHttpOptions options)
+    {
+        if (CheckAccess(context, options) is { } denied) return denied;
+        if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+            return HttpResults.BadRequest(new { error = "unexpected-body" });
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+        timeout.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
+        try
+        {
+            // The protocol verifier is synchronous. Cancellation is checked before publication, but a running
+            // verification phase must finish before this task can return a timeout or release its capacity.
+            var accepted = await Task.Run(() => finalizer.FinalizeStage(stageId, timeout.Token), timeout.Token);
+            return HttpResults.Ok(new { stageId = accepted.StageId, status = "accepted", verified = true,
+                integrity = "intact", runHash = accepted.RunHash, receiptPersisted = accepted.ReceiptPersisted });
+        }
+        catch (AefFinalizationException error)
+        {
+            var status = error.Code switch { "path" => 400, "busy" => 429, "limit" => 413,
+                "capacity" => 503, "state" or "conflict" => 409, _ => 422 };
+            return HttpResults.Json(new { error = error.Code }, statusCode: status);
+        }
+        catch (DirectoryNotFoundException) { return HttpResults.NotFound(new { error = "stage-not-found" }); }
+        catch (FileNotFoundException) { return HttpResults.Conflict(new { error = "stage-state-missing" }); }
+        catch (OperationCanceledException) { return HttpResults.StatusCode(StatusCodes.Status408RequestTimeout); }
+        catch (IOException) { return HttpResults.Json(new { error = "finalization-unavailable" }, statusCode: 503); }
+        catch (UnauthorizedAccessException) { return HttpResults.Json(new { error = "finalization-unavailable" }, statusCode: 503); }
+    }
+
+    private static async Task<IResult> UploadAuthorizedAsync(HttpContext context, IAefRunStager stager, IngestionHttpOptions options)
+    {
         if (context.Request.Headers.ContainsKey("Content-Encoding")) return HttpResults.StatusCode(StatusCodes.Status415UnsupportedMediaType);
         if (!MediaTypeHeaderValue.TryParse(context.Request.ContentType, out var type)
             || !string.Equals(type.MediaType.Value, "multipart/form-data", StringComparison.OrdinalIgnoreCase))

@@ -35,6 +35,7 @@ public sealed class IngestionHostingTests : IDisposable
         foreach (var descriptor in builder.Services.Where(d => d.ServiceType == typeof(IAefIngestionWorkspace)
             || d.ServiceType == typeof(IAefRunDiscovery)
             || d.ServiceType == typeof(IAefRunStager)
+            || d.ServiceType == typeof(IAefRunFinalizer)
             || d.ServiceType == typeof(IngestionHttpOptions)
             || d.ImplementationType?.Name == "IngestionLifetime"))
             services.Add(descriptor);

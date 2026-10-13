@@ -228,6 +228,69 @@ public sealed class IngestionEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Finalize_UploadedNativeRun_PublishesVerifiedBytesAndRefusesRepeatedFinalization()
+    {
+        await using var app = await Start(bytes: 64 << 20, fileBytes: 64 << 20);
+        using var client = Client(app);
+        var start = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        var source = AgentEval.Results.Adapters.Native.AefProbeRunWriter.Write(Path.Combine(_root, "source"),
+            [new() { CaseId = "a", State = AgentEval.Results.Writing.AefState.Passed }],
+            new AgentEval.Results.Adapters.Native.AefProbeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AgentEval.Results.Writing.AefTargetMode.Mocked,
+                SuiteRef = "redteam:test", Seal = true
+            }, start, start.AddSeconds(1)).Directory;
+        using var content = new MultipartFormDataContent("aef-fixture-boundary");
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            content.Add(new ByteArrayContent(File.ReadAllBytes(file)), "file", Path.GetRelativePath(source, file).Replace(Path.DirectorySeparatorChar, '/'));
+        var upload = await client.PostAsync("/api/v1/ingestion/runs", content);
+        Assert.Equal(HttpStatusCode.Accepted, upload.StatusCode);
+        using var uploaded = JsonDocument.Parse(await upload.Content.ReadAsStringAsync());
+        var id = uploaded.RootElement.GetProperty("stageId").GetString();
+        var route = $"/api/v1/ingestion/runs/{id}/finalize";
+        var response = await client.PostAsync(route, null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(_root, text);
+        using var accepted = JsonDocument.Parse(text);
+        Assert.True(accepted.RootElement.GetProperty("verified").GetBoolean());
+        var hash = accepted.RootElement.GetProperty("runHash").GetString()!;
+        var destination = Path.Combine(_root, "ingestion", "runs", hash);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+            AgentEval.Results.Integrity.AefRunVerifier.Verify(destination).Outcome);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(source, "seal.json")), File.ReadAllBytes(Path.Combine(destination, "seal.json")));
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync(route, null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Finalize_InvalidEvidence_Returns422WithoutPublishing()
+    {
+        await using var app = await Start();
+        using var client = Client(app);
+        var upload = await client.PostAsync("/api/v1/ingestion/runs", Files(("run.json", "invalid")));
+        using var uploaded = JsonDocument.Parse(await upload.Content.ReadAsStringAsync());
+        var id = uploaded.RootElement.GetProperty("stageId").GetString();
+        var response = await client.PostAsync($"/api/v1/ingestion/runs/{id}/finalize", null);
+        Assert.Equal(422, (int)response.StatusCode);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(_root, "ingestion", "runs")));
+    }
+
+    [Fact]
+    public async Task Finalize_AccessChecks_RunBeforeStageLookup()
+    {
+        await using var app = await Start();
+        using var client = Client(app, false);
+        var route = "/api/v1/ingestion/runs/" + new string('0', 32) + "/finalize";
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync(route, null)).StatusCode);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", Key);
+        client.DefaultRequestHeaders.Add("Origin", "https://untrusted.example");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync(route, null)).StatusCode);
+        client.DefaultRequestHeaders.Remove("Origin");
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(route, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync(route, new StringContent("body"))).StatusCode);
+    }
+
     private sealed class UnknownLengthContent : HttpContent
     {
         private readonly HttpContent _inner;
