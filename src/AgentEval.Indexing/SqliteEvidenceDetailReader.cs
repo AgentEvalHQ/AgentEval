@@ -38,31 +38,27 @@ public sealed class SqliteEvidenceDetailReader(EvidenceIndexOptions options) : I
 {
     /// <inheritdoc />
     public EvidenceDetailPage<IndexedResult> ReadResults(EvidenceDetailPageRequest request, CancellationToken cancellationToken = default) =>
-        Read(request, "results", "evaluation_results", ["result_id", "case_id", "trial", "outcome"], [0, 1, 3], ["result_id"],
+        Read(request, "results",
             r => new IndexedResult(r.GetString(0), Text(r, 1), Integer(r, 2), Text(r, 3)), r => new(r.ResultId, null, null), cancellationToken);
 
     /// <inheritdoc />
     public EvidenceDetailPage<IndexedMetric> ReadMetrics(EvidenceDetailPageRequest request, CancellationToken cancellationToken = default) =>
-        Read(request, "metrics", "metric_values", ["result_id", "metric_id", "ordinal", "score", "score_text", "passed", "provenance"], [0, 1, 4, 6],
-            ["result_id", "metric_id", "ordinal"], r => new IndexedMetric(r.GetString(0), r.GetString(1), r.GetInt32(2),
+        Read(request, "metrics", r => new IndexedMetric(r.GetString(0), r.GetString(1), r.GetInt32(2),
                 r.IsDBNull(3) ? null : r.GetDouble(3), Text(r, 4), r.IsDBNull(5) ? null : r.GetInt64(5) == 1, r.GetString(6)),
             r => new(r.ResultId, r.MetricId, r.Ordinal), cancellationToken);
 
     /// <inheritdoc />
     public EvidenceDetailPage<IndexedObservationSpan> ReadSpans(EvidenceDetailPageRequest request, CancellationToken cancellationToken = default) =>
-        Read(request, "spans", "observed_spans", ["report_ordinal", "group_id", "grouping_revision", "grouping_basis", "mapping_revision", "trace_id",
-            "span_id", "parent_span_id", "start_nanos", "end_nanos", "resource_index", "scope_index", "span_index"], [1, 2, 3, 4, 5, 6, 7, 8, 9], ["report_ordinal"],
+        Read(request, "spans",
             r => new IndexedObservationSpan(r.GetInt64(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6),
                 r.GetString(7), r.GetString(8), r.GetString(9), r.GetInt64(10), r.GetInt64(11), r.GetInt64(12)), r => new(null, null, r.ReportOrdinal), cancellationToken);
 
     /// <inheritdoc />
     public EvidenceDetailPage<IndexedObservationField> ReadFields(EvidenceDetailPageRequest request, CancellationToken cancellationToken = default) =>
-        Read(request, "fields", "observed_fields", ["report_ordinal", "field_name", "state", "text_value", "integer_value", "sources_json"], [1, 2, 3, 5],
-            ["report_ordinal", "field_name"], r => new IndexedObservationField(r.GetInt64(0), r.GetString(1), r.GetString(2), Text(r, 3), Integer(r, 4), r.GetString(5)),
+        Read(request, "fields", r => new IndexedObservationField(r.GetInt64(0), r.GetString(1), r.GetString(2), Text(r, 3), Integer(r, 4), r.GetString(5)),
             r => new(r.FieldName, null, r.ReportOrdinal), cancellationToken);
 
-    private EvidenceDetailPage<T> Read<T>(EvidenceDetailPageRequest request, string family, string table, string[] columns,
-        int[] textColumns, string[] order, Func<SqliteDataReader, T> project, Func<T, PageKey> key, CancellationToken token)
+    private EvidenceDetailPage<T> Read<T>(EvidenceDetailPageRequest request, string family, Func<SqliteDataReader, T> project, Func<T, PageKey> key, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request); token.ThrowIfCancellationRequested();
         if (request.SourceId is null || request.SourceId.Length != 64 || request.SourceId.Any(c => !char.IsAsciiHexDigit(c) || char.IsUpper(c)) ||
@@ -83,31 +79,21 @@ public sealed class SqliteEvidenceDetailReader(EvidenceIndexOptions options) : I
                 sourceKind = read.GetString(0); verification = read.GetString(1); fingerprint = read.GetString(2);
             }
             if ((family is "spans" or "fields") != (sourceKind == "observation")) throw new EvidenceIndexException("wrong-source-kind");
-            using var command = snapshot.Connection.CreateCommand(); command.Transaction = snapshot.Transaction;
-            // SQL identifiers come only from the fixed read families above; all request values are parameters.
-            var lengths = string.Join("+", textColumns.Select(i => $"coalesce(length(CAST({columns[i]} AS BLOB)),0)"));
-            command.CommandText = $"SELECT {string.Join(',', columns)},{lengths} FROM {table} WHERE source_id=$source";
-            command.Parameters.AddWithValue("$source", request.SourceId);
-            if (cursor is not null)
+            object?[]? values = cursor is null ? null : family switch
             {
-                object?[] values = family switch
-                {
-                    "results" => [cursor.Key.First], "metrics" => [cursor.Key.First, cursor.Key.Second, cursor.Key.Ordinal],
-                    "spans" => [cursor.Key.Ordinal], _ => [cursor.Key.Ordinal, cursor.Key.First]
-                };
-                var names = Enumerable.Range(0, values.Length).Select(i => "$key" + i).ToArray();
-                command.CommandText += order.Length == 1 ? $" AND {order[0]}>{names[0]}" : $" AND ({string.Join(',', order)})>({string.Join(',', names)})";
-                for (var i = 0; i < values.Length; i++) command.Parameters.AddWithValue(names[i], values[i]!);
-            }
-            command.CommandText += " ORDER BY " + string.Join(',', order) + " LIMIT $limit";
-            command.Parameters.AddWithValue("$limit", request.PageSize + 1);
+                "results" => [cursor.Key.First], "metrics" => [cursor.Key.First, cursor.Key.Second, cursor.Key.Ordinal],
+                "spans" => [cursor.Key.Ordinal], _ => [cursor.Key.Ordinal, cursor.Key.First]
+            };
+            using var command = EvidenceIndexPageCommand.Details(snapshot.Connection, snapshot.Transaction,
+                family, request.SourceId, request.PageSize, values);
+            var columnCount = EvidenceIndexPageCommand.Shape(family).Columns.Length;
             var items = ImmutableArray.CreateBuilder<T>(); var more = false; long bytes = 0;
             using (var read = command.ExecuteReader())
             while (read.Read())
             {
                 token.ThrowIfCancellationRequested();
                 if (items.Count == request.PageSize) { more = true; break; }
-                bytes += read.GetInt64(columns.Length);
+                bytes += read.GetInt64(columnCount);
                 if (bytes > 2 << 20) throw new EvidenceIndexException("page-byte-limit");
                 items.Add(project(read));
             }

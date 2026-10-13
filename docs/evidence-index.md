@@ -267,3 +267,15 @@ SQLite's [row-value scrolling example](https://www.sqlite.org/rowvalue.html) des
 All families reuse the same short read snapshot/ownership boundary and canonical cursor codec as source pages. Detail cursors additionally bind query family and source ID; they cannot be reused across sources or query families. The page-size, raw UTF-8 text and cursor bounds are the same: 1..500 rows, 2 MiB text and 65536 cursor characters. Text lengths are checked before materialization. Oversized pages fail as a whole; a single oversized field can require accessing the original evidence instead. No implicit aggregation, filtering of conflicts, score conversion or inferred evaluation verdict is performed.
 
 The original source documents remain necessary for hierarchy, effective overlays and fields deliberately omitted by indexing. These pages expose derived indexed facts and provenance, not evidence freshness or trust-policy decisions. SQL identifiers are fixed by the query family; all caller values use parameters. Read consistency is instance/generation scoped, and malformed/query-mismatched or stale continuations refuse explicitly.
+
+### Offline scale measurements
+
+Build the process fixture above, then run:
+
+```console
+python scripts/verify-index-scale.py --fixture scripts/index-rebuild-smoke/bin/Debug/net10.0/IndexRebuildSmoke.dll --sources 1000 --results-per-source 20
+```
+
+The runner owns a temporary directory and refuses an existing database. It writes the requested sources plus one source with 10,000 results and metrics, verifies unchanged retries, and traverses all sources and the large source's results/metrics at page sizes 25 and 250. Every returned key and numeric value is checked, including Int64 trials above JavaScript's exact integer range and nullable metric pass flags. Lost, duplicated, reordered or altered rows fail the run. The same fixture runs on Linux .NET 8 and Windows .NET 10 without providers or network access.
+
+JSON output records runtime, OS, dataset size, database bytes and elapsed time by operation, including five full schema/integrity validations. Phase diagnostics go to stderr. Page timings include ownership, validation and snapshot overhead, not just SQL execution. Timing is descriptive for the machine and workload, never a hardware-independent test threshold; this fixture alone does not establish a production capacity guarantee. It covers evaluated data traversal; observation correctness and byte-budget refusal also have dedicated indexing tests.

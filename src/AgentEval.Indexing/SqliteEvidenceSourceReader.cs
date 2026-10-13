@@ -46,26 +46,8 @@ public sealed class SqliteEvidenceSourceReader(EvidenceIndexOptions options) : I
             var instance = snapshot.InstanceId; var generation = snapshot.Generation;
             if (cursor is not null && (cursor.InstanceId != instance || cursor.Generation != generation))
                 throw new EvidenceIndexException("stale-cursor");
-            using var command = connection.CreateCommand(); command.Transaction = transaction;
-            command.CommandText = """
-                SELECT source_id,root_id,relative_path,kind,verification,content_digest,indexed_generation,
-                    length(CAST(source_id AS BLOB))+length(CAST(root_id AS BLOB))+length(CAST(relative_path AS BLOB))+
-                    length(CAST(kind AS BLOB))+length(CAST(verification AS BLOB))+length(CAST(content_digest AS BLOB))
-                FROM sources
-                """;
-            var conditions = new List<string>();
-            if (request.RootId is not null)
-            {
-                conditions.Add("root_id=$root COLLATE BINARY"); command.Parameters.AddWithValue("$root", request.RootId);
-            }
-            if (cursor is not null)
-            {
-                conditions.Add("(root_id,relative_path)>($lastRoot,$lastPath)");
-                command.Parameters.AddWithValue("$lastRoot", cursor.LastRoot); command.Parameters.AddWithValue("$lastPath", cursor.LastPath);
-            }
-            if (conditions.Count > 0) command.CommandText += " WHERE " + string.Join(" AND ", conditions);
-            command.CommandText += " ORDER BY root_id COLLATE BINARY,relative_path COLLATE BINARY LIMIT $limit";
-            command.Parameters.AddWithValue("$limit", request.PageSize + 1);
+            using var command = EvidenceIndexPageCommand.Sources(connection, transaction, request.RootId,
+                request.PageSize, cursor?.LastRoot, cursor?.LastPath);
             var items = ImmutableArray.CreateBuilder<IndexedSourceEntry>(); long textBytes = 0; var more = false;
             using (var reader = command.ExecuteReader())
             while (reader.Read())

@@ -14,6 +14,10 @@ try
 {
     switch (args[0])
     {
+        case "scale":
+            Print(IndexScaleFixture.Run(options, args.Length > 2 ? int.Parse(args[2]) : 1000,
+                args.Length > 3 ? int.Parse(args[3]) : 20));
+            break;
         case "initialize":
             using (var writer = new SqliteEvidenceIndexWriter(options, schema))
             { writer.BindRoots([Root()]); writer.Upsert(Source("old")); }
