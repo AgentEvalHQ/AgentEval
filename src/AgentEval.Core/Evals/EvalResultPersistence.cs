@@ -185,7 +185,7 @@ public static class EvalResultPersistence
             ? null
             : JudgeFingerprint.For(
                 result.Provenance.JudgeModel!,
-                rubricDigest: result.Provenance.PromptHash,
+                rubricDigest: result.Provenance.RubricDigest ?? result.Provenance.PromptHash,
                 subjectModel: subjectModel);
 
         return new ComparabilityFacts(result.Metric.Key, result.Metric.Version)

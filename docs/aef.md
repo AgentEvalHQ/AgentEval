@@ -309,6 +309,9 @@ and decision-model leaves also carry the model and rubric digest in their annota
 use the `LLM` annotator kind; code checks remain `CODE`. Rubric identity is available with content capture off;
 judge reasoning is attached only with capture on.
 
+Stored benchmark comparison metadata prefers the full rubric digest. Older results without one retain their
+legacy short fingerprint; comparisons do not treat a short fingerprint as equivalent to a full digest.
+
 Composite judge headers retain `JudgeProvider` when the evaluator or decision transport implements
 `IJudgeProviderSource`. The CLI benchmark judge factory captures the configured provider alongside its client;
 `ChatClientEvaluator.ProviderName` can also be supplied by hosts and survives rubric binding. System One
