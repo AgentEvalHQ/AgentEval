@@ -136,7 +136,7 @@ public sealed class EvidenceIndexRebuildPreparation(IEvidenceIndexSchema schema)
         return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
-    private static void WriteReceipt<T>(string path, T value, CancellationToken cancellationToken)
+    internal static void WriteReceipt<T>(string path, T value, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var bytes = JsonSerializer.SerializeToUtf8Bytes(value);

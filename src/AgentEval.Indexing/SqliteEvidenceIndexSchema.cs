@@ -47,6 +47,13 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
 
     /// <inheritdoc />
     public EvidenceIndexSchemaInfo EnsureCurrent(EvidenceIndexOptions options, CancellationToken cancellationToken = default)
+        => EnsureCore(options, leaseHeld: false, allowInitialize: true, cancellationToken);
+
+    // Recovery holds the same .lock lease and must never turn an empty/corrupt candidate into a new index.
+    internal EvidenceIndexSchemaInfo InspectWhileOwned(EvidenceIndexOptions options, CancellationToken cancellationToken)
+        => EnsureCore(options, leaseHeld: true, allowInitialize: false, cancellationToken);
+
+    private EvidenceIndexSchemaInfo EnsureCore(EvidenceIndexOptions options, bool leaseHeld, bool allowInitialize, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
@@ -64,7 +71,7 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
         if (File.Exists(path) && new FileInfo(path).Length > options.MaxDatabaseBytes) throw new EvidenceIndexException("size-limit");
         Directory.CreateDirectory(parent);
         CheckDirectories(parent);
-        using var ownership = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        using var ownership = leaseHeld ? null : new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         try
         {
             using var connection = Open(path, options.BusyTimeoutSeconds);
@@ -74,6 +81,7 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
             if (application == 0 && version == 0 && ScalarLong(connection, transaction,
                 "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'") == 0)
             {
+                if (!allowInitialize) throw new EvidenceIndexException("empty-rebuild-candidate");
                 Execute(connection, transaction, Script);
                 using var migration = connection.CreateCommand();
                 migration.Transaction = transaction;
