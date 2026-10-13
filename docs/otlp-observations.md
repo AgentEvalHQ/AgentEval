@@ -1,10 +1,10 @@
 # OTLP observations
 
 The OTLP observation receiver is under implementation. No `/v1/traces`
-endpoint is enabled by this change. The first delivered component is
-`IOtlpPayloadReader` in `AgentEval.Results.Observations`, with validated
-`OtlpIngestionLimits`. It reads bytes only: success is neither a parsed trace
-nor a persisted observation or an evaluation result.
+endpoint is enabled by this change. Delivered components in `AgentEval.Results.Observations` are the bounded
+`IOtlpPayloadReader`, validated `OtlpIngestionLimits`, an immutable trace model
+and `OtlpJsonTraceDecoder`. Payload reading and JSON decoding do not persist
+observations or establish evaluation results. Protobuf decoding is pending.
 
 ## Transport contract
 
@@ -31,11 +31,11 @@ observation acceptance; reading or decoding a payload is insufficient.
 | --- | --- | --- | --- |
 | Transport bytes | 4 MiB | 1 byte–64 MiB | Delivered payload reader |
 | Decoded bytes | 4 MiB | 1 byte–64 MiB | Delivered payload reader |
-| Spans/request | 4,096 | 1–100,000 | Message decoder, pending |
-| Attributes/owner | 128 | 1–1,024 | Message decoder, pending |
-| Total collection items/request | 100,000 | 1–1,000,000 | Message decoder, pending |
-| Nested message/value depth | 32 | 8–64 | Message decoder, pending |
-| UTF-8 string or bytes value | 16 KiB | 1 byte–1 MiB | Message decoder, pending |
+| Spans/request | 4,096 | 1–100,000 | Delivered JSON decoder; protobuf pending |
+| Attributes/owner | 128 | 1–1,024 | Delivered JSON decoder; protobuf pending |
+| Total collection items/request | 100,000 | 1–1,000,000 | Delivered JSON decoder; protobuf pending |
+| Nested message/value depth | 32 | 8–64 | Delivered JSON decoder; protobuf pending |
+| UTF-8 string or bytes value | 16 KiB | 1 byte–1 MiB | Delivered JSON decoder; protobuf pending |
 | Active receiver requests | 2 | 1–16 | Receiver lifetime, pending |
 | Timeout | 30 seconds | 1–600 seconds | Receiver lifetime, pending |
 
@@ -65,6 +65,36 @@ separate. A later SQLite index is derived from those authoritative files.
 
 Content capture will default to off. Structural metadata must be allowlisted;
 prompt, completion and tool payload content cannot be persisted by default.
-Message decoding, versioned dialect normalization, grouping, retention and this
-content policy remain the next implementation slices. Tests currently prove
-the byte-boundary component, not a completed receiver.
+Protobuf decoding, versioned dialect normalization, grouping, retention and this
+content policy remain the next implementation slices. Tests prove the payload
+boundary and JSON decoder, not a completed receiver.
+
+## JSON trace decoding
+
+`OtlpJsonTraceDecoder` implements `IOtlpTraceDecoder` and returns an immutable
+`OtlpTraceBatch`. The message fields follow the pinned upstream
+[trace definitions](https://github.com/open-telemetry/opentelemetry-proto/blob/v1.9.0/opentelemetry/proto/trace/v1/trace.proto),
+[common values](https://github.com/open-telemetry/opentelemetry-proto/blob/v1.9.0/opentelemetry/proto/common/v1/common.proto)
+and [resource definitions](https://github.com/open-telemetry/opentelemetry-proto/blob/v1.9.0/opentelemetry/proto/resource/v1/resource.proto).
+Resource/scope schema URLs, scope version, all flag bits, events, links and
+producer-reported dropped counts remain available to normalization. Entity
+references are retained as reported, not verified identities.
+
+Integers are parsed exactly, including integral exponent notation; timestamps
+remain unsigned nanoseconds. Integer and quoted double representations have an
+additional 128-character budget. Numeric enum values survive even when unknown;
+enum names are refused. Typed AnyValue data retains signed integers, binary64
+values (including explicit non-finite values), bytes, arrays and key-value lists.
+IDs must have the prescribed nonzero hexadecimal shape and are normalized to
+lower case. Empty parent IDs are allowed. Duplicate attribute keys and ambiguous
+AnyValue alternatives are refused.
+
+Unknown message fields are ignored semantically but consume structural budgets.
+JSON must be valid UTF-8. Null fields act as absent fields; null repeated entries
+are refused. General duplicate message fields use the final JSON value; AnyValue
+rejects multiple non-null alternatives. All JSON nodes, including unknown fields,
+count against the aggregate item budget. String limits count UTF-8 bytes. The
+payload is parsed into a bounded JsonDocument before model construction; parsing
+is synchronous, with cancellation checked before parsing and during traversal.
+The returned model owns its strings and immutable collections after that document
+is disposed. No raw JSON is retained by the decoder.
