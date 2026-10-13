@@ -33,7 +33,7 @@ namespace AgentEval.Evals.Agentic.JudgeQuality;
 /// Severity: <c>low</c> (meta-metric).
 /// </para>
 /// </summary>
-public sealed class CalibrationAccuracyEval : IEval
+public sealed class CalibrationAccuracyEval : IEvalConfigurationSource
 {
     private readonly double _passThreshold;
 
@@ -61,6 +61,28 @@ public sealed class CalibrationAccuracyEval : IEval
             throw new ArgumentOutOfRangeException(
                 nameof(passThreshold), passThreshold, "Pass threshold must be in [0, 1].");
         _passThreshold = passThreshold;
+    }
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        // Do not enumerate a potentially one-shot source before EvaluateAsync consumes it.
+        if (input.Metadata?.TryGetValue("calibration_pairs", out var raw) == true
+            && raw is not string && raw is not IReadOnlyList<(string Expected, string Actual)>)
+            return null;
+        var configuration = CaptureConfiguration();
+        var expected = ExtractPairs(input).Select(pair => pair.Expected).ToArray();
+        configuration["expectedLabelsDigest"] = "sha256:" + Convert.ToHexString(
+            global::System.Security.Cryptography.SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(expected))).ToLowerInvariant();
+        configuration["expectedLabelCount"] = expected.Length;
+        return configuration;
     }
 
     /// <inheritdoc/>

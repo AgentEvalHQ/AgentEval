@@ -28,7 +28,7 @@ namespace AgentEval.Evals.Agentic.JudgeQuality;
 /// (this is a meta-metric, not a real-world output evaluator).
 /// </para>
 /// </summary>
-public sealed class JudgeAgreementEval : IEval
+public sealed class JudgeAgreementEval : IEvalConfigurationSource
 {
     private readonly double _passThreshold;
 
@@ -58,6 +58,12 @@ public sealed class JudgeAgreementEval : IEval
                 nameof(passThreshold), passThreshold, "Pass threshold must be in [0, 1].");
         _passThreshold = passThreshold;
     }
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

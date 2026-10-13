@@ -36,7 +36,7 @@ namespace AgentEval.Evals.Agentic.JudgeQuality;
 /// score = 1.0, result = pass. If one evaluator drifted by 0.20, score = 0.80.
 /// </para>
 /// </summary>
-public sealed class JudgeDriftEval : IEval
+public sealed class JudgeDriftEval : IEvalConfigurationSource
 {
     private readonly double _passThreshold;
 
@@ -67,6 +67,12 @@ public sealed class JudgeDriftEval : IEval
                 nameof(passThreshold), passThreshold, "Pass threshold must be in [0, 1].");
         _passThreshold = passThreshold;
     }
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

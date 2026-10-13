@@ -2,6 +2,7 @@ using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Telemetry;
+using AgentEval.Evals.Agentic.JudgeQuality;
 using AgentEval.Evals.Agentic.StochasticStability;
 
 namespace AgentEval.Tests.Cli.Aef;
@@ -31,6 +32,7 @@ public sealed class CompositeSuiteDefinitionTests
     [InlineData("reasoning")]
     [InlineData("user-experience")]
     [InlineData("telemetry")]
+    [InlineData("judge-quality")]
     [InlineData("stochastic-stability")]
     public void Capture_AgenticPreset_IdentifiesConfiguredInstrumentsWithoutCalls(string preset)
     {
@@ -76,6 +78,33 @@ public sealed class CompositeSuiteDefinitionTests
         Assert.NotEqual(Digest(new LatencyEval()), Digest(new LatencyEval(passThreshold: 0.9)));
         Assert.NotEqual(Digest(new CostEval()), Digest(new CostEval(passThreshold: 0.9)));
         Assert.NotEqual(Digest(new TokenUsageEval()), Digest(new TokenUsageEval(passThreshold: 0.9)));
+    }
+
+    [Fact]
+    public void Capture_CalibrationReferences_BindsExpectedLabelsOnlyAndRefusesLazyInputs()
+    {
+        var graph = AgentEval.Cli.Commands.BenchAgenticCommand.ResolvePreset("judge-quality", new Judge("unused"));
+        AgentEval.Results.Suites.SuiteDefinitionManifest? Capture(object pairs) =>
+            CompositeSuiteDefinition.TryCreate("bench:judge-quality", graph,
+                new EvalInput("q", "r", Metadata: new Dictionary<string, object> { ["calibration_pairs"] = pairs }), 1);
+        var baseline = Capture(new[] { ("secret expected", "actual one") })!;
+        Assert.Equal(baseline.Digest, Capture(new[] { ("secret expected", "actual two") })!.Digest);
+        Assert.Equal(baseline.Digest, Capture("[{\"expected\":\"secret expected\",\"actual\":\"other\"}]")!.Digest);
+        Assert.NotEqual(baseline.Digest, Capture(new[] { ("changed reference", "actual one") })!.Digest);
+        Assert.NotEqual(baseline.Digest, Capture(Array.Empty<(string, string)>())!.Digest);
+        Assert.DoesNotContain("secret expected", baseline.ToJson().ToJsonString());
+        Assert.DoesNotContain("actual one", baseline.ToJson().ToJsonString());
+        IEnumerable<(string, string)> Lazy()
+        {
+            throw new InvalidOperationException("Capture must not consume this source.");
+#pragma warning disable CS0162
+            yield break;
+#pragma warning restore CS0162
+        }
+        Assert.Null(Capture(Lazy()));
+        Assert.NotEqual(new JudgeDriftEval().CaptureConfiguration().ToJsonString(), new JudgeDriftEval(0.1).CaptureConfiguration().ToJsonString());
+        Assert.NotEqual(new JudgeAgreementEval().CaptureConfiguration().ToJsonString(), new JudgeAgreementEval(0.9).CaptureConfiguration().ToJsonString());
+        Assert.NotEqual(new CalibrationAccuracyEval().CaptureConfiguration().ToJsonString(), new CalibrationAccuracyEval(0.9).CaptureConfiguration().ToJsonString());
     }
 
     private sealed class UnidentifiedJudge : IEvaluator

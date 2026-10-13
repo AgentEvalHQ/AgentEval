@@ -13,4 +13,9 @@ public interface IEvalConfigurationSource : IEval
 {
     /// <summary>Captures the applied configuration without executing the evaluator.</summary>
     JsonObject CaptureConfiguration();
+
+    /// <summary>Captures configuration and declared reference inputs for a particular invocation.</summary>
+    /// <remarks>Producers should call this overload. Return null when reference inputs cannot be captured
+    /// without consuming or changing execution inputs. Observed results must remain excluded.</remarks>
+    JsonObject? CaptureConfiguration(EvalInput input) => CaptureConfiguration();
 }

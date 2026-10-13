@@ -80,7 +80,9 @@ internal static class CompositeSuiteDefinition
                     node["components"] = components;
                     return node;
                 case IEvalConfigurationSource configured:
-                    node["configuration"] = configured.CaptureConfiguration().DeepClone();
+                    var configuration = configured.CaptureConfiguration(input);
+                    if (configuration is null) return null;
+                    node["configuration"] = configuration.DeepClone();
                     return node;
                 default: return null;
             }
