@@ -385,6 +385,10 @@ Agentic benchmarks also link their created store manifests, including interrupte
 GDPR and EU AI Act also record single-run identities, or ordered `trialRunIds` plus the aggregate `runId` for
 repeated runs. IDs are captured immediately after manifest creation, including an interrupted trial or aggregate
 persistence; an aggregate that was never created has no `runId`. Native adapter options expose the same links.
+If aggregate persistence fails partway through, AEF retains the already-computed rollup and completed trial trees,
+marks the run aborted, and omits the final gate. The linked aggregate manifest may exist without its store-v1 summary.
+Early scan failures retain only completed probes; a scan interrupted before its first result has empty results.
+Partially evaluated composites retain completed leaves alongside typed error/skipped states for unfinished work.
 Native run options accept `Config` and `CostPolicy`. CLI configuration uses an explicit list of applied settings:
 eval trial counts, repeated-run success thresholds, named metrics, and sampling settings (only for endpoint targets);
 red-team intensity, attack selection and failure policy; benchmark preset and requested trial count, including aborts.

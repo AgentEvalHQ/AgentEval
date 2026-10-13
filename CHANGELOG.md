@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Interruption verification:** deterministic CLI regressions cover early/partial OWASP, MITRE and NIST
+  scans, partial GDPR/EU AI Act/agentic evaluation, and failure midway through aggregate persistence.
+  Completed observations and trial rollups survive without inventing a final gate or a completed store summary.
+
 - **Evidence survives output failures:** a broken saved-run diagnostic stream no longer reports intact
   native AEF evidence as unwritten. GDPR, EU AI Act, agentic, OWASP, MITRE and NIST commands do not create
   a second aborted run when final console reporting fails after publication; their completed gate remains intact.

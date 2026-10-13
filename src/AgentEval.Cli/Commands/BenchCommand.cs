@@ -54,7 +54,7 @@ public static class BenchCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null)
+        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null)
     {
         if (runs < 1)
         {
@@ -198,11 +198,12 @@ public static class BenchCommand
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
+        var store = storeOverride ?? new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp) left behind by killed benchmark processes. Only CLI writer
         // entry points sweep — Mission Control (read-only viewer) must not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        if (store is FileSystemOutputStore fileStore)
+            await fileStore.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'" +

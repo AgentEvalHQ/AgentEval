@@ -1519,6 +1519,207 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Composite_AggregatePersistenceFailure_RetainsCompletedTrialsAndRollup(bool euAiAct, bool cancelled)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "aggregate-failure" }.ToJsonString());
+        using var cancellation = new CancellationTokenSource();
+        var store = System.Reflection.DispatchProxy.Create<AgentEval.Output.IOutputStore, AggregateFailureStore>();
+        var fault = (AggregateFailureStore)store;
+        fault.Inner = new AgentEval.Output.FileSystemOutputStore(workspace);
+        fault.Cancellation = cancelled ? cancellation : null;
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var exit = euAiAct
+            ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", new PassingEvaluator(),
+                responseText: "answer", runs: 2, aef: aef, ct: cancellation.Token, storeOverride: store)
+            : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", new PassingEvaluator(),
+                responseText: "answer", runs: 2, aef: aef, ct: cancellation.Token, storeOverride: store);
+        Assert.Equal(1, exit);
+        Assert.Equal(2, fault.AggregateWriteAttempts);
+        Assert.NotNull(fault.AggregateId);
+        var subject = new AgentEval.Output.SubjectIdentity(AgentEval.Output.SubjectKind.Agent, "subject");
+        var aggregateDirectory = store.ResolveRunDirectory(subject, fault.AggregateId!);
+        Assert.True(File.Exists(Path.Combine(aggregateDirectory, "manifest.json")));
+        Assert.False(File.Exists(Path.Combine(aggregateDirectory, "summary.json")));
+        Assert.Single(await Collect(store.GetScenarioResultsAsync(fault.AggregateId!)));
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        AssertCompositeStoreLinks(dir, 2);
+        Assert.Equal(fault.AggregateId, (string?)Document(dir, "run.json")["ext"]!["agenteval.store-v1"]!["runId"]);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => l["trials"] is not null && (string?)l["state"] == "passed");
+        Assert.All(lines.Where(l => l["trials"] is not null), l => Assert.Equal(2, (int)l["trials"]!["n"]!));
+        Assert.Contains(lines, l => (int?)l["trial"] == 0);
+        Assert.Contains(lines, l => (int?)l["trial"] == 1);
+    }
+
+    private static async Task<List<T>> Collect<T>(IAsyncEnumerable<T> items)
+    {
+        var result = new List<T>();
+        await foreach (var item in items) result.Add(item);
+        return result;
+    }
+
+    // Intercept only aggregate persistence, forwarding the full store interface to real files.
+    public class AggregateFailureStore : System.Reflection.DispatchProxy
+    {
+        public AgentEval.Output.IOutputStore Inner { get; set; } = null!;
+        public CancellationTokenSource? Cancellation { get; set; }
+        public string? AggregateId { get; private set; }
+        public int AggregateWriteAttempts { get; private set; }
+
+        protected override object? Invoke(System.Reflection.MethodInfo? method, object?[]? args)
+        {
+            if (method!.Name == nameof(AgentEval.Output.IOutputStore.StartRunAsync))
+                return Start((AgentEval.Output.SubjectIdentity)args![0]!, (AgentEval.Output.RunContext)args[1]!, (CancellationToken)args[2]!);
+            if (method.Name == nameof(AgentEval.Output.IOutputStore.WriteScenarioResultAsync)
+                && (string)args![0]! == AggregateId && ++AggregateWriteAttempts == 2)
+            {
+                if (Cancellation is not null)
+                {
+                    Cancellation.Cancel();
+                    return Task.FromCanceled(Cancellation.Token);
+                }
+                return Task.FromException(new IOException("Aggregate persistence fixture failure"));
+            }
+            return method.Invoke(Inner, args);
+        }
+
+        private async Task<AgentEval.Output.RunManifest> Start(AgentEval.Output.SubjectIdentity subject,
+            AgentEval.Output.RunContext context, CancellationToken token)
+        {
+            var manifest = await Inner.StartRunAsync(subject, context, token);
+            if (context.Harness == "StochasticBenchRunner") AggregateId = manifest.Run.RunId;
+            return manifest;
+        }
+    }
+
+    [Theory]
+    [InlineData("owasp", 0, false)]
+    [InlineData("owasp", 1, false)]
+    [InlineData("mitre", 0, false)]
+    [InlineData("mitre", 1, false)]
+    [InlineData("nist", 0, false)]
+    [InlineData("nist", 1, false)]
+    [InlineData("owasp", 0, true)]
+    [InlineData("owasp", 1, true)]
+    [InlineData("mitre", 0, true)]
+    [InlineData("mitre", 1, true)]
+    [InlineData("nist", 0, true)]
+    [InlineData("nist", 1, true)]
+    public async Task BenchScan_InterruptedDuringExecution_RetainsOnlyCompletedProbes(string family, int completed, bool cancelled)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "scan-failure" }.ToJsonString());
+        using var cancellation = new CancellationTokenSource();
+        var agent = new InterruptedScanAgent(completed, cancelled ? cancellation : null);
+        await using var endpoint = await LocalChatEndpoint.StartAsync("VERDICT: RESISTED\nCONFIDENCE: 0.95\nREASON: test");
+        using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(endpoint.Endpoint, "judge", "local-test");
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var result = family switch
+        {
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                judgeClientOverride: judge, aef: aef, ct: cancellation.Token),
+            "nist" => await BenchNistCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                judgeClientOverride: judge, aef: aef, ct: cancellation.Token),
+            _ => await BenchOwaspCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                judgeClientOverride: judge, aef: aef, ct: cancellation.Token),
+        };
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(completed + 1, agent.Calls);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.Null(Document(dir, "run.json")["ext"]?["agenteval.store-v1"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        Assert.Equal(completed, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+    }
+
+    private sealed class InterruptedScanAgent(int completed, CancellationTokenSource? cancellation) : AgentEval.Core.IEvaluableAgent
+    {
+        public string Name => "subject";
+        public int Calls { get; private set; }
+        public Task<AgentEval.Core.AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            if (++Calls > completed)
+            {
+                if (cancellation is not null)
+                {
+                    cancellation.Cancel();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                throw new ScanFixtureFatalException();
+            }
+            return Task.FromResult(new AgentEval.Core.AgentResponse { Text = "I cannot help with that." });
+        }
+    }
+
+    private sealed class ScanFixtureFatalException() : AgentEval.Core.FatalEvaluationException("Structural fixture failure");
+
+    [Theory]
+    [InlineData("gdpr", false)]
+    [InlineData("eu-ai-act", false)]
+    [InlineData("agentic", false)]
+    [InlineData("gdpr", true)]
+    [InlineData("eu-ai-act", true)]
+    [InlineData("agentic", true)]
+    public async Task Composite_InterruptedDuringEvaluation_RetainsCompletedLeaves(string family, bool cancelled)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "partial-evaluation" }.ToJsonString());
+        using var cancellation = new CancellationTokenSource();
+        var judge = new StopAfterOneEvaluator(cancelled ? cancellation : null);
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var exit = family switch
+        {
+            "gdpr" => await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", judge,
+                responseText: "answer", aef: aef, ct: cancellation.Token),
+            "eu-ai-act" => await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", judge,
+                responseText: "answer", aef: aef, ct: cancellation.Token),
+            _ => await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", "answer", judge,
+                budgetTier: "HIGH", aef: aef, ct: cancellation.Token),
+        };
+        Assert.Equal(1, exit);
+        Assert.True(judge.Calls >= 2);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        AssertStoreLink(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+        Assert.Contains(lines, l => (string?)l["state"] == "passed" && (string?)l["annotator"]?["kind"] == "LLM");
+        Assert.Contains(lines, l => (string?)l["state"] is "error" or "skipped" or "not_measured");
+    }
+
+    private sealed class StopAfterOneEvaluator(CancellationTokenSource? cancellation) : AgentEval.Core.IEvaluator
+    {
+        public int Calls { get; private set; }
+        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria,
+            CancellationToken ct = default)
+        {
+            if (++Calls == 1) return new PassingEvaluator().EvaluateAsync(input, output, criteria, ct);
+            if (cancellation is not null)
+            {
+                cancellation.Cancel();
+                ct.ThrowIfCancellationRequested();
+            }
+            throw new ScanFixtureFatalException();
+        }
+    }
+
     private sealed class CancellingEvaluator(CancellationTokenSource cancellation) : AgentEval.Core.IEvaluator
     {
         public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)

@@ -53,7 +53,7 @@ public static class BenchEuAiActCommand
         bool noAef = false,
         string? subjectVersion = null,
         bool agentIsLive = false,
-        int runs = 1, string? agentEndpoint = null)
+        int runs = 1, string? agentEndpoint = null, IOutputStore? storeOverride = null)
     {
         if (runs < 1)
         {
@@ -198,10 +198,11 @@ public static class BenchEuAiActCommand
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
+        var store = storeOverride ?? new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp). Phase-0 0.9: only CLI writer paths sweep; MC does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        if (store is FileSystemOutputStore fileStore)
+            await fileStore.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
