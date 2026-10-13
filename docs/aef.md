@@ -32,7 +32,9 @@ agenteval decide ./my-run --kind approve --by reviewer-42 --reason "Reviewed the
 agenteval aef view ./my-run --json
 ```
 
-`decide` currently supports run-level `approve` and `reject`. Both require an explicit opaque identity and a
+`decide` supports `approve` and `reject` for the run, or for one result with `--result <result-id>`.
+The result ID must belong to this run; reviewing it leaves the run's review status unchanged.
+Both require an explicit opaque identity and a
 nonblank reason. Identity is **self-attested**, not authenticated or cryptographically signed. The command
 appends one overlay event and seals its batch; approval does not change the original results, summaries, gates
 or checkpoint outcome. Inspect the effective review status with `aef view`.

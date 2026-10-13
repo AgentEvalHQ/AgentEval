@@ -32,10 +32,10 @@ public sealed class DecideCommandTests : IDisposable
     private Dictionary<string, string> Snapshot() => Directory.GetFiles(_directory, "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(_directory, path), path => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))));
 
-    private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence")
+    private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence", string? result = null)
     {
         var output = new StringWriter();
-        var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null);
+        var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null, result: result);
         return (exit, output.ToString());
     }
 
@@ -62,6 +62,40 @@ public sealed class DecideCommandTests : IDisposable
         Assert.Equal("reviewer-1", (string?)events[0]["by"]!["identity"]);
         Assert.Equal("self-attested", (string?)events[0]["by"]!["assurance"]);
         Assert.Equal("Reviewed evidence", (string?)events[0]["reason"]);
+    }
+
+    [Theory]
+    [InlineData("approve")]
+    [InlineData("reject")]
+    public void Run_ResultReview_ChangesOnlySelectedReviewAndPreservesEvidence(string kind)
+    {
+        CreateRun();
+        var before = Snapshot();
+        var id = (string)JsonNode.Parse(File.ReadLines(Path.Combine(_directory, "results.ndjson")).First())!["resultId"]!;
+        Assert.Equal(ExitCodes.Success, Decide("reject").Exit);
+        var (exit, output) = Decide(kind, result: id);
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Equal(id, (string?)JsonNode.Parse(output)!["resultId"]);
+        var view = EffectiveView.Compute(_directory, DateTimeOffset.UtcNow, null);
+        Assert.Equal(2, view.Reviews.Count);
+        Assert.Contains(view.Reviews, r => r.Target == "run" && r.Status == "reject");
+        Assert.Contains(view.Reviews, r => r.Target == id && r.Status == kind);
+        Assert.Empty(view.Results);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(_directory).Outcome);
+        var after = Snapshot();
+        foreach (var entry in before) Assert.Equal(entry.Value, after[entry.Key]);
+    }
+
+    [Theory]
+    [InlineData("missing-result")]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Run_InvalidResult_RefusesWithoutMutation(string result)
+    {
+        CreateRun();
+        var before = Snapshot();
+        Assert.Equal(ExitCodes.UsageError, Decide(result: result).Exit);
+        Assert.Equal(before.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
     }
 
     [Theory]
@@ -108,5 +142,6 @@ public sealed class DecideCommandTests : IDisposable
     {
         Assert.NotEmpty(DecideCommand.Create().Parse([_directory]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "approve", "--by", "reviewer", "--reason", "Reviewed", "--json"]).Errors);
+        Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "reject", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1"]).Errors);
     }
 }
