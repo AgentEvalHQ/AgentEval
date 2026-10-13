@@ -44,6 +44,19 @@ adopts another writer's work. Exit 0 means the decision batch was sealed; 1 mean
 the decision; 2 means an input or storage error. If writing is interrupted, inspect and verify the journal before
 retrying: an event may remain unsealed and has no effective decision status until its batch is sealed.
 
+For a bounded waiver, use `--kind waive` with exactly one `--result <id>` or `--requirement <external-id>`,
+a nonblank reason, and `--expires <UTC-time>` (RFC 3339 ending in `Z`, strictly after the decision time).
+Requirement IDs are external references; the command does not certify that a requirement exists or is satisfied.
+For example:
+
+```bash
+agenteval decide ./my-run --kind waive --requirement REQ-42 --by reviewer-42 --reason "Temporary exception pending retest" --expires 2026-11-01T00:00:00Z
+```
+
+The waiver is active from its decision time up to, but excluding, its expiry. `aef view` retains expired waivers
+as inactive history. Waivers leave sealed result states and gate outcomes unchanged; `--requirement` and
+`--expires` are refused for approval and rejection.
+
 ## What a run looks like
 
 ```text

@@ -16,22 +16,26 @@ internal static class DecideCommand
     internal static Command Create()
     {
         var directory = new Argument<string>("run-dir") { Description = "A verified, sealed AEF run folder." };
-        var kind = new Option<string>("--kind") { Required = true, Description = "Review decision: approve or reject. Does not change results or gates." };
+        var kind = new Option<string>("--kind") { Required = true, Description = "Decision: approve, reject or waive. Does not change sealed results or gates." };
         var identity = new Option<string>("--by") { Required = true, Description = "Your stable opaque identity; recorded as self-attested, not authenticated." };
-        var reason = new Option<string>("--reason") { Required = true, Description = "Why you approve or reject this run." };
+        var reason = new Option<string>("--reason") { Required = true, Description = "Why you are recording this decision." };
         var json = new Option<bool>("--json") { Description = "Print the event and sealed batch identifiers as JSON." };
         var result = new Option<string?>("--result") { Description = "Review this result ID instead of the whole run." };
-        var command = new Command("decide", "Append and seal an approve/reject review decision on an AEF run.");
+        var requirement = new Option<string?>("--requirement") { Description = "External requirement ID to waive; use instead of --result." };
+        var expires = new Option<string?>("--expires") { Description = "Required for waive: future RFC 3339 UTC time ending in Z." };
+        var command = new Command("decide", "Append and seal a review decision or bounded waiver on an AEF run.");
         command.Add(directory);
-        foreach (var option in new Option[] { kind, identity, reason, json, result }) command.Add(option);
+        foreach (var option in new Option[] { kind, identity, reason, json, result, requirement, expires }) command.Add(option);
         command.SetAction((ParseResult parsed, CancellationToken _) => Task.FromResult(Run(
             parsed.GetValue(directory)!, parsed.GetValue(kind)!, parsed.GetValue(identity)!, parsed.GetValue(reason)!,
-            parsed.GetValue(json), Console.Out, Console.Error, result: parsed.GetValue(result))));
+            parsed.GetValue(json), Console.Out, Console.Error, result: parsed.GetValue(result),
+            requirement: parsed.GetValue(requirement), expires: parsed.GetValue(expires))));
         return command;
     }
 
     internal static int Run(string directory, string kind, string identity, string reason, bool json,
-        TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, string? result = null)
+        TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, string? result = null,
+        string? requirement = null, string? expires = null)
     {
         try
         {
@@ -39,11 +43,25 @@ internal static class DecideCommand
             {
                 "approve" => AefOverlayKind.Approve,
                 "reject" => AefOverlayKind.Reject,
-                _ => throw new ArgumentException("Expected --kind approve or reject. Other decision kinds are not supported."),
+                "waive" => AefOverlayKind.Waive,
+                _ => throw new ArgumentException("Expected --kind approve, reject or waive. Other decision kinds are not supported."),
             };
             ArgumentException.ThrowIfNullOrWhiteSpace(identity);
             ArgumentException.ThrowIfNullOrWhiteSpace(reason);
             if (result is not null) ArgumentException.ThrowIfNullOrWhiteSpace(result);
+            if (requirement is not null) ArgumentException.ThrowIfNullOrWhiteSpace(requirement);
+            var at = AefTime.FromDateTimeOffset((clock ?? TimeProvider.System).GetUtcNow());
+            AefTime? until = null;
+            if (decision == AefOverlayKind.Waive)
+            {
+                if ((result is null) == (requirement is null))
+                    throw new ArgumentException("Expected exactly one waiver target: --result or --requirement.");
+                ArgumentException.ThrowIfNullOrWhiteSpace(expires);
+                until = AefTime.Parse(expires);
+                if (until.Value <= at) throw new ArgumentException("Expected --expires later than the decision time.");
+            }
+            else if (requirement is not null || expires is not null)
+                throw new ArgumentException("--requirement and --expires are only valid for --kind waive.");
             if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("The AEF run folder does not exist.");
             var verification = AefRunVerifier.Verify(directory);
             if (verification.Outcome != AefOutcome.Intact)
@@ -61,16 +79,17 @@ internal static class DecideCommand
             }
             var eventId = writer.Append(new AefOverlayEvent
             {
-                Kind = decision, Target = result is null ? AefOverlayTarget.TheRun : new AefOverlayTarget { Result = result }, Reason = reason,
+                Kind = decision, Target = new AefOverlayTarget { Result = result, Requirement = requirement }, Reason = reason,
                 By = new AefIdentity(identity, AefAssurance.SelfAttested),
-                At = AefTime.FromDateTimeOffset((clock ?? TimeProvider.System).GetUtcNow()),
+                At = at, Expires = until,
             });
             var batch = writer.SealBatch();
             if (json)
-                stdout.WriteLine(JsonSerializer.Serialize(new { eventId, runId = writer.RunId, resultId = result, kind,
+                stdout.WriteLine(JsonSerializer.Serialize(new { eventId, runId = writer.RunId, resultId = result,
+                    requirementId = requirement, expires = until?.ToString(), kind,
                     assurance = "self-attested", batch = batch.Number, sealPath = batch.SealPath }));
             else
-                stdout.WriteLine($"Recorded {kind} for {result ?? "the run"} as {eventId}, batch {batch.Number} (self-attested). Sealed results and gates are unchanged.");
+                stdout.WriteLine($"Recorded {kind} for {result ?? requirement ?? "the run"} as {eventId}, batch {batch.Number} (self-attested). Sealed results and gates are unchanged.");
             return ExitCodes.Success;
         }
         catch (AefWriteException)

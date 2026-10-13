@@ -32,10 +32,18 @@ public sealed class DecideCommandTests : IDisposable
     private Dictionary<string, string> Snapshot() => Directory.GetFiles(_directory, "*", SearchOption.AllDirectories)
         .ToDictionary(path => Path.GetRelativePath(_directory, path), path => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))));
 
-    private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence", string? result = null)
+    private static readonly DateTimeOffset DecisionTime = new(2026, 10, 13, 12, 0, 0, TimeSpan.Zero);
+    private sealed class DecisionClock : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => DecisionTime;
+    }
+
+    private (int Exit, string Output) Decide(string kind = "approve", string identity = "reviewer-1", string reason = "Reviewed evidence", string? result = null,
+        string? requirement = null, string? expires = null)
     {
         var output = new StringWriter();
-        var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null, result: result);
+        var exit = DecideCommand.Run(_directory, kind, identity, reason, true, output, TextWriter.Null,
+            new DecisionClock(), result, requirement, expires);
         return (exit, output.ToString());
     }
 
@@ -99,7 +107,7 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("waive", "reviewer", "reason")]
+    [InlineData("redact", "reviewer", "reason")]
     [InlineData("APPROVE", "reviewer", "reason")]
     [InlineData("approve", "", "reason")]
     [InlineData("approve", "reviewer", " ")]
@@ -138,10 +146,58 @@ public sealed class DecideCommandTests : IDisposable
     }
 
     [Fact]
+    public void Run_Waivers_RequireBoundedTimeAndPreserveOriginalEvidence()
+    {
+        CreateRun();
+        var before = Snapshot();
+        var id = (string)JsonNode.Parse(File.ReadLines(Path.Combine(_directory, "results.ndjson")).First())!["resultId"]!;
+        const string expiry = "2026-10-14T12:00:00Z";
+        Assert.Equal(ExitCodes.Success, Decide("waive", result: id, expires: expiry).Exit);
+        var (exit, output) = Decide("waive", requirement: "REQ-42", expires: expiry);
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Equal("REQ-42", (string?)JsonNode.Parse(output)!["requirementId"]);
+        Assert.Equal(expiry, (string?)JsonNode.Parse(output)!["expires"]);
+        foreach (var (time, active) in new[] { (DecisionTime.AddSeconds(-1), false), (DecisionTime, true), (DecisionTime.AddDays(1), false) })
+        {
+            var view = EffectiveView.Compute(_directory, time, null);
+            Assert.Equal(2, view.Waivers.Count);
+            Assert.All(view.Waivers, w => Assert.Equal(active, w.Active));
+            Assert.Equal(id, (string?)view.Waivers[0].Target["result"]);
+            Assert.Equal("REQ-42", (string?)view.Waivers[1].Target["requirement"]);
+            Assert.Empty(view.Results);
+            Assert.Empty(view.Reviews);
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(_directory).Outcome);
+        var after = Snapshot();
+        foreach (var entry in before) Assert.Equal(entry.Value, after[entry.Key]);
+    }
+
+    [Theory]
+    [InlineData("waive", null, null, "2026-10-14T12:00:00Z")]
+    [InlineData("waive", "result", "REQ-42", "2026-10-14T12:00:00Z")]
+    [InlineData("waive", null, "REQ-42", null)]
+    [InlineData("waive", null, "REQ-42", "2026-10-13T12:00:00Z")]
+    [InlineData("waive", null, "REQ-42", "2026-10-12T12:00:00Z")]
+    [InlineData("waive", null, "REQ-42", "2026-10-14")]
+    [InlineData("waive", null, "REQ-42", "2026-10-14T12:00:00+02:00")]
+    [InlineData("waive", null, " ", "2026-10-14T12:00:00Z")]
+    [InlineData("waive", "missing-result", null, "2026-10-14T12:00:00Z")]
+    [InlineData("approve", null, "REQ-42", null)]
+    [InlineData("reject", null, null, "2026-10-14T12:00:00Z")]
+    public void Run_InvalidWaiverOptions_RefuseWithoutMutation(string kind, string? result, string? requirement, string? expires)
+    {
+        CreateRun();
+        var before = Snapshot();
+        Assert.Equal(ExitCodes.UsageError, Decide(kind, result: result, requirement: requirement, expires: expires).Exit);
+        Assert.Equal(before.OrderBy(p => p.Key), Snapshot().OrderBy(p => p.Key));
+    }
+
+    [Fact]
     public void Create_RequiredOptionsAndSupportedInvocation_ParseAsExpected()
     {
         Assert.NotEmpty(DecideCommand.Create().Parse([_directory]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "approve", "--by", "reviewer", "--reason", "Reviewed", "--json"]).Errors);
         Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "reject", "--by", "reviewer", "--reason", "Reviewed", "--result", "result-1"]).Errors);
+        Assert.Empty(DecideCommand.Create().Parse([_directory, "--kind", "waive", "--by", "reviewer", "--reason", "Reviewed", "--requirement", "REQ-42", "--expires", "2026-10-14T12:00:00Z"]).Errors);
     }
 }
