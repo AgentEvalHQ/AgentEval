@@ -1648,6 +1648,122 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("gdpr", false)]
+    [InlineData("eu-ai-act", false)]
+    [InlineData("agentic", false)]
+    [InlineData("owasp", false)]
+    [InlineData("mitre", false)]
+    [InlineData("nist", false)]
+    [InlineData("gdpr", true)]
+    [InlineData("eu-ai-act", true)]
+    [InlineData("agentic", true)]
+    [InlineData("owasp", true)]
+    [InlineData("mitre", true)]
+    [InlineData("nist", true)]
+    public async Task Bench_OutputFailureAfterPublication_KeepsOneCompletedRun(string family, bool diagnostic)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "output-failure" }.ToJsonString());
+        await using var endpoint = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
+        await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: SUCCEEDED\nCONFIDENCE: 0.95\nREASON: test");
+        var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "subject");
+        using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test");
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var original = diagnostic ? Console.Error : Console.Out;
+        using var output = new FailOnOutputWriter(diagnostic ? "AEF run:" : "Overall result:");
+        int exit;
+        try
+        {
+            if (diagnostic) Console.SetError(output); else Console.SetOut(output);
+            exit = family switch
+            {
+                "gdpr" => await BenchCommand.RunGdprAsync("standard", "subject", _root, "question",
+                    evaluatorOverride: new PassingEvaluator(), responseText: "answer", aef: aef),
+                "eu-ai-act" => await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question",
+                    evaluatorOverride: new PassingEvaluator(), responseText: "answer", aef: aef),
+                "agentic" => await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", "answer",
+                    new PassingEvaluator(), budgetTier: "HIGH", aef: aef),
+                "mitre" => (await BenchMitreCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true)).ExitCode,
+                "nist" => (await BenchNistCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true)).ExitCode,
+                _ => (await BenchOwaspCommand.RunAsync("smoke", "subject", _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true)).ExitCode,
+            };
+        }
+        finally
+        {
+            if (diagnostic) Console.SetError(original); else Console.SetOut(original);
+            (agent as IDisposable)?.Dispose();
+        }
+        Assert.True(output.Failed, "The fixture must reach the post-publication output.");
+        var dir = RunDirectory(aef.FullName); // Exactly one run, never a completed + aborted pair.
+        AssertIntact(dir);
+        Assert.Equal("completed", (string?)Document(dir, "run.json")["status"]);
+        var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "gates.ndjson"))))!;
+        Assert.Equal(diagnostic ? (int)gate["exitCode"]! : 1, exit);
+        Assert.DoesNotContain("not written", output.ToString());
+    }
+
+    [Theory]
+    [InlineData(false, "AEF run:")]
+    [InlineData(false, "AEF note:")]
+    [InlineData(true, "AEF run:")]
+    [InlineData(true, "AEF note:")]
+    public async Task Native_SavedDiagnosticFailure_PreservesEvidenceAndExit(bool redteam, string prefix)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync(redteam ? "I cannot help with that." : "Hi");
+        using var output = new FailOnOutputWriter(prefix);
+        var original = Console.Error;
+        string root;
+        try
+        {
+            Console.SetError(output);
+            if (redteam)
+            {
+                var options = new RedTeamOptions
+                {
+                    Endpoint = endpoint.Endpoint, Model = "local-model", ApiKey = "local-test",
+                    Attacks = "PromptInjection", Intensity = "quick", MaxProbes = 1,
+                    Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")),
+                    Aef = new DirectoryInfo(Path.Combine(_root, "aef")), Quiet = false, FailOn = "never",
+                };
+                Assert.Equal(0, await RedTeamCommand.ExecuteAsync(options, CancellationToken.None));
+                root = options.Aef.FullName;
+            }
+            else
+            {
+                var options = Options(endpoint.Endpoint, quiet: false, subjectVersion: null);
+                Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+                root = options.Aef!.FullName;
+            }
+        }
+        finally { Console.SetError(original); }
+        Assert.True(output.Failed);
+        var dir = RunDirectory(root);
+        AssertIntact(dir);
+        Assert.Equal("completed", (string?)Document(dir, "run.json")["status"]);
+        Assert.DoesNotContain("not written", output.ToString());
+        Assert.DoesNotContain("could not be completed", output.ToString());
+    }
+
+    private sealed class FailOnOutputWriter(string prefix) : StringWriter
+    {
+        public bool Failed { get; private set; }
+        public override void WriteLine(string? value)
+        {
+            if (value?.TrimStart().StartsWith(prefix, StringComparison.Ordinal) == true)
+            {
+                Failed = true;
+                throw new IOException("Test output failure after evidence publication");
+            }
+            base.WriteLine(value);
+        }
+    }
+
     private sealed class FailOnPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)

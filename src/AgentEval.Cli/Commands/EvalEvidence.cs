@@ -47,13 +47,10 @@ internal sealed class EvalEvidence : IDisposable
             if (_session is not null)
             {
                 var (directory, hash) = _session.Complete(DateTimeOffset.UtcNow, gate, abortReason, _judgeUsage(), AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage);
-                if (!_options.Quiet)
-                {
-                    Console.Error.WriteLine($"  AEF run: {directory} ({(hash is null ? "unsealed" : $"run hash {hash[..12]}…")})");
-                    AefCliOptions.NoteMissingSubjectVersion(_options.SubjectVersion);
-                }
                 _session.Dispose();
                 _session = null;
+                if (!_options.Quiet)
+                    AefCliOptions.ReportSaved(directory, hash, _options.SubjectVersion, "  ");
             }
         }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }

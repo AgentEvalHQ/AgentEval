@@ -896,8 +896,7 @@ internal static class RedTeamCommand
             }, result.StartedAt, DateTimeOffset.UtcNow);
             if (!opts.Quiet)
             {
-                Console.Error.WriteLine($"  AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
-                AefCliOptions.NoteMissingSubjectVersion(opts.SubjectVersion);
+                AefCliOptions.ReportSaved(directory, runHash, opts.SubjectVersion, "  ");
             }
             return false;
         }

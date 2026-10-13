@@ -100,6 +100,20 @@ internal sealed class AefCliOptions
         }
     }
 
+    // The evidence is already durable. A closed/broken diagnostic stream cannot undo publication.
+    internal static void ReportSaved(string directory, string? hash, string? subjectVersion, string indent = "")
+    {
+        try
+        {
+            Console.Error.WriteLine($"{indent}AEF run: {directory} ({(hash is null ? "unsealed" : $"run hash {hash[..12]}...")})");
+            NoteMissingSubjectVersion(subjectVersion);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        {
+            // Do not report a write failure, retry publication or change the evaluation's exit code.
+        }
+    }
+
     internal static void NoteMissingSubjectVersion(string? version)
     {
         if (string.IsNullOrWhiteSpace(version))

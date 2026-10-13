@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Evidence survives output failures:** a broken saved-run diagnostic stream no longer reports intact
+  native AEF evidence as unwritten. GDPR, EU AI Act, agentic, OWASP, MITRE and NIST commands do not create
+  a second aborted run when final console reporting fails after publication; their completed gate remains intact.
+
 - **Large native judge inventories:** draft AEF run/seal schemas retain up to 4096 distinct judge/rubric
   entries. This fixes GDPR evidence loss after report failures or cancellation when the old 64-entry
   limit was exceeded. Consumers of the earlier draft schemas need the updated schema files.

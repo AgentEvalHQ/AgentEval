@@ -206,6 +206,7 @@ public static class BenchEuAiActCommand
 
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
 
+        var evidenceFinalized = false;
         var startedAt = DateTimeOffset.UtcNow;
         var partialTrials = new List<CompositeProgress>();
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
@@ -331,6 +332,7 @@ public static class BenchEuAiActCommand
             // ── Exit code ─────────────────────────────────────────────────────────
             if (aefFailed)
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            evidenceFinalized = true;
             Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
 
             // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping —
@@ -340,6 +342,8 @@ public static class BenchEuAiActCommand
         }
         catch (Exception ex)
         {
+            // A later presentation failure must not create a second, aborted run.
+            if (evidenceFinalized) return 1;
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             var snapshots = partialTrials.Select(p => p.Snapshot()).ToList();
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,

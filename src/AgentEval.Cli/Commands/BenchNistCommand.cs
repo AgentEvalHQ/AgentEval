@@ -171,6 +171,7 @@ public static class BenchNistCommand
 
         Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running NIST AI RMF benchmark ({preset}) for subject '{subject}'...");
 
+        var evidenceFinalized = false;
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
             storeRunId is null ? null : new() { RunId = storeRunId };
@@ -326,6 +327,7 @@ public static class BenchNistCommand
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
+            evidenceFinalized = true;
             Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
                 $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
                 $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
@@ -344,6 +346,8 @@ public static class BenchNistCommand
         }
         catch (Exception ex)
         {
+            // A later presentation failure must not create a second, aborted run.
+            if (evidenceFinalized) return (1, null);
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,

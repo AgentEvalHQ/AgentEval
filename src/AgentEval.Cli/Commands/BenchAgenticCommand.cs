@@ -237,6 +237,7 @@ public static class BenchAgenticCommand
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
 
+        var evidenceFinalized = false;
         var startedAt = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
         string? storeRunId = null;
@@ -336,6 +337,7 @@ public static class BenchAgenticCommand
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
+            evidenceFinalized = true;
             // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
             // indeterminate (11), not "gate failed" (9).
             var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
@@ -353,6 +355,8 @@ public static class BenchAgenticCommand
         }
         catch (Exception ex)
         {
+            // A later presentation failure must not create a second, aborted run.
+            if (evidenceFinalized) return 1;
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),

@@ -347,6 +347,10 @@ summary entry per lane, metric and path.
 Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
 Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
+Saved-run notices are best-effort: a broken or closed diagnostic stream does not turn successful publication
+into an AEF write failure. If final benchmark console reporting fails after publication, the command can return
+its existing reporting-error exit (1), while the single completed run retains the evaluation's gate and verdict.
+It does not publish a second aborted run for that presentation failure.
 Cancellation during eval or redteam execution seals completed results in an `aborted` run with no final gate.
 Eval creates its running folder before evaluation and appends each completed case or stochastic trial immediately.
 For single-run eval, named `--metrics` results are added as `case/metrics/<name>` children when scoring finishes.
