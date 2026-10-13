@@ -649,8 +649,9 @@ public static class AefJobRunner
             WriteChildren(run.Writer, handle, result.Children, root.Lane);
             if (result.Judges is { Count: > 0 })
             {
-                foreach (var judge in result.Judges) run.Judges[judge.Model] = judge;
-                run.Writer.SetJudges(run.Judges.Values.ToArray());
+                foreach (var judge in result.Judges)
+                    if (run.SeenJudges.Add(judge)) run.Judges.Add(judge);
+                run.Writer.SetJudges(run.Judges.ToArray());
             }
             AddSpend(run, result.Usd);
             _done++;
@@ -736,7 +737,9 @@ public static class AefJobRunner
         public bool CleanupAttempted { get; set; }
         public AefTime? CloseStarted { get; set; }
         public List<double> Usd { get; } = [];
-        public Dictionary<string, AefJudge> Judges { get; } = new(StringComparer.Ordinal);
+        // A model can grade with several instruments. Keep full record identity and first-use order.
+        public List<AefJudge> Judges { get; } = [];
+        public HashSet<AefJudge> SeenJudges { get; } = [];
     }
 
     /// <summary>

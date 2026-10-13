@@ -150,6 +150,13 @@ Tool expectations are refused because this adapter cannot enforce them. Criteria
 The first judge uses the existing default harness prompt; custom rubric digests are refused. A requested judge
 provider must match `openai-compatible` or `azure`, according to its adapter.
 
+Each distinct criteria list in a suite produces a distinct rubric instrument. Authorize one matching
+entry in the plan's `judges` array per distinct list, repeating the model entry when necessary.
+For example, two distinct criteria lists on `gpt-4o-mini` require
+`"judges": [{"model":"gpt-4o-mini"}, {"model":"gpt-4o-mini"}]`.
+Repeated identical criteria share one instrument; CRLF/LF differences do not create another.
+The runner refuses insufficient entries before making requests, preserving the plan's judge limit.
+
 Each role (`subject` or `judge`) accepts at most one `credentialRefs` entry. Its resolved value is passed directly
 as that role's API key, without ambient environment fallback or environment mutation. Use distinct reference
 names for different keys; the shared runner refuses one name assigned conflicting values across purposes.

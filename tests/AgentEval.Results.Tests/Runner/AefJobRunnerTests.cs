@@ -599,6 +599,52 @@ public sealed class AefJobRunnerTests : IDisposable
     private Task<AefJobResult> Run(IAefJobCase testCase, CancellationToken ct = default) =>
         AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase), _output, new AefJobOptions { At = Start }, ct);
 
+    [Theory]
+    [InlineData("provider")]
+    [InlineData("mode")]
+    [InlineData("panelSize")]
+    [InlineData("rubricDigest")]
+    [InlineData("calibration")]
+    public async Task RunAsync_JudgeIdentity_DeduplicatesOnlyExactInstruments(string differingField)
+    {
+        var first = new AefJudge
+        {
+            Model = "same-model", Provider = "provider-a", Mode = AefJudgeMode.Panel, PanelSize = 2,
+            RubricDigest = "sha256:" + new string('a', 64),
+            Calibration = new AefCalibration { LabelSet = "dataset:labels", N = 10, Accuracy = 0.8, MeasuredAt = Start },
+        };
+        var second = differingField switch
+        {
+            "provider" => first with { Provider = "provider-b" },
+            "mode" => first with { Mode = AefJudgeMode.Other },
+            "panelSize" => first with { PanelSize = 3 },
+            "rubricDigest" => first with { RubricDigest = "sha256:" + new string('b', 64) },
+            _ => first with { Calibration = first.Calibration with { Accuracy = 0.9 } },
+        };
+        var plan = JsonNode.Parse(Plan())!.AsObject();
+        plan["judges"] = new JsonArray(new JsonObject { ["model"] = "same-model" }, new JsonObject { ["model"] = "same-model" });
+        var testCase = new Case(_ => ValueTask.FromResult(Passed() with
+        {
+            Judges = [first, second, first with { Calibration = first.Calibration with { } }],
+        }));
+        var result = await AefJobRunner.RunAsync(Encoding.UTF8.GetBytes(plan.ToJsonString()), Manifest(),
+            new Target(testCase), _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.sealed", result.Terminal);
+        var directory = RunDirectory();
+        var judges = Json(directory, "run.json")["judges"]!.AsArray();
+        Assert.Equal(2, judges.Count);
+        Assert.True(JsonNode.DeepEquals(first.ToJson(), judges[0]));
+        Assert.True(JsonNode.DeepEquals(second.ToJson(), judges[1]));
+        var sealedJudges = Json(directory, "seal.json")["predicate"]!["judges"]!.AsArray();
+        Assert.Equal(2, sealedJudges.Count);
+        for (var i = 0; i < judges.Count; i++)
+        {
+            Assert.Equal((string?)judges[i]!["model"], (string?)sealedJudges[i]!["model"]);
+            Assert.Equal((string?)judges[i]!["rubricDigest"], (string?)sealedJudges[i]!["rubricDigest"]);
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+    }
+
     private static AefJobCaseResult Passed() => new(new AefResult
     {
         CaseId = "case-1", Path = "check", Evaluator = new AefEvaluator("test-async"), State = AefState.Passed,

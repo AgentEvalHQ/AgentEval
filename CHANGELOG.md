@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Runner judge provenance:** cases using one model with distinct rubrics retain each instrument in
+  first-use order. Deduplication includes provider, mode, panel size and calibration metadata instead
+  of overwriting earlier instruments by model name. Dataset plans must authorize one matching judge
+  entry per distinct criteria list in a suite; insufficient entries are refused before provider calls.
+
 - **Signed native checkpoint verification:** loopback eval, redteam and OWASP runs share one subject/version,
   sign their seals and feed three threshold lanes into a signed checkpoint. The crosscheck verifies the complete
   flow with the CLI and independent Python tools, including signature tampering and content privacy assertions.

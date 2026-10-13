@@ -157,6 +157,21 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
                 if (value.EvaluationCriteria is { Count: > 0 } && _judge is null)
                     throw Refuse("Dataset evaluation criteria require an explicit plan judge.");
             }
+            if (_judge is not null)
+            {
+                // STRM-4 permits each plan judge entry at most once in a run. One model may use
+                // several criteria-specific instruments; reserve an entry for each before any calls.
+                var instruments = cases.Where(value => value.EvaluationCriteria is { Count: > 0 })
+                    .Select(value => JsonSerializer.Serialize(value.EvaluationCriteria!
+                        .Select(criterion => criterion.Replace("\r\n", "\n", StringComparison.Ordinal))))
+                    .Distinct(StringComparer.Ordinal).Count();
+                var slots = plan["judges"]!.AsArray().OfType<JsonObject>().Count(judge =>
+                    Text(judge, "model") == _judge.Model
+                    && (Text(judge, "provider") is not { } provider || provider == _judge.Provider)
+                    && judge["rubricDigest"] is null);
+                if (instruments > slots)
+                    throw Refuse("Each distinct criteria list in a dataset suite requires a matching judge entry in the plan; repeat the judge entry to authorize multiple rubric instruments.");
+            }
             suites.Add(new Suite(this, reference, descriptor["version"]!.GetValue<string>(), AefEvalWriter.DatasetDigest(bytes), cases));
         }
         Suites = suites;

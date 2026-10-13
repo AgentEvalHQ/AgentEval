@@ -153,6 +153,57 @@ public sealed class AefDatasetJobTargetTests : IDisposable
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task RunAsync_DistinctCriteria_RequiresPlannedJudgeSlotsAndRetainsInstruments(int slots)
+    {
+        File.WriteAllText(Dataset, """
+            [{"id":"c1","input":"one","evaluationCriteria":["correct"]},
+             {"id":"c2","input":"two","evaluationCriteria":["concise"]},
+             {"id":"c3","input":"three","evaluationCriteria":["correct"]}]
+            """);
+        await using var subject = await LocalChatEndpoint.StartAsync("answer");
+        await using var judge = await LocalChatEndpoint.StartAsync("""{"overallScore":90,"summary":"good","criteriaResults":[]}""");
+        var plan = Plan(subject.Endpoint);
+        plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-4o-mini" });
+        if (slots == 2) plan["judges"]!.AsArray().Add(new JsonObject { ["model"] = "gpt-4o-mini" });
+        plan["ext"]!["agenteval.run"]!["judge"] = new JsonObject { ["endpoint"] = judge.Endpoint };
+        var bytes = Bytes(plan);
+        var target = await AefDatasetJobTarget.LoadAsync(bytes, PlanDirectory);
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, Output, new AefJobOptions { At = Start });
+        if (slots == 1)
+        {
+            Assert.Equal("job.refused", result.Terminal);
+            Assert.Contains("distinct criteria list", result.Reason);
+            Assert.Empty(subject.Requests);
+            Assert.Empty(judge.Requests);
+            return;
+        }
+        Assert.Equal("job.sealed", result.Terminal);
+        var directory = RunDirectory(result);
+        var header = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!;
+        var instruments = header["judges"]!.AsArray();
+        Assert.Equal(2, instruments.Count);
+        Assert.All(instruments, instrument => Assert.Equal("gpt-4o-mini", (string?)instrument!["model"]));
+        var annotations = File.ReadLines(Path.Combine(directory, "results.ndjson"))
+            .Select(line => JsonNode.Parse(line)!["annotator"])
+            .Where(annotation => annotation is not null).ToArray();
+        Assert.Equal(3, annotations.Length);
+        var digests = annotations.Select(annotation => (string?)annotation!["rubricDigest"]).ToArray();
+        Assert.NotNull(digests[0]);
+        Assert.NotEqual(digests[0], digests[1]);
+        Assert.Equal(digests[0], digests[2]);
+        Assert.Equal(digests.Take(2), instruments.Select(instrument => (string?)instrument!["rubricDigest"]));
+        var seal = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "seal.json")))!;
+        var sealedJudges = seal["predicate"]!["judges"]!.AsArray();
+        Assert.Equal(2, sealedJudges.Count);
+        Assert.All(sealedJudges, instrument => Assert.Equal("gpt-4o-mini", (string?)instrument!["model"]));
+        Assert.Equal(digests.Take(2), sealedJudges.Select(instrument => (string?)instrument!["rubricDigest"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        Assert.Empty(RunnerEventStream.Verify(Events(), plan));
+    }
+
+    [Theory]
     [InlineData("unknown-price")]
     [InlineData("missing-id")]
     [InlineData("digest-mismatch")]
