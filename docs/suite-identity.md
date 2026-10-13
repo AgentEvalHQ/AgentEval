@@ -208,3 +208,29 @@ used an unspecified random seed. It does not sample a second time or re-read a c
 identity. Full planned rosters survive interruption; observations remain separate. Empty selections
 declare the existing root-only case. Existing runner overloads retain their behavior; new progress
 overloads accept an optional preparation callback. Oracle and paired export integration follows in W04.
+
+## Comparing suite identities
+
+Use `agenteval aef compare-suites <baseline-dir> <candidate-dir> --json` before comparing scores.
+This command applies `agenteval/full-definition-v1`: both runs must be intact and sealed, with
+matching full frozen definitions. It verifies the fixed extension file against the seal and checks
+its digest, version, reference, frozen flag and planned count against the header metadata.
+Reads are bounded; extension metadata cannot redirect the reader to another file.
+
+The report contains both exact seal hashes, identity scopes and run statuses. Optional
+`--baseline-hash` and `--candidate-hash` pins refuse evidence other than the selected run.
+Exit codes are 0 for matching definitions, 13 for different or insufficient identities, and 2 for
+unsealed, invalid, inconsistent or unreadable evidence. The command does not modify the runs.
+
+Equal generation recipes do not establish equal generated content. Dataset-only and roster-only
+legacy digests, and missing digests, cannot establish full-definition equivalence either. They are
+reported as incomparable instead of being silently upgraded. Frozen definitions survive interruption,
+so completed and aborted runs can share an identity; score comparison still needs separate checks for
+completeness, subject, execution conditions and statistical validity. Integrity verification alone
+does not authenticate the producer or prove its declarations are truthful.
+
+`ISuiteIdentityReader` creates immutable verified snapshots, and `ISuiteCompatibilityEvaluator`
+compares them without filesystem access. The BCL-only Results package exposes these services without
+requiring a dependency injection framework. AEF checkpoint rule LANE-6 remains unchanged: its
+`suite-content` axis compares protocol digest values, including absent values. The stricter AgentEval
+policy is an explicit additional check, not a change to AEF conformance semantics.
