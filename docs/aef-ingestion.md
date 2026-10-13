@@ -62,6 +62,45 @@ Cancellation before reservation creates no stage. A refused initialization
 releases its lease; it does not delete an existing root or evidence. Empty
 initialization directories and the lease file may remain after failure.
 
+## Bounded source discovery
+
+`IAefRunDiscovery` finds candidate run folders under an explicitly supplied
+absolute local directory. It is registered with the opt-in ingestion services.
+It does not copy, parse, verify, or index evidence:
+
+```csharp
+var result = discovery.Discover(sourceRoot, new AefDiscoveryOptions
+{
+    MaxDepth = 8,
+    MaxEntries = 10_000,
+    MaxRuns = 1_000
+}, cancellationToken);
+```
+
+These are the default limits. Depth counts the source root as zero and allows
+0..64; entries allow 1..1,000,000; candidate count allows 1..100,000. Hidden
+entries are included. A regular `run.json` marker identifies a candidate even
+if its bytes are invalid JSON or no seal exists. Discovery never opens the
+marker or any other file contents. It does not descend into candidates, so
+an embedded extension folder cannot become a second import.
+
+Linked root ancestry is refused. Within the tree, links and special entries
+are skipped and reported. The existing `AefFolder.KindOf` classifier supplies
+entry types, including its documented platform fallback. Enumeration errors,
+depth omissions, and exceeded entry/run limits appear in `Issues`; any issue
+makes `Complete` false. Cancellation throws. Missing or invalid roots are
+errors, not complete empty scans.
+
+`Complete` describes discovery coverage only; it never means a candidate is
+valid or accepted. Returned lists are immutable and ordinally sorted. Which
+candidates fit a truncated scan depends on filesystem enumeration order.
+Entry counting includes files and directories; detecting that a bound was
+exceeded can enumerate one additional entry without inspecting it. Discovery
+is not an atomic filesystem snapshot: ingestion must copy and verify the
+staged contents before publication. Source ownership must prevent hostile
+concurrent path replacement. HTTP clients must not choose arbitrary local
+source roots or receive local candidate paths.
+
 ## Remaining lifecycle integration
 
 The next ingestion slices will copy discovered/uploaded evidence into staging

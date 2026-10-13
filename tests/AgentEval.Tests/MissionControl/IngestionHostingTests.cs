@@ -32,6 +32,7 @@ public sealed class IngestionHostingTests : IDisposable
         // Use only ingestion registrations so the test does not start an HTTP listener.
         IServiceCollection services = new ServiceCollection();
         foreach (var descriptor in builder.Services.Where(d => d.ServiceType == typeof(IAefIngestionWorkspace)
+            || d.ServiceType == typeof(IAefRunDiscovery)
             || d.ImplementationType?.Name == "IngestionLifetime"))
             services.Add(descriptor);
         return services.BuildServiceProvider();
@@ -42,6 +43,7 @@ public sealed class IngestionHostingTests : IDisposable
     {
         using var provider = Provider(false, Path.Combine(_base, "ingestion"));
         Assert.Null(provider.GetService<IAefIngestionWorkspace>());
+        Assert.Null(provider.GetService<IAefRunDiscovery>());
         Assert.Empty(provider.GetServices<IHostedService>());
         Assert.False(Directory.Exists(_base));
     }
@@ -77,6 +79,7 @@ public sealed class IngestionHostingTests : IDisposable
             var hosted = Assert.Single(provider.GetServices<IHostedService>());
             await hosted.StartAsync(default);
             var workspace = provider.GetRequiredService<IAefIngestionWorkspace>();
+            Assert.IsType<AefRunDiscovery>(provider.GetRequiredService<IAefRunDiscovery>());
             Assert.Equal(root, workspace.Root);
             workspace.BeginStage();
             Assert.Throws<IOException>(() => workspace.BeginStage());

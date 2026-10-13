@@ -14,6 +14,7 @@ internal static class IngestionHosting
         var configuration = builder.Configuration;
         if (!configuration.GetValue<bool>("AgentEval:Ingestion:Enabled")) return;
 
+        builder.Services.AddSingleton<IAefRunDiscovery, AefRunDiscovery>();
         builder.Services.AddSingleton<IAefIngestionWorkspace>(_ =>
         {
             var root = configuration["AgentEval:Ingestion:Root"];
