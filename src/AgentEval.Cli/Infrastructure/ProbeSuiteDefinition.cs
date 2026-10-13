@@ -15,6 +15,16 @@ namespace AgentEval.Cli.Infrastructure;
 internal static class ProbeSuiteDefinition
 {
     internal static SuiteDefinitionManifest? Create(RedTeamOptions cli, ScanPlan plan, string resolvedModel)
+        => CreateCore(AefEvalWriter.Ref("redteam", $"{cli.Attacks ?? "default"}/{cli.Intensity}"), plan,
+            cli.JudgeModel ?? resolvedModel, "openai-compatible", cli.AttackerModel ?? resolvedModel, "openai-compatible");
+
+    internal static SuiteDefinitionManifest? ForBenchmark(string family, string preset, string resolvedPreset,
+        Type verdictType, ScanPlan plan, string? judgeModel, string? judgeProvider)
+        => CreateCore(AefEvalWriter.Ref("bench", $"{family}/{preset}"), plan, judgeModel, judgeProvider, null, null,
+            new JsonObject { ["family"] = family, ["preset"] = resolvedPreset, ["verdictImplementation"] = verdictType.FullName });
+
+    private static SuiteDefinitionManifest? CreateCore(string suiteRef, ScanPlan plan,
+        string? judgeModel, string? judgeProvider, string? attackerModel, string? attackerProvider, JsonObject? benchmark = null)
     {
         var inputs = new JsonObject();
         var arms = new JsonArray();
@@ -55,15 +65,16 @@ internal static class ProbeSuiteDefinition
             ["delayTicks"] = policy.DelayBetweenProbes.Ticks, ["explain"] = policy.ExplainFindings,
             ["judgeEnabled"] = policy.JudgeClient is not null, ["judgeMode"] = policy.Mode.ToString(),
             ["judgeRubric"] = policy.Rubric.ToString(), ["judgeTimeoutTicks"] = policy.JudgeTimeout?.Ticks,
-            ["judgeModel"] = policy.JudgeClient is null ? null : cli.JudgeModel ?? resolvedModel,
-            ["judgeProvider"] = policy.JudgeClient is null ? null : "openai-compatible",
-            ["attackerModel"] = policy.AttackerClient is null ? null : cli.AttackerModel ?? resolvedModel,
-            ["attackerProvider"] = policy.AttackerClient is null ? null : "openai-compatible",
+            ["judgeModel"] = policy.JudgeClient is null ? null : judgeModel,
+            ["judgeProvider"] = policy.JudgeClient is null ? null : judgeProvider,
+            ["attackerModel"] = policy.AttackerClient is null ? null : attackerModel,
+            ["attackerProvider"] = policy.AttackerClient is null ? null : attackerProvider,
         };
+        if (benchmark is not null) definition["benchmark"] = benchmark;
         return new SuiteDefinitionReader().Read(AefJsonWriter.Document(new JsonObject
         {
             ["schemaVersion"] = "1.0", ["kind"] = "probe",
-            ["suiteRef"] = AefEvalWriter.Ref("redteam", $"{cli.Attacks ?? "default"}/{cli.Intensity}"),
+            ["suiteRef"] = suiteRef,
             ["definitionVersion"] = "probe-definition-1", ["frozen"] = policy.AttackerClient is null,
             ["inputs"] = inputs, ["definition"] = definition,
             ["caseIds"] = new JsonArray(ids.Select(id => (JsonNode?)JsonValue.Create(id)).ToArray()),

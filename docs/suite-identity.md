@@ -111,4 +111,7 @@ endpoints, credentials and observed responses are excluded. The full planned ros
 and cancellation, with missing probes reported separately, including benign controls that did not run.
 Attacker-driven scans retain a recipe manifest with `frozen: false` and no suite content digest.
 Capture supports the CLI's shipped attack factory; arbitrary external attack instances remain
-unclassified. Benchmark-family scan commands still need this integration.
+unclassified. `AttackPipeline.OnPlanPrepared` forwards the same callback for pipeline consumers.
+OWASP, MITRE and NIST commands bind the prepared plan together with the resolved preset and verdict
+implementation. Their fixed verdict rules are covered by the implementation assembly digest.
+Completed, interrupted and explicitly requested mock scan exports retain this declaration.

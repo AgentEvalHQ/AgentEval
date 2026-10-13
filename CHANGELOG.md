@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite
   digests are preserved. GDPR/EU AI Act capture supported composite graphs before execution and retain
   their manifests on cancellation. The redteam CLI captures exact prepared probes without regenerating
-  them and separates attacker-driven recipe identity from frozen content. Benchmark-family scans and
-  other composite producer capture remain in progress.
+  them and separates attacker-driven recipe identity from frozen content. OWASP/MITRE/NIST scan
+  exports also bind prepared probes and resolved verdict presets, including explicit mocks and
+  interrupted runs. Other composite producer capture remains in progress.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run

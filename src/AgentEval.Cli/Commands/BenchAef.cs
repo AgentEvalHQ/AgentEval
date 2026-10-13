@@ -24,12 +24,13 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
-            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
+            var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
+            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
@@ -45,7 +46,9 @@ internal static class BenchAef
                 JudgeProvider = judgeProvider,
                 TargetMode = targetMode,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
-                ProbesNotRun = scan.SkippedProbes,
+                Definition = definition,
+                ProbesNotRun = definition is null ? scan.SkippedProbes : Math.Max(scan.SkippedProbes,
+                    definition.CaseIds.Count - lines.Select(line => line.CaseId).Distinct(StringComparer.Ordinal).Count()),
                 Lane = family,
                 BenchVerdict = verdict is null ? null : (verdict.Score.Label, verdict.Score.Value),
                 Gate = abortReason is null && verdict is not null ? Gate(verdict.Score.Label, exitCode) : null,

@@ -104,11 +104,48 @@ public class BenchOwaspCommandTests : IDisposable
         var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
         Assert.Equal("aborted", (string?)header["status"]);
         Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
+        Assert.True(definition.CaseIds.Count > completed);
+        Assert.Equal(family, (string?)definition.ToJson()["definition"]!["benchmark"]!["family"]);
         Assert.Equal(completed, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
     // ── Env-gate parity with the other bench commands ─────────────────────────
+
+    [Theory]
+    [InlineData("owasp", false)]
+    [InlineData("mitre", false)]
+    [InlineData("nist", false)]
+    [InlineData("owasp", true)]
+    [InlineData("mitre", true)]
+    [InlineData("nist", true)]
+    public async Task BenchScan_CompletedAndExplicitMock_BindPreparedDefinition(string family, bool mock)
+    {
+        InitWorkspace();
+        var root = new DirectoryInfo(Path.Combine(_root, "defined-aef"));
+        var agent = mock ? null : new SafeRefusalAgent("subject");
+        var judge = mock ? null : new CountingJudge();
+        var result = family switch
+        {
+            "owasp" => await BenchOwaspCommand.RunAsync("smoke", "subject", _root, null, null, agent, judgeClientOverride: judge, aef: root, mock: mock),
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", "subject", _root, null, null, agent, judgeClientOverride: judge, aef: root, mock: mock),
+            _ => await BenchNistCommand.RunAsync("smoke", "subject", _root, null, null, agent, judgeClientOverride: judge, aef: root, mock: mock),
+        };
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11);
+        var path = Assert.Single(Directory.GetFiles(root.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(path)!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllBytes(path))!;
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal("completed", (string?)header["status"]);
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
+        Assert.Equal(definition.CaseIds.Count, (int)header["ext"]!["agenteval.observedRoster"]!["count"]!);
+        Assert.Equal(family, (string?)definition.ToJson()["definition"]!["benchmark"]!["family"]);
+    }
 
     private string[] WorkspaceFiles() =>
         Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)

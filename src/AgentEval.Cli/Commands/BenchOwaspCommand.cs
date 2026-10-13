@@ -199,6 +199,10 @@ public static class BenchOwaspCommand
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
         benchmark.Pipeline.OnProbeCompleted(partialScan.Add).BeginProbeScope(RedTeamAef.BeginProbeScope);
+        AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
+        if ((!isMock || aef is not null) && !noAef)
+            benchmark.Pipeline.OnPlanPrepared(plan => suiteDefinition = AgentEval.Cli.Infrastructure.ProbeSuiteDefinition.ForBenchmark(
+                "owasp", preset, benchmark.PresetName, benchmark.GetType(), plan, judgeModelName, judgeProvider));
         try
         {
             // Run the scan exactly once. The Phase-6 BuildEvalResult(RedTeamResult)
@@ -217,7 +221,7 @@ public static class BenchOwaspCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -229,7 +233,7 @@ public static class BenchOwaspCommand
             {
                 if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
-                    ExitCodes.GateIndeterminate, judgeLedger))
+                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition))
                     return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench owasp",
                     $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
@@ -360,7 +364,7 @@ public static class BenchOwaspCommand
             // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts, definition: suiteDefinition))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -389,7 +393,7 @@ public static class BenchOwaspCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts, definition: suiteDefinition))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
