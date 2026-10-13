@@ -37,6 +37,31 @@ public class EvalResultSchemaTests
             .Where(d => !d.IsValid)
             .Select(d => $"{d.EvaluationPath}: {string.Join(", ", d.Errors?.Select(e => $"{e.Key}={e.Value}") ?? [])}"));
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true)]
+    [InlineData("0123456789abcdef", false)]
+    public void Provenance_RubricDigest_RequiresFullDigestWhenPresent(string? digest, bool valid)
+    {
+        var node = JsonNode.Parse(PassResultJson)!;
+        node["provenance"]!["rubricDigest"] = digest;
+        var result = Evaluate(node.ToJsonString());
+        Assert.Equal(valid, result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(1, true)]
+    [InlineData(3, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Provenance_PanelSize_RequiresPositiveCountWhenPresent(int? size, bool valid)
+    {
+        var node = JsonNode.Parse(PassResultJson)!;
+        node["provenance"]!["judgePanelSize"] = size;
+        Assert.Equal(valid, Evaluate(node.ToJsonString()).IsValid);
+    }
+
     private const string PassResultJson = """
         {
           "metric": {

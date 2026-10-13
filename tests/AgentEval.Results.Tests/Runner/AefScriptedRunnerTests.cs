@@ -355,7 +355,7 @@ public sealed class AefScriptedRunnerTests : IDisposable
         var output = Path.Combine(_root, "out");
         var target = AefScriptedTarget.Read(Target(1, Suite("suite:s/a", "1", Case("a-1"))));
 
-        Assert.Throws<FormatException>(() => AefScriptedRunner.Run(Encoding.UTF8.GetBytes(plan), Manifest(), target, output, new AefJobOptions { At = Start }));
+        Assert.Throws<AefInputException>(() => AefScriptedRunner.Run(Encoding.UTF8.GetBytes(plan), Manifest(), target, output, new AefJobOptions { At = Start }));
         Assert.False(Directory.Exists(output));
     }
 
@@ -368,12 +368,12 @@ public sealed class AefScriptedRunnerTests : IDisposable
         manifest.Remove("runnerId");
         var output = Path.Combine(_root, "out");
 
-        Assert.Throws<FormatException>(() => AefScriptedRunner.Run(plan, manifest, target, output, new AefJobOptions { At = Start }));
+        Assert.Throws<AefInputException>(() => AefScriptedRunner.Run(plan, manifest, target, output, new AefJobOptions { At = Start }));
         Assert.False(Directory.Exists(output));
 
         Directory.CreateDirectory(output);
         File.WriteAllText(Path.Combine(output, "x"), "x");
-        Assert.Throws<ArgumentException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = Start }));
+        Assert.Throws<AefInputException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = Start }));
     }
 
     // ------------------------------------------------------------------ [PLAN-10], determinism
@@ -472,7 +472,7 @@ public sealed class AefScriptedRunnerTests : IDisposable
         }
         else
         {
-            Assert.Throws<FormatException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse(at) }));
+            Assert.Throws<AefInputException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse(at) }));
             Assert.False(Directory.Exists(output));
         }
     }
@@ -486,7 +486,7 @@ public sealed class AefScriptedRunnerTests : IDisposable
         var plan = Encoding.UTF8.GetBytes(Plan(suites: [("suite:s/a", "1")]).ToJsonString());
         var output = Path.Combine(_root, Guid.NewGuid().ToString("N"));
 
-        Assert.Throws<FormatException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse("9999-12-31T23:59:45Z") }));
+        Assert.Throws<AefInputException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse("9999-12-31T23:59:45Z") }));
         Assert.False(Directory.Exists(output));
     }
 

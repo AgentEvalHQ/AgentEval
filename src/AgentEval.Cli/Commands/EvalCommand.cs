@@ -359,7 +359,7 @@ internal static class EvalCommand
             standIn = agentClientOverride is not null;
             chatClient = CliChatClientDiagnostics.Wrap(agentClientOverride ?? (opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent");
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent", agentClientOverride is null ? (opts.Azure ? opts.DeploymentName : opts.Model) : null);
 
             agent = chatClient.AsEvaluableAgent(
                 name: resolvedName,
@@ -376,7 +376,7 @@ internal static class EvalCommand
         // The ledger counts the judge's calls and the tokens they report, for the AEF run's usage.
         var judgeLedger = opts.JudgeEndpoint is not null
             ? new JudgeCallLedger(CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge"))
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge", opts.JudgeModel ?? resolvedName))
             : null;
         IChatClient? judgeClient = judgeLedger;
         var harness = judgeClient is not null
@@ -392,7 +392,11 @@ internal static class EvalCommand
         // here was both wasted work AND could THROW for a reason (no evaluator client available) that
         // --runs > 1 is supposed to just warn-and-ignore, not fail the whole run on (review).
         IReadOnlyList<IMetric>? selectedMetricInstances = null;
-        IChatClient? metricsEvaluatorClient = judgeClient ?? chatClient;
+        // Meter the fallback only in its judging role; the agent keeps its original client.
+        if (judgeLedger is null && chatClient is not null && opts.Runs <= 1
+            && selectedMetrics?.Any(name => name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
+            judgeLedger = new JudgeCallLedger(chatClient);
+        IChatClient? metricsEvaluatorClient = judgeLedger ?? chatClient;
         if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
@@ -428,74 +432,113 @@ internal static class EvalCommand
 
         // 6c. Standard single-run evaluation path
         var startedAt = DateTimeOffset.UtcNow;
-        var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct);
-
-        // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
-        // case's REAL captured response (never re-invokes the agent) and attach the results to
-        // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
-        // already projects it into the exported report's MetricScores) that nothing previously populated.
-        // Purely additive: the harness's own pass/fail gate above is completely unchanged.
-        if (selectedMetricInstances is not null)
-        {
-            var metricsBuilder = AgentEvalBuilder.Create();
-            if (metricsEvaluatorClient is not null)
-                metricsBuilder.WithEvaluatorClient(metricsEvaluatorClient);
-            foreach (var metric in selectedMetricInstances)
-                metricsBuilder.AddMetric(metric);
-
-            await using var metricRunner = await metricsBuilder.BuildAsync(ct);
-            for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
-            {
-                var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
-                summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
-            }
-        }
-
-        // 6e. The run as sealed AEF evidence (S1 #5a): into the workspace's .agenteval/aef, or --aef. A write failure
-        // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
-        // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
+        var completed = new List<TestResult>();
+        var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-            (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow,
-                testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
-
-        // 7. Export
-        var report = summary.ToEvaluationReport(
-            agentName: resolvedName,
-            modelName: resolvedName,
-            endpoint: EndpointLabel(opts));
-        await ExportReportAsync(opts, report, ct);
-
-        // 8. Summary (unless --quiet)
-        if (!opts.Quiet)
-            ConsoleReporter.WriteSummary(summary);
-
-        // 9. Golden trace: compare with the saved run first, then save this one (both may be given, to update it).
-        var thisRun = GoldenTrace.FromResults(summary.Results, resolvedName);
-        GoldenTraceComparison? comparison = null;
-        if (golden is not null)
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases,
+                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null),
+            () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
+        try
         {
-            comparison = GoldenTraceComparer.Compare(golden, thisRun);
-            WriteGoldenComparison(comparison, opts);
-        }
+            var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct, result =>
+            {
+                var index = completed.Count;
+                completed.Add(result);
+                evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
+                    AefCliOptions.ContentCapture == AefContentCapture.On
+                        ? new AefNativeContent { Input = testCases[index].Input, Expected = testCases[index].ExpectedOutput } : null,
+                    caseUsage: true);
+            }, index => CliUsageMeter.Attribute(caseId: caseIds[index]));
+            ct.ThrowIfCancellationRequested();
 
-        if (opts.SaveGolden is not null)
-        {
-            await thisRun.SaveAsync(opts.SaveGolden.FullName, ct);
+            // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
+            // case's REAL captured response (never re-invokes the agent) and attach the results to
+            // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
+            // already projects it into the exported report's MetricScores) that nothing previously populated.
+            // Purely additive: the harness's own pass/fail gate above is completely unchanged.
+            if (selectedMetricInstances is not null)
+            {
+                var metricsBuilder = AgentEvalBuilder.Create();
+                if (metricsEvaluatorClient is not null)
+                    metricsBuilder.WithEvaluatorClient(metricsEvaluatorClient);
+                foreach (var metric in selectedMetricInstances)
+                    metricsBuilder.AddMetric(metric);
+
+                await using var metricRunner = await metricsBuilder.BuildAsync(ct);
+                for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
+                {
+                    using var usageAttribution = CliUsageMeter.Attribute(AefUsageRole.Judge, caseIds[i]);
+                    var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
+                    try
+                    {
+                        summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
+                        evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
+                    }
+                    finally
+                    {
+                        // A started metric call belongs to this case even if it supplies no final usage report.
+                        evidence.UpdateCaseUsage(caseIds[i]);
+                    }
+                }
+            }
+
+            // 7. Export
+            var report = summary.ToEvaluationReport(
+                agentName: resolvedName,
+                modelName: resolvedName,
+                endpoint: EndpointLabel(opts));
+            await ExportReportAsync(opts, report, ct);
+
+            // 8. Summary (unless --quiet)
             if (!opts.Quiet)
-                Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
-        }
+                ConsoleReporter.WriteSummary(summary);
 
-        // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
-        // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
-        // that was already failing in the golden trace does not fail the run.
-        if (aefFailed)
-            return ExitCodes.RuntimeError;
-        if (comparison is not null)
-            return comparison.HasRegression || (opts.FailOnToolChange && comparison.HasToolChange)
-                ? ExitCodes.TestFailure
-                : ExitCodes.Success;
-        return summary.AllPassed ? ExitCodes.Success : ExitCodes.TestFailure;
+            // 9. Golden trace: compare with the saved run first, then save this one (both may be given, to update it).
+            var thisRun = GoldenTrace.FromResults(summary.Results, resolvedName);
+            GoldenTraceComparison? comparison = null;
+            if (golden is not null)
+            {
+                comparison = GoldenTraceComparer.Compare(golden, thisRun);
+                WriteGoldenComparison(comparison, opts);
+            }
+
+            if (opts.SaveGolden is not null)
+            {
+                await thisRun.SaveAsync(opts.SaveGolden.FullName, ct);
+                if (!opts.Quiet)
+                    Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
+            }
+
+            // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
+            // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
+            // that was already failing in the golden trace does not fail the run.
+            var passed = comparison is not null
+                ? !comparison.HasRegression && !(opts.FailOnToolChange && comparison.HasToolChange)
+                : summary.AllPassed;
+            var exitCode = passed ? ExitCodes.Success : ExitCodes.TestFailure;
+            var gate = comparison is null ? null : new AefCommandGate
+            {
+                GateId = "gate:eval",
+                Rule = "golden-trace",
+                Outcome = passed ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
+                ExitCode = exitCode,
+                Comparability = AefComparability.Comparable,
+            };
+            var aefFailed = evidence.Complete(gate);
+            return aefFailed ? ExitCodes.RuntimeError : exitCode;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Close independently of the cancelled token. The completed prefix remains evidence; no interrupted
+            // case becomes a measured failure and no final gate is invented. Never persist exception messages.
+            evidence.Complete(abortReason: "cancelled");
+            throw;
+        }
+        catch
+        {
+            evidence.Complete(abortReason: "evaluation-failed");
+            throw;
+        }
     }
 
     /// <summary>
@@ -573,60 +616,62 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    /// <summary>
-    /// Writes the run as sealed AEF evidence (S1 #5a); returns true only when an explicit <c>--aef</c> could not be
-    /// written. A write the user did not ask for fails with a warning: the evaluation's own result stands.
-    /// </summary>
-    private static bool WriteAef(
-        EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge,
-        Func<string, AefEvalRunOptions, (string Directory, string RunHash)> write)
+    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, string? subjectProvider = null)
     {
-        var root = EvalAef.Root(opts);
-        if (root is null)
+        var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
+        var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
+        if (opts.Runs > 1) settings["successThreshold"] = opts.SuccessThreshold;
+        if (opts.Sut is null)
         {
-            if (!opts.NoAef && !opts.Quiet)
-                Console.Error.WriteLine("  AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
-            return false;
+            if (opts.Temperature is { } temperature) settings["temperature"] = temperature;
+            if (opts.MaxTokens is { } maxTokens) settings["maxTokens"] = maxTokens;
         }
-
-        try
+        if (opts.Runs == 1 && !string.IsNullOrWhiteSpace(opts.Metrics))
+            settings["metrics"] = new System.Text.Json.Nodes.JsonArray(opts.Metrics.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(name => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(name)).ToArray());
+        var scores = cases.Select(c => c.ToTestCase().PassingScore).ToArray();
+        IReadOnlyDictionary<string, AefThreshold>? thresholds = null;
+        if (scores.Length > 0 && scores.Distinct().Count() == 1)
+            thresholds = new Dictionary<string, AefThreshold> { ["case"] = new(AefThresholdOp.AtLeast, scores[0]) };
+        else if (scores.Length > 0)
         {
-            var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
-            var (directory, runHash) = write(Path.Combine(root, "runs"), new AefEvalRunOptions
-            {
-                SubjectRef = subjectRef,
-                SubjectKind = AefEvalWriter.KindOf(subjectRef),
-                SubjectVersion = opts.SubjectVersion,
-                Endpoint = opts.Endpoint,
-                // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
-                JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
-                TargetMode = targetMode,
-                // The gate the exit code applies; against a golden trace it is the regression check, not recorded yet.
-                GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
-                JudgeUsage = judge is { ReportedUsage: true }
-                    ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
-                    : null,
-                DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
-                DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
-            });
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}…)");
-            return false;
+            // Case IDs are already the evidence identities; never use prompt-derived display names.
+            var ids = EvalAef.CaseIds(cases);
+            var perCase = new System.Text.Json.Nodes.JsonObject();
+            for (var i = 0; i < ids.Count; i++)
+                perCase[ids[i]] = new System.Text.Json.Nodes.JsonObject { ["op"] = ">=", ["value"] = scores[i] };
+            settings["caseThresholds"] = perCase;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        return new AefEvalRunOptions
         {
-            if (opts.Aef is not null)
-            {
-                Console.Error.WriteLine($"  Error: the AEF run was not written: {ex.Message}");
-                return true;
-            }
-
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  Warning: the AEF run was not written: {ex.Message}");
-            return false;
-        }
+            Cli = AefCliOptions.Provenance ?? new() { Verb = "eval" },
+            Config = new AefRunConfig { Settings = settings, Thresholds = thresholds },
+            Seal = AefCliOptions.Seal,
+            Signer = AefCliOptions.Signer,
+            ContentCapture = AefCliOptions.ContentCapture,
+            SubjectRef = subjectRef,
+            SubjectKind = AefEvalWriter.KindOf(subjectRef),
+            SubjectVersion = opts.SubjectVersion,
+            Endpoint = opts.Endpoint,
+            // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
+            JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
+            JudgeProvider = opts.JudgeEndpoint is null ? null : "openai-compatible",
+            MetricJudgeModel = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName,
+            MetricJudgeProvider = opts.JudgeEndpoint is null ? subjectProvider : "openai-compatible",
+            TargetMode = targetMode,
+            // Golden-trace callers supply their comparison decision after it has been computed.
+            GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
+            JudgeUsage = judge is { ReportedUsage: true }
+                ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
+                : null,
+            DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
+            DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
+        };
     }
-
+    private static AefUsage? AefJudgeUsage(EvalOptions opts, string resolvedName, JudgeCallLedger? judge) =>
+        judge is { ReportedUsage: true }
+            ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
+            : null;
     private static string EndpointLabel(EvalOptions opts) =>
         opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure");
 
@@ -746,7 +791,8 @@ internal static class EvalCommand
         JudgeCallLedger? judgeLedger,
         CancellationToken ct)
     {
-        var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
+        var usageHarness = new CliUsageEvaluationHarness(harness);
+        var runner = new StochasticRunner(usageHarness, statisticsCalculator: null, evalOptions);
         var stochasticOptions = ToStochasticOptions(opts);
 
         if (!opts.Quiet)
@@ -755,54 +801,83 @@ internal static class EvalCommand
         var allPassed = true;
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
+        var caseIds = EvalAef.CaseIds(datasetTestCases);
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases),
+            () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
+            opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 
-        foreach (var datasetTestCase in datasetTestCases)
+        try
         {
-            var testCase = datasetTestCase.ToTestCase();
-
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
-
-            var result = await runner.RunStochasticTestAsync(agent, testCase, stochasticOptions, ct);
-            results.Add(result);
-
-            if (!opts.Quiet)
+            foreach (var datasetTestCase in datasetTestCases)
             {
-                // stdout is the export's channel, and this mode has no export; the table is a human report, so it
-                // goes to stderr with every other line here (OutputOptions writes to Console.Out by default).
-                result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
-                Console.Error.WriteLine($"    {result.Summary}");
+                var testCase = datasetTestCase.ToTestCase();
+                var caseId = caseIds[results.Count];
+
+
+                if (!opts.Quiet)
+                    Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
+
+                var result = await runner.RunStochasticTestAsync(agent, testCase, stochasticOptions with
+                {
+                    OnProgress = progress =>
+                    {
+                        if (progress.LastResult is not { } trial) return;
+                        if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
+                            ct.ThrowIfCancellationRequested();
+                        evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
+                            ? new AefNativeContent { Input = datasetTestCase.Input, Expected = datasetTestCase.ExpectedOutput } : null,
+                            trialUsage: usageHarness.TakeUsage(trial));
+                        stochasticOptions.OnProgress?.Invoke(progress);
+                    },
+                }, ct);
+                results.Add(result);
+                ct.ThrowIfCancellationRequested();
+
+                if (!opts.Quiet)
+                {
+                    // stdout is the export's channel, and this mode has no export; the table is a human report, so it
+                    // goes to stderr with every other line here (OutputOptions writes to Console.Out by default).
+                    result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
+                    Console.Error.WriteLine($"    {result.Summary}");
+                }
+
+                if (!result.Passed)
+                    allPassed = false;
             }
 
-            if (!result.Passed)
-                allPassed = false;
+            // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
+            var report = StochasticReport.Build(
+                results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
+                agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
+            await ExportReportAsync(opts, report, ct);
+
+            // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
+            var aefFailed = evidence.Complete();
+
+            // Summary
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine($"  === Stochastic Summary ===");
+                Console.Error.WriteLine($"  Test cases: {datasetTestCases.Count}");
+                Console.Error.WriteLine($"  Passed: {results.Count(r => r.Passed)}/{results.Count}");
+                Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
+            }
+
+            if (aefFailed)
+                return ExitCodes.RuntimeError;
+            return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
         }
-
-        // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
-        var report = StochasticReport.Build(
-            results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
-            agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
-        await ExportReportAsync(opts, report, ct);
-
-        // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
-        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
-            (runs, aefOptions) => AefEvalWriter.WriteTrials(
-                runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
-                AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));
-
-        // Summary
-        if (!opts.Quiet)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine();
-            Console.Error.WriteLine($"  === Stochastic Summary ===");
-            Console.Error.WriteLine($"  Test cases: {datasetTestCases.Count}");
-            Console.Error.WriteLine($"  Passed: {results.Count(r => r.Passed)}/{results.Count}");
-            Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
+            evidence.Complete(abortReason: "cancelled");
+            throw;
         }
-
-        if (aefFailed)
-            return ExitCodes.RuntimeError;
-        return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
+        catch
+        {
+            evidence.Complete(abortReason: "evaluation-failed");
+            throw;
+        }
     }
 }
 

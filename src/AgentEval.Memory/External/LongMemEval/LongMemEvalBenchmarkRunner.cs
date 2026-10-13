@@ -93,11 +93,17 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
     /// <summary>
     /// Runs the LongMemEval benchmark.
     /// </summary>
-    public async Task<ExternalBenchmarkResult> RunAsync(
+    public Task<ExternalBenchmarkResult> RunAsync(
         IEvaluableAgent agent,
         AgentBenchmarkConfig config,
         ExternalBenchmarkOptions options,
         CancellationToken ct = default)
+        => RunWithProgressAsync(agent, config, options, null, ct);
+
+    /// <summary>Runs the benchmark, synchronously reporting each completed question before continuing.</summary>
+    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+        IEvaluableAgent agent, AgentBenchmarkConfig config, ExternalBenchmarkOptions options,
+        Action<QuestionResult>? onCompleted, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(agent);
         ArgumentNullException.ThrowIfNull(config);
@@ -106,7 +112,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
 
         // 1. Load data
         var loaded = LoadEntries(options);
-        return await RunSelectedAsync(agent, options, loaded.Entries, executionLabel: null, ct, loaded);
+        return await RunSelectedAsync(agent, options, loaded.Entries, executionLabel: null, ct, loaded, onCompleted: onCompleted);
     }
 
     private async Task<ExternalBenchmarkResult> RunSelectedAsync(
@@ -116,7 +122,8 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
         string? executionLabel,
         CancellationToken ct,
         LoadedDataset? dataset = null,
-        OracleProjectionReport? oracleProjection = null)
+        OracleProjectionReport? oracleProjection = null,
+        Action<QuestionResult>? onCompleted = null)
     {
         _logger.LogInformation(
             "LongMemEval: loaded {Count} questions ({Mode} mode, stratified={Stratified})",
@@ -279,6 +286,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                     Duration = qStopwatch.Elapsed
                 });
 
+                onCompleted?.Invoke(questionResults[^1]);
                 _logger.LogWarning(
                     "[{Index}/{Total}] {Type,-30} {Error} — {QuestionId}  ({Elapsed:F1}s)",
                     i + 1, entries.Count, entry.QuestionType, safeCode, entry.QuestionId, qStopwatch.Elapsed.TotalSeconds);
@@ -343,6 +351,7 @@ public partial class LongMemEvalBenchmarkRunner : IExternalBenchmarkRunner
                 Duration = qStopwatch.Elapsed
             });
 
+            onCompleted?.Invoke(questionResults[^1]);
             var correctLabel = judgment.Status switch
             {
                 JudgeOutcomeStatus.Yes => "CORRECT",

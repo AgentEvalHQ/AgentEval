@@ -202,7 +202,8 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 15
+    # Full three-framework tests took ten minutes after restore/build on the hosted Windows runner.
+    timeout-minutes: 25
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
 
     steps:

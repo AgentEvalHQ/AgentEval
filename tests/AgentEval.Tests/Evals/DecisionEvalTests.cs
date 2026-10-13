@@ -18,8 +18,9 @@ public class DecisionEvalTests
 {
     // ── Fake transport ───────────────────────────────────────────────────────
 
-    private sealed class FakeDecisionClient : IDecisionClient
+    private sealed class FakeDecisionClient : IDecisionClient, AgentEval.Core.IJudgeProviderSource
     {
+        public string? ProviderName { get; init; }
         public double TrueProbability { get; set; } = 0.5;
         public string Model { get; set; } = "typesafe/jev-1.13-20260917";
         public DecisionUsage? Usage { get; set; } = new(200, 10, Cost: null);
@@ -39,6 +40,15 @@ public class DecisionEvalTests
                 StringComparer.Ordinal);
             return Task.FromResult(new DecisionResponse(Model, answers, Usage));
         }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("typesafe")]
+    public async Task EvaluateAsync_ProviderMetadata_PreservesKnownOrUnknown(string? provider)
+    {
+        var result = await MakeSut(new FakeDecisionClient { ProviderName = provider }).EvaluateAsync(MakeInput());
+        Assert.Equal(provider, result.Provenance.JudgeProvider);
     }
 
     private static DecisionEval MakeSut(
@@ -139,7 +149,39 @@ public class DecisionEvalTests
         Assert.Equal("~typesafe/jev-latest", client.LastRequest!.Model);           // and the alias went on the wire
         Assert.NotNull(result.Provenance.PromptHash);
         Assert.Equal(16, result.Provenance.PromptHash!.Length);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", result.Provenance.RubricDigest!);
         Assert.False(result.Provenance.CacheHit);
+    }
+
+    [Theory]
+    [InlineData("a\u001fb", "c", "d", null, "a", "b\u001fc", "d", null)]
+    [InlineData("a", "b\u001fc", "d", null, "a", "b", "c\u001fd", null)]
+    [InlineData("a", "b", "c\u001fd", null, "a", "b", "c", "d")]
+    [InlineData("a", null, "c", null, "a", "", "c", null)]
+    public async Task EvaluateAsync_LegacyDelimiterCollision_RetainsDistinctRubricDigests(
+        string instructionsA, string? trueA, string? falseA, string? referenceA,
+        string instructionsB, string? trueB, string? falseB, string? referenceB)
+    {
+        async Task<EvalProvenance> Run(string instructions, string? whenTrue, string? whenFalse, string? reference) =>
+            (await new DecisionEval(new FakeDecisionClient(), "k", "n", "c", "1", instructions,
+                trueCriteria: whenTrue, falseCriteria: whenFalse, reference: reference).EvaluateAsync(MakeInput())).Provenance;
+        var a = await Run(instructionsA, trueA, falseA, referenceA);
+        var b = await Run(instructionsB, trueB, falseB, referenceB);
+        Assert.Equal(a.PromptHash, b.PromptHash); // Historical fingerprint remains compatible.
+        Assert.NotEqual(a.RubricDigest, b.RubricDigest);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_SameRubricWithDifferentLineEndingsAndCase_RetainsDigest()
+    {
+        async Task<EvalProvenance> Run(string newline, string response) =>
+            (await new DecisionEval(new FakeDecisionClient(), "k", "n", "c", "1", "a" + newline + "b",
+                trueCriteria: "c" + newline + "d", falseCriteria: "e" + newline + "f",
+                reference: "g" + newline + "h").EvaluateAsync(MakeInput(response))).Provenance;
+        var a = await Run("\r\n", "first case");
+        var b = await Run("\n", "second case");
+        Assert.Equal(a.PromptHash, b.PromptHash);
+        Assert.Equal(a.RubricDigest, b.RubricDigest);
     }
 
     [Fact]

@@ -17,6 +17,113 @@ public sealed class AefProbeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(AefStimulus.Suite, "suite")]
+    [InlineData(AefStimulus.Generated, "generated")]
+    [InlineData(AefStimulus.External, "external")]
+    public void Write_Stimulus_RetainsDeclaredSource(AefStimulus stimulus, string wire)
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new() { CaseId = "case", State = AefState.Passed }],
+            Options() with { Stimulus = stimulus }, Start, Start.AddSeconds(1));
+        Assert.Equal(wire, (string?)AefTestRuns.Document(dir, "run.json")["execution"]!["stimulus"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Write_ObservedUsage_ReplacesLegacyRoleWithoutDoubleCounting(bool unknown)
+    {
+        var legacy = new AefUsage { Role = AefUsageRole.Judge, Model = "deployment", InputTokens = 999, CostUsd = 5 };
+        AefUsage[] observed = [new() { Role = AefUsageRole.Judge, Model = "reported-model",
+            InputTokens = unknown ? null : 10, CostUsd = unknown ? null : 0.1, CostSource = unknown ? null : "fixture" }];
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new() { CaseId = "case", State = AefState.Passed, Annotator = AefAnnotatorKind.Code, Usage = observed }],
+            Options() with { JudgeUsage = legacy, Usage = observed }, Start, Start.AddSeconds(1));
+        var lineUsage = Assert.Single(Assert.Single(AefTestRuns.Results(dir))["usage"]!.AsArray())!;
+        Assert.Equal("reported-model", (string?)lineUsage["model"]);
+        Assert.Equal(unknown ? (long?)null : 10, (long?)lineUsage["gen_ai.usage.input_tokens"]);
+        var summary = AefTestRuns.Document(dir, "summary.json");
+        var usage = Assert.Single(summary["usage"]!.AsArray())!;
+        Assert.Equal("reported-model", (string?)usage["model"]);
+        Assert.Equal(unknown ? (long?)null : 10, (long?)usage["gen_ai.usage.input_tokens"]);
+        if (unknown) Assert.Null(summary["cost"]);
+        else Assert.Equal(0.1, (double)summary["cost"]!["totalUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Fact]
+    public void Write_DistinctObservedRubrics_RetainsHeadersAndMatchingAnnotators()
+    {
+        var first = "sha256:" + new string('a', 64);
+        var second = "sha256:" + new string('b', 64);
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new() { CaseId = "a", State = AefState.Passed, Annotator = AefAnnotatorKind.Llm, RubricDigest = first },
+             new() { CaseId = "b", State = AefState.Failed, Annotator = AefAnnotatorKind.Llm, RubricDigest = second },
+             new() { CaseId = "c", State = AefState.Passed, Annotator = AefAnnotatorKind.Llm, RubricDigest = first },
+             new() { CaseId = "d", State = AefState.Passed, Annotator = AefAnnotatorKind.Code, RubricDigest = second }],
+            Options(), Start, Start.AddSeconds(1));
+        Assert.Equal(new[] { first, second }, AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray()
+            .Select(j => (string?)j!["rubricDigest"]));
+        var lines = AefTestRuns.Results(dir);
+        Assert.Equal(new string?[] { first, second, first, null }, lines.Select(l => (string?)l["annotator"]?["rubricDigest"]));
+        Assert.All(lines, l => Assert.Null(l["annotator"]?["promptHash"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("configured-provider", false)]
+    [InlineData("configured-provider", true)]
+    public void Write_ProviderIdentity_RecordsOnlyObservedJudge(string? provider, bool codeOnly)
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new AefProbeLine { CaseId = "probe", State = AefState.Passed,
+                Annotator = codeOnly ? AefAnnotatorKind.Code : AefAnnotatorKind.Llm }],
+            Options() with { JudgeProvider = provider }, Start, Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"];
+        if (codeOnly) Assert.Null(judges);
+        else Assert.Equal(provider, (string?)judges![0]!["provider"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Fact]
+    public void Write_InterruptedTrialStoreLinks_PreservesOnlyRecordedIdentities()
+    {
+        var (dir, _) = AefProbeRunWriter.Write(_out, [], new AefProbeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, SuiteRef = "bench:test",
+            AbortReason = "cancelled", StoreV1 = new() { TrialRunIds = ["trial-1"] },
+                Cli = new() { Verb = "redteam", GitCommit = new string('a', 40), GitBranch = "feature/test", GitDirty = true },
+        }, Start, Start.AddSeconds(1));
+        var link = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["ext"]!["agenteval.store-v1"]!;
+        Assert.Null(link["runId"]);
+        Assert.Equal("trial-1", (string?)link["trialRunIds"]![0]);
+        Assert.Equal("redteam", (string?)AefTestRuns.Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
     private static AefAttack Attack(bool? success) => new()
     {
         Technique = "PromptInjection",
@@ -95,4 +202,32 @@ public sealed class AefProbeRunWriterTests : IDisposable
     [Fact]
     public void RosterDigest_DoesNotDependOnOrderOrRepeats() =>
         Assert.Equal(AefProbeRunWriter.RosterDigest(["b", "a", "a"]), AefProbeRunWriter.RosterDigest(["a", "b"]));
+
+    [Theory]
+    [InlineData("vuln", 1, AefGateOutcome.NoShip)]
+    [InlineData("regression", 4, AefGateOutcome.NoShip)]
+    [InlineData("never", 0, AefGateOutcome.Ship)]
+    public void Write_CommandGateAndUsage_PreservesPolicyEvenWithFailedProbe(string policy, int exitCode, AefGateOutcome outcome)
+    {
+        var options = Options() with
+        {
+            Gate = new AefCommandGate { GateId = "gate:redteam", Rule = "fail-on:" + policy, ExitCode = exitCode, Outcome = outcome },
+            JudgeUsage = new AefUsage { Role = AefUsageRole.Judge, Model = "judge-x", InputTokens = 123, OutputTokens = 45 },
+        };
+        var (dir, _) = AefProbeRunWriter.Write(_out,
+            [new AefProbeLine { CaseId = "attack/p1", State = AefState.Failed, Annotator = AefAnnotatorKind.Llm }],
+            options, Start, Start.AddMinutes(1));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("fail-on:" + policy, (string?)gate["rule"]!["strategy"]);
+        Assert.Equal(exitCode, (int)gate["exitCode"]!);
+        Assert.Equal(exitCode == 0 ? "ship" : "no_ship", (string?)gate["outcome"]);
+        Assert.Single(gate["inputs"]!["results"]!.AsArray());
+        var usage = AefTestRuns.Document(dir, "summary.json")["usage"]![0]!;
+        Assert.Equal(123, (long)usage["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(45, (long)usage["gen_ai.usage.output_tokens"]!);
+    }
 }

@@ -482,6 +482,10 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 
 **Families**
 
+GDPR and EU AI Act accept `--runs N` (at least 1, default 1). Repeated runs use majority voting,
+retain each trial in AEF, and persist the voted result for reporting. Ties choose the more severe label;
+a pass supported by only some requested trials becomes a warning. `--sut mock` still runs only its demonstration.
+
 | Family | Purpose |
 |--------|---------|
 | `gdpr` | GDPR compliance benchmark. |
@@ -503,9 +507,11 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 - `agenteval bench --list` prints the registry-backed family catalog.
 - **AEF runs:** `gdpr`, `eu-ai-act`, `agentic`, `owasp`, `mitre`, `nist`, `perf`, `memory`, `longmemeval`,
   `typedmemeval`, `autoaudit`, `trace-fidelity` and `workflow-trace-fidelity` write each run as a sealed AEF run into the workspace's `.agenteval/aef` (or `--aef <dir>`;
-  `--no-aef` writes none; `--subject-version` records the subject's version, except on `autoaudit`, which audits
-  several models at once and records each as `model:<name>` with no version). A real target is recorded as `live`, a
+  `--no-aef` writes none; `--subject-version` records the subject's exact version). Autoaudit applies the supplied
+  version to every audited `model:<name>`; use separate invocations when versions differ. A real target is recorded as `live`, a
   graded `--response` or trace as `replayed`. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench).
+  Saved runs without an exact subject version cannot satisfy a checkpoint lane; native commands print a note after writing them.
+  Eval and red-team suppress this informational note with `--quiet`.
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
 - Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
 - **`bench gdpr calibrate --decisions` and `bench eu-ai-act calibrate --decisions`** grade the golden datasets with the decision model (TypeSafe Jev) instead of the generative judge. The transport is read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` (`JEV_TRANSPORT` forces one, `JEV_MODEL` pins a build); with neither configured the command exits **3**. The report header names the provider (TypeSafe or OpenRouter) and the model that was requested, marked as requested, because the provider may serve a different build under that name. It never contains the key or the endpoint.

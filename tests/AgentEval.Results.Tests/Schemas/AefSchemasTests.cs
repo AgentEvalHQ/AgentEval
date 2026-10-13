@@ -24,6 +24,22 @@ public class AefSchemasTests
         }
     }
 
+    [Theory]
+    [InlineData(64, true)]
+    [InlineData(65, true)]
+    [InlineData(4096, true)]
+    [InlineData(4097, false)]
+    public void RunAndSeal_JudgeInventoryLimits_Agree(int count, bool valid)
+    {
+        var judges = new JsonArray(Enumerable.Range(0, count)
+            .Select(i => (JsonNode)new JsonObject { ["model"] = $"judge-{i}" }).ToArray());
+        foreach (var schemas in new[] { AefSchemas.Writer, AefSchemas.Reader })
+        {
+            Assert.Equal(valid, schemas.IsValid("run#/properties/judges", judges));
+            Assert.Equal(valid, schemas.IsValid("seal#/properties/predicate/properties/judges", judges));
+        }
+    }
+
     [Fact]
     public void BothSets_Compile_WithTheSameNames()
     {

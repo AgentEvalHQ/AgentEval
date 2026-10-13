@@ -41,7 +41,7 @@ public class EnvelopeLimitTests
         var envelope = DsseEnvelope.Create(Dsse.InTotoPayloadType, seal, signer);
         var policy = new TrustPolicy([new TrustedKey("git:test@example.com", signer.PublicKey)]);
 
-        Assert.Throws<ArgumentException>(() => envelope.ToJson());
+        Assert.Throws<AefInputException>(() => envelope.ToJson());
 
         // The same envelope written by hand: valid in every way but its size.
         var signature = envelope.Signatures[0];

@@ -1,5 +1,13 @@
 ﻿# Red Team Evaluation
 
+CLI scans can produce native [AEF evidence](aef.md), including probe outcomes, observed judge/attacker usage,
+command decisions and retained partial results after interruption. `--aef <dir>` selects output;
+`--subject` and `--subject-version` bind it to an exact target identity. `--aef-key <pkcs8.pem>` signs seals,
+`--aef-unsealed` leaves sealing to a host, and `--no-aef` disables writing. Prompt/response capture is off unless
+`--aef-content on` is supplied. Outside a workspace, request output explicitly with `--aef`; mock scans also
+require explicit output and stay labelled `mocked`.
+
+
 AgentEval's Red Team module provides **automated security evaluation** for AI agents with probes based on [OWASP LLM Top 10](https://owasp.org/www-project-top-10-for-large-language-model-applications/) and [MITRE ATLAS](https://atlas.mitre.org/) taxonomies.
 
 > 🆕 **New here, or catching up on recent changes?** Read **[Red Team — What's New](redteam-whats-new.md)** for the recent coverage/multi-turn/real-tool upgrades, how AgentEval compares to PyRIT/garak and others, and a plain-English take on the hardest problem in red-teaming (trusting the verdict).

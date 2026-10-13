@@ -172,6 +172,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
                 progress.Report(new BenchmarkProgress
                 {
+                    Result = catResult,
                     CategoryName = catResult.CategoryName,
                     Score = catResult.Score,
                     Skipped = catResult.Skipped,

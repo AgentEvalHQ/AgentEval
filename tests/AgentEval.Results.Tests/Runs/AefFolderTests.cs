@@ -439,7 +439,7 @@ public sealed class AefFolderTests : IDisposable
         // A sealer refuses such a run: its paths are not ones a seal can name ([SEAL-1], [RUN-3]).
         File.Delete(Path.Combine(run, "seal.json"));
         File.Delete(Path.Combine(run, "attestation.dsse.json"));
-        var refused = Assert.Throws<InvalidOperationException>(() => AgentEval.Results.Writing.AefSealer.Seal(
+        var refused = Assert.Throws<AefInputException>(() => AgentEval.Results.Writing.AefSealer.Seal(
             run, new AgentEval.Results.Writing.AefSealOptions { SealedBy = AgentEval.Results.Writing.AefSealedBy.Ingest }));
         Assert.Contains("n\uFFFDo.txt path", refused.Message, StringComparison.Ordinal);
     }

@@ -69,14 +69,20 @@ public sealed class TypedMemEvalRunner
     /// <param name="vertical">Which mechanism to measure.</param>
     /// <param name="options">Null runs the vertical's own defaults.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task<ExternalBenchmarkResult> RunAsync(
+    public Task<ExternalBenchmarkResult> RunAsync(
         IEvaluableAgent agent,
         TypedMemEvalVertical vertical,
         TypedMemEvalOptions? options = null,
         CancellationToken ct = default)
+        => RunWithProgressAsync(agent, vertical, options, null, ct);
+
+    /// <summary>Runs a vertical and synchronously reports each completed question, including typed absences.</summary>
+    public async Task<ExternalBenchmarkResult> RunWithProgressAsync(
+        IEvaluableAgent agent, TypedMemEvalVertical vertical, TypedMemEvalOptions? options,
+        Action<QuestionResult>? onCompleted, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(agent);
-        return await RunCoreAsync(agent, vertical, options, oracleOptions: null, executionLabel: null, ct)
+        return await RunCoreAsync(agent, vertical, options, oracleOptions: null, executionLabel: null, ct, onCompleted)
             .ConfigureAwait(false);
     }
 
@@ -114,7 +120,8 @@ public sealed class TypedMemEvalRunner
         TypedMemEvalOptions? facade,
         LongMemEvalOracleOptions? oracleOptions,
         string? executionLabel,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<QuestionResult>? onCompleted = null)
     {
         var descriptor = TypedMemEvalVerticals.For(vertical);
         facade ??= new TypedMemEvalOptions();
@@ -188,6 +195,7 @@ public sealed class TypedMemEvalRunner
                     TypedMemEvalOutcome.Unrun, extension, TypedMemEvalCoverage.Unobserved, null);
                 results.Add(Skipped(
                     entry, details[entry.QuestionId], reason, questionStopwatch.Elapsed));
+                onCompleted?.Invoke(results[^1]);
                 continue;
             }
 
@@ -251,6 +259,7 @@ public sealed class TypedMemEvalRunner
                     TypedOutcome = details[entry.QuestionId],
                     Duration = questionStopwatch.Elapsed
                 });
+                onCompleted?.Invoke(results[^1]);
                 _logger.LogWarning(
                     "[{Index}/{Total}] {Shape,-24} {Error} — {QuestionId}",
                     i + 1, entries.Count, extension.Shape, safeCode, entry.QuestionId);
@@ -318,6 +327,7 @@ public sealed class TypedMemEvalRunner
                 Duration = questionStopwatch.Elapsed
             });
 
+            onCompleted?.Invoke(results[^1]);
             _logger.LogInformation(
                 "[{Index}/{Total}] {Shape,-24} {Outcome}",
                 i + 1, entries.Count, extension.Shape, detail.Outcome);

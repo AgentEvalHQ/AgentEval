@@ -85,7 +85,7 @@ public class JsonlDatasetLoader : IDatasetLoader
         }
     }
 
-    private static DatasetTestCase ParseLine(string line, int lineNumber)
+    internal static DatasetTestCase ParseLine(string line, int lineNumber, bool requireExplicitIds = false)
     {
         using var doc = JsonDocument.Parse(line, new JsonDocumentOptions
         {
@@ -99,6 +99,6 @@ public class JsonlDatasetLoader : IDatasetLoader
             throw new InvalidDataException($"the line is a JSON {root.ValueKind}, not a test case object.");
         }
 
-        return JsonParsingHelper.ParseTestCase(root, $"line_{lineNumber}");
+        return JsonParsingHelper.ParseTestCase(root, requireExplicitIds ? "" : $"line_{lineNumber}");
     }
 }

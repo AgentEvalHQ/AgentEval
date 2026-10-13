@@ -195,6 +195,7 @@ var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspa
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED; there is no default." };
 var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. Without it, --sut or --from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
+var benchEuAiActRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). Repeated runs are aggregated via MajorityVote and preserved as AEF trials." };
 var benchEuAiActAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
 var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave. Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
@@ -203,6 +204,7 @@ benchEuAiActCmd.Add(benchEuAiActRootOpt);
 benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
+benchEuAiActCmd.Add(benchEuAiActRunsOpt);
 benchEuAiActCmd.Add(benchEuAiActAzureFromEnvOpt);
 var benchEuAiActAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
 var benchEuAiActNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
@@ -257,7 +259,8 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
         aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -438,7 +441,8 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchOwaspAefOpt), noAef: parseResult.GetValue(benchOwaspNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
@@ -507,7 +511,8 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchMitreAefOpt), noAef: parseResult.GetValue(benchMitreNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
@@ -575,7 +580,8 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchNistAefOpt), noAef: parseResult.GetValue(benchNistNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchNistCmd);
@@ -808,6 +814,8 @@ benchCmd.Add(benchNistCmd);
         benchAutoAuditCmd.Add(aaModelsOpt);
         benchAutoAuditCmd.Add(aaSutOpt);
         var aaAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write one sealed AEF run per audited model under this folder (default: a workspace's .agenteval/aef)" };
+        var aaSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "Exact version recorded for every audited subject in AEF; audit separately when subjects have different versions." };
+        benchAutoAuditCmd.Add(aaSubjectVersionOpt);
         var aaNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
         benchAutoAuditCmd.Add(aaAefOpt);
         benchAutoAuditCmd.Add(aaNoAefOpt);
@@ -822,7 +830,8 @@ benchCmd.Add(benchNistCmd);
             var models = parseResult.GetValue(aaModelsOpt)?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct,
-                aef: parseResult.GetValue(aaAefOpt), noAef: parseResult.GetValue(aaNoAefOpt));
+                clientOverride: null, aef: parseResult.GetValue(aaAefOpt), noAef: parseResult.GetValue(aaNoAefOpt),
+                subjectVersion: parseResult.GetValue(aaSubjectVersionOpt));
         });
         benchCmd.Add(benchAutoAuditCmd);
     }
@@ -882,7 +891,8 @@ benchCmd.Add(benchNistCmd);
             var agentModel = agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfModelOpt) : null;
             return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct,
                 aef: parseResult.GetValue(benchPerfAefOpt), noAef: parseResult.GetValue(benchPerfNoAefOpt),
-                subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null);
+                subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null,
+                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfEndpointOpt) : null);
         });
         benchPerfCmd.Add(presetCmd);
     }
@@ -1038,7 +1048,11 @@ rootCmd.Add(SkillsScanCommand.Create());
 rootCmd.Add(LogFileCommand.Create());
 rootCmd.Add(AssertAiCommand.Create());             // assert-ai — serve/import/export/calibrate with Microsoft's ASSERT (assert-ai 0.3)
 rootCmd.Add(AefCommand.Create());                  // aef — verify/seal/view/checkpoint AEF 1.0 runs; export store v1, import ASSERT
+rootCmd.Add(AgentEval.Cli.Runner.RunnerManifest.Create());
+var aefRunCommand = AgentEval.Cli.Runner.RunCommand.Create();
+rootCmd.Add(aefRunCommand);
 
+var nativeAefOptions = new AefCliOptions(rootCmd);
 var parseResult = rootCmd.Parse(args);
 
 // A parse error — an unknown command or option, a value that does not convert (`--runs abc`), a missing required
@@ -1054,9 +1068,19 @@ if (parseResult.Action is System.CommandLine.Invocation.ParseErrorAction)
     return AgentEval.Cli.ExitCodes.UsageError;
 }
 
-using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
-using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
-return await parseResult.InvokeAsync();
+// A dry-run must not create even explicitly requested diagnostic files.
+if (parseResult.Action is System.CommandLine.Help.HelpAction)
+    return await parseResult.InvokeAsync();
+
+if (parseResult.CommandResult.Command == aefRunCommand && AgentEval.Cli.Runner.RunCommand.IsDryRun(parseResult))
+    return await nativeAefOptions.InvokeAsync(parseResult, () => parseResult.InvokeAsync());
+
+return await nativeAefOptions.InvokeAsync(parseResult, async () =>
+{
+    using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
+    using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
+    return await parseResult.InvokeAsync();
+});
 
 namespace AgentEval.Cli.Commands
 {

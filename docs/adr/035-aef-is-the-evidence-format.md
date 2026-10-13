@@ -47,8 +47,11 @@ round 3), each round's findings reworked into the text, the schemas and the conf
    - the patent commitment for implementers in force (the Community Specification License 1.0 is drafted and waits
      on counsel; until then Apache-2.0 alone applies).
 5. **Relation to ADR-034.** AEF is the export path for the result model that ADR-034 found missing. The store v1
-   exporter (`agenteval aef export`) writes existing runs as imported AEF runs ([RUN-15]); native writing from the
-   evaluation pipelines follows (PLAN S1 #5). `IResultExporter` stays the test pipeline's flat-report extension point.
+   exporter (`agenteval aef export`) writes existing runs as imported AEF runs ([RUN-15]); native
+   eval, redteam and benchmark pipelines write AEF directly, retaining typed absences, decisions, usage and partial
+   results. The CLI's local dataset Runner enforces plan bounds and scoped credentials; its scripted target retains
+   corpus compatibility. Signed native runs and a three-lane checkpoint are checked with both implementations.
+   `IResultExporter` stays the test pipeline's flat-report extension point.
 6. **No standards body yet.** Standards organisations take a format once several independent parties implement or
    adopt it. Until then AEF lives in this repository under its own governance, and the next steps are concrete and
    cheap: register its two in-toto predicate types with the in-toto attestation project; propose the evaluation-event

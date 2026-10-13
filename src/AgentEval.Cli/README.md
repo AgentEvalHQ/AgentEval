@@ -51,6 +51,24 @@ agenteval eval --endpoint https://api.openai.com/v1 --model gpt-4o --dataset age
 agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset agenteval.yaml
 ```
 
+### Run a bounded AEF plan
+
+```bash
+agenteval runner manifest --runner-id local-eval --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --dry-run --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --progress ndjson --max-usd 1
+```
+
+The local runner supports text-only dataset plans against existing OpenAI-compatible or Azure endpoints.
+It requires exact known model prices and explicit dataset case IDs. Authenticated endpoints require
+purpose-scoped credential references (always required for Azure); keyless OpenAI-compatible endpoints do not.
+Jobs save their plan, manifest, events and sealed runs under `.agenteval/aef/jobs/<jobId>/`.
+See [AEF runner configuration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md#local-dataset-runner)
+for plan settings and exit codes. `--aef-key` signs produced runs, including aborted runs; credentials and private
+keys are not copied into job evidence. The offline `s1-exit-crosscheck.sh` in `tests/AgentEval.Results.Conformance/`
+verifies signed eval/redteam/bench evidence and their three-lane checkpoint with .NET and Python.
+
 ### Stochastic evaluation (multi-run)
 
 ```bash

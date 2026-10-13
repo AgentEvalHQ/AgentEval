@@ -169,7 +169,7 @@
         "judges": {
           "description": "The judges, as run.json gives them and in the same order (SEAL-5).",
           "type": "array",
-          "maxItems": 64,
+          "maxItems": 4096,
           "items": {
             "type": "object",
             "required": [

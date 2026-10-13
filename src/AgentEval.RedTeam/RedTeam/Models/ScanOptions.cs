@@ -227,6 +227,20 @@ public class ScanOptions
     public Action<ScanProgress>? OnProgress { get; init; }
 
     /// <summary>
+    /// Called after each completed probe, with its attack, result, and whether it belongs to the benign-control arm.
+    /// Enables callers to retain partial evidence if the scan is cancelled. Parallel scans may invoke it concurrently;
+    /// callbacks must be thread-safe. A callback failure propagates to the caller.
+    /// </summary>
+    public Action<IAttackType, ProbeResult, bool>? OnProbeCompleted { get; init; }
+
+    /// <summary>
+    /// Creates an observation scope around probe execution and grading. The final argument identifies benign controls.
+    /// Scopes are disposed on success, failure or cancellation; parallel probes may invoke the factory concurrently.
+    /// </summary>
+    public Func<IAttackType, AttackProbe, bool, IDisposable?>? BeginProbeScope { get; init; }
+
+
+    /// <summary>
     /// How often to report progress. 1 = every probe, 5 = every 5th probe.
     /// Values &lt;= 0 are treated as 1 (report on every probe) to avoid a divide-by-zero
     /// in the scan loop. Default: 1.

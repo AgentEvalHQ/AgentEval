@@ -134,7 +134,31 @@ public sealed class CompositeEval : IEval
     }
 
     /// <inheritdoc/>
-    public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+        EvaluateObservedAsync(input, null, null, [], ct);
+
+    /// <summary>
+    /// Evaluates the tree and reports each completed node, including this root. Paths are component indexes from
+    /// this root (the root has an empty path), so repeated keys or reused eval instances remain distinct.
+    /// The callback runs synchronously on the completing task and must support concurrent calls. Callback exceptions
+    /// propagate to the caller. A cancelled or faulted node is not reported; its completed descendants still are.
+    /// </summary>
+    /// <param name="input">Input forwarded to every component.</param>
+    /// <param name="onCompleted">Receives the immutable index path and the completed result.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="onStarted">Optional callback before each node is invoked, using the same index paths.</param>
+    /// <returns>The normal composite result when evaluation completes.</returns>
+    public Task<EvalResult> EvaluateWithProgressAsync(
+        EvalInput input, Action<IReadOnlyList<int>, EvalResult> onCompleted, CancellationToken ct = default,
+        Action<IReadOnlyList<int>>? onStarted = null)
+    {
+        ArgumentNullException.ThrowIfNull(onCompleted);
+        return EvaluateObservedAsync(input, onCompleted, onStarted, [], ct);
+    }
+
+    private async Task<EvalResult> EvaluateObservedAsync(
+        EvalInput input, Action<IReadOnlyList<int>, EvalResult>? onCompleted,
+        Action<IReadOnlyList<int>>? onStarted, int[] path, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
 
@@ -150,7 +174,11 @@ public sealed class CompositeEval : IEval
         s_nestingDepth.Value = depth;
         try
         {
-            return await EvaluateCoreAsync(input, ct);
+            if (onCompleted is not null) ct.ThrowIfCancellationRequested();
+            onStarted?.Invoke(Array.AsReadOnly(path));
+            var result = await EvaluateCoreAsync(input, onCompleted, onStarted, path, ct);
+            onCompleted?.Invoke(Array.AsReadOnly(path), result);
+            return result;
         }
         finally
         {
@@ -158,11 +186,27 @@ public sealed class CompositeEval : IEval
         }
     }
 
-    private async Task<EvalResult> EvaluateCoreAsync(EvalInput input, CancellationToken ct)
+    private async Task<EvalResult> EvaluateCoreAsync(
+        EvalInput input, Action<IReadOnlyList<int>, EvalResult>? onCompleted,
+        Action<IReadOnlyList<int>>? onStarted, int[] path, CancellationToken ct)
     {
         // Run all sub-evals in parallel (no throttle in Phase 1).
-        var subTasks = Components.Select(c => c.Eval.EvaluateAsync(input, ct)).ToArray();
+        var subTasks = onCompleted is null
+            ? Components.Select(c => c.Eval.EvaluateAsync(input, ct)).ToArray()
+            : Components.Select((c, index) => EvaluateChildAsync(c.Eval, index)).ToArray();
         var subs = await Task.WhenAll(subTasks);
+
+        async Task<EvalResult> EvaluateChildAsync(IEval eval, int index)
+        {
+            ct.ThrowIfCancellationRequested();
+            int[] childPath = [.. path, index];
+            if (eval is CompositeEval composite)
+                return await composite.EvaluateObservedAsync(input, onCompleted, onStarted, childPath, ct);
+            onStarted?.Invoke(Array.AsReadOnly(childPath));
+            var result = await eval.EvaluateAsync(input, ct);
+            onCompleted!(Array.AsReadOnly(childPath), result);
+            return result;
+        }
 
         var (score, severity) = Aggregation.Aggregate(subs, Components);
         var (cost, allCacheHits) = CostRollup.Aggregate(subs);

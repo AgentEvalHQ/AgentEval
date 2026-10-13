@@ -7,8 +7,262 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
+  servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials
+  can be sent in cleartext.
+
+- **Runner judge provenance:** cases using one model with distinct rubrics retain each instrument in
+  first-use order. Deduplication includes provider, mode, panel size and calibration metadata instead
+  of overwriting earlier instruments by model name. Dataset plans must authorize one matching judge
+  entry per distinct criteria list in a suite; insufficient entries are refused before provider calls.
+
+- **Signed native checkpoint verification:** loopback eval, redteam and OWASP runs share one subject/version,
+  sign their seals and feed three threshold lanes into a signed checkpoint. The crosscheck verifies the complete
+  flow with the CLI and independent Python tools, including signature tampering and content privacy assertions.
+  Runner capability, conformance and workspace documentation now describes the implemented local behavior.
+
+- **HTTP test isolation:** the ASSERT sample/server tests share a non-parallel xUnit collection to
+  isolate their ephemeral-port and wildcard-listener setup from concurrent suite load.
+
+- **Inspect import diagnostics:** removed internal review identifiers from five refusals; public IN rule
+  identifiers and validation behavior are unchanged.
+
+- **Pre-release API change:** removed the unused `StochasticOptions.Seed` parameter/property, which
+  incorrectly promised reproducibility. Update constructor/deconstruction calls and configure provider
+  sampling through the agent/client instead. Repetition and statistical behavior are unchanged.
+
+- **Native export notice:** `aef export` warns when a workspace native AEF header already links the
+  exported store run or trial, while preserving export results and JSON stdout. New workspace
+  ignore templates exclude generated AEF run and job folders.
+
+- **Native metadata completion:** autoaudit accepts `--subject-version` and retains it for each audited
+  subject, including interrupted and explicit mock runs. Red-team AEF configuration records the normalized
+  judge policy when a judge is configured, without claiming that an unused fallback judge graded a result.
+
+- **Interruption verification:** deterministic CLI regressions cover early/partial OWASP, MITRE and NIST
+  scans, partial GDPR/EU AI Act/agentic evaluation, and failure midway through aggregate persistence.
+  Completed observations and trial rollups survive without inventing a final gate or a completed store summary.
+
+- **Evidence survives output failures:** a broken saved-run diagnostic stream no longer reports intact
+  native AEF evidence as unwritten. GDPR, EU AI Act, agentic, OWASP, MITRE and NIST commands do not create
+  a second aborted run when final console reporting fails after publication; their completed gate remains intact.
+
+- **Large native judge inventories:** draft AEF run/seal schemas retain up to 4096 distinct judge/rubric
+  entries. This fixes GDPR evidence loss after report failures or cancellation when the old 64-entry
+  limit was exceeded. Consumers of the earlier draft schemas need the updated schema files.
+
+- **Native CLI provenance:** AEF headers record the registered command and observed Git commit, branch
+  and dirty state in `agenteval.cli`, alongside existing store links. Git inspection is bounded; unknown
+  fields stay absent. Command arguments, working-directory paths and Git status filenames are not recorded.
+
+- **Unversioned evidence guidance:** native eval, red-team and benchmark commands explain that a saved run
+  without an exact subject version cannot satisfy a checkpoint lane. Eval/red-team quiet mode suppresses the note.
+
+- **Usage model identity:** replay, memory-poisoning, Gatekeeper and Runner client wrappers retain the
+  configured model when a call ends before the provider reports its model. Missing usage remains unknown.
+
+- **Red-team stimulus provenance:** attacker-configured runs now declare generated stimuli, and imported
+  probes/packs declare external stimuli. Fixed suites retain the default. Multi-turn attacker usage and
+  cancellation accounting are covered by loopback HTTP regression tests.
+
+- **Red-team probe usage:** direct red-team and OWASP/MITRE/NIST scan evidence attributes calls to
+  individual probes and benign controls, including parallel execution and grading. Preflight calls remain
+  run-level usage. Optional probe observation scopes are disposed on completion, failure and cancellation.
+
+- **Stochastic eval usage:** each completed trial records its own agent and judge usage; rollups do not
+  repeat these totals. Cancelled runs preserve completed trial counts and leave incomplete run usage unknown.
+
+- **Interrupted metric usage:** eval refreshes case usage even when a named metric throws or is cancelled.
+  Completed agent counts remain visible; an interrupted judge call stays unknown without a fabricated verdict.
+
+- **Per-case eval usage:** single-run eval case roots retain scoped agent and judge usage, including
+  subsequent named-metric calls, without repeating it on metric children. Completed-case counts survive
+  cancellation while incomplete run totals remain unknown. Interrupted streams retain observed model identity.
+
+- **Native usage summaries:** eval, redteam and scan summaries accept invocation-meter totals without
+  adding the same role's legacy ledger again. Reported model aliases remain distinct from fallback deployment
+  names without double counting; run cost is omitted when any recorded role's cost is unknown.
+
+- **Usage attribution:** asynchronous role/case scopes separate subject calls from metric judging when one
+  client serves both purposes. Known direct eval/redteam and Azure judge models are captured at construction;
+  auto-audit, replay and demo subject clients are classified as agent usage.
+
+- **Composite usage accounting:** native CLI invocations can collect observed client usage by role/model
+  and retain it in composite AEF summaries, including aborted runs. Missing or interrupted reports remain
+  unknown; complete known-model usage receives a ModelPricing estimate, with a total only when every role
+  has known cost. Existing eval/probe ledgers remain separate while coverage is completed.
+
+- **Named metric instruments:** CLI-selectable model metrics retain their own content-free template digests
+  in native judge headers and result annotations. Bias/misinformation empty-output shortcuts explicitly record
+  code grading, without a model judge or judge rationale. Existing prompts, scores and thresholds are unchanged.
+
+- **Benign-control grader accuracy:** controls answered by the refusal prefilter now record CODE grading,
+  rather than inventing an LLM verdict. Conclusive over-refusal judge results carry their actual rubric digest;
+  undecided/unknown grading does not claim a model. Code-only control reasons are not saved as judge rationale.
+
+- **Probe rubric provenance:** LLM probe grading fingerprints its actual system prompt and user template
+  without probe/response content. Adopted judge verdicts carry the digest into AEF headers and annotations;
+  distinct attack-family rubrics stay separate, and retained keyword verdicts do not acquire judge identity.
+
+- **Native grader annotations:** eval criteria, trials and named metrics identify known model judges;
+  assertions and code metrics identify code grading. Unmeasured results and aggregate decisions do not
+  claim additional grading. Dataset runner headers and criterion annotations retain observed rubric identity.
+
+- **Harness rubric identity:** successful normal and streaming evaluations retain a full instrument digest
+  through to native AEF judge headers. Distinct criteria remain distinct for the same judge model; case input,
+  output and rationale are excluded, and unknown or failed grading does not invent an observed rubric.
+
+- **Direct CLI judge providers:** eval and redteam record the configured OpenAI-compatible judge provider.
+  Named eval metrics retain Azure/OpenAI-compatible subject-client identity when reused for grading; custom
+  client overrides remain unknown. Single-run and stochastic harness evidence share the same provider facts.
+
+- **Eval/probe judge providers:** native writer options accept known provider identities. Eval sessions keep
+  separate model/provider pairs and do not copy the harness provider onto an explicitly separate metric judge.
+  OWASP, MITRE and NIST pass captured judge-provider identity through normal and interrupted scan evidence.
+  Adopted fallback-judge verdicts now retain their actual grader provenance instead of appearing code-graded.
+
+- **Benchmark judge providers:** judge construction captures the configured provider from the same settings
+  snapshot as the client. Atomic/decision provenance and composite AEF headers retain known providers; rubric
+  binding preserves them, unknown providers remain absent, and placeholder mock evidence clears them.
+
+- **Judge panel provenance:** panel wrappers persist their configured member count on success and no-verdict
+  results. Native composite headers distinguish measured panel members from ordinary single judges and a
+  separately invoked adjudicator, without deriving panel size from criteria or successful model counts.
+
+- **Decision-judge evidence:** native composite leaf results identify decision models as model judges rather
+  than code checks, and carry known rubric digests beside the model. Judge reasoning remains capture-on only;
+  code checks, aggregates and unmeasured results do not gain model annotations.
+
+- **Judge rubric identity:** atomic LLM and decision evaluations retain a full SHA-256 rubric digest alongside
+  the unchanged short prompt fingerprint. Structured full-digest encoding prevents delimiter collisions between
+  caller-supplied fields and criteria. Native composite headers preserve distinct rubrics for the same model;
+  legacy results without a full digest leave it absent. Mock placeholder provenance clears the digest.
+
+- **Agentic budget metadata:** AEF configuration records the applied, normalized budget tier (`all` when no
+  filter applies), including explicit mock evidence and interrupted runs. Other benchmark families omit it.
+
+- **Native threshold and suite facts:** eval headers record a shared case threshold only when all dataset cases
+  agree; mixed policies are keyed by evidence case ID. Stochastic headers no longer claim ignored named metrics.
+  Composite suite versions now retain the evaluation definition's exact version instead of the package version.
+
+- **Native run configuration and pricing:** eval/probe/composite headers accept applied configuration and
+  pricing policy. CLI evidence records eval sampling/trial/metric settings, red-team intensity/attack/failure
+  settings, and benchmark preset/trial counts. ModelPricing.TableName names the bundled baseline; native headers
+  publish that identity without inventing a spending limit, and hosts can supply a different pricing policy.
+
+- **Benchmark target endpoint wiring:** environment-backed benchmark commands retain the endpoint captured
+  when their client was constructed; explicit scan/perf endpoints also reach AEF deployment headers. Interrupted
+  runs keep the same endpoint. Replayed responses, mocks and unknown custom-target endpoints remain absent.
+
+- **Native composite deployment metadata:** composite writer options accept a known target endpoint, sanitize
+  user information/query/fragment, and use the same deployment reference encoding as Runner. Unknown or invalid
+  endpoints are omitted. Benchmark AEF helpers can forward the endpoint to composite and probe writers.
+
+- **Agentic and scan failure evidence:** agentic benchmarks link created store manifests and retain observed
+  results after fatal evaluation/report failures. OWASP, MITRE and NIST scans also retain measured probes after
+  scan or persistence errors, without a command gate. Opt-out and explicit-output error behavior is preserved.
+
+- **Composite store links and failure evidence:** GDPR and EU AI Act native evidence retains persisted trial
+  identities in execution order and the aggregate manifest identity when created. Fatal evaluation/report errors
+  now retain observed evidence in an aborted run without a command gate; explicit output failures still return
+  the runtime-error exit. Existing runner APIs remain available alongside manifest-aware progress overloads.
+
+- **Native benchmark store links:** AEF headers can retain path-free store-v1 run and ordered trial identities.
+  Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands now link manifests that were actually
+  created, including interrupted persistence. Runs stopped before manifest creation omit the link.
+
+- **TypedMemEval interruption evidence:** completed typed question outcomes survive cancellation or later failure.
+  Partial evidence withholds the benchmark aggregate and command gate; missing typed vectors never fall back to
+  compatibility accuracy. The existing runner API remains available beside a synchronous progress method.
+
+- **LongMemEval interruption evidence:** completed question results survive cancellation or later failure through
+  a synchronous progress API. Partial runs omit benchmark-wide accuracy and command gates; returned full results
+  remain available when persistence is interrupted.
+
+- **Memory benchmark interruption evidence:** completed categories now travel with progress updates, allowing
+  the CLI to retain them in an aborted AEF run on cancellation. Completed results also survive persistence
+  interruption; absent results are not fabricated and aborted runs have no gate.
+
+- **Trace-fidelity interruption evidence:** both trace and workflow reconciliation retain their observed result
+  as aborted, replayed AEF evidence when persistence or reporting is interrupted; aborted invocations omit gates.
+
+- **Live autoaudit interruption evidence:** completed models remain available as aborted AEF runs when a later
+  model or report fails. An interrupted model without a returned result has empty evidence; unstarted models
+  are omitted. Cancellation and exception propagation are preserved unless explicit evidence output fails.
+
+- **Live perf interruption evidence:** evaluation and persistence failures now retain an aborted AEF run,
+  including any returned benchmark result. Cancellation after persistence/reporting omits the gate;
+  `--no-aef` and explicit-output failure exit behavior remain respected.
+
 ### Added
 
+- **Plan-controlled runner content:** dataset jobs with `contentCapture: on` attach input/expected/output,
+  judge summaries and per-criterion rationale. Shared writer text attachment enforces capture-off even when
+  a target supplies content; native adapters reuse the same attachment logic and result-bound evidence IDs.
+
+- **Runner signing and evidence controls:** `run --aef-key` signs completed and aborted seals; `--aef` selects
+  the job evidence base. Subject/version/content flags assert saved-plan values without rewriting its bytes.
+  Jobs reject no-evidence/unsealed modes, and dry-run validates controls without requests or writes. Public
+  signing key IDs are recorded in runner policy; caller-owned library signers remain caller-owned.
+
+- **Perf and autoaudit mock AEF:** explicit output retains perf results and one autoaudit run per scripted
+  subject, with exit 11/inconclusive gates. Autoaudit progress callbacks preserve completed endpoint results
+  on interruption; an interrupted endpoint with no returned result has empty aborted evidence. Defaults
+  and `--no-aef` continue to write no AEF.
+
+- **Explicit composite mock evidence:** GDPR, EU AI Act and agentic benchmarks now honor explicit `--aef` for
+  mock runs, preserving exit 11 and completed children after interruption. Built-in placeholder judgments use
+  CODE provenance; supplied evaluators keep their own provenance. Default mock runs still write nothing.
+
+- **Explicit mock scan evidence:** OWASP, MITRE and NIST benchmarks honor `--sut mock --aef <dir>` with
+  mocked AEF provenance, exit 11 and an inconclusive gate. Default mock runs still store nothing; cancellation
+  preserves explicitly requested aborted evidence, and explicit write failures return exit 3.
+
+- **Native compliance artifacts:** GDPR/EU AI Act rich JSON reports (with content capture on) and OWASP/MITRE
+  content-free control summaries are attached byte-for-byte to matching AEF roots. Source-run binding rejects
+  overwritten reports; completed reports can remain attached when later rendering is cancelled.
+
+- **Opt-in native AEF content capture:** `--aef-content on|off` defaults to off. Eval inputs/expected answers/outputs,
+  available probe content and composite evaluation details are stored in result-linked blobs only when enabled.
+  Repeated and interrupted runs preserve content on observed trials without inventing content for synthetic rollups.
+
+- **Native CLI signing and host sealing:** `eval`, `redteam` and evaluating `bench` commands accept
+  `--aef-key <pkcs8.pem>` and `--aef-unsealed`. Keys and conflicting options are checked before command execution
+  or diagnostic-file initialization. Help does not load keys. Signers are scoped to one invocation.
+
+- **Native AEF adapters can leave closed evidence unsealed:** set `Seal = false` on eval, probe or composite
+  run options for a host to seal later. The writer verifies the closed evidence and returns a null run hash;
+  combining this mode with a signer is rejected before creating a run. Default sealing is unchanged.
+
+- **Explicit AEF input errors:** `AefInputException` identifies recognized writer, sealer, summary and job
+  input refusals. The conformance driver's write boundary no longer treats arbitrary argument or operation
+  exceptions as invalid input; callback bugs and post-write verification failures remain unexpected failures.
+- **Asynchronous AEF job engine:** `AefJobRunner.RunAsync` accepts target, suite, case and clock contracts,
+  preserving scripted job bytes while adding awaited cases, cancellation, error evidence, partial costs and
+  case deadlines. A monotonic elapsed clock supports real execution; scripted execution retains its simulated clock.
+  Shared `Analyze` performs acceptance and cost estimation without calls or writes. Optional progress output mirrors
+  persisted NDJSON bytes. Credentials are delivered by purpose without process environment changes; unsupported
+  purposes and conflicting values for one credential name are refused before execution.
+  Run preparation has its own cost/time bounds, included in estimates and first-case admission. Interrupted
+  preparation retains incurred cost in an aborted run without inventing a completed case.
+  Async resource cleanup runs once per started run on completion, cancellation and failures, with an independent
+  deadline. Closing-time overruns and cleanup errors are reported while retaining any sealed evidence.
+  Runner client foundations now include purpose-scoped endpoint creation without ambient key fallback or SDK
+  retries, plus per-role call, text-input and output-token caps. Missing usage and interrupted calls retain their
+  reserved cost; reported token overruns stop further calls. The live dataset target resolves relative snapshots,
+  binds exact known prices, budgets readiness separately, and records subject/judge usage including interrupted
+  calls. Unresolvable targets are refused before acceptance. Provider failures retain actual spend and identify
+  a crossed cost limit. `runner manifest` exposes schema-checked local capabilities with an explicit runner ID;
+  `run --plan` saves exact plan bytes and the manifest beside job events and runs in the workspace, with
+  documented terminal exit codes. `--dry-run --json` resolves and estimates without requests or file writes;
+  `--progress ndjson` mirrors persisted event bytes. `--max-usd` can only lower the plan cap and
+  `--refuse-over-budget` opts into upfront estimate refusal; both use the engine's shared acceptance rules.
+  Operator budget options are recorded separately and bound into job identity, preserving exact plan bytes.
+  `runner-crosscheck.sh` repeats offline runner integration, compares .NET/Python stream and run-conformance
+  findings, and drives the actual CLI through limits, refusals, scoped keys, missing usage and POSIX cancellation.
+  Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
+  reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
+  preserving criteria, assertions, named metrics, typed absences and content privacy.
 - **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
   `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.
@@ -27,7 +281,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   composite's strategy, threshold, measured parts and the rule that decided it, and each part's weight, whether it is
   required and its failure effect; a leaf's own breakdown (groundedness's claims) beside its verdict. A live agent
   is `live`, a stand-in `mocked`, a graded `--response` `replayed` (bench agentic always grades one).
-  `--runs` above 1 is not written yet.
+  GDPR and EU AI Act support `--runs N`: individual trial trees and majority-vote rollups are preserved in AEF.
+  Composite summaries distinguish the mean case score from the preset's aggregate score and verdict.
+- **AEF command decisions and partial evidence:** redteam and verdict-bearing benchmarks record their final gates;
+  eval writes completed cases and stochastic trials incrementally into a running folder, retaining unsealed evidence
+  if the process stops before closing. Interrupted composite benchmarks with no completed evaluations write empty results.
+  Single-run eval retains named metric children and their measured/absent states without changing the harness gate;
+  named LLM metrics record their judge and separately metered usage, including the subject-client fallback.
+  eval records its golden-trace decision. Redteam and OWASP/MITRE/NIST record complete reported judge token totals.
+  Cancelled eval and redteam execution seals completed evidence as aborted, without a final gate. Redteam and
+  OWASP/MITRE/NIST also retain completed scans when subsequent persistence or reporting is cancelled.
+  GDPR, EU AI Act, and agentic benchmarks retain completed nested evaluations on cancellation, preserving
+  `error` and `skipped` absence states and withholding the final command gate. Repeated GDPR/EU AI Act runs
+  preserve started trial trees and the requested trial policy, including trials with differing leaf breakdowns.
 - **`bench owasp`, `bench mitre` and `bench nist` write each scan as sealed AEF evidence** (`--aef`, `--no-aef`,
   `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
   benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
@@ -216,6 +482,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Repeated GDPR benchmark reports referenced an unsaved run.** The voted result is now persisted before report
+  generation, so `bench gdpr --runs N` can finish and write its report and AEF trial evidence.
 - **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
   process and stopped it on Ctrl+C only. A service manager, `kill` or a CI step sends SIGTERM to the launcher alone,
   so the launcher exited and the server kept the port and went on serving. Ctrl+C and SIGTERM now both stop the

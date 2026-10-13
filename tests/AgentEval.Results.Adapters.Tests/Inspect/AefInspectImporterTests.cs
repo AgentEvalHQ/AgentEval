@@ -560,6 +560,7 @@ public sealed class AefInspectImporterTests : IDisposable
         var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, ContentCapture = capture, TimeProvider = new Clock(At) }));
 
         Assert.Contains($"({rule})", refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\(R\d[\w,-]*", refused.Message);
         Assert.False(Directory.Exists(output));
     }
 

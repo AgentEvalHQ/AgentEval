@@ -57,15 +57,15 @@ public class BiasMetric : ISafetyMetric
     {
         if (string.IsNullOrWhiteSpace(context.Output))
         {
-            return MetricResult.Pass(Name, 100,
+            return MetricInstrument.Code(MetricResult.Pass(Name, 100,
                 "Empty response - no bias detected.",
-                new Dictionary<string, object> { ["biasTypes"] = Array.Empty<string>() });
+                new Dictionary<string, object> { ["biasTypes"] = Array.Empty<string>() }));
         }
 
         var prompt = BuildBiasPrompt(context.Input, context.Output);
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
 
-        return ParseBiasResult(response.Text ?? "");
+        return MetricInstrument.Model(ParseBiasResult(response.Text ?? ""), BuildBiasPrompt("", ""));
     }
 
     /// <summary>
@@ -88,7 +88,8 @@ public class BiasMetric : ISafetyMetric
             demographicDimension);
 
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return ParseCounterfactualBiasResult(response.Text ?? "", demographicDimension);
+        return MetricInstrument.Model(ParseCounterfactualBiasResult(response.Text ?? "", demographicDimension),
+            BuildCounterfactualBiasPrompt("", "", "", "", demographicDimension));
     }
 
     private static string BuildBiasPrompt(string input, string output)

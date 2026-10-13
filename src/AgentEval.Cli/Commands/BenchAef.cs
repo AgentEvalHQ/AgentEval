@@ -22,23 +22,40 @@ internal static class BenchAef
     /// </summary>
     public static bool WriteScan(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
-        AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult verdict)
+        AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
+        int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
-            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan), new AefProbeRunOptions
+            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
             {
+                Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
+                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
+                StoreV1 = storeV1,
+                Endpoint = endpoint,
+                Seal = AefCliOptions.Seal,
+                Signer = AefCliOptions.Signer,
+                ContentCapture = AefCliOptions.ContentCapture,
+                ComplianceArtifacts = complianceArtifacts?.Invoke(),
                 SubjectRef = AefEvalWriter.Ref("agent", subject),
                 SubjectVersion = subjectVersion,
                 JudgeModel = judgeModel,
+                JudgeProvider = judgeProvider,
                 TargetMode = targetMode,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
                 ProbesNotRun = scan.SkippedProbes,
                 Lane = family,
-                BenchVerdict = (verdict.Score.Label, verdict.Score.Value),
-            }, scan.StartedAt, scan.CompletedAt);
-            Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
+                BenchVerdict = verdict is null ? null : (verdict.Score.Label, verdict.Score.Value),
+                Gate = abortReason is null && verdict is not null ? Gate(verdict.Score.Label, exitCode) : null,
+                AbortReason = abortReason,
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
+                JudgeUsage = judgeLedger is { ReportedUsage: true }
+                    ? new AefUsage { Role = AefUsageRole.Judge, Model = judgeModel, InputTokens = judgeLedger.InputTokens, OutputTokens = judgeLedger.OutputTokens }
+                    : null,
+            }, scan.StartedAt, DateTimeOffset.UtcNow);
+            AefCliOptions.ReportSaved(directory, runHash, subjectVersion);
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -55,8 +72,10 @@ internal static class BenchAef
     public static bool WriteResult(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
-        IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt);
+        IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
+        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -70,8 +89,11 @@ internal static class BenchAef
     /// </summary>
     public static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
-        AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null);
+        AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
+        int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
+        bool trialAggregationCompleted = false, bool emptyResults = false,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -79,8 +101,23 @@ internal static class BenchAef
     /// </summary>
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
-        AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null);
+        AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
+        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint);
+
+    /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
+    internal static AefCommandGate Gate(string label, int exitCode) => new()
+    {
+        GateId = "gate:bench",
+        Rule = "label:" + label.ToLowerInvariant(),
+        ExitCode = exitCode,
+        Outcome = exitCode switch
+        {
+            ExitCodes.Success => AefGateOutcome.Ship,
+            ExitCodes.GateFailed or ExitCodes.GateWarning => AefGateOutcome.NoShip,
+            _ => AefGateOutcome.Inconclusive,
+        },
+    };
 
     /// <summary>
     /// bench memory's result as a tree: a case per category, weighted as the overall score weighs them (WeightedSum),
@@ -156,21 +193,48 @@ internal static class BenchAef
     private static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
-        string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt)
+        string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
+        IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
+        bool trialAggregationCompleted = false, bool emptyResults = false,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
-            var (directory, runHash) = AefCompositeRunWriter.Write(Path.Combine(root, "runs"), result, shape, new AefCompositeRunOptions
+            var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 };
+            if (budgetTier is not null) settings["budgetTier"] = budgetTier;
+            var options = new AefCompositeRunOptions
             {
+                Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
+                Config = new AefRunConfig { Settings = settings },
+                StoreV1 = storeV1,
+                Endpoint = endpoint,
+                Seal = AefCliOptions.Seal,
+                Signer = AefCliOptions.Signer,
+                ContentCapture = AefCliOptions.ContentCapture,
+                ComplianceArtifacts = complianceArtifacts?.Invoke(),
                 SubjectRef = AefEvalWriter.Ref(subjectKind, subject),   // the bench's own subject kind
                 SubjectVersion = subjectVersion,
                 TargetMode = targetMode,
                 Lane = family,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
                 CaseExt = caseExt,
-            }, startedAt, endedAt);
-            Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
+                Gate = exitCode is { } code ? Gate(result.Score.Label, code) : null,
+                AbortReason = abortReason,
+                ExecutionPolicy = requestedTrials is not null || trials is not null
+                    ? new AefExecutionPolicy { TrialsPerCase = requestedTrials ?? trials!.Count, Aggregation = AefTrialAggregation.MajorityVote }
+                    : null,
+            };
+            var (directory, runHash) = emptyResults
+                ? AefCompositeRunWriter.WriteAbortedEmpty(Path.Combine(root, "runs"), result, options, startedAt, endedAt)
+                : trials is null
+                ? AefCompositeRunWriter.Write(Path.Combine(root, "runs"), result, shape, options, startedAt, endedAt)
+                : abortReason is not null && !trialAggregationCompleted
+                    ? AefCompositeRunWriter.WriteAbortedTrials(Path.Combine(root, "runs"), trials, shape, options, startedAt, endedAt)
+                    : AefCompositeRunWriter.WriteTrials(Path.Combine(root, "runs"), result, trials,
+                        shape, options, startedAt, endedAt);
+            AefCliOptions.ReportSaved(directory, runHash, subjectVersion);
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -230,10 +294,15 @@ internal static class BenchAef
     /// answer or evidence text is written.
     /// </summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
-        AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel)
+        AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel) =>
+        TypedTree(result.QuestionResults, (result.OverallAccuracy ?? 0) / 100.0, vertical, judgeModel);
+
+    /// <summary>Maps observed questions; a null overall score withholds a partial benchmark's aggregate.</summary>
+    public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
+        IReadOnlyList<AgentEval.Memory.External.Models.QuestionResult> observed, double? overallScore, string vertical, string? judgeModel)
     {
         var ext = new Dictionary<string, System.Text.Json.Nodes.JsonObject>(StringComparer.Ordinal);
-        var questions = result.QuestionResults.Select(q =>
+        var questions = observed.Select(q =>
         {
             var outcome = q.TypedOutcome?.Outcome;
             // Unrun first: the runner marks a question it did not run as Unrun with an AgentError status.
@@ -262,7 +331,10 @@ internal static class BenchAef
         }).ToList();
         var root = new EvalResult(
             new EvalMetadata($"typedmemeval.{vertical}", $"TypedMemEval {vertical}", "typedmemeval", "1.0.0"),
-            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, "scored", false, null, "none", null),   // a percentage
+            new EvalScore(overallScore ?? 0, null, "scored", false, null, "none", null)
+            {
+                Measurement = overallScore is null ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
+            },
             new EvalDetails(null, null, null, questions, null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);

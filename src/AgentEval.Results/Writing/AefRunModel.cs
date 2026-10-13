@@ -798,7 +798,7 @@ public sealed record AefRunConfig
         {
             if (name == "thresholds")
             {
-                throw new ArgumentException("config.Settings holds 'thresholds': give them as Thresholds.");
+                throw new AefInputException("config.Settings holds 'thresholds': give them as Thresholds.");
             }
 
             json[name] = value?.DeepClone();

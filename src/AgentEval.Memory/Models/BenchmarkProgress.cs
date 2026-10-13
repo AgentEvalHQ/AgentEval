@@ -6,6 +6,8 @@ namespace AgentEval.Memory.Models;
 /// <summary>Progress update emitted after each benchmark category completes.</summary>
 public sealed record BenchmarkProgress
 {
+    /// <summary>The completed category, when supplied by the runner, for retaining observed results on interruption.</summary>
+    public BenchmarkCategoryResult? Result { get; init; }
     public required string CategoryName { get; init; }
     public required double Score { get; init; }
     public required bool Skipped { get; init; }

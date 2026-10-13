@@ -51,13 +51,29 @@ internal static class ProviderChatClientFactory
     /// </returns>
     public static (IChatClient? Client, string? Model, string? Diagnostic) TryCreate(string purpose, string? model = null, bool generousTimeout = false)
     {
+        var (client, resolved, diagnostic, _) = TryCreateWithEndpoint(purpose, model, generousTimeout);
+        return (client, resolved, diagnostic);
+    }
+
+    /// <summary>Returns the endpoint captured from the same settings that constructed the client.</summary>
+    internal static (IChatClient? Client, string? Model, string? Diagnostic, string? Endpoint) TryCreateWithEndpoint(
+        string purpose, string? model = null, bool generousTimeout = false)
+    {
+        var (client, resolved, diagnostic, endpoint, _) = TryCreateWithMetadata(purpose, model, generousTimeout);
+        return (client, resolved, diagnostic, endpoint);
+    }
+
+    /// <summary>Returns endpoint and provider from the same settings snapshot that constructed the client.</summary>
+    internal static (IChatClient? Client, string? Model, string? Diagnostic, string? Endpoint, string? Provider) TryCreateWithMetadata(
+        string purpose, string? model = null, bool generousTimeout = false)
+    {
         var settings = Settings;
         if (!settings.IsConfigured)
-            return (null, null, settings.Diagnostic ?? "No inference provider is configured.");
+            return (null, null, settings.Diagnostic ?? "No inference provider is configured.", null, null);
 
         var resolved = model ?? settings.Model;
         if (string.IsNullOrWhiteSpace(resolved))
-            return (null, null, $"{settings.DisplayName} is selected but names no model.");
+            return (null, null, $"{settings.DisplayName} is selected but names no model.", null, null);
 
         try
         {
@@ -80,7 +96,7 @@ internal static class ProviderChatClientFactory
                     .GetChatClient(resolved).AsIChatClient();
             }
 
-            return (CliChatClientDiagnostics.Wrap(client, purpose), resolved, null);
+            return (CliChatClientDiagnostics.Wrap(client, purpose, resolved), resolved, null, settings.Endpoint?.AbsoluteUri, settings.ProviderTag);
         }
         catch (Exception ex)
         {
@@ -90,7 +106,7 @@ internal static class ProviderChatClientFactory
             // endpoint; the full message stays out of the log.
             return (null, null,
                 $"Failed to construct the {settings.DisplayName} chat client ({ex.GetType().Name}) for " +
-                $"endpoint={SafeEndpoint(settings.Endpoint)}. Check the key and the endpoint.");
+                $"endpoint={SafeEndpoint(settings.Endpoint)}. Check the key and the endpoint.", null, null);
         }
     }
 

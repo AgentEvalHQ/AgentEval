@@ -97,6 +97,56 @@ public class BenchAgenticCommandTests : IDisposable
     private const string SuppliedQuestion = "Find ACME Corp's latest quarterly results.";
     private const string SuppliedAnswer = "I searched the filings: revenue was $4.2B, up 12% year over year.";
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(4, false)]
+    [InlineData(4, true)]
+    public async Task BenchAgentic_Cancelled_RetainsCompletedLeavesWithoutGate(int completed, bool noAef)
+    {
+        InitWorkspace();
+        using var cancel = new CancellationTokenSource();
+        var aef = new DirectoryInfo(Path.Combine(_root, "cancel-aef"));
+        var exit = await BenchAgenticCommand.RunAsync("rag-quality", "subject", _root, SuppliedQuestion, SuppliedAnswer,
+            evaluatorOverride: new CancellingEvaluator(cancel, completed), reference: SuppliedAnswer, context: SuppliedAnswer,
+            ct: cancel.Token, aef: aef, noAef: noAef);
+
+        Assert.Equal(1, exit);
+        if (noAef)
+        {
+            Assert.False(Directory.Exists(aef.FullName));
+            return;
+        }
+        var header = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(header)!;
+        var verified = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        Assert.Equal("aborted", (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        if (completed == 0)
+        {
+            Assert.Empty(lines);
+            return;
+        }
+        Assert.Contains(lines, l => (string?)l["state"] == "error");
+        if (completed > 0) Assert.Contains(lines, l => (string?)l["state"] == "passed");
+    }
+
+    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator
+    {
+        private int _calls;
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            if (Interlocked.Increment(ref _calls) > completed)
+            {
+                cancel.Cancel();
+                ct.ThrowIfCancellationRequested();
+            }
+            return new PassingStubEvaluator().EvaluateAsync(input, output, criteria, ct);
+        }
+    }
+
     private string[] WorkspaceFiles() =>
         Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(_root, f))

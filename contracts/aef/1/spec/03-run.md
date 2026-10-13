@@ -80,6 +80,8 @@ was kept.
   (`aggregation`, as a rollup's [RES-8]) and how many of them must pass for the case to pass (`requirePasses`, which
   an `aggregation` of `AtLeast` requires).
 - **[RUN-9] Judges.** `judges` lists the models that graded results (`model`, `provider`, `mode`, `rubricDigest`).
+  The list allows up to 4096 entries: a suite may use the same model with a different rubric for every criterion.
+  Keep those distinct instruments; do not truncate the list or discard known rubric identities to fit it.
   A judge's `mode` says how it graded: `single` when it graded results alone, `panel` when it was one of a panel that
   graded each result together (`panelSize` judges), `primary` or `shadow` beside another judge.
   A judge **MAY** carry `calibration`: how far it agreed with labelled cases before this run (`labelSet`, `n`,

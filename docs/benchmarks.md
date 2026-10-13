@@ -2,6 +2,13 @@
 
 > **Running industry-standard AI benchmarks and creating custom benchmark suites with AgentEval**
 
+Evaluating benchmark commands also write native [AEF evidence](aef.md)
+alongside their existing reports and store records. Use `--aef <dir>` for explicit output, `--no-aef` to disable
+it, `--subject-version <version>` to identify an exact subject build, and `--aef-key <pkcs8.pem>` to sign seals.
+Content capture defaults to off. Repeated runs retain trial trees and measured aggregate summaries;
+interrupted runs retain observed results without inventing a final gate. Explicit mock runs write AEF only
+when `--aef` is supplied and remain labelled `mocked`. See the [AEF guide](aef.md) for locations and write-failure behavior.
+
 AgentEval ships **12 benchmark families**, each registered in `BenchmarkFamilyRegistry` (`agenteval bench --list` enumerates them) with its own getting-started + plain-English explainer:
 
 | Family | What it measures | CLI | Docs |
@@ -104,6 +111,12 @@ PerformanceBenchmark is a pure-code measurement layer — no LLM judge involved.
 ## JSONL dataset loading
 
 Both the agentic suite and PerformanceBenchmark accept prompts loaded from JSONL files via `DatasetLoaderFactory`. JSONL is the industry-standard format for AI benchmark datasets (used by BFCL, GAIA, MMLU, GSM8K, ToolBench, etc.).
+
+For reproducible runs, `DatasetLoaderFactory.LoadSnapshotAsync(bytes, extension, requireExplicitIds: true)`
+parses the same UTF-8 bytes you retain or hash, without reopening a file. It supports the built-in JSON, JSONL,
+YAML, CSV and TSV formats. Explicit-ID mode refuses missing or duplicate IDs and preserves CSV IDs without
+trimming; CSV rows with empty inputs or ambiguous columns/quoting are refused. CSV snapshots use one physical
+line per record. Existing file-loading methods keep their current behavior and generated-ID defaults.
 
 ```csharp
 using AgentEval.DataLoaders;

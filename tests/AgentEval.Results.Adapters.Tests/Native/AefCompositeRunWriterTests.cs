@@ -18,6 +18,101 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Write_Usage_KeepsUnknownRolesAndOnlyTotalsCompleteCost(bool aborted, bool unknown)
+    {
+        var options = new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            AbortReason = aborted ? "cancelled" : null,
+            Usage = [new() { Role = AefUsageRole.Agent, Model = "subject", InputTokens = 10, CostUsd = 0.1, CostSource = "fixture" },
+                new() { Role = AefUsageRole.Judge, Model = "judge", CostUsd = unknown ? null : 0.2, CostSource = unknown ? null : "fixture" }],
+        };
+        var (dir, _) = aborted
+            ? AefCompositeRunWriter.WriteAbortedEmpty(_out, Leaf("case", "pass", 1), options, Start, Start.AddSeconds(1))
+            : AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed, options, Start, Start.AddSeconds(1));
+        var summary = AefTestRuns.Document(dir, "summary.json");
+        Assert.Equal(2, summary["usage"]!.AsArray().Count);
+        if (unknown) Assert.Null(summary["cost"]);
+        else Assert.Equal(0.3, (double)summary["cost"]!["totalUsd"]!, 8);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", false)]
+    [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", true)]
+    [InlineData("https://example.test/a%20b", "https://example.test/a%20b", false)]
+    [InlineData("not-an-endpoint?secret", null, false)]
+    [InlineData(null, null, false)]
+    public void Write_Endpoint_UsesSanitizedRunnerIdentity(string? endpoint, string? expected, bool aborted)
+    {
+        var options = new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            Endpoint = endpoint, AbortReason = aborted ? "cancelled" : null,
+        };
+        var (dir, _) = aborted
+            ? AefCompositeRunWriter.WriteAbortedEmpty(_out, Leaf("case", "pass", 1), options, Start, Start.AddSeconds(1))
+            : AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed, options, Start, Start.AddSeconds(1));
+        var text = File.ReadAllText(Path.Combine(dir, "run.json"));
+        var deployment = JsonNode.Parse(text)!["deployment"];
+        if (expected is null) Assert.Null(deployment);
+        else
+        {
+            Assert.Equal(expected, (string?)deployment!["endpoint"]);
+            var plan = new JsonObject { ["subject"] = new JsonObject { ["endpoint"] = expected } };
+            Assert.Equal(AgentEval.Results.Runner.AefPlanDefaults.DeploymentRef(plan), (string?)deployment["ref"]);
+        }
+        Assert.DoesNotContain("private", text);
+        Assert.DoesNotContain("secret", text);
+        Assert.DoesNotContain("token", text);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Fact]
+    public void Write_StoreV1Links_PreservesAggregateAndOrderedTrialIds()
+    {
+        var (dir, _) = AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+                StoreV1 = new() { RunId = "aggregate-1", TrialRunIds = ["trial-1", "trial-2"] },
+                Cli = new() { Verb = "bench test", GitCommit = new string('a', 40), GitBranch = "feature/test", GitDirty = true },
+            }, Start, Start.AddSeconds(1));
+        var header = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
+        Assert.Equal("1.0.0", (string?)header["suite"]!["version"]);
+        var link = header["ext"]!["agenteval.store-v1"]!;
+        Assert.Equal("aggregate-1", (string?)link["runId"]);
+        Assert.Equal(new[] { "trial-1", "trial-2" }, link["trialRunIds"]!.AsArray().Select(n => (string)n!));
+        Assert.NotEqual("aggregate-1", (string?)header["runId"]);
+        Assert.Equal("bench test", (string?)AefTestRuns.Document(dir, "run.json")["ext"]!["agenteval.cli"]!["verb"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Theory]
+    [InlineData("C:\\private\\run")]
+    [InlineData("/private/run")]
+    [InlineData("../run")]
+    public void Write_StoreV1Path_RejectsBeforeWriting(string identity)
+    {
+        Assert.Throws<ArgumentException>(() => AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
+                StoreV1 = new() { RunId = identity },
+            }, Start, Start.AddSeconds(1)));
+        Assert.False(Directory.Exists(_out));
+    }
+
     private static EvalResult Leaf(string key, string label, double value, string type = "atomic-code", string? judge = null, string severity = "none") => new(
         new(key, key, "test", "1.0.0"),
         new EvalScore(value, null, label, label == "pass", null, label == "pass" ? "none" : severity, null),
@@ -33,6 +128,239 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Start);
 
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
+
+    [Fact]
+    public void Write_SameModelDifferentProviders_PreservesDistinctJudgesAndUnknown()
+    {
+        var leaves = new[] { "provider-a", "provider-b", null }.Select((provider, i) =>
+        {
+            var leaf = Leaf("case" + i, "pass", 1, "atomic-llm", "same-model");
+            return leaf with { Provenance = leaf.Provenance with { JudgeProvider = provider } };
+        }).ToArray();
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), leaves);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(new[] { "provider-a", "provider-b", null }, judges.Select(j => (string?)j!["provider"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Write_ExplicitPanel_PreservesConfiguredSizeAndSeparateAdjudicator(bool panel, bool adjudicated)
+    {
+        var member = Composite("member", "pass", 1, null, new EvalLineage("threshold", []),
+            Leaf("criterion1", "pass", 1, "atomic-llm", "judge-a"),
+            Leaf("criterion2", "pass", 1, "atomic-llm", "judge-a"));
+        var children = new List<EvalResult> { member, Leaf("failed-judge", "error", 0, "atomic-llm", "not-measured") };
+        if (adjudicated) children.Add(Leaf("adjudicator", "pass", 1, "atomic-decision", "judge-b"));
+        var result = Composite("panel", "pass", 1, null, new EvalLineage("threshold", []), children.ToArray());
+        result = result with { Provenance = result.Provenance with { JudgePanelSize = panel ? 2 : null } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, result, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(adjudicated ? 2 : 1, judges.Count);
+        Assert.Equal("judge-a", (string?)judges[0]!["model"]);
+        Assert.Equal(panel ? "panel" : "single", (string?)judges[0]!["mode"]);
+        Assert.Equal(panel ? 2 : (int?)null, (int?)judges[0]!["panelSize"]);
+        if (adjudicated)
+        {
+            Assert.Equal("judge-b", (string?)judges[1]!["model"]);
+            Assert.Equal("single", (string?)judges[1]!["mode"]);
+            Assert.Null(judges[1]!["panelSize"]);
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
+    [InlineData("atomic-llm", false)]
+    [InlineData("atomic-llm", true)]
+    [InlineData("atomic-decision", false)]
+    [InlineData("atomic-decision", true)]
+    [InlineData("atomic-code", false)]
+    [InlineData("atomic-code", true)]
+    public void Write_LeafAnnotator_PreservesModelRubricAndContentPolicy(string type, bool capture)
+    {
+        var leaf = Leaf("case", "pass", 1, type, type == "atomic-code" ? null : "judge");
+        var digest = "sha256:" + new string('c', 64);
+        leaf = leaf with { Provenance = leaf.Provenance with { RubricDigest = digest } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, leaf, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+                ContentCapture = capture ? AefContentCapture.On : AefContentCapture.Off,
+            }, Start, Start.AddSeconds(1));
+        var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
+        var modelJudged = type != "atomic-code";
+        Assert.Equal(modelJudged ? "LLM" : "CODE", (string?)line["annotator"]!["kind"]);
+        Assert.Equal(modelJudged ? "judge" : null, (string?)line["annotator"]!["model"]);
+        Assert.Equal(modelJudged ? digest : null, (string?)line["annotator"]!["rubricDigest"]);
+        Assert.Null(line["annotator"]!["promptHash"]);
+        Assert.Equal(capture && modelJudged, line["reasoning"] is not null);
+        if (!capture) Assert.DoesNotContain("secret", File.ReadAllText(Path.Combine(dir, "results.ndjson")));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Fact]
+    public void Write_SameModelDifferentRubrics_PreservesDistinctInstrumentsAndLegacyAbsence()
+    {
+        var first = Leaf("first", "pass", 1, "atomic-llm", "judge");
+        first = first with { Provenance = first.Provenance with { RubricDigest = "sha256:" + new string('a', 64) } };
+        var second = first with { Metric = first.Metric with { Key = "second" },
+            Provenance = first.Provenance with { RubricDigest = "sha256:" + new string('b', 64) } };
+        var legacy = Leaf("legacy", "pass", 1, "atomic-llm", "judge");
+        legacy = legacy with { Provenance = legacy.Provenance with { PromptHash = "0123456789abcdef" } };
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), first, second, legacy);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(3, judges.Count);
+        Assert.Equal(first.Provenance.RubricDigest, (string?)judges[0]!["rubricDigest"]);
+        Assert.Equal(second.Provenance.RubricDigest, (string?)judges[1]!["rubricDigest"]);
+        Assert.Null(judges[2]!["rubricDigest"]);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Write_MoreThan64Rubrics_PreservesEveryInstrumentInSignedEvidence(bool aborted)
+    {
+        var leaves = Enumerable.Range(0, 65).Select(i =>
+        {
+            var leaf = Leaf($"criterion-{i}", "pass", 1, "atomic-llm", "judge");
+            return leaf with { Provenance = leaf.Provenance with { RubricDigest = $"sha256:{i:x64}" } };
+        }).ToArray();
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), leaves);
+        using var signer = AgentEval.Results.Signatures.EcdsaP256Signer.Generate();
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+                Signer = signer, AbortReason = aborted ? "report-error" : null,
+            }, Start, Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.Equal(leaves.Select(l => l.Provenance.RubricDigest), judges.Select(j => (string?)j!["rubricDigest"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Fact]
+    public void WriteAbortedEmpty_NoCompletedEvaluation_WritesNoPlannedResultsOrJudges()
+    {
+        var preset = Composite("preset", "error", 0, null, new EvalLineage("required-error", []),
+            Leaf("planned", "pass", 1, "atomic-llm", "not-called"));
+        var (dir, _) = AefCompositeRunWriter.WriteAbortedEmpty(_out, preset, new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+            AbortReason = "cancelled",
+            ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 3, Aggregation = AefTrialAggregation.MajorityVote },
+        }, Start, Start.AddSeconds(1));
+
+        Assert.Empty(File.ReadAllBytes(Path.Combine(dir, "results.ndjson")));
+        var header = AefTestRuns.Document(dir, "run.json");
+        Assert.Equal("aborted", (string?)header["status"]);
+        Assert.Null(header["judges"]);
+        Assert.Equal(3, (int)header["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WriteAbortedTrials_DifferentLeafBreakdowns_PreservesOnlyObservedPathsAndExactRollups(bool captureContent)
+    {
+        var first = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []),
+            Composite("leaf", "pass", 1, null, new EvalLineage("threshold", []), Leaf("claim", "pass", 1)));
+        var second = Composite("preset", "error", 0, null, new EvalLineage("required-error", []), Leaf("leaf", "error", 0));
+        var (dir, _) = AefCompositeRunWriter.WriteAbortedTrials(_out, [first, second],
+            new AefComponentShape(1, true, "Averaged", [Leaf()]), new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+                AbortReason = "cancelled",
+                ContentCapture = captureContent ? AefContentCapture.On : AefContentCapture.Off,
+                ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 3, Aggregation = AefTrialAggregation.MajorityVote },
+            }, Start, Start.AddSeconds(1));
+
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(5, lines.Count);
+        Assert.Equal(captureContent, lines.Any(l => l["evidence"] is not null));
+        Assert.All(lines.Where(l => l["trial"] is null), l => Assert.Null(l["evidence"]));
+        var roots = lines.Where(l => (string?)l["path"] == "case").ToList();
+        Assert.Equal(2, (int)Assert.Single(roots, l => l["trials"] is not null)["trials"]!["n"]!);
+        var claim = Assert.Single(lines, l => (string?)l["path"] == "case/claim" && l["trials"] is not null);
+        Assert.Equal(1, (int)claim["trials"]!["n"]!);
+        Assert.Equal("error", (string?)claim["state"]);
+        Assert.DoesNotContain(lines, l => (string?)l["path"] == "case/claim" && (int?)l["trial"] == 1);
+        Assert.Equal(3, (int)AefTestRuns.Document(dir, "run.json")["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    [Fact]
+    public void Write_AbortedTree_RetainsMeasuredChildrenWithoutGateOrInventedParentScore()
+    {
+        var interrupted = Leaf("interrupted", "error", 0);
+        interrupted = interrupted with { Score = interrupted.Score with { Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured } };
+        var article = Composite("article", "error", 0, null, new EvalLineage("required-error", []),
+            Leaf("finished", "pass", 1), interrupted);
+        var preset = Composite("preset", "error", 0, null, new EvalLineage("required-error", []), article);
+        var shape = new AefComponentShape(1, true, "Averaged", [new(1, true, "Averaged", [Leaf(), Leaf()])]);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, shape, new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+            AbortReason = "cancelled",
+            Gate = new AefCommandGate { GateId = "gate:bench", Rule = "label:pass", ExitCode = 0, Outcome = AefGateOutcome.Ship },
+        }, Start, Start.AddSeconds(1));
+
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        Assert.Equal("aborted", (string?)AefTestRuns.Document(dir, "run.json")["status"]);
+        Assert.Null(AefTestRuns.Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(3, lines.Count);
+        Assert.Equal("passed", (string?)Assert.Single(lines, l => (string?)l["path"] == "case/finished")["state"]);
+        foreach (var line in lines.Where(l => (string?)l["state"] == "error")) Assert.Null(line["scores"]);
+    }
 
     [Fact]
     public void Write_RecordsTheTree_ItsRulesAndComponents_IntactUnderBothVerifiers()
@@ -54,11 +382,16 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         var (dir, _) = AefCompositeRunWriter.Write(_out, preset, shape, new AefCompositeRunOptions
         {
             SubjectRef = "agent:support", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/standard",
+            Gate = new AefCommandGate { GateId = "gate:bench", Rule = "label:fail", ExitCode = 9, Outcome = AefGateOutcome.NoShip },
         }, Start, Start.AddMinutes(2));
 
         var verification = AefRunVerifier.Verify(dir);
         Assert.Equal(AefOutcome.Intact, verification.Outcome);
         Assert.Empty(verification.Problems);
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal(9, (int)gate["exitCode"]!);
+        Assert.Equal("no_ship", (string?)gate["outcome"]);
+        Assert.Equal(2, gate["inputs"]!["results"]!.AsArray().Count);
         if (AefTestRuns.ReferenceVerify(dir) is { } reference)
         {
             Assert.Equal("intact", (string?)reference["outcome"]);
@@ -90,6 +423,13 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
         var summary = AefTestRuns.Document(dir, "summary.json");
         Assert.Equal("fail", (string?)summary["ext"]!["agenteval.bench"]!["label"]);
+        var entries = summary["lanes"]![0]!["metrics"]!.AsArray();
+        var mean = Assert.Single(entries, e => (string?)e!["metric"] == "score")!;
+        var aggregate = Assert.Single(entries, e => (string?)e!["metric"] == "preset-score")!;
+        Assert.Equal(0.55, (double)mean["value"]!);
+        Assert.Equal(0.4, (double)aggregate["value"]!);
+        Assert.Equal("failed", (string?)aggregate["verdict"]);
+        Assert.Equal("agenteval.weightedsum", (string?)aggregate["aggregate"]!["method"]);
         var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.DoesNotContain("secret", all, StringComparison.Ordinal);   // summaries and recommendations are content
     }
@@ -113,6 +453,60 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Assert.Equal("Own", (string?)lines["case"]["aggregation"]!["strategy"]);
         Assert.Equal(0.0, (double)lines["case/2"]["component"]!["weight"]!);
         Assert.Equal("failed", (string?)lines["case/2"]["state"]);
+    }
+
+    [Fact]
+    public void WriteTrials_PreservesTreesDisagreementAndAbsences_IntactUnderBothVerifiers()
+    {
+        EvalResult Preset(string label, string childLabel, double value) =>
+            Composite("p", label, value, 0.7, new EvalLineage("threshold", []),
+                Composite("article", label, value, 0.7, new EvalLineage("threshold", []), Leaf("judge", childLabel, value, "atomic-llm", "judge-x")));
+        var trials = new[] { Preset("pass", "pass", 1), Preset("fail", "fail", 0), Preset("error", "error", 0) };
+        var rollup = Preset("fail", "fail", 0.5);
+        var shape = new AefComponentShape(1, true, "Averaged", [new(1, true, "Averaged", [Leaf()])]);
+        var (dir, _) = AefCompositeRunWriter.WriteTrials(_out, rollup, trials, shape,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/x" },
+            Start, Start.AddMinutes(1));
+
+        var verification = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        Assert.Equal(8, lines.Count);
+        foreach (var root in lines.Where(l => (string?)l["path"] == "case"))
+        {
+            var child = Assert.Single(lines, l => (string?)l["parentResultId"] == (string?)root["resultId"]);
+            Assert.Equal((int?)root["trial"], (int?)child["trial"]);
+        }
+        foreach (var aggregate in lines.Where(l => l["trial"] is null))
+        {
+            Assert.Equal(3, (int)aggregate["trials"]!["n"]!);
+            Assert.Equal(1, (int)aggregate["trials"]!["passed"]!);
+            Assert.False((bool)aggregate["trials"]!["agree"]!);
+            Assert.Null(aggregate["annotator"]);
+        }
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Write_WithheldPresetScore_DoesNotPublishItsPlaceholderAsAnAggregate()
+    {
+        var preset = Composite("p", "warn", 0, 0.7, new EvalLineage("required-error", []), Leaf("a", "pass", 0.8));
+        preset = preset with { Score = preset.Score with { Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/x" },
+            Start, Start.AddMinutes(1));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        var metrics = AefTestRuns.Document(dir, "summary.json")["lanes"]![0]!["metrics"]!.AsArray();
+        Assert.Equal(0.8, (double)Assert.Single(metrics, m => (string?)m!["metric"] == "score")!["value"]!);
+        var aggregate = Assert.Single(metrics, m => (string?)m!["metric"] == "preset-score")!;
+        Assert.Equal("not_measured", (string?)aggregate["verdict"]);
+        Assert.Null(aggregate["value"]);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+            Assert.Equal("intact", (string?)reference["outcome"]);
     }
 
     [Fact]

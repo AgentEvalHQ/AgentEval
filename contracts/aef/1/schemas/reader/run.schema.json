@@ -242,7 +242,7 @@
     "judges": {
       "description": "The models that graded results, in order. The judges and rubrics comparability axes compare this list in order (RUN-9, LANE-6).",
       "type": "array",
-      "maxItems": 64,
+      "maxItems": 4096,
       "items": {
         "type": "object",
         "required": [

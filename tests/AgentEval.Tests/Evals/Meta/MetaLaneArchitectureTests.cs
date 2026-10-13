@@ -121,7 +121,7 @@ public class MetaLaneArchitectureTests
     // ── §4.2's style rule, and the escape hatch it exists to watch ─────────────────────────────
 
     [Fact]
-    public void Measurement_IsOnlyAssigned_InsideEvalScoreItself()
+    public void Measurement_RestrictedStatesAreOnlyAssigned_InsideEvalScoreItself()
     {
         // Two greps, one test:
         //   (a) `Measurement = MeasurementState.NotApplicable` outside EvalScore.NotApplicable() —
@@ -153,7 +153,9 @@ public class MetaLaneArchitectureTests
                 var line = lines[i];
                 if (line.TrimStart().StartsWith("//", StringComparison.Ordinal)) continue;
                 if (line.TrimStart().StartsWith("///", StringComparison.Ordinal)) continue;
-                if (!line.Contains("Measurement = MeasurementState.", StringComparison.Ordinal)) continue;
+                // NotMeasured is the legal timeout/interruption path described above. Only the
+                // applicability factory and promotion back to Measured are restricted by §4.2.
+                if (!IsRestrictedMeasurementAssignment(line)) continue;
 
                 var assignsMeasured = line.Contains("Measurement = MeasurementState.Measured", StringComparison.Ordinal);
                 if (assignsMeasured || !isEvalScore)
@@ -178,6 +180,20 @@ public class MetaLaneArchitectureTests
 
         Assert.Empty(offenders);
     }
+
+    [Theory]
+    [InlineData("new EvalScore() { Measurement = MeasurementState.NotApplicable }", true)]
+    [InlineData("score with { Measurement = MeasurementState.Measured, Passed = true }", true)]
+    [InlineData("new EvalScore() { Measurement = MeasurementState.NotMeasured }", false)]
+    [InlineData("score with { Measurement = MeasurementState.NotMeasured }", false)]
+    [InlineData("Passed = false", false)]
+    public void MeasurementAssignmentMatcher_RestrictsApplicabilityAndPromotion_NotOperationalFailure(
+        string source, bool restricted)
+        => Assert.Equal(restricted, IsRestrictedMeasurementAssignment(source));
+
+    private static bool IsRestrictedMeasurementAssignment(string line) =>
+        line.Contains("Measurement = MeasurementState.NotApplicable", StringComparison.Ordinal)
+        || line.Contains("Measurement = MeasurementState.Measured", StringComparison.Ordinal);
 
     private static string? FindRepoRoot()
     {

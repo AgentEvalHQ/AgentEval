@@ -95,9 +95,47 @@ public class EvalResultPersistenceTests
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     [Fact]
+    public void ToScenarioResult_DistinctFullDigestsWithSameShortHash_RemainIncomparableAfterSerialization()
+    {
+        ScenarioResult Stored(char digest)
+        {
+            var result = MakeAtomicResult();
+            result = result with
+            {
+                Score = result.Score with { Threshold = 0.7 },
+                Provenance = result.Provenance with { PromptHash = "legacy-collision", RubricDigest = "sha256:" + new string(digest, 64) },
+            };
+            var scenario = EvalResultPersistence.ToScenarioResult(result, "same-case", "Same case", input: "same stimulus");
+            return JsonSerializer.Deserialize<ScenarioResult>(JsonSerializer.Serialize(scenario, s_jsonOpts), s_jsonOpts)!;
+        }
+
+        var a = Stored('a');
+        var b = Stored('b');
+        Assert.Equal("sha256:" + new string('a', 64), a.Comparability!.Judge!.RubricDigest);
+        Assert.Equal("legacy-collision", EvalResultPersistence.FromScenarioResult(a)!.Provenance.PromptHash);
+        Assert.Equal(ComparisonVerdict.Comparable, RunComparison.Of([a], [Stored('a')]).Verdict);
+        var comparison = RunComparison.Of([a], [b]);
+        Assert.Equal(ComparisonVerdict.Incomparable, comparison.Verdict);
+        Assert.Equal(ComparabilityAxisState.Mismatch,
+            comparison.Scenarios.Single().Axes.Single(axis => axis.Name == "judge.rubricDigest").State);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("legacy-hash")]
+    public void ToScenarioResult_NoFullDigest_PreservesLegacyFingerprint(string? shortHash)
+    {
+        var result = MakeAtomicResult();
+        result = result with { Provenance = result.Provenance with { PromptHash = shortHash } };
+        var scenario = EvalResultPersistence.ToScenarioResult(result, "case", "Case");
+        Assert.Equal(shortHash, scenario.Comparability!.Judge!.RubricDigest);
+    }
+
+    [Fact]
     public void ToScenarioResult_ThenFromScenarioResult_RoundTripPreservesStructure()
     {
         var original = MakeAtomicResult();
+        original = original with { Provenance = original.Provenance with { RubricDigest = "sha256:" + new string('a', 64), JudgeProvider = "test-provider" } };
         var sr = EvalResultPersistence.ToScenarioResult(original, "scen-001", "Acknowledgment Scenario");
         var restored = EvalResultPersistence.FromScenarioResult(sr);
 
@@ -110,6 +148,7 @@ public class EvalResultPersistenceTests
     public void ToScenarioResult_ThenFromScenarioResult_RecursiveCompositeRoundTrip()
     {
         var deep = MakeDeepComposite();
+        deep = deep with { Provenance = deep.Provenance with { JudgePanelSize = deep.Details.SubResults!.Count } };
         var sr = EvalResultPersistence.ToScenarioResult(deep, "scen-deep", "Deep Composite");
         var restored = EvalResultPersistence.FromScenarioResult(sr);
 

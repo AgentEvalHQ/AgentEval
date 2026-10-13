@@ -43,7 +43,7 @@ internal static class GatekeeperModelResolver
                     return new(null, null, ExitCodes.UsageError);
                 }
 
-                var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey), "judge");
+                var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey), "judge", deploymentName);
                 return new(c, Fingerprint("azure", azEndpoint, deploymentName!), ExitCodes.Success);
             }
 
@@ -55,7 +55,7 @@ internal static class GatekeeperModelResolver
                     return new(null, null, ExitCodes.UsageError);
                 }
 
-                var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint!, model!, apiKey), "judge");
+                var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint!, model!, apiKey), "judge", model);
                 return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
             }
 
@@ -73,7 +73,7 @@ internal static class GatekeeperModelResolver
                 var client = provider.UsesAzureProtocol
                     ? EndpointFactory.CreateAzure(providerEndpoint, provider.Model!, key)
                     : EndpointFactory.CreateOpenAICompatible(providerEndpoint, provider.Model!, key);
-                return new(CliChatClientDiagnostics.Wrap(client, "judge"),
+                return new(CliChatClientDiagnostics.Wrap(client, "judge", provider.Model),
                     Fingerprint(provider.ProviderTag, providerEndpoint, provider.Model!), ExitCodes.Success);
             }
 

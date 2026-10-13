@@ -11,12 +11,60 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Maps a red-team scan to AEF probe lines (S1 #5a): a line per probe at <c>probe</c>, case
 /// <c>&lt;attack&gt;/&lt;probe&gt;</c> (a <c>--transform</c> codec is already part of the probe id), and a line per benign
-/// control at <c>control</c>, case <c>benign/&lt;probe&gt;</c>. No prompt, response, grader reason or error message is
-/// carried: reasons name the kind of absence only ([RUN-11]).
+/// control at <c>control</c>, case <c>benign/&lt;probe&gt;</c>. Content is omitted by default; explicit capture carries
+/// observed content separately. Structural reasons name the kind of absence only ([RUN-11]).
 /// </summary>
 internal static class RedTeamAef
 {
-    public static IReadOnlyList<AefProbeLine> Lines(RedTeamResult result)
+    internal static IDisposable BeginProbeScope(IAttackType attack, AttackProbe probe, bool control) =>
+        AgentEval.Cli.Infrastructure.CliUsageMeter.Attribute(caseId: control ? $"benign/{probe.Id}" : $"{attack.Name}/{probe.Id}");
+
+    /// <summary>Thread-safe capture of completed probes, including an attack interrupted before it could return.</summary>
+    internal sealed class PartialScan(string agentName)
+    {
+        private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
+        private readonly object _sync = new();
+        private readonly Dictionary<IAttackType, List<ProbeResult>> _attacks = new();
+        private readonly List<ProbeResult> _controls = [];
+
+        public void Add(IAttackType attack, ProbeResult result, bool control)
+        {
+            lock (_sync)
+            {
+                if (control)
+                    _controls.Add(result);
+                else
+                {
+                    if (!_attacks.TryGetValue(attack, out var probes))
+                        _attacks.Add(attack, probes = []);
+                    probes.Add(result);
+                }
+            }
+        }
+
+        public RedTeamResult Snapshot()
+        {
+            lock (_sync)
+            {
+                return new RedTeamResult
+                {
+                    AgentName = agentName,
+                    StartedAt = _startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    AttackResults = _attacks.Select(pair => new AttackResult
+                    {
+                        AttackName = pair.Key.Name, AttackDisplayName = pair.Key.DisplayName,
+                        OwaspId = pair.Key.OwaspLlmId, MitreAtlasIds = pair.Key.MitreAtlasIds.ToArray(),
+                        NotMeasurableReason = pair.Key.NotMeasurableReason, Severity = pair.Key.DefaultSeverity,
+                        ProbeResults = pair.Value.OrderBy(p => p.ProbeId, StringComparer.Ordinal).ToList(),
+                    }).ToList(),
+                    BenignControlResults = _controls.ToList(),
+                };
+            }
+        }
+    }
+
+    public static IReadOnlyList<AefProbeLine> Lines(RedTeamResult result, bool captureContent = false)
     {
         var lines = new List<AefProbeLine>();
         foreach (var attack in result.AttackResults)
@@ -37,6 +85,8 @@ internal static class RedTeamAef
                 lines.Add(new AefProbeLine
                 {
                     CaseId = $"{attack.AttackName}/{probe.ProbeId}",
+                    Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase($"{attack.AttackName}/{probe.ProbeId}"),
+                    Content = captureContent ? Content(probe) : null,
                     State = state,
                     Reason = state switch
                     {
@@ -55,6 +105,7 @@ internal static class RedTeamAef
                     Turns = probe.TurnsUsed,
                     DurationMs = probe.Duration?.TotalMilliseconds,
                     Annotator = state is AefState.Error or AefState.NotApplicable ? null : Grader(probe),
+                    RubricDigest = Grader(probe) == AefAnnotatorKind.Llm ? probe.Grading?.RubricDigest : null,
                 });
             }
         }
@@ -71,12 +122,20 @@ internal static class RedTeamAef
             lines.Add(new AefProbeLine
             {
                 CaseId = $"benign/{control.ProbeId}",
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase($"benign/{control.ProbeId}"),
+                Content = captureContent ? Content(control, judgeGraded: control.GradedBy == GradingProvenanceKind.Judge) : null,
                 Control = true,
                 State = state,
                 Reason = state == AefState.Error ? ErrorReason(control.ErrorKind) : null,
                 DurationMs = control.Duration?.TotalMilliseconds,
-                // The over-refusal judge grades every benign control.
-                Annotator = state == AefState.Error ? null : AefAnnotatorKind.Llm,
+                // The prefilter can answer without calling the model; absent provenance stays unknown.
+                Annotator = state == AefState.Error ? null : control.GradedBy switch
+                {
+                    GradingProvenanceKind.Judge => AefAnnotatorKind.Llm,
+                    GradingProvenanceKind.Heuristic => AefAnnotatorKind.Code,
+                    _ => null,
+                },
+                RubricDigest = control.GradedBy == GradingProvenanceKind.Judge ? control.RubricDigest : null,
             });
         }
 
@@ -85,6 +144,16 @@ internal static class RedTeamAef
 
     private static AefAnnotatorKind Grader(ProbeResult probe) =>
         probe.Grading?.ShippedBy == GradingProvenanceKind.Judge ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code;
+
+    private static AefNativeContent Content(ProbeResult probe, bool judgeGraded = false) => new()
+    {
+        Input = probe.Prompt,
+        // Folded probes store their transcript in Response, not a single subject output.
+        Output = probe.TurnsUsed is null && probe.NodesExplored is null ? probe.Response : null,
+        Transcript = probe.TurnsUsed is not null || probe.NodesExplored is not null ? probe.Response : null,
+        JudgeReasoning = probe.Rationale ?? ((judgeGraded || Grader(probe) == AefAnnotatorKind.Llm) && !probe.HasError ? probe.Reason : null),
+        Document = probe.HasError ? null : probe.Reason,
+    };
 
     private static string ErrorReason(ProbeErrorKind kind) => kind switch
     {

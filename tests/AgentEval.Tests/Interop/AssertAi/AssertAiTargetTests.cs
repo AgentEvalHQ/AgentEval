@@ -17,6 +17,7 @@ namespace AgentEval.Tests.Interop.AssertAi;
 /// endpoint's reply (assert-ai 0.3.0, <c>core/session.py</c> and <c>stages/inference.py</c>); it is checked against
 /// ASSERT's own test of that code first, then used to show what ASSERT's judge sees of our replies.
 /// </summary>
+[Collection(AssertHttpServerCollection.Name)]
 public class AssertAiTargetTests
 {
     private static readonly string Fixtures = AssertAiRunTests.Fixtures;

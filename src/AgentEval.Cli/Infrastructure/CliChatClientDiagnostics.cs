@@ -20,6 +20,7 @@ internal static class CliChatClientDiagnostics
     /// <summary>Applies every active CLI diagnostic wrap to <paramref name="client"/>, in order.</summary>
     /// <param name="client">The chat client to observe.</param>
     /// <param name="label">A short role label (e.g. "sut"/"judge"/"attacker") passed to every active wrap.</param>
-    public static IChatClient Wrap(IChatClient client, string? label = null) =>
-        FixtureCapture.Wrap(VerboseLog.Wrap(client, label), label);
+    /// <param name="model">Configured model identity when known; a reported response model takes precedence for usage.</param>
+    public static IChatClient Wrap(IChatClient client, string? label = null, string? model = null) =>
+        CliUsageMeter.Wrap(FixtureCapture.Wrap(VerboseLog.Wrap(client, label), label), label, model);
 }

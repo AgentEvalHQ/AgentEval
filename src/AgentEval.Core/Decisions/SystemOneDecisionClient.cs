@@ -35,7 +35,7 @@ namespace AgentEval.Decisions;
 /// </para>
 /// </remarks>
 [Experimental(DecisionsPreview.DiagnosticId)]
-public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
+public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable, AgentEval.Core.IJudgeProviderSource
 {
     private static readonly TimeSpan s_defaultTimeout = TimeSpan.FromSeconds(60);
 

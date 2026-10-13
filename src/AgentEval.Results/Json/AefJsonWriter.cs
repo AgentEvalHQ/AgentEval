@@ -32,7 +32,7 @@ public static class AefJsonWriter
     /// Its size limit ([ENC-17]): <see cref="AefLimits.MaxJsonBytes"/>, or for a seal or an envelope
     /// <see cref="AefLimits.MaxSealBytes"/> or <see cref="AefLimits.MaxEnvelopeBytes"/> (<see cref="AefLimits.MaxBytesOf"/> gives it by path).
     /// </param>
-    /// <exception cref="ArgumentException">A value a reader would refuse, or a document beyond the limits.</exception>
+    /// <exception cref="AefInputException">A value a reader would refuse, or a document beyond the limits.</exception>
     public static byte[] Document(JsonObject document, int maxBytes = AefLimits.MaxJsonBytes)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -40,12 +40,12 @@ public static class AefJsonWriter
         Write(output, document, indent: 0, indented: true, depth: 1);
         output.Write("\n"u8);
         return output.WrittenCount > maxBytes
-            ? throw new ArgumentException($"The document is {output.WrittenCount} bytes: this JSON file is at most {maxBytes} ([ENC-17]).", nameof(document))
+            ? throw new AefInputException($"The document is {output.WrittenCount} bytes: this JSON file is at most {maxBytes} ([ENC-17]).", nameof(document))
             : output.WrittenSpan.ToArray();
     }
 
     /// <summary>One NDJSON line ([ENC-5]): the object on one line, ending in LF.</summary>
-    /// <exception cref="ArgumentException">A value a reader would refuse, or a line beyond the limits.</exception>
+    /// <exception cref="AefInputException">A value a reader would refuse, or a line beyond the limits.</exception>
     public static byte[] Line(JsonObject line)
     {
         ArgumentNullException.ThrowIfNull(line);
@@ -53,7 +53,7 @@ public static class AefJsonWriter
         Write(output, line, indent: 0, indented: false, depth: 1);
         if (output.WrittenCount > AefLimits.MaxJsonBytes)
         {
-            throw new ArgumentException($"The line is {output.WrittenCount} bytes: an NDJSON line is at most {AefLimits.MaxJsonBytes} ([ENC-17]).", nameof(line));
+            throw new AefInputException($"The line is {output.WrittenCount} bytes: an NDJSON line is at most {AefLimits.MaxJsonBytes} ([ENC-17]).", nameof(line));
         }
 
         output.Write("\n"u8);
@@ -64,7 +64,7 @@ public static class AefJsonWriter
     /// Any JSON value on one line, with no LF: the same rules for values, without the limits of an AEF file (a tool's
     /// output, such as the conformance driver's).
     /// </summary>
-    /// <exception cref="ArgumentException">A value a reader would refuse.</exception>
+    /// <exception cref="AefInputException">A value a reader would refuse.</exception>
     public static byte[] Compact(JsonNode? value)
     {
         var output = new ArrayBufferWriter<byte>();
@@ -73,12 +73,12 @@ public static class AefJsonWriter
     }
 
     /// <summary>A number as AEF writes it: plain digits for an integral value within ±(2^53 − 1), else the shortest text that reads back as the same binary64 value.</summary>
-    /// <exception cref="ArgumentException">NaN or an infinity ([ENC-3]).</exception>
+    /// <exception cref="AefInputException">NaN or an infinity ([ENC-3]).</exception>
     public static string FormatNumber(double value)
     {
         if (!double.IsFinite(value))
         {
-            throw new ArgumentException($"{value} is not a finite number: JSON has no NaN or infinity ([ENC-3]).", nameof(value));
+            throw new AefInputException($"{value} is not a finite number: JSON has no NaN or infinity ([ENC-3]).", nameof(value));
         }
 
         return Math.Floor(value) == value && Math.Abs(value) <= MaxExactInteger
@@ -145,7 +145,7 @@ public static class AefJsonWriter
     {
         if (depth > AefLimits.MaxDepth)
         {
-            throw new ArgumentException($"Nested deeper than {AefLimits.MaxDepth} objects and arrays ([ENC-17]).");
+            throw new AefInputException($"Nested deeper than {AefLimits.MaxDepth} objects and arrays ([ENC-17]).");
         }
     }
 
@@ -178,7 +178,7 @@ public static class AefJsonWriter
                 output.Write("null"u8);
                 break;
             default:
-                throw new ArgumentException($"A value of kind {value.GetValueKind()} is not JSON.");
+                throw new AefInputException($"A value of kind {value.GetValueKind()} is not JSON.");
         }
     }
 
@@ -197,7 +197,7 @@ public static class AefJsonWriter
         }
         catch (ArgumentException e)
         {
-            throw new ArgumentException($"A number JSON cannot hold ([ENC-3]): {e.Message}", e);
+            throw new AefInputException($"A number JSON cannot hold ([ENC-3]): {e.Message}", e);
         }
 
         return double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
@@ -218,7 +218,7 @@ public static class AefJsonWriter
 
             if (char.IsSurrogate(c))
             {
-                throw new ArgumentException($"A string holds an unpaired surrogate (\\u{(int)c:x4}) at {i} ([ENC-2]).");
+                throw new AefInputException($"A string holds an unpaired surrogate (\\u{(int)c:x4}) at {i} ([ENC-2]).");
             }
 
             if (c is not ('"' or '\\') && c >= 0x20)

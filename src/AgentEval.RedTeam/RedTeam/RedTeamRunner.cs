@@ -274,6 +274,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
 
             probeResults.Add(probeResult);
             onCompleted?.Invoke(probeResult);
+            options.OnProbeCompleted?.Invoke(attack, probeResult, !allowExplain);
             completedProbes++;
             lastOutcome = probeResult.Outcome;
 
@@ -340,6 +341,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                         var r = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken).ConfigureAwait(false);
                         indexed[idx] = r;
                         onCompleted?.Invoke(r);
+                        options.OnProbeCompleted?.Invoke(attack, r, !allowExplain);
 
                         if (stopOnSucceeded && r.Outcome == EvaluationOutcome.Succeeded)
                             Interlocked.Exchange(ref failFastHit, 1);
@@ -400,6 +402,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
         bool allowExplain,
         CancellationToken cancellationToken)
     {
+        using var scope = options.BeginProbeScope?.Invoke(attack, probe, !allowExplain);
         var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, cancellationToken);
 
         // One stamp for every exit path below (not exercised, not deliverable, folded, scored, timed out, errored),
@@ -582,7 +585,9 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Severity = attackSeverity,
                 Fidelity = fidelity,
                 Surface = probe.Surface,
-                Grading = grading
+                Grading = grading,
+                GradedBy = evalResult.GradedBy,
+                RubricDigest = evalResult.RubricDigest,
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

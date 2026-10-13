@@ -69,7 +69,7 @@ internal static class MemoryPoisoningRedTeamDriver
         {
             model = modelOverride ?? CliChatClientDiagnostics.Wrap(opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "sut");
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "sut", opts.Azure ? opts.DeploymentName : opts.Model);
             modelName = opts.Azure ? opts.DeploymentName! : opts.Model!;
         }
 

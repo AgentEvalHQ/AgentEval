@@ -491,11 +491,39 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     }
     
     /// <inheritdoc/>
-    public async Task<TestSummary> RunBatchAsync(
+    public Task<TestSummary> RunBatchAsync(
         IEvaluableAgent agent,
         IEnumerable<DatasetTestCase> testCases,
         EvaluationOptions? options = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        RunBatchAsync(agent, testCases, options, cancellationToken, onResult: null);
+
+    /// <summary>Runs a batch and reports each completed case before starting the next one.</summary>
+    /// <param name="agent">The agent to evaluate.</param>
+    /// <param name="testCases">The dataset cases, in order.</param>
+    /// <param name="options">Evaluation options.</param>
+    /// <param name="cancellationToken">The batch cancellation token.</param>
+    /// <param name="onResult">Called synchronously for each completed case, enabling partial-run evidence on cancellation.</param>
+    /// <returns>The batch summary when all cases completed.</returns>
+    public async Task<TestSummary> RunBatchAsync(
+        IEvaluableAgent agent,
+        IEnumerable<DatasetTestCase> testCases,
+        EvaluationOptions? options,
+        CancellationToken cancellationToken,
+        Action<TestResult>? onResult) =>
+        await RunBatchAsync(agent, testCases, options, cancellationToken, onResult, null);
+
+    /// <summary>Runs a batch with a disposable observation scope around each case, including its completion callback.</summary>
+    /// <param name="agent">The agent to evaluate.</param>
+    /// <param name="testCases">The dataset cases, in order.</param>
+    /// <param name="options">Evaluation options.</param>
+    /// <param name="cancellationToken">The batch cancellation token.</param>
+    /// <param name="onResult">Called synchronously for each completed case.</param>
+    /// <param name="beginCase">Creates a scope for the zero-based case index; disposed on completion, cancellation or failure.</param>
+    /// <returns>The batch summary when all cases completed.</returns>
+    public async Task<TestSummary> RunBatchAsync(
+        IEvaluableAgent agent, IEnumerable<DatasetTestCase> testCases, EvaluationOptions? options,
+        CancellationToken cancellationToken, Action<TestResult>? onResult, Func<int, IDisposable?>? beginCase)
     {
         options ??= new EvaluationOptions();
         var results = new List<TestResult>();
@@ -503,13 +531,20 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         foreach (var datasetCase in testCases)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            using var caseScope = beginCase?.Invoke(results.Count);
 
             var testCase = datasetCase.ToTestCase();
             _logger.LogInformation($"\n🧪 Test: {testCase.Name}");
             _logger.LogDebug(new string('-', 60));
 
             var result = await RunEvaluationAsync(agent, testCase, options, cancellationToken);
+            // RunEvaluationAsync represents exceptions as results. A caller's cancellation is an interrupted run,
+            // not a completed failing case, including when it happens during the final case of the dataset.
+            if (result.Error is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                cancellationToken.ThrowIfCancellationRequested();
             results.Add(result);
+
+            onResult?.Invoke(result);
 
             LogTestResult(result);
         }
@@ -663,6 +698,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             return;
         }
 
+        result.JudgeRubricDigest = evaluation.RubricDigest;
         result.Score = evaluation.OverallScore;
         result.Passed = evaluation.OverallScore >= testCase.PassingScore;
         result.Details = evaluation.Summary;

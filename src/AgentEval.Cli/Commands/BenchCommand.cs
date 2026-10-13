@@ -5,6 +5,7 @@
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
@@ -53,8 +54,13 @@ public static class BenchCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false)
+        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null)
     {
+        if (runs < 1)
+        {
+            Console.Error.WriteLine("Error: --runs must be at least 1.");
+            return ExitCodes.UsageError;
+        }
         // agentIsLive: the caller resolved agentOverride from --sut, a real target. Any other agentOverride is a stand-in,
         // which the AEF run records as mocked, never live (RUN-7).
         var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
@@ -115,9 +121,10 @@ public static class BenchCommand
         AgentEval.Core.IEvaluableAgent? agent = agentOverride;
         if (agent is null && azureFromEnv)
         {
-            var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            var (builtAgent, _, agentExit, envEndpoint) = AzureChatAgentFactory.TryBuildFromEnvWithEndpoint(subject);
             if (builtAgent is null) return agentExit;
             agent = builtAgent;
+            agentEndpoint = envEndpoint;
         }
 
         // ── Build registry ───────────────────────────────────────────────────
@@ -177,7 +184,7 @@ public static class BenchCommand
         else
         {
             // --sut mock, asked for by name: a canned answer, graded, labelled and not stored.
-            MockTarget.PrintBanner("bench gdpr", "a canned answer");
+            MockTarget.PrintBanner("bench gdpr", "a canned answer", aefRequested: aef is not null && !noAef);
             agentResponse =
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
@@ -186,150 +193,188 @@ public static class BenchCommand
 
         if (isMock)
         {
-            EvalResult mockResult;
-            try
-            {
-                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
-            }
-
-            return MockTarget.Finish("bench gdpr",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer" +
-                (runs > 1 ? " (--runs is ignored for a mock run)" : ""));
+            return await MockTarget.RunCompositeAsync("gdpr", preset, subject, subjectVersion, agentEvalDir,
+                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, runs);
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
+        var store = storeOverride ?? new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp) left behind by killed benchmark processes. Only CLI writer
         // entry points sweep — Mission Control (read-only viewer) must not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        if (store is FileSystemOutputStore fileStore)
+            await fileStore.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running GDPR benchmark ({preset}) for subject '{subject}'" +
             (runs > 1 ? $" [{runs} stochastic runs]" : "") + "...");
 
-        string runId;
-        EvalResult compositeResult;
+        var evidenceFinalized = false;
         var startedAt = DateTimeOffset.UtcNow;
+        var partialTrials = new List<CompositeProgress>();
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
+        EvalResult? completedRollup = null;
+        string? storeRunId = null;
+        var trialRunIds = new List<string>();
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
+            storeRunId is null && trialRunIds.Count == 0 ? null : new()
+            {
+                RunId = storeRunId,
+                TrialRunIds = runs > 1 ? trialRunIds.ToArray() : null,
+            };
+        void TrialCreated(string id)
+        {
+            if (runs > 1) trialRunIds.Add(id);
+            else storeRunId = id;
+        }
+        async Task<(string RunId, EvalResult Result)> RunTrial(CancellationToken token)
+        {
+            var progress = new CompositeProgress(benchmark);
+            partialTrials.Add(progress);
+            return await new GdprBenchmarkRunner().RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput,
+                TrialCreated, progress.Completed, progress.Started, ct: token);
+        }
         try
         {
-            if (runs > 1)
+            string runId;
+            EvalResult compositeResult;
+            IReadOnlyList<EvalResult>? trialResults = null;
+
+            try
             {
-                // Stochastic mode: run N times, aggregate via MajorityVote.
-                compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct);
-                // Use the benchmark key as the run ID for reporting purposes.
-                runId = $"{benchmark.Key}.runs{runs}.{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+                if (runs > 1)
+                {
+                    // Stochastic mode: run N times, aggregate via MajorityVote.
+                    compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct,
+                        async token => (await RunTrial(token)).Result);
+                    trialResults = compositeResult.Details.SubResults!;
+                    compositeResult = StochasticBenchRunner.RollupTree(trialResults);
+                    completedRollup = compositeResult;
+                    runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct, id => storeRunId = id);
+                }
+                else
+                {
+
+                    (runId, compositeResult) = await RunTrial(ct);
+                }
             }
-            else
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                var runner = new GdprBenchmarkRunner();
-                (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                throw;
             }
+
+            // ── Generate reports ─────────────────────────────────────────────────
+            // judgeMode reflects what actually ran:
+            //   stochastic N>1 → "multi-judge" (majority-vote aggregation across runs)
+            //   single judge   → "mode-a"
+            // (Mode-B per-criterion fan-out is wired via ScenarioToAtomicEval ctor flags
+            //  in the article-builder; bench gdpr does not enable that in v1.)
+            var judgeMode = runs > 1 ? "multi-judge" : "mode-a";
+
+            // Split the composite preset string (e.g. "standard+healthcare+hr") into a base
+            // preset + ordered domain-pack list so gdpr-evidence.json records each pack
+            // separately. The base name is what the schema's `preset` enum accepts; the
+            // packs land in a structured `domainPacks` array.
+            var presetTokens = preset.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var basePreset = presetTokens.Length > 0 ? presetTokens[0].ToLowerInvariant() : "standard";
+            var domainPacks = presetTokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
+
+            var reporter = new GDPRComplianceReporter(articles);
+            var options = new GdprReportOptions(
+                Preset: basePreset,
+                DomainPacks: domainPacks,
+                JudgeMode: judgeMode,
+                JudgeModel: judgeModelName);
+            GdprComplianceEvidence evidence;
+            try
+            {
+                evidence = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
+                throw;
+            }
+
+            // Derive output directory (mirrors FileSystemOutputStore path convention)
+            var sanitizedSubject = FileSystemLayout.Sanitize(subject);
+            var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+            var outputDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject, ts);
+            Directory.CreateDirectory(outputDir);
+            complianceArtifacts = () => ComplianceAef.Composite(Path.Combine(outputDir, "gdpr-evidence.json"), evidence.Base, compositeResult, evidence);
+
+            // Markdown report
+            try
+            {
+                var mdRenderer = new MarkdownRenderer();
+                var md = mdRenderer.Render(evidence);
+                var mdPath = Path.Combine(outputDir, "report.md");
+                await File.WriteAllTextAsync(mdPath, md);
+                Console.WriteLine($"Markdown report: {mdPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
+            }
+
+            // PDF report
+            try
+            {
+                var pdfRenderer = new GDPRPdfRenderer(articles);
+                var pdfPath = Path.Combine(outputDir, "report.pdf");
+                await pdfRenderer.RenderAsync(evidence, pdfPath);
+                Console.WriteLine($"PDF report: {pdfPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
+            }
+
+            ct.ThrowIfCancellationRequested();
+            var overall = evidence.Summary.OverallStatus;
+            var finalExit = BenchExitCodes.FromLabel(overall);
+            // ── AEF ───────────────────────────────────────────────────────────────
+            // One run of the preset as sealed evidence. A live agent (--from-env, or --sut) is live; a stand-in is mocked; a
+            // supplied --response is replayed: the subject was not driven, its recorded answer was graded.
+            // Repeated runs retain each trial tree and a corresponding majority-vote rollup tree.
+            var aefFailed = false;
+            if (!noAef)
+            {
+                var targetMode = agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                    : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                    : AgentEval.Results.Writing.AefTargetMode.Mocked;
+                aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
+                    compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
+                    trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null);
+            }
+
+            // ── Exit code ─────────────────────────────────────────────────────────
+            if (aefFailed)
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            evidenceFinalized = true;
+            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
+
+            // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
+            // the shared helper exists specifically so a future policy change lands in one place.
+            return finalExit;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+            // A later presentation failure must not create a second, aborted run.
+            if (evidenceFinalized) return 1;
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
+            var snapshots = partialTrials.Select(p => p.Snapshot()).ToList();
+            if (!noAef && BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion,
+                agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                    : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                    : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
+                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: abortReason, requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null))
+                return ExitCodes.RuntimeError;
             return 1;
         }
-
-        // ── Generate reports ─────────────────────────────────────────────────
-        // judgeMode reflects what actually ran:
-        //   stochastic N>1 → "multi-judge" (majority-vote aggregation across runs)
-        //   single judge   → "mode-a"
-        // (Mode-B per-criterion fan-out is wired via ScenarioToAtomicEval ctor flags
-        //  in the article-builder; bench gdpr does not enable that in v1.)
-        var judgeMode = runs > 1 ? "multi-judge" : "mode-a";
-
-        // Split the composite preset string (e.g. "standard+healthcare+hr") into a base
-        // preset + ordered domain-pack list so gdpr-evidence.json records each pack
-        // separately. The base name is what the schema's `preset` enum accepts; the
-        // packs land in a structured `domainPacks` array.
-        var presetTokens = preset.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var basePreset = presetTokens.Length > 0 ? presetTokens[0].ToLowerInvariant() : "standard";
-        var domainPacks = presetTokens.Skip(1).Select(t => t.ToLowerInvariant()).ToArray();
-
-        var reporter = new GDPRComplianceReporter(articles);
-        var options = new GdprReportOptions(
-            Preset: basePreset,
-            DomainPacks: domainPacks,
-            JudgeMode: judgeMode,
-            JudgeModel: judgeModelName);
-        GdprComplianceEvidence evidence;
-        try
-        {
-            evidence = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
-            return 1;
-        }
-
-        // Derive output directory (mirrors FileSystemOutputStore path convention)
-        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
-        var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject, ts);
-        Directory.CreateDirectory(outputDir);
-
-        // Markdown report
-        try
-        {
-            var mdRenderer = new MarkdownRenderer();
-            var md = mdRenderer.Render(evidence);
-            var mdPath = Path.Combine(outputDir, "report.md");
-            await File.WriteAllTextAsync(mdPath, md);
-            Console.WriteLine($"Markdown report: {mdPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
-        }
-
-        // PDF report
-        try
-        {
-            var pdfRenderer = new GDPRPdfRenderer(articles);
-            var pdfPath = Path.Combine(outputDir, "report.pdf");
-            await pdfRenderer.RenderAsync(evidence, pdfPath);
-            Console.WriteLine($"PDF report: {pdfPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-        }
-
-        // ── AEF ───────────────────────────────────────────────────────────────
-        // One run of the preset as sealed evidence. A live agent (--from-env, or --sut) is live; a stand-in is mocked; a
-        // supplied --response is replayed: the subject was not driven, its recorded answer was graded. --runs above 1 is
-        // not written yet (its MajorityVote root is AgentEval's, not one run of the preset).
-        var aefFailed = false;
-        if (!noAef && runs > 1)
-        {
-            Console.Error.WriteLine("AEF: --runs above 1 is not written as AEF yet, so this benchmark wrote no AEF run.");
-        }
-        else if (!noAef)
-        {
-            var targetMode = agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
-                : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
-                : AgentEval.Results.Writing.AefTargetMode.Mocked;
-            aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
-                compositeResult, startedAt, DateTimeOffset.UtcNow);
-        }
-
-        // ── Exit code ─────────────────────────────────────────────────────────
-        if (aefFailed)
-            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        var overall = evidence.Summary.OverallStatus;
-        Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
-
-        // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
-        // the shared helper exists specifically so a future policy change lands in one place.
-        return BenchExitCodes.FromLabel(overall);
     }
 
     /// <summary>

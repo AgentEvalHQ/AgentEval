@@ -207,6 +207,14 @@ public class EvaluationContext
 /// </summary>
 public class MetricResult
 {
+    /// <summary>Whether this result used model grading; null when the producer did not report it.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ModelGraded { get; init; }
+
+    /// <summary>Full instrument digest excluding case content; null when unknown or not model-graded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+
     /// <summary>Name of the metric.</summary>
     public required string MetricName { get; init; }
     

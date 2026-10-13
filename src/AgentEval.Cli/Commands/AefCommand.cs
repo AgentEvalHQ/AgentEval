@@ -149,9 +149,9 @@ internal static class AefCommand
             {
                 sealedRun = AefSealer.Seal(runDirectory, new AefSealOptions { SealedBy = by.Value, Signer = signer, TimeProvider = clock });
             }
-            catch (InvalidOperationException e)
+            catch (Exception e) when (e is AefInputException or AefWriteException)
             {
-                // Open, already sealed, not a run, or with problems (AefWriteException names them).
+                // Preserve this CLI's exit 1 for an unsealable run; the conformance driver's contract uses exit 2.
                 stderr.WriteLine($"✖ Not sealed: {e.Message}");
                 return ExitCodes.TestFailure;
             }
@@ -416,6 +416,7 @@ internal static class AefCommand
                 Signer = signer,
                 TimeProvider = clock,
             }, ct).ConfigureAwait(false);
+            WarnNativeTwin(root, id, stderr);
             return Converted(conversion, asJson, stdout);
         }
         catch (Exception e) when (IsInputError(e) || e is NotSupportedException or JsonException)
@@ -433,6 +434,50 @@ internal static class AefCommand
         finally
         {
             signer?.Dispose();
+        }
+    }
+
+    // Native outputs outside the workspace are not discoverable from a store-v1 run alone.
+    private static void WarnNativeTwin(string workspace, string storeRunId, TextWriter stderr)
+    {
+        var runs = Path.Combine(workspace, "aef", "runs");
+        if (!Directory.Exists(runs)) return;
+        try
+        {
+            foreach (var headerPath in Directory.EnumerateFiles(runs, "run.json", new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = true,
+                MaxRecursionDepth = 3,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+            }))
+            {
+                bool matches;
+                try
+                {
+                    using var stream = File.OpenRead(headerPath);
+                    using var document = JsonDocument.Parse(stream);
+                    var header = document.RootElement;
+                    if (header.ValueKind != JsonValueKind.Object || header.TryGetProperty("imported", out _) ||
+                        !header.TryGetProperty("ext", out var ext) || ext.ValueKind != JsonValueKind.Object ||
+                        !ext.TryGetProperty("agenteval.store-v1", out var link) || link.ValueKind != JsonValueKind.Object)
+                        continue;
+                    matches = link.TryGetProperty("runId", out var id) && id.ValueKind == JsonValueKind.String && id.GetString() == storeRunId;
+                    if (!matches && link.TryGetProperty("trialRunIds", out var trials) && trials.ValueKind == JsonValueKind.Array)
+                        matches = trials.EnumerateArray().Any(t => t.ValueKind == JsonValueKind.String && t.GetString() == storeRunId);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+                {
+                    continue; // An unrelated incomplete/unreadable run must not prevent export.
+                }
+                if (!matches) continue;
+                stderr.WriteLine("Note: native AEF evidence in this workspace already links this store run. Prefer the native evidence; this export is a separate imported projection.");
+                return;
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ObjectDisposedException)
+        {
+            // Discovery and its informational notice do not change an already completed export.
         }
     }
 

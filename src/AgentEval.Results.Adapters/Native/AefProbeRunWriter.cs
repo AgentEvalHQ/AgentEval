@@ -10,11 +10,13 @@ namespace AgentEval.Results.Adapters.Native;
 
 /// <summary>
 /// One probe of an adversarial scan, as AEF records it: a line at <c>probe</c> in lane <c>redteam</c>, or, for a
-/// benign control, at <c>control</c> in lane <c>over-refusal</c>. It holds no prompt, response or grader reasoning
-/// ([RUN-11]).
+/// benign control, at <c>control</c> in lane <c>over-refusal</c>. Optional observed content is kept separate and
+/// persisted only with explicit capture ([RUN-11]).
 /// </summary>
 public sealed record AefProbeLine
 {
+    /// <summary>Observed content; ignored unless the run explicitly enables content capture.</summary>
+    public AefNativeContent? Content { get; init; }
     /// <summary>The case id: <c>&lt;attack&gt;/&lt;probe&gt;</c> for a probe, <c>benign/&lt;probe&gt;</c> for a control.</summary>
     public required string CaseId { get; init; }
 
@@ -39,13 +41,37 @@ public sealed record AefProbeLine
     /// <summary>How long the probe took.</summary>
     public double? DurationMs { get; init; }
 
+    /// <summary>Observed calls belonging to this probe; absent when not captured.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
     /// <summary>Who graded it: <c>CODE</c> (an oracle) or <c>LLM</c> (the judge, named in run.json's judges).</summary>
     public AefAnnotatorKind? Annotator { get; init; }
+
+    /// <summary>Full SHA-256 identity of the judge instrument, excluding probe and response content; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
 }
 
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
+    public AefCliProvenance? Cli { get; init; }
+
+    /// <summary>Source of the probe stimuli; a fixed suite unless the caller identifies generation or import.</summary>
+    public AefStimulus Stimulus { get; init; } = AefStimulus.Suite;
+    /// <summary>Content-free configuration actually applied by the producer.</summary>
+    public AefRunConfig? Config { get; init; }
+
+    /// <summary>Pricing policy; defaults to the bundled baseline, with no implied spending limit.</summary>
+    public AefCostPolicy? CostPolicy { get; init; } = new() { PriceTable = AgentEval.Models.ModelPricing.TableName };
+
+    /// <summary>Related store-v1 benchmark run identities, if persistence created any.</summary>
+    public AefStoreV1Link? StoreV1 { get; init; }
+    /// <summary>Whether to persist observed content as evidence blobs; off by default.</summary>
+    public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
+    /// <summary>Exact compliance reports linked to their observed root cases.</summary>
+    public IReadOnlyList<AefComplianceArtifact>? ComplianceArtifacts { get; init; }
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
@@ -57,6 +83,21 @@ public sealed record AefProbeRunOptions
 
     /// <summary>The judge model, if one was configured; named only when it graded a line ([RUN-9]).</summary>
     public string? JudgeModel { get; init; }
+
+    /// <summary>The configured judge provider, when known from client construction.</summary>
+    public string? JudgeProvider { get; init; }
+
+    /// <summary>Reported judge usage, including calls that did not produce a verdict ([SUM-7]).</summary>
+    public AefUsage? JudgeUsage { get; init; }
+
+    /// <summary>Observed totals by role/model; each present role replaces its legacy usage source.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
+    /// <summary>The command's final decision, recorded before sealing ([GATE-1]).</summary>
+    public AefCommandGate? Gate { get; init; }
+
+    /// <summary>A content-free interruption reason; the run closes aborted without a final gate.</summary>
+    public string? AbortReason { get; init; }
 
     /// <summary>How the scan drove its target ([RUN-7]): a stand-in is <c>mocked</c>, a scripted model <c>scripted</c>.</summary>
     public required AefTargetMode TargetMode { get; init; }
@@ -78,10 +119,13 @@ public sealed record AefProbeRunOptions
 
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
+
+    /// <summary>Seal the closed run by default; false leaves verified unsealed evidence and returns no run hash.</summary>
+    public bool Seal { get; init; } = true;
 }
 
 /// <summary>
-/// Writes an adversarial scan (<c>agenteval redteam</c>) as a sealed AEF run. Lane <c>redteam</c> holds a line per
+/// Writes an adversarial scan (<c>agenteval redteam</c>) as an AEF run, sealed by default. Lane <c>redteam</c> holds a line per
 /// probe at path <c>probe</c>, with the metrics <c>resisted</c> (a rate over every probe: an inconclusive one counts 0,
 /// an error is not measured, SUM-4) and <c>resisted-conclusive</c> (1 or 0 on conclusive lines only, so its mean is the
 /// share of conclusive probes resisted). Lane <c>over-refusal</c> holds the benign controls at path <c>control</c> with
@@ -97,18 +141,20 @@ public static class AefProbeRunWriter
     public const string ResistedConclusiveMetric = "resisted-conclusive";
     public const string AnsweredMetric = "answered";
 
-    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
-    public static (string Directory, string RunHash) Write(
+    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it by default; returns its folder and a null run hash when sealing is disabled.</summary>
+    public static (string Directory, string? RunHash) Write(
         string runsRoot, IReadOnlyList<AefProbeLine> lines, AefProbeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(options);
-        if (lines.Count == 0)
+        AefNativeFinalization.Validate(options.Seal, options.Signer);
+        if (lines.Count == 0 && options.AbortReason is null)
         {
             throw new ArgumentException("a scan with no probe lines has nothing to record", nameof(lines));
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "redteam");
         var runId = folder.RunId;
         var directory = folder.Directory;
@@ -118,6 +164,9 @@ public static class AefProbeRunWriter
         {
             RunId = runId,
             Producer = AefConverter.DefaultProducer,
+            Config = options.Config,
+            CostPolicy = options.CostPolicy,
+            Ext = storeExtension,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
             Suite = new AefSuite
@@ -129,11 +178,13 @@ public static class AefProbeRunWriter
                 Frozen = true,
             },
             Judges = options.JudgeModel is not null && lines.Any(l => l.Annotator == AefAnnotatorKind.Llm)
-                ? [new AefJudge { Model = options.JudgeModel, Mode = AefJudgeMode.Single }]
+                ? lines.Where(l => l.Annotator == AefAnnotatorKind.Llm)
+                    .Select(l => new AefJudge { Model = options.JudgeModel, Provider = options.JudgeProvider,
+                        RubricDigest = l.RubricDigest, Mode = AefJudgeMode.Single }).Distinct().ToArray()
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
-            ContentCapture = AefContentCapture.Off,
-            Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
+            ContentCapture = options.ContentCapture,
+            Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = options.Stimulus },
         };
 
         var writer = AefRunWriter.Create(directory, header);
@@ -162,10 +213,17 @@ public static class AefProbeRunWriter
             }
 
             writer.SetMetrics(metrics);
+            var artifactLinks = AefComplianceArtifact.Write(writer, options.ComplianceArtifacts, options.ContentCapture, lines.Select(l => l.CaseId));
+            var resultIds = new List<string>();
             foreach (var line in lines)
             {
-                writer.AddResult(Line(line, options.JudgeModel, options.Lane));
+                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane) with
+                    { Evidence = artifactLinks.GetValueOrDefault(line.CaseId) },
+                    options.ContentCapture == AefContentCapture.On ? line.Content : null)).ResultId);
             }
+
+            if (options.AbortReason is null)
+                options.Gate?.Write(writer, runId, endedAt, resultIds);
 
             var lanes = new List<AefSummaryLane>
             {
@@ -191,10 +249,17 @@ public static class AefProbeRunWriter
                 };
             }
 
-            writer.SetSummary(new AefSummary { Lanes = lanes, Ext = ext.Count > 0 ? ext : null });
-            writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
-            var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
-            return (directory, seal.RunHash);
+            var totals = AefNativeUsage.Merge(options.Usage, options.JudgeUsage is { } legacy ? [legacy] : null);
+            writer.SetSummary(new AefSummary
+            {
+                Lanes = lanes,
+                Ext = ext.Count > 0 ? ext : null,
+                Usage = totals,
+                Cost = AefNativeUsage.Cost(totals),
+            });
+            writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
+                AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
+            return (directory, AefNativeFinalization.Complete(directory, options.Seal, options.Signer));
         }
         catch
         {
@@ -225,9 +290,11 @@ public static class AefProbeRunWriter
             Attack = line.Attack,
             Turns = line.Turns,
             DurationMs = line.DurationMs,
+            Usage = line.Usage,
             Scores = conclusive ? [new AefScore { Metric = ResistedConclusiveMetric, Value = line.State == AefState.Passed ? 1 : 0 }] : null,
             Annotator = line.Annotator is { } kind
-                ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null }
+                ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null,
+                    RubricDigest = kind == AefAnnotatorKind.Llm ? line.RubricDigest : null }
                 : null,
         };
     }

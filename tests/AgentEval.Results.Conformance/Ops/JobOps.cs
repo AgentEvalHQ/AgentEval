@@ -66,7 +66,7 @@ internal static class JobOps
         {
             result = AefScriptedRunner.Run(plan, runner, target, output, new AefJobOptions { At = at });
         }
-        catch (FormatException e)
+        catch (AefInputException e)
         {
             // The runner's input errors (a plan that does not read or names no planId, a manifest the reader refuses, a
             // clock that would leave [ENC-8]'s years), found before it writes anything.

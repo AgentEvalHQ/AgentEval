@@ -62,6 +62,52 @@ public class BenchOwaspCommandTests : IDisposable
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 
+    private sealed class CancellingAgent(CancellationTokenSource cancel, int completed) : IEvaluableAgent
+    {
+        private int _calls;
+        public string Name => "cancel-test";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) > completed)
+            {
+                cancel.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            return Task.FromResult(new AgentResponse { Text = "I cannot assist with that request." });
+        }
+    }
+
+    [Theory]
+    [InlineData("owasp", 0)]
+    [InlineData("owasp", 1)]
+    [InlineData("mitre", 0)]
+    [InlineData("mitre", 1)]
+    [InlineData("nist", 0)]
+    [InlineData("nist", 1)]
+    public async Task BenchScan_Cancelled_SealsCompletedProbesWithoutGate(string family, int completed)
+    {
+        InitWorkspace();
+        using var cancel = new CancellationTokenSource();
+        var agent = new CancellingAgent(cancel, completed);
+        var root = new DirectoryInfo(Path.Combine(_root, "partial-aef"));
+        var judge = new CountingJudge();
+        var result = family switch
+        {
+            "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, ct: cancel.Token, aef: root),
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, ct: cancel.Token, aef: root),
+            _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, ct: cancel.Token, aef: root),
+        };
+
+        Assert.Equal(1, result.ExitCode);
+        var dir = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(root.FullName, "run.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
+        Assert.Equal("aborted", (string?)header["status"]);
+        Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
+        Assert.Equal(completed, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
     // ── Env-gate parity with the other bench commands ─────────────────────────
 
     private string[] WorkspaceFiles() =>
@@ -81,7 +127,10 @@ public class BenchOwaspCommandTests : IDisposable
         {
             Interlocked.Increment(ref _calls);
             return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
-                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test")));
+                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test"))
+            {
+                Usage = new Microsoft.Extensions.AI.UsageDetails { InputTokenCount = 10, OutputTokenCount = 5 },
+            });
         }
 
         public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
@@ -169,10 +218,11 @@ public class BenchOwaspCommandTests : IDisposable
     {
         InitWorkspace();
         var aef = Path.Combine(_root, "aef-out");
+        var judge = new CountingJudge();
 
         var result = await BenchOwaspCommand.RunAsync(
             preset: "top10", subject: "OwaspAefAgent", rootOverride: _root, inputText: null, evaluatorOverride: null,
-            agentOverride: new SafeRefusalAgent("OwaspAefAgent"), judgeClientOverride: new CountingJudge(),
+            agentOverride: new SafeRefusalAgent("OwaspAefAgent"), judgeClientOverride: judge,
             aef: new DirectoryInfo(aef), subjectVersion: "3.0.0");
 
         Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
@@ -189,6 +239,13 @@ public class BenchOwaspCommandTests : IDisposable
         Assert.All(lines, l => Assert.Equal("owasp", (string?)l["lane"]));
         var summary = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "summary.json")))!;
         Assert.NotNull(summary["ext"]!["agenteval.bench"]!["label"]);
+        var usage = Assert.Single(summary["usage"]!.AsArray())!;
+        Assert.Equal((judge.Calls - 1) * 10, (long)usage["gen_ai.usage.input_tokens"]!); // readiness call is outside scan usage
+        Assert.Equal((judge.Calls - 1) * 5, (long)usage["gen_ai.usage.output_tokens"]!);
+        var gate = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("gate:bench", (string?)gate["gateId"]);
+        Assert.Equal(result.ExitCode, (int)gate["exitCode"]!);
+        Assert.Equal(result.ExitCode == 0 ? "ship" : result.ExitCode == 11 ? "inconclusive" : "no_ship", (string?)gate["outcome"]);
     }
 
     [Fact]

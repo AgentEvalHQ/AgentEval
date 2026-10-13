@@ -109,6 +109,9 @@ public class PerformanceMetrics
 /// </summary>
 public static class ModelPricing
 {
+    /// <summary>Identity of the bundled pricing baseline; hosts may override individual rates with <see cref="SetPricing"/>.</summary>
+    public const string TableName = "agenteval-model-pricing-2026-10-07";
+
     private static readonly ConcurrentDictionary<string, (decimal InputPer1K, decimal OutputPer1K)> _pricing = 
         new(StringComparer.OrdinalIgnoreCase)
     {

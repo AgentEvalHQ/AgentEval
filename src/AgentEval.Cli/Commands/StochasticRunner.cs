@@ -38,7 +38,8 @@ internal static class StochasticBenchRunner
         CompositeEval benchmark,
         EvalInput input,
         int runs,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Func<CancellationToken, Task<EvalResult>>? runTrial = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(subject);
@@ -47,18 +48,73 @@ internal static class StochasticBenchRunner
         if (runs < 1) throw new ArgumentOutOfRangeException(nameof(runs), "runs must be >= 1.");
 
         var results = new List<EvalResult>(runs);
-        var components = new List<EvalComponent>(runs);
         var runner = new GdprBenchmarkRunner();
 
         for (int i = 0; i < runs; i++)
         {
             ct.ThrowIfCancellationRequested();
-            var (_, r) = await runner.RunAsync(store, subject, benchmark, input, ct: ct);
+            var r = runTrial is null
+                ? (await runner.RunAsync(store, subject, benchmark, input, ct: ct)).Item2
+                : await runTrial(ct);
             results.Add(r);
-            components.Add(new EvalComponent(benchmark, 1.0, true));
         }
 
-        var (score, severity) = MajorityVoteAggregation.Instance.Aggregate(results, components);
+        var (aggregate, note) = Vote(results, benchmark.Threshold);
+        return new EvalResult(
+            Metric: new($"{benchmark.Key}.runs{runs}", $"{benchmark.Name} (×{runs} stochastic)", benchmark.Category, benchmark.Version),
+            Score: aggregate,
+            Details: new(null, null, note is null ? null : [note], results.AsReadOnly(), MajorityVoteAggregation.Instance.Name)
+            {
+                Summary = note,
+            },
+            Provenance: new("composite", null, null, null, null, results.Sum(r => r.Provenance.EstimatedCost), false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Votes at every corresponding node while retaining the preset's case tree for AEF trial evidence.</summary>
+    internal static EvalResult RollupTree(IReadOnlyList<EvalResult> trials)
+    {
+        if (trials.Count == 0) throw new ArgumentException("At least one trial is required.", nameof(trials));
+        var first = trials[0];
+        var children = first.Details.SubResults ?? [];
+        if (trials.Any(t => t.Metric.Key != first.Metric.Key || (t.Details.SubResults?.Count ?? 0) != children.Count))
+            throw new ArgumentException("Repeated benchmark trees must have matching ordered metric keys and structure.", nameof(trials));
+        var rollups = Enumerable.Range(0, children.Count)
+            .Select(i => RollupTree(trials.Select(t => t.Details.SubResults![i]).ToList())).ToList();
+        var (score, note) = Vote(trials, first.Score.Threshold);
+        return first with
+        {
+            Score = score,
+            Details = new EvalDetails(null, null, null, rollups, "MajorityVote") { Summary = note },
+            Provenance = new EvalProvenance("composite", null, null, null, null, trials.Sum(t => t.Provenance.EstimatedCost), false),
+            EvaluatedAt = DateTimeOffset.UtcNow,
+        };
+    }
+
+    /// <summary>Persists the voted tree so compliance reports reference a real, completed source run.</summary>
+    internal static async Task<string> PersistRollupAsync(IOutputStore store, SubjectIdentity subject,
+        EvalResult rollup, EvalInput input, CancellationToken ct, Action<string>? onRunCreated = null)
+    {
+        var manifest = await store.StartRunAsync(subject,
+            new RunContext("AgentEval.Cli", "src/AgentEval.Cli/", "StochasticBenchRunner", null, null, "compliance"), ct);
+        onRunCreated?.Invoke(manifest.Run.RunId);
+        static IEnumerable<EvalResult> Leaves(EvalResult node) => node.Details.SubResults is { Count: > 0 } parts
+            ? parts.SelectMany(Leaves) : [node];
+        var leaves = Leaves(rollup).ToList();
+        foreach (var leaf in leaves)
+            await store.WriteScenarioResultAsync(manifest.Run.RunId,
+                EvalResultPersistence.ToScenarioResult(leaf, leaf.Metric.Key, leaf.Metric.Name,
+                    input: input.Query, subjectModel: input.SubjectModel), ct);
+        var stats = leaves.Select(l => l.Score).ToRunStats();
+        await store.CompleteRunAsync(manifest, new RunSummary("1.0", manifest.Run.RunId,
+            rollup.Score.RunVerdict(stats), stats, new Dictionary<string, double> { ["overallScore"] = rollup.Score.Value }), ct);
+        return manifest.Run.RunId;
+    }
+
+    private static (EvalScore Score, string? Note) Vote(IReadOnlyList<EvalResult> results, double? threshold)
+    {
+        var runs = results.Count;
+        var (score, severity) = MajorityVoteAggregation.AggregateWeights(results, results.Select(_ => 1.0).ToList());
 
         // The verdict is the vote's winning LABEL, over the runs that produced one (#203 review, B6c-1). It was mapped
         // back from the vote's severity: with no counting run (every run errored, or withheld its pass) the vote's
@@ -92,14 +148,6 @@ internal static class StochasticBenchRunner
             }
         }
 
-        return new EvalResult(
-            Metric: new($"{benchmark.Key}.runs{runs}", $"{benchmark.Name} (×{runs} stochastic)", benchmark.Category, benchmark.Version),
-            Score: new(score, null, label, label == "pass", benchmark.Threshold, severity, null) { Measurement = measurement },
-            Details: new(null, null, note is null ? null : [note], results.AsReadOnly(), MajorityVoteAggregation.Instance.Name)
-            {
-                Summary = note,
-            },
-            Provenance: new("composite", null, null, null, null, results.Sum(r => r.Provenance.EstimatedCost), false),
-            EvaluatedAt: DateTimeOffset.UtcNow);
+        return (new EvalScore(score, null, label, label == "pass", threshold, severity, null) { Measurement = measurement }, note);
     }
 }

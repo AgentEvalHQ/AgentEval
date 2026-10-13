@@ -93,6 +93,7 @@ public class SystemOneDecisionClientTests
         using var sent = JsonDocument.Parse(handler.LastBody!);
         Assert.Equal(SystemOneClientOptions.TypeSafeDefaultModel, sent.RootElement.GetProperty("model").GetString());
         Assert.Equal("typesafe", client.ProviderName);
+        Assert.Equal("typesafe", ((AgentEval.Core.IJudgeProviderSource)client).ProviderName);
     }
 
     [Fact]

@@ -26,7 +26,6 @@ public record StochasticProgress(
 /// </summary>
 /// <param name="Runs">Number of test runs. Default: 10. Minimum: 3.</param>
 /// <param name="SuccessRateThreshold">Minimum pass rate to consider the test as successful (0.0-1.0). Default: 0.8 (80%).</param>
-/// <param name="Seed">Optional seed for reproducibility.</param>
 /// <param name="MaxParallelism">Maximum parallel runs. Default: 1 (sequential).</param>
 /// <param name="DelayBetweenRuns">Delay between runs to avoid rate limiting. Default: TimeSpan.Zero.</param>
 /// <param name="EnableStatisticalAnalysis">Whether to compute detailed statistics. Default: true.</param>
@@ -35,7 +34,6 @@ public record StochasticProgress(
 public record StochasticOptions(
     int Runs = 10,
     double SuccessRateThreshold = 0.8,
-    int? Seed = null,
     int MaxParallelism = 1,
     TimeSpan? DelayBetweenRuns = null,
     bool EnableStatisticalAnalysis = true,

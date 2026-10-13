@@ -87,6 +87,7 @@ public sealed class AtomicLlmEval : AtomicEval
     private readonly string? _sentPromptId;
     private readonly AgentEval.Core.EvalRubric? _rubric;
     private string? _promptHash;
+    private string? _rubricDigest;
 
     /// <summary>
     /// The tool data the judge is sent (#203 review, B5b). The evaluators whose rubric names tool calls or tool
@@ -165,10 +166,12 @@ public sealed class AtomicLlmEval : AtomicEval
     }
 
     // Computed on first use, after JudgeSeesToolData is initialised.
-    private string PromptHash => _promptHash ??= HashPrompt(_criteria,
+    private string PromptHash => (_promptHash ??= HashPrompt(_criteria,
         JudgeSeesToolData == JudgeToolData.None
             ? _promptMaterial
-            : _promptMaterial + "\u001f" + "judge-sees-tool-data:" + JudgeSeesToolData);
+            : _promptMaterial + "\u001f" + "judge-sees-tool-data:" + JudgeSeesToolData))[..16];
+    private string RubricDigest => _rubricDigest ??= RubricIdentity.Digest(
+        ["atomic-llm-v1", JudgeInputFramingVersion, _promptMaterial, JudgeSeesToolData.ToString(), .. _criteria]);
 
     /// <inheritdoc/>
     public override async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
@@ -334,7 +337,7 @@ public sealed class AtomicLlmEval : AtomicEval
                 PromptHash: PromptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false),
+                CacheHit: false) { RubricDigest = RubricDigest, JudgeProvider = (_evaluator as AgentEval.Core.IJudgeProviderSource)?.ProviderName },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -448,8 +451,7 @@ public sealed class AtomicLlmEval : AtomicEval
         }
     }
 
-    /// <summary>The instrument fingerprint: framing version, evaluator prompt material and the declared criteria.</summary>
-    /// <remarks>Same shape as <c>DecisionEval</c>'s: SHA-256 over unit-separated parts, first 16 hex characters.</remarks>
+    /// <summary>Legacy short fingerprint encoding; full rubric identity uses structured fields.</summary>
     private static string HashPrompt(IReadOnlyList<string> criteria, string evaluatorMaterial)
     {
         var material = JudgeInputFramingVersion + "\u001f" + evaluatorMaterial + "\u001f" + string.Join("\u001e", criteria);
@@ -457,6 +459,6 @@ public sealed class AtomicLlmEval : AtomicEval
         // and the same prompt from an LF checkout (the Linux-built package) are the same instrument, and must not
         // hash apart into a comparison-blocking mismatch.
         material = material.Replace("\r\n", "\n", StringComparison.Ordinal);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))[..16].ToLowerInvariant();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant();
     }
 }

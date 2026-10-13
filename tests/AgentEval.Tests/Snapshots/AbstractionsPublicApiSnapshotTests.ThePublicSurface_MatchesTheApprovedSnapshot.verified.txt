@@ -211,12 +211,11 @@ class AgentEval.Comparison.StochasticOptions : IEquatable<AgentEval.Comparison.S
     Int32 GetHashCode()
     Int32 MaxParallelism { get; init; }
     Int32 Runs { get; init; }
-    Int32? Seed { get; init; }
     String ToString()
     TimeSpan? DelayBetweenRuns { get; init; }
-    Void Deconstruct(out Int32 Runs, out Double SuccessRateThreshold, out Int32? Seed, out Int32 MaxParallelism, out TimeSpan? DelayBetweenRuns, out Boolean EnableStatisticalAnalysis, out Double ConfidenceLevel, out Action<AgentEval.Comparison.StochasticProgress> OnProgress)
+    Void Deconstruct(out Int32 Runs, out Double SuccessRateThreshold, out Int32 MaxParallelism, out TimeSpan? DelayBetweenRuns, out Boolean EnableStatisticalAnalysis, out Double ConfidenceLevel, out Action<AgentEval.Comparison.StochasticProgress> OnProgress)
     Void Validate()
-    ctor(Int32 Runs = 10, Double SuccessRateThreshold = 0.8, Int32? Seed = null, Int32 MaxParallelism = 1, TimeSpan? DelayBetweenRuns = null, Boolean EnableStatisticalAnalysis = true, Double ConfidenceLevel = 0.95, Action<AgentEval.Comparison.StochasticProgress> OnProgress = null)
+    ctor(Int32 Runs = 10, Double SuccessRateThreshold = 0.8, Int32 MaxParallelism = 1, TimeSpan? DelayBetweenRuns = null, Boolean EnableStatisticalAnalysis = true, Double ConfidenceLevel = 0.95, Action<AgentEval.Comparison.StochasticProgress> OnProgress = null)
     static AgentEval.Comparison.StochasticOptions CI { get; }
     static AgentEval.Comparison.StochasticOptions Default { get; }
     static AgentEval.Comparison.StochasticOptions Quick { get; }
@@ -412,6 +411,7 @@ class AgentEval.Core.EvaluationResult
     Int64? InputTokenCount { get; init; }
     Int64? OutputTokenCount { get; init; }
     String JudgeLabel { get; init; }
+    String RubricDigest { get; init; }
     String RubricSeverity { get; init; }
     String Summary { get; init; }
     ctor()
@@ -470,6 +470,8 @@ interface AgentEval.Core.IHistoryInjectableAgent
 interface AgentEval.Core.IJudgePromptSource
     String PromptMaterial { get; }
     String SystemPromptId { get; }
+interface AgentEval.Core.IJudgeProviderSource
+    String ProviderName { get; }
 interface AgentEval.Core.IMemoryMetric : AgentEval.Core.IMetric
 interface AgentEval.Core.IMetric
     AgentEval.Core.MetricCategory Categories { get; }
@@ -560,10 +562,12 @@ enum AgentEval.Core.MetricCategory
 class AgentEval.Core.MetricResult
     Boolean Measured { get; init; }
     Boolean Passed { get; init; }
+    Boolean? ModelGraded { get; init; }
     Double Score { get; init; }
     IDictionary<String, Object> Details { get; init; }
     String Explanation { get; init; }
     String MetricName { get; init; }
+    String RubricDigest { get; init; }
     ctor()
     static AgentEval.Core.MetricResult Fail(String metricName, String explanation, Double score = 0, IDictionary<String, Object> details = null)
     static AgentEval.Core.MetricResult NotMeasured(String metricName, String reason, IDictionary<String, Object> details = null)
@@ -869,10 +873,13 @@ sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalPro
     Boolean Equals(Object obj)
     Double EstimatedCost { get; init; }
     Int32 GetHashCode()
+    Int32? JudgePanelSize { get; init; }
     Int32? TokensUsed { get; init; }
     String JudgeModel { get; init; }
+    String JudgeProvider { get; init; }
     String PromptHash { get; init; }
     String PromptId { get; init; }
+    String RubricDigest { get; init; }
     String ToString()
     String Type { get; init; }
     Void Deconstruct(out String Type, out String JudgeModel, out String PromptId, out String PromptHash, out Int32? TokensUsed, out Double EstimatedCost, out Boolean CacheHit)
@@ -1412,6 +1419,7 @@ interface AgentEval.Models.IRedTeamResult
     String AgentName { get; }
     String Summary { get; }
 static class AgentEval.Models.ModelPricing
+    const String TableName
     static Decimal? EstimateCost(String modelName, Int32 inputTokens, Int32 outputTokens)
     static IEnumerable<String> KnownModels { get; }
     static Int32 EstimatePromptTokens(String systemPrompt, String userInput)
@@ -1495,6 +1503,7 @@ class AgentEval.Models.TestResult
     Int32 ToolCallCount { get; }
     String ActualOutput { get; set; }
     String Details { get; set; }
+    String JudgeRubricDigest { get; set; }
     String TestName { get; init; }
     ctor()
 class AgentEval.Models.TestResultSummary

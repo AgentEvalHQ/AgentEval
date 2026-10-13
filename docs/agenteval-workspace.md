@@ -33,7 +33,7 @@ Three files are written:
   `schemaVersion: "1.0"`. The stable identity anchor.
 - **`README.md`** — human-readable overview of the layout.
 - **`.gitignore`** — excludes per-run artefacts (`subjects/*/*/runs/`), the
-  runs index, and red-team outputs from source control. Baselines and
+  runs index, AEF runs/jobs (`aef/runs/`, `aef/jobs/`), and red-team outputs from source control. Baselines and
   compliance evidence are not excluded.
 
 If `.agenteval/solution.json` already exists, `agenteval init-workspace` exits cleanly
