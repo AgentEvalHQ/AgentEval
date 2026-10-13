@@ -69,8 +69,8 @@ refusals to exit 2 and unexpected failures to exit 1. The CLI's `aef seal` retai
 The ID comes from `--runner-id`, then `AGENTEVAL_RUNNER_ID`, then `runnerId` in `~/.agenteval/runner.json`.
 There is no hostname fallback. That optional configuration file supports `runnerId` and a `tags` array only;
 the manifest derives platform/runtime/software versions and advertises provider `local` and target mode `live`.
-This runner uses process isolation and an endpoint that is already running. Signing identity is omitted until
-runner signing is configured and implemented.
+This runner uses process isolation and an endpoint that is already running. The capability manifest omits a
+signing identity; a signed job records its public `signingKeyId` in its options and events.
 
 Run a plan with `agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json`.
 The root must exist; when omitted it is discovered from the current directory, falling back to that directory.
@@ -177,6 +177,21 @@ separate subject/judge keys, case/time/cost limits, upfront and unresolved-targe
 missing usage, provider overrun and SIGINT cancellation. SIGINT is exercised on POSIX hosts; Windows explicitly
 skips that process-signal scenario, while cooperative cancellation remains covered by the .NET tests.
 No external model endpoint or paid call is used. Temporary fixtures are removed on exit.
+
+### Verify a signed native checkpoint
+
+After restoring and building the CLI, run:
+
+```bash
+bash tests/AgentEval.Results.Conformance/s1-exit-crosscheck.sh net8.0
+bash tests/AgentEval.Results.Conformance/s1-exit-crosscheck.sh net10.0
+```
+
+The test drives eval, redteam and an OWASP benchmark through loopback HTTP for one exact subject/version.
+It signs all three runs, decides a checkpoint with three threshold lanes, signs that checkpoint and checks
+it using the CLI and independent Python run, checkpoint, lane and signature verifiers. It also checks that
+changing the checkpoint invalidates its signature. Prompts, responses and private keys stay outside the
+retained evidence. This verifies the local evidence flow; it makes no claim about a deployed model's quality.
 
 ### Export a run, check it, sign it
 
@@ -459,7 +474,9 @@ python contracts/aef/tools/aef_conformance.py --command "<your implementation>" 
 ```
 
 AgentEval's .NET implementation (`AgentEval.Results`) is written from the specification text alone and passes the
-corpus for every conformance class but Runner. A third implementation, in any language, is welcome: §9 of the
+corpus for every conformance class, including Runner through its scripted target. The CLI also drives bounded
+live dataset runs, checked separately with loopback integration tests. A third implementation, in any language,
+is welcome: §9 of the
 specification says how to claim conformance.
 
 ## What AEF does not do

@@ -209,6 +209,10 @@
     href: export.md
   - name: AEF Evidence Format
     href: aef.md
+  - name: Local AEF Runner
+    href: aef.md#local-dataset-runner
+  - name: Signed Native Checkpoint
+    href: aef.md#verify-a-signed-native-checkpoint
   - name: Rich Evaluation Output
     href: rich-evaluation-output-guide.md
   - name: Security Scanning

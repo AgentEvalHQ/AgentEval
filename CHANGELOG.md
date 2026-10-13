@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Signed native checkpoint verification:** loopback eval, redteam and OWASP runs share one subject/version,
+  sign their seals and feed three threshold lanes into a signed checkpoint. The crosscheck verifies the complete
+  flow with the CLI and independent Python tools, including signature tampering and content privacy assertions.
+  Runner capability, conformance and workspace documentation now describes the implemented local behavior.
+
 - **HTTP test isolation:** the ASSERT sample/server tests share a non-parallel xUnit collection to
   isolate their ephemeral-port and wildcard-listener setup from concurrent suite load.
 

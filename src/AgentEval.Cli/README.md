@@ -64,7 +64,9 @@ The local runner supports text-only dataset plans against existing OpenAI-compat
 It requires exact known model prices, explicit dataset case IDs and purpose-scoped credential references.
 Jobs save their plan, manifest, events and sealed runs under `.agenteval/aef/jobs/<jobId>/`.
 See [AEF runner configuration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md#local-dataset-runner)
-for plan settings and exit codes.
+for plan settings and exit codes. `--aef-key` signs produced runs, including aborted runs; credentials and private
+keys are not copied into job evidence. The offline `s1-exit-crosscheck.sh` in `tests/AgentEval.Results.Conformance/`
+verifies signed eval/redteam/bench evidence and their three-lane checkpoint with .NET and Python.
 
 ### Stochastic evaluation (multi-run)
 
