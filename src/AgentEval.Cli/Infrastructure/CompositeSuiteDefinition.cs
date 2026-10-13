@@ -22,22 +22,22 @@ internal static class CompositeSuiteDefinition
             var name = "implementation." + assembly.GetName().Name;
             if (!inputs.ContainsKey(name)) inputs[name] = SuiteDefinitionManifest.Hash(File.ReadAllBytes(assembly.Location));
         }
-        JsonObject? Capture(IEval eval, bool emitted, int depth)
+        JsonObject? Capture(IEval eval, bool emitted, int depth, bool collectCases = true)
         {
             if (depth > EvalTreeLimits.MaxTreeWalkDepth) return null;
             Implementation(eval.GetType());
-            if (emitted) cases.Add(eval.Key);
+            if (emitted && collectCases) cases.Add(eval.Key);
             var node = new JsonObject { ["key"] = eval.Key, ["version"] = eval.Version, ["type"] = eval.GetType().FullName };
             switch (eval)
             {
                 case IEvalDefinitionWrapper wrapper:
                     if (wrapper.Key != wrapper.DefinitionInner.Key) return null;
-                    var wrapped = Capture(wrapper.DefinitionInner, emitted, depth + 1);
+                    var wrapped = Capture(wrapper.DefinitionInner, emitted, depth + 1, collectCases);
                     if (wrapped is null) return null;
                     node["inner"] = wrapped;
                     return node;
                 case AgentScenarioEval scenario:
-                    var inner = Capture(scenario.Inner, emitted, depth + 1);
+                    var inner = Capture(scenario.Inner, emitted, depth + 1, collectCases);
                     if (inner is null) return null;
                     node["scenarioInput"] = scenario.ScenarioInputDigest;
                     node["inner"] = inner;
@@ -69,7 +69,7 @@ internal static class CompositeSuiteDefinition
                     var components = new JsonArray();
                     foreach (var component in composite.Components)
                     {
-                        var child = Capture(component.Eval, true, depth + 1);
+                        var child = Capture(component.Eval, true, depth + 1, collectCases);
                         if (child is null) return null;
                         components.Add(new JsonObject
                         {
@@ -78,6 +78,19 @@ internal static class CompositeSuiteDefinition
                         });
                     }
                     node["components"] = components;
+                    return node;
+                case IEvalInstrumentSource instrumentSource:
+                    var instrumentConfiguration = instrumentSource.CaptureConfiguration(input);
+                    if (instrumentConfiguration is null) return null;
+                    node["configuration"] = instrumentConfiguration.DeepClone();
+                    var instruments = new JsonArray();
+                    foreach (var instrument in instrumentSource.DefinitionInstruments)
+                    {
+                        var captured = Capture(instrument, false, depth + 1, false);
+                        if (captured is null) return null;
+                        instruments.Add(captured);
+                    }
+                    node["instruments"] = instruments;
                     return node;
                 case IEvalConfigurationSource configured:
                     var configuration = configured.CaptureConfiguration(input);

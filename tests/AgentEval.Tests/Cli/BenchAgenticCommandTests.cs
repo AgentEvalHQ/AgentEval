@@ -327,6 +327,25 @@ public class BenchAgenticCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task BenchAgentic_DiagnosticsWithoutTrace_SealsDeclaredUnmeasuredRoster()
+    {
+        InitWorkspace();
+        var aef = new DirectoryInfo(Path.Combine(_root, "diagnostic-aef"));
+        var exit = await BenchAgenticCommand.RunAsync(preset: "glass-box-diagnostics", subject: "Diagnostics", rootOverride: _root,
+            inputText: SuppliedQuestion, responseText: SuppliedAnswer, evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null, aef: aef);
+        Assert.True(exit is 9 or 10 or 11, $"Expected an unmeasured gate; got {exit}.");
+        var run = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(8, definition.CaseIds.Count);
+        var header = global::System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
+    }
+
+    [Fact]
     public async Task BenchAgentic_RagQuality_WithAReferenceAndContext_GradesEveryLeaf_AndPasses()
     {
         InitWorkspace();

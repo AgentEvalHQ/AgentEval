@@ -17,7 +17,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// transparency (EU AI Act Art. 14 / GDPR Art. 32 evidence), not inherently "bad" behavior by the agent.</para>
 /// <para>Reads ChatTurn Response entries from the Glass Box trace; skipped when no trace / no ChatTurn responses.</para>
 /// </summary>
-public sealed class SafetyInterventionEval : IEval
+public sealed class SafetyInterventionEval : IEvalConfigurationSource
 {
     private const string KeyValue = "safety_intervention";
     private const string NameValue = "Safety Intervention Rate";
@@ -36,6 +36,9 @@ public sealed class SafetyInterventionEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

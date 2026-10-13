@@ -19,7 +19,7 @@ namespace AgentEval.Evals.Agentic.Security;
 /// The forbidden pattern is supplied via the constructor (default: common PII/secret markers). Reads
 /// ToolExecution entries; skipped when no trace / no tool-execution entries.</para>
 /// </summary>
-public sealed class ArgumentSanitizationEval : IEval
+public sealed class ArgumentSanitizationEval : IEvalConfigurationSource
 {
     private const string KeyValue = "argument_sanitization";
     private const string NameValue = "Argument Sanitization";
@@ -48,6 +48,23 @@ public sealed class ArgumentSanitizationEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["patternDigest"] = "sha256:" + Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(
+            global::System.Text.Encoding.UTF8.GetBytes(_forbidden.ToString()))).ToLowerInvariant(),
+        ["options"] = (int)_forbidden.Options,
+        ["timeoutTicks"] = _forbidden.MatchTimeout.Ticks,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input)
+    {
+        // A Regex does not expose its construction culture or custom subclass behavior.
+        return _forbidden.GetType() == typeof(Regex) && _forbidden.Options.HasFlag(RegexOptions.CultureInvariant)
+            ? CaptureConfiguration() : null;
+    }
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

@@ -33,6 +33,7 @@ public sealed class CompositeSuiteDefinitionTests
     [InlineData("user-experience")]
     [InlineData("telemetry")]
     [InlineData("judge-quality")]
+    [InlineData("glass-box-diagnostics")]
     [InlineData("stochastic-stability")]
     public void Capture_AgenticPreset_IdentifiesConfiguredInstrumentsWithoutCalls(string preset)
     {
@@ -105,6 +106,55 @@ public sealed class CompositeSuiteDefinitionTests
         Assert.NotEqual(new JudgeDriftEval().CaptureConfiguration().ToJsonString(), new JudgeDriftEval(0.1).CaptureConfiguration().ToJsonString());
         Assert.NotEqual(new JudgeAgreementEval().CaptureConfiguration().ToJsonString(), new JudgeAgreementEval(0.9).CaptureConfiguration().ToJsonString());
         Assert.NotEqual(new CalibrationAccuracyEval().CaptureConfiguration().ToJsonString(), new CalibrationAccuracyEval(0.9).CaptureConfiguration().ToJsonString());
+    }
+
+    [Fact]
+    public void Capture_Diagnostics_BindsBaselineJudgeAndRegexPolicyWithoutAddingCases()
+    {
+        string Digest(IEval leaf, string? baseline = null)
+        {
+            var graph = new CompositeEval("root", "root", "test", "1", [new(leaf)], WeightedSumAggregation.Instance);
+            var metadata = new Dictionary<string, object>();
+            if (baseline is not null) metadata["trusted_system_prompt"] = baseline;
+            var manifest = CompositeSuiteDefinition.TryCreate("bench:diagnostics", graph, new EvalInput("q", "r", Metadata: metadata), 1)!;
+            Assert.NotNull(manifest);
+            Assert.Single(manifest.CaseIds);
+            Assert.DoesNotContain("private baseline", manifest.ToJson().ToJsonString());
+            return manifest.Digest;
+        }
+        var injection = new AgentEval.Evals.Agentic.Security.SystemPromptInjectionEval(new Judge("prompt"));
+        Assert.NotEqual(Digest(injection), Digest(injection, ""));
+        Assert.NotEqual(Digest(injection, "private baseline"), Digest(injection, "changed baseline"));
+        Assert.NotEqual(Digest(injection), Digest(new AgentEval.Evals.Agentic.Security.SystemPromptInjectionEval(new Judge("changed"))));
+        Assert.NotEqual(Digest(injection), Digest(new AgentEval.Evals.Agentic.Security.SystemPromptInjectionEval()));
+        AgentEval.Evals.Agentic.Security.ArgumentSanitizationEval RegexEval(string pattern, int timeout) => new(
+            new global::System.Text.RegularExpressions.Regex(pattern, global::System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+                TimeSpan.FromMilliseconds(timeout)));
+        Assert.NotEqual(Digest(RegexEval("secret", 100)), Digest(RegexEval("changed", 100)));
+        Assert.NotEqual(Digest(RegexEval("secret", 100)), Digest(RegexEval("secret", 200)));
+        var unknown = new AgentEval.Evals.Agentic.Security.ArgumentSanitizationEval(new global::System.Text.RegularExpressions.Regex("(?i)secret"));
+        Assert.Null(unknown.CaptureConfiguration(new EvalInput("q", "r")));
+    }
+
+    private sealed class NestedInstrument(IEval instrument) : IEvalInstrumentSource
+    {
+        public string Key => "outer";
+        public string Name => Key;
+        public string Category => "test";
+        public string Version => "1";
+        public IReadOnlyList<IEval> DefinitionInstruments => [instrument];
+        public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void Capture_CompositeInstrument_DoesNotAddItsInternalCasesToEmittedRoster()
+    {
+        var graph = new CompositeEval("root", "root", "test", "1",
+            [new(new NestedInstrument(Build(new Judge("prompt"))))], WeightedSumAggregation.Instance);
+        var definition = CompositeSuiteDefinition.TryCreate("bench:nested", graph, new EvalInput("q", "r"), 1)!;
+        Assert.Equal(new[] { "outer" }, definition.CaseIds);
+        Assert.Contains("leaf", definition.ToJson().ToJsonString());
     }
 
     private sealed class UnidentifiedJudge : IEvaluator

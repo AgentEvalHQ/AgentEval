@@ -15,7 +15,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// <b>Severity</b> on fail: <c>low</c>.</para>
 /// <para>Reads ChatTurn Response entries from the Glass Box trace; skipped when no trace / no ChatTurn responses.</para>
 /// </summary>
-public sealed class TruncationDetectionEval : IEval
+public sealed class TruncationDetectionEval : IEvalConfigurationSource
 {
     private const string KeyValue = "truncation_detection";
     private const string NameValue = "Truncation Detection";
@@ -34,6 +34,9 @@ public sealed class TruncationDetectionEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

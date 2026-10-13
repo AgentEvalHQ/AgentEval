@@ -20,7 +20,7 @@ namespace AgentEval.Evals.Agentic.Diagnostics;
 /// <para><b>Input</b>: reads <see cref="TraceEntryScope.ToolExecution"/> entries from
 /// <c>EvalInput.GetTrace()</c>. Skipped when no trace is attached or the trace has no tool-execution entries.</para>
 /// </summary>
-public sealed class ToolReliabilityEval : IEval
+public sealed class ToolReliabilityEval : IEvalConfigurationSource
 {
     private const string KeyValue = "tool_reliability";
     private const string NameValue = "Tool Reliability";
@@ -39,6 +39,9 @@ public sealed class ToolReliabilityEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
