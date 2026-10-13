@@ -247,6 +247,34 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Write_MoreThan64Rubrics_PreservesEveryInstrumentInSignedEvidence(bool aborted)
+    {
+        var leaves = Enumerable.Range(0, 65).Select(i =>
+        {
+            var leaf = Leaf($"criterion-{i}", "pass", 1, "atomic-llm", "judge");
+            return leaf with { Provenance = leaf.Provenance with { RubricDigest = $"sha256:{i:x64}" } };
+        }).ToArray();
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), leaves);
+        using var signer = AgentEval.Results.Signatures.EcdsaP256Signer.Generate();
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+                Signer = signer, AbortReason = aborted ? "report-error" : null,
+            }, Start, Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.Equal(leaves.Select(l => l.Provenance.RubricDigest), judges.Select(j => (string?)j!["rubricDigest"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void WriteAbortedEmpty_NoCompletedEvaluation_WritesNoPlannedResultsOrJudges()
     {

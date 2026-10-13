@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Large native judge inventories:** draft AEF run/seal schemas retain up to 4096 distinct judge/rubric
+  entries. This fixes GDPR evidence loss after report failures or cancellation when the old 64-entry
+  limit was exceeded. Consumers of the earlier draft schemas need the updated schema files.
+
 - **Native CLI provenance:** AEF headers record the registered command and observed Git commit, branch
   and dirty state in `agenteval.cli`, alongside existing store links. Git inspection is bounded; unknown
   fields stay absent. Command arguments, working-directory paths and Git status filenames are not recorded.

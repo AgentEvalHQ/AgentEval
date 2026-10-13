@@ -5,6 +5,10 @@
 AEF 1.0 is settled but not yet tagged. These are changes to 1.0 itself, made before the `aef-1.0` tag: what critic
 round 11 found, and what AgentEval needs to write AEF natively. None is an erratum.
 
+- **Native suites with many rubrics** ([RUN-9], [SEAL-5]): run and seal judge lists accept up to 4096 entries,
+  raised from 64. Standard GDPR evaluation exceeds the old limit when every observed rubric is retained.
+  Writer and derived reader schemas change together; the run-plan limit remains 16. This is a pre-release
+  correction to the draft, and consumers with older draft schemas must update to read these larger lists.
 - **A summary's `sum` and `value` are compared exactly** ([SUM-5], [SUM-8], §3.6): each is defined to one binary64
   value (`value` is the rounded `sum` divided by `n`; an even count's median is the exact mean of the two middle values,
   rounded once), so a Run verifier compares them exactly, and an exact mean where SUM-5 gives the division (`0.42` for
