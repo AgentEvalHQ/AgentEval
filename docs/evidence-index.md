@@ -5,8 +5,8 @@ index. It targets .NET 8, 9 and 10 and keeps SQLite dependencies outside the
 BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
 Transactional source projection, AEF snapshot imports and verified observation
-imports, legacy/root reconciliation and rebuild/recovery are implemented. Stable query
-pagination is the next slice.
+imports, legacy/root reconciliation, rebuild/recovery and source inventory pagination
+are implemented. Result and observation pagination remain subsequent slices.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -79,7 +79,7 @@ Adapters must validate their unsigned range before insertion.
 
 Indexes cover source discovery, subjects, suites, cases, metrics, trace identity
 and ordered group members. These are the schema foundations for stable queries;
-they do not yet constitute a pagination API or a measured scale guarantee.
+source inventory pagination below uses the root/path ordering; the remaining query families still need pagination and measured scale acceptance.
 
 ## Atomic initial and incremental writes
 
@@ -107,8 +107,10 @@ source coverage before deciding a source disappeared; a partial or failed scan
 must never authorize deletion. A retained previous projection means “last indexed
 snapshot,” not a guarantee that current source files still match it.
 
-The writer holds the sidecar ownership lease for its lifetime and refuses
-concurrent operations rather than queueing. Defaults are 100000 rows per source
+The writer holds a shared replacement lease (`.lock`) plus an exclusive writer
+lease (`.writer.lock`) for its lifetime. Queries can share the replacement lease;
+schema mutation and rebuild promotion require it exclusively. The single writer
+refuses concurrent writer operations rather than queueing. Defaults are 100000 rows per source
 (including the source row), 16 MiB aggregate projection text, 100000 retained
 sources, and 1000000 total source-owned rows. Configurable maxima are respectively
 1000000, 64 MiB, 1000000 and 10000000. The byte limit bounds projected text; it is
@@ -239,3 +241,13 @@ python scripts/verify-index-rebuild.py --fixture scripts/index-rebuild-smoke/bin
 ```
 
 The offline fixture starts a real helper, waits until candidate preparation has committed a source, kills that helper while its writer is still alive, and uses fresh processes to inspect and discard the unready candidate. It then prepares and publishes a replacement, exits without returning the publication result, retries from a fresh process, verifies the exact backup and new rows, rejects root rebinding after restart and refuses a changed target. Verified on native Windows .NET 10 and Linux .NET 8/10. Unit tests additionally reconstruct interrupted-copy and backup-before-replacement states. This is process-failure evidence, not a power-loss durability claim.
+
+### Stable source inventory pages
+
+`IEvidenceSourceReader.Read` returns detached source provenance entries ordered by SQLite binary `(root_id, relative_path)`, using the existing root/path index and a keyset predicate rather than offsets. The optional root filter is exact and case-sensitive. Page size is 1..500 (default 100). One extra row detects continuation; materialized string payload is capped at 2 MiB of raw UTF-8 text, checked before fetching strings. This is not a serialized HTTP-response size limit. An oversized page fails explicitly; restart with a smaller page size.
+
+Cursors are bounded canonical base64url JSON (maximum 65536 characters) carrying protocol/schema version, index instance, generation, root filter, page size and the last key. A cursor is query state, not an authentication token. Changing root filter/page size, malformed or noncanonical cursor bytes refuse. Changed generation or replacement instance returns `stale-cursor`; the caller restarts traversal. No-op writes keep cursors valid. Global generation intentionally invalidates even a root-scoped cursor when another root changes.
+
+Each read holds a shared replacement lease, validates the current schema without initialization/migration, then reads metadata and rows in one deferred, read-only SQLite transaction. It leaves no connection or snapshot alive between pages and coexists with the single writer. Replacement/schema operations require exclusive ownership. The first implementation performs full schema/integrity validation per page; reducing that cost safely belongs to scale acceptance. No fixed execution-time or large-index throughput claim is made.
+
+SQLite's [row-value scrolling example](https://www.sqlite.org/rowvalue.html) describes the keyset approach, and the provider documents [deferred transactions](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/transactions). Unicode order follows SQLite binary UTF-8 ordering rather than .NET UTF-16 ordinal ordering. Tests cover multiple roots, Unicode ordering, update/rebuild invalidation, no-op writes, malformed/query-mismatched cursors, missing-index noncreation, ownership conflicts and raw UTF-8 byte limits. The subprocess fixture also verifies queries during an open writer and refusal of replacement ownership until it closes.

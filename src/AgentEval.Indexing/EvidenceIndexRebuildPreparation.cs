@@ -150,7 +150,7 @@ public sealed class EvidenceIndexRebuildPreparation(IEvidenceIndexSchema schema)
         // Called only for this invocation's unique directory. Do not recurse into unexpected entries:
         // callbacks get a writer, but trusted filesystem ownership is still a required precondition.
         var allowed = new HashSet<string>(StringComparer.Ordinal)
-        { OwnerName, ReceiptName, DatabaseName, DatabaseName + ".lock", DatabaseName + "-journal", DatabaseName + "-wal", DatabaseName + "-shm" };
+        { OwnerName, ReceiptName, DatabaseName, DatabaseName + ".lock", DatabaseName + ".writer.lock", DatabaseName + "-journal", DatabaseName + "-wal", DatabaseName + "-shm" };
         var entries = new List<string>();
         foreach (var path in Directory.EnumerateFileSystemEntries(directory))
         {

@@ -26,6 +26,17 @@ def main():
 
         original = run("initialize")
         original_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+        live_writer = subprocess.Popen(command + ["hold-writer", str(target)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        writer_lines = queue.Queue()
+        threading.Thread(target=lambda: writer_lines.put(live_writer.stdout.readline()), daemon=True).start()
+        try:
+            assert writer_lines.get(timeout=30).strip() == "HOLDING_TARGET"
+            assert len(run("page")["Items"]) == 1
+            assert run("capture", expected=4)["Code"] == "busy-or-unavailable"
+        finally:
+            if live_writer.poll() is None:
+                live_writer.kill()
+            live_writer.communicate(timeout=10)
         holding = subprocess.Popen(command + ["hold", str(target)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         lines = queue.Queue()
         threading.Thread(target=lambda: lines.put(holding.stdout.readline()), daemon=True).start()
@@ -75,7 +86,7 @@ def main():
         assert refusal["Code"] == "stale-rebuild-target"
         assert target.read_bytes() == b"later target bytes"
         run("discard", stale["Directory"])
-        print("PASS: killed preparation, restart inspection/discard, committed replacement retry, exact backup, persistent root binding, stale-target refusal")
+        print("PASS: shared reader/writer ownership, killed preparation, restart inspection/discard, committed replacement retry, exact backup, persistent root binding, stale-target refusal")
 
 
 if __name__ == "__main__":

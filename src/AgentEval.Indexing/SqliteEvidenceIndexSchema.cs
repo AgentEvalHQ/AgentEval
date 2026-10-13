@@ -56,7 +56,10 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
     internal EvidenceIndexSchemaInfo InspectWhileOwned(EvidenceIndexOptions options, CancellationToken cancellationToken)
         => EnsureCore(options, leaseHeld: true, allowInitialize: false, cancellationToken);
 
-    private EvidenceIndexSchemaInfo EnsureCore(EvidenceIndexOptions options, bool leaseHeld, bool allowInitialize, CancellationToken cancellationToken)
+    internal EvidenceIndexSchemaInfo InspectReadOnlyWhileOwned(EvidenceIndexOptions options, CancellationToken cancellationToken)
+        => EnsureCore(options, leaseHeld: true, allowInitialize: false, cancellationToken, readOnly: true);
+
+    private EvidenceIndexSchemaInfo EnsureCore(EvidenceIndexOptions options, bool leaseHeld, bool allowInitialize, CancellationToken cancellationToken, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
@@ -70,6 +73,7 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
         CheckDirectories(parent);
         CheckFile(path);
         CheckFile(path + ".lock");
+        CheckFile(path + ".writer.lock");
         foreach (var suffix in new[] { "-journal", "-wal", "-shm" }) CheckFile(path + suffix);
         if (File.Exists(path) && new FileInfo(path).Length > options.MaxDatabaseBytes) throw new EvidenceIndexException("size-limit");
         Directory.CreateDirectory(parent);
@@ -77,8 +81,8 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
         using var ownership = leaseHeld ? null : new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         try
         {
-            using var connection = Open(path, options.BusyTimeoutSeconds);
-            using var transaction = connection.BeginTransaction();
+            using var connection = Open(path, options.BusyTimeoutSeconds, readOnly);
+            using var transaction = connection.BeginTransaction(deferred: readOnly);
             var application = ScalarLong(connection, transaction, "PRAGMA application_id");
             var version = ScalarLong(connection, transaction, "PRAGMA user_version");
             var initialized = false;
@@ -147,11 +151,11 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
         catch (SqliteException error) { throw new EvidenceIndexException(error.SqliteErrorCode is 5 or 6 ? "busy" : "invalid-database"); }
     }
 
-    internal static SqliteConnection Open(string path, int timeout)
+    internal static SqliteConnection Open(string path, int timeout, bool readOnly = false)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = path, Mode = SqliteOpenMode.ReadWriteCreate, Pooling = false,
+            DataSource = path, Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate, Pooling = false,
             ForeignKeys = true, DefaultTimeout = timeout
         }.ToString());
         try { connection.Open(); Execute(connection, null, "PRAGMA trusted_schema=OFF;"); return connection; }

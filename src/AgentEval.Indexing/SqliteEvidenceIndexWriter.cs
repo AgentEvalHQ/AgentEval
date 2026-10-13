@@ -23,6 +23,7 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
     private readonly EvidenceIndexWriteLimits _limits;
     private readonly SqliteConnection _connection;
     private readonly FileStream _lease;
+    private readonly FileStream _writerLease;
     private bool _disposed;
     private static readonly string[] SourceTables = ["sources", "evaluation_runs", "evaluation_results", "metric_values", "observation_batches", "observed_spans", "observed_fields"];
 
@@ -38,18 +39,21 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
         schema.EnsureCurrent(options, cancellationToken);
         _options = options;
         var path = Path.GetFullPath(options.DatabasePath);
-        _lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        _lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.Read, FileShare.Read);
         SqliteConnection? opened = null;
+        FileStream? writerLease = null;
         try
         {
+            writerLease = new FileStream(path + ".writer.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             opened = SqliteEvidenceIndexSchema.Open(path, options.BusyTimeoutSeconds);
             using var command = opened.CreateCommand(); command.CommandText = "PRAGMA page_size";
             var pageSize = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
             command.CommandText = "PRAGMA max_page_count=" + (options.MaxDatabaseBytes / pageSize).ToString(CultureInfo.InvariantCulture);
             command.ExecuteScalar();
             _connection = opened;
+            _writerLease = writerLease;
         }
-        catch { opened?.Dispose(); _lease.Dispose(); throw; }
+        catch { opened?.Dispose(); writerLease?.Dispose(); _lease.Dispose(); throw; }
     }
 
     /// <inheritdoc />
@@ -347,6 +351,6 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
     /// <inheritdoc />
     public void Dispose()
     {
-        lock (_gate) { if (_disposed) return; _disposed = true; _connection.Dispose(); _lease.Dispose(); }
+        lock (_gate) { if (_disposed) return; _disposed = true; _connection.Dispose(); _writerLease.Dispose(); _lease.Dispose(); }
     }
 }

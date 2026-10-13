@@ -19,6 +19,13 @@ try
             { writer.BindRoots([Root()]); writer.Upsert(Source("old")); }
             Print(schema.EnsureCurrent(options)); break;
         case "capture": Print(promotion.CaptureTarget(options)); break;
+        case "page": Print(new SqliteEvidenceSourceReader(options).Read(new())); break;
+        case "hold-writer":
+            using (var writer = new SqliteEvidenceIndexWriter(options, schema))
+            {
+                Console.WriteLine("HOLDING_TARGET"); Console.Out.Flush(); Thread.Sleep(Timeout.Infinite);
+            }
+            break;
         case "prepare":
         case "hold":
             Print(new EvidenceIndexRebuildPreparation(schema).Prepare(options, (writer, token) =>
@@ -55,6 +62,7 @@ try
     return 0;
 }
 catch (EvidenceIndexException error) { Print(new { error.Code }); return 3; }
+catch (IOException) { Print(new { Code = "busy-or-unavailable" }); return 4; }
 
 static EvidenceIndexSource Source(string path) => new("root", path, new string('a', 64), IndexedEvidenceKind.Legacy,
     IndexedVerification.Unverified, new(path, null, "agent:fixture", null, null, null, "PASS", "unknown"), [], [], null);

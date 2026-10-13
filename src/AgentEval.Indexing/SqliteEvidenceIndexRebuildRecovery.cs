@@ -100,7 +100,7 @@ public sealed class SqliteEvidenceIndexRebuildRecovery : IEvidenceIndexRebuildRe
             CheckOptionalFile(database + ".lock");
             writer = new FileStream(database + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             var allowed = new HashSet<string>(StringComparer.Ordinal)
-                { OwnerName, ReceiptName, DatabaseName, DatabaseName + ".lock", DatabaseName + "-journal", DatabaseName + "-wal", DatabaseName + "-shm",
+                { OwnerName, ReceiptName, DatabaseName, DatabaseName + ".lock", DatabaseName + ".writer.lock", DatabaseName + "-journal", DatabaseName + "-wal", DatabaseName + "-shm",
                     "promotion.json", "publish.sqlite", "previous.sqlite" };
             var files = new List<string>();
             foreach (var path in System.IO.Directory.EnumerateFileSystemEntries(directory, "*", new EnumerationOptions { AttributesToSkip = 0, IgnoreInaccessible = false }))
@@ -109,7 +109,7 @@ public sealed class SqliteEvidenceIndexRebuildRecovery : IEvidenceIndexRebuildRe
                 var filename = Path.GetFileName(path);
                 if (files.Count == allowed.Count || !allowed.Contains(filename) || AefFolder.KindOf(path) != AefEntryKind.File)
                     throw new EvidenceIndexException("unexpected-rebuild-entry");
-                var maximum = filename is OwnerName or ReceiptName or "promotion.json" or DatabaseName + ".lock" ? 32 << 10 : target.MaxDatabaseBytes;
+                var maximum = filename is OwnerName or ReceiptName or "promotion.json" or DatabaseName + ".lock" or DatabaseName + ".writer.lock" ? 32 << 10 : target.MaxDatabaseBytes;
                 if (new FileInfo(path).Length > maximum) throw new EvidenceIndexException("rebuild-file-limit");
                 files.Add(path);
             }
