@@ -507,8 +507,8 @@ a pass supported by only some requested trials becomes a warning. `--sut mock` s
 - `agenteval bench --list` prints the registry-backed family catalog.
 - **AEF runs:** `gdpr`, `eu-ai-act`, `agentic`, `owasp`, `mitre`, `nist`, `perf`, `memory`, `longmemeval`,
   `typedmemeval`, `autoaudit`, `trace-fidelity` and `workflow-trace-fidelity` write each run as a sealed AEF run into the workspace's `.agenteval/aef` (or `--aef <dir>`;
-  `--no-aef` writes none; `--subject-version` records the subject's version, except on `autoaudit`, which audits
-  several models at once and records each as `model:<name>` with no version). A real target is recorded as `live`, a
+  `--no-aef` writes none; `--subject-version` records the subject's exact version). Autoaudit applies the supplied
+  version to every audited `model:<name>`; use separate invocations when versions differ. A real target is recorded as `live`, a
   graded `--response` or trace as `replayed`. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench).
   Saved runs without an exact subject version cannot satisfy a checkpoint lane; native commands print a note after writing them.
   Eval and red-team suppress this informational note with `--quiet`.

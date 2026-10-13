@@ -180,6 +180,11 @@ No external model endpoint or paid call is used. Temporary fixtures are removed 
 
 ### Export a run, check it, sign it
 
+Export warns on stderr when a native header in the workspace’s `.agenteval/aef/runs/` links
+the same store run or trial. Prefer that native evidence: conversion is a separate imported projection.
+Discovery ignores imported headers and malformed files; custom output locations are not searched.
+The notice does not certify integrity—use `aef verify` for that.
+
 ```bash
 # Convert one run of the .agenteval store (store v1 records no target mode: say so if it ran live)
 agenteval aef export .agenteval --run 2026-10-08T120000Z-a1b2 ./aef-run --target-mode live --no-seal
@@ -207,6 +212,9 @@ exported run is never passed off as live evidence unless you say it was. The ful
 §7.5.
 
 ## Runs from eval, redteam and bench
+
+`bench autoaudit --subject-version <version>` records that exact version for each audited subject, including
+interrupted runs. Run separate audits when subjects have different versions. Without the flag, the version stays unknown.
 
 Native CLI runs include `ext.agenteval.cli` with the registered command (`verb`) and, when Git inspection succeeds,
 `gitCommit`, `gitBranch` and `gitDirty` observed in the invocation directory. Unknown Git fields are omitted.
@@ -391,7 +399,7 @@ Early scan failures retain only completed probes; a scan interrupted before its 
 Partially evaluated composites retain completed leaves alongside typed error/skipped states for unfinished work.
 Native run options accept `Config` and `CostPolicy`. CLI configuration uses an explicit list of applied settings:
 eval trial counts, repeated-run success thresholds, named metrics, and sampling settings (only for endpoint targets);
-red-team intensity, attack selection and failure policy; benchmark preset and requested trial count, including aborts.
+red-team intensity, attack selection, failure policy and configured judge mode; benchmark preset and requested trial count, including aborts.
 Eval uses `config.thresholds.case` when every dataset case has the same passing score. With differing scores,
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions

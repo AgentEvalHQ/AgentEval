@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory(prefix="aef-mock-") as temporary:
             args = ["bench", "perf", "latency", "--root", str(workspace), "--subject", "mock-subject", "--sut", "mock"]
         elif family == "autoaudit":
             args = ["bench", "autoaudit", "--sut", "mock"]
+        args += ["--subject-version", "fixture-v1"]
         invoke(args, 11, workspace)
         assert not list(store.iterdir()), "Default mock wrote legacy data or AEF"
         destination = workspace / "evidence"
@@ -41,6 +42,7 @@ with tempfile.TemporaryDirectory(prefix="aef-mock-") as temporary:
         for header_path in headers:
             run = header_path.parent
             header = json.loads(header_path.read_text())
+            assert header["subject"]["version"] == "fixture-v1", header
             assert header["execution"]["targetMode"] == "mocked"
             assert not header.get("judges"), header
             gates = [json.loads(line) for line in (run / "gates.ndjson").read_text().splitlines()]

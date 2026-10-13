@@ -280,7 +280,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-                BenchAutoAuditCommand.RunAsync(null, mock: true, ct: cancel.Token, aef: destination));
+                BenchAutoAuditCommand.RunAsync(null, models: null, mock: true, ct: cancel.Token, clientOverride: null, aef: destination, noAef: false, subjectVersion: "fixture-v1"));
         }
         finally { Console.SetOut(original); }
         var headers = Directory.GetFiles(destination.FullName, "run.json", SearchOption.AllDirectories);
@@ -289,10 +289,34 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         {
             var run = Path.GetDirectoryName(file)!;
             AssertIntact(run);
+            Assert.Equal("fixture-v1", (string?)Document(run, "run.json")["subject"]!["version"]);
             Assert.Equal("aborted", (string?)Document(run, "run.json")["status"]);
             Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
             var lines = File.Exists(Path.Combine(run, "results.ndjson")) ? File.ReadAllLines(Path.Combine(run, "results.ndjson")) : [];
             Assert.Equal(afterReport, lines.Length > 0);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(false, "fixture-v1")]
+    [InlineData(true, null)]
+    [InlineData(true, "fixture-v1")]
+    public async Task Autoaudit_SubjectVersion_PreservesExplicitValueOrAbsence(bool mock, string? version)
+    {
+        using var client = new AgentEval.Testing.ScriptedChatClient()
+            .AddToolCall("c1", "Lookup", new Dictionary<string, object?> { ["customerId"] = "4471" })
+            .AddText("Customer 4471 is active with a balance of $120.40 and one open billing ticket.");
+        var destination = new DirectoryInfo(Path.Combine(_root, "versioned-audit"));
+        Assert.Equal(mock ? 11 : 0, await BenchAutoAuditCommand.RunAsync(null, mock ? null : ["fixture-model"], mock,
+            CancellationToken.None, mock ? null : _ => client, destination, false, version));
+        var headers = Directory.GetFiles(destination.FullName, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(mock ? 3 : 1, headers.Length);
+        foreach (var header in headers)
+        {
+            var dir = Path.GetDirectoryName(header)!;
+            AssertIntact(dir);
+            Assert.Equal(version, (string?)Document(dir, "run.json")["subject"]!["version"]);
         }
     }
 
@@ -897,8 +921,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(judge.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!);
     }
 
-    [Fact]
-    public async Task Redteam_HttpTarget_RecordsItsPolicyAndJudgeUsage()
+    [Theory]
+    [InlineData("primary", true)]
+    [InlineData(" FaLlBaCk ", true)]
+    [InlineData("primary", false)]
+    public async Task Redteam_HttpTarget_RecordsItsPolicyAndJudgeUsage(string mode, bool withJudge)
     {
         await using var agent = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
         await using var judge = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: not determined");
@@ -906,7 +933,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         {
             Endpoint = agent.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
             Attacks = "Misinformation,InsecureOutput", MaxProbes = 1,
-            JudgeEndpoint = judge.Endpoint, JudgeModel = "local-judge", JudgeApiKey = "local-test",
+            JudgeEndpoint = withJudge ? judge.Endpoint : null, JudgeModel = "local-judge", JudgeApiKey = "local-test", JudgeMode = mode,
             Format = "json", Output = new FileInfo(Path.Combine(_root, "redteam.json")), Quiet = true,
             Aef = new DirectoryInfo(Path.Combine(_root, "redteam-aef")), FailOn = "never",
         };
@@ -915,9 +942,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.NotEmpty(agent.Requests);
-        Assert.NotEmpty(judge.Requests);
+        // These conclusive refusals need a judge only in primary mode; fallback remains unused.
+        var judgeCalled = withJudge && mode.Trim().Equals("primary", StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(judgeCalled, judge.Requests.Count > 0);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
+        Assert.Equal(withJudge ? mode.Trim().ToLowerInvariant() : null, (string?)Document(dir, "run.json")["config"]!["judgeMode"]);
         Assert.Equal("never", (string?)Document(dir, "run.json")["config"]!["failOn"]);
         Assert.Equal("quick", (string?)Document(dir, "run.json")["config"]!["intensity"]);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
@@ -925,8 +955,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("fail-on:never", (string?)gate["rule"]!["strategy"]);
         Assert.Equal(exit, (int)gate["exitCode"]!);
         Assert.Equal("ship", (string?)gate["outcome"]);
-        var usage = Assert.Single(Document(dir, "summary.json")["usage"]!.AsArray())!;
-        Assert.Equal(judge.Requests.Count * 10, (long)usage["gen_ai.usage.input_tokens"]!);
+        if (judgeCalled)
+        {
+            var usage = Assert.Single(Document(dir, "summary.json")["usage"]!.AsArray())!;
+            Assert.Equal(judge.Requests.Count * 10, (long)usage["gen_ai.usage.input_tokens"]!);
+        }
+        else Assert.Null(Document(dir, "run.json")["judges"]);
     }
 
     [Theory]
@@ -1252,7 +1286,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var reportPath = Path.Combine(_root, "report-directory");
         Directory.CreateDirectory(reportPath);
         Task<int> Invoke() => BenchAutoAuditCommand.RunAsync(
-            outPath: interruption == "report" ? reportPath : null,
+            outPath: interruption == "report" ? reportPath : null, mock: false,
             models: interruption == "report" ? ["first"] : ["first", "second", "unstarted"],
             clientOverride: model =>
             {
@@ -1263,7 +1297,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                     throw new OperationCanceledException(cancel.Token);
                 }
                 throw new InvalidOperationException("test factory failure");
-            }, aef: aef, noAef: noAef, ct: cancel.Token);
+            }, aef: aef, noAef: noAef, ct: cancel.Token, subjectVersion: "fixture-v1");
         if (invalidOutput) Assert.Equal(3, await Invoke());
         else if (interruption == "cancel") await Assert.ThrowsAnyAsync<OperationCanceledException>(Invoke);
         else if (interruption == "factory") await Assert.ThrowsAsync<InvalidOperationException>(Invoke);
@@ -1285,6 +1319,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         {
             var dir = Path.GetDirectoryName(header)!;
             AssertIntact(dir);
+            Assert.Equal("fixture-v1", (string?)Document(dir, "run.json")["subject"]!["version"]);
             Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
             Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
             Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));

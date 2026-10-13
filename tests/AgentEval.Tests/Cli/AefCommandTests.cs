@@ -7,6 +7,8 @@ using System.Text.Json.Nodes;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Native;
+using AgentEval.Results.Writing;
 using AgentEval.Tests.Contracts;
 using Xunit;
 
@@ -168,6 +170,39 @@ public class AefCommandTests : IDisposable
         Assert.Equal(ExitCodes.UsageError, await AefCommand.RunExportAsync(workspace, Out("x"), null, "mocked", "on", false, null, false, TextWriter.Null, TextWriter.Null));
         Assert.Equal(ExitCodes.UsageError, await AefCommand.RunExportAsync(runDirectory, Out("x"), null, "real", "on", false, null, false, TextWriter.Null, TextWriter.Null));
         Assert.Equal(ExitCodes.UsageError, await AefCommand.RunExportAsync(_root, Out("x"), null, "mocked", "on", false, null, false, TextWriter.Null, TextWriter.Null));
+    }
+
+    [Theory]
+    [InlineData("aggregate", true)]
+    [InlineData("trial", true)]
+    [InlineData("unrelated", false)]
+    [InlineData("imported", false)]
+    [InlineData("malformed", false)]
+    public async Task Export_NativeTwinNotice_MatchesOnlyNativeStoreLinks(string kind, bool warns)
+    {
+        var (workspace, runDirectory, runId) = await StoreRunAsync();
+        var (native, _) = AefProbeRunWriter.Write(Path.Combine(workspace, "aef", "runs"),
+            [new AefProbeLine { CaseId = "probe-1", State = AefState.Passed }], new AefProbeRunOptions
+            {
+                SubjectRef = "agent:billing", TargetMode = AefTargetMode.Scripted, SuiteRef = "redteam:test",
+                StoreV1 = kind == "trial" ? new() { TrialRunIds = [runId] }
+                    : new() { RunId = kind == "unrelated" ? "other-run" : runId },
+            }, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var headerPath = Path.Combine(native, "run.json");
+        if (kind == "imported")
+        {
+            var header = JsonNode.Parse(File.ReadAllText(headerPath))!;
+            header["imported"] = new JsonObject();
+            File.WriteAllText(headerPath, header.ToJsonString());
+        }
+        if (kind == "malformed") File.WriteAllText(headerPath, "{");
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var exit = await AefCommand.RunExportAsync(runDirectory, Out(), null, "mocked", "off", false, null, true, stdout, stderr);
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Equal(warns, stderr.ToString().Contains("native AEF evidence", StringComparison.Ordinal));
+        Assert.NotNull(JsonNode.Parse(stdout.ToString()));
+        Assert.Equal(ExitCodes.Success, Run((o, e) => AefCommand.RunVerify(Out(), null, null, true, o, e)).Exit);
     }
 
     [Fact]

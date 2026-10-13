@@ -862,18 +862,18 @@ internal static class RedTeamCommand
         try
         {
             var lines = RedTeamAef.Lines(result, AefCliOptions.ContentCapture == AefContentCapture.On);
+            var settings = new System.Text.Json.Nodes.JsonObject
+            {
+                ["intensity"] = opts.Intensity.ToLowerInvariant(),
+                ["attacks"] = opts.Attacks ?? "default",
+                ["failOn"] = opts.FailOn.ToLowerInvariant(),
+            };
+            if (judge is not null)
+                settings["judgeMode"] = ParseJudgeMode(opts.JudgeMode).ToString().ToLowerInvariant();
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "redteam" },
-                Config = new AefRunConfig
-                {
-                    Settings = new System.Text.Json.Nodes.JsonObject
-                    {
-                        ["intensity"] = opts.Intensity.ToLowerInvariant(),
-                        ["attacks"] = opts.Attacks ?? "default",
-                        ["failOn"] = opts.FailOn.ToLowerInvariant(),
-                    },
-                },
+                Config = new AefRunConfig { Settings = settings },
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
                 ContentCapture = AefCliOptions.ContentCapture,

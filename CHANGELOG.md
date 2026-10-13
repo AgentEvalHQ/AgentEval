@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native export notice:** `aef export` warns when a workspace native AEF header already links the
+  exported store run or trial, while preserving export results and JSON stdout. New workspace
+  ignore templates exclude generated AEF run and job folders.
+
+- **Native metadata completion:** autoaudit accepts `--subject-version` and retains it for each audited
+  subject, including interrupted and explicit mock runs. Red-team AEF configuration records the normalized
+  judge policy when a judge is configured, without claiming that an unused fallback judge graded a result.
+
 - **Interruption verification:** deterministic CLI regressions cover early/partial OWASP, MITRE and NIST
   scans, partial GDPR/EU AI Act/agentic evaluation, and failure midway through aggregate persistence.
   Completed observations and trial rollups survive without inventing a final gate or a completed store summary.

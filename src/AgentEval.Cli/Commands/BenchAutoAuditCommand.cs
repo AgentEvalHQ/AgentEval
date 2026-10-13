@@ -38,21 +38,27 @@ public static class BenchAutoAuditCommand
     /// <param name="mock">Run the scripted showcase instead (<c>--sut mock</c>).</param>
     /// <param name="ct">Cancels the run.</param>
     /// <param name="clientOverride">Test seam: builds the client for a model instead of the provider.</param>
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         string? outPath,
         IReadOnlyList<string>? models = null,
         bool mock = false,
         CancellationToken ct = default,
         Func<string, IChatClient>? clientOverride = null,
         DirectoryInfo? aef = null,
-        bool noAef = false)
+        bool noAef = false) =>
+        RunAsync(outPath, models, mock, ct, clientOverride, aef, noAef, subjectVersion: null);
+
+    /// <summary>Runs the auto-audit with an exact version applied to each audited subject's AEF evidence.</summary>
+    public static async Task<int> RunAsync(string? outPath, IReadOnlyList<string>? models, bool mock,
+        CancellationToken ct, Func<string, IChatClient>? clientOverride, DirectoryInfo? aef, bool noAef,
+        string? subjectVersion)
     {
         if (mock)
         {
             if (models is { Count: > 0 })
                 return MockTarget.RefuseMockWithRealTarget();
 
-            return await RunMockAsync(outPath, aef, noAef, ct);
+            return await RunMockAsync(outPath, aef, noAef, ct, subjectVersion: subjectVersion);
         }
 
         if (models is { Count: 0 })
@@ -100,11 +106,11 @@ public static class BenchAutoAuditCommand
             for (var i = 0; i < results.Count; i++)
             {
                 var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
-                failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], null,
+                failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], subjectVersion,
                     mode, tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt, abortReason: reason, endpoint: deploymentEndpoints[i]);
             }
             if (active is not null)
-                failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", active, null,
+                failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", active, subjectVersion,
                     mode, MockTarget.UnmeasuredResult("autoaudit"), modelStart, DateTimeOffset.UtcNow,
                     subjectKind: "model", abortReason: reason, emptyResults: true, endpoint: activeEndpoint);
             return failed;
@@ -191,7 +197,7 @@ public static class BenchAutoAuditCommand
     }
 
     internal static async Task<int> RunMockAsync(string? outPath, DirectoryInfo? aef, bool noAef, CancellationToken ct,
-        Action<AutoAuditEndpointResult>? onCompleted = null)
+        Action<AutoAuditEndpointResult>? onCompleted = null, string? subjectVersion = null)
     {
         MockTarget.PrintBanner(Command, "three scripted endpoints (clean, silent retry, PII leak)",
             aefRequested: aef is not null && !noAef);
@@ -204,12 +210,12 @@ public static class BenchAutoAuditCommand
             foreach (var entry in completed)
             {
                 var (tree, ext) = BenchAef.AutoAuditTree(entry.Result);
-                if (BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", entry.Result.Endpoint, null,
+                if (BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", entry.Result.Endpoint, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, tree, entry.Start, entry.End, subjectKind: "model",
                     caseExt: ext, exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason))
                     return true;
             }
-            return active is not null && BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", active, null,
+            return active is not null && BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", active, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Mocked, MockTarget.UnmeasuredResult("autoaudit"), started,
                 DateTimeOffset.UtcNow, subjectKind: "model", abortReason: reason, emptyResults: true);
         }

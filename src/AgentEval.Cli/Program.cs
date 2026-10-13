@@ -814,6 +814,8 @@ benchCmd.Add(benchNistCmd);
         benchAutoAuditCmd.Add(aaModelsOpt);
         benchAutoAuditCmd.Add(aaSutOpt);
         var aaAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write one sealed AEF run per audited model under this folder (default: a workspace's .agenteval/aef)" };
+        var aaSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "Exact version recorded for every audited subject in AEF; audit separately when subjects have different versions." };
+        benchAutoAuditCmd.Add(aaSubjectVersionOpt);
         var aaNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
         benchAutoAuditCmd.Add(aaAefOpt);
         benchAutoAuditCmd.Add(aaNoAefOpt);
@@ -828,7 +830,8 @@ benchCmd.Add(benchNistCmd);
             var models = parseResult.GetValue(aaModelsOpt)?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct,
-                aef: parseResult.GetValue(aaAefOpt), noAef: parseResult.GetValue(aaNoAefOpt));
+                clientOverride: null, aef: parseResult.GetValue(aaAefOpt), noAef: parseResult.GetValue(aaNoAefOpt),
+                subjectVersion: parseResult.GetValue(aaSubjectVersionOpt));
         });
         benchCmd.Add(benchAutoAuditCmd);
     }
