@@ -3,8 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Collections.Immutable;
-using System.Text.Json;
-using AgentEval.Results.Runs;
 using Microsoft.Data.Sqlite;
 
 namespace AgentEval.Indexing;
@@ -29,7 +27,6 @@ public interface IEvidenceSourceReader
 /// </summary>
 public sealed class SqliteEvidenceSourceReader(EvidenceIndexOptions options) : IEvidenceSourceReader
 {
-    private const int MaxCursorLength = 65536;
     private const long MaxPageTextBytes = 2 << 20;
 
     /// <inheritdoc />
@@ -42,31 +39,11 @@ public sealed class SqliteEvidenceSourceReader(EvidenceIndexOptions options) : I
             (string.IsNullOrWhiteSpace(root) || root.Length > 1024 || root.Any(char.IsControl)))
             throw new EvidenceIndexException("invalid-page-request");
         var cursor = Decode(request);
-        if (string.IsNullOrWhiteSpace(options.DatabasePath) || !Path.IsPathFullyQualified(options.DatabasePath) ||
-            options.MaxDatabaseBytes is < (64 << 10) or > (64L << 30) || options.BusyTimeoutSeconds is < 1 or > 30)
-            throw new EvidenceIndexException("invalid-read-options");
-        var path = Path.GetFullPath(options.DatabasePath);
-        new EvidenceIndexRootPlanner().Plan([new("index-parent", Path.GetDirectoryName(path)!, IndexedEvidenceKind.Aef)], cancellationToken: cancellationToken);
-        if (!EvidenceIndexRebuildPreparation.Exists(path)) throw new EvidenceIndexException("missing-index");
-        if (AefFolder.KindOf(path) != AefEntryKind.File || AefFolder.KindOf(path + ".lock") != AefEntryKind.File)
-            throw new EvidenceIndexException("unsafe-path");
-        using var lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
-            // Initial correctness path validates the complete schema/integrity per operation. W07 scale
-            // acceptance can optimize validation without weakening snapshot or replacement ownership.
-            new SqliteEvidenceIndexSchema().InspectReadOnlyWhileOwned(options, cancellationToken);
-            using var connection = SqliteEvidenceIndexSchema.Open(path, options.BusyTimeoutSeconds, readOnly: true);
-            using var transaction = connection.BeginTransaction(deferred: true);
-            string instance; long generation;
-            using (var metadata = connection.CreateCommand())
-            {
-                metadata.Transaction = transaction;
-                metadata.CommandText = "SELECT instance_id,generation FROM index_metadata WHERE singleton=1";
-                using var read = metadata.ExecuteReader();
-                if (!read.Read()) throw new EvidenceIndexException("missing-metadata");
-                instance = read.GetString(0); generation = read.GetInt64(1);
-            }
+            using var snapshot = EvidenceIndexReadSnapshot.Open(options, cancellationToken);
+            var connection = snapshot.Connection; var transaction = snapshot.Transaction;
+            var instance = snapshot.InstanceId; var generation = snapshot.Generation;
             if (cursor is not null && (cursor.InstanceId != instance || cursor.Generation != generation))
                 throw new EvidenceIndexException("stale-cursor");
             using var command = connection.CreateCommand(); command.Transaction = transaction;
@@ -111,31 +88,17 @@ public sealed class SqliteEvidenceSourceReader(EvidenceIndexOptions options) : I
     private static SourceCursor? Decode(EvidenceSourcePageRequest request)
     {
         if (request.Cursor is null) return null;
-        if (request.Cursor.Length is 0 or > MaxCursorLength || request.Cursor.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')))
+        var cursor = EvidenceIndexCursor.Decode<SourceCursor>(request.Cursor);
+        if (cursor is null || cursor.Version != 1 || cursor.SchemaVersion != SqliteEvidenceIndexSchema.CurrentVersion ||
+            !Guid.TryParseExact(cursor.InstanceId, "N", out _) || cursor.Generation < 0 ||
+            cursor.RootId != request.RootId || cursor.PageSize != request.PageSize ||
+            string.IsNullOrWhiteSpace(cursor.LastRoot) || cursor.LastRoot.Length > 1024 ||
+            string.IsNullOrWhiteSpace(cursor.LastPath) || cursor.LastPath.Length > 4096 ||
+            cursor.RootId is not null && cursor.LastRoot != cursor.RootId)
             throw new EvidenceIndexException("invalid-cursor");
-        try
-        {
-            var encoded = request.Cursor.Replace('-', '+').Replace('_', '/');
-            var bytes = Convert.FromBase64String(encoded.PadRight((encoded.Length + 3) / 4 * 4, '='));
-            var cursor = JsonSerializer.Deserialize<SourceCursor>(bytes, new JsonSerializerOptions { MaxDepth = 4 });
-            if (cursor is null || cursor.Version != 1 || cursor.SchemaVersion != SqliteEvidenceIndexSchema.CurrentVersion ||
-                !Guid.TryParseExact(cursor.InstanceId, "N", out _) || cursor.Generation < 0 ||
-                cursor.RootId != request.RootId || cursor.PageSize != request.PageSize ||
-                string.IsNullOrWhiteSpace(cursor.LastRoot) || cursor.LastRoot.Length > 1024 ||
-                string.IsNullOrWhiteSpace(cursor.LastPath) || cursor.LastPath.Length > 4096 ||
-                cursor.RootId is not null && cursor.LastRoot != cursor.RootId ||
-                Encode(cursor) != request.Cursor)
-                throw new EvidenceIndexException("invalid-cursor");
-            return cursor;
-        }
-        catch (Exception error) when (error is FormatException or JsonException) { throw new EvidenceIndexException("invalid-cursor"); }
+        return cursor;
     }
-    private static string Encode(SourceCursor cursor)
-    {
-        var value = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(cursor)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        if (value.Length > MaxCursorLength) throw new EvidenceIndexException("cursor-size-limit");
-        return value;
-    }
+    private static string Encode(SourceCursor cursor) => EvidenceIndexCursor.Encode(cursor);
     private sealed record SourceCursor(int Version, int SchemaVersion, string InstanceId, long Generation, string? RootId,
         int PageSize, string LastRoot, string LastPath);
 }

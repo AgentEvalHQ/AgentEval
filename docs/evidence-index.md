@@ -6,7 +6,8 @@ BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
 Transactional source projection, AEF snapshot imports and verified observation
 imports, legacy/root reconciliation, rebuild/recovery and source inventory pagination
-are implemented. Result and observation pagination remain subsequent slices.
+and result/metric/observation detail pagination are implemented. Measured scale
+acceptance remains the next indexing slice.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -251,3 +252,18 @@ Cursors are bounded canonical base64url JSON (maximum 65536 characters) carrying
 Each read holds a shared replacement lease, validates the current schema without initialization/migration, then reads metadata and rows in one deferred, read-only SQLite transaction. It leaves no connection or snapshot alive between pages and coexists with the single writer. Replacement/schema operations require exclusive ownership. The first implementation performs full schema/integrity validation per page; reducing that cost safely belongs to scale acceptance. No fixed execution-time or large-index throughput claim is made.
 
 SQLite's [row-value scrolling example](https://www.sqlite.org/rowvalue.html) describes the keyset approach, and the provider documents [deferred transactions](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/transactions). Unicode order follows SQLite binary UTF-8 ordering rather than .NET UTF-16 ordinal ordering. Tests cover multiple roots, Unicode ordering, update/rebuild invalidation, no-op writes, malformed/query-mismatched cursors, missing-index noncreation, ownership conflicts and raw UTF-8 byte limits. The subprocess fixture also verifies queries during an open writer and refusal of replacement ownership until it closes.
+
+### Result, metric and observation detail pages
+
+`IEvidenceDetailReader` supplies four source-scoped page families through `EvidenceDetailPageRequest(SourceId, PageSize, Cursor)`. Use the exact source ID returned by source inventory. Missing sources return `source-not-found`; an existing source with no relevant detail rows returns an empty page. Evaluation queries refuse observation sources, and observation queries refuse evaluated sources. Every page includes source kind, verification and projection fingerprint plus the index instance/generation.
+
+| Method | Stable primary-key ordering | Preserved distinctions |
+| --- | --- | --- |
+| `ReadResults` | Binary result ID | Null case ID for legacy aggregates, nullable trial/outcome, exact Int64 trial |
+| `ReadMetrics` | Binary result ID, metric ID, numeric ordinal | Duplicate metric occurrences, numeric versus textual score, nullable passed flag and provenance |
+| `ReadSpans` | Numeric report ordinal | Duplicate span reports, group/mapping revisions, indices and exact 20-digit unsigned timestamp strings |
+| `ReadFields` | Numeric report ordinal, binary field name | Missing/invalid/conflict state, exact Int64 values, nullable text and retained source-provenance JSON |
+
+All families reuse the same short read snapshot/ownership boundary and canonical cursor codec as source pages. Detail cursors additionally bind query family and source ID; they cannot be reused across sources or query families. The page-size, raw UTF-8 text and cursor bounds are the same: 1..500 rows, 2 MiB text and 65536 cursor characters. Text lengths are checked before materialization. Oversized pages fail as a whole; a single oversized field can require accessing the original evidence instead. No implicit aggregation, filtering of conflicts, score conversion or inferred evaluation verdict is performed.
+
+The original source documents remain necessary for hierarchy, effective overlays and fields deliberately omitted by indexing. These pages expose derived indexed facts and provenance, not evidence freshness or trust-policy decisions. SQL identifiers are fixed by the query family; all caller values use parameters. Read consistency is instance/generation scoped, and malformed/query-mismatched or stale continuations refuse explicitly.
