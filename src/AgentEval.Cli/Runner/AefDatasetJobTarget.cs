@@ -192,9 +192,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         if (string.IsNullOrWhiteSpace(model) || !ModelPricing.KnownModels.Contains(model, StringComparer.OrdinalIgnoreCase)
             || ModelPricing.GetPricing(model) is not { } price || price.InputPricePerMillion < 0 || price.OutputPricePerMillion < 0)
             throw Refuse("A configured model has no exact known non-negative price; its case cost cannot be bounded.");
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")
-            || uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0)
-            throw Refuse("Runner endpoints must be HTTP(S) URIs without user info, query or fragment.");
+        _ = EndpointFactory.ValidateRunnerEndpoint(endpoint);
         var azure = options["azure"] is null ? false : options["azure"] is JsonValue v && v.TryGetValue<bool>(out var flag)
             ? flag : throw Refuse("Runner azure must be a boolean.");
         var deployment = Text(options, "deployment");

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
+  servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials
+  can be sent in cleartext.
+
 - **Runner judge provenance:** cases using one model with distinct rubrics retain each instrument in
   first-use order. Deduplication includes provider, mode, panel size and calibration metadata instead
   of overwriting earlier instruments by model name. Dataset plans must authorize one matching judge

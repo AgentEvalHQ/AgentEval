@@ -129,6 +129,8 @@ enforcing the additional operator cap should also inspect the recorded options a
 The plan extension is `ext."agenteval.run"`. The subject endpoint comes from `subject.endpoint`;
 `model` names an exact entry in AgentEval's model price table, defaulting to the decoded `model:` subject name.
 Unknown model aliases are refused rather than matched to a similar model's price.
+Subject and judge endpoints require HTTPS; plain HTTP is allowed only for loopback servers.
+Endpoint validation happens during plan loading, before credentials or provider requests.
 
 | Setting | Default | Meaning |
 |---|---|---|

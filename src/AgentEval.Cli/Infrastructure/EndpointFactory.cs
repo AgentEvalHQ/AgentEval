@@ -9,6 +9,7 @@
 
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using AgentEval.Providers;
 using AgentEval.Results;
 using Azure;
 using Azure.AI.OpenAI;
@@ -33,10 +34,7 @@ internal static class EndpointFactory
     /// </remarks>
     internal static IChatClient CreateForRunner(string endpoint, string model, string? apiKey, bool azure = false)
     {
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
-            throw new AefInputException("Runner endpoint must be an absolute HTTP(S) URI without user info, query or fragment.");
+        var uri = ValidateRunnerEndpoint(endpoint);
         if (string.IsNullOrWhiteSpace(model))
             throw new AefInputException("Runner model must be specified.");
         if (apiKey is not null && string.IsNullOrWhiteSpace(apiKey))
@@ -54,6 +52,14 @@ internal static class EndpointFactory
         var openAIOptions = new OpenAIClientOptions { Endpoint = uri, RetryPolicy = new ClientRetryPolicy(0) };
         return new OpenAIClient(new ApiKeyCredential(apiKey ?? "no-key-needed"), openAIOptions)
             .GetChatClient(model).AsIChatClient();
+    }
+
+    internal static Uri ValidateRunnerEndpoint(string? endpoint)
+    {
+        if (!InferenceProviderEnvironment.TryValidateEndpoint(endpoint, out var uri, out _)
+            || uri is null || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+            throw new AefInputException("Runner endpoints require HTTPS (HTTP is allowed only on loopback), without user info, query or fragment.");
+        return uri;
     }
 
     /// <summary>

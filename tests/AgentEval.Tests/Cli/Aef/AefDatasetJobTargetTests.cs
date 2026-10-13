@@ -210,6 +210,8 @@ public sealed class AefDatasetJobTargetTests : IDisposable
     [InlineData("tool-expectations")]
     [InlineData("criteria-without-judge")]
     [InlineData("unknown-field")]
+    [InlineData("remote-http-subject")]
+    [InlineData("remote-http-judge")]
     public async Task RunAsync_UnresolvablePlan_RefusesBeforeAnyHttpCall(string issue)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync();
@@ -217,6 +219,12 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         if (issue == "tool-expectations") File.WriteAllText(Dataset, """[{"id":"c1","input":"private-input","expectedTools":["Buy"]}]""");
         if (issue == "criteria-without-judge") File.WriteAllText(Dataset, """[{"id":"c1","input":"private-input","evaluationCriteria":["correct"]}]""");
         var plan = Plan(endpoint.Endpoint);
+        if (issue == "remote-http-subject") plan["subject"]!["endpoint"] = "http://example.test/v1";
+        if (issue == "remote-http-judge")
+        {
+            plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-4o-mini" });
+            plan["ext"]!["agenteval.run"]!["judge"] = new JsonObject { ["endpoint"] = "http://example.test/v1" };
+        }
         if (issue == "unknown-price") plan["ext"]!["agenteval.run"]!["model"] = "unknown-gpt-4o-mini-alias";
         if (issue == "unknown-field") plan["ext"]!["agenteval.run"]!["apiKey"] = "secret-key";
         if (issue == "digest-mismatch") plan["suites"]![0]!["digest"] = "sha256:" + new string('0', 64);

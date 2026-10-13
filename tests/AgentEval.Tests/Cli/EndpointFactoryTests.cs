@@ -120,4 +120,28 @@ public sealed class EndpointFactoryTests : IDisposable
     {
         Assert.Throws<AefInputException>(() => EndpointFactory.CreateForRunner("https://example.test/v1", "model", key));
     }
+
+    [Theory]
+    [InlineData("http://example.test/v1", false)]
+    [InlineData("http://example.test/", true)]
+    [InlineData("http://192.0.2.1/v1", false)]
+    [InlineData("http://localhost.example.test/v1", false)]
+    public void CreateForRunner_RemoteHttp_RefusesBeforeClientConstruction(string endpoint, bool azure)
+    {
+        var error = Assert.Throws<AefInputException>(() => EndpointFactory.CreateForRunner(endpoint, "model", "secret-key", azure));
+        Assert.Contains("HTTPS", error.Message);
+        Assert.DoesNotContain(endpoint, error.Message);
+        Assert.DoesNotContain("secret-key", error.Message);
+    }
+
+    [Theory]
+    [InlineData("https://example.test/v1")]
+    [InlineData("http://localhost:12345/v1")]
+    [InlineData("http://127.0.0.1:12345/v1")]
+    [InlineData("http://[::1]:12345/v1")]
+    public void CreateForRunner_HttpsOrLoopbackHttp_AcceptsWithoutNetwork(string endpoint)
+    {
+        using var client = EndpointFactory.CreateForRunner(endpoint, "model", "scoped-key");
+        Assert.NotNull(client);
+    }
 }
