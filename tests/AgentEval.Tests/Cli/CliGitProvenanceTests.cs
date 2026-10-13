@@ -21,25 +21,37 @@ public sealed class CliGitProvenanceTests : IDisposable
     [Fact]
     public async Task Capture_Repository_ReportsCleanDirtyAndDetachedWithoutPaths()
     {
+        // This fixture tests Git state, not the production two-second best-effort budget.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await Git("init", "--initial-branch=feature/provenance");
         await Git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
             "commit", "--allow-empty", "-m", "fixture");
-        var clean = await CliGitProvenance.CaptureAsync("bench gdpr", _root);
+        var clean = await CliGitProvenance.CaptureAsync("bench gdpr", _root, timeout.Token);
         Assert.Equal(40, clean.GitCommit!.Length);
         Assert.Equal("feature/provenance", clean.GitBranch);
         Assert.False(clean.GitDirty);
         File.WriteAllText(Path.Combine(_root, "private-input.txt"), "private body");
-        var dirty = await CliGitProvenance.CaptureAsync("eval", _root);
+        var dirty = await CliGitProvenance.CaptureAsync("eval", _root, timeout.Token);
         Assert.True(dirty.GitDirty);
         Assert.Equal(clean.GitCommit, dirty.GitCommit);
         await Git("checkout", "--detach", "HEAD");
-        var detached = await CliGitProvenance.CaptureAsync("redteam", _root);
+        var detached = await CliGitProvenance.CaptureAsync("redteam", _root, timeout.Token);
         Assert.Null(detached.GitBranch);
         Assert.Equal(clean.GitCommit, detached.GitCommit);
         var json = System.Text.Json.JsonSerializer.Serialize(detached);
         Assert.DoesNotContain(_root, json);
         Assert.DoesNotContain("private-input", json);
         Assert.DoesNotContain("private body", json);
+    }
+
+    [Fact]
+    public async Task Capture_CancelledBeforeLookup_KeepsUnknownFieldsAbsent()
+    {
+        var snapshot = await CliGitProvenance.CaptureAsync("eval", _root, new CancellationToken(canceled: true));
+        Assert.Equal("eval", snapshot.Verb);
+        Assert.Null(snapshot.GitCommit);
+        Assert.Null(snapshot.GitBranch);
+        Assert.Null(snapshot.GitDirty);
     }
 
     [Fact]

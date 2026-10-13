@@ -189,7 +189,7 @@ public class StochasticRunnerTests
         var testCase = new TestCase { Name = "Test", Input = "input" };
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runner.RunStochasticTestAsync(agent, testCase, options));
+            () => runner.RunStochasticTestAsync(agent, testCase, options).WaitAsync(TimeSpan.FromSeconds(30)));
 
         // The 3 non-faulting siblings observed cancellation by the time the call returned. Without
         // the linked-CTS fix they would still be delaying, unobserved (CancelledCount would be 0).
@@ -222,7 +222,8 @@ public class StochasticRunnerTests
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                // Only cancellation may complete a sibling; scheduler delay must not turn it into a success.
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
             }
             catch (OperationCanceledException)
             {

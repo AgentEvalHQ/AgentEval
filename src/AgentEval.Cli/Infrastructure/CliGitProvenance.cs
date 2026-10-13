@@ -11,9 +11,14 @@ internal static class CliGitProvenance
     internal static async Task<AefCliProvenance> CaptureAsync(string verb, string directory)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        var commit = await ReadAsync(directory, ["rev-parse", "--verify", "HEAD"], timeout.Token);
-        var branch = await ReadAsync(directory, ["symbolic-ref", "--quiet", "--short", "HEAD"], timeout.Token);
-        var status = await ReadAsync(directory, ["status", "--porcelain", "--untracked-files=normal"], timeout.Token);
+        return await CaptureAsync(verb, directory, timeout.Token);
+    }
+
+    internal static async Task<AefCliProvenance> CaptureAsync(string verb, string directory, CancellationToken token)
+    {
+        var commit = await ReadAsync(directory, ["rev-parse", "--verify", "HEAD"], token);
+        var branch = await ReadAsync(directory, ["symbolic-ref", "--quiet", "--short", "HEAD"], token);
+        var status = await ReadAsync(directory, ["status", "--porcelain", "--untracked-files=normal"], token);
         return new()
         {
             Verb = verb,
