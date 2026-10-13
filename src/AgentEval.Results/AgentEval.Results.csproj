@@ -15,6 +15,8 @@
   <!-- The AEF 1.0 writer and reader schemas, embedded from contracts/aef/1/schemas (linked, never copied, so there is
        one source; a test checks the embedded bytes equal the files). Schemas/AefSchemas.cs compiles them. -->
   <ItemGroup>
+    <EmbeddedResource Include="..\..\schemas\suites\1\definition.schema.json"
+                      LogicalName="AgentEval.Results.Suites.definition.schema.json" />
     <EmbeddedResource Include="..\..\schemas\requirements\1\catalogue.schema.json"
                       LogicalName="AgentEval.Results.Requirements.catalogue.schema.json" />
     <EmbeddedResource Include="..\..\contracts\aef\1\schemas\writer\*.schema.json"
