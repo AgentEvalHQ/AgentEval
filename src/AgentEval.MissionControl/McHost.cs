@@ -7,6 +7,7 @@ using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using HttpResults = Microsoft.AspNetCore.Http.Results;
 using ChilliCream.Nitro.App;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -36,6 +37,8 @@ public static class McHost
     /// </summary>
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
+        Hosting.IngestionHosting.Configure(builder);
+
         // Evaluator-card registry: loads all EvaluatorCard JSON files at startup
         // from AgentEval.Evals.Agentic's embedded resources. Drives
         // Query.evaluators(...). Plan-08 MC1.5.3.
@@ -267,7 +270,7 @@ public static class McHost
             // SPA needs to see the flag flip without a restart.
             var workspaceInitialized = Directory.Exists(
                 System.IO.Path.Combine(resolvedWorkspaceRoot, ".agenteval"));
-            return Results.Json(new
+            return HttpResults.Json(new
             {
                 mode = resolvedMode,
                 agentEvalVersion = typeof(AgentEval.Output.IOutputStoreReader).Assembly
@@ -331,6 +334,6 @@ public static class McHost
     /// <c>AgentEval.DataLoaders</c> (made visible to MC via <c>InternalsVisibleTo</c>) rather than
     /// re-implementing the walk, so the discovery rule lives in one place.
     /// </remarks>
-    private static string DiscoverWorkspaceRoot(string startDir) =>
+    internal static string DiscoverWorkspaceRoot(string startDir) =>
         AgentEval.Output.WorkspaceRootDiscovery.Find(startDir) ?? startDir;
 }
