@@ -150,6 +150,21 @@ public sealed class AefIngestionWorkspace : IAefIngestionWorkspace
     }
 
     /// <inheritdoc />
+    public string OpenAcceptedRun(string runHash)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (runHash is null || runHash.Length != 64 || !runHash.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))
+                throw new AefFinalizationException("path", "invalid accepted run hash");
+            var path = Path.Combine(RunsDirectory, runHash);
+            RejectLinks(path);
+            if (!Directory.Exists(path)) throw new DirectoryNotFoundException("Accepted evidence not found.");
+            return path;
+        }
+    }
+
+    /// <inheritdoc />
     public void Dispose()
     {
         lock (_gate)

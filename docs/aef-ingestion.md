@@ -208,7 +208,8 @@ does not establish a trusted signer, a passing verdict, or complete benchmark
 coverage. The default HTTP finalizer supplies no signer trust policy; trusted
 in-process callers can supply one through `AefRunFinalizer`.
 
-Successful verification writes a `publishing` receipt with the verified hash,
+Successful verification writes a `publishing` receipt with the verified base
+hash and a separate full-file snapshot fingerprint,
 then moves the original `content/` directory to `runs/<runHash>` with one
 no-overwrite rename. The files, signatures, and overlays are not rewritten.
 This rename is the commit point. The workspace checks cancellation while
@@ -216,13 +217,17 @@ holding its ownership lock immediately before the rename, so disposal cannot
 release ownership during publication. A final `accepted` receipt follows.
 
 HTTP 200 returns `stageId`, `status: accepted`, `verified: true`,
-`integrity: intact`, `runHash`, and `receiptPersisted`. Local paths are omitted.
+`integrity: intact`, `runHash`, `receiptPersisted`, and `alreadyAccepted`.
+Local paths are omitted. `alreadyAccepted` is true for a verified retry,
+recovered publication, or exact duplicate upload.
 If the final receipt cannot be saved after publication, `receiptPersisted`
 is false; the verified evidence remains published and requires receipt
 recovery. A late cancellation or lost response cannot undo the rename.
 
-Only one verification runs at a time per finalizer service; a stage file
-lease also prevents simultaneous finalization by another service instance.
+Only one verification runs at a time per finalizer service. Upload,
+finalization, and retry share an exclusive stage lease, held through state
+writes. Recovery therefore cannot acquire the stage while an upload is
+active. The lease deliberately uses `FileShare.None` across platforms.
 Cancellation and the configured timeout are checked during preflight and
 between verification phases. The existing protocol verifier is synchronous
 and cannot be interrupted mid-phase: a timeout response can wait for that
@@ -230,10 +235,41 @@ phase to finish, and verification capacity remains occupied until then.
 Cancellation before the commit check prevents publication.
 
 Finalization returns 422 for invalid/unsealed evidence, 409 for an incomplete
-or already-finalized stage or an existing accepted hash, 404 for an unknown
+stage, conflicting evidence or an unprovable receipt, 404 for an unknown
 stage, 413 for content bounds, 429 for a busy verifier, and 503 for unavailable
-storage/capacity. It does not overwrite an existing hash, even for apparently
-identical uploads. Duplicate reconciliation is the next lifecycle slice.
+storage/capacity. It never overwrites an existing hash.
+
+## Exact duplicates and interrupted publication
+
+The AEF base run hash excludes signatures and overlays. Ingestion's
+`snapshotDigest` applies the AEF manifest encoding to **every** stored file,
+including `seal.json`, attestations and overlays. This application fingerprint
+does not change the protocol run hash. It is written with the base hash
+before publication and retained in the accepted receipt.
+
+An upload with an existing base hash is deduplicated only after the existing
+directory passes fresh bounded verification and both full-file fingerprints
+match. Different signatures or valid but different overlays cause a conflict;
+they are not silently merged. Exact duplicates return the existing accepted
+directory with `alreadyAccepted: true` and retain their own accepted receipt.
+Their staging copy currently remains until archival is implemented.
+
+Retrying an accepted stage re-verifies the accepted directory and checks its
+inventory, base hash and full-file fingerprint against the receipt. Missing,
+changed or invalid accepted evidence cannot turn a retry into a successful
+response merely because a receipt says `accepted`.
+
+For an interrupted `publishing` stage, retry handles both sides of the rename:
+
+- If content remains in staging, it is verified against the recorded snapshot
+  before publication is attempted again.
+- If content has moved, the accepted directory is independently verified
+  against the receipt before `accepted` state is restored.
+
+Receipts lacking the recorded snapshot fingerprint are refused for automatic
+reconciliation; the service does not invent proof of an earlier upload's
+unsealed files. Incomplete upload states remain unpublishable. This retry
+behavior does not yet archive receipts or discard interrupted uploads.
 
 `AgentEval:Ingestion:MaxAcceptedRuns` defaults to 1,000 and accepts 1..100,000.
 All existing entries directly under `runs/` count against this budget. Failed
@@ -261,8 +297,8 @@ independent Python reader, and checks rejection of unsealed/tampered imports.
 
 ## Remaining lifecycle integration
 
-The next ingestion slices add duplicate reconciliation, interrupted-commit
-recovery, receipt archival, and a complete access/resource audit. Invalid,
+The next ingestion slices add receipt archival, bounded recovery operations
+for failed/interrupted uploads, and a complete access/resource audit. Invalid,
 unsealed, or incomplete uploads must never become query-visible accepted
 evidence. These operations build on the same directories and commit point.
 

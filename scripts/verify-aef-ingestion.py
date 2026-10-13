@@ -136,7 +136,19 @@ def main():
             verified = subprocess.run([sys.executable, str(repository / "contracts/aef/tools/aef_verify.py"), "run", str(destination)],
                                       capture_output=True, text=True, timeout=30)
             assert verified.returncode == 0 and json.loads(verified.stdout)["outcome"] == "intact", verified.stdout
-            assert post(b"", route=route)[0] == 409
+            status, retry_body = post(b"", route=route)
+            assert status == 200 and json.loads(retry_body)["alreadyAccepted"], (status, retry_body)
+            # Simulate the durable state left when the rename committed but the final receipt did not.
+            receipt_path = storage / ".staging" / stage_id / "state.json"
+            receipt = json.loads(receipt_path.read_text())
+            receipt["status"] = "publishing"
+            receipt_path.write_text(json.dumps(receipt))
+            status, recovered_body = post(b"", route=route)
+            assert status == 200 and json.loads(recovered_body)["alreadyAccepted"], (status, recovered_body)
+            assert json.loads(receipt_path.read_text())["status"] == "accepted"
+            duplicate_id = upload_files(source_files)
+            status, duplicate_body = post(b"", route=f"/api/v1/ingestion/runs/{duplicate_id}/finalize")
+            assert status == 200 and json.loads(duplicate_body)["alreadyAccepted"], (status, duplicate_body)
             unsealed_id = upload_files({p: b for p, b in source_files.items() if p != "seal.json"})
             assert post(b"", route=f"/api/v1/ingestion/runs/{unsealed_id}/finalize")[0] == 422
             tampered = dict(source_files)
@@ -144,7 +156,7 @@ def main():
             tampered_id = upload_files(tampered)
             assert post(b"", route=f"/api/v1/ingestion/runs/{tampered_id}/finalize")[0] == 422
             assert len(list((storage / "runs").iterdir())) == 1
-            print("PASS: Kestrel staging/access/limits/timeout; sealed finalization preserves bytes and passes independent verifier; unsealed/tampered refused")
+            print("PASS: Kestrel staging/access/limits/timeout; independently verified publication; exact duplicate/retry/crash recovery; unsealed/tampered refused")
         finally:
             process.terminate()
             try:

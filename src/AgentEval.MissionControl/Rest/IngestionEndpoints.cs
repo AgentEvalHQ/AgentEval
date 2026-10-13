@@ -55,7 +55,8 @@ internal static class IngestionEndpoints
             // verification phase must finish before this task can return a timeout or release its capacity.
             var accepted = await Task.Run(() => finalizer.FinalizeStage(stageId, timeout.Token), timeout.Token);
             return HttpResults.Ok(new { stageId = accepted.StageId, status = "accepted", verified = true,
-                integrity = "intact", runHash = accepted.RunHash, receiptPersisted = accepted.ReceiptPersisted });
+                integrity = "intact", runHash = accepted.RunHash, receiptPersisted = accepted.ReceiptPersisted,
+                alreadyAccepted = accepted.AlreadyAccepted });
         }
         catch (AefFinalizationException error)
         {

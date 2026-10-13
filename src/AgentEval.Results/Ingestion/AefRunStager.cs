@@ -35,11 +35,13 @@ public sealed class AefRunStager : IAefRunStager
             throw new AefStagingException("busy", "concurrent upload capacity reached");
         }
         AefIngestionStage? stage = null;
+        FileStream? stageLease = null;
         long bytes = 0;
         var count = 0;
         try
         {
             stage = _workspace.BeginStage(cancellationToken);
+            stageLease = AefStageLease.Acquire(stage);
             var content = Path.Combine(stage.Directory, "content");
             Directory.CreateDirectory(content);
             AefStageState.Write(stage, "receiving", count, bytes);
@@ -81,7 +83,7 @@ public sealed class AefRunStager : IAefRunStager
         }
         catch (Exception error)
         {
-            if (stage is not null)
+            if (stage is not null && stageLease is not null)
             {
                 // If state persistence fails, retain receiving/absent state. Recovery must treat it as incomplete.
                 try { AefStageState.Write(stage, error is OperationCanceledException ? "interrupted" : "failed", count, bytes); }
@@ -89,7 +91,11 @@ public sealed class AefRunStager : IAefRunStager
             }
             throw;
         }
-        finally { Interlocked.Decrement(ref _active); }
+        finally
+        {
+            stageLease?.Dispose();
+            Interlocked.Decrement(ref _active);
+        }
     }
 
     private static void ReservePath(string path, Dictionary<string, (string Spelling, bool File)> paths)

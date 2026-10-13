@@ -121,7 +121,7 @@ public sealed class AefRunFinalizerTests : IDisposable
     }
 
     [Fact]
-    public async Task FinalizeStage_DuplicateHash_DoesNotOverwriteAndRestoresStagedState()
+    public async Task FinalizeStage_ExactDuplicate_DoesNotOverwriteAndRecordsAcceptedState()
     {
         using var source = new TestRun().Write().Seal();
         var first = await Stage(source);
@@ -129,8 +129,10 @@ public sealed class AefRunFinalizerTests : IDisposable
         var accepted = finalizer.FinalizeStage(first.Id);
         var seal = File.ReadAllBytes(Path.Combine(accepted.Directory, "seal.json"));
         var duplicate = await Stage(source);
-        Assert.Equal("conflict", Refused(duplicate).Code);
-        Assert.Equal("staged", State(duplicate));
+        var retry = finalizer.FinalizeStage(duplicate.Id);
+        Assert.True(retry.AlreadyAccepted);
+        Assert.Equal(accepted.Directory, retry.Directory);
+        Assert.Equal("accepted", State(duplicate));
         Assert.True(Directory.Exists(duplicate.Directory));
         Assert.Equal(seal, File.ReadAllBytes(Path.Combine(accepted.Directory, "seal.json")));
     }
@@ -233,6 +235,106 @@ public sealed class AefRunFinalizerTests : IDisposable
         Assert.False(result.ReceiptPersisted);
         Assert.Equal("publishing", State(stage));
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(result.Directory).Outcome);
+        Directory.Delete(Path.Combine(Path.GetDirectoryName(stage.Directory)!, "state.tmp"));
+        var recovered = new AefRunFinalizer(_workspace).FinalizeStage(stage.Id);
+        Assert.True(recovered.AlreadyAccepted);
+        Assert.True(recovered.ReceiptPersisted);
+        Assert.Equal("accepted", State(stage));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FinalizeStage_InterruptedPublication_RecoversBeforeOrAfterRename(bool renamed)
+    {
+        using var source = new TestRun().Write().Seal();
+        var stage = await Stage(source);
+        var hash = source.Verify().RunHash!.Value.Value;
+        var digest = AefRunFinalizer.SnapshotDigest(AgentEval.Results.Runs.AefRunFolder.Open(stage.Directory));
+        AefStageState.Write(_workspace.OpenStage(stage.Id), "publishing", stage.FileCount, stage.Bytes, hash, digest);
+        if (renamed) _workspace.PublishVerifiedStage(stage.Id, hash);
+        var result = new AefRunFinalizer(_workspace).FinalizeStage(stage.Id);
+        Assert.Equal(renamed, result.AlreadyAccepted);
+        Assert.True(result.ReceiptPersisted);
+        Assert.Equal("accepted", State(stage));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(result.Directory).Outcome);
+        Assert.Single(Directory.EnumerateDirectories(_workspace.RunsDirectory));
+    }
+
+    [Fact]
+    public async Task FinalizeStage_SameBaseDifferentSignature_RefusesDuplicateWithoutChangingAcceptedFiles()
+    {
+        using var firstSigner = EcdsaP256Signer.Generate();
+        using var secondSigner = EcdsaP256Signer.Generate();
+        using var source = new TestRun().Write().Seal().Attest(firstSigner);
+        var first = await Stage(source);
+        var accepted = new AefRunFinalizer(_workspace).FinalizeStage(first.Id);
+        var signature = File.ReadAllBytes(Path.Combine(accepted.Directory, "attestation.dsse.json"));
+        source.Attest(secondSigner);
+        var second = await Stage(source);
+        Assert.Equal(accepted.RunHash, source.Verify().RunHash!.Value.Value);
+        Assert.Equal("conflict", Refused(second).Code);
+        Assert.Equal(signature, File.ReadAllBytes(Path.Combine(accepted.Directory, "attestation.dsse.json")));
+        Assert.Equal("staged", State(second));
+    }
+
+    [Fact]
+    public async Task FinalizeStage_SameBaseDifferentValidOverlay_RefusesDuplicate()
+    {
+        using var source = new TestRun().Write().Seal();
+        source.AppendBatch([TestRun.Event("ov_1", "annotate", new())]);
+        var first = await Stage(source);
+        var accepted = new AefRunFinalizer(_workspace).FinalizeStage(first.Id);
+        source.AppendBatch([TestRun.Event("ov_2", "annotate", new())]);
+        Assert.Equal(accepted.RunHash, source.Verify().RunHash!.Value.Value);
+        Assert.Equal("conflict", Refused(await Stage(source)).Code);
+        Assert.False(File.Exists(Path.Combine(accepted.Directory, "overlays", "seal-0002.json")));
+    }
+
+    [Fact]
+    public async Task FinalizeStage_AcceptedEvidenceChanged_RefusesRetry()
+    {
+        using var source = new TestRun().Write().Seal();
+        var stage = await Stage(source);
+        var accepted = new AefRunFinalizer(_workspace).FinalizeStage(stage.Id);
+        File.AppendAllText(Path.Combine(accepted.Directory, "run.json"), " ");
+        Assert.Equal("state", Refused(stage).Code);
+    }
+
+    [Fact]
+    public async Task FinalizeStage_AcceptedEvidenceMissing_ReportsReceiptConflictRatherThanUnknownStage()
+    {
+        using var source = new TestRun().Write().Seal();
+        var stage = await Stage(source);
+        var accepted = new AefRunFinalizer(_workspace).FinalizeStage(stage.Id);
+        Directory.Move(accepted.Directory, accepted.Directory + "-relocated");
+        Assert.Equal("state", Refused(stage).Code);
+        Assert.Equal("accepted", State(stage));
+    }
+
+    [Fact]
+    public async Task FinalizeStage_ActiveUpload_CannotAcquireStageLeaseOrRewriteState()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var upload = new AefRunStager(_workspace).StageAsync(Paused());
+        await entered.Task;
+        try
+        {
+            var directory = Assert.Single(Directory.EnumerateDirectories(Path.Combine(_root, ".staging")));
+            var id = Path.GetFileName(directory);
+            Assert.Throws<IOException>(() => new AefRunFinalizer(_workspace).FinalizeStage(id));
+            Assert.Equal("receiving", AefStageState.Read(_workspace.OpenStage(id)).Status);
+        }
+        finally { release.TrySetResult(); }
+        Assert.Equal("staged", State(await upload));
+        async IAsyncEnumerable<AefUploadFile> Paused()
+        {
+            entered.TrySetResult();
+            await release.Task;
+            using var stream = new MemoryStream("{}"u8.ToArray());
+            yield return new("run.json", stream);
+        }
     }
 
     [Fact]
@@ -274,6 +376,7 @@ public sealed class AefRunFinalizerTests : IDisposable
         public string RunsDirectory => inner.RunsDirectory;
         public AefIngestionStage BeginStage(CancellationToken cancellationToken = default) => inner.BeginStage(cancellationToken);
         public AefIngestionStage OpenStage(string id) => inner.OpenStage(id);
+        public string OpenAcceptedRun(string hash) => inner.OpenAcceptedRun(hash);
         public string PublishVerifiedStage(string id, string hash, CancellationToken cancellationToken = default)
         {
             before?.Invoke();

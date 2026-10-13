@@ -22,6 +22,9 @@ public interface IAefIngestionWorkspace : IDisposable
     /// <summary>Resolves an existing ordinary stage by its server-generated ID; refuses disposed ownership and links.</summary>
     AefIngestionStage OpenStage(string stageId);
 
+    /// <summary>Resolves an ordinary accepted-run directory by its hash, without asserting its integrity.</summary>
+    string OpenAcceptedRun(string runHash);
+
     /// <summary>
     /// Atomically moves stage/content into runs/runHash without overwriting. The trusted caller must first verify
     /// the stage against this hash. This filesystem primitive does not perform protocol verification itself.

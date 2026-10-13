@@ -229,7 +229,7 @@ public sealed class IngestionEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task Finalize_UploadedNativeRun_PublishesVerifiedBytesAndRefusesRepeatedFinalization()
+    public async Task Finalize_UploadedNativeRun_PublishesVerifiedBytesAndReconcilesRepeatedFinalization()
     {
         await using var app = await Start(bytes: 64 << 20, fileBytes: 64 << 20);
         using var client = Client(app);
@@ -260,7 +260,10 @@ public sealed class IngestionEndpointTests : IDisposable
         Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
             AgentEval.Results.Integrity.AefRunVerifier.Verify(destination).Outcome);
         Assert.Equal(File.ReadAllBytes(Path.Combine(source, "seal.json")), File.ReadAllBytes(Path.Combine(destination, "seal.json")));
-        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync(route, null)).StatusCode);
+        var retry = await client.PostAsync(route, null);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        using var retried = JsonDocument.Parse(await retry.Content.ReadAsStringAsync());
+        Assert.True(retried.RootElement.GetProperty("alreadyAccepted").GetBoolean());
     }
 
     [Fact]

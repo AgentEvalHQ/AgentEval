@@ -19,7 +19,8 @@ public interface IAefRunFinalizer
 /// <param name="RunHash">Verified sealed run hash, 64 lower-case hexadecimal characters.</param>
 /// <param name="Directory">Accepted local path; do not expose over HTTP.</param>
 /// <param name="ReceiptPersisted">Whether accepted state was persisted after publication. False requires receipt recovery.</param>
-public sealed record AefAcceptedRun(string StageId, string RunHash, string Directory, bool ReceiptPersisted);
+/// <param name="AlreadyAccepted">True when the verified evidence already existed, including recovery and exact duplicate uploads.</param>
+public sealed record AefAcceptedRun(string StageId, string RunHash, string Directory, bool ReceiptPersisted, bool AlreadyAccepted = false);
 
 /// <summary>A bounded, content-free refusal to finalize an upload.</summary>
 public sealed class AefFinalizationException : IOException
