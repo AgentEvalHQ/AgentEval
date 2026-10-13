@@ -21,12 +21,20 @@ public partial class LongMemEvalBenchmarkRunner
     /// <paramref name="oracleConfig"/> must match. AgentEval records those declarations
     /// but cannot prove the configuration of an opaque normal agent.
     /// </remarks>
-    public async Task<LongMemEvalPairedResult> RunPairedAsync(
+    public Task<LongMemEvalPairedResult> RunPairedAsync(
         IEvaluableAgent normalAgent,
         AgentBenchmarkConfig normalConfig,
         IChatClient oracleAnswerClient,
         AgentBenchmarkConfig oracleConfig,
         ExternalBenchmarkOptions options,
+        CancellationToken ct = default) =>
+        RunPairedWithProgressAsync(normalAgent, normalConfig, oracleAnswerClient, oracleConfig, options, null, ct);
+
+    /// <summary>Runs both arms over one selection, reporting immutable preparation identity and observed progress.</summary>
+    /// <remarks>Oracle projection and preparation occur only after normal completion. Callbacks never receive gold or history from preparation snapshots.</remarks>
+    public async Task<LongMemEvalPairedResult> RunPairedWithProgressAsync(
+        IEvaluableAgent normalAgent, AgentBenchmarkConfig normalConfig, IChatClient oracleAnswerClient,
+        AgentBenchmarkConfig oracleConfig, ExternalBenchmarkOptions options, LongMemEvalPairedProgress? progress,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(normalAgent);
@@ -39,8 +47,11 @@ public partial class LongMemEvalBenchmarkRunner
 
         var loaded = LoadEntries(options);
         var entries = loaded.Entries;
-        var selectedQuestionIds = Array.AsReadOnly(
-            entries.Select(entry => entry.QuestionId).ToArray());
+        var source = new ExternalBenchmarkPlan(options, entries);
+        var plan = new LongMemEvalPairedPlan(source, normalConfig, oracleConfig, GetReportedModelId(_chatClient));
+        progress?.OnPrepared?.Invoke(plan);
+        progress?.OnArmPrepared?.Invoke(LongMemEvalArm.Normal, source);
+        ct.ThrowIfCancellationRequested();
 
         // This await is a security boundary: no oracle projection or oracle reader exists
         // until the normal path has fully completed.
@@ -50,7 +61,8 @@ public partial class LongMemEvalBenchmarkRunner
             entries,
             executionLabel: "normal",
             ct,
-            loaded);
+            loaded, onCompleted: question => progress?.OnQuestionCompleted?.Invoke(LongMemEvalArm.Normal, question));
+        progress?.OnArmCompleted?.Invoke(LongMemEvalArm.Normal, normal);
 
         ct.ThrowIfCancellationRequested();
         // The paired oracle is always the gold-only ceiling: it exists to bound the normal arm, and
@@ -59,6 +71,8 @@ public partial class LongMemEvalBenchmarkRunner
             .Select(LongMemEvalOracleProjector.Project)
             .ToArray();
         var oracleEntries = projections.Select(projection => projection.Entry).ToArray();
+        progress?.OnArmPrepared?.Invoke(LongMemEvalArm.Oracle, new ExternalBenchmarkPlan(options, oracleEntries));
+        ct.ThrowIfCancellationRequested();
         var oracleReader = new LongMemEvalOracleReader(oracleAnswerClient);
         var oracle = await RunSelectedAsync(
             oracleReader,
@@ -69,7 +83,9 @@ public partial class LongMemEvalBenchmarkRunner
             loaded with { Entries = oracleEntries },
             OracleProjectionReport.From(
                 LongMemEvalOracleOptions.GoldOnly,
-                projections.Select(projection => projection.Realised).ToArray()));
+                projections.Select(projection => projection.Realised).ToArray()),
+            onCompleted: question => progress?.OnQuestionCompleted?.Invoke(LongMemEvalArm.Oracle, question));
+        progress?.OnArmCompleted?.Invoke(LongMemEvalArm.Oracle, oracle);
 
         double? oracleGap =
             normal.OverallAccuracy.HasValue && oracle.OverallAccuracy.HasValue
@@ -78,9 +94,10 @@ public partial class LongMemEvalBenchmarkRunner
 
         return new LongMemEvalPairedResult
         {
+            Plan = plan,
             Normal = normal,
             Oracle = oracle,
-            SelectedQuestionIds = selectedQuestionIds,
+            SelectedQuestionIds = source.QuestionIds,
             NormalAnswerModel = LongMemEvalModelIdentity.From(normalConfig),
             OracleAnswerModel = LongMemEvalModelIdentity.From(
                 oracleConfig,

@@ -41,6 +41,9 @@ public sealed class LongMemEvalModelIdentity
 /// </summary>
 public sealed class LongMemEvalPairedResult
 {
+    /// <summary>Pre-execution pairing identity, present on runner-produced results; null for older manually constructed results.</summary>
+    public LongMemEvalPairedPlan? Plan { get; init; }
+
     /// <summary>Normal memory-agent result.</summary>
     public required ExternalBenchmarkResult Normal { get; init; }
 

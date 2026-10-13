@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using AgentEval.Memory.External.LongMemEval;
 
 namespace AgentEval.Memory.External.Models;
@@ -22,6 +23,15 @@ public sealed class ExternalBenchmarkPlan
     public string? CorpusDigest { get; }
     /// <summary>Detached applied configuration; excludes local dataset paths.</summary>
     public JsonObject Configuration => (JsonObject)_configuration.DeepClone();
+
+    [JsonConstructor]
+    internal ExternalBenchmarkPlan(IReadOnlyList<string> questionIds, string selectedInputsDigest, string? corpusDigest, JsonObject configuration)
+    {
+        QuestionIds = Array.AsReadOnly(questionIds.ToArray());
+        SelectedInputsDigest = selectedInputsDigest;
+        CorpusDigest = corpusDigest;
+        _configuration = (JsonObject)configuration.DeepClone();
+    }
 
     internal ExternalBenchmarkPlan(ExternalBenchmarkOptions options, IReadOnlyList<LongMemEvalEntry> entries, string? corpusJson = null)
     {
