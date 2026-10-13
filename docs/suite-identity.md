@@ -5,7 +5,8 @@ weights, aggregation or configuration that defined their evaluation. AgentEval's
 [suite manifest](../schemas/suites/1/definition.schema.json) separates these concepts.
 
 The manifest reader, deterministic hashing, native eval and dataset-runner bindings are implemented.
-Probe/composite bindings and comparison compatibility are still being implemented; existing
+Probe/composite adapter bindings are available; their CLI definition capture and comparison compatibility
+are still being implemented. Existing
 dataset-only or roster-only identities are not silently reclassified as full definitions.
 
 ## Manifest 1.0
@@ -71,3 +72,20 @@ match the full definition; old dataset-byte digests are refused. Limits that con
 (case deadline and role input/output/call caps) are included. Job interruption, observed costs and
 which planned cases finished are not used to build a new definition. Runner validation checks that
 the declared definition, suite reference/version, content digest and actual planned roster agree.
+
+## Probe and composite adapters
+
+`AefProbeRunOptions.Definition` and `AefCompositeRunOptions.Definition` accept a manifest captured
+by the caller before execution. Writers check its kind, suite reference and frozen planned roster,
+bind its version/content digest, and store the manifest under the run seal. A completed run cannot
+omit planned cases; explicitly interrupted runs can contain a subset. Composite rosters include
+nested component IDs. `run.json` records the observed roster separately in `agenteval.observedRoster`.
+
+Without a manifest, probe adapters label their identity `observed-roster` and composite adapters
+label theirs `legacy-roster`. Existing composite roster digests remain unchanged, including empty
+interrupted exports. These scopes do not prove evaluation-definition equivalence. Generated probes
+without a frozen declaration have no suite content digest and report `frozen: false`; a supplied
+dynamic manifest identifies the recipe without claiming fixed generated stimuli.
+
+CLI probe/composite producers do not yet supply these manifests. Their existing evidence remains
+explicitly roster-scoped until producer capture is integrated.
