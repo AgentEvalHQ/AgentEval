@@ -5,8 +5,8 @@ index. It targets .NET 8, 9 and 10 and keeps SQLite dependencies outside the
 BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
 Transactional source projection, AEF snapshot imports and verified observation
-imports are implemented. Legacy adapters, rebuild orchestration and query
-pagination are subsequent slices.
+imports, legacy/root reconciliation and rebuild/recovery are implemented. Stable query
+pagination is the next slice.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -30,7 +30,7 @@ native file classifier. The filesystem owner must prevent concurrent path
 replacement by untrusted local processes. A sidecar ownership lease excludes
 concurrent schema operations, and SQLite locks govern the database transaction.
 
-Version one initializes only an empty database with zero application/version
+Initialization accepts only an empty database with zero application/version
 identifiers and no user schema. Initialization writes the schema, migration
 script digest, instance ID and generation zero in one transaction. Failure,
 cancellation before commit or an exceeded size budget rolls back the migration.
@@ -59,6 +59,7 @@ individual database integrity scans are not preemptible.
 | Table | Purpose |
 | --- | --- |
 | `index_metadata`, `schema_migrations` | Instance/generation identity and migration provenance |
+| `root_bindings` | Persistent namespace-to-directory/format bindings |
 | `sources` | Root-relative location, evidence kind, content digest and verification state |
 | `evaluation_runs` | AEF or legacy run identity, subject, suite, outcome and explicit completeness |
 | `evaluation_results`, `metric_values` | Per-case/trial outcomes and metric values with provenance |
@@ -197,7 +198,7 @@ The source digest binds a versioned, path-sorted manifest of consumed file hashe
 
 `IEvidenceRootIndexer` imports an explicit bounded AEF/legacy root plan. Different formats may share a physical directory but require distinct root IDs. After a complete owner scan it retires prior rows in a covered namespace only when their replacement was imported **during that pass**, or when pruning is explicitly enabled and the source marker is confirmed absent. Old row fingerprints guard removal. A failed owner scan retains covered rows. A nested run hidden beneath a newly introduced parent marker produces an explicit issue instead of silent loss. Source evidence is never deleted.
 
-Root IDs must remain bound to their configured directory and format. This service does not persist workspace configuration or authorize rebinding IDs; the caller owns that contract. Removing a root from configuration does not silently remove its indexed namespace: rebuild or explicit guarded retirement is required. Imports and covered-root retirement commit per source, not atomically across the workspace; callers must surface incomplete coverage and must not treat retained rows as fresh. Observation stores use their dedicated inventory/import service rather than recursive marker discovery.
+Root IDs remain bound to their configured directory and format in schema version 2. Evaluated-run coordinators atomically bind their configured roots before imports; conflicting directory/format reuse refuses across restarts. Workspace configuration itself remains caller-owned. Removing a root from configuration does not silently remove its indexed namespace: rebuild or explicit guarded retirement is required. Imports and covered-root retirement commit per source, not atomically across the workspace; callers must surface incomplete coverage and must not treat retained rows as fresh. Observation stores use their dedicated inventory/import service rather than recursive marker discovery.
 
 ### Preparing a rebuild
 
@@ -219,4 +220,22 @@ The recovery design preserves SQLite sidecars because hot journals may contain d
 
 Promotion flushes an intent receipt, copies and verifies a publish file, then moves it to a previously absent target or uses `File.Replace` with an owned `previous.sqlite` backup. The prepared candidate remains intact. Retry recognizes the persisted intent plus matching active digest and verifies the retained backup. An interrupted publish copy is rebuilt; a backup created before replacement is verified against the still-current old target before retry. Changed targets refuse rather than roll back later work. Cancellation is checked before replacement; after that commit point the call reports success and later retries can recognize it.
 
-These operations commit one index replacement, not a simultaneous filesystem snapshot of all source roots. Flushes and retry logic do not promise portable power-loss durability. Persistent root bindings and independent process-interruption acceptance are still pending W07-04 work; API/host wiring remains in W08.
+These operations commit one index replacement, not a simultaneous filesystem snapshot of all source roots. Flushes and retry logic do not promise portable power-loss durability. Persistent root bindings and independent process-interruption acceptance are implemented; API/host wiring remains in W08.
+
+### Schema version 2 and persistent root namespaces
+
+Version 2 adds `root_bindings(root_id, directory, kind)`. Migration first validates the exact historical version 1 schema and migration digest, then adds the table and version 2 ledger entry in the same transaction. Existing source rows and instance ID remain; generation increments once. Fresh initialization applies both scripts and starts at generation zero. Unknown versions or drift refuse. Inspection of an already-prepared older candidate refuses upgrade rather than changing bytes behind its ready receipt; prepare a new candidate with the current schema.
+
+`IEvidenceIndexWriter.BindRoots` normalizes and validates a bounded batch of ordinary source directories, then binds every ID transactionally. Directory comparison is case-insensitive on Windows and ordinal elsewhere. A batch conflict rolls back earlier inserts. Repeated identical bindings do not advance generation; new bindings advance it once. Upserts refuse evidence kinds inconsistent with a binding. The index retains at most 4096 bindings; each path is limited to 4096 characters, subject to the database byte budget.
+
+Old rows with no recorded binding cannot establish directory provenance. Attempting to bind such a populated namespace returns `unbound-existing-root`; rebuild it from configured authoritative roots instead of guessing. Direct projection writers and observation-store callers can explicitly call `BindRoots` when they have the physical root configuration. AEF/legacy import coordinators do so automatically. Removing source rows does not remove the binding or authorize reusing its ID elsewhere; a new namespace or deliberate rebuild is required.
+
+### Process interruption acceptance
+
+Build `scripts/index-rebuild-smoke/IndexRebuildSmoke.csproj`, then run:
+
+```console
+python scripts/verify-index-rebuild.py --fixture scripts/index-rebuild-smoke/bin/Debug/net10.0/IndexRebuildSmoke.dll
+```
+
+The offline fixture starts a real helper, waits until candidate preparation has committed a source, kills that helper while its writer is still alive, and uses fresh processes to inspect and discard the unready candidate. It then prepares and publishes a replacement, exits without returning the publication result, retries from a fresh process, verifies the exact backup and new rows, rejects root rebinding after restart and refuses a changed target. Verified on native Windows .NET 10 and Linux .NET 8/10. Unit tests additionally reconstruct interrupted-copy and backup-before-replacement states. This is process-failure evidence, not a power-loss durability claim.

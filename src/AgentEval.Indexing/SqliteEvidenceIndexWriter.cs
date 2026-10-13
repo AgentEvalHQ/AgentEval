@@ -53,6 +53,57 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
     }
 
     /// <inheritdoc />
+    public void BindRoots(IEnumerable<EvidenceIndexRoot> roots, CancellationToken cancellationToken = default)
+    {
+        var plan = new EvidenceIndexRootPlanner().Plan(roots, 4096, cancellationToken);
+        var bindings = plan.ScanRoots.Concat(plan.CoveredRoots.Select(r => r.Root)).OrderBy(r => r.RootId, StringComparer.Ordinal).ToArray();
+        Enter(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            var changed = false;
+            foreach (var root in bindings)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _ = Identity(root.RootId, ".");
+                if (root.Directory.Length > 4096) throw new EvidenceIndexException("root-path-limit");
+                var kind = root.Kind.ToString().ToLowerInvariant();
+                using var find = _connection.CreateCommand(); find.Transaction = transaction;
+                find.CommandText = "SELECT directory,kind FROM root_bindings WHERE root_id=$root";
+                find.Parameters.AddWithValue("$root", root.RootId);
+                using (var reader = find.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        if (!string.Equals(reader.GetString(0), root.Directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+                            || reader.GetString(1) != kind)
+                            throw new EvidenceIndexException("root-binding-conflict");
+                        continue;
+                    }
+                }
+                using var existing = _connection.CreateCommand(); existing.Transaction = transaction;
+                existing.CommandText = "SELECT 1 FROM sources WHERE root_id=$root LIMIT 1";
+                existing.Parameters.AddWithValue("$root", root.RootId);
+                if (existing.ExecuteScalar() is not null) throw new EvidenceIndexException("unbound-existing-root");
+                if (Scalar(transaction, "SELECT count(*) FROM root_bindings") >= 4096) throw new EvidenceIndexException("root-binding-limit");
+                Execute(transaction, "INSERT INTO root_bindings VALUES ($p0,$p1,$p2)", root.RootId, root.Directory, kind);
+                changed = true;
+            }
+            if (changed)
+            {
+                var generation = Scalar(transaction, "SELECT generation FROM index_metadata WHERE singleton=1");
+                if (generation == long.MaxValue) throw new EvidenceIndexException("generation-limit");
+                Execute(transaction, "UPDATE index_metadata SET generation=$p0 WHERE singleton=1", generation + 1);
+            }
+            if (Scalar(transaction, "PRAGMA page_count") > _options.MaxDatabaseBytes / Scalar(transaction, "PRAGMA page_size"))
+                throw new EvidenceIndexException("size-limit");
+            cancellationToken.ThrowIfCancellationRequested(); transaction.Commit();
+        }
+        catch (SqliteException error) { throw SqlFailure(error); }
+        finally { Monitor.Exit(_gate); }
+    }
+
+    /// <inheritdoc />
     public EvidenceIndexMutation Upsert(EvidenceIndexSource source, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -79,6 +130,12 @@ public sealed class SqliteEvidenceIndexWriter : IEvidenceIndexWriter
             }
             var fingerprint = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
             using var transaction = _connection.BeginTransaction();
+            using (var binding = _connection.CreateCommand())
+            {
+                binding.Transaction = transaction; binding.CommandText = "SELECT kind FROM root_bindings WHERE root_id=$root";
+                binding.Parameters.AddWithValue("$root", source.RootId);
+                if (binding.ExecuteScalar() is string boundKind && boundKind != kind) throw new EvidenceIndexException("root-binding-conflict");
+            }
             var generation = Scalar(transaction, "SELECT generation FROM index_metadata WHERE singleton=1");
             var existing = FindCore(id, transaction);
             if (existing?.Fingerprint == fingerprint) return new(id, fingerprint, generation, false);

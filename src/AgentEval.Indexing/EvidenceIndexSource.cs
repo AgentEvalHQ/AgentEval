@@ -47,6 +47,8 @@ public sealed record EvidenceIndexMutation(string SourceId, string Fingerprint, 
 /// <summary>Atomic source replacement and guarded deletion in a rebuildable index.</summary>
 public interface IEvidenceIndexWriter : IDisposable
 {
+    /// <summary>Atomically binds a bounded set of root IDs to ordinary source directories and formats; rebinding refuses.</summary>
+    void BindRoots(IEnumerable<EvidenceIndexRoot> roots, CancellationToken cancellationToken = default);
     /// <summary>Replaces all derived rows and the source checkpoint atomically; identical projections are skipped.</summary>
     EvidenceIndexMutation Upsert(EvidenceIndexSource source, CancellationToken cancellationToken = default);
     /// <summary>Reads one source checkpoint by its stable root-relative identity.</summary>

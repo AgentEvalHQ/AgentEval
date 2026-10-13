@@ -35,15 +35,18 @@ public sealed class EvidenceIndexException(string code) : IOException(
     public string Code { get; } = code;
 }
 
-/// <summary>Version-one schema, transactional initialization and strict migration/schema provenance checks.</summary>
+/// <summary>Transactional schema initialization/migration and strict schema provenance checks.</summary>
 public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
 {
     /// <summary>Current derived schema version, independent of AEF and OTLP versions.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
     internal const int ApplicationId = 0x41454958;
-    private static readonly string Script = LoadScript();
+    private static readonly string Script = LoadScript("EvidenceIndexSchema.sql");
     private static readonly string ScriptDigest = Digest(Script);
-    private static readonly Lazy<string> ExpectedSchema = new(CreateExpectedSchema);
+    private static readonly string ScriptV2 = LoadScript("EvidenceIndexSchemaV2.sql");
+    private static readonly string ScriptV2Digest = Digest(ScriptV2);
+    private static readonly Lazy<string> ExpectedSchemaV1 = new(() => CreateExpectedSchema(1));
+    private static readonly Lazy<string> ExpectedSchema = new(() => CreateExpectedSchema(CurrentVersion));
 
     /// <inheritdoc />
     public EvidenceIndexSchemaInfo EnsureCurrent(EvidenceIndexOptions options, CancellationToken cancellationToken = default)
@@ -78,6 +81,7 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
             using var transaction = connection.BeginTransaction();
             var application = ScalarLong(connection, transaction, "PRAGMA application_id");
             var version = ScalarLong(connection, transaction, "PRAGMA user_version");
+            var initialized = false;
             if (application == 0 && version == 0 && ScalarLong(connection, transaction,
                 "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'") == 0)
             {
@@ -89,20 +93,31 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
                 migration.Parameters.AddWithValue("$digest", ScriptDigest);
                 migration.Parameters.AddWithValue("$instance", Guid.NewGuid().ToString("N"));
                 migration.ExecuteNonQuery();
-                Execute(connection, transaction, $"PRAGMA application_id={ApplicationId}; PRAGMA user_version={CurrentVersion};");
+                Execute(connection, transaction, $"PRAGMA application_id={ApplicationId}; PRAGMA user_version=1;");
+                version = 1; initialized = true;
             }
-            else if (application != ApplicationId || version != CurrentVersion)
+            else if (application != ApplicationId || version is < 1 or > CurrentVersion)
                 throw new EvidenceIndexException("unsupported-schema");
+            if (version == 1)
+            {
+                if (!allowInitialize) throw new EvidenceIndexException("rebuild-schema-upgrade-required");
+                if (SchemaDigest(connection, transaction) != ExpectedSchemaV1.Value) throw new EvidenceIndexException("schema-drift");
+                VerifyMigrations(connection, transaction, 1);
+                Execute(connection, transaction, ScriptV2);
+                using var migration = connection.CreateCommand(); migration.Transaction = transaction;
+                migration.CommandText = "INSERT INTO schema_migrations VALUES (2, $digest)";
+                migration.Parameters.AddWithValue("$digest", ScriptV2Digest); migration.ExecuteNonQuery();
+                if (!initialized)
+                {
+                    if (ScalarLong(connection, transaction, "SELECT generation FROM index_metadata WHERE singleton=1") == long.MaxValue)
+                        throw new EvidenceIndexException("generation-limit");
+                    Execute(connection, transaction, "UPDATE index_metadata SET generation=generation+1 WHERE singleton=1");
+                }
+                Execute(connection, transaction, "PRAGMA user_version=2");
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (SchemaDigest(connection, transaction) != ExpectedSchema.Value) throw new EvidenceIndexException("schema-drift");
-            using (var migration = connection.CreateCommand())
-            {
-                migration.Transaction = transaction;
-                migration.CommandText = "SELECT version, script_sha256 FROM schema_migrations ORDER BY version";
-                using var reader = migration.ExecuteReader();
-                if (!reader.Read() || reader.GetInt64(0) != CurrentVersion || reader.GetString(1) != ScriptDigest || reader.Read())
-                    throw new EvidenceIndexException("migration-drift");
-            }
+            VerifyMigrations(connection, transaction, CurrentVersion);
             using (var check = connection.CreateCommand())
             {
                 check.Transaction = transaction;
@@ -169,15 +184,26 @@ public sealed class SqliteEvidenceIndexSchema : IEvidenceIndexSchema
         }
         return Digest(text.ToString());
     }
-    private static string CreateExpectedSchema()
+    private static void VerifyMigrations(SqliteConnection connection, SqliteTransaction transaction, int version)
+    {
+        using var migration = connection.CreateCommand(); migration.Transaction = transaction;
+        migration.CommandText = "SELECT version, script_sha256 FROM schema_migrations ORDER BY version";
+        using var reader = migration.ExecuteReader();
+        for (var expected = 1; expected <= version; expected++)
+            if (!reader.Read() || reader.GetInt64(0) != expected || reader.GetString(1) != (expected == 1 ? ScriptDigest : ScriptV2Digest))
+                throw new EvidenceIndexException("migration-drift");
+        if (reader.Read()) throw new EvidenceIndexException("migration-drift");
+    }
+    private static string CreateExpectedSchema(int version)
     {
         using var connection = Open(":memory:", 2);
         Execute(connection, null, Script);
+        if (version >= 2) Execute(connection, null, ScriptV2);
         return SchemaDigest(connection, null);
     }
-    private static string LoadScript()
+    private static string LoadScript(string name)
     {
-        using var stream = typeof(SqliteEvidenceIndexSchema).Assembly.GetManifestResourceStream("AgentEval.Indexing.EvidenceIndexSchema.sql")!;
+        using var stream = typeof(SqliteEvidenceIndexSchema).Assembly.GetManifestResourceStream("AgentEval.Indexing." + name)!;
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
     }

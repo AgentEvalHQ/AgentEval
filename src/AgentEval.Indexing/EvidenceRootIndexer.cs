@@ -41,6 +41,7 @@ public sealed class EvidenceRootIndexer(IEvidenceIndexRootPlanner planner, IAefE
         var plan = planner.Plan(roots, maximumRoots, cancellationToken);
         if (plan.ScanRoots.Any(r => r.Kind == IndexedEvidenceKind.Observation))
             throw new EvidenceIndexException("unsupported-root-format");
+        writer.BindRoots(plan.ScanRoots.Concat(plan.CoveredRoots.Select(r => r.Root)), cancellationToken);
         // Capture guards before any import mutation. Reconciliation only touches these prior rows.
         var previous = plan.CoveredRoots.ToDictionary(r => r.Root.RootId,
             r => writer.ListSources(r.Root.RootId, cancellationToken), StringComparer.Ordinal);

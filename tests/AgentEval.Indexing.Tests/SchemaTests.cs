@@ -3,6 +3,8 @@
 // Licensed under the MIT License.
 
 using Microsoft.Data.Sqlite;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace AgentEval.Indexing.Tests;
 
@@ -15,22 +17,56 @@ public sealed class SchemaTests : IDisposable
     private SqliteConnection Open() => SqliteEvidenceIndexSchema.Open(Database, 1);
     private static void Sql(SqliteConnection connection, string sql) => SqliteEvidenceIndexSchema.Execute(connection, null, sql);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Ensure_VersionOneIndex_MigratesOnlyAfterValidatingHistoricalSchema(bool drift)
+    {
+        Directory.CreateDirectory(_root);
+        using var stream = typeof(SqliteEvidenceIndexSchema).Assembly.GetManifestResourceStream("AgentEval.Indexing.EvidenceIndexSchema.sql")!;
+        using var text = new StreamReader(stream);
+        var script = text.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
+        var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(script))).ToLowerInvariant();
+        var instance = Guid.NewGuid().ToString("N");
+        using (var connection = Open())
+        {
+            Sql(connection, script);
+            Sql(connection, $"INSERT INTO schema_migrations VALUES (1,'{digest}'); INSERT INTO index_metadata VALUES (1,7,'{instance}'); PRAGMA application_id={SqliteEvidenceIndexSchema.ApplicationId}; PRAGMA user_version=1;");
+            Sql(connection, "INSERT INTO sources VALUES ('legacy','root','run','legacy','digest',7,'unverified'); INSERT INTO evaluation_runs(source_id,source_kind,run_id,completeness) VALUES ('legacy','legacy','run','unknown');");
+            if (drift) Sql(connection, "DROP INDEX ix_spans_group");
+        }
+        var before = File.ReadAllBytes(Database);
+        if (drift)
+        {
+            Assert.Equal("schema-drift", Assert.Throws<EvidenceIndexException>(() => Ensure()).Code);
+            Assert.Equal(before, File.ReadAllBytes(Database));
+            return;
+        }
+        var migrated = Ensure();
+        Assert.Equal(2, migrated.Version); Assert.Equal(instance, migrated.InstanceId); Assert.Equal(8, migrated.Generation);
+        Assert.Equal(migrated, Ensure());
+        using var reopened = Open(); using var count = reopened.CreateCommand();
+        count.CommandText = "SELECT count(*) FROM sources"; Assert.Equal(1L, count.ExecuteScalar());
+        count.CommandText = "SELECT count(*) FROM root_bindings"; Assert.Equal(0L, count.ExecuteScalar());
+        count.CommandText = "SELECT count(*) FROM schema_migrations"; Assert.Equal(2L, count.ExecuteScalar());
+    }
+
     [Fact]
     public void Ensure_EmptyDatabase_InitializesAndReopensWithoutChangingIdentity()
     {
         var first = Ensure();
-        Assert.Equal(1, first.Version);
+        Assert.Equal(2, first.Version);
         Assert.Equal(0, first.Generation);
         Assert.True(Guid.TryParseExact(first.InstanceId, "N", out _));
         Assert.Equal(first, Ensure());
         using var connection = Open();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'";
-        Assert.Equal(10L, command.ExecuteScalar());
+        Assert.Equal(11L, command.ExecuteScalar());
     }
 
     [Theory]
-    [InlineData("PRAGMA user_version=2", "unsupported-schema")]
+    [InlineData("PRAGMA user_version=3", "unsupported-schema")]
     [InlineData("PRAGMA application_id=123", "unsupported-schema")]
     [InlineData("ALTER TABLE sources ADD COLUMN unexpected TEXT", "schema-drift")]
     [InlineData("DROP INDEX ix_spans_group", "schema-drift")]
@@ -106,7 +142,7 @@ public sealed class SchemaTests : IDisposable
             command.CommandText = "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'";
             Assert.Equal(0L, command.ExecuteScalar());
         }
-        Assert.Equal(1, Ensure().Version);
+        Assert.Equal(2, Ensure().Version);
     }
 
     [Fact]

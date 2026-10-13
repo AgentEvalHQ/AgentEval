@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="EvidenceIndexSchema.sql" />
+    <EmbeddedResource Include="EvidenceIndexSchemaV2.sql" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <ProjectReference Include="../AgentEval.Results/AgentEval.Results.csproj" />
     <InternalsVisibleTo Include="AgentEval.Indexing.Tests" />

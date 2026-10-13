@@ -15,6 +15,7 @@ internal static class DirectoryEvidenceIndexImport
         Func<string, AefDiscoveryOptions?, CancellationToken, AefDiscoveryResult> discover,
         Func<string, string, string, CancellationToken, EvidenceIndexSource> read, IEvidenceIndexWriter writer)
     {
+        writer.BindRoots([new(rootId, directory, kind == "aef" ? IndexedEvidenceKind.Aef : IndexedEvidenceKind.Legacy)], cancellationToken);
         writer.Find(rootId, ".", cancellationToken);
         var previous = pruneMissing ? writer.ListSources(rootId, cancellationToken) : [];
         var inventory = discover(directory, options, cancellationToken);
