@@ -177,3 +177,16 @@ task binds the instruction/request hashes, tool-loop limit, gate policy, trace t
 assemblies. The scripted showcase declares a distinct instrument and retains mocked target mode.
 Endpoint names and measured behavior are observations, so all endpoints within the same instrument
 share a definition. Completion, client-factory failures, cancellation and report-write failures retain it.
+
+## Built-in memory producer
+
+The built-in memory command declares a generated recipe before execution: the selected benchmark,
+resolved preset key, ordered category weights/types, context-pressure overrides, judge identity,
+embedded scenario/corpus hashes and implementation hashes. It emits one benchmark case with weighted
+category children. Completed and interrupted exports retain the same recipe and separately record
+the observed results.
+
+This producer uses runtime UTC values for unanchored temporal inputs and code-generated fallback
+scenarios. Its declaration is therefore `frozen: false`, with a recipe digest in the extension and no
+suite content digest. It must not be treated as identical frozen evaluation content in comparisons.
+Changing the recipe's configuration still changes its digest; no prompts or corpus text are exported.

@@ -113,8 +113,8 @@ internal static class BenchAef
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
-        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint);
+        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition);
 
     /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
     internal static AefCommandGate Gate(string label, int exitCode) => new()
@@ -131,7 +131,7 @@ internal static class BenchAef
     };
 
     /// <summary>
-    /// bench memory's result as a tree: a case per category, weighted as the overall score weighs them (WeightedSum),
+    /// bench memory's result as a tree: one benchmark case with weighted category children (WeightedSum),
     /// each with the command's own label (pass at 70 and above, warn from 50, fail below), a skipped category skipped and
     /// an errored one error. The one model is the agent and its judge.
     /// </summary>

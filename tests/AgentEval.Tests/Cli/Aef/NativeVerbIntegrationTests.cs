@@ -1469,6 +1469,47 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(completed, lines.Count(l => ((string?)l["path"])?.StartsWith("case/", StringComparison.Ordinal) == true));
+        AssertMemoryRecipe(dir);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        await InitCommand.RunAsync("memory-definition", _root);
+        var original = Console.Out;
+        using var cancel = new CancellationTokenSource();
+        using var output = new CancelOnPersistenceWriter(cancel, "Running memory benchmark");
+        using var client = new MemoryReplyClient();
+        var destination = new DirectoryInfo(Path.Combine(_root, "memory-definition"));
+        int exit;
+        try
+        {
+            if (cancelBeforeCalls) Console.SetOut(output);
+            exit = await BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination);
+        }
+        finally { Console.SetOut(original); }
+        Assert.Equal(cancelBeforeCalls ? 1 : 0, exit);
+        var directory = RunDirectory(destination.FullName);
+        AssertIntact(directory);
+        AssertMemoryRecipe(directory);
+        if (cancelBeforeCalls) Assert.Empty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+        else Assert.NotEmpty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+    }
+
+    private static void AssertMemoryRecipe(string directory)
+    {
+        var header = Document(directory, "run.json");
+        Assert.False((bool)header["suite"]!["frozen"]!);
+        Assert.Null(header["suite"]!["digest"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(AgentEval.Cli.Infrastructure.MemorySuiteDefinition.Create("quick", AgentEval.Benchmarks.MemoryBenchmark.Quick, null, "override").Digest,
+            manifest.Digest);
+        Assert.Equal(manifest.Digest, (string?)header["ext"]!["agenteval.suiteIdentity"]!["digest"]);
+        Assert.Equal(new[] { "memory.quick" }, manifest.CaseIds);
     }
 
     private sealed class MemoryReplyClient : Microsoft.Extensions.AI.IChatClient

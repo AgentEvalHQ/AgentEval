@@ -125,6 +125,8 @@ public static class BenchMemoryCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         var runner = MemoryBenchmarkRunner.Create(chatClient);
+        var suiteDefinition = noAef ? null : AgentEval.Cli.Infrastructure.MemorySuiteDefinition.Create(
+            preset, benchmark, model, chatClientOverride is null ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override");
         MemoryBenchmarkResult? result = null;
         var completed = new List<BenchmarkCategoryResult>();
         var startedAt = DateTimeOffset.UtcNow;
@@ -142,13 +144,13 @@ public static class BenchMemoryCommand
             });
             if (observed is null)
                 return BenchAef.WriteResult(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode,
-                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true, storeV1: StoreLink(), endpoint: agentEndpoint);
+                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition);
             var verdict = result is null ? "INCOMPLETE" : Verdict(observed);
             var (tree, shape) = BenchAef.MemoryTree(observed, preset, verdict, model);
             return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
                 startedAt, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
-                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint);
+                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition);
         }
         try
         {
