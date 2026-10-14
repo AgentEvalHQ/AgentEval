@@ -36,6 +36,9 @@ public sealed class SuiteQueryServiceTests : IDisposable
         var detail = new ResultDetailQueryService();
         Assert.Equal(QueryState.NotConfigured, detail.Result("source", "result", default).State);
         Assert.Throws<OperationCanceledException>(() => detail.Result("source", "result", default, new(true)));
+        var governance = new GovernanceQueryService();
+        Assert.Equal(QueryState.NotConfigured, governance.Status(new("agent", "1"), [], default).State);
+        Assert.Throws<OperationCanceledException>(() => governance.Status(new("agent", "1"), [], default, new(true)));
     }
 
     private string Copy(string name)

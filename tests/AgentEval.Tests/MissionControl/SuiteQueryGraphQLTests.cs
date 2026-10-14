@@ -17,18 +17,22 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace AgentEval.Tests.MissionControl;
 
-public sealed class SuiteQueryGraphQLTests : IDisposable
+public sealed partial class SuiteQueryGraphQLTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ae-suite-http-" + Guid.NewGuid().ToString("N"));
     private EvidenceIndexRoot Root => new("root", Path.Combine(_root, "evidence"), IndexedEvidenceKind.Aef);
     private string Database => Path.Combine(_root, "index.sqlite");
     public SuiteQueryGraphQLTests() => Directory.CreateDirectory(Root.Directory);
-    private WebApplicationFactory<Query> Factory(bool enabled = true, bool roots = true, string? directory = null) =>
+    private WebApplicationFactory<Query> Factory(bool enabled = true, bool roots = true, string? directory = null,
+        string? catalogue = null, string? policy = null, int maxSources = 8) =>
         new WebApplicationFactory<Query>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("AgentEval:Queries:Enabled", enabled.ToString());
             builder.UseSetting("AgentEval:Queries:IndexPath", Database);
             builder.UseSetting("AgentEval:Root", _root);
+            if (catalogue is not null) builder.UseSetting("AgentEval:Queries:CataloguePath", catalogue);
+            if (policy is not null) builder.UseSetting("AgentEval:Queries:TrustPolicyPath", policy);
+            builder.UseSetting("AgentEval:Queries:GovernanceLimits:MaxSources", maxSources.ToString());
             if (roots)
             {
                 builder.UseSetting("AgentEval:Queries:AefRoots:0:RootId", "root");
@@ -38,8 +42,9 @@ public sealed class SuiteQueryGraphQLTests : IDisposable
     private static async Task<JsonDocument> Read(HttpClient client, string query)
     {
         using var response = await client.PostAsJsonAsync("/graphql", new { query });
-        response.EnsureSuccessStatusCode();
-        var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, body);
+        var json = JsonDocument.Parse(body);
         Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
         return json;
     }

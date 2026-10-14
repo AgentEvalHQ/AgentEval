@@ -30,7 +30,7 @@ The service preserves the [index page contracts](evidence-index.md): finite row/
 
 Each operation performs at most one bounded reader call. Consumers choose a suitable page size instead of automatically walking the index within one request. Full index validation is part of that operation's cost; cancellation does not impose a hard deadline inside synchronous SQLite integrity checks.
 
-This library supplies shared contracts, evidence pages, verified suite comparison, result detail and governance services described below. GraphQL integration is in progress, starting with source inventory. Notification delivery and transport-parity acceptance remain integration work. Existing legacy endpoints are preserved.
+This library supplies shared contracts, evidence pages, verified suite comparison, result detail and governance services described below. GraphQL exposes the indexed pages and verified suite, result-detail and governance queries. Notification delivery and transport-parity acceptance remain integration work. Existing legacy endpoints are preserved.
 
 ## Verified suite queries
 
@@ -68,7 +68,7 @@ The capability defaults to NotConfigured. Enable it with `AgentEval:Queries:Enab
 
 `evidenceResults`, `evidenceMetrics`, `evidenceSpans` and `evidenceFields` take an explicit `sourceId` plus optional `pageSize` and `cursor`. Each delegates to one shared bounded query and returns index revision, source kind, verification and projection fingerprint with its items. All Int64 values (trial, report ordinal, coordinates and token values) are decimal strings; unsigned nanosecond timestamps remain decimal strings. Metric ordinals are Int32 and finite scores remain numeric. Exceptional scores use `scoreText`; absent aggregate case IDs and unknown pass states remain null. Observation conflicts retain their state and `sourcesJson` provenance without inventing a consensus value. The provenance is JSON text; clients that parse its embedded integers must preserve their precision.
 
-Pages distinguish Empty, NotFound, InvalidRequest, StaleCursor and ResourceLimit. Refusals return null data, never partial rows. A cursor is bound to the source, query family, page size and index revision. Results and metrics only accept evaluation sources; spans and fields only accept observation sources. These are indexed projections, not fresh seal verification or a telemetry-derived evaluation verdict. Governance still requires transport integration.
+Pages distinguish Empty, NotFound, InvalidRequest, StaleCursor and ResourceLimit. Refusals return null data, never partial rows. A cursor is bound to the source, query family, page size and index revision. Results and metrics only accept evaluation sources; spans and fields only accept observation sources. These are indexed projections, not fresh seal verification or a telemetry-derived evaluation verdict. Governance is exposed separately over verified evidence, as described below.
 
 ## GraphQL verified suite identity
 
@@ -84,4 +84,14 @@ Suite reads re-verify the selected seal. Tampering or binding changes return no 
 
 The response includes sealed JSON and state, effective state, the selected override event, reviews, displayed assurance, unsealed-event count and exact view time. Run seal, full snapshot and policy digests identify the evidence and authority used. Index generation is decimal text. The service owns seal/overlay verification and response limits; the resolver only maps the result. Unsealed tails do not change effective state, and unsigned authenticated claims remain self-attested. Missing results, invalid evidence and resource limits return typed outcomes with null data. No blob bytes or physical directories are returned.
 
-An embedding host may register a `TrustPolicy` in DI before requests; otherwise result-detail queries use the shared service's no-trusted-keys default. Request arguments cannot grant trust. Standalone policy-file configuration will be added with governance hosting. The resolver's operation cost is 250, within the existing host-wide cost/depth limits.
+An embedding host may register a `TrustPolicy` in DI before requests; otherwise result-detail queries use the shared service's no-trusted-keys default. Request arguments cannot grant trust. Standalone hosts can configure the bounded JSON trust-policy file described below. The resolver's operation cost is 250, within the existing host-wide cost/depth limits.
+
+## GraphQL governance and host authority
+
+`governanceStatus(subjectRef, subjectVersion, sourceIds, at)` delegates to `IGovernanceQueryService`. Its typed outcome carries the detached `RequirementStatusReport`: catalogue/policy digests, exact view time, selected hashes, overlay identities, observations, sealed/effective statuses, diagnostics, reviews and scoped waiver history. The report records contain no filesystem locations or lazy evidence readers. Empty selection is an Available report with not_measured requirements, not discovery of a recent run. `at` uses the same exact UTC parser as result detail. The resolver has cost 500; the existing operation cost limit applies to aliases as well.
+
+Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requirement catalogue, in addition to enabled queries, index path and AEF roots. Missing catalogue configuration gives NotConfigured. The host reads at most 1 MiB plus one detection byte and validates the catalogue at startup. CLI YAML catalogue support is unchanged; this host boundary accepts JSON. Files are read once, so configuration changes require a host restart.
+
+`AgentEval:Queries:TrustPolicyPath` optionally supplies an absolute JSON trust-policy path under the same 1 MiB bound. The parsed policy is shared by governance and result detail. An embedding host's pre-registered `TrustPolicy` takes precedence; without either configuration, no signing key is trusted. Requests cannot provide a catalogue, policy, directory or waiver permission. Valid signatures and explicitly scoped `requirements:waive:<id>` authority are separate checks, and expired waivers do not change current status.
+
+`AgentEval:Queries:GovernanceLimits` can lower `MaxSources` (default/ceiling 8), `MaxCaptureBytes` (64 MiB), `MaxRowRulePairs` (100000) and `MaxResponseBytes` (2 MiB). The shared service validates ceilings and enforces them before returning a report. Host-wide response/operation limits and transport parity remain part of W08 acceptance; the report cap does not claim to cap alias-multiplied transport envelopes.
