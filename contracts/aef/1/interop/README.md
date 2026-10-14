@@ -106,7 +106,7 @@ mapping still loses something.
 | I5 | Trial aggregations beyond `MajorityVote` | `AllPass`, `AnyPass`, `Mean`, `Median`, `Max`, `PassAtK` (with `k`) |
 | I6 | Times per result | `startedAt` and `endedAt` on a result line |
 | I7 | Facts a converter supplied | `imported` in `run.json`: the original tool and the fields the converter asserted ([RUN-15](../spec/03-run.md#32-runjson)) |
-| I8 | An attestation bound to the evaluated artifact; registered media types | **Mapping accepted; implementation pending.** [Artifact companion](artifact-companion.md) defines the artifact/seal binding and trust boundary. [in-toto.md](in-toto.md) describes existing predicates and proposed media types. External predicate/media-type submissions remain owner-controlled; this mapping claims no registration. A DSSE `payloadType` needs no registration, so SIG-1 does not wait on either. |
+| I8 | An attestation bound to the evaluated artifact; registered media types | **Companion implemented; external registration separate.** [Artifact companion](artifact-companion.md) defines the artifact/seal binding, Results API, CLI and trust boundary. [in-toto.md](in-toto.md) describes existing predicates and proposed media types. External predicate/media-type submissions remain owner-controlled; this mapping claims no registration. A DSSE `payloadType` needs no registration, so SIG-1 does not wait on either. |
 
 Found while mapping the current format: a summary entry with no rule is now `scored`
 ([SUM-6](../spec/03-run.md#36-summaryjson)), and `summary.json` has the run's usage per party and model

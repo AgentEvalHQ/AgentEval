@@ -30,6 +30,7 @@ namespace AgentEval.Cli.Commands;
 /// <item><c>verify</c>: a run's outcome (§4.5) and every problem;</item>
 /// <item><c>compare-suites</c>: strict full-definition identity, with exit 13 when incomparable;</item>
 /// <item><c>seal</c>: seal a closed run (§4.1), optionally signed;</item>
+/// <item><c>companion create|verify</c>: bind explicit artifact digests to sealed evidence and report separate signature trust;</item>
 /// <item><c>view</c>: a run's effective view with its overlays (§4.3);</item>
 /// <item><c>checkpoint</c>: a checkpoint's problems ([CKP-7], [CKP-8]) and each lane's result (§5.3);</item>
 /// <item><c>export</c>: a run of AgentEval's older output store (store v1, §7.5) as an AEF run;</item>
@@ -43,7 +44,7 @@ namespace AgentEval.Cli.Commands;
 /// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error (for <c>export-otel</c> and
 /// <c>export-inspect</c>, a run it refuses to export too: an invalid one, or one the page's rules refuse).
 /// </summary>
-internal static class AefCommand
+internal static partial class AefCommand
 {
     private static readonly JsonSerializerOptions s_json = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -53,6 +54,7 @@ internal static class AefCommand
         cmd.Add(CreateVerify());
         cmd.Add(CreateCompareSuites());
         cmd.Add(CreateSeal());
+        cmd.Add(CreateCompanion());
         cmd.Add(CreateView());
         cmd.Add(CreateCheckpoint());
         cmd.Add(CreateExport());

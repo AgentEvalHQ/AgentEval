@@ -1,6 +1,6 @@
 # Artifact-bound evidence companion
 
-Status: mapping and Results model/service implemented; CLI and full acceptance remain pending.
+Status: mapping, Results model/service and CLI implemented and covered by companion and command acceptance tests.
 This is an optional companion profile, not a change to the AEF 1.0 run schema.
 
 ## Purpose and boundary
@@ -120,8 +120,8 @@ their existing independent verification and time-selection rules.
 - CLI output must distinguish producer assertion, byte binding and verified signer.
   Publishing predicates/media types and keyless Sigstore support remain separate.
 
-W09-01 completes this mapping only. W09-02 delivers implementation; W09-04 supplies
-the broader interoperability roundtrip acceptance.
+W09-01 completes this mapping only. W09-02 delivers the companion implementation
+and its roundtrip acceptance. W09-04 separately covers EvalPort mapping roundtrips.
 
 ## Results API
 
@@ -154,3 +154,32 @@ source is never modified. This is not an atomic filesystem snapshot of a changin
 source. The captured evidence must verify as a whole, and observed size/type changes
 are refused. Capture cancellation is cooperative; the synchronous run verifier is
 checked for cancellation before and after its work, not forcibly interrupted.
+
+## CLI
+
+```sh
+agenteval aef companion create ./run --artifact-sha256 <64-lowercase-hex> --name agent.tar --output ./companion --key ./producer.pem --json
+agenteval aef companion verify ./run --artifact-sha256 <64-lowercase-hex> --document ./companion/artifact-evidence.json --envelope ./companion/artifact-evidence.dsse.json --policy ./trust.json --require-signer producer --json
+```
+
+Omit `--key` to create an unsigned companion. Creation publishes a new directory
+containing the document and optional envelope by a same-parent directory rename.
+The output must be outside the run, must not already exist, and must have an existing
+ordinary parent directory. No existing output is overwritten. A failed signing step
+publishes neither file. Private staging is cleaned up on handled failure; an abrupt
+process termination can leave a `.ae-companion-*` directory in the selected parent.
+This is local filesystem publication, not a cross-machine durability guarantee.
+
+Verification reads only explicitly selected files; it does not discover envelopes
+or policies beside the document. Bounds are 64 KiB for a document or key, 128 KiB
+for an envelope and 1 MiB for a policy. Inputs and ancestors must be ordinary files
+and directories, respectively. These checks do not promise protection against an
+adversary concurrently replacing directories in a caller-controlled filesystem.
+
+Exit 0 from verification means an intact byte binding, no detected envelope/signature
+failure, and satisfaction of `--require-signer` if supplied. Without that option,
+unsigned or untrusted bindings can return 0; this never means deployment approval.
+Exit 1 means a binding, signature or required-identity check failed. Exit 2 is an
+input/usage refusal. The JSON report always separates `intactBinding`,
+`signatureStatus`, per-signature checks, verified identities and withheld count.
+`--require-signer` requires an explicit policy and exact identity match.
