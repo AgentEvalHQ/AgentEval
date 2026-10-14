@@ -262,9 +262,47 @@ digits. Invalid dates, unknown offset `-00:00`, missing offsets and finer precis
 are refused. Completion cannot precede start; per-result completion must lie within
 the declared run interval. No completion time means a running, unsealed run.
 A completed ResultSet declaring boolean `metadata.openeval.partial: true` maps to
-an aborted run. This planner still does not write results or publish a run.
+an aborted run.
 
-Still pending: full ResultSet adapters, including the losses in the tables above
-and roundtrip acceptance. A directly parsed extension alone has not had its seal
+## Implemented importer and remaining work
+
+`IAefEvalPortImporter` / `AefEvalPortImporter.Import` now accepts bounded in-memory
+ResultSet bytes and writes an AEF run with the planned header and context extension.
+Completed runs close and optionally receive an ingest seal. A source without a
+completion time remains running and unsealed. Failed writes are discarded using
+the existing adapter cleanup rules; an existing nonempty destination is refused.
+
+Each source result becomes a root at `evalport`; grader observations become children.
+Grader paths use a deterministic SHA-256 of the original grader identifier, retained
+alongside its original type in `ext.evalport`. Null scores become `not_measured`;
+numeric scores retain normalized and optional raw values. Captured output and grader
+reasoning use blobs. Capture-off writes neither their contents nor their digests.
+
+The implemented root mapping uses **Own** aggregation and zero-weight grader children,
+preserving the source's `passed` declaration instead of pretending that an AEF
+threshold reproduces arbitrary EvalPort aggregation metadata. `rulePath: threshold`
+is the AEF display category for that declared Boolean decision; no numeric threshold
+is asserted. This supersedes the speculative `Min`/`WeightedSum` root reconstruction
+in the mapping tables for this importer. It is not a validation of the source's
+aggregation calculation. Aggregation metadata is retained only with capture-on.
+
+Explicit attempts map to zero-based trial indices; repeated cases receive
+converter-computed `AllPass` rollup trees. Rollups cover observed attempts only, do
+not fill gaps, and are marked `converterComputed`. Counts and agreement come from
+the recorded states. No measured trials gives `not_measured`; incomplete measured
+agreement without a failure gives `inconclusive`. Trial indices must fit the current
+AEF writer's Int32 representation, and each rollup supports at most 1000 trials.
+Duration integers beyond binary64's exact integer range are refused rather than
+rounded by the writer. These are explicit adapter limits.
+
+The current importer does not transfer provider configuration, arbitrary metadata,
+the source summary or external signatures; conversion notes state these losses.
+The AEF summary is recomputed from root pass observations/rollups without a run-level
+approval rule. Detailed source error mapping, aggregation semantic acceptance,
+reverse conversion, CLI wiring and complete interoperability roundtrip acceptance
+remain unfinished. The full W09 interoperability task is not complete.
+
+Still pending: remaining ResultSet adapter coverage and roundtrip acceptance.
+A directly parsed extension alone has not had its seal
 checked. Group chains across multiple runs are consumer joins;
 this component does not resolve parents or prove absence of cross-run cycles.
