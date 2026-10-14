@@ -1,6 +1,8 @@
 using AgentEval.Results;
 using AgentEval.Results.Adapters.EvalPort;
 using AgentEval.Results.Writing;
+using System.Text;
+using System.Text.Json.Nodes;
 
 namespace AgentEval.Results.Adapters.Tests;
 
@@ -50,6 +52,40 @@ public sealed class EvalPortNativeExportTests : IDisposable
         Assert.NotEqual((string?)rows[0]!["test_case_id"], (string?)rows[1]!["test_case_id"]);
         Assert.All(rows, row => { Assert.Null(row!["attempt"]); Assert.Equal("case", (string?)row["metadata"]!["aef"]!["caseId"]); });
         Assert.Equal(rows.ToJsonString(), exporter.Export(_root).ResultSet.ToJson()["results"]!.ToJsonString());
+    }
+
+    [Fact]
+    public void Roundtrip_NativeMultipleRoots_PreservesProjectedObservationsAndOriginalMetadata()
+    {
+        Write(Result("score", AefState.Scored, 0.5), Result("absence", AefState.NotMeasured));
+        var exporter = new AefEvalPortExporter();
+        var projected = exporter.Export(_root).ResultSet.ToJson();
+        var imported = AefTestRuns.TempPath("evalport-native-reimport");
+        try
+        {
+            new AefEvalPortImporter().Import(Encoding.UTF8.GetBytes(projected.ToJsonString()), imported,
+                new() { TargetMode = AefTargetMode.Replayed, Subject = new() { Ref = "agent:native", Kind = AefSubjectKind.Agent } });
+            var after = exporter.Export(imported).ResultSet.ToJson()["results"]!.AsArray();
+            var before = projected["results"]!.AsArray();
+            Assert.Equal(before.Count, after.Count);
+            for (var i = 0; i < before.Count; i++)
+            {
+                Assert.Equal((string?)before[i]!["test_case_id"], (string?)after[i]!["test_case_id"]);
+                Assert.Equal((bool)before[i]!["passed"]!, (bool)after[i]!["passed"]!);
+                Assert.Null(after[i]!["attempt"]);
+                Assert.True(JsonNode.DeepEquals(before[i]!["metadata"]!["aef"], after[i]!["metadata"]!["aef"]));
+                var originalGrader = before[i]!["grader_results"]![0]!; var grader = after[i]!["grader_results"]![0]!;
+                Assert.True(JsonNode.DeepEquals(originalGrader["score"], grader["score"]));
+                Assert.Equal((string?)originalGrader["grader_id"], (string?)grader["grader_id"]);
+                Assert.True(JsonNode.DeepEquals(originalGrader["metadata"]!["aef"], grader["metadata"]!["aef"]));
+            }
+            // EvalPort has no native scored/absence distinction. Original typed state remains a source declaration.
+            Assert.Equal("failed", (string?)AefTestRuns.Results(imported)[0]["state"]);
+            Assert.Equal("scored", (string?)after[0]!["metadata"]!["aef"]!["state"]);
+            var reference = AefTestRuns.ReferenceVerify(imported);
+            if (reference is not null) Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+        finally { AefTestRuns.Delete(imported); }
     }
 
     [Fact]

@@ -50,6 +50,8 @@ public sealed class EvalPortCommandTests : IDisposable
     [InlineData("existing")]
     [InlineData("oversized")]
     [InlineData("malformed")]
+    [InlineData("invalid-json")]
+    [InlineData("duplicate-key")]
     [InlineData("subject")]
     public void Import_InvalidInput_PreservesDestinationAndCleansStaging(string scenario)
     {
@@ -57,6 +59,8 @@ public sealed class EvalPortCommandTests : IDisposable
         if (scenario == "existing") { Directory.CreateDirectory(output); File.WriteAllText(Path.Combine(output, "keep"), "original"); }
         if (scenario == "oversized") File.WriteAllBytes(input, new byte[4 * 1024 * 1024 + 1]);
         if (scenario == "malformed") File.WriteAllText(input, "{}");
+        if (scenario == "invalid-json") File.WriteAllText(input, "{");
+        if (scenario == "duplicate-key") File.WriteAllText(input, "{\"version\":1,\"version\":2}");
         Assert.Equal(2, AefCommand.RunImportEvalPort(input, output, "mocked", scenario == "subject" ? "agent:test" : null,
             null, null, "off", false, null, true, TextWriter.Null, TextWriter.Null));
         Assert.Equal(scenario == "existing", Directory.Exists(output));

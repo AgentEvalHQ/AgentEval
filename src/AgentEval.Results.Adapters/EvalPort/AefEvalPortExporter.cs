@@ -56,7 +56,7 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
             notes.Add("Overlays are not applied; exported values are base evidence.");
         }
         var docs = AefRunDocuments.Read(folder); var run = docs.Run!;
-        var origin = run["ext"]?["evalport"] as JsonObject;
+        var origin = Origin(run);
         var suite = origin?["suite_id"]?.GetValue<string>() ?? options.SuiteId ?? run["suite"]?["ref"]?.GetValue<string>();
         if (string.IsNullOrEmpty(suite)) throw Refuse("no suite identity; supply one explicitly");
         var results = new JsonArray();
@@ -104,7 +104,7 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
         foreach (var root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var ext = root["ext"]?["evalport"];
+            var ext = Origin(root);
             var graders = new JsonArray();
             var caseId = Text(root["caseId"]);
             var row = new JsonObject { ["test_case_id"] = caseMapping.GetValueOrDefault((caseId, Text(root["path"])), caseId),
@@ -128,7 +128,7 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
             {
                 var descendants = children[Text(line["resultId"])].Where(x => x["trials"] is null).ToArray();
                 if (descendants.Length > 0) { foreach (var child in Enumerable.Reverse(descendants)) stack.Push(child); continue; }
-                var leafExt = line["ext"]?["evalport"];
+                var leafExt = Origin(line);
                 var state = Text(line["state"]);
                 var score = (line["scores"] as JsonArray)?.FirstOrDefault();
                 JsonNode? normalized = score?["normalized"] ?? score?["value"];
@@ -200,7 +200,7 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
                 if (BlobText(pointer["blob"]!.GetValue<string>()) is { } text)
                     EvalPortSupplement.Restore(document, AefJsonReader.ParseDocument(Encoding.UTF8.GetBytes(text)).AsObject(), notes);
             }
-            catch (Exception e) when (e is InvalidOperationException or NullReferenceException or ArgumentException)
+            catch (Exception e) when (e is not AefInputException && e is (InvalidOperationException or NullReferenceException or ArgumentException))
             { throw Refuse("invalid source supplement shape or identity mapping"); }
         }
         cancellationToken.ThrowIfCancellationRequested();
@@ -216,6 +216,20 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
             try { return new UTF8Encoding(false, true).GetString(bytes); }
             catch (DecoderFallbackException) { throw Refuse("captured content is not UTF-8 text"); }
         }
+    }
+
+    private static JsonObject? Origin(JsonObject document)
+    {
+        var node = document["ext"]?["evalport"];
+        if (node is null) return null;
+        if (node is not JsonObject origin) throw Refuse("evalport origin extension must be an object");
+        foreach (var field in new[] { "suite_id", "run_id", "providerModel", "grader_id", "type", "errorEvidence" })
+            if (origin[field] is { } value && (value is not JsonValue scalar || !scalar.TryGetValue<string>(out _)))
+                throw Refuse("evalport origin identifier must be a string");
+        if (origin["attemptDeclared"] is { } attempt && (attempt is not JsonValue flag || !flag.TryGetValue<bool>(out _)))
+            throw Refuse("evalport attemptDeclared must be boolean");
+        if (origin["error"] is { } error && error is not JsonObject) throw Refuse("evalport error classification must be an object");
+        return origin;
     }
 
     private static string Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : "";

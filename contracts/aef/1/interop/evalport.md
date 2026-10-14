@@ -392,6 +392,30 @@ source `metadata.aef` is not an exporter attestation. External signatures are
 never transferred. The supplement is omitted entirely with capture off; an
 authorized withheld supplement is omitted with a note rather than fabricated.
 
+### Resource and malformed-extension acceptance
+
+A valid AEF seal does not establish that arbitrary `ext.evalport` data has the
+converter's expected shape. Export explicitly validates origin identifiers,
+attempt-presence flags and error-object shape before using them. Malformed
+supplement pointers, unsupported supplement versions and mismatched or duplicate
+observation identities are refused. Blob digests must contain exactly 64 lowercase
+hex digits after `sha256:` before any blob path is constructed.
+
+Captured text has a cumulative 4 MiB read budget. The final ResultSet separately
+has a 4 MiB serialized JSON limit: an output blob of exactly 4 MiB cannot fit once
+the result envelope is added, and JSON escaping can make smaller raw text exceed
+the document limit. Oversized documents are refused rather than truncated. CLI
+import/export translates strict JSON and byte-limit errors into input-error exit
+code 2 and retains existing destination data.
+
+Generic native AEF roundtrips preserve the projected EvalPort observations and,
+with capture on, original `metadata.aef` declarations. They do not restore the
+original AEF tree or typed states from arbitrary metadata: for example, a scored
+AEF result maps to EvalPort `passed: false` and becomes a failed observation on
+reimport, while its original `scored` state remains explicitly in source metadata.
+Multiple root paths keep distinct projected test-case IDs without invented
+attempts. This is a documented lossy projection, not an AEF identity roundtrip.
+
 ### CLI publication
 
 ```sh

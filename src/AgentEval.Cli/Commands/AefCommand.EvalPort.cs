@@ -69,7 +69,7 @@ internal static partial class AefCommand
             Directory.Move(staging, output); staging = null;
             return Converted(converted with { Directory = output }, asJson, stdout);
         }
-        catch (Exception e) when (IsInputError(e) || e is NotSupportedException)
+        catch (Exception e) when (IsInputError(e) || e is NotSupportedException or AefReadException)
         { stderr.WriteLine(e.Message); return ExitCodes.UsageError; }
         finally { if (staging is not null && Directory.Exists(staging)) Directory.Delete(staging, true); }
     }
@@ -125,7 +125,7 @@ internal static partial class AefCommand
             }
             return ExitCodes.Success;
         }
-        catch (Exception e) when (IsInputError(e) || e is NotSupportedException)
+        catch (Exception e) when (IsInputError(e) || e is NotSupportedException or AefReadException)
         { stderr.WriteLine(e.Message); return ExitCodes.UsageError; }
         finally { if (staging is not null) File.Delete(staging); }
     }
