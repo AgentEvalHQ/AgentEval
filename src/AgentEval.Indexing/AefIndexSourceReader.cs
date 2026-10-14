@@ -37,39 +37,9 @@ public sealed class AefIndexSourceReader : IAefIndexSourceReader
     /// <inheritdoc />
     public EvidenceIndexSource Read(string rootId, string relativePath, string directory, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory)) throw new EvidenceIndexException("invalid-source-path");
-        directory = Path.GetFullPath(directory);
-        if (!OperatingSystem.IsWindows() && !AefFolder.NativeInUse) throw new EvidenceIndexException("unsupported-file-classifier");
-        for (var current = directory; current is not null; current = Path.GetDirectoryName(current))
-            if (AefFolder.KindOf(current) != AefEntryKind.Folder) throw new EvidenceIndexException("unsafe-source-path");
-        DirectoryInfo? snapshot = null;
         try
         {
-            var inventory = AefIngestionInventory.Scan(directory, _limits, cancellationToken);
-            snapshot = Directory.CreateTempSubdirectory("ae-index-snapshot-");
-            var buffer = new byte[64 << 10];
-            foreach (var (path, size) in inventory.Files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var source = Path.Combine(directory, path.Replace('/', Path.DirectorySeparatorChar));
-                var destination = Path.Combine(snapshot.FullName, path.Replace('/', Path.DirectorySeparatorChar));
-                if (AefFolder.KindOf(source) != AefEntryKind.File) throw new EvidenceIndexException("source-changed");
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                long copied = 0;
-                while (true)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var read = input.Read(buffer, 0, (int)Math.Min(buffer.Length, size - copied + 1));
-                    if (read == 0) break;
-                    copied += read;
-                    if (copied > size) throw new EvidenceIndexException("source-changed");
-                    output.Write(buffer, 0, read);
-                }
-                if (copied != size) throw new EvidenceIndexException("source-changed");
-            }
+            using var snapshot = AefReadSnapshot.Capture(directory, _limits, cancellationToken);
             var folder = AefRunFolder.Open(snapshot.FullName);
             var verification = AefRunVerifier.Verify(folder);
             cancellationToken.ThrowIfCancellationRequested();
@@ -108,11 +78,5 @@ public sealed class AefIndexSourceReader : IAefIndexSourceReader
         }
         catch (AefStagingException error) { throw new EvidenceIndexException("snapshot-" + error.Code); }
         catch (FormatException) { throw new EvidenceIndexException("invalid-aef-identity"); }
-        finally
-        {
-            // Only this invocation's newly created directory is removed. Its entries were copied as regular
-            // files, never linked; trusted filesystem ownership is required throughout capture/verification.
-            if (snapshot is not null) Directory.Delete(snapshot.FullName, recursive: true);
-        }
     }
 }

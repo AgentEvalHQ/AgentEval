@@ -5,6 +5,8 @@
 using AgentEval.Indexing;
 using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
+using AgentEval.Results;
+using AgentEval.Results.Ingestion;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -82,7 +84,7 @@ public sealed class SuiteQueryServiceTests : IDisposable
         Assert.False(outcome.Data!.Compatibility.Compatible); Assert.Equal(reason, outcome.Data.Compatibility.Reason);
     }
 
-    private string WriteDefinition(SqliteEvidenceIndexWriter index, string name, bool frozen, bool aborted, double threshold = 0.8)
+    private string WriteDefinition(SqliteEvidenceIndexWriter index, string name, bool frozen, bool aborted, double threshold = 0.8, string? padding = null)
     {
         var manifest = new SuiteDefinitionReader().Read(Encoding.UTF8.GetBytes(new JsonObject
         {
@@ -105,10 +107,74 @@ public sealed class SuiteQueryServiceTests : IDisposable
         run.SetMetrics([new() { Id = "quality", Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 1) }]);
         run.PutExtFile(SuiteDefinitionManifest.ExtensionFile, manifest.ToBytes());
         if (!aborted) run.AddResult(new() { CaseId = "case-a", Path = "quality", Evaluator = new("code:quality"),
-            State = AefState.Passed, Scores = [new() { Metric = "quality", Value = 0.9 }] });
+            State = AefState.Passed, Ext = padding is null ? null : new JsonObject { ["fixture.padding"] = padding }, Scores = [new() { Metric = "quality", Value = 0.9 }] });
         run.Close(aborted ? AefRunStatus.Aborted : AefRunStatus.Completed, started.AddSeconds(1), aborted ? "cancelled" : null);
         AefSealer.Seal(directory);
         return index.Upsert(new AefIndexSourceReader(new SuiteIdentityReader()).Read("root", name, directory)).SourceId;
+    }
+
+    [Fact]
+    public void ResultDetail_VerifiedOverrideAndUnsealedTail_KeepSealedAndEffectiveStatesSeparate()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = Import(writer, "detail");
+        var indexed = new SqliteEvidenceDetailReader(Options).ReadResults(new(id)).Items[0];
+        var service = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options), new AefResultDetailReader(), [Root]);
+        var at = AefTime.Parse("2026-10-14T00:00:00Z");
+        var before = service.Result(id, indexed.ResultId, at); Assert.Equal(QueryState.Available, before.State);
+        var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "detail"));
+        var changed = overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = indexed.ResultId },
+            By = new("reviewer:fixture", AefAssurance.Authenticated), At = at,
+            State = AefState.Warn, Reason = "verified review"
+        });
+        overlay.SealBatch();
+        overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = indexed.ResultId },
+            By = new("reviewer:fixture", AefAssurance.SelfAttested), At = at,
+            State = AefState.Passed, Reason = "unfinished review"
+        });
+        var outcome = service.Result(id, indexed.ResultId, at);
+        Assert.Equal(QueryState.Available, outcome.State); var detail = outcome.Data!.Result;
+        Assert.Equal(before.Data!.Result.SealedJson, detail.SealedJson);
+        Assert.Equal(indexed.Outcome, detail.SealedState); Assert.Equal("warn", detail.EffectiveState);
+        Assert.Equal(changed, detail.OverrideEvent); Assert.Equal(1, detail.UnsealedEvents);
+        Assert.Equal("self-attested", Assert.Single(detail.Assurance).Shown);
+        Assert.NotEqual(before.Data.Result.SnapshotDigest, detail.SnapshotDigest);
+        Assert.Equal(before.Data.Result.RunHash, detail.RunHash);
+        Assert.Equal(QueryState.NotFound, service.Result(id, "missing-result", at).State);
+        File.WriteAllText(Path.Combine(Root.Directory, "detail", "overlays", "seal-0001.json"), "{}");
+        Assert.Equal(QueryState.Unavailable, service.Result(id, indexed.ResultId, at).State);
+    }
+
+    [Fact]
+    public void ResultDetail_TamperedEvidenceInvalidTimeAndCaptureLimit_RefuseWithoutPartialDetail()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = Import(writer, "detail");
+        var result = new SqliteEvidenceDetailReader(Options).ReadResults(new(id)).Items[0].ResultId;
+        var at = AefTime.Parse("2026-10-14T00:00:00Z");
+        var limited = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options),
+            new AefResultDetailReader(new AefStagingOptions { MaxBytes = 100, MaxFileBytes = 100 }), [Root]);
+        Assert.Equal(QueryState.ResourceLimit, limited.Result(id, result, at).State);
+        Assert.Null(limited.Result(id, result, at).Data);
+        var service = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options), new AefResultDetailReader(), [Root]);
+        Assert.Equal(QueryState.InvalidRequest, service.Result(id, result, new AefTime(0, -1)).State);
+        File.AppendAllText(Path.Combine(Root.Directory, "detail", "results.ndjson"), " ");
+        Assert.Equal(QueryState.Unavailable, service.Result(id, result, at).State);
+        Assert.Throws<OperationCanceledException>(() => service.Result(id, result, at, new(true)));
+    }
+
+    [Fact]
+    public void ResultDetail_OversizedResponse_RefusesWithoutReturningPartialContent()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var id = WriteDefinition(writer, "large", true, false, padding: new string('x', 2 << 20));
+        var resultId = new SqliteEvidenceDetailReader(Options).ReadResults(new(id)).Items[0].ResultId;
+        var service = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options), new AefResultDetailReader(), [Root]);
+        var result = service.Result(id, resultId, AefTime.Parse("2026-10-14T00:00:00Z"));
+        Assert.Equal(QueryState.ResourceLimit, result.State); Assert.Null(result.Data);
+        Assert.Equal("detail-byte-limit", result.Code);
     }
 
     [Fact]
