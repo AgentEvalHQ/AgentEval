@@ -84,6 +84,8 @@ public static class McHost
         // subjects. Scoped because it depends on IOutputStoreReader. Plan-08 MC1.4.4.
         builder.Services.AddScoped<ComplianceMatrixService>();
 
+        AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
+
         // GraphQL (Hot Chocolate 16, ChilliCream — primary read surface).
         // Plan-07 §3 Challenge 1: hybrid REST + GraphQL split.
         //   Reads (dashboard, compliance matrix, recursive EvalResult tree,

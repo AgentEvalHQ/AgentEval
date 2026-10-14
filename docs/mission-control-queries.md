@@ -30,7 +30,7 @@ The service preserves the [index page contracts](evidence-index.md): finite row/
 
 Each operation performs at most one bounded reader call. Consumers choose a suitable page size instead of automatically walking the index within one request. Full index validation is part of that operation's cost; cancellation does not impose a hard deadline inside synchronous SQLite integrity checks.
 
-This library supplies shared contracts, evidence page semantics and the verified suite queries described below. Fuller evidence detail/comparison and governance services, host registration, GraphQL mapping, notification delivery and transport-parity acceptance remain integration work. Existing legacy endpoints are unchanged by introducing this library.
+This library supplies shared contracts, evidence pages, verified suite comparison, result detail and governance services described below. GraphQL integration is in progress, starting with source inventory. Notification delivery and transport-parity acceptance remain integration work. Existing legacy endpoints are preserved.
 
 ## Verified suite queries
 
@@ -59,3 +59,9 @@ The service captures each selected run into a bounded owned copy and delegates v
 An empty evidence selection produces an Available report with explicit `not_measured` requirements, not implicit discovery of recent evidence. The report retains catalogue/policy digests, exact selected hashes, overlay identities, sealed/effective observations, scoped waiver history, reviews and explanations. A signed waiver only changes status when its signer has the configured requirement-specific permission and its expiry is active. Identity compatibility is not substituted for these governance rules.
 
 The resource caps bound input and computation size, not a wall-clock deadline for synchronous verification. Snapshot capture and resolver checks observe cancellation between operations. Acceptance tests cover exact aggregate-byte and response-byte boundaries, cross-run work limits, changed selection revisions, conflicting overlay snapshots of the same seal, invalid host limits, signed scoped waiver authority and expiry. Host transport/authentication integration remains separate work.
+
+## GraphQL source inventory
+
+The additive `evidenceSources(rootId, pageSize, cursor)` field delegates to `IEvidenceQueryService`. It returns typed `state`, `code` and optional `data` with index identity, generation, items and continuation. Generation and indexed-generation values are decimal strings, preserving Int64 precision in JavaScript. Source items expose indexed provenance and relative paths, never persisted physical binding directories.
+
+The capability defaults to NotConfigured. Enable it with `AgentEval:Queries:Enabled=true` and an absolute `AgentEval:Queries:IndexPath` pointing at an existing derived index. Reads do not initialize, migrate or rebuild it; a missing index returns Unavailable/missing-index. Existing host depth, cost and request-timeout settings remain in effect; the resolver has an explicit cost weight. This adds source inventory only; the other shared services still require transport integration.
