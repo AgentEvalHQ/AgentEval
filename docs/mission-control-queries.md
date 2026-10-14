@@ -167,6 +167,16 @@ same view time. If the selected detail uses a different index revision from
 the result list, a warning asks the user to refresh the list. Failed verification
 hides previously displayed detail. Sealed JSON is displayed as text.
 
+The source view also provides **Metrics**, **Spans**, and **Fields**. Each query
+loads at most 25 rows with independent revision-bound pagination. Metrics retain
+finite scores, exceptional score text, nullable pass flags and occurrence
+provenance; the browser does not derive a pass rate. Observation sources open
+directly to spans, preserving exact nanosecond timestamps and grouping/mapping
+metadata. Fields preserve conflict states and exact integer strings, with
+expandable original source provenance. These observations do not imply an
+evaluation verdict. Views inappropriate for a source family show the host's
+typed refusal instead of fabricating an empty result.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;

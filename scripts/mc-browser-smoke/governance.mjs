@@ -29,12 +29,34 @@ try {
   let state = 'AVAILABLE';
   let fail = false;
   let detailState = 'AVAILABLE';
+  let recordsState = 'AVAILABLE';
+  let sourceKind = 'aef';
   const requests = [];
   await page.route('**/api/v1/version', route => route.fulfill({ json: { mode: 'local', version: 'test' } }));
   await page.route('**/graphql', async route => {
     const request = route.request().postDataJSON();
     if (request.query.includes('WorkspaceState')) {
       await route.fulfill({ json: { data: { workspace: { initialized: false, root: null, agentEvalVersion: 'test' } } } }); return;
+    }
+    if (/Governance(Metrics|Spans|Fields)/.test(request.query)) {
+      requests.push(request.variables);
+      const metrics = request.query.includes('GovernanceMetrics');
+      const spans = request.query.includes('GovernanceSpans');
+      const items = metrics ? [
+        { resultId: 'result-1', metricId: 'zero-score', ordinal: 0, score: 0, scoreText: null, passed: false, provenance: 'reported' },
+        { resultId: 'result-1', metricId: 'exceptional-score', ordinal: 1, score: null, scoreText: 'NaN', passed: null, provenance: 'reported' },
+      ] : spans ? [{ reportOrdinal: '9223372036854775806', groupId: 'group-1', groupingRevision: 'group-v1', groupingBasis: 'trace',
+        mappingRevision: 'mapping-v1', traceId: 'trace-1', spanId: 'span-1', parentSpanId: '',
+        startNanos: '18446744073709551614', endNanos: '18446744073709551615', resourceIndex: '0', scopeIndex: '1', spanIndex: '2' }]
+        : [{ reportOrdinal: '9223372036854775806', fieldName: 'subject', state: 'conflict', textValue: null,
+          integerValue: '-9223372036854775808', sourcesJson: '[{"value":"<script>bad()</script>"},{"value":"other"}]' }];
+      await route.fulfill({ json: { data: { page: { state: recordsState, code: null,
+        data: ['AVAILABLE', 'EMPTY'].includes(recordsState) ? {
+          indexInstanceId: 'index-test', generation: '9223372036854775807', sourceKind: metrics ? 'aef' : 'observation',
+          verification: metrics ? 'intact' : 'unverified', fingerprint: 'record-fingerprint',
+          nextCursor: recordsState === 'EMPTY' ? null : 'records-next', items: recordsState === 'EMPTY' ? [] : items,
+        } : null,
+      } } } }); return;
     }
     if (request.query.includes('GovernanceResultDetail')) {
       requests.push(request.variables);
@@ -66,7 +88,7 @@ try {
       data: ['AVAILABLE', 'EMPTY'].includes(state) ? {
         indexInstanceId: 'index-test', generation: '9223372036854775807', nextCursor: state === 'EMPTY' ? null : 'page-two',
         items: state === 'EMPTY' ? [] : [{ sourceId: 'source-1', rootId: 'fixtures', relativePath: '<img src=x onerror=alert(1)>',
-          kind: 'aef', verification: 'Intact', fingerprint: 'abc', indexedGeneration: '9223372036854775806' }],
+          kind: sourceKind, verification: 'Intact', fingerprint: 'abc', indexedGeneration: '9223372036854775806' }],
       } : null,
     } } } });
   });
@@ -129,11 +151,46 @@ try {
   assert.equal(requests.at(-1).at, '2026-01-01T00:00:00Z');
   detailState = 'UNAVAILABLE';
   await detail.getByRole('button', { name: 'Re-verify' }).click();
-  await detail.getByRole('status').filter({ hasText: 'Verified evidence is currently unavailable' }).waitFor();
+  await detail.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
   assert.equal(await detail.getByText('snapshot-digest', { exact: true }).count(), 0);
   assert.equal(await detail.locator('pre').count(), 0);
+  await page.getByRole('link', { name: 'Metrics', exact: true }).click();
+  await page.getByRole('heading', { name: 'Metric occurrences' }).waitFor();
+  const zero = page.getByRole('row').filter({ hasText: 'zero-score' });
+  await zero.waitFor();
+  assert.equal(await zero.getByRole('cell', { name: '0', exact: true }).count(), 2);
+  assert.equal(await zero.getByRole('cell', { name: 'False', exact: true }).count(), 1);
+  const exceptional = page.getByRole('row').filter({ hasText: 'exceptional-score' });
+  assert.equal(await exceptional.getByRole('cell', { name: 'NaN', exact: true }).count(), 1);
+  assert.equal(await exceptional.getByRole('cell', { name: 'Not declared', exact: true }).count(), 2);
+  recordsState = 'STALE_CURSOR';
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await page.getByRole('status').filter({ hasText: 'The index changed' }).waitFor();
+  assert.equal(requests.at(-1).cursor, 'records-next');
+  assert.equal(await page.locator('table').count(), 0);
+  recordsState = 'EMPTY';
+  await page.getByRole('button', { name: 'First page' }).click();
+  await page.getByRole('status').filter({ hasText: 'No indexed records' }).waitFor();
+  assert.equal(requests.at(-1).cursor, null);
+  recordsState = 'AVAILABLE';
+  await page.getByRole('link', { name: 'Fields', exact: true }).click();
+  await page.getByRole('cell', { name: 'conflict', exact: true }).waitFor();
+  assert.equal(await page.getByRole('cell', { name: '-9223372036854775808', exact: true }).count(), 1);
+  await page.locator('summary').filter({ hasText: 'Source provenance' }).click();
+  assert.match(await page.locator('pre').innerText(), /<script>bad/);
+  assert.equal(await page.locator('main script').count(), 0);
+  await page.getByRole('link', { name: 'Evidence sources', exact: true }).click();
+  sourceKind = 'observation';
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('link', { name: '<img src=x onerror=alert(1)>', exact: true }).click();
+  await page.getByRole('heading', { name: 'Observed spans' }).waitFor();
+  await page.getByRole('cell', { name: '18446744073709551614', exact: true }).waitFor();
+  assert.equal(await page.getByRole('cell', { name: '18446744073709551615', exact: true }).count(), 1);
+  assert.equal(requests.at(-1).cursor, null);
   assert.deepEqual(errors, []);
-  console.log('Governance browser acceptance passed: workspace, source navigation, exact generations, escaped content, filtering, pagination, refusals, aggregate absences, sealed/effective states, explicit view time, revision mismatch and stale-detail cleanup.');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
+    'Wide observation tables should scroll inside their panel, not widen the page.');
+  console.log('Governance browser acceptance passed: workspace, source/results/detail navigation, metrics, observation routing, exact integers/nanos, conflicts, safe provenance, refusals, pagination and stale-data cleanup.');
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));

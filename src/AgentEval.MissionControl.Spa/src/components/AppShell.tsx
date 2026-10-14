@@ -64,7 +64,7 @@ export function AppShell() {
       <Header />
       <div className="flex flex-1">
         <Sidebar disabled={needsWorkspace} />
-        <main className="flex-1 p-6 bg-slate-50">
+        <main className="flex-1 min-w-0 p-6 bg-slate-50">
           <ErrorBoundary>
             {showLanding && wsQ.data ? (
               <WorkspaceLandingPage

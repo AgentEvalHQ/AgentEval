@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { graphqlClient } from "@/lib/graphql-client";
+
+import { EvidenceRecords } from "@/components/EvidenceRecords";
+import { EvidenceQueryStatus as Status, type EvidenceOutcome as Outcome } from "@/components/EvidenceQueryStatus";
 
 const RESULTS_QUERY = /* GraphQL */ `
   query GovernanceResults($sourceId: String!, $cursor: String) {
@@ -26,7 +29,6 @@ const DETAIL_QUERY = /* GraphQL */ `
   }
 `;
 
-interface Outcome<T> { state: string; code: string | null; data: T | null }
 interface ResultsPage {
   indexInstanceId: string; generation: string; sourceKind: string; verification: string;
   fingerprint: string; nextCursor: string | null;
@@ -40,26 +42,21 @@ interface Detail {
   assurance: { event: string; shown: string }[];
 }
 const button = "rounded border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
-const messages: Record<string, string> = {
-  EMPTY: "No indexed results in this page.",
-  NOT_CONFIGURED: "This query capability is not configured on the host.",
-  NOT_FOUND: "The selected evidence was not found.",
-  INVALID_REQUEST: "The request is not valid for this evidence. Check the selection and UTC view time.",
-  STALE_CURSOR: "The index changed. Restart from the first page.",
-  RESOURCE_LIMIT: "The query exceeded the host's resource budget.",
-  UNAVAILABLE: "Verified evidence is currently unavailable. Check the host and refresh.",
-};
-
-function Status({ fetching, error, outcome }: { fetching: boolean; error: boolean; outcome?: Outcome<unknown> }) {
-  return <p role="status" className="text-sm" aria-live="polite">{fetching ? "Loading evidence…" : error
-    ? "Connection failed. Refresh to try again." : outcome?.state === "AVAILABLE" ? "Evidence loaded."
-    : outcome ? messages[outcome.state] ?? "Unsupported availability state." : "No response available."}</p>;
-}
-
 export function GovernanceSourcePage() {
   const { sourceId = "" } = useParams();
-  // A route change starts a fresh traversal and clears the previous selection.
-  return <SourceResults key={sourceId} sourceId={sourceId} />;
+  const [search] = useSearchParams();
+  const requested = search.get("view");
+  const view = requested === "metrics" || requested === "spans" || requested === "fields" ? requested : "results";
+  return <div className="space-y-5 min-w-0">
+    <nav aria-label="Evidence views" className="flex flex-wrap gap-4">
+      <Link to="/governance" className="text-accent-700 underline">Evidence sources</Link>
+      {(["results", "metrics", "spans", "fields"] as const).map(tab => <Link key={tab}
+        to={`?view=${tab}`} aria-current={view === tab ? "page" : undefined}
+        className={view === tab ? "font-semibold" : "text-accent-700 underline"}>{tab[0].toUpperCase() + tab.slice(1)}</Link>)}
+    </nav>
+    {view === "results" ? <SourceResults key={sourceId} sourceId={sourceId} />
+      : <EvidenceRecords key={`${sourceId}:${view}`} sourceId={sourceId} view={view} />}
+  </div>;
 }
 
 function SourceResults({ sourceId }: { sourceId: string }) {
