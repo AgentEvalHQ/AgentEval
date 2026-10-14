@@ -24,14 +24,17 @@ public sealed class GovernanceQueryService : IGovernanceQueryService
     private readonly IRequirementStatusResolver _resolver;
     private readonly RequirementCatalogue _catalogue;
     private readonly TrustPolicy? _policy;
+    private readonly GovernanceQueryLimits _limits;
 
     /// <summary>Accepts explicit host configuration and injected verification/status services.</summary>
     public GovernanceQueryService(IEvidenceSourceLookup lookup, IBoundedRequirementEvidenceReader reader,
-        IRequirementStatusResolver resolver, RequirementCatalogue catalogue, IEnumerable<EvidenceIndexRoot> roots, TrustPolicy? policy = null)
+        IRequirementStatusResolver resolver, RequirementCatalogue catalogue, IEnumerable<EvidenceIndexRoot> roots, TrustPolicy? policy = null,
+        GovernanceQueryLimits? limits = null)
     {
         _selection = new(lookup, roots); _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _catalogue = catalogue ?? throw new ArgumentNullException(nameof(catalogue)); _policy = policy;
+        _limits = limits ?? new(); _limits.Validate();
     }
 
     /// <inheritdoc />
@@ -43,12 +46,12 @@ public sealed class GovernanceQueryService : IGovernanceQueryService
         if (!at.IsValid || string.IsNullOrWhiteSpace(subject.Ref) || string.IsNullOrWhiteSpace(subject.Version) ||
             subject.Ref.Length > 1024 || subject.Version.Length > 1024)
             return new(QueryState.InvalidRequest, null, "invalid-governance-request");
-        if (sourceIds.Count > 8) return new(QueryState.ResourceLimit, null, "evidence-count-limit");
-        var selectedIds = sourceIds.Take(9).ToArray();
-        if (selectedIds.Length > 8) return new(QueryState.ResourceLimit, null, "evidence-count-limit");
+        if (sourceIds.Count > _limits.MaxSources) return new(QueryState.ResourceLimit, null, "evidence-count-limit");
+        var selectedIds = sourceIds.Take(_limits.MaxSources + 1).ToArray();
+        if (selectedIds.Length > _limits.MaxSources) return new(QueryState.ResourceLimit, null, "evidence-count-limit");
         try
         {
-            var evidence = new List<RequirementEvidence>(); long remaining = 64L << 20; long rows = 0;
+            var evidence = new List<RequirementEvidence>(); long remaining = _limits.MaxCaptureBytes; long rows = 0;
             string? instance = null; long generation = -1;
             foreach (var id in selectedIds.Distinct(StringComparer.Ordinal))
             {
@@ -64,14 +67,14 @@ public sealed class GovernanceQueryService : IGovernanceQueryService
                 if (captured.CapturedBytes < 0 || captured.CapturedBytes > remaining || captured.ResultRows < 0)
                     throw new InvalidOperationException("Expected: bounded capture accounting. Actual: invalid reader accounting. Suggestions: correct the evidence reader. Because: query budgets must hold across adapters.");
                 remaining -= captured.CapturedBytes; rows += captured.ResultRows;
-                if (rows * _catalogue.Requirements.Count > 100_000)
+                if (rows * _catalogue.Requirements.Count > _limits.MaxRowRulePairs)
                     return new(QueryState.ResourceLimit, null, "governance-work-limit");
                 evidence.Add(captured.Evidence);
             }
             cancellationToken.ThrowIfCancellationRequested();
             var report = _resolver.Resolve(_catalogue, subject, evidence, at, RequirementEvidenceReader.PolicyDigest(_policy));
             cancellationToken.ThrowIfCancellationRequested();
-            if (System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(report).Length > 2 << 20)
+            if (!QueryJsonBudget.Fits(report, _limits.MaxResponseBytes))
                 return new(QueryState.ResourceLimit, null, "governance-response-limit");
             return new(QueryState.Available, report, null);
         }

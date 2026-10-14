@@ -221,7 +221,8 @@ public sealed class SuiteQueryServiceTests : IDisposable
         Assert.NotEqual("waived", Assert.Single(unsignedAuthority.Data.Requirements).Status);
     }
 
-    private GovernanceQueryService Governance(double threshold = 0.8, TrustPolicy? policy = null)
+    private GovernanceQueryService Governance(double threshold = 0.8, TrustPolicy? policy = null,
+        GovernanceQueryLimits? limits = null, IEvidenceSourceLookup? lookup = null)
     {
         var catalogue = new RequirementCatalogueReader().Read(Encoding.UTF8.GetBytes(new JsonObject
         {
@@ -233,8 +234,82 @@ public sealed class SuiteQueryServiceTests : IDisposable
                 ["freshnessSeconds"] = 86400, ["allowEffectiveOverrides"] = false
             })
         }.ToJsonString()));
-        return new(new SqliteEvidenceSourceLookup(Options), new BoundedRequirementEvidenceReader(new RequirementEvidenceReader()),
-            new RequirementStatusResolver(), catalogue, [Root], policy);
+        return new(lookup ?? new SqliteEvidenceSourceLookup(Options), new BoundedRequirementEvidenceReader(new RequirementEvidenceReader()),
+            new RequirementStatusResolver(), catalogue, [Root], policy, limits);
+    }
+
+    [Fact]
+    public void Governance_AggregateCaptureAndWorkBudgets_ApplyAcrossSelectedRuns()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var first = WriteDefinition(writer, "first-budget", true, false);
+        var second = WriteDefinition(writer, "second-budget", true, false);
+        long Bytes(string name) => Directory.EnumerateFiles(Path.Combine(Root.Directory, name), "*", SearchOption.AllDirectories)
+            .Sum(file => new FileInfo(file).Length);
+        var total = Bytes("first-budget") + Bytes("second-budget");
+        var subject = new RequirementSubject("agent:query", "1"); var at = AefTime.Parse("2026-10-01T11:00:00Z");
+        Assert.Equal(QueryState.Available, Governance(limits: new() { MaxCaptureBytes = total, MaxRowRulePairs = 2 }).Status(subject, [first, second], at).State);
+        var bytes = Governance(limits: new() { MaxCaptureBytes = total - 1 }).Status(subject, [first, second], at);
+        Assert.Equal(QueryState.ResourceLimit, bytes.State); Assert.Equal("evidence-byte-limit", bytes.Code); Assert.Null(bytes.Data);
+        var work = Governance(limits: new() { MaxRowRulePairs = 1 }).Status(subject, [first, second], at);
+        Assert.Equal(QueryState.ResourceLimit, work.State); Assert.Equal("governance-work-limit", work.Code); Assert.Null(work.Data);
+    }
+
+    [Fact]
+    public void Governance_ResponseBudget_UsesExactSerializedBytesAndReturnsNoPartialReport()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = WriteDefinition(writer, "response-budget", true, false);
+        var subject = new RequirementSubject("agent:query", "1"); var at = AefTime.Parse("2026-10-01T11:00:00Z");
+        var expected = Governance().Status(subject, [id], at).Data!;
+        var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(expected).Length;
+        Assert.Equal(QueryState.Available, Governance(limits: new() { MaxResponseBytes = bytes }).Status(subject, [id], at).State);
+        var limited = Governance(limits: new() { MaxResponseBytes = bytes - 1 }).Status(subject, [id], at);
+        Assert.Equal(QueryState.ResourceLimit, limited.State); Assert.Equal("governance-response-limit", limited.Code); Assert.Null(limited.Data);
+    }
+
+    [Fact]
+    public void Governance_ChangedIndexSelection_RefusesMixedRevisionReport()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var first = WriteDefinition(writer, "first-revision", true, false); var second = WriteDefinition(writer, "second-revision", true, false);
+        var service = Governance(lookup: new ChangingLookup(new SqliteEvidenceSourceLookup(Options)));
+        var result = service.Status(new("agent:query", "1"), [first, second], AefTime.Parse("2026-10-01T11:00:00Z"));
+        Assert.Equal(QueryState.StaleCursor, result.State); Assert.Equal("selection-changed", result.Code); Assert.Null(result.Data);
+    }
+
+    [Fact]
+    public void Governance_SameSealWithConflictingOverlaySnapshots_RefusesInsteadOfChoosingAnAlias()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]);
+        var first = WriteDefinition(writer, "original", true, false);
+        var original = Path.Combine(Root.Directory, "original"); var alias = Path.Combine(Root.Directory, "alias");
+        foreach (var file in Directory.EnumerateFiles(original, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(alias, Path.GetRelativePath(original, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!); File.Copy(file, destination);
+        }
+        var second = writer.Upsert(new AefIndexSourceReader(new SuiteIdentityReader()).Read("root", "alias", alias)).SourceId;
+        var service = Governance(); var at = AefTime.Parse("2026-10-01T11:00:00Z");
+        Assert.Single(service.Status(new("agent:query", "1"), [first, second], at).Data!.SelectedRunHashes);
+        var resultId = new SqliteEvidenceDetailReader(Options).ReadResults(new(second)).Items[0].ResultId;
+        var overlay = AefOverlayWriter.Open(alias);
+        overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = resultId }, State = AefState.Failed,
+            By = new("reviewer:fixture", AefAssurance.SelfAttested), At = at, Reason = "different overlay history"
+        });
+        overlay.SealBatch();
+        var conflict = service.Status(new("agent:query", "1"), [first, second], at);
+        Assert.Equal(QueryState.Unavailable, conflict.State); Assert.Equal("invalid-governance-evidence", conflict.Code); Assert.Null(conflict.Data);
+    }
+
+    [Fact]
+    public void Governance_HostLimitsOutsideCeilings_RefuseConfiguration()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => Governance(limits: new() { MaxSources = 9 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Governance(limits: new() { MaxCaptureBytes = 0 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Governance(limits: new() { MaxRowRulePairs = 100_001 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Governance(limits: new() { MaxResponseBytes = (2 << 20) + 1 }));
     }
 
     [Fact]
