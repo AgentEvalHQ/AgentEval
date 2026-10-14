@@ -190,12 +190,26 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
             results.Add(row);
         }
         notes.Add("AEF evidence trees are flattened to root results and leaf graders; gates, effective overlays and signatures are not transferred.");
+        var supplementPath = "ext/" + EvalPortSupplement.FileName;
+        if (capture && folder.Has(supplementPath))
+        {
+            try
+            {
+                var pointer = AefJsonReader.ParseDocument(folder.Read(supplementPath, 1024));
+                if (pointer["schemaVersion"]?.GetValue<string>() != "1.0") throw Refuse("unsupported supplement version");
+                if (BlobText(pointer["blob"]!.GetValue<string>()) is { } text)
+                    EvalPortSupplement.Restore(document, AefJsonReader.ParseDocument(Encoding.UTF8.GetBytes(text)).AsObject(), notes);
+            }
+            catch (Exception e) when (e is InvalidOperationException or NullReferenceException or ArgumentException)
+            { throw Refuse("invalid source supplement shape or identity mapping"); }
+        }
         cancellationToken.ThrowIfCancellationRequested();
         return new(EvalPortResultSet.Parse(Encoding.UTF8.GetBytes(document.ToJsonString())), hash.Value, notes.Order(StringComparer.Ordinal).ToArray());
 
         string? BlobText(string digest)
         {
-            if (!digest.StartsWith("sha256:", StringComparison.Ordinal) || digest.Length != 71) throw Refuse("invalid blob reference");
+            if (!digest.StartsWith("sha256:", StringComparison.Ordinal) || digest.Length != 71 ||
+                digest.AsSpan(7).ContainsAnyExcept("0123456789abcdef")) throw Refuse("invalid blob reference");
             var path = AefRunFolder.BlobPath(digest[7..]);
             if (!folder.Has(path)) { notes.Add("Authorized withheld content is omitted."); return null; }
             var bytes = folder.Read(path, blobBudget); blobBudget -= bytes.Length;

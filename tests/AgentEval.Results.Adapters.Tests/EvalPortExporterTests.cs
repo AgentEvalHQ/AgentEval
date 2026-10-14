@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using AgentEval.Results;
 using AgentEval.Results.Adapters.EvalPort;
+using AgentEval.Results.Signatures;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Tests;
@@ -61,6 +62,75 @@ public sealed class EvalPortExporterTests : IDisposable
         Assert.Equal("provider_error", (string?)row["error"]!["type"]);
         Assert.Null(row["grader_results"]![0]!["reason"]);
         Assert.Contains(export.Notes, n => n.Contains("message/code", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Export_CapturedSupplement_RestoresSourceDeclarationsAndAttemptMetadata()
+    {
+        var source = Source();
+        source["provider"]!["api_base"] = "https://example.test/api?secret=PRIVATE";
+        source["provider"]!["temperature"] = 0.75;
+        source["provider"]!["max_tokens"] = 123;
+        source["provider"]!["extra"] = new JsonObject { ["token"] = "PRIVATE" };
+        source["summary"] = new JsonObject { ["total"] = 999, ["passed"] = 998 };
+        source["metadata"] = new JsonObject { ["nested"] = new JsonObject { ["exact"] = JsonNode.Parse("9007199254740993") }, ["aef"] = "source claim" };
+        var first = source["results"]![0]!;
+        first["metadata"] = new JsonObject { ["label"] = "first" };
+        first["grader_results"]![0]!["metadata"] = new JsonObject { ["private"] = "PRIVATE", ["nullable"] = null };
+        var second = first.DeepClone(); second["attempt"] = 3; second["metadata"]!["label"] = "third";
+        source["results"]!.AsArray().Add(second);
+        Import(source);
+        var export = new AefEvalPortExporter().Export(_root); var result = export.ResultSet.ToJson();
+        foreach (var field in new[] { "provider", "summary" }) Assert.True(JsonNode.DeepEquals(source[field], result[field]), field);
+        foreach (var entry in source["metadata"]!.AsObject()) Assert.True(JsonNode.DeepEquals(entry.Value, result["metadata"]![entry.Key]));
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.Equal((string?)source["results"]![i]!["metadata"]!["label"], (string?)result["results"]![i]!["metadata"]!["label"]);
+            Assert.Equal("PRIVATE", (string?)result["results"]![i]!["grader_results"]![0]!["metadata"]!["private"]);
+            Assert.True(result["results"]![i]!["grader_results"]![0]!["metadata"]!.AsObject().ContainsKey("nullable"));
+        }
+        Assert.Contains(export.Notes, n => n.Contains("source declarations", StringComparison.Ordinal));
+        Assert.Contains(export.Notes, n => n.Contains("collisions", StringComparison.Ordinal));
+        var nativeSummary = File.ReadAllText(Path.Combine(_root, "summary.json"));
+        Assert.DoesNotContain("999", nativeSummary);
+    }
+
+    [Fact]
+    public void Export_CaptureOff_DoesNotStoreSupplementContentOrDigest()
+    {
+        var source = Source();
+        source["provider"]!["extra"] = new JsonObject { ["secret"] = "PRIVATE-SUPPLEMENT" };
+        source["metadata"] = new JsonObject { ["secret"] = "PRIVATE-SUPPLEMENT" };
+        Import(source, AefContentCapture.Off);
+        Assert.False(File.Exists(Path.Combine(_root, "ext", "evalport-supplement.json")));
+        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            Assert.DoesNotContain("PRIVATE-SUPPLEMENT", File.ReadAllText(file));
+        var result = new AefEvalPortExporter().Export(_root).ResultSet.ToJson();
+        Assert.Null(result["provider"]!["extra"]); Assert.Null(result["metadata"]!["secret"]);
+    }
+
+    [Fact]
+    public void Export_WithheldCorpus_RequiresAuthorityAndExplicitBaseSelection()
+    {
+        var fixture = Path.Combine(AefTestRuns.RepoRoot, "contracts", "aef", "1", "conformance", "runs", "withheld-blob");
+        var run = Path.Combine(fixture, "run");
+        var policy = TrustPolicy.Parse(File.ReadAllBytes(Path.Combine(fixture, "policy.json")));
+        var exporter = new AefEvalPortExporter();
+        Assert.Throws<AefInputException>(() => exporter.Export(run, new() { IgnoreOverlays = true }));
+        Assert.Throws<AefInputException>(() => exporter.Export(run, new() { Policy = policy }));
+        var export = exporter.Export(run, new() { Policy = policy, IgnoreOverlays = true });
+        Assert.Contains(export.Notes, n => n.Contains("withheld", StringComparison.Ordinal));
+        Assert.Contains(export.Notes, n => n.Contains("base evidence", StringComparison.Ordinal));
+        var graders = export.ResultSet.ToJson()["results"]!.AsArray().SelectMany(r => r!["grader_results"]!.AsArray());
+        var helpfulness = Assert.Single(graders, g => (string?)g!["grader_id"] == "triage/helpfulness");
+        Assert.Null(helpfulness!["reason"]);
+    }
+
+    [Fact]
+    public void Export_CancelledBeforeCapture_DoesNotReadMissingDirectory()
+    {
+        Assert.Throws<OperationCanceledException>(() => new AefEvalPortExporter().Export(_root, cancellationToken: new(true)));
+        Assert.False(Directory.Exists(_root));
     }
 
     [Fact]

@@ -95,9 +95,9 @@ GraderResult.
 | `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; a ResultSet without `suite_version` requires a caller-supplied exact version, listed in `imported.asserted`. A ResultSet digest is not a suite identity. |
 | `started_at`, `completed_at` | `startedAt`, `endedAt` in UTC | exact instant |
 | `runner` | `imported.from`; `producer` is the converter (RUN-15) | exact |
-| `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy: a ResultSet names a model, which may be one part of the subject |
+| `provider.model`, `api_base`, `temperature`, `max_tokens`, `extra` | model identity supplies `subject` unless explicitly overridden; complete provider declaration is captured as supplemental document evidence | source declaration roundtrips with capture on; provider configuration is not asserted as native deployment configuration |
 | (EvalPort does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
-| `isolation`, `group` | `ext/evalport-context.json` | exact through `EvalPortRunContext`; full ResultSet conversion remains pending |
+| `isolation`, `group` | `ext/evalport-context.json` | exact through verified import/export, including custom strings and exact sequence integers |
 | `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
 | `test_case_id` | `caseId` | exact |
 | `attempt` | `trial` = `attempt` − 1, on the Result's root line and on each of its grader lines ([RES-8](../spec/03-run.md#344-repeated-trials)) | exact |
@@ -131,7 +131,7 @@ Trial rollups and their agreement. Severity, verdict rules, thresholds and uncer
 A result's start time, and the usage of each party. Evidence other than the case content, evidence digests, gate
 decisions, the run's seal, overlays and signatures. `execution.targetMode`, judge calibration and `imported`.
 
-**EvalPort → AEF.** `isolation` and `group`: AEF has no field for either. The kind of non-measurement behind a null
+**EvalPort → AEF.** `isolation` and `group` use a verified extension rather than native fields. The kind of non-measurement behind a null
 score: skipped, pending or failed. The aggregation behind `passed`, when the producer did not declare it. The case
 content, when the converter writes `contentCapture: off`.
 
@@ -335,7 +335,7 @@ individual results; converter rollups do not become extra EvalPort observations.
 Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
 The exported document is checked by the pinned ResultSet validator. This is an
 initial reverse projection, not completion of the full mapping matrix: remaining
-provider/metadata fidelity, aggregation acceptance and further resource tests
+aggregation acceptance, generic reverse structural fidelity and further resource tests
 still need acceptance.
 
 When one AEF case has multiple distinct root paths, each case/path receives a
@@ -344,6 +344,25 @@ collisions with existing case IDs. Original case/path identity remains in each
 result's `metadata.aef.caseId` and `path`. This prevents duplicate observations
 without relabeling separate roots as repeated attempts or combining their verdicts.
 The mapping is stable within the selected run and is reported in conversion notes.
+
+### Captured source declarations
+
+With content capture on, the importer writes a structured supplemental document
+blob referenced by `ext/evalport-supplement.json` and document evidence
+`E-evalport-supplement`. It contains provider configuration, the declared source
+summary, and run/result/grader metadata. Per-observation metadata is keyed by
+case ID and effective attempt; grader metadata is keyed by grader ID. Scores,
+verdicts, output and reasoning are still mapped through native AEF results and
+evidence, not reconstructed from a saved ResultSet archive.
+
+The exporter reads the supplement only from the verified owned snapshot and
+within the shared 4 MiB captured-content budget. It restores declarations after
+native projection, then validates the complete ResultSet. Source summary values
+remain source claims; they do not replace the recomputed AEF summary. On metadata
+key collisions the captured source value wins, with an explicit conversion note;
+source `metadata.aef` is not an exporter attestation. External signatures are
+never transferred. The supplement is omitted entirely with capture off; an
+authorized withheld supplement is omitted with a note rather than fabricated.
 
 ### CLI publication
 
