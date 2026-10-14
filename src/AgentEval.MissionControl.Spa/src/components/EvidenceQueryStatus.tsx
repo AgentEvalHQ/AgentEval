@@ -10,10 +10,10 @@ const messages: Record<string, string> = {
   UNAVAILABLE: "Evidence is currently unavailable. Check the host and refresh.",
 };
 
-export function EvidenceQueryStatus({ fetching, error, outcome }: {
-  fetching: boolean; error: boolean; outcome?: EvidenceOutcome<unknown>;
+export function EvidenceQueryStatus({ fetching, error, outcome, messages: overrides }: {
+  fetching: boolean; error: boolean; outcome?: EvidenceOutcome<unknown>; messages?: Record<string, string>;
 }) {
   return <p role="status" className="text-sm" aria-live="polite">{fetching ? "Loading evidence…" : error
     ? "Connection failed. Refresh to try again." : outcome?.state === "AVAILABLE" ? "Evidence loaded."
-    : outcome ? messages[outcome.state] ?? "Unsupported availability state." : "No response available."}</p>;
+    : outcome ? overrides?.[outcome.state] ?? messages[outcome.state] ?? "Unsupported availability state." : "No response available."}</p>;
 }

@@ -50,6 +50,7 @@ export function GovernanceSourcePage() {
   return <div className="space-y-5 min-w-0">
     <nav aria-label="Evidence views" className="flex flex-wrap gap-4">
       <Link to="/governance" className="text-accent-700 underline">Evidence sources</Link>
+      <Link to={`/governance/requirements?source=${encodeURIComponent(sourceId)}`} className="text-accent-700 underline">Requirements for this source</Link>
       {(["results", "metrics", "spans", "fields"] as const).map(tab => <Link key={tab}
         to={`?view=${tab}`} aria-current={view === tab ? "page" : undefined}
         className={view === tab ? "font-semibold" : "text-accent-700 underline"}>{tab[0].toUpperCase() + tab.slice(1)}</Link>)}

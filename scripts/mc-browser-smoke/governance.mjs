@@ -31,12 +31,31 @@ try {
   let detailState = 'AVAILABLE';
   let recordsState = 'AVAILABLE';
   let sourceKind = 'aef';
+  let requirementsState = 'AVAILABLE';
   const requests = [];
   await page.route('**/api/v1/version', route => route.fulfill({ json: { mode: 'local', version: 'test' } }));
   await page.route('**/graphql', async route => {
     const request = route.request().postDataJSON();
     if (request.query.includes('WorkspaceState')) {
       await route.fulfill({ json: { data: { workspace: { initialized: false, root: null, agentEvalVersion: 'test' } } } }); return;
+    }
+    if (request.query.includes('GovernanceRequirements')) {
+      requests.push(request.variables);
+      const hasEvidence = request.variables.sourceIds.length > 0;
+      await route.fulfill({ json: { data: { governanceStatus: { state: requirementsState, code: null,
+        data: requirementsState === 'AVAILABLE' ? {
+          catalogueDigest: 'catalogue-digest', policyDigest: 'requirement-policy', at: request.variables.at,
+          subject: { ref: request.variables.subjectRef, version: request.variables.subjectVersion },
+          selectedRunHashes: hasEvidence ? ['selected-hash'] : [],
+          evidence: hasEvidence ? [{ runId: 'run-1', runHash: 'selected-hash', overlayDigest: 'overlay-digest' }] : [],
+          requirements: [{ id: 'REQ-1', baseStatus: hasEvidence ? 'fail' : 'missing', effectiveStatus: hasEvidence ? 'fail' : 'missing',
+            status: hasEvidence ? 'waived' : 'missing', diagnostics: ['<script>diagnostic()</script>'],
+            observations: hasEvidence ? [{ runHash: 'selected-hash', resultId: 'result-1', lane: 'scenario', metric: 'metric-1', path: 'root',
+              sealedState: 'fail', effectiveState: 'fail', overrideEvent: null, value: 0, endedAt: '2026-01-01T00:00:00.000000001Z' }] : [],
+            reviews: [],
+          }],
+        } : null,
+      } } } }); return;
     }
     if (/Governance(Metrics|Spans|Fields)/.test(request.query)) {
       requests.push(request.variables);
@@ -187,10 +206,43 @@ try {
   await page.getByRole('cell', { name: '18446744073709551614', exact: true }).waitFor();
   assert.equal(await page.getByRole('cell', { name: '18446744073709551615', exact: true }).count(), 1);
   assert.equal(requests.at(-1).cursor, null);
+  await page.getByRole('link', { name: 'Requirements for this source', exact: true }).click();
+  await page.getByRole('heading', { name: 'Requirements status' }).waitFor();
+  assert.equal(await page.getByLabel('Evidence source IDs').inputValue(), 'source-1');
+  assert.equal(await page.getByRole('region', { name: 'Requirement report' }).count(), 0);
+  await page.getByLabel('Subject reference').fill('agent:test');
+  await page.getByLabel('Subject version').fill('v1');
+  await page.getByLabel('UTC view time').fill('2026-01-02T00:00:00.000000001Z');
+  await page.getByLabel('Evidence source IDs').fill('source-1\nsource-1');
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  const report = page.getByRole('region', { name: 'Requirement report' });
+  await report.getByText('catalogue-digest', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, ['source-1']);
+  assert.equal(requests.at(-1).at, '2026-01-02T00:00:00.000000001Z');
+  assert.equal(await report.getByRole('cell', { name: 'fail', exact: true }).count(), 2);
+  assert.equal(await report.getByRole('cell', { name: 'waived', exact: true }).count(), 1);
+  await report.locator('summary').filter({ hasText: '1 observations' }).click();
+  await report.getByText('<script>diagnostic()</script>', { exact: true }).waitFor();
+  assert.equal(await report.locator('script').count(), 0);
+  await page.getByLabel('Subject version').fill('v2');
+  assert.equal(await report.getByText('agent:test / v1', { exact: true }).count(), 1);
+  await page.getByLabel('Evidence source IDs').fill('');
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await report.getByText('agent:test / v2', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, []);
+  assert.equal(await report.getByRole('cell', { name: 'missing', exact: true }).count(), 3);
+  requirementsState = 'UNAVAILABLE';
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await page.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
+  assert.equal(await report.count(), 0);
+  requirementsState = 'STALE_CURSOR';
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await page.getByRole('status').filter({ hasText: 'Resolve requirements again' }).waitFor();
+  assert.equal(await report.count(), 0);
   assert.deepEqual(errors, []);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
     'Wide observation tables should scroll inside their panel, not widen the page.');
-  console.log('Governance browser acceptance passed: workspace, source/results/detail navigation, metrics, observation routing, exact integers/nanos, conflicts, safe provenance, refusals, pagination and stale-data cleanup.');
+  console.log('Governance browser acceptance passed: workspace, evidence browsing, exact values, requirements selection/time/statuses, safe provenance, refusals, pagination and stale-data cleanup.');
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));

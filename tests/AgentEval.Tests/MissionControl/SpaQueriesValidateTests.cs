@@ -33,7 +33,7 @@ public sealed class SpaQueriesValidateTests : IClassFixture<SeededMissionControl
 
     private static readonly Regex Operation = new(@"^\s*(query|mutation|subscription)\b|^\s*\{", RegexOptions.Compiled);
 
-    private static readonly Regex RequiredVariable = new(@"\$(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?<type>[A-Za-z_][A-Za-z0-9_]*)!", RegexOptions.Compiled);
+    private static readonly Regex RequiredVariable = new(@"\$(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?<type>\[[A-Za-z_][A-Za-z0-9_]*!?\]|[A-Za-z_][A-Za-z0-9_]*)!", RegexOptions.Compiled);
 
     private readonly SeededMissionControlFactory _factory;
 
@@ -78,6 +78,7 @@ public sealed class SpaQueriesValidateTests : IClassFixture<SeededMissionControl
             m => m.Groups["name"].Value,
             m => (object)(m.Groups["type"].Value switch
             {
+                "[String!]" or "[String]" => Array.Empty<string>(),
                 "Int" => 1,
                 "Float" => 1.0,
                 "Boolean" => false,

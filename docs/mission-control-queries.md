@@ -177,6 +177,20 @@ expandable original source provenance. These observations do not imply an
 evaluation verdict. Views inappropriate for a source family show the host's
 typed refusal instead of fabricating an empty result.
 
+Open **Requirements status** from the inventory, or **Requirements for this
+source** from a source view. Enter the exact subject reference and version,
+UTC view time and one evidence source ID per line. Submitting resolves the
+host-configured catalogue and trust policy through `governanceStatus`.
+Duplicate source IDs are removed; a blank list explicitly selects no evidence.
+The browser does not discover a latest run or infer a subject/version.
+
+The report shows base, effective and final statuses, selected observations,
+diagnostics and reviews. Catalogue/policy digests and selected run/overlay
+identities identify its inputs. Editing the form does not relabel the existing
+report: submitted inputs remain visible until another request is submitted.
+Loading, refused and failed requests hide the old report. An unavailable
+query is not a missing requirement or a successful evaluation.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;
