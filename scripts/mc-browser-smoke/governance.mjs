@@ -32,12 +32,44 @@ try {
   let recordsState = 'AVAILABLE';
   let sourceKind = 'aef';
   let requirementsState = 'AVAILABLE';
+  let checkpointState = 'AVAILABLE';
+  let checkpointTrust = 'absent';
   const requests = [];
   await page.route('**/api/v1/version', route => route.fulfill({ json: { mode: 'local', version: 'test' } }));
   await page.route('**/graphql', async route => {
     const request = route.request().postDataJSON();
     if (request.query.includes('WorkspaceState')) {
       await route.fulfill({ json: { data: { workspace: { initialized: false, root: null, agentEvalVersion: 'test' } } } }); return;
+    }
+    if (request.query.includes('GovernanceCheckpoints')) {
+      await route.fulfill({ json: { data: { checkpoints: { state: 'AVAILABLE', code: null, data: [{
+        id: 'release', checkpointId: 'cp-test', subjectRef: 'agent:test', subjectVersion: 'v1',
+        declaredState: 'decided', declaredOutcome: 'approved', manifestDigest: 'checkpoint-digest',
+      }] } } } }); return;
+    }
+    if (request.query.includes('GovernanceCheckpointExplanation')) {
+      requests.push(request.variables);
+      const trusted = checkpointTrust === 'trusted';
+      const declaration = JSON.stringify({ checkpointId: 'cp-test', subject: { ref: 'agent:test', version: 'v1' },
+        state: 'decided', outcome: 'approved', decision: { reasons: ['<script>checkpoint reason</script>'], lanes: [{ lane: 'quality', status: 'passed' }] },
+        lanes: [{ lane: 'quality', runs: [{ runId: 'run-1', runHash: 'run-hash' }], rule: { kind: 'comparison', minimumN: 'RULE_INTEGER', baseline: { runId: 'baseline-1', runHash: 'baseline-hash' } } }],
+        ext: { exactInteger: 'EXACT_INTEGER' },
+      }).replace('"EXACT_INTEGER"', '9223372036854775807').replace('"RULE_INTEGER"', '9223372036854775806');
+      await route.fulfill({ json: { data: { checkpointExplanation: { state: checkpointState, code: null,
+        data: checkpointState === 'AVAILABLE' ? { checkpointId: 'release', sourceIds: request.variables.sourceIds,
+          indexInstanceId: 'checkpoint-index', indexGeneration: '9223372036854775807', explanation: {
+            manifestDigest: 'checkpoint-digest', policyDigest: 'checkpoint-policy', requestedAt: request.variables.at,
+            evaluatedAt: '2026-01-01T00:00:00.000000001Z', manifestJson: declaration,
+            manifestProblems: trusted ? [] : ['decision'], problems: trusted ? [] : [{ path: 'lanes/quality', code: 'lane-result' }],
+            lanes: [{ lane: 'quality', ruleKind: 'comparison', evidenceStatus: trusted ? 'passed' : 'incomparable', subjectVersion: 'v1',
+              oldestClosedAt: '2025-12-31T23:00:00Z', axes: trusted ? [] : ['suite-digest'], readsUnknown: false,
+              problems: trusted ? [] : [{ path: 'lanes/quality/runs/run-1', code: 'run-missing' }] }],
+            signedBy: trusted ? ['reviewer:test'] : [], anchors: trusted ? ['run-hash'] : [],
+            envelopePresent: checkpointTrust !== 'absent', signatureChecked: checkpointTrust !== 'absent',
+            envelopeResult: checkpointTrust === 'malformed' ? 'Malformed' : null,
+            signatures: ['trusted', 'untrusted'].includes(checkpointTrust) ? [{ keyId: 'key-1', result: trusted ? 'VERIFIED' : 'UNTRUSTED_KEY', identity: trusted ? 'reviewer:test' : null }] : [],
+          } } : null,
+      } } } }); return;
     }
     if (request.query.includes('GovernanceRequirements')) {
       requests.push(request.variables);
@@ -263,10 +295,50 @@ try {
   await page.getByRole('button', { name: 'Resolve requirements' }).click();
   await page.getByRole('status').filter({ hasText: 'Resolve requirements again' }).waitFor();
   assert.equal(await report.count(), 0);
+  await page.getByRole('link', { name: 'Evidence sources', exact: true }).click();
+  await page.getByRole('link', { name: 'Checkpoint evidence', exact: true }).click();
+  await page.getByRole('heading', { name: 'Checkpoint evidence' }).waitFor();
+  await page.getByLabel('Configured checkpoint').selectOption('release');
+  await page.getByLabel('Evidence source IDs').fill('source-1\nsource-1');
+  await page.getByLabel('UTC view time').fill('2026-02-01T00:00:00.000000009Z');
+  assert.equal(await page.getByRole('region', { name: 'Checkpoint explanation' }).count(), 0);
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  const checkpoint = page.getByRole('region', { name: 'Checkpoint explanation' });
+  await checkpoint.getByText('checkpoint-digest', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, ['source-1']);
+  assert.equal(requests.at(-1).at, '2026-02-01T00:00:00.000000009Z');
+  assert.equal(await checkpoint.getByText('approved', { exact: true }).count(), 1);
+  assert.equal(await checkpoint.getByRole('cell', { name: 'incomparable', exact: true }).count(), 1);
+  assert.equal(await checkpoint.getByText('2026-01-01T00:00:00.000000001Z', { exact: true }).count(), 1);
+  await checkpoint.getByText('No signature envelope supplied.', { exact: true }).waitFor();
+  await checkpoint.getByText('Manifest: decision', { exact: true }).waitFor();
+  await checkpoint.getByText('lanes/quality: lane-result', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: /^Rule parameters$/ }).click();
+  await checkpoint.getByText('See exact integer in original manifest', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: 'Declared evidence references' }).click();
+  await checkpoint.getByText('Baseline: baseline-1 / baseline-hash', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: 'Original manifest' }).click();
+  assert.match(await checkpoint.locator('pre').innerText(), /9223372036854775807/);
+  assert.equal(await checkpoint.locator('script').count(), 0);
+  checkpointTrust = 'untrusted';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('key-1: UNTRUSTED_KEY — No verified identity', { exact: true }).waitFor();
+  await checkpoint.getByText('Anchored run hashes: None', { exact: true }).waitFor();
+  checkpointTrust = 'trusted';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('Established signers: reviewer:test', { exact: true }).waitFor();
+  await checkpoint.getByText('Anchored run hashes: run-hash', { exact: true }).waitFor();
+  checkpointTrust = 'malformed';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('Envelope verification: Malformed', { exact: true }).waitFor();
+  checkpointState = 'UNAVAILABLE';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await page.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
+  assert.equal(await checkpoint.count(), 0);
   assert.deepEqual(errors, []);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
     'Wide observation tables should scroll inside their panel, not widen the page.');
-  console.log('Governance browser acceptance passed: workspace, evidence browsing, exact values, requirements selection/time/statuses, safe provenance, refusals, pagination and stale-data cleanup.');
+  console.log('Governance browser acceptance passed: workspace, evidence, requirements, checkpoint declarations/rules/trust, exact values, safe provenance, refusals and stale-data cleanup.');
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));

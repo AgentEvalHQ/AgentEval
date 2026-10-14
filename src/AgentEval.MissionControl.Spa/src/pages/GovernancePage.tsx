@@ -60,6 +60,7 @@ export function GovernancePage() {
     <div>
       <h2 className="text-2xl font-semibold">Governance evidence</h2>
       <Link className="text-accent-700 underline" to="/governance/requirements">Requirements status</Link>
+      <Link className="text-accent-700 underline ml-4" to="/governance/checkpoints">Checkpoint evidence</Link>
       <p className="text-slate-600 mt-2">Browse evidence from the host's configured workspace. Source integrity and evaluation outcomes are separate facts.</p>
     </div>
     <div className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">

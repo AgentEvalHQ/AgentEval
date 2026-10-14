@@ -227,8 +227,17 @@ recomputed lane evidence, verification problems, established signers and
 anchored run hashes. Decided checkpoints use their recorded evaluation time.
 Envelope presence, whether verification was attempted, envelope failures and
 per-signature results are separate fields. A passing lane is not checkpoint
-approval, and an available explanation is not proof of trust. The host exposes this adapter through the checkpoint queries below; the
-browser view is still pending.
+approval, and an available explanation is not proof of trust. The host exposes
+this adapter through the checkpoint queries below and the browser's
+`/governance/checkpoints` view. Choose a configured checkpoint, explicit source
+IDs and UTC view time, then submit to inspect its explanation. Draft edits do
+not change the submitted report. Refreshes and refusals hide cached reports.
+
+The view separates declared decisions from recomputed lane evidence and
+signature trust. Expand each lane for rule parameters and evidence references.
+The original manifest remains available as escaped JSON, preserving exact
+integers; unsafe JavaScript integers in parameter summaries point to that
+original representation instead of displaying rounded values.
 
 `ICheckpointQueryService` provides the shared query boundary over this adapter.
 The host supplies at most sixteen `ConfiguredCheckpoint` objects, which copy
