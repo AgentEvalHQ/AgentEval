@@ -139,3 +139,27 @@ The host reads at most RequestBytes plus one detection byte before GraphQL parsi
 Responses are buffered under the serialized-byte cap, including aliases and JSON escaping. A response that exceeds the cap is discarded and replaced by a bounded 503 `response-byte-limit` error, without partial evidence JSON. Buffer memory is finite and tied to the concurrency limit; this cap is separate from shared services' logical page/report limits. A deadline before headers are sent returns 408; cancellation after response delivery starts aborts the connection. Slots are released on success, refusal or cancellation.
 
 Plain Nitro browser documents and assets retain their existing delivery path. GraphQL WebSocket upgrades are refused while these budgets are enabled; use bounded HTTP queries and the dedicated SSE invalidation feed. Query-disabled legacy deployments retain their previous behavior. The existing GraphQL cost/depth checks still apply in addition to these envelope limits.
+# Governance workspace in the web app
+
+Open **Governance** in Mission Control's sidebar (`/governance`) to check the
+configured evidence connection and browse source inventory. This view uses
+`evidenceSources` from the shared query service. Its index is configured on the
+server independently of the legacy workspace initialization screen.
+
+Filter by a logical root ID, or leave it blank for all configured roots. The
+page shows up to 25 sources, the index instance and exact generation values.
+Use **Next page** to continue; if the index changes, **First page** restarts the
+traversal. **Refresh** checks the current selection again. Integrity labels
+describe indexed source verification, not evaluation success or compliance.
+
+An empty result is distinct from an unconfigured, unavailable or refused query.
+Failed refreshes hide previously cached inventory. The app uses its configured
+API endpoint and existing host access boundary; it does not register filesystem
+roots or provision remote credentials.
+
+Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
+`node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
+to use installed Edge. This checks controlled API responses in a real browser;
+`SpaQueriesValidateTests` checks the actual SPA operations against the production
+GraphQL schema. A complete indexed-evidence browser journey is separate work.
+
