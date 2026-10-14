@@ -92,7 +92,7 @@ GraderResult.
 |---|---|---|
 | `run_id` | `runId` when it matches the id pattern (letters, digits, `.`, `_`, `:`, `-`; at most 128); otherwise a hash, with the original in `ext` | exact or lossy |
 | `version` | `ext` | none |
-| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; when `suite_version` is absent, the converter computes one from the suite file's digest and lists `suite.version` in `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)) |
+| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; a ResultSet without `suite_version` requires a caller-supplied exact version, listed in `imported.asserted`. A ResultSet digest is not a suite identity. |
 | `started_at`, `completed_at` | `startedAt`, `endedAt` in UTC | exact instant |
 | `runner` | `imported.from`; `producer` is the converter (RUN-15) | exact |
 | `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy: a ResultSet names a model, which may be one part of the subject |
@@ -248,6 +248,21 @@ This boundary does not yet check aggregation metadata or perform date conversion
 schema `format` is an annotation in the reused validator. The importer must check
 those before producing AEF evidence. It accepts the pinned schema's shape with
 major version 1, and refuses unknown fields including the proposed `verdict` field.
+
+The internal import planner now validates header and temporal mapping before output
+creation. `AefEvalPortImportOptions` supplies target mode, an optional explicit
+subject and a missing suite version. Without an explicit subject, a declared
+provider model becomes a model subject; if neither is available, import planning
+refuses. Caller-supplied subject and suite-version facts are listed as assertions.
+Unsupported run identifiers are mapped to a deterministic SHA-256-based identifier,
+with the source identifier retained in the header's `ext.evalport`.
+
+Known RFC3339 offsets are normalized to UTC without rounding up to nine fractional
+digits. Invalid dates, unknown offset `-00:00`, missing offsets and finer precision
+are refused. Completion cannot precede start; per-result completion must lie within
+the declared run interval. No completion time means a running, unsealed run.
+A completed ResultSet declaring boolean `metadata.openeval.partial: true` maps to
+an aborted run. This planner still does not write results or publish a run.
 
 Still pending: full ResultSet adapters, including the losses in the tables above
 and roundtrip acceptance. A directly parsed extension alone has not had its seal
