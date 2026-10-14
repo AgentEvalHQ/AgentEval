@@ -33,7 +33,7 @@ public sealed class ConfiguredCheckpoint
     /// <summary>Path-free checkpoint declarations, not a verification result.</summary>
     public CheckpointDescriptor Descriptor { get; }
     internal ReadOnlyMemory<byte> Manifest => _manifest;
-    internal ReadOnlyMemory<byte>? Envelope => _envelope is null ? null : new ReadOnlyMemory<byte>(_envelope);
+    internal ReadOnlyMemory<byte>? Envelope => _envelope is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(_envelope);
 }
 /// <summary>Configured identity and declared checkpoint metadata; no approval or trust is inferred.</summary>
 public sealed record CheckpointDescriptor(string Id, string CheckpointId, string SubjectRef, string SubjectVersion,

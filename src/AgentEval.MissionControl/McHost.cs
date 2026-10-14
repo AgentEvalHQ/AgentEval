@@ -190,13 +190,9 @@ public static class McHost
                 // ships inline `<script>` / `<style>` blocks WITHOUT nonces or
                 // hashes. Tightening to `'strict-dynamic'` or nonce-only would
                 // break the embedded /graphql Nitro UI.
-                // Risk surface in Phase 1 is low because:
-                //   1. The portal is loopback-only (127.0.0.1, no LAN expose).
-                //   2. There is no auth or multi-tenancy; no third-party content
-                //      reaches the response body.
-                //   3. Browser-rendered REPORT outputs (report.html / xml / sarif)
-                //      are forced to attachment Content-Disposition (Task 7.13)
-                //      so they cannot execute as same-origin script.
+                // Enabled evidence queries enforce the read-access boundary
+                // separately. Report downloads use attachment disposition;
+                // evidence declarations rendered by the SPA must remain escaped.
                 // Phase 2 should tighten when Nitro grows nonce support, OR
                 // gate `unsafe-inline` behind a development-only env flag.
                 headers["Content-Security-Policy"] =

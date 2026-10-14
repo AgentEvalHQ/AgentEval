@@ -1,4 +1,80 @@
+OBJECT AefProblem {
+  code: String!
+  path: String!
+}
+
 SCALAR Boolean
+
+OBJECT CheckpointDescriptor {
+  checkpointId: String!
+  declaredOutcome: String
+  declaredState: String!
+  id: String!
+  manifestDigest: String!
+  subjectRef: String!
+  subjectVersion: String!
+}
+
+OBJECT CheckpointExplanation {
+  anchors: [String!]!
+  envelopePresent: Boolean!
+  envelopeResult: String
+  evaluatedAt: String!
+  lanes: [CheckpointLaneExplanation!]!
+  manifestDigest: String!
+  manifestJson: String!
+  manifestProblems: [String!]!
+  policyDigest: String!
+  problems: [AefProblem!]!
+  requestedAt: String!
+  signatureChecked: Boolean!
+  signatures: [DsseSignatureCheck!]!
+  signedBy: [String!]!
+}
+
+OBJECT CheckpointExplanationResponse {
+  code: String
+  data: CheckpointSelectionView
+  state: QueryState!
+}
+
+OBJECT CheckpointLaneExplanation {
+  axes: [String!]!
+  evidenceStatus: String
+  lane: String!
+  oldestClosedAt: String
+  problems: [AefProblem!]!
+  readsUnknown: Boolean!
+  ruleKind: String!
+  subjectVersion: String
+}
+
+OBJECT CheckpointSelectionView {
+  checkpointId: String!
+  explanation: CheckpointExplanation!
+  indexGeneration: String
+  indexInstanceId: String
+  sourceIds: [String!]!
+}
+
+OBJECT CheckpointsResponse {
+  code: String
+  data: [CheckpointDescriptor!]
+  state: QueryState!
+}
+
+OBJECT DsseSignatureCheck {
+  identity: String
+  keyId: String!
+  result: DsseSignatureResult!
+}
+
+ENUM DsseSignatureResult {
+  INVALID
+  UNSUPPORTED_ALGORITHM
+  UNTRUSTED_KEY
+  VERIFIED
+}
 
 OBJECT EvidenceAssuranceView {
   event: String!
@@ -176,6 +252,8 @@ OBJECT GovernanceStatusResponse {
 SCALAR Int
 
 OBJECT Query {
+  checkpointExplanation(at: String!, checkpointId: String!, sourceIds: [String!]!): CheckpointExplanationResponse!
+  checkpoints: CheckpointsResponse!
   evidenceFields(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceFieldView!
   evidenceMetrics(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceMetricView!
   evidenceResultDetail(at: String!, resultId: String!, sourceId: String!): EvidenceResultDetailResponse!

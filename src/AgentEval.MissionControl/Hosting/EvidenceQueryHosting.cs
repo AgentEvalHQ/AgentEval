@@ -21,6 +21,7 @@ internal static class EvidenceQueryHosting
             builder.Services.TryAddSingleton<ISuiteQueryService>(_ => new SuiteQueryService());
             builder.Services.TryAddSingleton<IResultDetailQueryService>(_ => new ResultDetailQueryService());
             builder.Services.TryAddSingleton<IGovernanceQueryService>(_ => new GovernanceQueryService());
+            builder.Services.TryAddSingleton<ICheckpointQueryService>(_ => new CheckpointQueryService());
             return;
         }
         var path = builder.Configuration["AgentEval:Queries:IndexPath"];
@@ -38,6 +39,7 @@ internal static class EvidenceQueryHosting
             builder.Services.TryAddSingleton<ISuiteQueryService>(_ => new SuiteQueryService());
             builder.Services.TryAddSingleton<IResultDetailQueryService>(_ => new ResultDetailQueryService());
             builder.Services.TryAddSingleton<IGovernanceQueryService>(_ => new GovernanceQueryService());
+            builder.Services.TryAddSingleton<ICheckpointQueryService>(_ => new CheckpointQueryService());
             return;
         }
         var roots = configuredRoots.Select(root => new EvidenceIndexRoot(root["RootId"]!, root["Directory"]!, IndexedEvidenceKind.Aef)).ToArray();
@@ -56,6 +58,23 @@ internal static class EvidenceQueryHosting
         builder.Services.TryAddSingleton<ISuiteQueryService>(sp => new SuiteQueryService(
             sp.GetRequiredService<IEvidenceSourceLookup>(), sp.GetRequiredService<ISuiteIdentityReader>(),
             sp.GetRequiredService<ISuiteCompatibilityEvaluator>(), roots));
+        var checkpointEntries = builder.Configuration.GetSection("AgentEval:Queries:Checkpoints").GetChildren().Take(17).ToArray();
+        if (checkpointEntries.Length > 16)
+            throw new InvalidOperationException("Expected: at most sixteen configured checkpoints. Actual: too many entries. Suggestions: reduce the checkpoint set. Because: query configuration must be bounded.");
+        if (checkpointEntries.Length == 0)
+            builder.Services.TryAddSingleton<ICheckpointQueryService>(_ => new CheckpointQueryService());
+        else
+        {
+            var checkpoints = checkpointEntries.Select(entry => new ConfiguredCheckpoint(entry["Id"]!,
+                ReadConfiguration(entry["ManifestPath"]!), string.IsNullOrWhiteSpace(entry["EnvelopePath"])
+                    ? (ReadOnlyMemory<byte>?)null : ReadConfiguration(entry["EnvelopePath"]!))).ToArray();
+            if (checkpoints.Select(c => c.Descriptor.Id).Distinct(StringComparer.Ordinal).Count() != checkpoints.Length)
+                throw new InvalidOperationException("Expected: distinct checkpoint IDs. Actual: duplicate IDs. Suggestions: configure one manifest per ID. Because: evidence selection must be unambiguous.");
+            builder.Services.TryAddSingleton<IBoundedCheckpointReader, BoundedCheckpointReader>();
+            builder.Services.TryAddSingleton<ICheckpointQueryService>(sp => new CheckpointQueryService(
+                sp.GetRequiredService<IEvidenceSourceLookup>(), sp.GetRequiredService<IBoundedCheckpointReader>(),
+                checkpoints, roots, sp.GetService<TrustPolicy>()));
+        }
         var cataloguePath = builder.Configuration["AgentEval:Queries:CataloguePath"];
         if (string.IsNullOrWhiteSpace(cataloguePath))
         {
@@ -81,7 +100,7 @@ internal static class EvidenceQueryHosting
 
     private static byte[] ReadConfiguration(string path)
     {
-        if (!System.IO.Path.IsPathFullyQualified(path))
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.Path.IsPathFullyQualified(path))
             throw new InvalidOperationException("Expected: absolute query configuration path. Actual: relative path. Suggestions: configure an explicit JSON file. Because: host authority must not depend on the working directory.");
         using var input = File.OpenRead(path);
         var bytes = new byte[RequirementCatalogueReader.MaxBytes + 1];
@@ -93,7 +112,7 @@ internal static class EvidenceQueryHosting
             total += read;
         }
         if (total == bytes.Length)
-            throw new InvalidOperationException("Expected: query configuration at most 1 MiB. Actual: file exceeds the limit. Suggestions: reduce the catalogue or trust policy. Because: configuration loading is bounded.");
+            throw new InvalidOperationException("Expected: query configuration at most 1 MiB. Actual: file exceeds the limit. Suggestions: reduce the catalogue, trust policy or checkpoint input. Because: configuration loading is bounded.");
         return bytes.AsSpan(0, total).ToArray();
     }
 }

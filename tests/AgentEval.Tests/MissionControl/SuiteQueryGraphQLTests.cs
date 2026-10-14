@@ -27,7 +27,7 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
     private string Database => Path.Combine(_root, "index.sqlite");
     public SuiteQueryGraphQLTests() => Directory.CreateDirectory(Root.Directory);
     private WebApplicationFactory<Query> Factory(bool enabled = true, bool roots = true, string? directory = null,
-        string? catalogue = null, string? policy = null, int maxSources = 8) =>
+        string? catalogue = null, string? policy = null, int maxSources = 8, string? checkpoint = null, string? checkpointEnvelope = null) =>
         new WebApplicationFactory<Query>().WithWebHostBuilder(builder =>
         {
             LoopbackTestConnection.Configure(builder);
@@ -36,6 +36,12 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
             builder.UseSetting("AgentEval:Root", _root);
             if (catalogue is not null) builder.UseSetting("AgentEval:Queries:CataloguePath", catalogue);
             if (policy is not null) builder.UseSetting("AgentEval:Queries:TrustPolicyPath", policy);
+            if (checkpoint is not null)
+            {
+                builder.UseSetting("AgentEval:Queries:Checkpoints:0:Id", "release");
+                builder.UseSetting("AgentEval:Queries:Checkpoints:0:ManifestPath", checkpoint);
+                if (checkpointEnvelope is not null) builder.UseSetting("AgentEval:Queries:Checkpoints:0:EnvelopePath", checkpointEnvelope);
+            }
             builder.UseSetting("AgentEval:Queries:GovernanceLimits:MaxSources", maxSources.ToString());
             if (roots)
             {

@@ -51,6 +51,7 @@ public sealed partial class SuiteQueryServiceTests
         Assert.Equal(descriptor.ManifestDigest, outcome.Data.Explanation.ManifestDigest);
         Assert.Equal("passed", Assert.Single(outcome.Data.Explanation.Lanes).EvidenceStatus);
         Assert.Empty(outcome.Data.Explanation.Anchors);
+        Assert.False(outcome.Data.Explanation.EnvelopePresent);
         Assert.DoesNotContain(_root, JsonSerializer.Serialize(outcome.Data));
         var empty = service.Explain("release", [], at);
         Assert.Equal(QueryState.Available, empty.State); Assert.Null(empty.Data!.IndexGeneration);

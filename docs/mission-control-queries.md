@@ -98,7 +98,7 @@ Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requ
 
 ## Contract acceptance
 
-The reviewed GraphQL contract for the nine shared query fields is pinned in `tests/AgentEval.Tests/MissionControl/EvidenceSchema.txt`. Its HTTP introspection test walks every reachable output/scalar/enum type and records field signatures, argument defaults and nullability. A schema change requires reviewing this artifact, including whether new reachable fields expose storage details or alter numeric precision. Setting `AGENTEVAL_SCHEMA_CAPTURE` to a local output path captures the current contract for review; it does not update the expected snapshot or bypass comparison. Complete payloads for all nine query fields are compared between direct service calls and HTTP over actual indexed/sealed/OTLP fixtures. Only documented index-identity naming and exact integer-to-string adaptations are applied. Cases retain suite compatibility explanations, sealed/effective result detail, observation conflicts and signed waiver authority/refusal provenance. Typed unavailable, empty, missing, invalid, stale and resource-limit outcomes are also compared for indexed pages. HTTP envelope tests include real Kestrel response-cap refusal without partial data. Streaming acceptance stalls writes and flushes to verify deadline cancellation and subscriber-slot recovery.
+The reviewed GraphQL contract for the eleven shared query fields is pinned in `tests/AgentEval.Tests/MissionControl/EvidenceSchema.txt`. Its HTTP introspection test walks every reachable output/scalar/enum type and records field signatures, argument defaults and nullability. A schema change requires reviewing this artifact, including whether new reachable fields expose storage details or alter numeric precision. Setting `AGENTEVAL_SCHEMA_CAPTURE` to a local output path captures the current contract for review; it does not update the expected snapshot or bypass comparison. Complete payloads for the original nine query fields are compared between direct service calls and HTTP over actual indexed/sealed/OTLP fixtures. Only documented index-identity naming and exact integer-to-string adaptations are applied. Cases retain suite compatibility explanations, sealed/effective result detail, observation conflicts and signed waiver authority/refusal provenance. Typed unavailable, empty, missing, invalid, stale and resource-limit outcomes are also compared for indexed pages. HTTP envelope tests include real Kestrel response-cap refusal without partial data. Streaming acceptance stalls writes and flushes to verify deadline cancellation and subscriber-slot recovery.
 
 ## Shared change notifications
 
@@ -227,8 +227,8 @@ recomputed lane evidence, verification problems, established signers and
 anchored run hashes. Decided checkpoints use their recorded evaluation time.
 Envelope presence, whether verification was attempted, envelope failures and
 per-signature results are separate fields. A passing lane is not checkpoint
-approval, and an available explanation is not proof of trust. The checkpoint
-query endpoint and browser view are not yet connected to this adapter.
+approval, and an available explanation is not proof of trust. The host exposes this adapter through the checkpoint queries below; the
+browser view is still pending.
 
 `ICheckpointQueryService` provides the shared query boundary over this adapter.
 The host supplies at most sixteen `ConfiguredCheckpoint` objects, which copy
@@ -246,3 +246,36 @@ to use installed Edge. This checks controlled API responses in a real browser;
 `SpaQueriesValidateTests` checks the actual SPA operations against the production
 GraphQL schema. A complete indexed-evidence browser journey is separate work.
 
+
+### Checkpoint GraphQL configuration
+
+Checkpoint configuration is independent of `CataloguePath`. With queries enabled,
+an explicit index path and configured AEF roots, add up to sixteen entries under
+`AgentEval:Queries:Checkpoints`:
+
+```json
+[
+  {
+    "Id": "release",
+    "ManifestPath": "/absolute/path/release.json",
+    "EnvelopePath": "/absolute/path/release.dsse.json"
+  }
+]
+```
+
+Paths are host configuration and must be absolute. `EnvelopePath` is optional.
+Manifest and envelope files are each limited to 1 MiB and copied at startup;
+changing files requires host reconfiguration/restart. The existing
+`TrustPolicyPath` supplies verification authority. Missing checkpoint configuration,
+disabled queries, or absent AEF roots yields `NOT_CONFIGURED`.
+
+`checkpoints` returns bounded configured declarations. Call
+`checkpointExplanation(checkpointId, sourceIds, at)` with the configured ID,
+explicit indexed source IDs and UTC time to get the verified explanation.
+Index generations are nullable decimal strings; an empty source selection has
+no index revision. Signature results are GraphQL enums (`VERIFIED`,
+`UNTRUSTED_KEY`, `INVALID`, `UNSUPPORTED_ALGORITHM`), separate from envelope
+presence/failure and checkpoint anchors. Complete reports preserve the shared
+service data, with only generation-to-string and enum-name transport changes.
+Both fields use the existing GraphQL read-access and HTTP resource limits;
+explanation has an operation cost of 500 and listing 100.

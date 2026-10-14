@@ -19,7 +19,7 @@ public sealed class EvidenceSchemaTests
         var roots = new HashSet<string>(StringComparer.Ordinal)
         {
             "evidenceSources", "evidenceResults", "evidenceMetrics", "evidenceSpans", "evidenceFields",
-            "evidenceSuite", "evidenceSuiteComparison", "evidenceResultDetail", "governanceStatus"
+            "evidenceSuite", "evidenceSuiteComparison", "evidenceResultDetail", "governanceStatus", "checkpoints", "checkpointExplanation"
         };
         var pending = new Queue<string>(); pending.Enqueue("Query");
         var visited = new HashSet<string>(StringComparer.Ordinal);
