@@ -37,8 +37,8 @@ observation acceptance; reading or decoding a payload is insufficient.
 | Total collection items/request | 100,000 | 1–1,000,000 | Delivered JSON and protobuf decoders |
 | Nested message/value depth | 32 | 8–64 | Delivered JSON and protobuf decoders |
 | UTF-8 string or bytes value | 16 KiB | 1 byte–1 MiB | Delivered JSON and protobuf decoders |
-| Active receiver requests | 2 | 1–16 | Receiver lifetime, pending |
-| Timeout | 30 seconds | 1–600 seconds | Receiver lifetime, pending |
+| Active receiver requests | 2 | 1–16 | Receiver lifetime through acceptance |
+| Timeout | 30 seconds | 1–600 seconds | Linked cancellation through receiver phases |
 
 The 4 MiB application default targets development/evaluation telemetry; it is
 configurable up to 64 MiB. These budgets are independent: compression cannot
@@ -70,14 +70,14 @@ Observed traces describe what telemetry reported. They do not establish an
 evaluation verdict, benchmark completeness, suite compatibility, or a sealed AEF
 run hash. The existing `AefOtelImporter` converts explicit evaluation log events;
 it is not this live trace receiver. AEF evidence and observation storage remain
-separate. A later SQLite index is derived from those authoritative files.
+separate. The SQLite index is derived from those authoritative files.
 
-Content capture will default to off. Structural metadata must be allowlisted;
-prompt, completion and tool payload content cannot be persisted by default.
-Versioned structural normalization is implemented; see
-[the dialect mappings](otlp-dialects.md). Grouping, retention and the content
-policy remain the next implementation slices. Tests prove the payload
-boundary and both decoders, not a completed receiver.
+Content capture defaults to off. The content policy allowlists structural metadata
+before persistence; prompt, completion and tool payload content are removed by
+default. Versioned structural normalization, session grouping and bounded durable
+storage are implemented; see [the dialect mappings](otlp-dialects.md) and the
+sections below. Decoder, store and HTTP tests cover these boundaries; the offline
+Kestrel fixture exercises the complete receiver.
 
 ## JSON trace decoding
 

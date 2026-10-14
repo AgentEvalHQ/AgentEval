@@ -390,5 +390,6 @@ replacement. Ingestion uses one configured owner key, not tenant-level roles,
 per-principal quotas or an Internet-facing rate limiter. Deployments exposing
 it beyond a trusted service boundary need suitable host/network controls.
 
-Sealed evidence files remain authoritative. The later SQLite index is derived
-and rebuildable; indexing/query visibility is a separate integration wave.
+Sealed evidence files remain authoritative. The SQLite index is derived
+and rebuildable; configure indexing and query visibility separately as described
+in [the evidence index guide](evidence-index.md).

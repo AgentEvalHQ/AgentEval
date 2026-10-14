@@ -1,7 +1,7 @@
 # OTLP dialect research and normalization contract
 
 Research checkpoint: 2026-10-14. This resolves the accepted Mission Control RI1
-inventory before implementing the normalizer. Export support does not establish
+inventory used by the normalizer. Export support does not establish
 identical attribute semantics or default export configuration.
 
 | Framework | Primary evidence | Receiver decision |
@@ -43,7 +43,7 @@ Consensus is present only when valid candidates agree; missing, invalid and
 conflicting are distinct. Invalid candidates cannot be rescued by a valid alias.
 Token counts must be nonnegative integers and are never inferred from totals or
 summed across parent/child spans. Content filtering and durable observation
-storage remain separate implementation steps.
+storage are separate components described in [OTLP observations](otlp-observations.md).
 
 ## Delivered API and field map
 
