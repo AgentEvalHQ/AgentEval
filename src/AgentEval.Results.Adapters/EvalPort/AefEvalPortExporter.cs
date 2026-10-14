@@ -84,15 +84,33 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
         var capture = Text(run["contentCapture"]) == "on";
         var blobBudget = AefLimits.MaxJsonBytes;
         var rowBytes = 0;
+        var roots = lines.Where(x => x["parentResultId"] is null && x["trials"] is null).ToArray();
+        var splitCases = roots.GroupBy(x => Text(x["caseId"]), StringComparer.Ordinal)
+            .Where(g => g.Select(x => Text(x["path"])).Distinct(StringComparer.Ordinal).Count() > 1)
+            .Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
+        var reservedCases = roots.Select(x => Text(x["caseId"])).ToHashSet(StringComparer.Ordinal);
+        var caseMapping = new Dictionary<(string Case, string Path), string>();
+        foreach (var key in roots.Select(x => (Case: Text(x["caseId"]), Path: Text(x["path"])))
+            .Distinct().OrderBy(x => x.Case, StringComparer.Ordinal).ThenBy(x => x.Path, StringComparer.Ordinal))
+        {
+            if (!splitCases.Contains(key.Case)) continue;
+            var stem = "aef-root-" + AefConverter.Sha256Of(Encoding.UTF8.GetBytes(new JsonArray(key.Case, key.Path).ToJsonString()))[7..];
+            var candidate = stem; var suffix = 0;
+            while (!reservedCases.Add(candidate)) candidate = stem + "-" + (++suffix);
+            caseMapping.Add(key, candidate);
+        }
+        if (caseMapping.Count > 0) notes.Add("Cases with multiple root paths use distinct deterministic test_case_id values; metadata.aef.caseId/path preserve original identity.");
         if (lines.Any(x => x["trials"] is not null)) notes.Add("AEF trial rollups are omitted; individual attempts remain.");
-        foreach (var root in lines.Where(x => x["parentResultId"] is null && x["trials"] is null))
+        foreach (var root in roots)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var ext = root["ext"]?["evalport"];
             var graders = new JsonArray();
-            var row = new JsonObject { ["test_case_id"] = root["caseId"]!.DeepClone(),
+            var caseId = Text(root["caseId"]);
+            var row = new JsonObject { ["test_case_id"] = caseMapping.GetValueOrDefault((caseId, Text(root["path"])), caseId),
                 ["passed"] = Text(root["state"]) == "passed", ["grader_results"] = graders,
-                ["metadata"] = new JsonObject { ["aef"] = new JsonObject { ["state"] = root["state"]!.DeepClone(), ["path"] = root["path"]!.DeepClone() } } };
+                ["metadata"] = new JsonObject { ["aef"] = new JsonObject { ["state"] = root["state"]!.DeepClone(),
+                    ["caseId"] = caseId, ["path"] = root["path"]!.DeepClone() } } };
             if (root["trial"] is { } trial && ext?["attemptDeclared"]?.GetValue<bool>() != false)
             {
                 var value = EvalPortResultSet.Integer(trial, 0);
@@ -114,7 +132,18 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
                 var state = Text(line["state"]);
                 var score = (line["scores"] as JsonArray)?.FirstOrDefault();
                 JsonNode? normalized = score?["normalized"] ?? score?["value"];
-                if (normalized is not null && (normalized.GetValue<double>() is < 0 or > 1)) throw Refuse("score outside [0,1] has no normalized value");
+                var verdictProjection = score is null && state is "passed" or "failed";
+                if (verdictProjection)
+                {
+                    normalized = JsonValue.Create(state == "passed" ? 1 : 0);
+                    notes.Add("Scoreless pass/fail assertions use a declared Boolean score projection, not an observed numeric metric.");
+                }
+                else if (normalized is not null)
+                {
+                    if (normalized is not JsonValue numeric || !numeric.TryGetValue<double>(out var number) || !double.IsFinite(number))
+                        throw Refuse("AEF score is not a finite numeric value");
+                    else if (number is < 0 or > 1) throw Refuse("score outside [0,1] has no normalized value");
+                }
                 var grader = new JsonObject
                 {
                     ["grader_id"] = leafExt?["grader_id"]?.DeepClone() ?? line["path"]!.DeepClone(),
@@ -122,7 +151,9 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
                     ["score"] = normalized?.DeepClone(), ["passed"] = normalized is not null && state == "passed",
                     ["metadata"] = new JsonObject { ["aef"] = new JsonObject { ["state"] = state, ["path"] = line["path"]!.DeepClone() } },
                 };
-                if (score?["normalized"] is not null && score["value"] is { } raw)
+                if (line["scores"] is { } sourceScores) grader["metadata"]!["aef"]!["scores"] = sourceScores.DeepClone();
+                if (verdictProjection) grader["metadata"]!["aef"]!["scoreProjection"] = "verdict";
+                if (score?["normalized"] is not null && score["value"] is JsonValue raw && raw.TryGetValue<double>(out var rawNumber) && double.IsFinite(rawNumber))
                     grader["metadata"]!["openeval.raw_score"] = raw.DeepClone();
                 if (capture && line["reasoning"]?["blob"] is { } reasonDigest && BlobText(reasonDigest.GetValue<string>()) is { } reason)
                     grader["reason"] = reason;

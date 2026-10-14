@@ -324,14 +324,27 @@ output, grader reasoning and source error objects are read only from verified lo
 blobs. Capture-off or authorized withholding leaves content absent and reports the
 loss. Generic AEF leaf states and paths are retained under `metadata.aef`; flattened
 trees, omitted rollups and first-score-only mapping are listed in conversion notes.
-Scores outside [0,1] without normalization are refused. Repeated attempts remain
+Scores outside [0,1] without normalization are refused. Source score arrays remain
+in grader `metadata.aef.scores`, while only the first score is projected numerically.
+Scoreless AEF pass/fail assertions map to score 1/0, explicitly labeled
+`metadata.aef.scoreProjection: "verdict"`; this is a Boolean projection rather than
+an observed numeric metric. Typed absences remain null-score, nonpassing graders.
+Non-finite values are invalid AEF evidence and are refused, not repaired on export.
+Repeated attempts remain
 individual results; converter rollups do not become extra EvalPort observations.
 
 Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
 The exported document is checked by the pinned ResultSet validator. This is an
-initial reverse projection, not completion of the full mapping matrix: generic
-multi-root identity handling, remaining provider/metadata fidelity, aggregation
+initial reverse projection, not completion of the full mapping matrix: remaining
+provider/metadata fidelity, aggregation
 acceptance, further resource tests and CLI publication still need acceptance.
+
+When one AEF case has multiple distinct root paths, each case/path receives a
+deterministic `aef-root-<sha256>` EvalPort test-case identifier. A suffix resolves
+collisions with existing case IDs. Original case/path identity remains in each
+result's `metadata.aef.caseId` and `path`. This prevents duplicate observations
+without relabeling separate roots as repeated attempts or combining their verdicts.
+The mapping is stable within the selected run and is reported in conversion notes.
 
 Still pending: remaining ResultSet adapter coverage and roundtrip acceptance.
 A directly parsed extension alone has not had its seal

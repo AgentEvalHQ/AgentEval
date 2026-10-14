@@ -14,7 +14,7 @@ public sealed class EvalPortExporterTests : IDisposable
         {"version":"1.0.0-rc.5","suite_id":"suite","suite_version":"v1","run_id":"run",
         "runner":{"name":"source-runner","version":"3"},"provider":{"model":"model-name"},
         "started_at":"2026-10-01T00:00:00Z","completed_at":"2026-10-01T00:01:00Z",
-        "isolation":"custom","group":{"group_id":"sweep","sequence":9007199254740993},
+        "isolation":"custom","group":{"group_id":"sweep","parent_group_id":"campaign","role":"custom-role","label":"display only","sequence":9007199254740993},
         "results":[{"test_case_id":"case","passed":false,"actual_output":"answer",
         "error":{"type":"provider_error","message":"error-detail","code":"E1","retryable":true},
         "grader_results":[{"grader_id":"judge","type":"llm","score":0.25,"passed":false,"reason":"reason"}]}]}
