@@ -23,6 +23,7 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
 
     private WebApplicationFactory<Query> Factory(bool enabled) => new WebApplicationFactory<Query>().WithWebHostBuilder(builder =>
         {
+            LoopbackTestConnection.Configure(builder);
             builder.UseSetting("AgentEval:Queries:Enabled", enabled.ToString());
             builder.UseSetting("AgentEval:Queries:IndexPath", Database);
             builder.UseSetting("AgentEval:Root", _root);

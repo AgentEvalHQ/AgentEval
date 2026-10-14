@@ -22,6 +22,7 @@ public sealed class EvidenceNotificationTests : IDisposable
     private WebApplicationFactory<Query> Factory(bool enabled = true, int lifetime = 30) =>
         new WebApplicationFactory<Query>().WithWebHostBuilder(builder =>
         {
+            LoopbackTestConnection.Configure(builder);
             builder.UseSetting("AgentEval:Root", _root);
             builder.UseSetting("AgentEval:Queries:Enabled", "true");
             builder.UseSetting("AgentEval:Queries:IndexPath", Database);

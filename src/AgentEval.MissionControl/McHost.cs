@@ -85,6 +85,7 @@ public static class McHost
         builder.Services.AddScoped<ComplianceMatrixService>();
 
         AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceReadAccess.Configure(builder);
         AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Configure(builder);
 
         // GraphQL (Hot Chocolate 16, ChilliCream — primary read surface).
@@ -104,11 +105,11 @@ public static class McHost
             //
             // Phase-8 Task 8.8 — Introspection-in-production decision:
             // The default Hot Chocolate configuration leaves GraphQL introspection
-            // enabled. In a Phase-1 local-only deployment (loopback bind, no auth)
-            // that's intentional: introspection enables the embedded Nitro UI,
+            // enabled. Enabled evidence queries apply EvidenceReadAccess to the entire
+            // GraphQL route, including introspection. Introspection enables the embedded Nitro UI,
             // schema-tooling for SPA development, and `__type` queries that the
-            // Phase-5 5.2 regression tests rely on. There is no risk surface
-            // because the entire endpoint is loopback-only.
+            // Phase-5 5.2 regression tests rely on. Query-disabled legacy deployments
+            // retain their existing deployment access assumptions.
             // Phase 2 of Mission Control (multi-user / auth gates) should:
             //   1. Gate introspection behind an environment flag
             //      (e.g. AGENTEVAL_MC_DISABLE_INTROSPECTION=1).
@@ -153,7 +154,7 @@ public static class McHost
     /// </summary>
     public static void ConfigurePipeline(WebApplication app)
     {
-        // Defense-in-depth response headers. Phase 1 has no auth and the bench
+        // Defense-in-depth response headers. The bench
         // pipeline lets users write arbitrary text into report.html / report.xml,
         // so cap script execution and MIME-sniffing at the response level.
         // The frame-ancestors directive prevents click-jacking against operators
@@ -215,6 +216,8 @@ public static class McHost
                     "frame-ancestors 'none'";
             await next();
         });
+
+        AgentEval.MissionControl.Hosting.EvidenceReadAccess.Use(app);
 
         // GraphQL endpoint at /graphql. A browser GET to /graphql/ gets Hot Chocolate's
         // Nitro GraphQL IDE (ChilliCream.Nitro.App, successor to BananaCakePop).

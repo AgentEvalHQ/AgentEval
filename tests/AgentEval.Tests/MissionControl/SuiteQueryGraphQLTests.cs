@@ -27,6 +27,7 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         string? catalogue = null, string? policy = null, int maxSources = 8) =>
         new WebApplicationFactory<Query>().WithWebHostBuilder(builder =>
         {
+            LoopbackTestConnection.Configure(builder);
             builder.UseSetting("AgentEval:Queries:Enabled", enabled.ToString());
             builder.UseSetting("AgentEval:Queries:IndexPath", Database);
             builder.UseSetting("AgentEval:Root", _root);
