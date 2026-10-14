@@ -13,6 +13,13 @@ public sealed class EvalPortNativeExportTests : IDisposable
     public void Dispose() => AefTestRuns.Delete(_root);
     private void Write(params AefResult[] results)
     {
+        var writer = Writer();
+        foreach (var result in results) writer.AddResult(result);
+        writer.Close(AefRunStatus.Completed, Start.AddSeconds(1)); AefSealer.Seal(_root);
+    }
+
+    private AefRunWriter Writer()
+    {
         var writer = AefRunWriter.Create(_root, new()
         {
             RunId = "native", Producer = new() { Name = "native", Version = "1" },
@@ -20,9 +27,11 @@ public sealed class EvalPortNativeExportTests : IDisposable
             Suite = new() { Ref = "suite:native", Version = "1" }, StartedAt = Start,
             ContentCapture = AefContentCapture.Off, Execution = new() { TargetMode = AefTargetMode.Mocked },
         });
-        writer.SetMetrics([new() { Id = "score", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Unbounded }]);
-        foreach (var result in results) writer.AddResult(result);
-        writer.Close(AefRunStatus.Completed, Start.AddSeconds(1)); AefSealer.Seal(_root);
+        writer.SetMetrics([
+            new() { Id = "score", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Unbounded },
+            new() { Id = "second", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Unbounded },
+        ]);
+        return writer;
     }
     private static AefResult Result(string path, AefState state, double? value = null) => new()
     {
@@ -86,6 +95,55 @@ public sealed class EvalPortNativeExportTests : IDisposable
             if (reference is not null) Assert.Equal("intact", (string?)reference["outcome"]);
         }
         finally { AefTestRuns.Delete(imported); }
+    }
+
+    [Fact]
+    public void Export_NestedOwnTree_KeepsSourceRootDecisionAndLeafObservations()
+    {
+        var writer = Writer();
+        var root = writer.AddResult(Result("root", AefState.Passed) with
+        { Aggregation = new() { Strategy = AefAggregationStrategy.Own, RulePath = AefRulePath.Threshold, Measured = 2, Total = 2 } });
+        var branch = writer.AddResult(Result("root/branch", AefState.Passed) with
+        { Component = new(0, false), Aggregation = new() { Strategy = AefAggregationStrategy.Own, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 } }, root);
+        writer.AddResult(Result("root/branch/leaf", AefState.Failed, 0.2) with { Component = new(0, false) }, branch);
+        writer.AddResult(Result("root/direct", AefState.Passed, 0.9) with { Component = new(0, false) }, root);
+        writer.Close(AefRunStatus.Completed, Start.AddSeconds(1)); AefSealer.Seal(_root);
+        var export = new AefEvalPortExporter().Export(_root); var rows = export.ResultSet.ToJson()["results"]!.AsArray();
+        var row = Assert.Single(rows)!; Assert.True((bool)row["passed"]!);
+        var grades = row["grader_results"]!.AsArray(); Assert.Equal(2, grades.Count);
+        Assert.Equal("root/branch/leaf", (string?)grades[0]!["grader_id"]);
+        Assert.False((bool)grades[0]!["passed"]!); Assert.True((bool)grades[1]!["passed"]!);
+        Assert.Contains(export.Notes, n => n.Contains("flattened", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Export_MultipleScores_ProjectsFirstAndRetainsAllSourceScores()
+    {
+        Write(Result("metrics", AefState.Passed, 0.2) with
+        { Scores = [new() { Metric = "score", Value = 0.2, Label = "first" }, new() { Metric = "second", Value = 0.8, Label = "second" }] });
+        var export = new AefEvalPortExporter().Export(_root); var grade = export.ResultSet.ToJson()["results"]![0]!["grader_results"]![0]!;
+        Assert.Equal(0.2, (double)grade["score"]!);
+        Assert.Equal(2, grade["metadata"]!["aef"]!["scores"]!.AsArray().Count);
+        Assert.Equal("second", (string?)grade["metadata"]!["aef"]!["scores"]![1]!["label"]);
+        Assert.Contains(export.Notes, n => n.Contains("first score", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Export_NativeSummary_ExcludesUnscoredObservationsFromPassRate()
+    {
+        Write(Result("pass", AefState.Passed), Result("missing", AefState.NotMeasured));
+        var summary = new AefEvalPortExporter().Export(_root).ResultSet.ToJson()["summary"]!;
+        Assert.Equal(2, (int)summary["total"]!); Assert.Equal(1, (int)summary["passed"]!);
+        Assert.Equal(0, (int)summary["failed"]!); Assert.Equal(1, (int)summary["skipped"]!);
+        Assert.Equal(1d, (double)summary["pass_rate"]!);
+    }
+
+    [Fact]
+    public void Export_UnscoredSummary_DoesNotInventPassRate()
+    {
+        Write(Result("missing", AefState.NotMeasured));
+        var summary = new AefEvalPortExporter().Export(_root).ResultSet.ToJson()["summary"]!;
+        Assert.Equal(1, (int)summary["skipped"]!); Assert.Null(summary["pass_rate"]);
     }
 
     [Fact]

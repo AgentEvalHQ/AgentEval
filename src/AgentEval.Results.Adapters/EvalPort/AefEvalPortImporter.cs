@@ -148,6 +148,7 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
                 Aggregation = children.Count > 0 ? Own(children.Select(c => c.Result).ToArray()) : null,
                 EndedAt = result["completed_at"] is { } time ? EvalPortTimestamp.Parse(time.GetValue<string>()) : null,
                 DurationMs = result["duration_ms"] is { } duration ? ExactDuration(duration) : null,
+                TraceLink = SourceTrace(result),
                 Ext = new() { ["evalport"] = new JsonObject { ["passed"] = result["passed"]!.DeepClone(),
                     ["attemptDeclared"] = result.ContainsKey("attempt"), ["error"] = errorContext,
                     ["aggregationCheck"] = EvalPortAggregation.Assess(result, options.AggregationContext),
@@ -163,6 +164,16 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
         var value = EvalPortResultSet.Integer(duration, 0);
         if (value > 9_007_199_254_740_991L) throw Refuse("duration cannot be represented exactly by the AEF writer");
         return value;
+    }
+
+    private static AefTraceLink? SourceTrace(JsonObject result)
+    {
+        var metadata = result["metadata"] as JsonObject;
+        if (metadata?.ContainsKey("openeval.trace_id") != true) return null;
+        if (metadata["openeval.trace_id"] is not JsonValue value || !value.TryGetValue<string>(out var trace) ||
+            trace.Length != 32 || trace.AsSpan().ContainsAnyExcept("0123456789abcdef"))
+            throw Refuse("openeval.trace_id must be 32 lowercase hexadecimal characters");
+        return new(trace);
     }
 
     private static void WriteRollups(AefRunWriter writer, List<Observation> observations, CancellationToken ct)

@@ -74,6 +74,11 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
         { ["name"] = run["producer"]!["name"]!.DeepClone(), ["version"] = run["producer"]!["version"]!.DeepClone() };
         if (run["subject"]?["kind"]?.GetValue<string>() == "model")
             document["provider"] = new JsonObject { ["model"] = origin?["providerModel"]?.DeepClone() ?? run["subject"]!["ref"]!.DeepClone() };
+        if (run["deployment"]?["endpoint"] is { } endpoint)
+        {
+            document["provider"] ??= new JsonObject();
+            document["provider"]!["api_base"] = endpoint.DeepClone();
+        }
         var contextPath = "ext/" + EvalPortRunContext.ExtensionFile;
         if (folder.Has(contextPath)) document = EvalPortRunContext.Parse(folder.Read(contextPath, EvalPortRunContext.MaxBytes)).ApplyTo(document);
         results = document["results"]!.AsArray();
@@ -118,6 +123,11 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
                 row["attempt"] = value + 1;
             }
             if (root["endedAt"] is { } completed) row["completed_at"] = completed.DeepClone();
+            if (root["traceLink"] is JsonObject rootTrace)
+            {
+                row["metadata"]!["openeval.trace_id"] = rootTrace["traceId"]!.DeepClone();
+                row["metadata"]!["aef"]!["traceLink"] = rootTrace.DeepClone();
+            }
             if (root["durationMs"] is { } duration)
             {
                 try { row["duration_ms"] = EvalPortResultSet.Integer(duration, 0); }
@@ -157,6 +167,9 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
                     grader["metadata"]!["openeval.raw_score"] = raw.DeepClone();
                 if (capture && line["reasoning"]?["blob"] is { } reasonDigest && BlobText(reasonDigest.GetValue<string>()) is { } reason)
                     grader["reason"] = reason;
+                else if (capture && line["reasoning"] is null && line["reason"] is { } nativeReason)
+                    grader["reason"] = nativeReason.DeepClone();
+                if (line["traceLink"] is { } leafTrace) grader["metadata"]!["aef"]!["traceLink"] = leafTrace.DeepClone();
                 if (state is not ("passed" or "failed")) notes.Add("AEF states without EvalPort equivalents survive only in metadata.aef.state.");
                 if ((line["scores"] as JsonArray)?.Count > 1) notes.Add("Only the first score per leaf is projected.");
                 graders.Add(grader);
@@ -183,13 +196,22 @@ public sealed class AefEvalPortExporter : IAefEvalPortExporter
             {
                 row["error"] = new JsonObject { ["type"] = ext?["error"]?["type"]?.DeepClone() ?? JsonValue.Create("runner_error") };
                 if (ext?["error"]?["retryable"] is { } retry) row["error"]!["retryable"] = retry.DeepClone();
-                notes.Add("Error message/code content was unavailable; only classification is exported.");
+                if (capture && ext is null && root["reason"] is { } nativeReason) row["error"]!["message"] = nativeReason.DeepClone();
+                else notes.Add("Error message/code content was unavailable; only classification is exported.");
             }
             rowBytes += Encoding.UTF8.GetByteCount(row.ToJsonString());
             if (rowBytes > AefLimits.MaxJsonBytes) throw Refuse("export exceeds 4 MiB");
             results.Add(row);
         }
         notes.Add("AEF evidence trees are flattened to root results and leaf graders; gates, effective overlays and signatures are not transferred.");
+        notes.Add("Native execution policy, suite digests, component rules, thresholds, uncertainty and party usage are not converted into EvalPort policy or cost claims.");
+        var passedCount = results.Count(r => r!["passed"]!.GetValue<bool>());
+        var unscoredCount = results.Count(r => r!["grader_results"]!.AsArray().All(g => g!["score"] is null));
+        var measuredCount = results.Count - unscoredCount;
+        document["summary"] = new JsonObject { ["total"] = results.Count, ["passed"] = passedCount,
+            ["failed"] = measuredCount - passedCount, ["skipped"] = unscoredCount };
+        if (measuredCount > 0) document["summary"]!["pass_rate"] = (double)passedCount / measuredCount;
+        notes.Add("Projected summary counts exported observations, excluding all-null results from the pass-rate denominator; skipped denotes unscored observations. Native lanes, intervals and rollups are not summary equivalents.");
         var supplementPath = "ext/" + EvalPortSupplement.FileName;
         if (capture && folder.Has(supplementPath))
         {

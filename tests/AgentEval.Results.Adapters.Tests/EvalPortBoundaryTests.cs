@@ -12,7 +12,8 @@ public sealed class EvalPortBoundaryTests : IDisposable
     private readonly string _root = AefTestRuns.TempPath("evalport-boundary");
     public void Dispose() => AefTestRuns.Delete(_root);
     private void Write(JsonObject? runExt = null, JsonObject? resultExt = null, string? output = null,
-        string? pointer = null, string? supplement = null)
+        string? pointer = null, string? supplement = null, string? endpoint = null, AefTraceLink? trace = null,
+        AefState state = AefState.Passed, string? reason = null)
     {
         var start = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         var writer = AefRunWriter.Create(_root, new()
@@ -21,6 +22,7 @@ public sealed class EvalPortBoundaryTests : IDisposable
             Subject = new() { Ref = "agent:native", Kind = AefSubjectKind.Agent },
             Suite = new() { Ref = "suite:native", Version = "1" }, StartedAt = start,
             ContentCapture = AefContentCapture.On, Execution = new() { TargetMode = AefTargetMode.Mocked }, Ext = runExt,
+            Deployment = endpoint is null ? null : new() { Ref = "deployment:test", Endpoint = endpoint },
         });
         if (output is not null) writer.AddEvidence(new() { EvidenceId = "E-output", Kind = AefEvidenceKind.Output,
             Link = AefEvidenceLink.ToBlob(writer.PutBlob(Encoding.UTF8.GetBytes(output))) });
@@ -31,9 +33,25 @@ public sealed class EvalPortBoundaryTests : IDisposable
             pointer = new JsonObject { ["schemaVersion"] = "1.0", ["blob"] = blob.Digest }.ToJsonString();
         }
         if (pointer is not null) writer.PutExtFile("evalport-supplement.json", Encoding.UTF8.GetBytes(pointer));
-        writer.AddResult(new() { CaseId = "case", Path = "check", Evaluator = new("code:check"), State = AefState.Passed,
+        writer.AddResult(new() { CaseId = "case", Path = "check", Evaluator = new("code:check"), State = state, Reason = reason, TraceLink = trace,
             Ext = resultExt, Evidence = output is null ? null : ["E-output"] });
         writer.Close(AefRunStatus.Completed, start.AddSeconds(1)); AefSealer.Seal(_root);
+    }
+
+    [Theory]
+    [InlineData(AefState.NotMeasured)]
+    [InlineData(AefState.Error)]
+    public void Export_NativeEndpointTraceAndReason_PreservesAvailableFields(AefState state)
+    {
+        var trace = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7");
+        Write(endpoint: "https://example.test/api", trace: trace, state: state, reason: "Native explanation");
+        var result = new AefEvalPortExporter().Export(_root).ResultSet.ToJson();
+        Assert.Equal("https://example.test/api", (string?)result["provider"]!["api_base"]);
+        var row = result["results"]![0]!;
+        Assert.Equal(trace.TraceId, (string?)row["metadata"]!["openeval.trace_id"]);
+        Assert.Equal(trace.SpanId, (string?)row["metadata"]!["aef"]!["traceLink"]!["spanId"]);
+        Assert.Equal("Native explanation", (string?)row["grader_results"]![0]!["reason"]);
+        if (state == AefState.Error) Assert.Equal("Native explanation", (string?)row["error"]!["message"]);
     }
 
     [Theory]

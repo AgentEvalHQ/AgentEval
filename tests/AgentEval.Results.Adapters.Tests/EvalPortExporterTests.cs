@@ -134,6 +134,28 @@ public sealed class EvalPortExporterTests : IDisposable
     }
 
     [Fact]
+    public void Export_TraceIdentity_RoundtripsThroughNativeFieldWithCaptureOff()
+    {
+        const string trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        var source = Source(); source["results"]![0]!["metadata"] = new JsonObject { ["openeval.trace_id"] = trace };
+        Import(source, AefContentCapture.Off);
+        Assert.Equal(trace, (string?)AefTestRuns.Results(_root)[0]["traceLink"]!["traceId"]);
+        Assert.Equal(trace, (string?)new AefEvalPortExporter().Export(_root).ResultSet.ToJson()["results"]![0]!["metadata"]!["openeval.trace_id"]);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("\"short\"")]
+    [InlineData("\"4BF92F3577B34DA6A3CE929D0E0E4736\"")]
+    public void Import_InvalidDeclaredTrace_RefusesBeforeWriting(string value)
+    {
+        var source = Source(); source["results"]![0]!["metadata"] = new JsonObject { ["openeval.trace_id"] = JsonNode.Parse(value) };
+        Assert.Throws<AefInputException>(() => Import(source));
+        Assert.False(Directory.Exists(_root));
+    }
+
+    [Fact]
     public void Export_ChangedEvidenceOrWrongPin_Refuses()
     {
         Import(Source()); var exporter = new AefEvalPortExporter();

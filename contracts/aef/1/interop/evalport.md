@@ -41,161 +41,72 @@ declaration on partly scored results. Both are drafts. The adapter can emit `ver
 
 ## AEF → EvalPort
 
-One run gives one ResultSet. Each root line (no `parentResultId`) gives one Result. Each leaf under it gives one
-GraderResult.
+The exporter accepts an intact sealed AEF run and projects each non-rollup root
+into a Result and each descendant leaf into a GraderResult. This table describes
+the implemented ResultSet adapter. It does not describe an EvalSuite exporter.
 
-| AEF | EvalPort | Fidelity |
+| AEF input | EvalPort output | Fidelity / boundary |
 |---|---|---|
-| `runId` | `run_id` | exact |
-| `suite.ref`, `suite.version` | `suite_id`, `suite_version` | exact |
-| `suite.digest` | `metadata` | none |
-| `startedAt`, `endedAt` | `started_at`, `completed_at` | exact |
-| `producer.name`, `producer.version`; for an imported run, `imported.from` ([RUN-15](../spec/03-run.md#32-runjson)) | `runner.name`, `runner.version`: the tool that ran the evaluation | exact |
-| `subject` | `provider.model` when `subject.kind` is `model`; otherwise `metadata` | lossy |
-| `deployment.endpoint` | `provider.api_base` | exact |
-| `status: aborted`, `abortReason` | `metadata.openeval.partial: true`, reason in `metadata` | lossy |
-| `execution`, `contentCapture`, `judges`, `imported.asserted` | `metadata` | none |
-| a root line's `caseId` | `test_case_id` | exact |
-| `trial` | `attempt` = `trial` + 1 | exact |
-| a `trials` rollup line | none: EvalPort has attempts and no rollup | none |
-| root `state: passed` | `passed: true` | exact |
-| root `state` `failed`, `warn` | `passed: false`, with at least one scored grader | lossy: `warn` and `failed` look the same |
-| root `state: inconclusive` | `passed: false` | lossy |
-| root `state: scored` | `passed: false` | lossy: EvalPort has no outcome for "no rule applied", and `passed: false` beside a score reads as a verified failure (Rule 6) |
-| root `state: error` | `error` (`type: runner_error`, `message` = `reason`) | lossy: AEF records no error class |
-| a leaf's `path` | `grader_id` | exact |
-| a leaf's `annotator.kind` or `evaluator.id` | `type` (e.g. `aef_llm`) | lossy |
-| a measured leaf's `scores[0]` | `score` = `normalized`, or `value` when it is already in [0, 1] | exact; a value outside [0, 1] goes to `metadata.openeval.raw_score` |
-| a measured leaf's `state` | `passed` = (`state` is `passed`) | lossy for `warn`, `inconclusive` and `scored` |
-| `scores[].label` | `metadata` | none |
-| a leaf in a typed absence | `score: null`, `passed: false`, `reason` | lossy: `not_measured`, `not_applicable`, `skipped`, `error` and `pending` all become one null |
-| `reason` | `reason` | exact |
-| `component.weight` | the grader's `weight` in the suite | exact |
-| `component.required` | none | none |
-| root `aggregation.strategy` | `metadata.openeval.aggregation`: `WeightedSum` → `weighted` with the same `threshold`; `MajorityVote` → `majority`; `Min` → `all` when the pass flags follow the scores | lossy: `WeightedMedian` and `CapByWorst` have no counterpart |
-| `aggregation.measured`, `total`, `unmeasured`, `rulePath`, `decisive` | `metadata` | none |
-| `severity`, `verdictRule`, `uncertainty`, `annotator` | `metadata` | none |
-| `durationMs` | `duration_ms` (an integer) | exact to the millisecond |
-| a root line's `endedAt` | `completed_at` of the Result | exact; `startedAt` has no field |
-| `traceLink.traceId` | `metadata.openeval.trace_id` | lossy: the span id is lost |
-| `usage` entries | `metadata.openeval.cost` | lossy: EvalPort does not fix that key's shape |
-| evidence of kind `output` (capture `on`) | `actual_output` | exact when captured |
-| evidence of kind `input`, `expected` (capture `on`) | the test case's `input`, `expected_output` in an exported Suite | exact when captured |
-| other evidence, blobs | `metadata` | none |
-| `summary.json` | `summary` (`total`, `passed`, `failed`, `skipped`, `pass_rate`, `avg_score`, `by_grader`) | lossy: `N` against `n`, verdicts, intervals and lanes are lost |
-| `gates.ndjson`, overlays | none | none |
-| `seal.json`, `attestation.dsse.json` | a Sigstore bundle over the exported file is EvalPort's equivalent; it signs other bytes | none: the run hash can be kept in `metadata` |
+| `runId`, `suite.ref`, `suite.version` | `run_id`, `suite_id`, `suite_version` | Original EvalPort IDs are restored for imported runs; a caller can supply a missing suite ID. |
+| `startedAt`, `endedAt` | `started_at`, `completed_at` | Exact represented instants. |
+| Producer, preserved source runner | `runner` | Preserved source declaration takes precedence over converter identity. |
+| Model subject | `provider.model` | Original provider model restored when retained; native model reference otherwise. Full subject remains in run `metadata.aef`. |
+| `deployment.endpoint` | `provider.api_base` | Exact native endpoint. Preserved source provider configuration takes precedence when present. |
+| Aborted status | `metadata.openeval.partial` | Boolean projection; abort reason is not an EvalPort status field. |
+| Isolation/group extension | `isolation`, `group` | Exact verified extension, including original sequence number token. |
+| Root `caseId`, `path`, `trial` | `test_case_id`, `attempt` | Multiple root paths get distinct deterministic IDs. Original case/path remain in metadata. Imported implicit attempt presence is preserved. |
+| Root state | `passed` | True only for passed, measured observations; original state remains in metadata. |
+| Leaf identity | `grader_id`, `type` | Restores preserved source grader ID/type; native path and generic type `aef` otherwise. |
+| First score | `score`, `metadata.openeval.raw_score` | Uses normalized score or an in-range value. Unnormalized values outside [0,1] are refused. All source scores remain in grader metadata. |
+| Scoreless pass/fail | Score 1/0 | Explicit `metadata.aef.scoreProjection: verdict`; not an observed numeric score. |
+| Typed absence | Null score, false pass flag | Original typed state survives in metadata; EvalPort has no equivalent native state. |
+| Captured reasoning, native reason | `reason` | Verified reasoning blob takes precedence; native reason is used only when no reasoning is declared, with capture on. Withheld reasoning is not replaced. |
+| Root trace link | `metadata.openeval.trace_id` | Trace ID maps natively; full trace/span link remains in `metadata.aef.traceLink`. Leaf links remain in grader metadata. |
+| Captured output evidence | `actual_output` | Exact UTF-8 text within the budget; multiple outputs for one result are refused. |
+| Source error evidence, native error reason | `error` | Restores captured source error; native errors use runner_error plus captured reason. Missing content stays absent. |
+| Exported observations | `summary` | Recomputed projection: total, passed, failed, skipped/unscored, measured-only pass rate. No pass rate when all observations are unscored. |
+| Captured source supplement | Provider, summary, metadata | Restored as source declarations. A source summary is not an independently verified conclusion. |
+| Run hash | `metadata.aef.runHash` | Provenance only; no signature over exported bytes. Source metadata collisions are explicitly reported. |
+| Rollups, internal tree nodes, gates, effective overlays, signatures | No native counterpart in this projection | Omitted with conversion notes. Overlays require explicit base-evidence selection. |
+| AEF execution policy, suite digest, thresholds, component rules, uncertainty, usage, summary lanes/intervals | Not converted into EvalPort policies or cost claims | These have no universally equivalent ResultSet interpretation. Current projection does not reconstruct them from arbitrary metadata. |
 
 ## EvalPort → AEF
 
-| EvalPort | AEF | Fidelity |
+The importer accepts a standalone ResultSet. It does not accept Suite/TestCase
+content as though that content were present in the ResultSet.
+
+| EvalPort input | AEF output | Fidelity / boundary |
 |---|---|---|
-| `run_id` | `runId` when it matches the id pattern (letters, digits, `.`, `_`, `:`, `-`; at most 128); otherwise a hash, with the original in `ext` | exact or lossy |
-| `version` | `ext` | none |
-| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; a ResultSet without `suite_version` requires a caller-supplied exact version, listed in `imported.asserted`. A ResultSet digest is not a suite identity. |
-| `started_at`, `completed_at` | `startedAt`, `endedAt` in UTC | exact instant |
-| `runner` | `imported.from`; `producer` is the converter (RUN-15) | exact |
-| `provider.model`, `api_base`, `temperature`, `max_tokens`, `extra` | model identity supplies `subject` unless explicitly overridden; complete provider declaration is captured as supplemental document evidence | source declaration roundtrips with capture on; provider configuration is not asserted as native deployment configuration |
-| (EvalPort does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
-| `isolation`, `group` | `ext/evalport-context.json` | exact through verified import/export, including custom strings and exact sequence integers |
-| `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
-| `test_case_id` | `caseId` | exact |
-| `attempt` | `trial` = `attempt` − 1, on the Result's root line and on each of its grader lines ([RES-8](../spec/03-run.md#344-repeated-trials)) | exact |
-| (several attempts of a case; EvalPort has no rollup) | one rollup line per case and path, with `trials`: `n` the attempts, `passed` those whose line is `passed` ([RES-8](../spec/03-run.md#344-repeated-trials)) | lossy: the rollup's `trials.aggregation` and state are the converter's reading |
-| a Result | a root line | exact |
-| `Result.passed`, with the graders | root `state`: `passed`; else `failed` when a scored grader failed; else `not_measured` when every grader is null | lossy: which aggregation produced `passed` is often undeclared |
-| `Result.error` | `state: error`, `reason` = `type: message` | exact |
-| a GraderResult | a child line, `path` = `<root path>/<grader_id>` | exact |
-| `score` (a number) | `scores[].value`, `normalized` = `score` | exact |
-| `metadata.openeval.raw_score` | `scores[].value` = raw, `normalized` = `score` | exact |
-| `passed` with a number | `state` `passed` or `failed` | exact |
-| `score: null` | `state: not_measured` with a `reason` | lossy: null does not say whether the grader was skipped, pending or failed |
-| `reason` | `reason` | exact |
-| the grader's `weight` | `component.weight`; `required` is `true` for `all` | lossy |
-| `openeval.aggregation` | native `Own` aggregation retains the source decision; `ext.evalport.aggregationCheck` records agreement with available policy inputs | declared policies are checked; absent suite facts are explicitly unverifiable, not assumed equal-weight or default-all |
-| `actual_output`; a test case's `input`, `expected_output` | blobs cited by evidence of kind `output`, `input`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
-| a test case's `context`, `retrieval_context` | blobs cited by evidence of kind `document` (capture `on`) | exact when captured |
-| `duration_ms` | `durationMs` | exact |
-| `Result.completed_at` | `endedAt` on the root line | exact |
-| `metadata.openeval.trace_id` | `traceLink.traceId` | exact |
-| `metadata.openeval.cost` | `usage` entries | lossy: EvalPort does not fix the key's shape |
-| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); each entry's `verdict` is `scored`, with no `rule`, since a ResultSet's pass rate has no run-level rule ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact for the counts and rates, which the verifier recomputes |
-| proposed `verdict` (`passed`, `failed`, `unverified`) | root `state` `passed`, `failed`, `not_measured` (or `inconclusive` when graders scored) | exact |
-| a `.sigstore.json` bundle | retained outside the run; AEF 1.0 public-key trust policy does not accept a keyless Sigstore bundle ([SIG-4](../spec/04-integrity.md#44-signatures)) | no automatic trust transfer |
+| `run_id` | `runId` and origin extension | Exact valid AEF ID, otherwise deterministic hash ID with original retained. |
+| `version`, `runner` | Origin extension, `imported.from` | Producer is the converter; source runner remains a declaration. |
+| Suite ID/version | Typed suite reference and exact version | Missing version requires a caller assertion. ResultSet bytes never define suite identity. |
+| Provider model | Model subject unless overridden | Other provider configuration is captured as source document evidence, not invented deployment identity. |
+| No target execution mode | Caller-supplied `execution.targetMode` | Recorded in `imported.asserted`. |
+| Start/end/result completion | Native UTC timestamps | Exact to nine fractional digits; inconsistent intervals and unsupported timestamps refused. |
+| `openeval.partial` | Aborted status on completed source | No completion means running/unsealed. |
+| Isolation/group | Sealed context extension | Exact declarations; does not prove actual execution isolation. |
+| Case ID, attempt | Case ID, zero-based trial | Repeated cases get explicit trials; converter AllPass rollups are labeled converter-computed. |
+| Result and graders | Root plus grader children | `Own` retains source decision; grader IDs map to deterministic paths and original IDs are retained. |
+| Score/pass flag | Native score and passed/failed state | Null becomes not_measured. Raw score is retained alongside normalization. |
+| Aggregation declaration | `ext.evalport.aggregationCheck` | Checks available result/suite inputs; contradictions refused and missing facts explicitly unverifiable. See suite-context section. |
+| `openeval.trace_id` | Root `traceLink.traceId` | Exact 32 lowercase hex characters required, including with capture off. No span ID is invented. |
+| Reason, actual output | Reasoning/output blobs | Capture on only. Capture off retains neither these contents nor their hashes. |
+| Error | Error state, classification, optional document evidence | Message/code captured only with capture on; type/retryability remain available without content. |
+| Integer duration | `durationMs` | Exact supported writer range; no silent rounding. |
+| Provider configuration, metadata, source summary | Supplemental document evidence | Captured and keyed by observation/grader identity; restored as source claims. `openeval.cost` has no fixed shape and is not invented as native party usage. |
+| Result observations | Recomputed AEF summary | Pass observations/rollups, with no invented run-level approval rule. Source summary is kept separately. |
+| External signature | No inherited AEF trust | Source signatures do not sign the imported AEF bytes. |
+| Proposed `verdict`, unsupported source fields | Refusal by pinned schema | Draft fields are not silently accepted. |
 
-## What does not carry over
+## Roundtrip acceptance
 
-**AEF → EvalPort.** Which typed absence a leaf was, and `warn`, `inconclusive` or `scored` at the root, except in
-metadata. A score's `label`. `component.required` and the aggregation's `rulePath`, `decisive` and measured share.
-Trial rollups and their agreement. Severity, verdict rules, thresholds and uncertainty. `N` against `n` in the summary.
-A result's start time, and the usage of each party. Evidence other than the case content, evidence digests, gate
-decisions, the run's seal, overlays and signatures. `execution.targetMode`, judge calibration and `imported`.
-
-**EvalPort → AEF.** `isolation` and `group` use a verified extension rather than native fields. The kind of non-measurement behind a null
-score: skipped, pending or failed. The aggregation behind `passed`, when the producer did not declare it. The case
-content, when the converter writes `contentCapture: off`.
-
-## Worked example
-
-The corpus line for `triage/helpfulness` of `case-17` is one of four lines of that case. All four go into one
-EvalPort Result. Here is the root line; its `resultId` recomputes with [RES-4](../spec/03-run.md#342-result-ids):
-
-```json
-{"schemaVersion":"1.0","resultId":"r_479d157f3423e95d566bcbfc0c6d2461","parentResultId":null,"caseId":"case-17","path":"triage","evaluator":{"id":"composite:triage","version":"2"},"state":"failed","severity":"medium","scores":[{"metric":"triage","value":0.55,"normalized":0.55}],"verdictRule":{"expr":"triage >= threshold","threshold":0.8,"source":"run.config.thresholds.triage"},"aggregation":{"strategy":"WeightedSum","threshold":0.8,"score":0.55,"rulePath":"threshold","measured":2,"total":3,"minimumMeasuredShare":0.5,"unmeasured":{"not_measured":0,"not_applicable":1,"skipped":0,"error":0},"decisive":["r_1264eeb36620c9cbe97b71ffdbcfd331"]},"durationMs":4210,"turns":3,"evidence":["E-1"]}
-```
-
-The ResultSet below is valid against EvalPort's `schema/resultset.json`. The children `triage/policy`,
-`triage/helpfulness` and `triage/groundedness` become grader results. The `not_applicable` leaf becomes
-`score: null`. `WeightedSum` with threshold 0.8 becomes `weighted` with threshold 0.8. EvalPort's weighted mean of the
-scored graders is (0.5 × 1.0 + 0.5 × 0.1) / 1.0 = 0.55, so `passed` is `false`, as in AEF. The facts EvalPort has no
-field for go under `metadata.aef`:
-
-```json
-{
-  "$schema": "https://evalport.org/schema/resultset.json",
-  "version": "1.0.0",
-  "suite_id": "suite:support/triage-scenarios",
-  "suite_version": "4",
-  "run_id": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
-  "started_at": "2026-10-02T14:02:11.120Z",
-  "completed_at": "2026-10-02T14:06:23.004Z",
-  "runner": {"name": "agenteval-cli", "version": "1.0.0"},
-  "provider": {"api_base": "http://localhost:5080"},
-  "results": [
-    {
-      "test_case_id": "case-17",
-      "grader_results": [
-        {"grader_id": "triage/policy", "type": "aef_code", "score": 1.0, "passed": true,
-         "metadata": {"aef": {"resultId": "r_bb4438fbedb43552a9fe55695931d5e4", "state": "passed", "evaluator": {"id": "code:refund-escalation", "version": "1"}, "component": {"weight": 0.5, "required": true}}}},
-        {"grader_id": "triage/helpfulness", "type": "aef_llm", "score": 0.1, "passed": false,
-         "metadata": {"aef": {"resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331", "state": "failed", "evaluator": {"id": "llm:helpfulness", "version": "3"}, "component": {"weight": 0.5, "required": false}}}},
-        {"grader_id": "triage/groundedness", "type": "aef_llm", "score": null, "passed": false,
-         "reason": "No retrieved context was recorded for this case: nothing to ground against.",
-         "metadata": {"aef": {"resultId": "r_306364ba4d940f649ea348dadfbe17de", "state": "not_applicable", "evaluator": {"id": "llm:groundedness", "version": "1"}, "component": {"weight": 0.0, "required": false}}}}
-      ],
-      "passed": false,
-      "duration_ms": 4210,
-      "metadata": {
-        "openeval.aggregation": {"strategy": "weighted", "threshold": 0.8},
-        "openeval.trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-        "aef": {"resultId": "r_479d157f3423e95d566bcbfc0c6d2461", "path": "triage", "state": "failed", "severity": "medium",
-                "aggregation": {"strategy": "WeightedSum", "rulePath": "threshold", "measured": 2, "total": 3}}
-      }
-    }
-  ]
-}
-```
-
-Read back:
-
-- `test_case_id` gives `caseId` `case-17`;
-- each `grader_id` gives a child `path`;
-- `metadata.aef.path` gives the root path.
-
-RES-4 then gives the same four ids as the corpus: `r_479d157f3423e95d566bcbfc0c6d2461`,
-`r_bb4438fbedb43552a9fe55695931d5e4`, `r_1264eeb36620c9cbe97b71ffdbcfd331` and `r_306364ba4d940f649ea348dadfbe17de`.
-An importer that ignores `metadata.aef` reads the null score as `not_measured`, and gets `not_applicable` back only
-from metadata.
+Imported ResultSet roundtrips cover original IDs, exact group context, attempts,
+provider/runner declarations, captured output/reason/error content, metadata and
+source summary. Native AEF roundtrips preserve projected observations and captured
+source metadata; original AEF tree/result identities and typed states are not
+restored from metadata. `EvalPortExporterTests`, `EvalPortNativeExportTests`,
+`EvalPortBoundaryTests` and `EvalPortAggregationTests` exercise these distinctions,
+including independent reference AEF verification.
 
 ## Isolation and group extension
 
@@ -264,7 +175,7 @@ the declared run interval. No completion time means a running, unsealed run.
 A completed ResultSet declaring boolean `metadata.openeval.partial: true` maps to
 an aborted run.
 
-## Implemented importer and remaining work
+## Implemented conversion profile
 
 `IAefEvalPortImporter` / `AefEvalPortImporter.Import` now accepts bounded in-memory
 ResultSet bytes and writes an AEF run with the planned header and context extension.
@@ -306,10 +217,11 @@ evidence record. With capture-off, message and code content are omitted and
 `contentOmitted` records that omission when applicable. Thus error classification
 does not require retaining provider messages that may contain case content.
 
-The current importer does not transfer provider configuration, arbitrary metadata,
-the source summary or external signatures; conversion notes state these losses.
+With capture on, the importer retains provider configuration, arbitrary metadata
+and source summary as supplemental source declarations. External signatures and
+trust do not transfer; conversion notes distinguish these facts.
 The AEF summary is recomputed from root pass observations/rollups without a run-level
-approval rule. Complete interoperability roundtrip acceptance remains unfinished. The full W09 interoperability task is not complete.
+approval rule. This profile is covered by the roundtrip and negative-case acceptance tests.
 
 `IAefEvalPortExporter` / `AefEvalPortExporter` now exports verified base evidence
 from a bounded owned copy. It requires an intact seal, supports an optional exact
@@ -333,9 +245,8 @@ individual results; converter rollups do not become extra EvalPort observations.
 
 Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
 The exported document is checked by the pinned ResultSet validator. This is an
-initial reverse projection, not completion of the full mapping matrix: remaining
-generic reverse structural fidelity and further resource tests
-still need acceptance.
+lossy reverse projection: it preserves exported observations, not the original
+AEF structure. The mapping tables and resource tests define this boundary.
 
 When one AEF case has multiple distinct root paths, each case/path receives a
 deterministic `aef-root-<sha256>` EvalPort test-case identifier. A suffix resolves
@@ -443,7 +354,6 @@ termination can leave a `.ae-evalport-*` staging entry; this is not a published
 run. Publication does not promise crash durability or protection against a
 concurrent adversarial filesystem replacement.
 
-Still pending: remaining ResultSet adapter coverage and roundtrip acceptance.
 A directly parsed extension alone has not had its seal
 checked. Group chains across multiple runs are consumer joins;
 this component does not resolve parents or prove absence of cross-run cycles.
