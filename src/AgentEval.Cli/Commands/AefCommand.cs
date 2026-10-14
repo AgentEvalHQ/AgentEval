@@ -60,6 +60,7 @@ internal static partial class AefCommand
         cmd.Add(CreateExport());
         cmd.Add(CreateImport());
         cmd.Add(CreateExportOtel());
+        cmd.Add(CreateExportEvalPort());
         cmd.Add(CreateExportInspect());
         return cmd;
     }
@@ -598,6 +599,7 @@ internal static partial class AefCommand
         cmd.Add(assertAi);
         cmd.Add(CreateImportOtel());
         cmd.Add(CreateImportInspect());
+        cmd.Add(CreateImportEvalPort());
         return cmd;
     }
 

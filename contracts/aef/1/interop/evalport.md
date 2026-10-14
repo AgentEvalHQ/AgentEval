@@ -309,9 +309,8 @@ does not require retaining provider messages that may contain case content.
 The current importer does not transfer provider configuration, arbitrary metadata,
 the source summary or external signatures; conversion notes state these losses.
 The AEF summary is recomputed from root pass observations/rollups without a run-level
-approval rule. Aggregation semantic acceptance,
-reverse conversion, CLI wiring and complete interoperability roundtrip acceptance
-remain unfinished. The full W09 interoperability task is not complete.
+approval rule. Aggregation semantic acceptance and complete interoperability
+roundtrip acceptance remain unfinished. The full W09 interoperability task is not complete.
 
 `IAefEvalPortExporter` / `AefEvalPortExporter` now exports verified base evidence
 from a bounded owned copy. It requires an intact seal, supports an optional exact
@@ -336,8 +335,8 @@ individual results; converter rollups do not become extra EvalPort observations.
 Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
 The exported document is checked by the pinned ResultSet validator. This is an
 initial reverse projection, not completion of the full mapping matrix: remaining
-provider/metadata fidelity, aggregation
-acceptance, further resource tests and CLI publication still need acceptance.
+provider/metadata fidelity, aggregation acceptance and further resource tests
+still need acceptance.
 
 When one AEF case has multiple distinct root paths, each case/path receives a
 deterministic `aef-root-<sha256>` EvalPort test-case identifier. A suffix resolves
@@ -345,6 +344,33 @@ collisions with existing case IDs. Original case/path identity remains in each
 result's `metadata.aef.caseId` and `path`. This prevents duplicate observations
 without relabeling separate roots as repeated attempts or combining their verdicts.
 The mapping is stable within the selected run and is reported in conversion notes.
+
+### CLI publication
+
+```sh
+agenteval aef import evalport resultset.json new-run --target-mode mocked --content-capture off
+agenteval aef export-evalport new-run resultset-export.json --json
+```
+
+Import requires `--target-mode`. Supply `--subject-ref` and `--subject-kind`
+together when asserting a subject; otherwise the provider model supplies it.
+Use `--suite-version` when the source omits an exact version. The existing
+`--content-capture on|off`, `--no-seal` and `--key` conversion controls apply;
+the example explicitly disables content capture. Signing requires sealing.
+An unfinished source run remains unsealed and cannot be exported by this command.
+
+Export accepts `--run-hash`, `--suite-id`, `--policy` and `--ignore-overlays`.
+Ignoring overlays explicitly selects base evidence. Conversion notes are emitted
+in both text and JSON output; exported bytes do not inherit the source signature.
+
+Both destinations must be absent with an ordinary existing parent directory.
+Export must be outside the selected run. Import reads at most 4 MiB of ordinary
+file input; key and policy reads are bounded at 64 KiB and 1 MiB respectively.
+Completed output is published by a sibling rename without overwriting existing
+paths. Cancellation or handled failure removes owned staging output. A process
+termination can leave a `.ae-evalport-*` staging entry; this is not a published
+run. Publication does not promise crash durability or protection against a
+concurrent adversarial filesystem replacement.
 
 Still pending: remaining ResultSet adapter coverage and roundtrip acceptance.
 A directly parsed extension alone has not had its seal
