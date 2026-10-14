@@ -4,6 +4,7 @@ using AgentEval.Results;
 using AgentEval.Results.Adapters.EvalPort;
 using AgentEval.Results.Integrity;
 using AgentEval.Results.Interop;
+using AgentEval.Results.Runs;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Tests;
@@ -77,6 +78,74 @@ public sealed class EvalPortImporterTests : IDisposable
         var result = new AefEvalPortImporter().Import(Source(completed: false), _root, Options());
         Assert.Equal(AefOutcome.Unsealed, result.Verification.Outcome); Assert.Null(result.Seal);
         Assert.Equal("running", (string?)JsonNode.Parse(File.ReadAllText(Path.Combine(_root, "run.json")))!["status"]);
+    }
+
+    [Fact]
+    public void Import_ExecutionError_RetainsStructuredDetailsAsCitedBlob()
+    {
+        var source = JsonNode.Parse(Source())!;
+        source["results"]![0]!["error"] = new JsonObject
+        { ["type"] = "provider_error", ["message"] = "PRIVATE_ERROR", ["code"] = "PRIVATE_CODE", ["retryable"] = true };
+        var result = new AefEvalPortImporter().Import(Encoding.UTF8.GetBytes(source.ToJsonString()), _root, Options());
+        Assert.Equal(AefOutcome.Intact, result.Verification.Outcome);
+        var root = JsonNode.Parse(File.ReadLines(Path.Combine(_root, "results.ndjson")).First())!;
+        Assert.Equal("error", (string?)root["state"]);
+        Assert.Equal("provider_error", (string?)root["ext"]!["evalport"]!["error"]!["type"]);
+        Assert.Equal(2, root["evidence"]!.AsArray().Count);
+        var evidenceId = (string)root["ext"]!["evalport"]!["errorEvidence"]!;
+        var evidence = File.ReadLines(Path.Combine(_root, "evidence.ndjson")).Select(x => JsonNode.Parse(x)!)
+            .Single(x => (string?)x["evidenceId"] == evidenceId);
+        var digest = ((string)evidence["link"]!["blob"]!)[7..];
+        var blob = Path.Combine(_root, AefRunFolder.BlobPath(digest));
+        var captured = JsonNode.Parse(File.ReadAllText(blob));
+        Assert.True(JsonNode.DeepEquals(source["results"]![0]!["error"], captured));
+    }
+
+    [Fact]
+    public void Import_CaptureOffError_RetainsClassificationWithoutSensitiveDetails()
+    {
+        var source = JsonNode.Parse(Source())!;
+        source["results"]![0]!["error"] = new JsonObject
+        { ["type"] = "timeout", ["message"] = "PRIVATE_ERROR", ["code"] = "PRIVATE_CODE", ["retryable"] = false };
+        new AefEvalPortImporter().Import(Encoding.UTF8.GetBytes(source.ToJsonString()), _root, Options(AefContentCapture.Off));
+        foreach (var path in Directory.GetFiles(_root, "*", SearchOption.AllDirectories))
+            Assert.DoesNotContain("PRIVATE_", File.ReadAllText(path));
+        var root = JsonNode.Parse(File.ReadLines(Path.Combine(_root, "results.ndjson")).First())!;
+        Assert.Equal("timeout", (string?)root["ext"]!["evalport"]!["error"]!["type"]);
+        Assert.True((bool)root["ext"]!["evalport"]!["error"]!["contentOmitted"]!);
+    }
+
+    [Fact]
+    public void Import_MixedImplicitAndExplicitAttempts_PreservesOriginalDeclaration()
+    {
+        var source = JsonNode.Parse(Source(repeats: true))!;
+        source["results"]![0]!.AsObject().Remove("attempt");
+        new AefEvalPortImporter().Import(Encoding.UTF8.GetBytes(source.ToJsonString()), _root, Options());
+        var roots = File.ReadLines(Path.Combine(_root, "results.ndjson")).Select(x => JsonNode.Parse(x)!)
+            .Where(x => x["parentResultId"] is null && x["trial"] is not null).ToArray();
+        Assert.False((bool)roots[0]["ext"]!["evalport"]!["attemptDeclared"]!);
+        Assert.True((bool)roots[1]["ext"]!["evalport"]!["attemptDeclared"]!);
+    }
+
+    [Fact]
+    public void Import_LateWriterRefusal_RestoresExistingEmptyDestination()
+    {
+        Directory.CreateDirectory(_root);
+        var source = JsonNode.Parse(Source())!;
+        source["results"]![0]!["test_case_id"] = new string('x', 257);
+        Assert.Throws<AefInputException>(() => new AefEvalPortImporter().Import(
+            Encoding.UTF8.GetBytes(source.ToJsonString()), _root, Options()));
+        Assert.True(Directory.Exists(_root));
+        Assert.Empty(Directory.GetFileSystemEntries(_root));
+    }
+
+    [Fact]
+    public void Import_PreCanceled_DoesNotCreateDestination()
+    {
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => new AefEvalPortImporter().Import(
+            Source(), _root, Options(), cancellation.Token));
+        Assert.False(Directory.Exists(_root));
     }
 
     [Fact]

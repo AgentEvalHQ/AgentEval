@@ -295,10 +295,21 @@ AEF writer's Int32 representation, and each rollup supports at most 1000 trials.
 Duration integers beyond binary64's exact integer range are refused rather than
 rounded by the writer. These are explicit adapter limits.
 
+Root `ext.evalport.attemptDeclared` records whether the source supplied `attempt`.
+This keeps an omitted attempt distinguishable from an explicit attempt 1, even
+when both become trial 0 in a repeated case's AEF tree.
+
+An execution error keeps its declared type and retryability in root metadata and
+uses AEF state `error`. With capture-on, the complete source error object is stored
+as document evidence cited by the root; `ext.evalport.errorEvidence` identifies the
+evidence record. With capture-off, message and code content are omitted and
+`contentOmitted` records that omission when applicable. Thus error classification
+does not require retaining provider messages that may contain case content.
+
 The current importer does not transfer provider configuration, arbitrary metadata,
 the source summary or external signatures; conversion notes state these losses.
 The AEF summary is recomputed from root pass observations/rollups without a run-level
-approval rule. Detailed source error mapping, aggregation semantic acceptance,
+approval rule. Aggregation semantic acceptance,
 reverse conversion, CLI wiring and complete interoperability roundtrip acceptance
 remain unfinished. The full W09 interoperability task is not complete.
 

@@ -24,7 +24,7 @@ public interface IAefEvalPortImporter
 public sealed class AefEvalPortImporter : IAefEvalPortImporter
 {
     private const string RootPath = "evalport";
-    private sealed record Observation(AefResult Root, IReadOnlyList<(AefResult Result, string? Reason)> Children, string? Output);
+    private sealed record Observation(AefResult Root, IReadOnlyList<(AefResult Result, string? Reason)> Children, string? Output, JsonObject? Error);
 
     /// <inheritdoc/>
     public AefConversion Import(ReadOnlyMemory<byte> resultSet, string outputDirectory,
@@ -39,6 +39,7 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
             "Root passed flags are source declarations: Own aggregation records grader children with zero weight; no source threshold is invented.",
             "Repeated attempts use converter-computed AllPass rollups; missing observations do not become passing evidence.",
             "Provider configuration, arbitrary metadata, source summary and external signatures are not transferred; no external trust is inherited.",
+            "Source error objects are retained as document evidence only with capture-on; capture-off retains declared error type/retryability and omits message/code content.",
         }).ToArray();
         var existed = Directory.Exists(outputDirectory);
         // Create owns only a new/empty destination. A refusal must never discard preexisting data.
@@ -55,13 +56,24 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var root = observation.Root;
+                var evidenceIds = new List<string>();
                 if (observation.Output is { } output && options.ContentCapture == AefContentCapture.On)
                 {
                     var evidenceId = "E-output-" + (++evidenceIndex);
                     writer.AddEvidence(new() { EvidenceId = evidenceId, Kind = AefEvidenceKind.Output,
                         Link = AefEvidenceLink.ToBlob(writer.PutBlob(Encoding.UTF8.GetBytes(output))) });
-                    root = root with { Evidence = [evidenceId] };
+                    evidenceIds.Add(evidenceId);
                 }
+                if (observation.Error is { } error && options.ContentCapture == AefContentCapture.On)
+                {
+                    var evidenceId = "E-error-" + (++evidenceIndex);
+                    writer.AddEvidence(new() { EvidenceId = evidenceId, Kind = AefEvidenceKind.Document,
+                        Description = "EvalPort source error object",
+                        Link = AefEvidenceLink.ToBlob(writer.PutBlob(Encoding.UTF8.GetBytes(error.ToJsonString()))) });
+                    evidenceIds.Add(evidenceId);
+                    root.Ext!["evalport"]!["errorEvidence"] = evidenceId;
+                }
+                root = root with { Evidence = evidenceIds.Count == 0 ? null : evidenceIds };
                 var parent = writer.AddResult(root);
                 foreach (var (child, reason) in observation.Children)
                 {
@@ -116,20 +128,29 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
                 }, grader["reason"]?.GetValue<string>()));
             }
             var isError = result["error"] is not null;
+            var errorContext = isError ? new JsonObject() : null;
+            if (result["error"] is JsonObject sourceError)
+            {
+                foreach (var key in new[] { "type", "retryable" })
+                    if (sourceError.ContainsKey(key)) errorContext![key] = sourceError[key]!.DeepClone();
+                if (options.ContentCapture == AefContentCapture.Off && (sourceError.ContainsKey("message") || sourceError.ContainsKey("code")))
+                    errorContext!["contentOmitted"] = true;
+            }
             var rootState = isError ? AefState.Error : children.All(c => !Measured(c.Result.State)) ? AefState.NotMeasured :
                 result["passed"]!.GetValue<bool>() ? AefState.Passed : AefState.Failed;
             var root = new AefResult
             {
                 CaseId = caseId, Path = RootPath, Trial = trial, Evaluator = new("evalport:result"), State = rootState,
-                Reason = isError ? "EvalPort result records an execution error." : rootState == AefState.NotMeasured ? "EvalPort has no measured grader." : null,
+                Reason = isError ? "EvalPort execution error" + (errorContext?["type"] is { } type ? ": " + type.GetValue<string>() : ".") : rootState == AefState.NotMeasured ? "EvalPort has no measured grader." : null,
                 Scores = Measured(rootState) ? [new() { Metric = "evalport.pass", Value = rootState == AefState.Passed ? 1 : 0 }] : null,
                 Aggregation = children.Count > 0 ? Own(children.Select(c => c.Result).ToArray()) : null,
                 EndedAt = result["completed_at"] is { } time ? EvalPortTimestamp.Parse(time.GetValue<string>()) : null,
                 DurationMs = result["duration_ms"] is { } duration ? ExactDuration(duration) : null,
                 Ext = new() { ["evalport"] = new JsonObject { ["passed"] = result["passed"]!.DeepClone(),
+                    ["attemptDeclared"] = result.ContainsKey("attempt"), ["error"] = errorContext,
                     ["aggregation"] = options.ContentCapture == AefContentCapture.On ? result["metadata"]?["openeval.aggregation"]?.DeepClone() : null } },
             };
-            observations.Add(new(root, children, result["actual_output"]?.GetValue<string>()));
+            observations.Add(new(root, children, result["actual_output"]?.GetValue<string>(), result["error"]?.DeepClone().AsObject()));
         }
         return observations;
     }
