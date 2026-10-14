@@ -92,6 +92,36 @@ public sealed class EvidenceQueryBudgetTests : IDisposable
     }
 
     [Fact]
+    public async Task Query_RealKestrel_OversizedResponseNeverSendsPartialEvidence()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        var path = new string('x', 850);
+        writer.Upsert(new("root", path, new string('a', 64), IndexedEvidenceKind.Legacy, IndexedVerification.Unverified,
+            new("run", null, null, null, null, null, null, "unknown"), [], [], null));
+        var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Configuration.Sources.Clear();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["AgentEval:Root"] = _root, ["AgentEval:Queries:Enabled"] = "true",
+            ["AgentEval:Queries:IndexPath"] = Database, ["AgentEval:Queries:HttpLimits:ResponseBytes"] = "1024"
+        });
+        AgentEval.MissionControl.McHost.ConfigureServices(builder);
+        await using var app = builder.Build(); AgentEval.MissionControl.McHost.ConfigurePipeline(app);
+        await app.StartAsync(); using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        const string field = "evidenceSources(pageSize:1) { data { items { relativePath } } }";
+        using var accepted = await client.PostAsJsonAsync("/graphql", new { query = "{ a:" + field + " }" });
+        accepted.EnsureSuccessStatusCode(); Assert.Contains(path, await accepted.Content.ReadAsStringAsync());
+        using var refused = await client.PostAsJsonAsync("/graphql", new { query = "{ a:" + field + " b:" + field + " }" });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+        var bytes = await refused.Content.ReadAsByteArrayAsync(); Assert.InRange(bytes.Length, 1, 1024);
+        using var json = JsonDocument.Parse(bytes);
+        Assert.False(json.RootElement.TryGetProperty("data", out _));
+        Assert.Equal("response-byte-limit", json.RootElement.GetProperty("errors")[0].GetProperty("extensions").GetProperty("code").GetString());
+        using var next = await client.PostAsJsonAsync("/graphql", new { query = "{ping}" });
+        next.EnsureSuccessStatusCode(); Assert.Contains("pong", await next.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Query_StalledBody_TimesOutAndReleasesConcurrencySlot()
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();

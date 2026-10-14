@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using AgentEval.MissionControl.Core;
+using AgentEval.MissionControl.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
 
 namespace AgentEval.Tests.MissionControl;
 
@@ -119,6 +122,65 @@ public sealed class EvidenceNotificationTests : IDisposable
         try { while (await reader.ReadLineAsync(timeout.Token) is not null) { } }
         catch (IOException) { }
         catch (OperationCanceledException) when (!timeout.IsCancellationRequested) { }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Events_StalledWriteOrFlush_DeadlineCancelsAndReleasesSubscription(bool stallFlush)
+    {
+        var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton(_ => new EvidenceChangeFeed(maximumSubscribers: 1));
+        builder.Services.AddSingleton<IEvidenceChangeFeed>(sp => sp.GetRequiredService<EvidenceChangeFeed>());
+        builder.Services.AddSingleton(new EvidenceNotificationOptions(5, 6, 60, 1));
+        await using var app = builder.Build();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        app.Use(async (context, next) =>
+        {
+            context.Response.Body = new StalledOutput(stallFlush, entered, cancelled);
+            try { await next(context); }
+            finally { finished.TrySetResult(); }
+        });
+        EvidenceNotificationHosting.Map(app); await app.StartAsync();
+        using var client = app.GetTestClient();
+        var request = client.GetAsync("/api/v1/evidence/events", HttpCompletionOption.ResponseHeadersRead);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var feed = app.Services.GetRequiredService<IEvidenceChangeFeed>(); Assert.Null(feed.Subscribe());
+        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var replacement = feed.Subscribe(); Assert.NotNull(replacement);
+        // The mapped endpoint aborts a timed-out stream; TestServer may surface it before or after headers.
+        try { using var response = await request.WaitAsync(TimeSpan.FromSeconds(5)); }
+        catch (HttpRequestException) { }
+        catch (OperationCanceledException) { }
+        catch (IOException) { }
+    }
+
+    private sealed class StalledOutput(bool stallFlush, TaskCompletionSource entered, TaskCompletionSource cancelled) : Stream
+    {
+        private async Task Stall(CancellationToken token)
+        {
+            entered.TrySetResult();
+            try { await Task.Delay(Timeout.Infinite, token); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { cancelled.TrySetResult(); throw; }
+        }
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            stallFlush ? ValueTask.CompletedTask : new(Stall(cancellationToken));
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        public override Task FlushAsync(CancellationToken cancellationToken) => stallFlush ? Stall(cancellationToken) : Task.CompletedTask;
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
