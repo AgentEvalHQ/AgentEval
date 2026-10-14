@@ -52,6 +52,12 @@ suite definitions. Output includes captured fixture content; use synthetic data
 when adapting this example. Tests execute this same sample source and verify all
 seven output runs.
 
+## Offline multi-turn benchmark (P3)
+
+For saved multi-turn conversations and benchmark denominator accounting, see
+[sample P3](multiturn-example/README.md). Run it offline with
+`dotnet run --project samples/AgentEval.Samples -- --assert-multiturn`.
+
 ## Against a real ASSERT
 
 Serve the agent on a real model (the one `AI_INFERENCE_PROVIDER` selects), then point ASSERT at it:

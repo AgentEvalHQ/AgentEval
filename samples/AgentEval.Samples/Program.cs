@@ -234,6 +234,7 @@ public static class Program
         [
             new("ASSERT (Microsoft RAI)",    "A MAF agent served as ASSERT's HTTP target; an ASSERT run read into AgentEval (harm and over-refusal as ASSERT computes them, verdicts composed with an AgentEval check); labelled cases written for ASSERT's judge", AssertInterop.RunAsync),
             new("ASSERT evidence", "Offline direct ASSERT import and sealed per-case composite evidence from the hand-authored billing fixture", AssertEvidence.RunAsync),
+            new("ASSERT multi-turn benchmark", "Offline saved conversations and case-level benchmark rates with missing/error outcomes", AssertMultiturnBenchmark.RunAsync),
         ]),
     ];
 
@@ -293,6 +294,14 @@ public static class Program
         // its own, accurate, warning.
         if (args.Length == 0 && !AIConfig.IsConfigured)
             AIConfig.PrintMissingCredentialsWarning();
+
+        // Stable offline entry point, independent of the flattened sample menu numbers.
+        if (args.Contains("--assert-multiturn", StringComparer.OrdinalIgnoreCase))
+        {
+            _interactive = false;
+            await AssertMultiturnBenchmark.RunAsync();
+            return;
+        }
 
         // Stable offline entry point, independent of the flattened sample menu numbers.
         if (args.Contains("--assert-evidence", StringComparer.OrdinalIgnoreCase))

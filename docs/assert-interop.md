@@ -26,6 +26,10 @@ over the same saved transcripts. The [sample instructions](../samples/interop/as
 list the expected pass, fail, warning and unmeasured outcomes. The fixture is
 hand-authored; this example does not run a live ASSERT judge or establish live compatibility.
 
+Sample P3 (`--assert-multiturn`) demonstrates [saved multi-turn benchmark evidence](../samples/interop/assert-ai/multiturn-example/README.md):
+one observation per conversation, measured-case rate denominators, and separate
+missing-score and judge-error counts.
+
 ## Which ASSERT
 
 The formats are **assert-ai 0.3.0**. They were read from ASSERT's source (release `v0.3.0` and `main` at

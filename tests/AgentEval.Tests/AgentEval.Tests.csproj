@@ -111,6 +111,8 @@
              Link="Samples/01_AssertInterop.Run.cs" />
     <Compile Include="../../samples/AgentEval.Samples/Interop/02_AssertEvidence.cs"
              Link="Samples/02_AssertEvidence.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Interop/03_AssertMultiturnBenchmark.cs"
+             Link="Samples/03_AssertMultiturnBenchmark.cs" />
   </ItemGroup>
 
 </Project>
