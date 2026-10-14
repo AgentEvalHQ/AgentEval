@@ -8,12 +8,13 @@ using AgentEval.Results.Runs;
 namespace AgentEval.Indexing;
 
 // One invocation owns the copied ordinary files. Provides a private copy for subsequent verification.
-internal sealed class AefReadSnapshot(DirectoryInfo directory) : IDisposable
+internal sealed class AefReadSnapshot(DirectoryInfo directory, long bytes) : IDisposable
 {
     internal string FullName => directory.FullName;
+    internal long Bytes { get; } = bytes;
     internal static AefReadSnapshot Capture(string directory, AefStagingOptions limits, CancellationToken cancellationToken)
-        => new(Copy(directory, limits, cancellationToken));
-    private static DirectoryInfo Copy(string directory, AefStagingOptions limits, CancellationToken cancellationToken)
+        => Copy(directory, limits, cancellationToken);
+    private static AefReadSnapshot Copy(string directory, AefStagingOptions limits, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory)) throw new EvidenceIndexException("invalid-source-path");
@@ -48,7 +49,7 @@ internal sealed class AefReadSnapshot(DirectoryInfo directory) : IDisposable
                 }
                 if (copied != size) throw new EvidenceIndexException("source-changed");
             }
-            return snapshot;
+            return new(snapshot, inventory.Bytes);
         }
         catch
         {

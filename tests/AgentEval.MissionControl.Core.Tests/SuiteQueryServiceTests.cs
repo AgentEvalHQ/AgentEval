@@ -7,6 +7,8 @@ using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 using AgentEval.Results;
 using AgentEval.Results.Ingestion;
+using AgentEval.Results.Requirements;
+using AgentEval.Results.Signatures;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -108,6 +110,7 @@ public sealed class SuiteQueryServiceTests : IDisposable
         run.PutExtFile(SuiteDefinitionManifest.ExtensionFile, manifest.ToBytes());
         if (!aborted) run.AddResult(new() { CaseId = "case-a", Path = "quality", Evaluator = new("code:quality"),
             State = AefState.Passed, Ext = padding is null ? null : new JsonObject { ["fixture.padding"] = padding }, Scores = [new() { Metric = "quality", Value = 0.9 }] });
+        if (!aborted) run.SetSummary(new() { Lanes = [new AefSummaryLane("main", [new() { Metric = "quality", Path = "quality" }])] });
         run.Close(aborted ? AefRunStatus.Aborted : AefRunStatus.Completed, started.AddSeconds(1), aborted ? "cancelled" : null);
         AefSealer.Seal(directory);
         return index.Upsert(new AefIndexSourceReader(new SuiteIdentityReader()).Read("root", name, directory)).SourceId;
@@ -175,6 +178,63 @@ public sealed class SuiteQueryServiceTests : IDisposable
         var result = service.Result(id, resultId, AefTime.Parse("2026-10-14T00:00:00Z"));
         Assert.Equal(QueryState.ResourceLimit, result.State); Assert.Null(result.Data);
         Assert.Equal("detail-byte-limit", result.Code);
+    }
+
+    [Fact]
+    public void Governance_ExplicitEvidenceAndEmptySelection_PreserveSubjectStatusAndProvenance()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = WriteDefinition(writer, "governance", true, false);
+        var service = Governance(); var at = AefTime.Parse("2026-10-01T11:00:00Z");
+        var result = service.Status(new("agent:query", "1"), [id, id], at);
+        Assert.Equal(QueryState.Available, result.State); Assert.Single(result.Data!.SelectedRunHashes);
+        Assert.Equal("met", Assert.Single(result.Data.Requirements).Status);
+        Assert.Equal("not_measured", Assert.Single(service.Status(new("agent:query", "2"), [id], at).Data!.Requirements).Status);
+        Assert.Equal("not_measured", Assert.Single(service.Status(new("agent:query", "1"), [], at).Data!.Requirements).Status);
+        Assert.Equal(QueryState.ResourceLimit, service.Status(new("agent:query", "1"), Enumerable.Repeat(id, 9).ToArray(), at).State);
+        Assert.Throws<OperationCanceledException>(() => service.Status(new("agent:query", "1"), [id], at, new(true)));
+    }
+
+    [Fact]
+    public void Governance_SignedWaiver_RequiresScopedAuthorityAndActiveExpiry()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = WriteDefinition(writer, "waiver", true, false);
+        using var signer = EcdsaP256Signer.Generate();
+        var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "waiver"));
+        overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Waive, Target = new() { Requirement = "team:quality" },
+            By = new("reviewer:fixture", AefAssurance.Signed), At = AefTime.Parse("2026-10-01T10:30:00Z"),
+            Expires = AefTime.Parse("2026-10-01T12:00:00Z"), Reason = "time-limited exception"
+        });
+        overlay.SealBatch(signer);
+        var policy = new TrustPolicy([new TrustedKey("reviewer:fixture", signer.PublicKey, [RequirementEvidenceReader.WaivePermission("team:quality")])]);
+        var query = Governance(0.95, policy);
+        var active = query.Status(new("agent:query", "1"), [id], AefTime.Parse("2026-10-01T11:00:00Z"));
+        Assert.Equal(QueryState.Available, active.State); var status = Assert.Single(active.Data!.Requirements);
+        Assert.Equal("waived", status.Status); Assert.True(Assert.Single(status.Waivers).Authorized);
+        Assert.Equal("signed", Assert.Single(status.Waivers).Assurance);
+        var expired = query.Status(new("agent:query", "1"), [id], AefTime.Parse("2026-10-01T13:00:00Z"));
+        Assert.NotEqual("waived", Assert.Single(expired.Data!.Requirements).Status);
+        var noAuthority = new TrustPolicy([new TrustedKey("reviewer:fixture", signer.PublicKey)]);
+        var unsignedAuthority = Governance(0.95, noAuthority).Status(new("agent:query", "1"), [id], AefTime.Parse("2026-10-01T11:00:00Z"));
+        Assert.False(Assert.Single(Assert.Single(unsignedAuthority.Data!.Requirements).Waivers).Authorized);
+        Assert.NotEqual("waived", Assert.Single(unsignedAuthority.Data.Requirements).Status);
+    }
+
+    private GovernanceQueryService Governance(double threshold = 0.8, TrustPolicy? policy = null)
+    {
+        var catalogue = new RequirementCatalogueReader().Read(Encoding.UTF8.GetBytes(new JsonObject
+        {
+            ["schemaVersion"] = "1.0", ["requirements"] = new JsonArray(new JsonObject
+            {
+                ["id"] = "team:quality", ["selector"] = new JsonObject { ["lane"] = "main", ["metric"] = "quality", ["path"] = "quality" },
+                ["acceptance"] = new JsonObject { ["kind"] = "threshold", ["operator"] = ">=", ["value"] = threshold },
+                ["aggregation"] = new JsonObject { ["kind"] = "all", ["missing"] = "not_measured" },
+                ["freshnessSeconds"] = 86400, ["allowEffectiveOverrides"] = false
+            })
+        }.ToJsonString()));
+        return new(new SqliteEvidenceSourceLookup(Options), new BoundedRequirementEvidenceReader(new RequirementEvidenceReader()),
+            new RequirementStatusResolver(), catalogue, [Root], policy);
     }
 
     [Fact]
