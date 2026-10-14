@@ -30,7 +30,7 @@ The service preserves the [index page contracts](evidence-index.md): finite row/
 
 Each operation performs at most one bounded reader call. Consumers choose a suitable page size instead of automatically walking the index within one request. Full index validation is part of that operation's cost; cancellation does not impose a hard deadline inside synchronous SQLite integrity checks.
 
-This library supplies shared contracts, evidence pages, verified suite comparison, result detail and governance services described below. GraphQL exposes the indexed pages and verified suite, result-detail and governance queries. Notification delivery and transport-parity acceptance remain integration work. Existing legacy endpoints are preserved.
+This library supplies shared contracts, evidence pages, verified suite comparison, result detail and governance services described below. GraphQL exposes the indexed pages and verified suite, result-detail, governance and checkpoint queries. Notification delivery and transport-parity acceptance are implemented as described below. Existing legacy endpoints are preserved.
 
 ## Verified suite queries
 
@@ -94,7 +94,7 @@ Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requ
 
 `AgentEval:Queries:TrustPolicyPath` optionally supplies an absolute JSON trust-policy path under the same 1 MiB bound. The parsed policy is shared by governance and result detail. An embedding host's pre-registered `TrustPolicy` takes precedence; without either configuration, no signing key is trusted. Requests cannot provide a catalogue, policy, directory or waiver permission. Valid signatures and explicitly scoped `requirements:waive:<id>` authority are separate checks, and expired waivers do not change current status.
 
-`AgentEval:Queries:GovernanceLimits` can lower `MaxSources` (default/ceiling 8), `MaxCaptureBytes` (64 MiB), `MaxRowRulePairs` (100000) and `MaxResponseBytes` (2 MiB). The shared service validates ceilings and enforces them before returning a report. Host-wide response/operation limits and transport parity remain part of W08 acceptance; the report cap does not claim to cap alias-multiplied transport envelopes.
+`AgentEval:Queries:GovernanceLimits` can lower `MaxSources` (default/ceiling 8), `MaxCaptureBytes` (64 MiB), `MaxRowRulePairs` (100000) and `MaxResponseBytes` (2 MiB). The shared service validates ceilings and enforces them before returning a report. Separate host-wide response/operation limits cover alias-multiplied transport envelopes; see the HTTP budgets and contract acceptance below.
 
 ## Contract acceptance
 
@@ -253,7 +253,10 @@ Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;
 `SpaQueriesValidateTests` checks the actual SPA operations against the production
-GraphQL schema. A complete indexed-evidence browser journey is separate work.
+GraphQL schema. `governance-live.mjs` exercises the production host with actual
+indexed evidence, signatures, waiver expiry and tamper refusal; see the
+[browser acceptance instructions](../scripts/mc-browser-smoke/README.md), including
+how to target an installed CLI package.
 
 
 ### Checkpoint GraphQL configuration

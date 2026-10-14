@@ -6,8 +6,9 @@ BCL-only `AgentEval.Results` project. Source files remain authoritative; this
 database is derived state, not an alternative evidence seal or acceptance store.
 Transactional source projection, AEF snapshot imports and verified observation
 imports, legacy/root reconciliation, rebuild/recovery and source inventory pagination
-and result/metric/observation detail pagination are implemented. Measured scale
-acceptance remains the next indexing slice.
+and result/metric/observation detail pagination are implemented. Offline scale
+acceptance covers evaluated and observation traversal as described below; it
+does not establish a production capacity or latency guarantee.
 
 The provider is pinned to
 [Microsoft.Data.Sqlite 10.0.12](https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12),
@@ -80,7 +81,9 @@ Adapters must validate their unsigned range before insertion.
 
 Indexes cover source discovery, subjects, suites, cases, metrics, trace identity
 and ordered group members. These are the schema foundations for stable queries;
-source inventory pagination below uses the root/path ordering; the remaining query families still need pagination and measured scale acceptance.
+source inventory pagination uses the root/path ordering, while result, metric,
+span and field pages use their stable keys. Offline scale acceptance for these
+families is described below.
 
 ## Atomic initial and incremental writes
 
@@ -223,7 +226,7 @@ The recovery design preserves SQLite sidecars because hot journals may contain d
 
 Promotion flushes an intent receipt, copies and verifies a publish file, then moves it to a previously absent target or uses `File.Replace` with an owned `previous.sqlite` backup. The prepared candidate remains intact. Retry recognizes the persisted intent plus matching active digest and verifies the retained backup. An interrupted publish copy is rebuilt; a backup created before replacement is verified against the still-current old target before retry. Changed targets refuse rather than roll back later work. Cancellation is checked before replacement; after that commit point the call reports success and later retries can recognize it.
 
-These operations commit one index replacement, not a simultaneous filesystem snapshot of all source roots. Flushes and retry logic do not promise portable power-loss durability. Persistent root bindings and independent process-interruption acceptance are implemented; API/host wiring remains in W08.
+These operations commit one index replacement, not a simultaneous filesystem snapshot of all source roots. Flushes and retry logic do not promise portable power-loss durability. Persistent root bindings and independent process-interruption acceptance are implemented. [Shared query services and GraphQL reads](mission-control-queries.md) use the derived index; requests do not initialize or rebuild it.
 
 ### Schema version 2 and persistent root namespaces
 
