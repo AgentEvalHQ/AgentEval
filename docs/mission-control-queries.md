@@ -1,5 +1,17 @@
 # Shared Mission Control queries
 
+## Implemented UI and desktop scope
+
+The governance views described here are part of the existing React web app,
+served by `agenteval mc serve`. They cover evidence browsing, requirement status,
+decision history and verification of configured checkpoints. They do not provide
+a native desktop application or checkpoint authoring and execution orchestration.
+
+`AgentEval.MissionControl.Core` supplies transport-independent services that a
+future desktop client can call in-process. Avalonia Studio, desktop packaging,
+native accessibility and desktop acceptance tests are not implemented by this
+milestone. Web browser acceptance does not establish desktop readiness.
+
 `AgentEval.MissionControl.Core` is a transport-independent library for in-process consumers and remote adapters. It references Results and Indexing, with no ASP.NET, GraphQL or MAF dependency. Results retains its BCL-only boundary.
 
 `IEvidenceQueryService` currently exposes one-page `Sources`, `Results`, `Metrics`, `Spans` and `Fields` operations. `EvidenceQueryService` composes injected `IEvidenceSourceReader` and `IEvidenceDetailReader` instances; its parameterless constructor represents an explicitly unconfigured capability. It never discovers storage, creates an index, follows continuations automatically or repairs unavailable evidence.
