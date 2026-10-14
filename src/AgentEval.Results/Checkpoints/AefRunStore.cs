@@ -95,6 +95,10 @@ public sealed class AefRunStore
         _byRunId = runs.GroupBy(r => r.RunId, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
     }
 
+    // Only the bounded snapshot adapter combines explicitly captured stores. No filesystem discovery.
+    internal static AefRunStore Combine(IReadOnlyList<AefRunStore> stores) =>
+        new("", stores.SelectMany(store => store.Runs).ToArray());
+
     /// <summary>The folder of runs.</summary>
     public string Root { get; }
 

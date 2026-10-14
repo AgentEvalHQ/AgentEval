@@ -212,6 +212,24 @@ timeline. Unsealed events remain a separate count with no effective history.
 The complete result detail, including history, remains subject to the 2 MiB
 response limit; oversized detail is refused without a partial timeline.
 
+### Checkpoint verification adapter
+
+`IBoundedCheckpointReader` in Indexing wraps the existing checkpoint verifier
+for explicit server-resolved run selections. It captures ordinary files into
+private snapshots, checks each selected run hash and integrity, and combines
+only those snapshots. It does not discover sibling runs. Limits are eight
+selections, 64 MiB aggregate capture, 1 MiB each for manifest and envelope,
+64 lanes, 100,000 result-row/lane pairs and 2 MiB serialized explanation.
+
+The detached explanation retains exact manifest and policy digests, the
+requested time and actual evaluation time, original manifest declarations,
+recomputed lane evidence, verification problems, established signers and
+anchored run hashes. Decided checkpoints use their recorded evaluation time.
+Envelope presence, whether verification was attempted, envelope failures and
+per-signature results are separate fields. A passing lane is not checkpoint
+approval, and an available explanation is not proof of trust. The checkpoint
+query endpoint and browser view are not yet connected to this adapter.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;
