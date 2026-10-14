@@ -235,6 +235,20 @@ empty extension is distinguishable. Tampered, unsealed or hash-mismatched eviden
 is refused. The source run is never modified. Capture is not an atomic filesystem
 snapshot; verification applies to the owned copy. Cancellation is cooperative.
 
+`AgentEval.Results.Adapters.EvalPort.EvalPortResultSet` now provides the conversion
+input boundary. It uses the [vendored pinned schema](../../../evalport/1.0.0-rc.5/README.md)
+offline, strict JSON at 4 MiB, detached source data and the context validation above.
+It rejects duplicate case/attempt pairs (an absent attempt collides with explicit
+attempt 1), repeated grader identifiers within a result, null-score graders marked
+passing and passing results with no measured graders. Attempt and duration fields
+must be exact integers within Int64 range. These limits are adapter refusals, not
+new constraints claimed for all EvalPort producers. No output is written by parsing.
+
+This boundary does not yet check aggregation metadata or perform date conversion:
+schema `format` is an annotation in the reused validator. The importer must check
+those before producing AEF evidence. It accepts the pinned schema's shape with
+major version 1, and refuses unknown fields including the proposed `verdict` field.
+
 Still pending: full ResultSet adapters, including the losses in the tables above
 and roundtrip acceptance. A directly parsed extension alone has not had its seal
 checked. Group chains across multiple runs are consumer joins;
