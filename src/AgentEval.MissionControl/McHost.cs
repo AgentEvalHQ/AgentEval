@@ -86,6 +86,7 @@ public static class McHost
 
         AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
         AgentEval.MissionControl.Hosting.EvidenceReadAccess.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceQueryBudget.Configure(builder);
         AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Configure(builder);
 
         // GraphQL (Hot Chocolate 16, ChilliCream — primary read surface).
@@ -218,6 +219,7 @@ public static class McHost
         });
 
         AgentEval.MissionControl.Hosting.EvidenceReadAccess.Use(app);
+        AgentEval.MissionControl.Hosting.EvidenceQueryBudget.Use(app);
 
         // GraphQL endpoint at /graphql. A browser GET to /graphql/ gets Hot Chocolate's
         // Nitro GraphQL IDE (ChilliCream.Nitro.App, successor to BananaCakePop).

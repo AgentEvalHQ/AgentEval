@@ -98,7 +98,7 @@ Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requ
 
 ## Contract acceptance
 
-The reviewed GraphQL contract for the nine shared query fields is pinned in `tests/AgentEval.Tests/MissionControl/EvidenceSchema.txt`. Its HTTP introspection test walks every reachable output/scalar/enum type and records field signatures, argument defaults and nullability. A schema change requires reviewing this artifact, including whether new reachable fields expose storage details or alter numeric precision. Setting `AGENTEVAL_SCHEMA_CAPTURE` to a local output path captures the current contract for review; it does not update the expected snapshot or bypass comparison. Complete payloads for all nine query fields are compared between direct service calls and HTTP over actual indexed/sealed/OTLP fixtures. Only documented index-identity naming and exact integer-to-string adaptations are applied. Cases retain suite compatibility explanations, sealed/effective result detail, observation conflicts and signed waiver authority/refusal provenance. Typed unavailable, empty, missing, invalid, stale and resource-limit outcomes are also compared for indexed pages. The broader request/response and slow-transport limit audit remains W08-06 work.
+The reviewed GraphQL contract for the nine shared query fields is pinned in `tests/AgentEval.Tests/MissionControl/EvidenceSchema.txt`. Its HTTP introspection test walks every reachable output/scalar/enum type and records field signatures, argument defaults and nullability. A schema change requires reviewing this artifact, including whether new reachable fields expose storage details or alter numeric precision. Setting `AGENTEVAL_SCHEMA_CAPTURE` to a local output path captures the current contract for review; it does not update the expected snapshot or bypass comparison. Complete payloads for all nine query fields are compared between direct service calls and HTTP over actual indexed/sealed/OTLP fixtures. Only documented index-identity naming and exact integer-to-string adaptations are applied. Cases retain suite compatibility explanations, sealed/effective result detail, observation conflicts and signed waiver authority/refusal provenance. Typed unavailable, empty, missing, invalid, stale and resource-limit outcomes are also compared for indexed pages. HTTP request/response envelope limits are described below; further slow-stream and cancellation acceptance remains W08-06 work.
 
 ## Shared change notifications
 
@@ -121,3 +121,21 @@ Without `AgentEval:Queries:ReadApiKey`, access requires an actual loopback peer 
 Setting ReadApiKey requires an exact Bearer key on every protected request, including loopback. Keys must contain 32..256 printable ASCII characters without spaces; supply a random secret through host configuration rather than a URL. Key hashes are compared in constant time. Remote requests additionally require HTTPS; direct loopback requests may use HTTP. A valid key grants access to all evidence roots configured for this single host: this is not a multi-user or per-root authorization system. SSE clients with a key should use streaming fetch with an Authorization header; native EventSource cannot attach that header.
 
 The host does not trust X-Forwarded-For or X-Forwarded-Proto. Do not expose a keyless host through a proxy that rewrites its peer and Host to loopback. Proxy deployments must require a read key and preserve an authenticated TLS boundary; trusted forwarded-header integration is not added by this feature. Rejected requests return 401 for missing/invalid configured credentials or 403 for origin/transport/locality failures, with no evidence data. Protected responses use no-store.
+
+## GraphQL HTTP envelope budgets
+
+With evidence queries enabled, GraphQL POST operations and GET operations with a query string pass through HTTP budgets after access checks. Configure `AgentEval:Queries:HttpLimits`:
+
+| Setting | Default | Allowed range |
+|---|---:|---:|
+| RequestBytes | 262144 | 1024..1048576 |
+| QueryStringBytes | 65536 | 1024..262144 |
+| ResponseBytes | 8388608 | 1024..33554432 |
+| Concurrency | 4 | 1..32 |
+| RequestSeconds | 30 | 1..120 |
+
+The host reads at most RequestBytes plus one detection byte before GraphQL parsing, including requests without Content-Length. Oversized bodies or UTF-8 query strings return 413. A busy concurrency gate returns 429 without waiting in an unbounded queue. The request deadline covers body reading, execution and response delivery through cooperative cancellation; it cannot forcibly interrupt synchronous SQLite validation.
+
+Responses are buffered under the serialized-byte cap, including aliases and JSON escaping. A response that exceeds the cap is discarded and replaced by a bounded 503 `response-byte-limit` error, without partial evidence JSON. Buffer memory is finite and tied to the concurrency limit; this cap is separate from shared services' logical page/report limits. A deadline before headers are sent returns 408; cancellation after response delivery starts aborts the connection. Slots are released on success, refusal or cancellation.
+
+Plain Nitro browser documents and assets retain their existing delivery path. GraphQL WebSocket upgrades are refused while these budgets are enabled; use bounded HTTP queries and the dedicated SSE invalidation feed. Query-disabled legacy deployments retain their previous behavior. The existing GraphQL cost/depth checks still apply in addition to these envelope limits.
