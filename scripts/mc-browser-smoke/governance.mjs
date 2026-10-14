@@ -28,12 +28,36 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   let state = 'AVAILABLE';
   let fail = false;
+  let detailState = 'AVAILABLE';
   const requests = [];
   await page.route('**/api/v1/version', route => route.fulfill({ json: { mode: 'local', version: 'test' } }));
   await page.route('**/graphql', async route => {
     const request = route.request().postDataJSON();
     if (request.query.includes('WorkspaceState')) {
       await route.fulfill({ json: { data: { workspace: { initialized: false, root: null, agentEvalVersion: 'test' } } } }); return;
+    }
+    if (request.query.includes('GovernanceResultDetail')) {
+      requests.push(request.variables);
+      await route.fulfill({ json: { data: { evidenceResultDetail: {
+        state: detailState, code: null, data: detailState === 'AVAILABLE' ? {
+          sourceId: request.variables.sourceId, resultId: request.variables.resultId,
+          indexInstanceId: 'index-test', indexGeneration: '9223372036854775807',
+          runHash: 'run-hash', snapshotDigest: 'snapshot-digest', policyDigest: 'policy-digest', at: request.variables.at,
+          sealedState: 'fail', effectiveState: 'pass', overrideEvent: 'override-1', unsealedEvents: 2,
+          reviews: [{ target: 'result-1', status: 'approved', event: 'review-1' }],
+          assurance: [{ event: 'override-1', shown: 'integrity-only' }],
+          sealedJson: '{"message":"<img src=x onerror=alert(1)>"}',
+        } : null,
+      } } } }); return;
+    }
+    if (request.query.includes('GovernanceResults')) {
+      await route.fulfill({ json: { data: { evidenceResults: {
+        state: 'AVAILABLE', code: null, data: {
+          indexInstanceId: 'index-test', generation: '9223372036854775806', sourceKind: 'aef',
+          verification: 'intact', fingerprint: 'fingerprint-test', nextCursor: null,
+          items: [{ resultId: 'result-1', caseId: null, trial: null, outcome: null }],
+        },
+      } } } }); return;
     }
     requests.push(request.variables);
     if (fail) { await route.fulfill({ status: 503, body: 'Unavailable' }); return; }
@@ -83,8 +107,33 @@ try {
   await page.getByRole('button', { name: 'Refresh' }).click();
   await page.getByRole('status').filter({ hasText: 'Connection failed' }).waitFor();
   assert.equal(await page.locator('table').count(), 0);
+  fail = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('link', { name: '<img src=x onerror=alert(1)>', exact: true }).click();
+  await page.getByRole('heading', { name: 'Source results', exact: true }).waitFor();
+  await page.getByText('No case (aggregate)', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Not declared', { exact: true }).count(), 1);
+  assert.equal(await page.getByText('Not measured', { exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'result-1', exact: true }).click();
+  const detail = page.getByRole('region', { name: 'Verified result detail' });
+  await detail.getByText('snapshot-digest', { exact: true }).waitFor();
+  await detail.getByRole('alert').waitFor();
+  assert.equal(await detail.getByText('fail', { exact: true }).count(), 1);
+  assert.equal(await detail.getByText('pass', { exact: true }).count(), 1);
+  await detail.getByText('Sealed result JSON', { exact: true }).click();
+  assert.match(await detail.locator('pre').innerText(), /<img src=x/);
+  assert.equal(await detail.locator('img').count(), 0);
+  await detail.getByLabel('UTC view time').fill('2026-01-01T00:00:00Z');
+  await detail.getByRole('button', { name: 'Apply time' }).click();
+  await detail.getByText('2026-01-01T00:00:00Z', { exact: true }).waitFor();
+  assert.equal(requests.at(-1).at, '2026-01-01T00:00:00Z');
+  detailState = 'UNAVAILABLE';
+  await detail.getByRole('button', { name: 'Re-verify' }).click();
+  await detail.getByRole('status').filter({ hasText: 'Verified evidence is currently unavailable' }).waitFor();
+  assert.equal(await detail.getByText('snapshot-digest', { exact: true }).count(), 0);
+  assert.equal(await detail.locator('pre').count(), 0);
   assert.deepEqual(errors, []);
-  console.log('Governance browser acceptance passed: independent workspace, exact generations, escaped content, filtering, pagination, refusal states and failed-refresh cleanup.');
+  console.log('Governance browser acceptance passed: workspace, source navigation, exact generations, escaped content, filtering, pagination, refusals, aggregate absences, sealed/effective states, explicit view time, revision mismatch and stale-detail cleanup.');
 } finally {
   await browser?.close();
   await new Promise(done => server.close(done));

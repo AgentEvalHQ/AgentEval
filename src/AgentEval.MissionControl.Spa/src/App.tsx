@@ -14,6 +14,7 @@ import { EvaluatorDetailPage } from "@/pages/EvaluatorDetailPage";
 import { RedTeamCampaigns } from "@/pages/RedTeamCampaigns";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { GovernancePage } from "@/pages/GovernancePage";
+import { GovernanceSourcePage } from "@/pages/GovernanceSourcePage";
 
 // Plan-08 MC1.6.2 + Waves 2-5: routing.
 // Routes match plan-07 §10. Wave 4 adds /compliance/:regulation. Phase 1
@@ -39,6 +40,7 @@ export function App() {
         <Route path="runs/:runId/trace" element={<TraceWaterfallPage />} />
         <Route path="compliance" element={<ComplianceListPage />} />
         <Route path="governance" element={<GovernancePage />} />
+        <Route path="governance/sources/:sourceId" element={<GovernanceSourcePage />} />
         <Route path="compliance/:regulation" element={<ComplianceMatrixPage />} />
         <Route
           path="compliance/:regulation/:kind/:name/:ts"

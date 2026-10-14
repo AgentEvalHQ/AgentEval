@@ -139,7 +139,7 @@ The host reads at most RequestBytes plus one detection byte before GraphQL parsi
 Responses are buffered under the serialized-byte cap, including aliases and JSON escaping. A response that exceeds the cap is discarded and replaced by a bounded 503 `response-byte-limit` error, without partial evidence JSON. Buffer memory is finite and tied to the concurrency limit; this cap is separate from shared services' logical page/report limits. A deadline before headers are sent returns 408; cancellation after response delivery starts aborts the connection. Slots are released on success, refusal or cancellation.
 
 Plain Nitro browser documents and assets retain their existing delivery path. GraphQL WebSocket upgrades are refused while these budgets are enabled; use bounded HTTP queries and the dedicated SSE invalidation feed. Query-disabled legacy deployments retain their previous behavior. The existing GraphQL cost/depth checks still apply in addition to these envelope limits.
-# Governance workspace in the web app
+## Governance workspace in the web app
 
 Open **Governance** in Mission Control's sidebar (`/governance`) to check the
 configured evidence connection and browse source inventory. This view uses
@@ -156,6 +156,16 @@ An empty result is distinct from an unconfigured, unavailable or refused query.
 Failed refreshes hide previously cached inventory. The app uses its configured
 API endpoint and existing host access boundary; it does not register filesystem
 roots or provision remote credentials.
+
+Select a source to browse its indexed result rows. Aggregate case absence,
+undeclared trials and unmeasured outcomes remain explicit. AEF result IDs open
+a freshly verified detail view under the host's trust policy. The view displays
+sealed and effective states separately, review events, established assurance,
+unsealed event counts, and run/snapshot/policy digests. The UTC view time starts
+at selection time and remains fixed until edited; **Re-verify** reloads that
+same view time. If the selected detail uses a different index revision from
+the result list, a warning asks the user to refresh the list. Failed verification
+hides previously displayed detail. Sealed JSON is displayed as text.
 
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`

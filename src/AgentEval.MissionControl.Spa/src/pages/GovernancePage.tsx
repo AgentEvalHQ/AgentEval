@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { graphqlClient } from "@/lib/graphql-client";
 import { graphqlUrl } from "@/lib/env";
@@ -90,7 +91,7 @@ export function GovernancePage() {
         <caption className="p-4 text-left font-medium">Evidence sources — {page.items.length} on this page</caption>
         <thead className="bg-slate-100"><tr>{["Source", "Root", "Kind", "Integrity", "Indexed generation"].map(label => <th key={label} className="p-3">{label}</th>)}</tr></thead>
         <tbody>{page.items.map(source => <tr key={source.sourceId} className="border-t border-slate-100">
-          <td className="p-3 break-all"><div>{source.relativePath}</div><div className="text-xs text-slate-500 font-mono">{source.sourceId}</div></td>
+          <td className="p-3 break-all"><Link className="text-accent-700 underline" to={`/governance/sources/${encodeURIComponent(source.sourceId)}`}>{source.relativePath}</Link><div className="text-xs text-slate-500 font-mono">{source.sourceId}</div></td>
           <td className="p-3 break-all">{source.rootId}</td><td className="p-3">{source.kind}</td>
           <td className="p-3">{source.verification}</td><td className="p-3 font-mono">{source.indexedGeneration}</td>
         </tr>)}</tbody>
