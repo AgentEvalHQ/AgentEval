@@ -24,6 +24,17 @@ public sealed class SuiteQueryServiceTests : IDisposable
     private SuiteQueryService Service(params EvidenceIndexRoot[] roots) => new(new SqliteEvidenceSourceLookup(Options),
         new SuiteIdentityReader(), new SuiteCompatibilityEvaluator(), roots);
 
+    [Fact]
+    public void SuiteQueries_Unconfigured_ReturnExplicitStateAndHonorCancellation()
+    {
+        var service = new SuiteQueryService();
+        Assert.Equal(QueryState.NotConfigured, service.Identity("source").State);
+        Assert.Null(service.Identity("source").Data);
+        Assert.Equal("not-configured", service.Compare("baseline", "candidate").Code);
+        Assert.Throws<OperationCanceledException>(() => service.Identity("source", new(true)));
+        Assert.Throws<OperationCanceledException>(() => service.Compare("baseline", "candidate", new(true)));
+    }
+
     private string Copy(string name)
     {
         string? fixture = null;

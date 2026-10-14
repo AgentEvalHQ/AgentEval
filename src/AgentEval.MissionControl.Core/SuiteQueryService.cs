@@ -23,9 +23,12 @@ public interface ISuiteQueryService
 /// <summary>Resolves persisted bindings against trusted configuration before invoking the verifying identity reader.</summary>
 public sealed class SuiteQueryService : ISuiteQueryService
 {
-    private readonly ConfiguredAefSelection _selection;
-    private readonly ISuiteIdentityReader _reader;
-    private readonly ISuiteCompatibilityEvaluator _compatibility;
+    private readonly ConfiguredAefSelection? _selection;
+    private readonly ISuiteIdentityReader? _reader;
+    private readonly ISuiteCompatibilityEvaluator? _compatibility;
+
+    /// <summary>Creates an explicitly unconfigured capability without inferring storage or roots.</summary>
+    public SuiteQueryService() { }
 
     /// <summary>Validates a bounded configured root set. Configuration grants access; indexed bindings alone do not.</summary>
     public SuiteQueryService(IEvidenceSourceLookup lookup, ISuiteIdentityReader reader,
@@ -40,12 +43,13 @@ public sealed class SuiteQueryService : ISuiteQueryService
     public QueryResult<VerifiedSuiteEvidence> Identity(string sourceId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_selection is null) return new(QueryState.NotConfigured, null, "not-configured");
         try
         {
             var resolved = _selection.Resolve(sourceId, cancellationToken);
             if (resolved.Data is null) return new(resolved.State, null, resolved.Code);
             var selected = resolved.Data.Selection;
-            var identity = _reader.Read(resolved.Data.Directory, resolved.Data.RunHash);
+            var identity = _reader!.Read(resolved.Data.Directory, resolved.Data.RunHash);
             cancellationToken.ThrowIfCancellationRequested();
             return new(QueryState.Available, new(sourceId, selected.InstanceId, selected.Generation, identity), null);
         }
@@ -74,7 +78,7 @@ public sealed class SuiteQueryService : ISuiteQueryService
         if (baseline.Data.IndexInstanceId != candidate.Data.IndexInstanceId || baseline.Data.IndexGeneration != candidate.Data.IndexGeneration)
             return new(QueryState.StaleCursor, null, "selection-changed");
         cancellationToken.ThrowIfCancellationRequested();
-        var compatibility = _compatibility.Compare(baseline.Data.Identity, candidate.Data.Identity);
+        var compatibility = _compatibility!.Compare(baseline.Data.Identity, candidate.Data.Identity);
         return new(QueryState.Available, new(baseline.Data, candidate.Data, compatibility), null);
     }
 }
