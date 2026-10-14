@@ -5,9 +5,8 @@ weights, aggregation or configuration that defined their evaluation. AgentEval's
 [suite manifest](../schemas/suites/1/definition.schema.json) separates these concepts.
 
 The manifest reader, deterministic hashing, native eval and dataset-runner bindings are implemented.
-Probe/composite adapter bindings are available; their CLI definition capture and comparison compatibility
-are still being implemented. Existing
-dataset-only or roster-only identities are not silently reclassified as full definitions.
+Probe/composite adapters, supported CLI definition capture and strict suite comparison are available.
+Existing dataset-only or roster-only identities are not silently reclassified as full definitions.
 
 ## Manifest 1.0
 
@@ -100,8 +99,8 @@ assemblies are hashed once per capture. Subject responses and identities are kep
 `AtomicLlmEval.CaptureDefinition()` exposes an immutable, content-free leaf snapshot, including whether
 the evaluator identifies its prompt. `AgentScenarioEval` exposes its inner judge and scenario input digest.
 Unknown evaluator kinds, unidentified prompts and custom aggregation strategies keep legacy identity
-scope; they are not guessed from result trees. Agentic and other composite producer capture is
-still in progress. Explicit mock benchmark paths also retain their existing identity scope.
+scope; they are not guessed from result trees. Supported agentic graphs and explicit composite mock
+exports use the capture described below.
 
 Agentic wrappers can expose their configured inner instrument through `IEvalDefinitionWrapper`.
 The wrapper implementation is still hashed, including its input framing and fixed decision logic.
@@ -134,8 +133,8 @@ when their judge is identified. Explicit composite mock exports also capture the
 execution and retain it on cancellation. Their built-in judge is identified as `fixed-placeholder` by
 its exact implementation type, with no claimed LLM prompt. They retain `mocked` target mode and one
 actual trial regardless of an ignored mock `--runs` option. Interrupted snapshots expand configured
-wrappers with bounded traversal so missing nested checks retain their planned shape. Other producer capture remains in progress;
-unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
+wrappers with bounded traversal so missing nested checks retain their planned shape.
+Unsupported graphs keep legacy scope. These changes do not alter scoring or judge prompts.
 
 ## Red-team scan capture
 
@@ -243,7 +242,7 @@ completeness, subject, execution conditions and statistical validity. Integrity 
 does not authenticate the producer or prove its declarations are truthful.
 
 `ISuiteIdentityReader` creates immutable verified snapshots, and `ISuiteCompatibilityEvaluator`
-compares them without filesystem access. The BCL-only Results package exposes these services without
+compares them without filesystem access. The BCL-only Results project exposes these services without
 requiring a dependency injection framework. AEF checkpoint rule LANE-6 remains unchanged: its
 `suite-content` axis compares protocol digest values, including absent values. The stricter AgentEval
 policy is an explicit additional check, not a change to AEF conformance semantics.
