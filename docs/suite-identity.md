@@ -122,7 +122,10 @@ lists or JSON and returns no declaration for potentially one-shot enumerables, p
 Diagnostic capture hashes the trusted system-prompt baseline and regex pattern/options/timeout, and binds
 optional judges through `IEvalInstrumentSource`. Nested instruments contribute identity without adding
 emitted result cases. Culture-dependent or custom regex implementations remain unclassified because
-construction culture and subclass behavior cannot be reconstructed safely.
+construction culture and subclass behavior cannot be reconstructed safely for caller-supplied regexes.
+The built-in system-prompt leakage detector records its pattern construction culture and hashes the
+effective pattern/options/timeout settings. Later caller culture changes do not replace the culture
+retained by those compiled patterns; matching and scoring behavior are unchanged.
 Safety and adversarial capture hash applied static policy, compiled custom patterns and ordered library
 entries, effective regex settings, scan limits and thresholds, with nested judge declarations. Dynamic
 policy resolvers, external content classifiers and overridden matcher delegates remain unclassified;

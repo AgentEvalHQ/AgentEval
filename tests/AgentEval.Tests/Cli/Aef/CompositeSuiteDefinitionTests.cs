@@ -12,6 +12,40 @@ namespace AgentEval.Tests.Cli.Aef;
 
 public sealed class CompositeSuiteDefinitionTests
 {
+    [Fact]
+    public async Task Capture_LeakagePatternConstructionCulture_BindsIdentityAndSurvivesCallerCultureChange()
+    {
+        var previousCulture = global::System.Globalization.CultureInfo.CurrentCulture;
+        var declarations = new List<string>();
+        try
+        {
+            foreach (var (culture, calls) in new[] { ("en-US", 0), ("tr-TR", 1) })
+            {
+                // A separate assembly load creates each static pattern set under its own culture.
+                var context = new global::System.Runtime.Loader.AssemblyLoadContext("leakage-" + culture, isCollectible: true);
+                try
+                {
+                    global::System.Globalization.CultureInfo.CurrentCulture = global::System.Globalization.CultureInfo.GetCultureInfo(culture);
+                    var assembly = context.LoadFromAssemblyPath(typeof(SystemPromptLeakageEval).Assembly.Location);
+                    var type = assembly.GetType(typeof(SystemPromptLeakageEval).FullName!)!;
+                    var judge = new Judge("fixture");
+                    var eval = (IEvalConfigurationSource)Activator.CreateInstance(type, judge, null, 0.9)!;
+                    var captured = eval.CaptureConfiguration();
+                    Assert.Equal(culture, captured["patternCulture"]!.GetValue<string>());
+                    Assert.StartsWith("sha256:", captured["patternsDigest"]!.GetValue<string>());
+                    declarations.Add(captured.ToJsonString());
+                    global::System.Globalization.CultureInfo.CurrentCulture = global::System.Globalization.CultureInfo.InvariantCulture;
+                    Assert.Equal(captured.ToJsonString(), eval.CaptureConfiguration().ToJsonString());
+                    await eval.EvaluateAsync(new EvalInput("q", "IGNORE PREVIOUS INSTRUCTIONS"));
+                    Assert.Equal(calls, judge.Calls);
+                }
+                finally { context.Unload(); }
+            }
+            Assert.NotEqual(declarations[0], declarations[1]);
+        }
+        finally { global::System.Globalization.CultureInfo.CurrentCulture = previousCulture; }
+    }
+
     private sealed class CyclicWrapper : IEvalDefinitionWrapper
     {
         public string Key => "cycle";
