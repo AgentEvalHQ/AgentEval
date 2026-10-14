@@ -4,8 +4,10 @@
 
 #if NET10_0_OR_GREATER
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using AgentEval.Indexing;
+using AgentEval.Results.Observations;
 using AgentEval.MissionControl.GraphQL;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -93,6 +95,127 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         using var invalid = await QueryAsync(client, "{ evidenceSources(pageSize:501) { state code } }");
         Assert.Equal("INVALID_REQUEST", invalid.RootElement.GetProperty("data").GetProperty("evidenceSources").GetProperty("state").GetString());
         Assert.False(File.Exists(Database));
+    }
+
+    [Fact]
+    public async Task EvidencePages_ActualEvaluation_PreserveValuesAndRejectStaleOrWrongFamilyCursors()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        var source = new EvidenceIndexSource("root", "run", new string('a', 64), IndexedEvidenceKind.Legacy,
+            IndexedVerification.Unverified, new("run", null, null, null, null, null, "PASS", "unknown"),
+            [new("a", "case-a", 9007199254740993L, "PASS"), new("legacy:summary", null, null, "PASS")],
+            [new("a", "quality", 2, .5, null, false, "reported"), new("a", "quality", 10, null, "NaN", null, "reported")], null);
+        var id = writer.Upsert(source).SourceId;
+        using var factory = Factory(true); using var client = factory.CreateClient();
+        using var first = await QueryAsync(client, $$"""
+            { evidenceResults(sourceId:"{{id}}",pageSize:1) { state data {
+              sourceKind verification fingerprint nextCursor items { resultId caseId trial outcome } } }
+              evidenceMetrics(sourceId:"{{id}}") { data { items { ordinal score scoreText passed provenance } } } }
+            """);
+        var data = first.RootElement.GetProperty("data");
+        var page = data.GetProperty("evidenceResults").GetProperty("data");
+        Assert.Equal("legacy", page.GetProperty("sourceKind").GetString());
+        Assert.Equal("unverified", page.GetProperty("verification").GetString());
+        Assert.Equal(writer.Find("root", "run")!.Fingerprint, page.GetProperty("fingerprint").GetString());
+        Assert.Equal("9007199254740993", Assert.Single(page.GetProperty("items").EnumerateArray()).GetProperty("trial").GetString());
+        var metrics = data.GetProperty("evidenceMetrics").GetProperty("data").GetProperty("items");
+        Assert.Equal(new[] { 2, 10 }, metrics.EnumerateArray().Select(m => m.GetProperty("ordinal").GetInt32()));
+        Assert.Equal(.5, metrics[0].GetProperty("score").GetDouble());
+        Assert.False(metrics[0].GetProperty("passed").GetBoolean());
+        Assert.Equal("NaN", metrics[1].GetProperty("scoreText").GetString());
+        Assert.Equal(JsonValueKind.Null, metrics[1].GetProperty("score").ValueKind);
+        Assert.Equal(JsonValueKind.Null, metrics[1].GetProperty("passed").ValueKind);
+        var cursor = JsonSerializer.Serialize(page.GetProperty("nextCursor").GetString());
+        var nextQuery = $$"""
+            { evidenceResults(sourceId:"{{id}}",pageSize:1,cursor:{{cursor}}) { state code data { items { caseId trial } nextCursor } } }
+            """;
+        using var next = await QueryAsync(client, nextQuery);
+        var last = next.RootElement.GetProperty("data").GetProperty("evidenceResults").GetProperty("data");
+        var aggregate = Assert.Single(last.GetProperty("items").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, aggregate.GetProperty("caseId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, aggregate.GetProperty("trial").ValueKind);
+        Assert.Equal(JsonValueKind.Null, last.GetProperty("nextCursor").ValueKind);
+        using var wrong = await QueryAsync(client, $$"""
+            { evidenceMetrics(sourceId:"{{id}}",pageSize:1,cursor:{{cursor}}) { state code }
+              evidenceSpans(sourceId:"{{id}}") { state code } }
+            """);
+        Assert.Equal("invalid-cursor", wrong.RootElement.GetProperty("data").GetProperty("evidenceMetrics").GetProperty("code").GetString());
+        Assert.Equal("wrong-source-kind", wrong.RootElement.GetProperty("data").GetProperty("evidenceSpans").GetProperty("code").GetString());
+        writer.Upsert(source with { Run = source.Run! with { Outcome = "FAIL" } });
+        using var stale = await QueryAsync(client, nextQuery);
+        var refusal = stale.RootElement.GetProperty("data").GetProperty("evidenceResults");
+        Assert.Equal("STALE_CURSOR", refusal.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, refusal.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task EvidencePages_EmptyMissingAndOversized_AreDistinctTypedOutcomes()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        var source = new EvidenceIndexSource("root", "run", new string('a', 64), IndexedEvidenceKind.Legacy,
+            IndexedVerification.Unverified, new("run", null, null, null, null, null, null, "unknown"), [], [], null);
+        var emptyId = writer.Upsert(source).SourceId;
+        var largeId = writer.Upsert(source with { RelativePath = "large", Results = [new("a", null, null, null)],
+            Metrics = [new("a", "quality", 0, .5, null, null, new string('x', (2 << 20) + 1))] }).SourceId;
+        using var factory = Factory(true); using var client = factory.CreateClient();
+        using var json = await QueryAsync(client, $$"""
+            { empty:evidenceResults(sourceId:"{{emptyId}}") { state data { items { resultId } } }
+              missing:evidenceResults(sourceId:"{{new string('0', 64)}}") { state code data { generation } }
+              large:evidenceMetrics(sourceId:"{{largeId}}") { state code data { generation } } }
+            """);
+        var data = json.RootElement.GetProperty("data");
+        Assert.Equal("EMPTY", data.GetProperty("empty").GetProperty("state").GetString());
+        Assert.Empty(data.GetProperty("empty").GetProperty("data").GetProperty("items").EnumerateArray());
+        Assert.Equal("NOT_FOUND", data.GetProperty("missing").GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, data.GetProperty("missing").GetProperty("data").ValueKind);
+        Assert.Equal("RESOURCE_LIMIT", data.GetProperty("large").GetProperty("state").GetString());
+        Assert.Equal("page-byte-limit", data.GetProperty("large").GetProperty("code").GetString());
+        Assert.Equal(JsonValueKind.Null, data.GetProperty("large").GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task EvidencePages_ActualObservations_PreserveDuplicatesExactTimesAndConflictProvenance()
+    {
+        const string span = """
+            {"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","startTimeUnixNano":"18446744073709551615",
+             "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
+             {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},
+             {"key":"gen_ai.usage.completion_tokens","value":{"intValue":"13"}}]}
+            """;
+        var batch = new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("{\"resourceSpans\":[{\"scopeSpans\":[{\"spans\":[" + span + "," + span + "]}]}]}"));
+        using var store = new OtlpObservationStore(new() { Root = Path.Combine(_root, "observations"), Source = "receiver" },
+            new OtlpContentPolicy(), new OtlpSessionGrouper(new OtlpTraceNormalizer()));
+        store.Accept(batch);
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        Assert.True(new OtlpObservationIndexer(writer).Import("observations", store).Complete);
+        var id = writer.ListSources("observations").Single().Checkpoint.SourceId;
+        using var factory = Factory(true); using var client = factory.CreateClient();
+        using var json = await QueryAsync(client, $$"""
+            { evidenceSpans(sourceId:"{{id}}") { data { sourceKind items { reportOrdinal spanId startNanos resourceIndex } } }
+              evidenceFields(sourceId:"{{id}}") { data { items { reportOrdinal fieldName state integerValue textValue sourcesJson } } }
+              evidenceResults(sourceId:"{{id}}") { state code } }
+            """);
+        var data = json.RootElement.GetProperty("data");
+        var spans = data.GetProperty("evidenceSpans").GetProperty("data");
+        Assert.Equal("observation", spans.GetProperty("sourceKind").GetString());
+        var reports = spans.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "0", "1" }, reports.Select(s => s.GetProperty("reportOrdinal").GetString()));
+        Assert.All(reports, s => Assert.Equal("18446744073709551615", s.GetProperty("startNanos").GetString()));
+        Assert.Equal(reports[0].GetProperty("spanId").GetString(), reports[1].GetProperty("spanId").GetString());
+        var fields = data.GetProperty("evidenceFields").GetProperty("data").GetProperty("items").EnumerateArray().ToArray();
+        var inputs = fields.Where(f => f.GetProperty("fieldName").GetString() == "tokens.input").ToArray();
+        Assert.Equal(2, inputs.Length);
+        Assert.All(inputs, f => Assert.Equal("9007199254740993", f.GetProperty("integerValue").GetString()));
+        var conflicts = fields.Where(f => f.GetProperty("fieldName").GetString() == "tokens.output").ToArray();
+        Assert.Equal(2, conflicts.Length);
+        foreach (var field in conflicts)
+        {
+            Assert.Equal("Conflict", field.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Null, field.GetProperty("integerValue").ValueKind);
+            using var provenance = JsonDocument.Parse(field.GetProperty("sourcesJson").GetString()!);
+            Assert.Equal(new long[] { 12, 13 }, provenance.RootElement.EnumerateArray().Select(p => p.GetProperty("Integer").GetInt64()).Order());
+        }
+        Assert.Equal("wrong-source-kind", data.GetProperty("evidenceResults").GetProperty("code").GetString());
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
