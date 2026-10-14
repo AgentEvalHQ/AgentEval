@@ -95,3 +95,11 @@ Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requ
 `AgentEval:Queries:TrustPolicyPath` optionally supplies an absolute JSON trust-policy path under the same 1 MiB bound. The parsed policy is shared by governance and result detail. An embedding host's pre-registered `TrustPolicy` takes precedence; without either configuration, no signing key is trusted. Requests cannot provide a catalogue, policy, directory or waiver permission. Valid signatures and explicitly scoped `requirements:waive:<id>` authority are separate checks, and expired waivers do not change current status.
 
 `AgentEval:Queries:GovernanceLimits` can lower `MaxSources` (default/ceiling 8), `MaxCaptureBytes` (64 MiB), `MaxRowRulePairs` (100000) and `MaxResponseBytes` (2 MiB). The shared service validates ceilings and enforces them before returning a report. Host-wide response/operation limits and transport parity remain part of W08 acceptance; the report cap does not claim to cap alias-multiplied transport envelopes.
+
+## Shared change notifications
+
+`IEvidenceChangeFeed` is the transport-free subscription boundary; `IEvidenceChangePublisher` is the host-owned producer. The `EvidenceChangeFeed` implementation defaults to 32 subscribers with 16 queued notifications each, with fixed configurable ceilings of 256 subscribers and 1024 queued items per subscriber. A subscription attempt returns null when all slots are occupied. Consumers must dispose subscriptions; cancellation and completion of the single-reader enumeration release the slot automatically.
+
+Every subscription starts with a Connected resync hint. Changed and Reconcile hints tell clients to repeat authoritative queries. When a queue fills, its pending items are replaced by an explicit Overflow hint with the latest sequence. Publishing does not wait for slow consumers. There is no replay log: reconnecting always requires resynchronization. Epoch and sequence are process-local notification ordering, never an index generation or evidence snapshot identity. Notifications carry no evidence content, paths or authorization grants. Shutdown ends subscriptions and discards their pending hints.
+
+This supplies the shared feed only. Host change detection, SSE delivery and transport-level lifecycle acceptance remain W08-05 integration work.
