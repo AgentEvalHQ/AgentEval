@@ -19,6 +19,13 @@ The types are in the `AgentEval` package (namespace `AgentEval.Interop.AssertAi`
 (`dotnet run -- 106` in `samples/AgentEval.Samples`) shows all of them; `samples/interop/assert-ai/` explains how to
 run it against a real ASSERT.
 
+For an offline evidence walkthrough, run
+`dotnet run --project samples/AgentEval.Samples -- --assert-evidence` from the repository root.
+Sample P2 writes a direct ASSERT-to-AEF import plus sealed per-case composites
+over the same saved transcripts. The [sample instructions](../samples/interop/assert-ai/README.md#offline-sealed-evidence-p2)
+list the expected pass, fail, warning and unmeasured outcomes. The fixture is
+hand-authored; this example does not run a live ASSERT judge or establish live compatibility.
+
 ## Which ASSERT
 
 The formats are **assert-ai 0.3.0**. They were read from ASSERT's source (release `v0.3.0` and `main` at

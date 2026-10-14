@@ -109,6 +109,8 @@
     <!-- P1 (ASSERT interop): the sample's logic, so the test runs what the sample runs. -->
     <Compile Include="../../samples/AgentEval.Samples/Interop/01_AssertInterop.Run.cs"
              Link="Samples/01_AssertInterop.Run.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Interop/02_AssertEvidence.cs"
+             Link="Samples/02_AssertEvidence.cs" />
   </ItemGroup>
 
 </Project>
