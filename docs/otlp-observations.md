@@ -47,14 +47,22 @@ through reading, decoding and acceptance, and pass its linked timeout/cancellati
 token through each phase. The payload reader itself is stateless across calls
 and does not enforce receiver concurrency or wall-clock time.
 
-`OtlpPayloadReader` uses a 64 KiB copy buffer and a bounded output stream. It
-requests at most the remaining transport/decoded allowance plus one lookahead
-byte. Gzip members share one aggregate decoded budget. Trailing transport bytes
-still count even when the decompressor stops reading. Compression decoding uses
-the platform `GZipStream`; the message decoder must separately validate OTLP
-structure. Returned arrays are caller-owned; the input remains open on success,
-refusal and cancellation. Output accumulation and the returned copy can coexist,
-so the decoded byte budget is not an exact process-memory ceiling.
+`OtlpPayloadReader` uses a 64 KiB copy buffer and requests at most the remaining
+transport/decoded allowance plus one lookahead byte. Gzip transport is buffered
+within the request budget before decoding. Each member must have a complete
+header, DEFLATE body and trailer with valid CRC32 and decoded length; optional
+header checksums are checked too. Concatenated members share one aggregate
+decoded budget. Truncated members and trailing non-member bytes are refused.
+All transport bytes count toward the request budget, including malformed suffixes.
+
+Raw DEFLATE uses the BCL inflater; framing validation is local and does not change
+process-wide compression switches. The inflater receives single bytes from the
+bounded memory buffer to avoid reading ahead into a member trailer. This adds
+CPU overhead for poorly compressible payloads. The message decoder separately
+validates OTLP structure. Returned arrays are caller-owned; the input remains
+open on success, refusal and cancellation. The compressed buffer, decoded output
+and returned copy can coexist, so neither byte budget is an exact process-memory
+ceiling. Receiver concurrency and timeout limits still apply.
 
 ## Evidence and content boundary
 

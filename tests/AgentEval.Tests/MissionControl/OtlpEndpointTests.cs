@@ -108,6 +108,25 @@ public sealed class OtlpEndpointTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true, 1)]
+    [InlineData(true, 8)]
+    [InlineData(false, 1)]
+    [InlineData(false, 8)]
+    public async Task Export_TruncatedGzip_ReturnsBadRequestWithoutAcceptingRecord(bool json, int missingBytes)
+    {
+        await using var app = await Start();
+        using var client = Client(app);
+        var type = json ? "application/json" : "application/x-protobuf";
+        using var compressed = Body(json ? "{}"u8.ToArray() : [], type, gzip: true);
+        var wire = await compressed.ReadAsByteArrayAsync();
+        using var body = Body(wire[..^missingBytes], type);
+        body.Headers.ContentEncoding.Add("gzip");
+        var response = await client.PostAsync("/v1/traces", body);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_root, "observations", "records")));
+    }
+
+    [Theory]
     [InlineData(false, null, "127.0.0.1", false, 401)]
     [InlineData(true, "Origin", "127.0.0.1", false, 403)]
     [InlineData(true, "Sec-Fetch-Site", "127.0.0.1", false, 403)]

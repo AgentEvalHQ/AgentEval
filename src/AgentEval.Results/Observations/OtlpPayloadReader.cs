@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.IO.Compression;
-
 namespace AgentEval.Results.Observations;
 
 /// <summary>
@@ -36,11 +34,13 @@ public sealed class OtlpPayloadReader : IOtlpPayloadReader
         {
             if (compression == OtlpCompression.Gzip)
             {
-                using var gzip = new GZipStream(bounded, CompressionMode.Decompress, leaveOpen: true);
-                await CopyDecoded(gzip).ConfigureAwait(false);
-                // GZipStream may stop before the transport does. Trailing bytes still consume the request budget.
-                while (await bounded.ReadAsync(buffer, cancellationToken).ConfigureAwait(false) != 0) { }
-                if (bounded.BytesRead < 18) throw new OtlpIngestionException("malformed", "incomplete gzip envelope");
+                // Retain at most the transport budget before validating each complete member.
+                // This also counts all trailing bytes, including malformed suffixes.
+                int count;
+                while ((count = await bounded.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) != 0)
+                    output.Write(buffer, 0, count);
+                return OtlpGzipDecoder.Decode(output.GetBuffer().AsMemory(0, (int)output.Length),
+                    _limits.MaxDecodedBytes, cancellationToken);
             }
             else await CopyDecoded(bounded).ConfigureAwait(false);
         }
@@ -68,7 +68,6 @@ public sealed class OtlpPayloadReader : IOtlpPayloadReader
     private sealed class TransportStream(Stream input, int limit) : Stream
     {
         private int _read;
-        internal int BytesRead => _read;
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
