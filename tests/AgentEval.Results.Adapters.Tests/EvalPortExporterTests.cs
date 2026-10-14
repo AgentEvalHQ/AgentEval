@@ -136,7 +136,7 @@ public sealed class EvalPortExporterTests : IDisposable
     [Fact]
     public void Export_TraceIdentity_RoundtripsThroughNativeFieldWithCaptureOff()
     {
-        const string trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        const string trace = "4bf92f3577b34da6a3ce929d0e0e4736"; // DevSkim: ignore DS173237 - W3C Trace Context example identity
         var source = Source(); source["results"]![0]!["metadata"] = new JsonObject { ["openeval.trace_id"] = trace };
         Import(source, AefContentCapture.Off);
         Assert.Equal(trace, (string?)AefTestRuns.Results(_root)[0]["traceLink"]!["traceId"]);

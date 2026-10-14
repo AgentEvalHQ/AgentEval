@@ -11,12 +11,14 @@ using AgentEval.Results.Observations;
 
 internal static class ObservationScaleFixture
 {
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
     internal static object Run(EvidenceIndexOptions options, int reports)
     {
         if (reports is < 1 or > 2000 || File.Exists(options.DatabasePath))
             throw new ArgumentException("Expected: a new index and 1..2000 reports. Actual: invalid fixture input. Suggestions: use a temporary directory. Because: existing evidence must remain untouched.");
-        const string span = """
-            {"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"private-prompt",
+        const string span = $$$"""
+            {"traceId":"{{{TestTraceId}}}","spanId":"0123456789abcdef","name":"private-prompt",
              "startTimeUnixNano":"18446744073709551615",
              "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
              {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},

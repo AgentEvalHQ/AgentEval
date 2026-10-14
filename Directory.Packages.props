@@ -8,7 +8,10 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <!-- Microsoft Agent Framework — core packages on 1.23.0 (stable), bumped from 1.17.0 (2026-10).
+    <!-- Microsoft Agent Framework — core packages on 1.24.0 (stable), within the currency gate.
+         The 1.24 package manifests retain the existing Extensions.AI/OpenAI dependency floors.
+         Preview-only sample integrations remain pinned separately below.
+         Previous upgrade validation (1.17 to 1.23, 2026-10):
          1.17→1.23 needed NO source changes: a trial build had 0 errors on net8/9/10 and the same warning set as 1.17.
          The runtime-relevant changes are in tool approval (1.18 #7474 bounds the auto-approval loop with
          MaxAutoApprovalIterations; 1.22/1.23 #8375/#8641 bind and then enforce approval responses on replay;
@@ -31,13 +34,13 @@
              1.14.0, which is why AgentEval's own AEGK001 experimental marker and every MAAI001 suppression
              around the approval bridge were removed.
          Microsoft.Agents.AI.Harness reaches its first STABLE release at 1.17.0 (was preview-only at 1.13.0). -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.24.0" />
     <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.23.0-preview.260928.1" /><!-- preview-only; A2A boundary sample + tests -->
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.23.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.23.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.24.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.24.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.24.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.23.0-preview.260928.1" /><!-- preview-only; sample-only -->
-    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.23.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
+    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.24.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
     <PackageVersion Include="Azure.AI.Projects" Version="3.0.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry 1.23.0-preview.260928.1, whose nuspec declares exactly 3.0.0-beta.3 (a major beta with breaking changes; referenced only by the Foundry SAMPLES, which build against it) -->
     <!-- S1: AGENT-HOOKS-0.1 interceptor contract (MIT, zero dependencies, lib/net8.0 + native FFI for
          win-x64/linux-x64/osx-x64/osx-arm64). Used ONLY by src/AgentEval.MAF.AgentHooks; deliberately not
@@ -85,6 +88,9 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
 
     <!-- Core -->
+    <!-- Pin the transitive PKCS dependency to the .NET 8 servicing fix for
+         GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7; compatible with all target frameworks. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.12" /><!-- floor raised by Microsoft.Extensions.AI 10.10.0 (required by MAF 1.23.0) -->
     <PackageVersion Include="System.Memory.Data" Version="10.0.10" /><!-- floor raised by Azure.Core (transitive via Azure.AI.Projects 3.0.0-beta.3, required by Microsoft.Agents.AI.Foundry 1.23.0-preview) -->
     <!-- Security: originally pinned to 1.15.3, the patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF).

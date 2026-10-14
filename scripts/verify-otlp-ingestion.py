@@ -151,7 +151,7 @@ def main():
             assert inventory() == before
 
             secret = {"resourceSpans": [{"scopeSpans": [{"spans": [{
-                "traceId": "0123456789abcdef0123456789abcdef", "spanId": "0123456789abcdef",
+                "traceId": "0123456789abcdef0123456789abcdef", "spanId": "0123456789abcdef", # DevSkim: ignore DS173237 - synthetic OTLP trace identity
                 "name": "fixture-private-prompt", "attributes": [
                     {"key": "unknown.content", "value": {"stringValue": "fixture-private-output"}}]}]}]}]}
             assert post(json.dumps(secret).encode())[0] == 200

@@ -27,7 +27,7 @@ public sealed class ArtifactCompanionCommandTests : IDisposable
     public void CreateAndVerify_SignedBundle_ReportsTrustAndRequiresExactIdentity()
     {
         var run = Run(); var output = Path.Combine(_root, "companion");
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — AEF signatures require P-256; the key is freshly generated
         var keyPath = Path.Combine(_root, "key.pem"); File.WriteAllText(keyPath, key.ExportPkcs8PrivateKeyPem());
         using var signer = new EcdsaP256Signer(key);
         var policy = Path.Combine(_root, "policy.json");

@@ -18,6 +18,8 @@ namespace AgentEval.Tests.MissionControl;
 
 public sealed class OtlpEndpointTests : IDisposable
 {
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
     private const string Key = "fixture-otlp-key-01234567890123456789";
     private readonly string _root = Path.Combine(Path.GetTempPath(), "mc-otlp-" + Guid.NewGuid().ToString("N"));
     private async Task<WebApplication> Start(bool enabled = true, string? remote = "127.0.0.1", bool https = false,
@@ -61,7 +63,7 @@ public sealed class OtlpEndpointTests : IDisposable
             using (var compressor = new GZipStream(stream, CompressionMode.Compress, true)) compressor.Write(bytes);
             bytes = stream.ToArray();
             // GZipStream can emit no envelope if no input was written. Use an actual empty gzip member.
-            if (bytes.Length == 0) bytes = Convert.FromHexString("1f8b080000000000000303000000000000000000");
+            if (bytes.Length == 0) bytes = Convert.FromHexString("1f8b080000000000000303000000000000000000"); // DevSkim: ignore DS173237 - public empty gzip member bytes
         }
         var content = new ByteArrayContent(bytes);
         content.Headers.ContentType = new MediaTypeHeaderValue(type);
@@ -216,8 +218,8 @@ public sealed class OtlpEndpointTests : IDisposable
     {
         await using var app = await Start();
         using var client = Client(app);
-        using var body = Body(Encoding.UTF8.GetBytes("""
-            {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef",
+        using var body = Body(Encoding.UTF8.GetBytes($$$"""
+            {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"{{{TestTraceId}}}",
             "spanId":"0123456789abcdef","name":"private-prompt","attributes":[{"key":"private","value":{"stringValue":"private-output"}}]}]}]}]}
             """));
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/v1/traces", body)).StatusCode);

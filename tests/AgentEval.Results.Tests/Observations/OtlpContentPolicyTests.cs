@@ -9,14 +9,16 @@ namespace AgentEval.Results.Tests.Observations;
 
 public sealed class OtlpContentPolicyTests
 {
-    private static OtlpTraceBatch Input() => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("""
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
+    private static OtlpTraceBatch Input() => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes($$$$"""
         {"resourceSpans":[{"resource":{"attributes":[
           {"key":"service.name","value":{"stringValue":"service"}},
           {"key":"secret","value":{"stringValue":"resource-secret"}}],"droppedAttributesCount":3,
           "entityRefs":[{"type":"private","idKeys":["secret"]}]},
           "schemaUrl":"schema","scopeSpans":[{"scope":{"name":"sdk","version":"1",
           "attributes":[{"key":"secret","value":{"stringValue":"scope-secret"}}]},"spans":[{
-          "traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef",
+          "traceId":"{{{{TestTraceId}}}}","spanId":"0123456789abcdef",
           "name":"prompt-secret","traceState":"secret","droppedAttributesCount":4,
           "droppedEventsCount":5,"droppedLinksCount":6,"status":{"code":2,"message":"error-secret"},
           "attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"model"}},
@@ -24,7 +26,7 @@ public sealed class OtlpContentPolicyTests
             {"key":"gen_ai.usage.prompt_tokens","value":{"arrayValue":{"values":[{"stringValue":"nested-secret"}]}}},
             {"key":"gen_ai.input.messages","value":{"stringValue":"message-secret"}}],
           "events":[{"name":"event-secret","attributes":[{"key":"secret","value":{"stringValue":"event-payload"}}]}],
-          "links":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"1123456789abcdef",
+          "links":[{"traceId":"{{{{TestTraceId}}}}","spanId":"1123456789abcdef",
             "traceState":"link-secret","droppedAttributesCount":7,
             "attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"link-secret"}}]}]
         }]}]}]}

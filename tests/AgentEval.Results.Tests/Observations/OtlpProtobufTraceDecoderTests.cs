@@ -105,7 +105,7 @@ public sealed class OtlpProtobufTraceDecoderTests
     {
         var source = Fixture("complete", ".pb");
         var decoder = new OtlpProtobufTraceDecoder(new() { MaxItems = 5000, MaxDepth = 16 });
-        var random = new Random(612);
+        var random = new Random(612); // DevSkim: ignore DS148264 — deterministic fuzz input, not cryptographic randomness
         for (var iteration = 0; iteration < 500; iteration++)
         {
             var bytes = source.ToArray();

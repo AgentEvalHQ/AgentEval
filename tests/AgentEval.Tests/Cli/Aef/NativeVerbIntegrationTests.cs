@@ -443,7 +443,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var command = EvalCommand.Create();
         var controls = new AefCliOptions(command);
         var options = Options(endpoint.Endpoint);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — AEF signatures require P-256; the key is freshly generated
         var keyPath = Path.Combine(_root, "key.pem");
         File.WriteAllText(keyPath, key.ExportPkcs8PrivateKeyPem());
         var parsed = command.Parse(["--aef-key", keyPath, "--dataset", options.Dataset.FullName]);

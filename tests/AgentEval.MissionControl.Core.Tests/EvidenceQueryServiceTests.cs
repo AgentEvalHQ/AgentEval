@@ -11,6 +11,8 @@ namespace AgentEval.MissionControl.Core.Tests;
 
 public sealed class EvidenceQueryServiceTests : IDisposable
 {
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ae-shared-query-" + Guid.NewGuid().ToString("N"));
     private EvidenceIndexOptions Options => new() { DatabasePath = Path.Combine(_root, "index.sqlite") };
     private EvidenceQueryService Service() => new(new SqliteEvidenceSourceReader(Options), new SqliteEvidenceDetailReader(Options));
@@ -101,8 +103,8 @@ public sealed class EvidenceQueryServiceTests : IDisposable
     [Fact]
     public void ObservationQueries_StoredEvidence_PreserveDuplicateReportsAndConflictProvenance()
     {
-        const string span = """
-            {"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef",
+        const string span = $$$"""
+            {"traceId":"{{{TestTraceId}}}","spanId":"0123456789abcdef",
              "startTimeUnixNano":"18446744073709551615",
              "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
              {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},

@@ -43,7 +43,7 @@ public sealed class EvalPortBoundaryTests : IDisposable
     [InlineData(AefState.Error)]
     public void Export_NativeEndpointTraceAndReason_PreservesAvailableFields(AefState state)
     {
-        var trace = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7");
+        var trace = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"); // DevSkim: ignore DS173237 - W3C Trace Context example identity
         Write(endpoint: "https://example.test/api", trace: trace, state: state, reason: "Native explanation");
         var result = new AefEvalPortExporter().Export(_root).ResultSet.ToJson();
         Assert.Equal("https://example.test/api", (string?)result["provider"]!["api_base"]);

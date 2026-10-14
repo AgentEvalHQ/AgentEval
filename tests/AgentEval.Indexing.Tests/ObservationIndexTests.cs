@@ -10,13 +10,15 @@ namespace AgentEval.Indexing.Tests;
 
 public sealed class ObservationIndexTests : IDisposable
 {
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ae-observation-index-" + Guid.NewGuid().ToString("N"));
     private string Database => Path.Combine(_root, "index.sqlite");
     private OtlpObservationStore Store() => new(new() { Root = Path.Combine(_root, "observations"), Source = "receiver" },
         new OtlpContentPolicy(), new OtlpSessionGrouper(new OtlpTraceNormalizer()));
     private SqliteEvidenceIndexWriter Writer() => new(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
-    private static OtlpTraceBatch Batch(string span = "0123456789abcdef") => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("""
-        {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"SPAN",
+    private static OtlpTraceBatch Batch(string span = "0123456789abcdef") => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes($$$"""
+        {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"{{{TestTraceId}}}","spanId":"SPAN",
         "startTimeUnixNano":"18446744073709551615","name":"private-prompt",
         "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
         {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},

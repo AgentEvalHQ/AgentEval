@@ -105,7 +105,7 @@ public sealed class OtlpPayloadReaderTests
 
     // Independently generated with Python gzip/zlib, including all optional RFC 1952 fields.
     private static byte[] OptionalHeaderMember() => Convert.FromHexString(
-        "1f8b081f0000000000ff0300657874666978747572652e6a736f6e006f7074696f6e616c2068656164657200b0a4ab562a4a2dce2f2d4a4e0d2e48cc2b56b28a8ead050095e3b04c14000000");
+        "1f8b081f0000000000ff0300657874666978747572652e6a736f6e006f7074696f6e616c2068656164657200b0a4ab562a4a2dce2f2d4a4e0d2e48cc2b56b28a8ead050095e3b04c14000000"); // DevSkim: ignore DS173237 - public gzip fixture bytes with optional headers
 
     [Theory]
     [InlineData(false)]
@@ -169,7 +169,7 @@ public sealed class OtlpPayloadReaderTests
         var payload = new byte[128 * 1024];
         if (compressible)
             for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i % 19);
-        else new Random(42).NextBytes(payload);
+        else new Random(42).NextBytes(payload); // DevSkim: ignore DS148264 — reproducible compression test bytes, not a secret
         using var wire = new MemoryStream();
         using (var compressor = new GZipStream(wire, level, leaveOpen: true)) compressor.Write(payload);
         using var input = new FragmentedInput(wire.ToArray(), 8192);

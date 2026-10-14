@@ -10,14 +10,16 @@ namespace AgentEval.Results.Tests.Observations;
 
 public sealed class OtlpObservationStoreTests : IDisposable
 {
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ae-observations-" + Guid.NewGuid().ToString("N"));
     private OtlpObservationStore Open(OtlpContentCapture capture = OtlpContentCapture.Off, int records = 4096,
         int recordBytes = 16 << 20, long storedBytes = 512L << 20) => new(new()
         { Root = _root, Source = "receiver", Capture = capture, MaxRecords = records, MaxRecordBytes = recordBytes, MaxStoredBytes = storedBytes },
         new OtlpContentPolicy(), new OtlpSessionGrouper(new OtlpTraceNormalizer()));
-    private static OtlpTraceBatch Batch(string model = "model") => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("""
+    private static OtlpTraceBatch Batch(string model = "model") => new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes($$$"""
         {"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"service"}}]},
-        "scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef",
+        "scopeSpans":[{"spans":[{"traceId":"{{{TestTraceId}}}","spanId":"0123456789abcdef",
         "name":"private-prompt","attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"MODEL"}},
         {"key":"session.id","value":{"stringValue":"session"}},{"key":"private","value":{"stringValue":"private-payload"}}]}]}]}]}
         """.Replace("MODEL", model)));

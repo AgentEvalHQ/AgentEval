@@ -9,6 +9,8 @@ using AgentEval.Results.Writing;
 using AgentEval.Results.Observations;
 using System.Text;
 
+const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
 // Offline fixture: all values and reviewer identities are test data, with no provider calls.
 // Require a new directory so acceptance cannot accidentally reuse old index/evidence state.
 var workspace = Path.GetFullPath(args.Single());
@@ -61,9 +63,9 @@ using var observations = new OtlpObservationStore(new()
 {
     Root = Path.Combine(workspace, "observations"), Source = "offline-observer"
 }, new OtlpContentPolicy(), new OtlpSessionGrouper(new OtlpTraceNormalizer()));
-observations.Accept(new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("""
+observations.Accept(new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes($$$"""
     {"resourceSpans":[{"scopeSpans":[{"spans":[{
-    "traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef",
+    "traceId":"{{{TestTraceId}}}","spanId":"0123456789abcdef",
     "startTimeUnixNano":"18446744073709551615",
     "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
     {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},

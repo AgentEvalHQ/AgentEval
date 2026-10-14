@@ -10,8 +10,10 @@ namespace AgentEval.Results.Tests.Observations;
 
 public sealed class OtlpTraceNormalizerTests
 {
-    private static readonly OtlpSpan EmptySpan = new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes("""
-        {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef"}]}]}]}
+    private const string TestTraceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+
+    private static readonly OtlpSpan EmptySpan = new OtlpJsonTraceDecoder().Decode(Encoding.UTF8.GetBytes($$"""
+        {"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"{{TestTraceId}}","spanId":"0123456789abcdef"}]}]}]}
         """)).Resources[0].Scopes[0].Spans[0];
     private static OtlpAttribute Text(string key, string value) => new(key, new OtlpValue.Text(value));
     private static OtlpAttribute Count(string key, long value) => new(key, new OtlpValue.Integer(value));

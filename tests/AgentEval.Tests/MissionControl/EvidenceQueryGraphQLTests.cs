@@ -195,8 +195,9 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
     [Fact]
     public async Task EvidencePages_ActualObservations_PreserveDuplicatesExactTimesAndConflictProvenance()
     {
-        const string span = """
-            {"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","startTimeUnixNano":"18446744073709551615",
+        const string traceId = "0123456789abcdef0123456789abcdef"; // DevSkim: ignore DS173237 - synthetic OTLP trace identity, not a credential
+        const string span = $$$"""
+            {"traceId":"{{{traceId}}}","spanId":"0123456789abcdef","startTimeUnixNano":"18446744073709551615",
              "attributes":[{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}},
              {"key":"gen_ai.usage.output_tokens","value":{"intValue":"12"}},
              {"key":"gen_ai.usage.completion_tokens","value":{"intValue":"13"}}]}
