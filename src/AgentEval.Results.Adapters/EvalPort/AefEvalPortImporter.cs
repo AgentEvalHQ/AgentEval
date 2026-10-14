@@ -38,6 +38,7 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
         {
             "Root passed flags are source declarations: Own aggregation records grader children with zero weight; no source threshold is invented.",
             "Repeated attempts use converter-computed AllPass rollups; missing observations do not become passing evidence.",
+            "Each observation records an aggregationCheck: verified means agreement with available policy inputs, not trusted execution; unverifiable means suite facts or policy semantics are unavailable.",
             "With capture-on, provider configuration, source summary and arbitrary metadata are retained as source declarations in supplemental document evidence; capture-off omits them. External signatures and trust are not transferred.",
             "Source error objects are retained as document evidence only with capture-on; capture-off retains declared error type/retryability and omits message/code content.",
         }).ToArray();
@@ -149,6 +150,7 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
                 DurationMs = result["duration_ms"] is { } duration ? ExactDuration(duration) : null,
                 Ext = new() { ["evalport"] = new JsonObject { ["passed"] = result["passed"]!.DeepClone(),
                     ["attemptDeclared"] = result.ContainsKey("attempt"), ["error"] = errorContext,
+                    ["aggregationCheck"] = EvalPortAggregation.Assess(result, options.AggregationContext),
                     ["aggregation"] = options.ContentCapture == AefContentCapture.On ? result["metadata"]?["openeval.aggregation"]?.DeepClone() : null } },
             };
             observations.Add(new(root, children, result["actual_output"]?.GetValue<string>(), result["error"]?.DeepClone().AsObject()));

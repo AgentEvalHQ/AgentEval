@@ -112,7 +112,7 @@ GraderResult.
 | `score: null` | `state: not_measured` with a `reason` | lossy: null does not say whether the grader was skipped, pending or failed |
 | `reason` | `reason` | exact |
 | the grader's `weight` | `component.weight`; `required` is `true` for `all` | lossy |
-| `openeval.aggregation` | `aggregation.strategy`: `weighted` → `WeightedSum`, `majority` → `MajorityVote`, `all` → `Min`; `any` has no counterpart. A root with grader lines always carries `aggregation`, and each grader line `component` ([RES-5](../spec/03-run.md#343-composites)), so a Result without the extension takes EvalPort's default, `all` | lossy |
+| `openeval.aggregation` | native `Own` aggregation retains the source decision; `ext.evalport.aggregationCheck` records agreement with available policy inputs | declared policies are checked; absent suite facts are explicitly unverifiable, not assumed equal-weight or default-all |
 | `actual_output`; a test case's `input`, `expected_output` | blobs cited by evidence of kind `output`, `input`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
 | a test case's `context`, `retrieval_context` | blobs cited by evidence of kind `document` (capture `on`) | exact when captured |
 | `duration_ms` | `durationMs` | exact |
@@ -309,8 +309,7 @@ does not require retaining provider messages that may contain case content.
 The current importer does not transfer provider configuration, arbitrary metadata,
 the source summary or external signatures; conversion notes state these losses.
 The AEF summary is recomputed from root pass observations/rollups without a run-level
-approval rule. Aggregation semantic acceptance and complete interoperability
-roundtrip acceptance remain unfinished. The full W09 interoperability task is not complete.
+approval rule. Complete interoperability roundtrip acceptance remains unfinished. The full W09 interoperability task is not complete.
 
 `IAefEvalPortExporter` / `AefEvalPortExporter` now exports verified base evidence
 from a bounded owned copy. It requires an intact seal, supports an optional exact
@@ -335,7 +334,7 @@ individual results; converter rollups do not become extra EvalPort observations.
 Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
 The exported document is checked by the pinned ResultSet validator. This is an
 initial reverse projection, not completion of the full mapping matrix: remaining
-aggregation acceptance, generic reverse structural fidelity and further resource tests
+generic reverse structural fidelity and further resource tests
 still need acceptance.
 
 When one AEF case has multiple distinct root paths, each case/path receives a
@@ -344,6 +343,35 @@ collisions with existing case IDs. Original case/path identity remains in each
 result's `metadata.aef.caseId` and `path`. This prevents duplicate observations
 without relabeling separate roots as repeated attempts or combining their verdicts.
 The mapping is stable within the selected run and is reported in conversion notes.
+
+### Aggregation checks and suite context
+
+Before writing output, the importer checks result-level `openeval.aggregation`
+against measured graders. Null scores are excluded. Supported policies are `all`,
+`any`, strict `majority` (pass fraction greater than its cutoff, default 0.5), and
+`weighted` (weighted score greater than or equal to the required threshold).
+Malformed known policies and demonstrable pass-flag contradictions are refused.
+Unknown policy fields and execution-error overrides are explicitly unverifiable.
+This follows the [pinned aggregation specification](https://github.com/adhabnr-ux/evalport/blob/d0e90c48cfa8cabceefb066dcfa757ea3f5c85f3/SPEC.md#aggregation-extension-metadataopenevalaggregation).
+
+A standalone ResultSet does not establish its suite's default policy or grader
+weights. The API's optional `EvalPortAggregationContext` supplies these facts:
+`Strategy` and `Threshold` describe the suite default, and `GraderWeights` contains
+each resolved grader weight (explicitly 1 when the suite definition omits it).
+A missing measured grader weight prevents a weighted check; it never becomes an
+invented default. Result-level policies override the supplied suite default.
+Supplying context adds `evalport.aggregationContext` to `imported.asserted`.
+The current CLI imports standalone ResultSets without suite context.
+
+Each root retains `ext.evalport.aggregationCheck`, including status, reason and,
+when checked, measured count, expected decision, strategy and threshold. Weighted
+checks also record the caller-supplied weights and computed score. Finite weights
+are scaled before summation to avoid overflow; comparison uses binary64 arithmetic.
+Zero total measured weight is unverifiable. These checks are retained with capture
+off because they contain decision inputs rather than captured output or reasoning.
+`verified` here means arithmetic agreement with the available inputs, not trusted
+execution or an approval. Native AEF still uses `Own` to avoid substituting a
+different AEF aggregation rule for the recorded external decision.
 
 ### Captured source declarations
 

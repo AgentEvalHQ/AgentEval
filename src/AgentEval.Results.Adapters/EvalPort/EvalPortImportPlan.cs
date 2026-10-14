@@ -19,6 +19,8 @@ public sealed record AefEvalPortImportOptions : AefConversionOptions
     public AefSubject? Subject { get; init; }
     /// <summary>Exact suite version when absent from the ResultSet; never a digest of result bytes.</summary>
     public string? SuiteVersion { get; init; }
+    /// <summary>Optional caller-asserted suite policy and resolved weights for aggregation checks.</summary>
+    public EvalPortAggregationContext? AggregationContext { get; init; }
 }
 
 // Planning validates temporal and identity inputs before any run directory is created.
@@ -30,6 +32,7 @@ internal sealed record EvalPortImportPlan(EvalPortResultSet Source, AefRunHeader
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(options);
         var doc = source.ToJson(); var asserted = new List<string> { "execution.targetMode", "contentCapture" };
         var notes = new List<string>();
+        if (options.AggregationContext is not null) asserted.Add("evalport.aggregationContext");
         var subject = options.Subject;
         if (subject is not null) asserted.AddRange(["subject.ref", "subject.kind"]);
         else if (doc["provider"]?["model"] is JsonValue model && model.TryGetValue<string>(out var modelName) && modelName.Length > 0)
