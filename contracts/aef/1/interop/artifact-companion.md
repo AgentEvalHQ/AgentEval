@@ -1,6 +1,6 @@
 # Artifact-bound evidence companion
 
-Status: mapping accepted for implementation; writer/verifier acceptance is still pending.
+Status: mapping and Results model/service implemented; CLI and full acceptance remain pending.
 This is an optional companion profile, not a change to the AEF 1.0 run schema.
 
 ## Purpose and boundary
@@ -122,3 +122,35 @@ their existing independent verification and time-selection rules.
 
 W09-01 completes this mapping only. W09-02 delivers implementation; W09-04 supplies
 the broader interoperability roundtrip acceptance.
+
+## Results API
+
+```csharp
+IArtifactCompanionService companions = new ArtifactCompanionService();
+// runDirectory is an explicit absolute local path; artifactSha256 is caller supplied.
+var document = companions.Create(runDirectory, "agent.tar", artifactSha256);
+var envelope = companions.Sign(document, signer);
+var report = companions.Verify(document, artifactSha256, runDirectory, envelope, policy);
+```
+
+`Create` verifies a bounded owned copy and refuses unsealed or invalid evidence.
+It returns a document without writing companion files into the run. `Sign` reuses
+the existing DSSE signer and preserves document bytes. The caller owns the signer.
+`Verify` returns `ArtifactMatches`, `SealMatches`, `RunHashMatches`, the existing
+`Evidence` verification report, and separate `Signature` checks. `IntactBinding`
+combines the byte-binding checks and base evidence integrity only; consumers must
+also inspect the signature outcome and apply their own acceptance policy.
+
+An absent envelope gives `Signature == null`. A present malformed envelope has an
+explicit malformed result. Without caller policy, an empty trust policy is used and
+`PolicySupplied` is false; no identity is trusted implicitly. Withholding remains
+visible in `Evidence.Withheld`. The same caller policy is used for evidence redaction
+authority and companion signer identification, without transferring authority
+between them.
+
+The shared internal capture reads an ordinary, bounded file inventory into a
+temporary owned directory. Verification and seal hashing then use that copy; the
+source is never modified. This is not an atomic filesystem snapshot of a changing
+source. The captured evidence must verify as a whole, and observed size/type changes
+are refused. Capture cancellation is cooperative; the synchronous run verifier is
+checked for cancellation before and after its work, not forcibly interrupted.
