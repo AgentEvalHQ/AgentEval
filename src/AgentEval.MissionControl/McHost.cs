@@ -85,6 +85,7 @@ public static class McHost
         builder.Services.AddScoped<ComplianceMatrixService>();
 
         AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Configure(builder);
 
         // GraphQL (Hot Chocolate 16, ChilliCream — primary read surface).
         // Plan-07 §3 Challenge 1: hybrid REST + GraphQL split.
@@ -236,6 +237,7 @@ public static class McHost
         });
 
         // REST: minimal binary + version surface (plan-07 §8.2).
+        AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Map(app);
         // Plan-08 portal-review B4 (T2.2, 2026-05-25): the deployment mode is
         // sourced from configuration (`AgentEval:Mode` / env `AgentEval__Mode`)
         // instead of being hard-coded. Mode A on loopback reports `"local"`;
