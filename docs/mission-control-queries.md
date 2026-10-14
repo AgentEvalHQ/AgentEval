@@ -191,6 +191,15 @@ report: submitted inputs remain visible until another request is submitted.
 Loading, refused and failed requests hide the old report. An unavailable
 query is not a missing requirement or a successful evaluation.
 
+Expand a requirement's **Waiver history** to inspect every verified waiver
+retained in its report, including inactive and unauthorized entries. Each entry
+shows its exact run/requirement scope, event, declared identity, established
+assurance, expiry, activity at the report time, and scoped authorization.
+Inactive does not necessarily mean expired: a waiver may also begin after the
+selected view time. A signed event still requires the configured permission
+for that requirement. The final status remains the resolver's decision, and
+sealed measurements remain unchanged.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;

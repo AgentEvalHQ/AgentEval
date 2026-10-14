@@ -48,11 +48,17 @@ try {
           subject: { ref: request.variables.subjectRef, version: request.variables.subjectVersion },
           selectedRunHashes: hasEvidence ? ['selected-hash'] : [],
           evidence: hasEvidence ? [{ runId: 'run-1', runHash: 'selected-hash', overlayDigest: 'overlay-digest' }] : [],
-          requirements: [{ id: 'REQ-1', baseStatus: hasEvidence ? 'fail' : 'missing', effectiveStatus: hasEvidence ? 'fail' : 'missing',
-            status: hasEvidence ? 'waived' : 'missing', diagnostics: ['<script>diagnostic()</script>'],
+          requirements: [{ id: 'REQ-1', baseStatus: hasEvidence ? 'not_met' : 'not_measured', effectiveStatus: hasEvidence ? 'not_met' : 'not_measured',
+            status: hasEvidence ? 'waived' : 'not_measured', diagnostics: ['<script>diagnostic()</script>'],
             observations: hasEvidence ? [{ runHash: 'selected-hash', resultId: 'result-1', lane: 'scenario', metric: 'metric-1', path: 'root',
               sealedState: 'fail', effectiveState: 'fail', overrideEvent: null, value: 0, endedAt: '2026-01-01T00:00:00.000000001Z' }] : [],
             reviews: [],
+            waivers: hasEvidence ? [
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-active', identity: 'approver-1', assurance: 'signed', expires: '2027-01-01T00:00:00Z', active: true, authorized: true },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-expired', identity: 'approver-1', assurance: 'signed', expires: '2025-01-01T00:00:00Z', active: false, authorized: true },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-untrusted', identity: '<script>claim()</script>', assurance: 'self-attested', expires: '2027-01-01T00:00:00Z', active: true, authorized: false },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-wrong-permission', identity: 'approver-2', assurance: 'signed', expires: '2027-01-01T00:00:00Z', active: true, authorized: false },
+            ] : [],
           }],
         } : null,
       } } } }); return;
@@ -219,10 +225,19 @@ try {
   await report.getByText('catalogue-digest', { exact: true }).waitFor();
   assert.deepEqual(requests.at(-1).sourceIds, ['source-1']);
   assert.equal(requests.at(-1).at, '2026-01-02T00:00:00.000000001Z');
-  assert.equal(await report.getByRole('cell', { name: 'fail', exact: true }).count(), 2);
+  assert.equal(await report.getByRole('cell', { name: 'not_met', exact: true }).count(), 2);
   assert.equal(await report.getByRole('cell', { name: 'waived', exact: true }).count(), 1);
   await report.locator('summary').filter({ hasText: '1 observations' }).click();
   await report.getByText('<script>diagnostic()</script>', { exact: true }).waitFor();
+  assert.equal(await report.locator('script').count(), 0);
+  await report.locator('summary').filter({ hasText: 'Waiver history (4)' }).click();
+  const activeWaiver = report.locator('dl[aria-label="Waiver waiver-active"]');
+  assert.match(await activeWaiver.innerText(), /Active at view time/);
+  assert.match(await activeWaiver.innerText(), /Authorized for this requirement/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-expired"]').innerText(), /Inactive at view time/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-untrusted"]').innerText(), /self-attested/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-wrong-permission"]').innerText(), /Not authorized/);
+  assert.equal(await report.getByText('<script>claim()</script>', { exact: true }).count(), 1);
   assert.equal(await report.locator('script').count(), 0);
   await page.getByLabel('Subject version').fill('v2');
   assert.equal(await report.getByText('agent:test / v1', { exact: true }).count(), 1);
@@ -230,7 +245,7 @@ try {
   await page.getByRole('button', { name: 'Resolve requirements' }).click();
   await report.getByText('agent:test / v2', { exact: true }).waitFor();
   assert.deepEqual(requests.at(-1).sourceIds, []);
-  assert.equal(await report.getByRole('cell', { name: 'missing', exact: true }).count(), 3);
+  assert.equal(await report.getByRole('cell', { name: 'not_measured', exact: true }).count(), 3);
   requirementsState = 'UNAVAILABLE';
   await page.getByRole('button', { name: 'Resolve requirements' }).click();
   await page.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();

@@ -11,6 +11,7 @@ const REQUIREMENTS_QUERY = /* GraphQL */ `
       data { catalogueDigest policyDigest at subject { ref version } selectedRunHashes
         evidence { runId runHash overlayDigest }
         requirements { id baseStatus effectiveStatus status diagnostics
+          waivers { runHash requirement event identity assurance expires active authorized }
           observations { runHash resultId lane metric path sealedState effectiveState overrideEvent value endedAt }
           reviews { runHash target status event }
         }
@@ -27,6 +28,8 @@ interface Report {
     observations: { runHash: string; resultId: string; lane: string; metric: string; path: string;
       sealedState: string; effectiveState: string; overrideEvent: string | null; value: number | null; endedAt: string }[];
     reviews: { runHash: string; target: string; status: string; event: string }[];
+    waivers: { runHash: string; requirement: string; event: string; identity: string; assurance: string;
+      expires: string; active: boolean; authorized: boolean }[];
   }[];
 }
 
@@ -99,6 +102,17 @@ export function RequirementsPage() {
             </dl>)}
             <p className="font-medium mt-2">Reviews</p>
             {rule.reviews.length === 0 ? <p>No reviews.</p> : rule.reviews.map((review, i) => <p className="break-all" key={i}>{review.runHash} / {review.target}: {review.status} — {review.event}</p>)}
+          </details>
+          <details className="mt-3"><summary className="cursor-pointer">Waiver history ({rule.waivers.length})</summary>
+            <p className="my-2 text-slate-600">Activity is evaluated at the report's view time. Authorization is determined by the host's trust policy for this requirement. A signature alone does not grant permission; a waiver for one run does not cover another.</p>
+            {rule.waivers.length === 0 ? <p>No verified requirement waivers.</p> : rule.waivers.map((waiver, i) =>
+              <dl key={i} className="border-t pt-2 my-3 break-all" aria-label={`Waiver ${waiver.event}`}>
+                {[["Run hash", waiver.runHash], ["Requirement scope", waiver.requirement], ["Event", waiver.event],
+                  ["Declared identity", waiver.identity], ["Established assurance", waiver.assurance],
+                  ["Expires", waiver.expires], ["Activity", waiver.active ? "Active at view time" : "Inactive at view time"],
+                  ["Authorization", waiver.authorized ? "Authorized for this requirement" : "Not authorized for this requirement"]].map(([label, value]) =>
+                  <div key={label}><dt className="inline font-medium">{label}: </dt><dd className="inline">{value}</dd></div>)}
+              </dl>)}
           </details></td>
         </tr>)}</tbody>
       </table></div>
