@@ -120,8 +120,8 @@ their existing independent verification and time-selection rules.
 - CLI output must distinguish producer assertion, byte binding and verified signer.
   Publishing predicates/media types and keyless Sigstore support remain separate.
 
-W09-01 completes this mapping only. W09-02 delivers the companion implementation
-and its roundtrip acceptance. W09-04 separately covers EvalPort mapping roundtrips.
+The mapping, companion implementation and roundtrip acceptance are complete.
+EvalPort conversion is described separately in [the EvalPort profile](evalport.md).
 
 ## Results API
 

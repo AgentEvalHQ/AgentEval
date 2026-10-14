@@ -155,9 +155,9 @@ passing and passing results with no measured graders. Attempt and duration field
 must be exact integers within Int64 range. These limits are adapter refusals, not
 new constraints claimed for all EvalPort producers. No output is written by parsing.
 
-This boundary does not yet check aggregation metadata or perform date conversion:
-schema `format` is an annotation in the reused validator. The importer must check
-those before producing AEF evidence. It accepts the pinned schema's shape with
+This parser does not check aggregation metadata or perform date conversion:
+schema `format` is an annotation in the reused validator. The importer checks
+those before producing AEF evidence. The parser accepts the pinned schema's shape with
 major version 1, and refuses unknown fields including the proposed `verdict` field.
 
 The internal import planner now validates header and temporal mapping before output
@@ -193,9 +193,9 @@ The implemented root mapping uses **Own** aggregation and zero-weight grader chi
 preserving the source's `passed` declaration instead of pretending that an AEF
 threshold reproduces arbitrary EvalPort aggregation metadata. `rulePath: threshold`
 is the AEF display category for that declared Boolean decision; no numeric threshold
-is asserted. This supersedes the speculative `Min`/`WeightedSum` root reconstruction
-in the mapping tables for this importer. It is not a validation of the source's
-aggregation calculation. Aggregation metadata is retained only with capture-on.
+is asserted. This representation does not itself validate the source's aggregation
+calculation; the separate aggregation checks are described below. Original aggregation
+metadata is retained only with capture-on, while the check report is retained in both modes.
 
 Explicit attempts map to zero-based trial indices; repeated cases receive
 converter-computed `AllPass` rollup trees. Rollups cover observed attempts only, do
