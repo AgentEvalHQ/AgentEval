@@ -97,7 +97,7 @@ GraderResult.
 | `runner` | `imported.from`; `producer` is the converter (RUN-15) | exact |
 | `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy: a ResultSet names a model, which may be one part of the subject |
 | (EvalPort does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
-| `isolation`, `group` | `ext` | none |
+| `isolation`, `group` | `ext/evalport-context.json` | exact through `EvalPortRunContext`; full ResultSet conversion remains pending |
 | `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
 | `test_case_id` | `caseId` | exact |
 | `attempt` | `trial` = `attempt` − 1, on the Result's root line and on each of its grader lines ([RES-8](../spec/03-run.md#344-repeated-trials)) | exact |
@@ -121,7 +121,7 @@ GraderResult.
 | `metadata.openeval.cost` | `usage` entries | lossy: EvalPort does not fix the key's shape |
 | `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); each entry's `verdict` is `scored`, with no `rule`, since a ResultSet's pass rate has no run-level rule ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact for the counts and rates, which the verifier recomputes |
 | proposed `verdict` (`passed`, `failed`, `unverified`) | root `state` `passed`, `failed`, `not_measured` (or `inconclusive` when graders scored) | exact |
-| a `.sigstore.json` bundle | outside the run; AEF accepts Sigstore as a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | lossy |
+| a `.sigstore.json` bundle | retained outside the run; AEF 1.0 public-key trust policy does not accept a keyless Sigstore bundle ([SIG-4](../spec/04-integrity.md#44-signatures)) | no automatic trust transfer |
 
 ## What does not carry over
 
@@ -197,7 +197,36 @@ RES-4 then gives the same four ids as the corpus: `r_479d157f3423e95d566bcbfc0c6
 An importer that ignores `metadata.aef` reads the null score as `not_measured`, and gets `not_applicable` back only
 from metadata.
 
-## Still open
+## Isolation and group extension
 
-- **`isolation` and `group`.** AEF has no field for a ResultSet's trial isolation or for its membership in a group of
-  sibling runs.
+`AgentEval.Results.Interop.EvalPortRunContext` preserves these run-level declarations
+in `ext/evalport-context.json`, written before the run is closed and covered by its
+normal seal. This adds no fields to the base AEF 1.0 run schema.
+
+```json
+{"schemaVersion":"1.0","isolation":"fresh","group":{"group_id":"sweep-1","parent_group_id":"campaign-1","role":"candidate","label":"model A","sequence":17}}
+```
+
+The implementation follows the isolation/group constraints in the
+[pinned ResultSet schema](https://raw.githubusercontent.com/adhabnr-ux/evalport/d0e90c48cfa8cabceefb066dcfa757ea3f5c85f3/schema/resultset.json),
+rechecked on 2026-10-14. Isolation and role remain open strings; absence stays
+undeclared. Group identifiers and optional parent identifiers are nonempty strings;
+self-parenting is refused. Sequence is an exact nonnegative JSON integer, with no
+inferred contiguous membership or group completeness. Labels are display text,
+never identity. Declaring isolation does not prove that execution enforced it.
+
+`FromResultSet` extracts these fields from strict JSON bounded to the standard AEF
+JSON limit; it does not validate other ResultSet fields. `ToBytes`/`Parse` use a
+64 KiB extension limit. `WriteTo` writes through an open `AefRunWriter`.
+`ApplyTo` returns a detached object and refuses conflicting destination context.
+Both the numeric value and original sequence token are retained; no conversion
+through binary64 or a JavaScript number is used to determine integrality.
+
+The extension parser is deliberately closed at version 1.0. Unknown isolation/role
+values are accepted, while unknown field names are refused. This preserves the
+pinned schema's distinction between open vocabularies and closed objects.
+
+Still pending: verified extension reads and full ResultSet adapters, including the
+losses in the tables above and roundtrip acceptance. A parsed extension alone has
+not had its seal checked. Group chains across multiple runs are consumer joins;
+this component does not resolve parents or prove absence of cross-run cycles.
