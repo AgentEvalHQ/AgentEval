@@ -1,26 +1,26 @@
+import { lazy } from "react";
 import { Route, Routes } from "react-router";
 import { AppShell } from "@/components/AppShell";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { SubjectDetailPage } from "@/pages/SubjectDetailPage";
-import { RunsListPage } from "@/pages/RunsListPage";
-import { RunDetailPage } from "@/pages/RunDetailPage";
-import { ScenarioTreePage } from "@/pages/ScenarioTreePage";
-import { TraceWaterfallPage } from "@/pages/TraceWaterfallPage";
-import { ComplianceListPage } from "@/pages/ComplianceListPage";
-import { ComplianceMatrixPage } from "@/pages/ComplianceMatrixPage";
-import { EvidenceDetailPage } from "@/pages/EvidenceDetailPage";
-import { EvaluatorsPage } from "@/pages/EvaluatorsPage";
-import { EvaluatorDetailPage } from "@/pages/EvaluatorDetailPage";
-import { RedTeamCampaigns } from "@/pages/RedTeamCampaigns";
 import { NotFoundPage } from "@/pages/NotFoundPage";
-import { GovernancePage } from "@/pages/GovernancePage";
-import { RequirementsPage } from "@/pages/RequirementsPage";
-import { CheckpointsPage } from "@/pages/CheckpointsPage";
-import { GovernanceSourcePage } from "@/pages/GovernanceSourcePage";
 
-// Plan-08 MC1.6.2 + Waves 2-5: routing.
-// Routes match plan-07 §10. Wave 4 adds /compliance/:regulation. Phase 1
-// SPA core navigation is now feature-complete for the shipped backend.
+// Load page code on navigation so governance reads do not download every chart.
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then(module => ({ default: module.DashboardPage })));
+const SubjectDetailPage = lazy(() => import("@/pages/SubjectDetailPage").then(module => ({ default: module.SubjectDetailPage })));
+const RunsListPage = lazy(() => import("@/pages/RunsListPage").then(module => ({ default: module.RunsListPage })));
+const RunDetailPage = lazy(() => import("@/pages/RunDetailPage").then(module => ({ default: module.RunDetailPage })));
+const ScenarioTreePage = lazy(() => import("@/pages/ScenarioTreePage").then(module => ({ default: module.ScenarioTreePage })));
+const TraceWaterfallPage = lazy(() => import("@/pages/TraceWaterfallPage").then(module => ({ default: module.TraceWaterfallPage })));
+const ComplianceListPage = lazy(() => import("@/pages/ComplianceListPage").then(module => ({ default: module.ComplianceListPage })));
+const ComplianceMatrixPage = lazy(() => import("@/pages/ComplianceMatrixPage").then(module => ({ default: module.ComplianceMatrixPage })));
+const EvidenceDetailPage = lazy(() => import("@/pages/EvidenceDetailPage").then(module => ({ default: module.EvidenceDetailPage })));
+const EvaluatorsPage = lazy(() => import("@/pages/EvaluatorsPage").then(module => ({ default: module.EvaluatorsPage })));
+const EvaluatorDetailPage = lazy(() => import("@/pages/EvaluatorDetailPage").then(module => ({ default: module.EvaluatorDetailPage })));
+const RedTeamCampaigns = lazy(() => import("@/pages/RedTeamCampaigns").then(module => ({ default: module.RedTeamCampaigns })));
+const GovernancePage = lazy(() => import("@/pages/GovernancePage").then(module => ({ default: module.GovernancePage })));
+const RequirementsPage = lazy(() => import("@/pages/RequirementsPage").then(module => ({ default: module.RequirementsPage })));
+const CheckpointsPage = lazy(() => import("@/pages/CheckpointsPage").then(module => ({ default: module.CheckpointsPage })));
+const GovernanceSourcePage = lazy(() => import("@/pages/GovernanceSourcePage").then(module => ({ default: module.GovernanceSourcePage })));
+
 export function App() {
   return (
     <Routes>

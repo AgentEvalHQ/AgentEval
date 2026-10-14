@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History, Swords } from "lucide-react";
@@ -72,7 +73,9 @@ export function AppShell() {
                 agentEvalVersion={wsQ.data.workspace.agentEvalVersion}
               />
             ) : (
-              <Outlet />
+              <Suspense fallback={<p role="status" className="text-slate-500">Loading page…</p>}>
+                <Outlet />
+              </Suspense>
             )}
           </ErrorBoundary>
         </main>

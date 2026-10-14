@@ -36,4 +36,7 @@ retains only the public trust policy. Acceptance covers source navigation,
 metrics, exact observation integers and conflicts, signed decision history,
 authorized waiver expiry, checkpoint signatures/anchors, missing selection and
 post-index evidence tampering. This is a source-build acceptance path; CLI
-package installation is covered separately by `run.sh`.
+package installation is covered separately by `run.sh`. To run the governance
+journey against an installed package too, set `MC_SMOKE_HOST_ROOT` to its
+`tools/net10.0/any` directory. The harness then uses both the packaged Mission
+Control assembly and its packaged `wwwroot`, rather than source build outputs.

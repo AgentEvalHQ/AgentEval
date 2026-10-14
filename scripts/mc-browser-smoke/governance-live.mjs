@@ -13,14 +13,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const fixture = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const port = Number(process.env.MC_SMOKE_PORT ?? 5057);
 const url = `http://127.0.0.1:${port}`;
-const host = resolve(root, 'src/AgentEval.MissionControl');
+const host = process.env.MC_SMOKE_HOST_ROOT
+  ? resolve(process.env.MC_SMOKE_HOST_ROOT) : resolve(root, 'src/AgentEval.MissionControl');
+const hostDll = process.env.MC_SMOKE_HOST_ROOT
+  ? resolve(host, 'AgentEval.MissionControl.dll') : resolve(host, 'bin/Debug/net10.0/AgentEval.MissionControl.dll');
 // Refuse an occupied port instead of accidentally testing an unrelated service.
 try {
   await fetch(url, { signal: AbortSignal.timeout(1000) });
   throw new Error(`Port ${port} already serves HTTP`);
 } catch (error) { if (error.message.includes('already serves')) throw error; }
 const log = createWriteStream(resolve(fixture.workspace, 'host.log'));
-const server = spawn('dotnet', [resolve(host, 'bin/Debug/net10.0/AgentEval.MissionControl.dll'),
+const server = spawn('dotnet', [hostDll,
   '--urls', url, '--contentRoot', host, '--webroot', resolve(host, 'wwwroot'),
   ...Object.entries(fixture.configuration).flatMap(([key, value]) => [`--${key}`, value])],
   { cwd: host, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
