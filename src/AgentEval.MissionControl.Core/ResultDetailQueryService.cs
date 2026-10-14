@@ -19,9 +19,11 @@ public interface IResultDetailQueryService
 /// <summary>Composes the shared configured location policy and bounded verifying detail reader.</summary>
 public sealed class ResultDetailQueryService : IResultDetailQueryService
 {
-    private readonly ConfiguredAefSelection _selection;
-    private readonly IAefResultDetailReader _reader;
+    private readonly ConfiguredAefSelection? _selection;
+    private readonly IAefResultDetailReader? _reader;
     private readonly TrustPolicy? _policy;
+    /// <summary>Creates an explicitly unconfigured capability without discovering storage.</summary>
+    public ResultDetailQueryService() { }
     /// <summary>Configuration, including trust authority, is supplied by the host rather than by individual requests.</summary>
     public ResultDetailQueryService(IEvidenceSourceLookup lookup, IAefResultDetailReader reader,
         IEnumerable<EvidenceIndexRoot> roots, TrustPolicy? policy = null)
@@ -32,6 +34,7 @@ public sealed class ResultDetailQueryService : IResultDetailQueryService
     public QueryResult<SelectedResultDetail> Result(string sourceId, string resultId, AefTime at, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_selection is null) return new(QueryState.NotConfigured, null, "not-configured");
         if (!at.IsValid || string.IsNullOrWhiteSpace(resultId) || resultId.Length > 1024)
             return new(QueryState.InvalidRequest, null, "invalid-detail-request");
         try
@@ -39,7 +42,7 @@ public sealed class ResultDetailQueryService : IResultDetailQueryService
             var resolved = _selection.Resolve(sourceId, cancellationToken);
             if (resolved.Data is null) return new(resolved.State, null, resolved.Code);
             var location = resolved.Data;
-            var detail = _reader.Read(location.Directory, location.RunHash, resultId, at, _policy, cancellationToken);
+            var detail = _reader!.Read(location.Directory, location.RunHash, resultId, at, _policy, cancellationToken);
             if (detail is null) return new(QueryState.NotFound, null, "result-not-found");
             return new(QueryState.Available, new(sourceId, location.Selection.InstanceId, location.Selection.Generation, detail), null);
         }

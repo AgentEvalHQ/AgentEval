@@ -113,6 +113,86 @@ public sealed class SuiteQueryGraphQLTests : IDisposable
         Assert.DoesNotContain(_root, tampered.RootElement.ToString());
     }
 
+    [Fact]
+    public async Task ResultDetail_SealedOverrideAndUnsealedTail_PreserveVerifiedViewsAndExactTime()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        writer.BindRoots([Root]); var id = WriteDefinition(writer, "detail", true, false);
+        var resultId = new SqliteEvidenceDetailReader(new() { DatabasePath = Database }).ReadResults(new(id)).Items[0].ResultId;
+        const string at = "2026-10-14T00:00:00.123456789Z";
+        var query = $$"""
+            { evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"{{at}}") { state code data {
+              sourceId indexGeneration runHash snapshotDigest policyDigest at resultId sealedJson sealedState effectiveState
+              overrideEvent unsealedEvents reviews { target status event } assurance { event shown } } } }
+            """;
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var before = await Read(client, query);
+        var original = before.RootElement.GetProperty("data").GetProperty("evidenceResultDetail").GetProperty("data");
+        var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "detail"));
+        var changed = overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = resultId },
+            By = new("reviewer:http", AefAssurance.Authenticated), At = AefTime.Parse(at),
+            State = AefState.Warn, Reason = "sealed review"
+        });
+        overlay.SealBatch();
+        overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = resultId },
+            By = new("reviewer:http", AefAssurance.SelfAttested), At = AefTime.Parse(at),
+            State = AefState.Failed, Reason = "unsealed review"
+        });
+        using var after = await Read(client, query);
+        var outcome = after.RootElement.GetProperty("data").GetProperty("evidenceResultDetail");
+        Assert.Equal("AVAILABLE", outcome.GetProperty("state").GetString());
+        var detail = outcome.GetProperty("data");
+        Assert.Equal(at, detail.GetProperty("at").GetString());
+        Assert.Equal(original.GetProperty("sealedJson").GetString(), detail.GetProperty("sealedJson").GetString());
+        Assert.Equal("passed", detail.GetProperty("sealedState").GetString());
+        Assert.Equal("warn", detail.GetProperty("effectiveState").GetString());
+        Assert.Equal(changed, detail.GetProperty("overrideEvent").GetString());
+        Assert.Equal(1, detail.GetProperty("unsealedEvents").GetInt32());
+        Assert.Equal("self-attested", Assert.Single(detail.GetProperty("assurance").EnumerateArray()).GetProperty("shown").GetString());
+        Assert.Equal(original.GetProperty("runHash").GetString(), detail.GetProperty("runHash").GetString());
+        Assert.NotEqual(original.GetProperty("snapshotDigest").GetString(), detail.GetProperty("snapshotDigest").GetString());
+        Assert.DoesNotContain(_root, after.RootElement.ToString());
+        File.WriteAllText(Path.Combine(Root.Directory, "detail", "overlays", "seal-0001.json"), "{}");
+        using var corrupt = await Read(client, query);
+        var refused = corrupt.RootElement.GetProperty("data").GetProperty("evidenceResultDetail");
+        Assert.Equal("UNAVAILABLE", refused.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, refused.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task ResultDetail_InvalidTimeMissingResultAndOversizedDetail_ReturnTypedRefusals()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        writer.BindRoots([Root]); var id = WriteDefinition(writer, "large-detail", true, false, padding: new string('x', 2 << 20));
+        var resultId = new SqliteEvidenceDetailReader(new() { DatabasePath = Database }).ReadResults(new(id)).Items[0].ResultId;
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Read(client, $$"""
+            { invalid:evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"2026-02-30T00:00:00Z") { state code data { resultId } }
+              missing:evidenceResultDetail(sourceId:"{{id}}",resultId:"missing",at:"2026-10-14T00:00:00Z") { state code data { resultId } }
+              large:evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"2026-10-14T00:00:00Z") { state code data { resultId } } }
+            """);
+        var data = json.RootElement.GetProperty("data");
+        Assert.Equal("INVALID_REQUEST", data.GetProperty("invalid").GetProperty("state").GetString());
+        Assert.Equal("NOT_FOUND", data.GetProperty("missing").GetProperty("state").GetString());
+        Assert.Equal("RESOURCE_LIMIT", data.GetProperty("large").GetProperty("state").GetString());
+        foreach (var field in data.EnumerateObject()) Assert.Equal(JsonValueKind.Null, field.Value.GetProperty("data").ValueKind);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task ResultDetail_DisabledOrWithoutRoots_ReturnsNotConfigured(bool enabled, bool roots)
+    {
+        using var factory = Factory(enabled, roots); using var client = factory.CreateClient();
+        using var json = await Read(client, "{ evidenceResultDetail(sourceId:\"none\",resultId:\"none\",at:\"bad\") { state code } }");
+        Assert.Equal("NOT_CONFIGURED", json.RootElement.GetProperty("data").GetProperty("evidenceResultDetail").GetProperty("state").GetString());
+        Assert.False(File.Exists(Database));
+    }
+
     private string WriteDefinition(SqliteEvidenceIndexWriter index, string name, bool frozen, bool aborted, double threshold = 0.8, string? padding = null)
     {
         var manifest = new SuiteDefinitionReader().Read(Encoding.UTF8.GetBytes(new JsonObject

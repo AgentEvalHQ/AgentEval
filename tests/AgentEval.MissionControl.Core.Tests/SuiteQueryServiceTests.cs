@@ -33,6 +33,9 @@ public sealed class SuiteQueryServiceTests : IDisposable
         Assert.Equal("not-configured", service.Compare("baseline", "candidate").Code);
         Assert.Throws<OperationCanceledException>(() => service.Identity("source", new(true)));
         Assert.Throws<OperationCanceledException>(() => service.Compare("baseline", "candidate", new(true)));
+        var detail = new ResultDetailQueryService();
+        Assert.Equal(QueryState.NotConfigured, detail.Result("source", "result", default).State);
+        Assert.Throws<OperationCanceledException>(() => detail.Result("source", "result", default, new(true)));
     }
 
     private string Copy(string name)

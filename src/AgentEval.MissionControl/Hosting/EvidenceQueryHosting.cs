@@ -5,6 +5,7 @@
 using AgentEval.Indexing;
 using AgentEval.MissionControl.Core;
 using AgentEval.Results.Suites;
+using AgentEval.Results.Signatures;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentEval.MissionControl.Hosting;
@@ -17,6 +18,7 @@ internal static class EvidenceQueryHosting
         {
             builder.Services.TryAddSingleton<IEvidenceQueryService>(_ => new EvidenceQueryService());
             builder.Services.TryAddSingleton<ISuiteQueryService>(_ => new SuiteQueryService());
+            builder.Services.TryAddSingleton<IResultDetailQueryService>(_ => new ResultDetailQueryService());
             return;
         }
         var path = builder.Configuration["AgentEval:Queries:IndexPath"];
@@ -32,6 +34,7 @@ internal static class EvidenceQueryHosting
         if (configuredRoots.Length == 0)
         {
             builder.Services.TryAddSingleton<ISuiteQueryService>(_ => new SuiteQueryService());
+            builder.Services.TryAddSingleton<IResultDetailQueryService>(_ => new ResultDetailQueryService());
             return;
         }
         var roots = configuredRoots.Select(root => new EvidenceIndexRoot(root["RootId"]!, root["Directory"]!, IndexedEvidenceKind.Aef)).ToArray();
@@ -40,6 +43,10 @@ internal static class EvidenceQueryHosting
         builder.Services.TryAddSingleton<IEvidenceSourceLookup>(_ => new SqliteEvidenceSourceLookup(options));
         builder.Services.TryAddSingleton<ISuiteIdentityReader, SuiteIdentityReader>();
         builder.Services.TryAddSingleton<ISuiteCompatibilityEvaluator, SuiteCompatibilityEvaluator>();
+        builder.Services.TryAddSingleton<IAefResultDetailReader, AefResultDetailReader>();
+        builder.Services.TryAddSingleton<IResultDetailQueryService>(sp => new ResultDetailQueryService(
+            sp.GetRequiredService<IEvidenceSourceLookup>(), sp.GetRequiredService<IAefResultDetailReader>(),
+            roots, sp.GetService<TrustPolicy>()));
         builder.Services.TryAddSingleton<ISuiteQueryService>(sp => new SuiteQueryService(
             sp.GetRequiredService<IEvidenceSourceLookup>(), sp.GetRequiredService<ISuiteIdentityReader>(),
             sp.GetRequiredService<ISuiteCompatibilityEvaluator>(), roots));
