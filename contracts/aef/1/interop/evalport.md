@@ -226,7 +226,16 @@ The extension parser is deliberately closed at version 1.0. Unknown isolation/ro
 values are accepted, while unknown field names are refused. This preserves the
 pinned schema's distinction between open vocabularies and closed objects.
 
-Still pending: verified extension reads and full ResultSet adapters, including the
-losses in the tables above and roundtrip acceptance. A parsed extension alone has
-not had its seal checked. Group chains across multiple runs are consumer joins;
+`IEvalPortRunContextReader` / `EvalPortRunContextReader` provides a verified read:
+it captures a bounded owned copy, verifies the base run, optionally checks the
+caller's exact run hash, then parses the extension under its 64 KiB limit. The
+result includes `RunId`, `RunHash`, the base `Evidence` verification report and
+nullable `Context`. Null means that the sealed run has no extension; an existing
+empty extension is distinguishable. Tampered, unsealed or hash-mismatched evidence
+is refused. The source run is never modified. Capture is not an atomic filesystem
+snapshot; verification applies to the owned copy. Cancellation is cooperative.
+
+Still pending: full ResultSet adapters, including the losses in the tables above
+and roundtrip acceptance. A directly parsed extension alone has not had its seal
+checked. Group chains across multiple runs are consumer joins;
 this component does not resolve parents or prove absence of cross-run cycles.
