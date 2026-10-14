@@ -20,7 +20,9 @@ the predicate semantics below belong to AgentEval.
 
 The profile has exactly one subject and one evidence binding. All fields below are
 required. Digest values are 64 lowercase hexadecimal characters. `runHash` uses the
-existing AEF run-hash representation and is recomputed by the existing run verifier.
+existing AEF run-hash representation (64 lowercase hexadecimal characters) and is
+checked by the existing run verifier. Authorized withholding retains the sealed
+manifest identity; it does not imply that unavailable blob bytes were rehashed.
 
 ```json
 {
@@ -54,7 +56,9 @@ alone does not establish that the underlying evidence files are intact.
 
 The predicate URI is proposed for this profile; it is not a claim of external
 registration or endorsement. Readers reject unsupported predicate URIs, major schema
-versions, digest algorithms, binding kinds and subject cardinalities. Readers follow
+versions, digest algorithms, binding kinds and subject cardinalities. Later minor
+versions of major 1 are accepted when all required known fields remain supported;
+malformed version strings are refused. Readers follow
 AEF strict JSON rules (including duplicate-member rejection), preserve original
 bytes for signature verification and ignore unknown optional members. Unknown
 members never supply trust or change the interpretation of known fields.
@@ -83,8 +87,10 @@ Report these separately, without converting them into an evaluation pass:
 
 1. Document validity and supported profile.
 2. Artifact digest match against the explicit caller selection.
-3. Exact seal digest match and recomputed run-hash match.
-4. Existing AEF run-verification outcome; unsealed/invalid is not an intact binding.
+3. Exact seal digest match and verified run-hash match.
+4. Existing AEF run-verification outcome, including the withheld-file count;
+   unsealed/invalid is not an intact binding. Withheld bytes remain unavailable,
+   even when the existing verifier accepts their authorized withholding.
 5. Companion signature identities verified under the supplied policy, or an explicit
    unsigned/not-checked result. A present malformed or mismatched envelope is reported.
 
