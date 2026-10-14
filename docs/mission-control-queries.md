@@ -96,6 +96,10 @@ Configure `AgentEval:Queries:CataloguePath` with an absolute path to a JSON requ
 
 `AgentEval:Queries:GovernanceLimits` can lower `MaxSources` (default/ceiling 8), `MaxCaptureBytes` (64 MiB), `MaxRowRulePairs` (100000) and `MaxResponseBytes` (2 MiB). The shared service validates ceilings and enforces them before returning a report. Host-wide response/operation limits and transport parity remain part of W08 acceptance; the report cap does not claim to cap alias-multiplied transport envelopes.
 
+## Contract acceptance
+
+The reviewed GraphQL contract for the nine shared query fields is pinned in `tests/AgentEval.Tests/MissionControl/EvidenceSchema.txt`. Its HTTP introspection test walks every reachable output/scalar/enum type and records field signatures, argument defaults and nullability. A schema change requires reviewing this artifact, including whether new reachable fields expose storage details or alter numeric precision. Setting `AGENTEVAL_SCHEMA_CAPTURE` to a local output path captures the current contract for review; it does not update the expected snapshot or bypass comparison. Full governance reports are also compared between direct service calls and HTTP, including signed waiver authority and refusal provenance. Other query-family parity and the broader host-access/limit audit remain W08-06 work.
+
 ## Shared change notifications
 
 `IEvidenceChangeFeed` is the transport-free subscription boundary; `IEvidenceChangePublisher` is the host-owned producer. The `EvidenceChangeFeed` implementation defaults to 32 subscribers with 16 queued notifications each, with fixed configurable ceilings of 256 subscribers and 1024 queued items per subscriber. A subscription attempt returns null when all slots are occupied. Consumers must dispose subscriptions; cancellation and completion of the single-reader enumeration release the slot automatically.

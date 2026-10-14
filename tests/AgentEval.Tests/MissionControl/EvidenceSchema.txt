@@ -1,0 +1,298 @@
+SCALAR Boolean
+
+OBJECT EvidenceAssuranceView {
+  event: String!
+  shown: String!
+}
+
+OBJECT EvidenceFieldView {
+  fieldName: String!
+  integerValue: String
+  reportOrdinal: String!
+  sourcesJson: String!
+  state: String!
+  textValue: String
+}
+
+OBJECT EvidenceMetricView {
+  metricId: String!
+  ordinal: Int!
+  passed: Boolean
+  provenance: String!
+  resultId: String!
+  score: Float
+  scoreText: String
+}
+
+OBJECT EvidencePageResponseOfEvidenceFieldView {
+  code: String
+  data: EvidencePageViewOfEvidenceFieldView
+  state: QueryState!
+}
+
+OBJECT EvidencePageResponseOfEvidenceMetricView {
+  code: String
+  data: EvidencePageViewOfEvidenceMetricView
+  state: QueryState!
+}
+
+OBJECT EvidencePageResponseOfEvidenceResultView {
+  code: String
+  data: EvidencePageViewOfEvidenceResultView
+  state: QueryState!
+}
+
+OBJECT EvidencePageResponseOfEvidenceSpanView {
+  code: String
+  data: EvidencePageViewOfEvidenceSpanView
+  state: QueryState!
+}
+
+OBJECT EvidencePageViewOfEvidenceFieldView {
+  fingerprint: String!
+  generation: String!
+  indexInstanceId: String!
+  items: [EvidenceFieldView!]!
+  nextCursor: String
+  sourceKind: String!
+  verification: String!
+}
+
+OBJECT EvidencePageViewOfEvidenceMetricView {
+  fingerprint: String!
+  generation: String!
+  indexInstanceId: String!
+  items: [EvidenceMetricView!]!
+  nextCursor: String
+  sourceKind: String!
+  verification: String!
+}
+
+OBJECT EvidencePageViewOfEvidenceResultView {
+  fingerprint: String!
+  generation: String!
+  indexInstanceId: String!
+  items: [EvidenceResultView!]!
+  nextCursor: String
+  sourceKind: String!
+  verification: String!
+}
+
+OBJECT EvidencePageViewOfEvidenceSpanView {
+  fingerprint: String!
+  generation: String!
+  indexInstanceId: String!
+  items: [EvidenceSpanView!]!
+  nextCursor: String
+  sourceKind: String!
+  verification: String!
+}
+
+OBJECT EvidenceResultDetailResponse {
+  code: String
+  data: EvidenceResultDetailView
+  state: QueryState!
+}
+
+OBJECT EvidenceResultDetailView {
+  assurance: [EvidenceAssuranceView!]!
+  at: String!
+  effectiveState: String!
+  indexGeneration: String!
+  indexInstanceId: String!
+  overrideEvent: String
+  policyDigest: String!
+  resultId: String!
+  reviews: [EvidenceReviewView!]!
+  runHash: String!
+  sealedJson: String!
+  sealedState: String!
+  snapshotDigest: String!
+  sourceId: String!
+  unsealedEvents: Int!
+}
+
+OBJECT EvidenceResultView {
+  caseId: String
+  outcome: String
+  resultId: String!
+  trial: String
+}
+
+OBJECT EvidenceReviewView {
+  event: String!
+  status: String!
+  target: String!
+}
+
+OBJECT EvidenceSourceView {
+  fingerprint: String!
+  indexedGeneration: String!
+  kind: String!
+  relativePath: String!
+  rootId: String!
+  sourceId: String!
+  verification: String!
+}
+
+OBJECT EvidenceSourcesPageView {
+  generation: String!
+  indexInstanceId: String!
+  items: [EvidenceSourceView!]!
+  nextCursor: String
+}
+
+OBJECT EvidenceSourcesResponse {
+  code: String
+  data: EvidenceSourcesPageView
+  state: QueryState!
+}
+
+OBJECT EvidenceSpanView {
+  endNanos: String!
+  groupId: String!
+  groupingBasis: String!
+  groupingRevision: String!
+  mappingRevision: String!
+  parentSpanId: String!
+  reportOrdinal: String!
+  resourceIndex: String!
+  scopeIndex: String!
+  spanId: String!
+  spanIndex: String!
+  startNanos: String!
+  traceId: String!
+}
+
+SCALAR Float
+
+OBJECT GovernanceStatusResponse {
+  code: String
+  data: RequirementStatusReport
+  state: QueryState!
+}
+
+SCALAR Int
+
+OBJECT Query {
+  evidenceFields(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceFieldView!
+  evidenceMetrics(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceMetricView!
+  evidenceResultDetail(at: String!, resultId: String!, sourceId: String!): EvidenceResultDetailResponse!
+  evidenceResults(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceResultView!
+  evidenceSources(cursor: String, pageSize: Int! = 100, rootId: String): EvidenceSourcesResponse!
+  evidenceSpans(cursor: String, pageSize: Int! = 100, sourceId: String!): EvidencePageResponseOfEvidenceSpanView!
+  evidenceSuite(sourceId: String!): SuiteIdentityResponse!
+  evidenceSuiteComparison(baselineSourceId: String!, candidateSourceId: String!): SuiteComparisonResponse!
+  governanceStatus(at: String!, sourceIds: [String!]!, subjectRef: String!, subjectVersion: String!): GovernanceStatusResponse!
+}
+
+ENUM QueryState {
+  AVAILABLE
+  EMPTY
+  INVALID_REQUEST
+  NOT_CONFIGURED
+  NOT_FOUND
+  RESOURCE_LIMIT
+  STALE_CURSOR
+  UNAVAILABLE
+}
+
+OBJECT RequirementEvidenceIdentity {
+  overlayDigest: String!
+  runHash: String!
+  runId: String!
+}
+
+OBJECT RequirementObservation {
+  effectiveState: String!
+  endedAt: String!
+  lane: String!
+  metric: String!
+  overrideEvent: String
+  path: String!
+  resultId: String!
+  runHash: String!
+  sealedState: String!
+  value: Float
+}
+
+OBJECT RequirementReview {
+  event: String!
+  runHash: String!
+  status: String!
+  target: String!
+}
+
+OBJECT RequirementStatus {
+  baseStatus: String!
+  diagnostics: [String!]!
+  effectiveStatus: String!
+  id: String!
+  observations: [RequirementObservation!]!
+  reviews: [RequirementReview!]!
+  status: String!
+  waivers: [RequirementWaiver!]!
+}
+
+OBJECT RequirementStatusReport {
+  at: String!
+  catalogueDigest: String!
+  evidence: [RequirementEvidenceIdentity!]!
+  policyDigest: String!
+  requirements: [RequirementStatus!]!
+  selectedRunHashes: [String!]!
+  subject: RequirementSubject!
+}
+
+OBJECT RequirementSubject {
+  ref: String!
+  version: String!
+}
+
+OBJECT RequirementWaiver {
+  active: Boolean!
+  assurance: String!
+  authorized: Boolean!
+  event: String!
+  expires: String!
+  identity: String!
+  requirement: String!
+  runHash: String!
+}
+
+SCALAR String
+
+OBJECT SuiteComparisonResponse {
+  code: String
+  data: SuiteComparisonView
+  state: QueryState!
+}
+
+OBJECT SuiteComparisonView {
+  baseline: SuiteIdentityView!
+  candidate: SuiteIdentityView!
+  compatible: Boolean!
+  description: String!
+  reason: String!
+}
+
+OBJECT SuiteIdentityResponse {
+  code: String
+  data: SuiteIdentityView
+  state: QueryState!
+}
+
+OBJECT SuiteIdentityView {
+  contentDigest: String
+  definitionDigest: String
+  frozen: Boolean
+  indexGeneration: String!
+  indexInstanceId: String!
+  runHash: String!
+  runId: String!
+  runStatus: String!
+  scope: String!
+  sourceId: String!
+  suiteRef: String
+  suiteVersion: String
+}

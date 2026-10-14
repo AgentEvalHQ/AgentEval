@@ -5,6 +5,9 @@
 #if NET10_0_OR_GREATER
 using System.Text.Json;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
+using AgentEval.MissionControl.Core;
+using Microsoft.Extensions.DependencyInjection;
 using AgentEval.Indexing;
 using AgentEval.Results;
 using AgentEval.Results.Requirements;
@@ -33,8 +36,8 @@ public sealed partial class SuiteQueryGraphQLTests
           state code data { catalogueDigest policyDigest at subject { ref version } selectedRunHashes
             evidence { runId runHash overlayDigest }
             requirements { id baseStatus effectiveStatus status diagnostics
-              observations { runHash resultId lane metric path sealedState effectiveState value endedAt }
-              waivers { event identity assurance expires active authorized }
+              observations { runHash resultId lane metric path sealedState effectiveState overrideEvent value endedAt }
+              waivers { runHash requirement event identity assurance expires active authorized }
               reviews { runHash target status event } } } } }
         """;
 
@@ -61,6 +64,10 @@ public sealed partial class SuiteQueryGraphQLTests
         var outcome = active.RootElement.GetProperty("data").GetProperty("governanceStatus");
         Assert.Equal("AVAILABLE", outcome.GetProperty("state").GetString());
         var report = outcome.GetProperty("data");
+        var direct = factory.Services.GetRequiredService<IGovernanceQueryService>().Status(new("agent:query", "1"), [id], AefTime.Parse("2026-10-01T11:00:00Z"));
+        Assert.Equal(QueryState.Available, direct.State);
+        Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(direct.Data, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            JsonNode.Parse(report.GetRawText())), "The complete GraphQL report must equal the in-process report.");
         var status = Assert.Single(report.GetProperty("requirements").EnumerateArray());
         Assert.Equal("waived", status.GetProperty("status").GetString());
         var waiver = Assert.Single(status.GetProperty("waivers").EnumerateArray());
@@ -75,6 +82,9 @@ public sealed partial class SuiteQueryGraphQLTests
         using var otherFactory = Factory(catalogue: catalogue, policy: noAuthority); using var other = otherFactory.CreateClient();
         using var refused = await Read(other, GovernanceQuery(id));
         var untrusted = refused.RootElement.GetProperty("data").GetProperty("governanceStatus").GetProperty("data");
+        var directUntrusted = otherFactory.Services.GetRequiredService<IGovernanceQueryService>().Status(new("agent:query", "1"), [id], AefTime.Parse("2026-10-01T11:00:00Z"));
+        Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(directUntrusted.Data, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            JsonNode.Parse(untrusted.GetRawText())), "Authority refusal provenance must survive transport unchanged.");
         Assert.NotEqual(report.GetProperty("policyDigest").GetString(), untrusted.GetProperty("policyDigest").GetString());
         Assert.False(untrusted.GetProperty("requirements")[0].GetProperty("waivers")[0].GetProperty("authorized").GetBoolean());
         Assert.NotEqual("waived", untrusted.GetProperty("requirements")[0].GetProperty("status").GetString());

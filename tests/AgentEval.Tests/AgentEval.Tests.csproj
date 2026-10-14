@@ -77,6 +77,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Compliance/Gdpr/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="MissionControl/EvidenceSchema.txt" LogicalName="AgentEval.Tests.EvidenceSchema.txt" />
     <EmbeddedResource Include="Compliance/EuAiAct/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="MAF/Gatekeeper/Fixtures/gatekeeper-replay-v1.jsonl"
