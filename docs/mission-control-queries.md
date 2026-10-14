@@ -200,6 +200,18 @@ selected view time. A signed event still requires the configured permission
 for that requirement. The final status remains the resolver's decision, and
 sealed measurements remain unchanged.
 
+Verified result detail includes a **Verified decision history** timeline for
+overrides, adjudications and reviews targeting the selected result, plus
+run-level reviews. It retains superseded decisions in overlay file order and
+shows the original line, declared timestamp, identity and reason alongside
+the verifier's established assurance. Timestamps do not reorder events.
+Current markers identify the events supplying the effective state or latest
+review for each target; they do not imply signature authority or change the
+sealed run. Annotations and unrelated result decisions are not part of this
+timeline. Unsealed events remain a separate count with no effective history.
+The complete result detail, including history, remains subject to the 2 MiB
+response limit; oversized detail is refused without a partial timeline.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;

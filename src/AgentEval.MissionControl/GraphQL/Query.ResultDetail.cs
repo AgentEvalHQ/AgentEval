@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.MissionControl.Core;
+using AgentEval.Indexing;
 using AgentEval.Results;
 using HotChocolate.CostAnalysis.Types;
 
@@ -14,7 +15,11 @@ public sealed record EvidenceResultDetailResponse(QueryState State, string? Code
 public sealed record EvidenceResultDetailView(string SourceId, string IndexInstanceId, string IndexGeneration,
     string RunHash, string SnapshotDigest, string PolicyDigest, string At, string ResultId, string SealedJson,
     string SealedState, string EffectiveState, string? OverrideEvent, IReadOnlyList<EvidenceReviewView> Reviews,
-    IReadOnlyList<EvidenceAssuranceView> Assurance, int UnsealedEvents);
+    IReadOnlyList<EvidenceAssuranceView> Assurance, int UnsealedEvents)
+{
+    /// <summary>Verified decision history in file order, including superseded decisions.</summary>
+    public IReadOnlyList<VerifiedDecisionEvent> Decisions { get; init; } = [];
+}
 /// <summary>A review target, status and originating event.</summary>
 public sealed record EvidenceReviewView(string Target, string Status, string Event);
 /// <summary>Assurance actually established for a displayed event, not its unverified claim.</summary>
@@ -34,7 +39,8 @@ public sealed partial class Query
             selected.IndexInstanceId, Decimal(selected.IndexGeneration), detail.RunHash, detail.SnapshotDigest,
             detail.PolicyDigest, detail.At, detail.ResultId, detail.SealedJson, detail.SealedState, detail.EffectiveState,
             detail.OverrideEvent, detail.Reviews.Select(r => new EvidenceReviewView(r.Target, r.Status, r.Event)).ToArray(),
-            detail.Assurance.Select(a => new EvidenceAssuranceView(a.Event, a.Shown)).ToArray(), detail.UnsealedEvents));
+            detail.Assurance.Select(a => new EvidenceAssuranceView(a.Event, a.Shown)).ToArray(), detail.UnsealedEvents)
+            { Decisions = detail.Decisions });
     }
 
     private static AefTime ParseViewTime(string value)

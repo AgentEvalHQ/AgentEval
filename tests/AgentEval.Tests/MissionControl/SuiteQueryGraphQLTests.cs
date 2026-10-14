@@ -148,13 +148,20 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         var query = $$"""
             { evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"{{at}}") { state code data {
               sourceId indexInstanceId indexGeneration runHash snapshotDigest policyDigest at resultId sealedJson sealedState effectiveState
-              overrideEvent unsealedEvents reviews { target status event } assurance { event shown } } } }
+              overrideEvent unsealedEvents reviews { target status event } assurance { event shown }
+              decisions { line event kind target at identity assurance state reason current } } } }
             """;
         using var factory = Factory(); using var client = factory.CreateClient();
         using var before = await Read(client, query);
         var original = before.RootElement.GetProperty("data").GetProperty("evidenceResultDetail").GetProperty("data");
         AssertDetailParity(factory, id, resultId, at, original);
         var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "detail"));
+        var superseded = overlay.Append(new AefOverlayEvent
+        {
+            Kind = AefOverlayKind.Override, Target = new() { Result = resultId },
+            By = new("reviewer:earlier", AefAssurance.Authenticated), At = AefTime.Parse("2026-10-15T00:00:00Z"),
+            State = AefState.Failed, Reason = "earlier file entry with later declared time"
+        });
         var changed = overlay.Append(new AefOverlayEvent
         {
             Kind = AefOverlayKind.Override, Target = new() { Result = resultId },
@@ -178,6 +185,17 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         Assert.Equal("passed", detail.GetProperty("sealedState").GetString());
         Assert.Equal("warn", detail.GetProperty("effectiveState").GetString());
         Assert.Equal(changed, detail.GetProperty("overrideEvent").GetString());
+        var decisions = detail.GetProperty("decisions").EnumerateArray().ToArray();
+        Assert.Equal(2, decisions.Length);
+        Assert.Equal(superseded, decisions[0].GetProperty("event").GetString());
+        Assert.Equal(1, decisions[0].GetProperty("line").GetInt32());
+        Assert.False(decisions[0].GetProperty("current").GetBoolean());
+        Assert.Equal("2026-10-15T00:00:00Z", decisions[0].GetProperty("at").GetString());
+        Assert.Equal("self-attested", decisions[0].GetProperty("assurance").GetString());
+        Assert.Equal(changed, decisions[1].GetProperty("event").GetString());
+        Assert.True(decisions[1].GetProperty("current").GetBoolean());
+        Assert.Equal("sealed review", decisions[1].GetProperty("reason").GetString());
+        Assert.Equal(resultId, decisions[1].GetProperty("target").GetString());
         Assert.Equal(1, detail.GetProperty("unsealedEvents").GetInt32());
         Assert.Equal("self-attested", Assert.Single(detail.GetProperty("assurance").EnumerateArray()).GetProperty("shown").GetString());
         Assert.Equal(original.GetProperty("runHash").GetString(), detail.GetProperty("runHash").GetString());
@@ -207,6 +225,47 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         Assert.Equal("NOT_FOUND", data.GetProperty("missing").GetProperty("state").GetString());
         Assert.Equal("RESOURCE_LIMIT", data.GetProperty("large").GetProperty("state").GetString());
         foreach (var field in data.EnumerateObject()) Assert.Equal(JsonValueKind.Null, field.Value.GetProperty("data").ValueKind);
+    }
+
+    [Fact]
+    public async Task ResultDetail_DecisionHistory_RetainsRunReviewsAndEstablishedSignerAssurance()
+    {
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Database }, new SqliteEvidenceIndexSchema());
+        writer.BindRoots([Root]); var id = WriteDefinition(writer, "history", true, false);
+        var resultId = new SqliteEvidenceDetailReader(new() { DatabasePath = Database }).ReadResults(new(id)).Items[0].ResultId;
+        using var signer = AgentEval.Results.Signatures.EcdsaP256Signer.Generate();
+        var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "history"));
+        string Append(AefOverlayKind kind, AefOverlayTarget target, string identity) => overlay.Append(new AefOverlayEvent
+        {
+            Kind = kind, Target = target, By = new(identity, AefAssurance.Authenticated),
+            At = AefTime.Parse("2026-10-01T11:00:00.123456789Z"), Reason = "recorded review"
+        });
+        var earlier = Append(AefOverlayKind.Approve, AefOverlayTarget.TheRun, "reviewer:history");
+        var latest = Append(AefOverlayKind.Reject, AefOverlayTarget.TheRun, "reviewer:other");
+        var resultReview = Append(AefOverlayKind.Approve, new() { Result = resultId }, "reviewer:history");
+        Append(AefOverlayKind.Annotate, AefOverlayTarget.TheRun, "reviewer:history");
+        overlay.SealBatch(signer);
+        Append(AefOverlayKind.Reject, new() { Result = resultId }, "reviewer:history");
+        var policyPath = Path.Combine(_root, "history-policy.json");
+        File.WriteAllText(policyPath, new AgentEval.Results.Signatures.TrustPolicy([
+            new AgentEval.Results.Signatures.TrustedKey("reviewer:history", signer.PublicKey)
+        ]).ToJson().ToJsonString());
+        using var factory = Factory(policy: policyPath); using var client = factory.CreateClient();
+        using var json = await Read(client, $$"""
+            { evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"2026-10-02T00:00:00Z") {
+              state data { unsealedEvents decisions { line event kind target at identity assurance state reason current } } } }
+            """);
+        var outcome = json.RootElement.GetProperty("data").GetProperty("evidenceResultDetail");
+        Assert.Equal("AVAILABLE", outcome.GetProperty("state").GetString());
+        var detail = outcome.GetProperty("data");
+        var rows = detail.GetProperty("decisions").EnumerateArray().ToArray();
+        Assert.Equal(new[] { earlier, latest, resultReview }, rows.Select(r => r.GetProperty("event").GetString()));
+        Assert.Equal(new[] { false, true, true }, rows.Select(r => r.GetProperty("current").GetBoolean()));
+        Assert.Equal(new[] { "signed", "self-attested", "signed" }, rows.Select(r => r.GetProperty("assurance").GetString()));
+        Assert.Equal(new[] { "run", "run", resultId }, rows.Select(r => r.GetProperty("target").GetString()));
+        Assert.All(rows, row => Assert.Equal(JsonValueKind.Null, row.GetProperty("state").ValueKind));
+        Assert.Equal("2026-10-01T11:00:00.123456789Z", rows[0].GetProperty("at").GetString());
+        Assert.Equal(1, detail.GetProperty("unsealedEvents").GetInt32());
     }
 
     [Theory]

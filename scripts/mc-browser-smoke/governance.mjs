@@ -92,7 +92,11 @@ try {
           runHash: 'run-hash', snapshotDigest: 'snapshot-digest', policyDigest: 'policy-digest', at: request.variables.at,
           sealedState: 'fail', effectiveState: 'pass', overrideEvent: 'override-1', unsealedEvents: 2,
           reviews: [{ target: 'result-1', status: 'approved', event: 'review-1' }],
-          assurance: [{ event: 'override-1', shown: 'integrity-only' }],
+          assurance: [{ event: 'override-1', shown: 'signed' }],
+          decisions: [
+            { line: 1, event: 'old-override', kind: 'override', target: 'result-1', at: '2026-02-01T00:00:00Z', identity: 'reviewer-1', assurance: 'self-attested', state: 'fail', reason: '<script>old reason</script>', current: false },
+            { line: 2, event: 'override-1', kind: 'adjudicate', target: 'result-1', at: '2026-01-01T00:00:00Z', identity: 'reviewer-2', assurance: 'signed', state: 'pass', reason: 'current decision', current: true },
+          ],
           sealedJson: '{"message":"<img src=x onerror=alert(1)>"}',
         } : null,
       } } } }); return;
@@ -165,14 +169,19 @@ try {
   const detail = page.getByRole('region', { name: 'Verified result detail' });
   await detail.getByText('snapshot-digest', { exact: true }).waitFor();
   await detail.getByRole('alert').waitFor();
-  assert.equal(await detail.getByText('fail', { exact: true }).count(), 1);
-  assert.equal(await detail.getByText('pass', { exact: true }).count(), 1);
+  const timeline = detail.locator('ol > li');
+  assert.equal(await timeline.count(), 2);
+  assert.match(await timeline.nth(0).innerText(), /Line 1: override — Superseded/);
+  assert.match(await timeline.nth(1).innerText(), /Line 2: adjudicate — Current/);
+  assert.equal(await detail.locator('script').count(), 0);
+  assert.equal(await detail.locator('dl').first().getByText('fail', { exact: true }).count(), 1);
+  assert.equal(await detail.locator('dl').first().getByText('pass', { exact: true }).count(), 1);
   await detail.getByText('Sealed result JSON', { exact: true }).click();
   assert.match(await detail.locator('pre').innerText(), /<img src=x/);
   assert.equal(await detail.locator('img').count(), 0);
   await detail.getByLabel('UTC view time').fill('2026-01-01T00:00:00Z');
   await detail.getByRole('button', { name: 'Apply time' }).click();
-  await detail.getByText('2026-01-01T00:00:00Z', { exact: true }).waitFor();
+  await detail.locator('dl').first().getByText('2026-01-01T00:00:00Z', { exact: true }).waitFor();
   assert.equal(requests.at(-1).at, '2026-01-01T00:00:00Z');
   detailState = 'UNAVAILABLE';
   await detail.getByRole('button', { name: 'Re-verify' }).click();

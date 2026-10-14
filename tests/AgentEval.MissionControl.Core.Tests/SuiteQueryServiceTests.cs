@@ -141,6 +141,7 @@ public sealed class SuiteQueryServiceTests : IDisposable
         var service = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options), new AefResultDetailReader(), [Root]);
         var at = AefTime.Parse("2026-10-14T00:00:00Z");
         var before = service.Result(id, indexed.ResultId, at); Assert.Equal(QueryState.Available, before.State);
+        Assert.Empty(before.Data!.Result.Decisions);
         var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "detail"));
         var changed = overlay.Append(new AefOverlayEvent
         {
@@ -161,6 +162,9 @@ public sealed class SuiteQueryServiceTests : IDisposable
         Assert.Equal(indexed.Outcome, detail.SealedState); Assert.Equal("warn", detail.EffectiveState);
         Assert.Equal(changed, detail.OverrideEvent); Assert.Equal(1, detail.UnsealedEvents);
         Assert.Equal("self-attested", Assert.Single(detail.Assurance).Shown);
+        var decision = Assert.Single(detail.Decisions);
+        Assert.Equal(changed, decision.Event); Assert.True(decision.Current);
+        Assert.Equal("self-attested", decision.Assurance); Assert.Equal("verified review", decision.Reason);
         Assert.NotEqual(before.Data.Result.SnapshotDigest, detail.SnapshotDigest);
         Assert.Equal(before.Data.Result.RunHash, detail.RunHash);
         Assert.Equal(QueryState.NotFound, service.Result(id, "missing-result", at).State);
@@ -195,6 +199,28 @@ public sealed class SuiteQueryServiceTests : IDisposable
         var result = service.Result(id, resultId, AefTime.Parse("2026-10-14T00:00:00Z"));
         Assert.Equal(QueryState.ResourceLimit, result.State); Assert.Null(result.Data);
         Assert.Equal("detail-byte-limit", result.Code);
+    }
+
+    [Fact]
+    public void ResultDetail_DecisionHistoryExceedsResponseBudget_RefusesWithoutPartialHistory()
+    {
+        using var writer = Writer(); writer.BindRoots([Root]); var id = WriteDefinition(writer, "large-history", true, false);
+        var resultId = new SqliteEvidenceDetailReader(Options).ReadResults(new(id)).Items[0].ResultId;
+        var at = AefTime.Parse("2026-10-14T00:00:00Z");
+        var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "large-history"));
+        for (var i = 0; i < 100; i++)
+            overlay.Append(new AefOverlayEvent
+            {
+                Kind = AefOverlayKind.Approve, Target = new() { Result = resultId },
+                By = new("reviewer:fixture", AefAssurance.SelfAttested), At = at,
+                Reason = new string('<', 4096)
+            });
+        overlay.SealBatch();
+        var service = new ResultDetailQueryService(new SqliteEvidenceSourceLookup(Options), new AefResultDetailReader(), [Root]);
+        var outcome = service.Result(id, resultId, at);
+        Assert.Equal(QueryState.ResourceLimit, outcome.State);
+        Assert.Equal("detail-byte-limit", outcome.Code);
+        Assert.Null(outcome.Data);
     }
 
     [Fact]

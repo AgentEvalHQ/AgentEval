@@ -24,6 +24,7 @@ const DETAIL_QUERY = /* GraphQL */ `
         sealedJson sealedState effectiveState overrideEvent unsealedEvents
         reviews { target status event }
         assurance { event shown }
+        decisions { line event kind target at identity assurance state reason current }
       }
     }
   }
@@ -40,6 +41,8 @@ interface Detail {
   sealedJson: string; sealedState: string; effectiveState: string; overrideEvent: string | null;
   unsealedEvents: number; reviews: { target: string; status: string; event: string }[];
   assurance: { event: string; shown: string }[];
+  decisions: { line: number; event: string; kind: string; target: string; at: string; identity: string;
+    assurance: string; state: string | null; reason: string | null; current: boolean }[];
 }
 const button = "rounded border border-slate-300 bg-white px-3 py-2 text-sm disabled:opacity-50";
 export function GovernanceSourcePage() {
@@ -147,6 +150,16 @@ function ResultDetail({ sourceId, resultId, indexInstance, indexGeneration }: {
       <h4 className="font-medium">Established event assurance</h4>
       {data.assurance.length ? <ul className="text-sm space-y-2">{data.assurance.map((assurance, i) =>
         <li key={i} className="break-all">{assurance.event}: {assurance.shown}</li>)}</ul> : <p className="text-sm">No event assurance reported.</p>}
+      <h4 className="font-medium">Verified decision history</h4>
+      <p className="text-sm text-slate-600">Override, adjudication and review events appear in file order. Timestamps are declarations and do not reorder decisions. Current events supply the effective state or review; earlier events remain visible. Unsealed events are excluded.</p>
+      {data.decisions.length === 0 ? <p className="text-sm">No verified decisions for this result or its run.</p>
+        : <ol className="space-y-3">{data.decisions.map(decision => <li key={decision.event} className="border rounded p-3 text-sm break-all">
+          <p className="font-medium">Line {decision.line}: {decision.kind} — {decision.current ? "Current" : "Superseded"}</p>
+          <dl>{[["Event", decision.event], ["Target", decision.target], ["Declared time", decision.at],
+            ["Declared identity", decision.identity], ["Established assurance", decision.assurance],
+            ["Replacement state", decision.state ?? "Not applicable"], ["Reason", decision.reason ?? "Not declared"]].map(([label, value]) =>
+            <div key={label}><dt className="inline font-medium">{label}: </dt><dd className="inline">{value}</dd></div>)}</dl>
+        </li>)}</ol>}
       <details><summary className="cursor-pointer font-medium">Sealed result JSON</summary>
         <pre className="mt-3 p-3 bg-slate-50 overflow-auto text-xs max-h-96">{data.sealedJson}</pre>
       </details>
