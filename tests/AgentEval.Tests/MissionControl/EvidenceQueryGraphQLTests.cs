@@ -6,6 +6,10 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Globalization;
+using AgentEval.MissionControl.Core;
+using Microsoft.Extensions.DependencyInjection;
 using AgentEval.Indexing;
 using AgentEval.Results.Observations;
 using AgentEval.MissionControl.GraphQL;
@@ -46,6 +50,7 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         var data = json.RootElement.GetProperty("data"); Assert.Equal("pong", data.GetProperty("ping").GetString());
         var result = data.GetProperty("evidenceSources"); Assert.Equal("NOT_CONFIGURED", result.GetProperty("state").GetString());
         Assert.Equal("not-configured", result.GetProperty("code").GetString()); Assert.Equal(JsonValueKind.Null, result.GetProperty("data").ValueKind);
+        AssertOutcomeParity(factory.Services.GetRequiredService<IEvidenceQueryService>().Sources(new()), result);
         Assert.False(File.Exists(Database));
     }
 
@@ -64,9 +69,10 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
             command.ExecuteNonQuery();
         }
         using var factory = Factory(true); using var client = factory.CreateClient();
-        using var json = await QueryAsync(client, "{ evidenceSources(pageSize:1) { state data { generation nextCursor items { relativePath indexedGeneration verification } } } }");
+        using var json = await QueryAsync(client, "{ evidenceSources(pageSize:1) { state data { indexInstanceId generation nextCursor items { sourceId rootId relativePath kind fingerprint indexedGeneration verification } } } }");
         var result = json.RootElement.GetProperty("data").GetProperty("evidenceSources");
         Assert.Equal("AVAILABLE", result.GetProperty("state").GetString()); var page = result.GetProperty("data");
+        AssertPageParity(factory.Services.GetRequiredService<IEvidenceQueryService>().Sources(new(PageSize: 1)).Data!, page);
         Assert.Equal("9007199254740993", page.GetProperty("generation").GetString());
         var item = Assert.Single(page.GetProperty("items").EnumerateArray());
         Assert.Equal("9007199254740993", item.GetProperty("indexedGeneration").GetString());
@@ -92,9 +98,12 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         using var factory = Factory(true); using var client = factory.CreateClient();
         using var missing = await QueryAsync(client, "{ evidenceSources { state code } }");
         var result = missing.RootElement.GetProperty("data").GetProperty("evidenceSources");
+        var queries = factory.Services.GetRequiredService<IEvidenceQueryService>();
+        AssertOutcomeParity(queries.Sources(new()), result);
         Assert.Equal("UNAVAILABLE", result.GetProperty("state").GetString()); Assert.Equal("missing-index", result.GetProperty("code").GetString());
         using var invalid = await QueryAsync(client, "{ evidenceSources(pageSize:501) { state code } }");
         Assert.Equal("INVALID_REQUEST", invalid.RootElement.GetProperty("data").GetProperty("evidenceSources").GetProperty("state").GetString());
+        AssertOutcomeParity(queries.Sources(new(PageSize: 501)), invalid.RootElement.GetProperty("data").GetProperty("evidenceSources"));
         Assert.False(File.Exists(Database));
     }
 
@@ -110,11 +119,15 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         using var factory = Factory(true); using var client = factory.CreateClient();
         using var first = await QueryAsync(client, $$"""
             { evidenceResults(sourceId:"{{id}}",pageSize:1) { state data {
-              sourceKind verification fingerprint nextCursor items { resultId caseId trial outcome } } }
-              evidenceMetrics(sourceId:"{{id}}") { data { items { ordinal score scoreText passed provenance } } } }
+              indexInstanceId generation sourceKind verification fingerprint nextCursor items { resultId caseId trial outcome } } }
+              evidenceMetrics(sourceId:"{{id}}") { data { indexInstanceId generation sourceKind verification fingerprint nextCursor
+                items { resultId metricId ordinal score scoreText passed provenance } } } }
             """);
         var data = first.RootElement.GetProperty("data");
         var page = data.GetProperty("evidenceResults").GetProperty("data");
+        var queries = factory.Services.GetRequiredService<IEvidenceQueryService>();
+        AssertPageParity(queries.Results(new(id, 1)).Data!, page);
+        AssertPageParity(queries.Metrics(new(id)).Data!, data.GetProperty("evidenceMetrics").GetProperty("data"));
         Assert.Equal("legacy", page.GetProperty("sourceKind").GetString());
         Assert.Equal("unverified", page.GetProperty("verification").GetString());
         Assert.Equal(writer.Find("root", "run")!.Fingerprint, page.GetProperty("fingerprint").GetString());
@@ -145,6 +158,7 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         writer.Upsert(source with { Run = source.Run! with { Outcome = "FAIL" } });
         using var stale = await QueryAsync(client, nextQuery);
         var refusal = stale.RootElement.GetProperty("data").GetProperty("evidenceResults");
+        AssertOutcomeParity(queries.Results(new(id, 1, page.GetProperty("nextCursor").GetString())), refusal);
         Assert.Equal("STALE_CURSOR", refusal.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, refusal.GetProperty("data").ValueKind);
     }
@@ -172,6 +186,10 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         Assert.Equal("RESOURCE_LIMIT", data.GetProperty("large").GetProperty("state").GetString());
         Assert.Equal("page-byte-limit", data.GetProperty("large").GetProperty("code").GetString());
         Assert.Equal(JsonValueKind.Null, data.GetProperty("large").GetProperty("data").ValueKind);
+        var queries = factory.Services.GetRequiredService<IEvidenceQueryService>();
+        AssertOutcomeParity(queries.Results(new(emptyId)), data.GetProperty("empty"));
+        AssertOutcomeParity(queries.Results(new(new string('0', 64))), data.GetProperty("missing"));
+        AssertOutcomeParity(queries.Metrics(new(largeId)), data.GetProperty("large"));
     }
 
     [Fact]
@@ -192,12 +210,17 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
         var id = writer.ListSources("observations").Single().Checkpoint.SourceId;
         using var factory = Factory(true); using var client = factory.CreateClient();
         using var json = await QueryAsync(client, $$"""
-            { evidenceSpans(sourceId:"{{id}}") { data { sourceKind items { reportOrdinal spanId startNanos resourceIndex } } }
-              evidenceFields(sourceId:"{{id}}") { data { items { reportOrdinal fieldName state integerValue textValue sourcesJson } } }
+            { evidenceSpans(sourceId:"{{id}}") { data { indexInstanceId generation sourceKind verification fingerprint nextCursor
+                items { reportOrdinal groupId groupingRevision groupingBasis mappingRevision traceId spanId parentSpanId startNanos endNanos resourceIndex scopeIndex spanIndex } } }
+              evidenceFields(sourceId:"{{id}}") { data { indexInstanceId generation sourceKind verification fingerprint nextCursor
+                items { reportOrdinal fieldName state integerValue textValue sourcesJson } } }
               evidenceResults(sourceId:"{{id}}") { state code } }
             """);
         var data = json.RootElement.GetProperty("data");
         var spans = data.GetProperty("evidenceSpans").GetProperty("data");
+        var queries = factory.Services.GetRequiredService<IEvidenceQueryService>();
+        AssertPageParity(queries.Spans(new(id)).Data!, spans);
+        AssertPageParity(queries.Fields(new(id)).Data!, data.GetProperty("evidenceFields").GetProperty("data"));
         Assert.Equal("observation", spans.GetProperty("sourceKind").GetString());
         var reports = spans.GetProperty("items").EnumerateArray().ToArray();
         Assert.Equal(new[] { "0", "1" }, reports.Select(s => s.GetProperty("reportOrdinal").GetString()));
@@ -217,6 +240,35 @@ public sealed class EvidenceQueryGraphQLTests : IDisposable
             Assert.Equal(new long[] { 12, 13 }, provenance.RootElement.EnumerateArray().Select(p => p.GetProperty("Integer").GetInt64()).Order());
         }
         Assert.Equal("wrong-source-kind", data.GetProperty("evidenceResults").GetProperty("code").GetString());
+    }
+
+    private static void AssertOutcomeParity<T>(QueryResult<T> direct, JsonElement transported) where T : class
+    {
+        Assert.Equal(JsonNamingPolicy.SnakeCaseUpper.ConvertName(direct.State.ToString()), transported.GetProperty("state").GetString());
+        if (transported.TryGetProperty("code", out var code)) Assert.Equal(direct.Code, code.GetString());
+        if (direct.Data is null && transported.TryGetProperty("data", out var data)) Assert.Equal(JsonValueKind.Null, data.ValueKind);
+    }
+
+    private static void AssertPageParity(object directPage, JsonElement transported)
+    {
+        var expected = JsonSerializer.SerializeToNode(directPage, new JsonSerializerOptions(JsonSerializerDefaults.Web))!.AsObject();
+        expected["indexInstanceId"] = expected["instanceId"]!.DeepClone(); expected.Remove("instanceId");
+        // These are the documented wire adaptations. All other page content must survive unchanged.
+        var integers = new HashSet<string>(StringComparer.Ordinal)
+        { "generation", "indexedGeneration", "trial", "reportOrdinal", "resourceIndex", "scopeIndex", "spanIndex", "integerValue" };
+        void Adapt(JsonNode? node)
+        {
+            if (node is JsonObject obj)
+                foreach (var (key, value) in obj.ToArray())
+                {
+                    if (integers.Contains(key) && value is not null) obj[key] = value.GetValue<long>().ToString(CultureInfo.InvariantCulture);
+                    else Adapt(value);
+                }
+            else if (node is JsonArray array) foreach (var item in array) Adapt(item);
+        }
+        Adapt(expected);
+        Assert.True(JsonNode.DeepEquals(expected, JsonNode.Parse(transported.GetRawText())),
+            "The full page must match direct service output after documented naming and exact-integer adaptations.");
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);

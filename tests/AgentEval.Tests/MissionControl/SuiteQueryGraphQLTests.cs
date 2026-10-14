@@ -9,6 +9,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Indexing;
 using AgentEval.MissionControl.GraphQL;
+using AgentEval.MissionControl.Core;
+using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 using AgentEval.Results;
 using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
@@ -79,12 +82,28 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         using var json = await Read(client, $$"""
             { evidenceSuiteComparison(baselineSourceId:"{{baseline}}",candidateSourceId:"{{candidate}}") {
               state code data { compatible reason description
-                baseline { sourceId indexGeneration runHash runStatus scope definitionDigest frozen }
-                candidate { sourceId indexGeneration runHash runStatus scope definitionDigest frozen } } } }
+                baseline { sourceId indexInstanceId indexGeneration runHash runId runStatus scope suiteRef suiteVersion contentDigest definitionDigest frozen }
+                candidate { sourceId indexInstanceId indexGeneration runHash runId runStatus scope suiteRef suiteVersion contentDigest definitionDigest frozen } } } }
             """);
         var outcome = json.RootElement.GetProperty("data").GetProperty("evidenceSuiteComparison");
         Assert.Equal("AVAILABLE", outcome.GetProperty("state").GetString());
         var data = outcome.GetProperty("data");
+        var direct = factory.Services.GetRequiredService<ISuiteQueryService>().Compare(baseline, candidate);
+        Assert.Equal(QueryState.Available, direct.State);
+        var expected = new JsonObject
+        {
+            ["compatible"] = direct.Data!.Compatibility.Compatible, ["reason"] = direct.Data.Compatibility.Reason,
+            ["description"] = direct.Data.Compatibility.Description,
+            ["baseline"] = IdentityJson(direct.Data.Baseline), ["candidate"] = IdentityJson(direct.Data.Candidate)
+        };
+        Assert.True(JsonNode.DeepEquals(expected, JsonNode.Parse(data.GetRawText())), "Complete suite comparison must match the direct service.");
+        using var identityResponse = await Read(client, $$"""
+            { evidenceSuite(sourceId:"{{baseline}}") { state code data {
+              sourceId indexInstanceId indexGeneration runHash runId runStatus scope suiteRef suiteVersion contentDigest definitionDigest frozen } } }
+            """);
+        var identity = factory.Services.GetRequiredService<ISuiteQueryService>().Identity(baseline);
+        Assert.True(JsonNode.DeepEquals(IdentityJson(identity.Data!), JsonNode.Parse(identityResponse.RootElement
+            .GetProperty("data").GetProperty("evidenceSuite").GetProperty("data").GetRawText())));
         Assert.Equal(compatible, data.GetProperty("compatible").GetBoolean());
         Assert.Equal(reason, data.GetProperty("reason").GetString());
         Assert.Equal("completed", data.GetProperty("baseline").GetProperty("runStatus").GetString());
@@ -128,12 +147,13 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         const string at = "2026-10-14T00:00:00.123456789Z";
         var query = $$"""
             { evidenceResultDetail(sourceId:"{{id}}",resultId:"{{resultId}}",at:"{{at}}") { state code data {
-              sourceId indexGeneration runHash snapshotDigest policyDigest at resultId sealedJson sealedState effectiveState
+              sourceId indexInstanceId indexGeneration runHash snapshotDigest policyDigest at resultId sealedJson sealedState effectiveState
               overrideEvent unsealedEvents reviews { target status event } assurance { event shown } } } }
             """;
         using var factory = Factory(); using var client = factory.CreateClient();
         using var before = await Read(client, query);
         var original = before.RootElement.GetProperty("data").GetProperty("evidenceResultDetail").GetProperty("data");
+        AssertDetailParity(factory, id, resultId, at, original);
         var overlay = AefOverlayWriter.Open(Path.Combine(Root.Directory, "detail"));
         var changed = overlay.Append(new AefOverlayEvent
         {
@@ -152,6 +172,7 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         var outcome = after.RootElement.GetProperty("data").GetProperty("evidenceResultDetail");
         Assert.Equal("AVAILABLE", outcome.GetProperty("state").GetString());
         var detail = outcome.GetProperty("data");
+        AssertDetailParity(factory, id, resultId, at, detail);
         Assert.Equal(at, detail.GetProperty("at").GetString());
         Assert.Equal(original.GetProperty("sealedJson").GetString(), detail.GetProperty("sealedJson").GetString());
         Assert.Equal("passed", detail.GetProperty("sealedState").GetString());
@@ -197,6 +218,26 @@ public sealed partial class SuiteQueryGraphQLTests : IDisposable
         using var json = await Read(client, "{ evidenceResultDetail(sourceId:\"none\",resultId:\"none\",at:\"bad\") { state code } }");
         Assert.Equal("NOT_CONFIGURED", json.RootElement.GetProperty("data").GetProperty("evidenceResultDetail").GetProperty("state").GetString());
         Assert.False(File.Exists(Database));
+    }
+
+    private static JsonObject IdentityJson(VerifiedSuiteEvidence evidence)
+    {
+        // Reuse the content-free domain report, not the GraphQL resolver or its transport mapper.
+        var json = evidence.Identity.ToJson();
+        json["contentDigest"] = json["suiteDigest"]?.DeepClone(); json.Remove("suiteDigest");
+        json["sourceId"] = evidence.SourceId; json["indexInstanceId"] = evidence.IndexInstanceId;
+        json["indexGeneration"] = evidence.IndexGeneration.ToString(CultureInfo.InvariantCulture);
+        return json;
+    }
+
+    private static void AssertDetailParity(WebApplicationFactory<Query> factory, string source, string result, string at, JsonElement transported)
+    {
+        var direct = factory.Services.GetRequiredService<IResultDetailQueryService>().Result(source, result, AefTime.Parse(at));
+        Assert.Equal(QueryState.Available, direct.State);
+        var expected = JsonSerializer.SerializeToNode(direct.Data!.Result, new JsonSerializerOptions(JsonSerializerDefaults.Web))!.AsObject();
+        expected["sourceId"] = direct.Data.SourceId; expected["indexInstanceId"] = direct.Data.IndexInstanceId;
+        expected["indexGeneration"] = direct.Data.IndexGeneration.ToString(CultureInfo.InvariantCulture);
+        Assert.True(JsonNode.DeepEquals(expected, JsonNode.Parse(transported.GetRawText())), "All sealed/effective detail and provenance must match the direct service.");
     }
 
     private string WriteDefinition(SqliteEvidenceIndexWriter index, string name, bool frozen, bool aborted, double threshold = 0.8, string? padding = null)
