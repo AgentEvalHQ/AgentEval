@@ -97,6 +97,7 @@ OBJECT EvidenceResultDetailResponse {
 OBJECT EvidenceResultDetailView {
   assurance: [EvidenceAssuranceView!]!
   at: String!
+  decisions: [VerifiedDecisionEvent!]!
   effectiveState: String!
   indexGeneration: String!
   indexInstanceId: String!
@@ -295,4 +296,17 @@ OBJECT SuiteIdentityView {
   sourceId: String!
   suiteRef: String
   suiteVersion: String
+}
+
+OBJECT VerifiedDecisionEvent {
+  assurance: String!
+  at: String!
+  current: Boolean!
+  event: String!
+  identity: String!
+  kind: String!
+  line: Int!
+  reason: String
+  state: String
+  target: String!
 }

@@ -14,7 +14,7 @@ using System.Text.Json.Nodes;
 
 namespace AgentEval.MissionControl.Core.Tests;
 
-public sealed class SuiteQueryServiceTests : IDisposable
+public sealed partial class SuiteQueryServiceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "ae-suite-query-" + Guid.NewGuid().ToString("N"));
     private EvidenceIndexOptions Options => new() { DatabasePath = Path.Combine(_root, "index.sqlite") };

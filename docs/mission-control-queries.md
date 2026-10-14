@@ -230,6 +230,16 @@ per-signature results are separate fields. A passing lane is not checkpoint
 approval, and an available explanation is not proof of trust. The checkpoint
 query endpoint and browser view are not yet connected to this adapter.
 
+`ICheckpointQueryService` provides the shared query boundary over this adapter.
+The host supplies at most sixteen `ConfiguredCheckpoint` objects, which copy
+validated manifest/envelope bytes and expose path-free descriptors. `List`
+returns those declarations; `Explain` accepts a configured ID, up to eight
+source IDs and an exact UTC time. It reuses configured evidence-root bindings,
+deduplicates sources, refuses mixed index revisions, and returns the selected
+IDs and revision beside the explanation. An empty selection has no index
+revision and can produce explicit missing-run verification problems. Query
+availability does not imply that the checkpoint passed verification.
+
 Browser acceptance: build `src/AgentEval.MissionControl.Spa`, then run
 `node scripts/mc-browser-smoke/governance.mjs`. Set `PLAYWRIGHT_CHANNEL=msedge`
 to use installed Edge. This checks controlled API responses in a real browser;
