@@ -83,7 +83,8 @@ internal sealed record EvalPortImportPlan(EvalPortResultSet Source, AefRunHeader
             Execution = new() { TargetMode = options.TargetMode },
             Imported = new() { From = from, Asserted = asserted.AsReadOnly() },
             Ext = new JsonObject { ["evalport"] = new JsonObject
-            { ["version"] = doc["version"]!.DeepClone(), ["run_id"] = source.RunId, ["suite_id"] = source.SuiteId } },
+            { ["version"] = doc["version"]!.DeepClone(), ["run_id"] = source.RunId, ["suite_id"] = source.SuiteId,
+                ["providerModel"] = doc["provider"]?["model"]?.DeepClone(), ["runner"] = doc["runner"]?.DeepClone() } },
         };
         return new(source, header, status, ended,
             status == AefRunStatus.Aborted ? "Source ResultSet declares openeval.partial." : null, notes.AsReadOnly());

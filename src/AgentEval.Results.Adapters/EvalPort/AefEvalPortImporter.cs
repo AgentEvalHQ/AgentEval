@@ -38,7 +38,7 @@ public sealed class AefEvalPortImporter : IAefEvalPortImporter
         {
             "Root passed flags are source declarations: Own aggregation records grader children with zero weight; no source threshold is invented.",
             "Repeated attempts use converter-computed AllPass rollups; missing observations do not become passing evidence.",
-            "Provider configuration, arbitrary metadata, source summary and external signatures are not transferred; no external trust is inherited.",
+            "Provider configuration beyond model identity, arbitrary metadata, source summary and external signatures are not transferred; no external trust is inherited.",
             "Source error objects are retained as document evidence only with capture-on; capture-off retains declared error type/retryability and omits message/code content.",
         }).ToArray();
         var existed = Directory.Exists(outputDirectory);

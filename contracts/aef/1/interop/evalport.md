@@ -313,6 +313,26 @@ approval rule. Aggregation semantic acceptance,
 reverse conversion, CLI wiring and complete interoperability roundtrip acceptance
 remain unfinished. The full W09 interoperability task is not complete.
 
+`IAefEvalPortExporter` / `AefEvalPortExporter` now exports verified base evidence
+from a bounded owned copy. It requires an intact seal, supports an optional exact
+run-hash pin, and refuses overlay-bearing runs unless `IgnoreOverlays` explicitly
+selects base evidence. It does not apply an effective view or transfer a signature.
+
+Imported source run/suite/grader identifiers, declared runner/model identity,
+isolation/group context and attempt presence are restored when preserved. Captured
+output, grader reasoning and source error objects are read only from verified local
+blobs. Capture-off or authorized withholding leaves content absent and reports the
+loss. Generic AEF leaf states and paths are retained under `metadata.aef`; flattened
+trees, omitted rollups and first-score-only mapping are listed in conversion notes.
+Scores outside [0,1] without normalization are refused. Repeated attempts remain
+individual results; converter rollups do not become extra EvalPort observations.
+
+Captured text consumption and the resulting ResultSet each have a 4 MiB bound.
+The exported document is checked by the pinned ResultSet validator. This is an
+initial reverse projection, not completion of the full mapping matrix: generic
+multi-root identity handling, remaining provider/metadata fidelity, aggregation
+acceptance, further resource tests and CLI publication still need acceptance.
+
 Still pending: remaining ResultSet adapter coverage and roundtrip acceptance.
 A directly parsed extension alone has not had its seal
 checked. Group chains across multiple runs are consumer joins;
