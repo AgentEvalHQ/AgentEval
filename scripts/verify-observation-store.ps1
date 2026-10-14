@@ -18,7 +18,62 @@ if ($Phase -ne 'parent') {
     $policy = [AgentEval.Results.Observations.OtlpContentPolicy]::new()
     $store = [AgentEval.Results.Observations.OtlpObservationStore]::new($options, $policy, $grouper, $token)
     try {
-        $json = '{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"service"}}]},"scopeSpans":[{"spans":[{"traceId":"0123456789abcdef0123456789abcdef","spanId":"0123456789abcdef","name":"private-prompt","attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"model"}},{"key":"session.id","value":{"stringValue":"session"}},{"key":"gen_ai.provider.name","value":{"stringValue":"provider"}},{"key":"gen_ai.usage.input_tokens","value":{"intValue":"9007199254740993"}}]}]}]}]}' # DevSkim: ignore DS173237 - synthetic OTLP trace identity and fixture payload
+        $testTraceId = "0123456789abcdef0123456789abcdef" # DevSkim: ignore DS173237 - synthetic OTLP trace identity
+        $json = @"
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "service"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "$testTraceId",
+              "spanId": "0123456789abcdef",
+              "name": "private-prompt",
+              "attributes": [
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "model"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "session"
+                  }
+                },
+                {
+                  "key": "gen_ai.provider.name",
+                  "value": {
+                    "stringValue": "provider"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "9007199254740993"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+"@
         $decoder = [AgentEval.Results.Observations.OtlpJsonTraceDecoder]::new($null)
         $payload = [System.ReadOnlyMemory[byte]]::new([System.Text.Encoding]::UTF8.GetBytes($json))
         $receipt = $store.Accept($decoder.Decode($payload, $token), $token)

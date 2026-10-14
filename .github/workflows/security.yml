@@ -113,7 +113,7 @@ jobs:
           cat vulnerability-report.txt
           echo "::error::Vulnerable dependencies found. Please update affected packages."
           exit 1
-        elif grep -q "The given project has no vulnerable packages" vulnerability-report.txt; then
+        elif grep -q '^The given project .* has no vulnerable packages' vulnerability-report.txt; then
           echo "✅ No vulnerable packages found"
         else
           echo "::error::Unable to determine vulnerability status"
