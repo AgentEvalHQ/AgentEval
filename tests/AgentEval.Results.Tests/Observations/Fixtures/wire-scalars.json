@@ -1,0 +1,38 @@
+{
+  "resourceSpans": [
+    {
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "0123456789abcdef0123456789abcdef",
+              "spanId": "0123456789abcdef",
+              "kind": -1,
+              "attributes": [
+                {
+                  "key": "bool",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "integer",
+                  "value": {
+                    "intValue": "-1"
+                  }
+                },
+                {
+                  "key": "double",
+                  "value": {
+                    "doubleValue": "NaN"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 5
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

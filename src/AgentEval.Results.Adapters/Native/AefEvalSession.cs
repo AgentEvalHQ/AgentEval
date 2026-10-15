@@ -4,6 +4,8 @@
 
 using AgentEval.Models;
 using AgentEval.Core;
+using System.Text.Json.Nodes;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Native;
@@ -46,17 +48,24 @@ public static partial class AefEvalWriter
             _options = options;
             _plannedTrials = plannedTrials;
             _requirePasses = requirePasses;
+            var digest = DatasetDigest(options.DatasetBytes);
+            var suiteRef = AefConverter.TypedRef("dataset", options.DatasetName);
+            var definition = options.Definition;
+            if (definition is not null && (definition.Kind != "dataset" || definition.SuiteRef != suiteRef
+                || definition.ToJson()["inputs"]?["dataset"]?.GetValue<string>() != SuiteDefinitionManifest.Hash(options.DatasetBytes)))
+                throw new ArgumentException("Expected: dataset definition bound to this suite and exact snapshot. Actual: definition binding differs. Suggestions: build the definition from the captured dataset bytes. Because: evidence must identify what was executed.", nameof(options));
             _folder = AefRunFolder.Reserve(runsRoot, startedAt, "eval");
             try
             {
                 var runId = _folder.RunId;
                 var directory = _folder.Directory;
-                var digest = DatasetDigest(options.DatasetBytes);
+                var ext = AefCliProvenance.Extension(options.Cli) ?? new JsonObject();
+                ext["agenteval.suiteIdentity"] = definition?.Metadata() ?? new JsonObject { ["scope"] = "dataset", ["digest"] = digest };
                 var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
                 var header = new AefRunHeader
                 {
                     RunId = runId,
-                    Ext = AefCliProvenance.Extension(options.Cli),
+                    Ext = ext,
                     Producer = AefConverter.DefaultProducer,
                     Config = options.Config,
                     CostPolicy = options.CostPolicy,
@@ -64,10 +73,10 @@ public static partial class AefEvalWriter
                     Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
                     Suite = new AefSuite
                     {
-                        Ref = AefConverter.TypedRef("dataset", options.DatasetName),
-                        Version = "sha256-" + digest["sha256:".Length..][..12],
-                        Digest = digest,
-                        Frozen = true,
+                        Ref = suiteRef,
+                        Version = definition?.DefinitionVersion ?? "sha256-" + digest["sha256:".Length..][..12],
+                        Digest = definition is null ? digest : definition.SuiteContentDigest,
+                        Frozen = definition?.Frozen ?? true,
                         ExecutionPolicy = requirePasses is { } k
                             ? new AefExecutionPolicy { TrialsPerCase = plannedTrials!.Value, RequirePasses = k, Aggregation = AefTrialAggregation.AtLeast }
                             : null,
@@ -78,6 +87,7 @@ public static partial class AefEvalWriter
                 };
 
                 _writer = AefRunWriter.Create(directory, header);
+                if (definition is not null) _writer.PutExtFile(SuiteDefinitionManifest.ExtensionFile, definition.ToBytes());
                 _metrics.AddRange(
                 [
                     new AefMetric
@@ -114,6 +124,8 @@ public static partial class AefEvalWriter
         {
             EnsureOpen();
             ArgumentNullException.ThrowIfNull(result);
+            if (_options.Definition is { Frozen: true } definition && !definition.CaseIds.Contains(caseId, StringComparer.Ordinal))
+                throw new ArgumentException("Expected: a case in the frozen planned roster. Actual: undeclared case. Suggestions: declare the complete roster before execution. Because: observed outcomes cannot change suite identity.", nameof(caseId));
             content = _options.ContentCapture == AefContentCapture.On
                 ? (content ?? new AefNativeContent()) with
                 {
@@ -229,6 +241,9 @@ public static partial class AefEvalWriter
             };
             if (options.AbortReason is null && _trials.Any(t => t.Value.Count != _plannedTrials))
                 throw new InvalidOperationException("An incomplete trial run must close aborted.");
+            if (options.AbortReason is null && options.Definition is { Frozen: true } definition
+                && !definition.CaseIds.ToHashSet(StringComparer.Ordinal).SetEquals(_cases.Keys.Concat(_trials.Keys)))
+                throw new InvalidOperationException("Expected: every frozen planned case observed before completed status. Actual: incomplete roster. Suggestions: finish the remaining cases or close aborted. Because: partial execution must not claim complete evidence.");
             foreach (var pair in _trials)
                 if (!_rolledUp.Contains(pair.Key)) AddRollup(pair.Key, pair.Value);
             if (options.AbortReason is not null)
@@ -263,6 +278,11 @@ public static partial class AefEvalWriter
                 Lanes = [new AefSummaryLane(Lane, [new AefSummaryEntry { Metric = PassMetric, Path = CasePath }, new AefSummaryEntry { Metric = ScoreMetric, Path = CasePath }])],
                 Cost = AefNativeUsage.Cost(totals),
                 Usage = totals,
+                Ext = new JsonObject { ["agenteval.observedRoster"] = new JsonObject
+                {
+                    ["digest"] = AefProbeRunWriter.RosterDigest(_cases.Keys.Concat(_trials.Keys)),
+                    ["count"] = _cases.Keys.Concat(_trials.Keys).Distinct(StringComparer.Ordinal).Count(),
+                } },
             });
             _writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);

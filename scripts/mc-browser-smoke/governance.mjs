@@ -1,0 +1,345 @@
+// UI acceptance against controlled API responses. Run after the SPA production build:
+// node scripts/mc-browser-smoke/governance.mjs
+// This checks browser behavior; SpaQueriesValidateTests separately checks the real schema.
+import { chromium } from 'playwright';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { resolve, extname, sep } from 'node:path';
+import assert from 'node:assert/strict';
+
+const root = resolve(import.meta.dirname, '../../src/AgentEval.MissionControl/wwwroot');
+const server = createServer(async (request, response) => {
+  try {
+    const path = new URL(request.url, 'http://localhost').pathname;
+    const file = path.startsWith('/assets/') ? resolve(root, `.${path}`) : resolve(root, 'index.html');
+    if (!file.startsWith(root + sep)) {
+      response.writeHead(404).end(); return;
+    }
+    response.setHeader('Content-Type', { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' }[extname(file)] ?? 'application/octet-stream');
+    response.end(await readFile(file));
+  } catch { response.writeHead(404).end(); }
+});
+await new Promise(done => server.listen(0, '127.0.0.1', done));
+let browser;
+try {
+  browser = await chromium.launch(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {});
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  let state = 'AVAILABLE';
+  let fail = false;
+  let detailState = 'AVAILABLE';
+  let recordsState = 'AVAILABLE';
+  let sourceKind = 'aef';
+  let requirementsState = 'AVAILABLE';
+  let checkpointState = 'AVAILABLE';
+  let checkpointTrust = 'absent';
+  const requests = [];
+  await page.route('**/api/v1/version', route => route.fulfill({ json: { mode: 'local', version: 'test' } }));
+  await page.route('**/graphql', async route => {
+    const request = route.request().postDataJSON();
+    if (request.query.includes('WorkspaceState')) {
+      await route.fulfill({ json: { data: { workspace: { initialized: false, root: null, agentEvalVersion: 'test' } } } }); return;
+    }
+    if (request.query.includes('GovernanceCheckpoints')) {
+      await route.fulfill({ json: { data: { checkpoints: { state: 'AVAILABLE', code: null, data: [{
+        id: 'release', checkpointId: 'cp-test', subjectRef: 'agent:test', subjectVersion: 'v1',
+        declaredState: 'decided', declaredOutcome: 'approved', manifestDigest: 'checkpoint-digest',
+      }] } } } }); return;
+    }
+    if (request.query.includes('GovernanceCheckpointExplanation')) {
+      requests.push(request.variables);
+      const trusted = checkpointTrust === 'trusted';
+      const declaration = JSON.stringify({ checkpointId: 'cp-test', subject: { ref: 'agent:test', version: 'v1' },
+        state: 'decided', outcome: 'approved', decision: { reasons: ['<script>checkpoint reason</script>'], lanes: [{ lane: 'quality', status: 'passed' }] },
+        lanes: [{ lane: 'quality', runs: [{ runId: 'run-1', runHash: 'run-hash' }], rule: { kind: 'comparison', minimumN: 'RULE_INTEGER', baseline: { runId: 'baseline-1', runHash: 'baseline-hash' } } }],
+        ext: { exactInteger: 'EXACT_INTEGER' },
+      }).replace('"EXACT_INTEGER"', '9223372036854775807').replace('"RULE_INTEGER"', '9223372036854775806');
+      await route.fulfill({ json: { data: { checkpointExplanation: { state: checkpointState, code: null,
+        data: checkpointState === 'AVAILABLE' ? { checkpointId: 'release', sourceIds: request.variables.sourceIds,
+          indexInstanceId: 'checkpoint-index', indexGeneration: '9223372036854775807', explanation: {
+            manifestDigest: 'checkpoint-digest', policyDigest: 'checkpoint-policy', requestedAt: request.variables.at,
+            evaluatedAt: '2026-01-01T00:00:00.000000001Z', manifestJson: declaration,
+            manifestProblems: trusted ? [] : ['decision'], problems: trusted ? [] : [{ path: 'lanes/quality', code: 'lane-result' }],
+            lanes: [{ lane: 'quality', ruleKind: 'comparison', evidenceStatus: trusted ? 'passed' : 'incomparable', subjectVersion: 'v1',
+              oldestClosedAt: '2025-12-31T23:00:00Z', axes: trusted ? [] : ['suite-digest'], readsUnknown: false,
+              problems: trusted ? [] : [{ path: 'lanes/quality/runs/run-1', code: 'run-missing' }] }],
+            signedBy: trusted ? ['reviewer:test'] : [], anchors: trusted ? ['run-hash'] : [],
+            envelopePresent: checkpointTrust !== 'absent', signatureChecked: checkpointTrust !== 'absent',
+            envelopeResult: checkpointTrust === 'malformed' ? 'Malformed' : null,
+            signatures: ['trusted', 'untrusted'].includes(checkpointTrust) ? [{ keyId: 'key-1', result: trusted ? 'VERIFIED' : 'UNTRUSTED_KEY', identity: trusted ? 'reviewer:test' : null }] : [],
+          } } : null,
+      } } } }); return;
+    }
+    if (request.query.includes('GovernanceRequirements')) {
+      requests.push(request.variables);
+      const hasEvidence = request.variables.sourceIds.length > 0;
+      await route.fulfill({ json: { data: { governanceStatus: { state: requirementsState, code: null,
+        data: requirementsState === 'AVAILABLE' ? {
+          catalogueDigest: 'catalogue-digest', policyDigest: 'requirement-policy', at: request.variables.at,
+          subject: { ref: request.variables.subjectRef, version: request.variables.subjectVersion },
+          selectedRunHashes: hasEvidence ? ['selected-hash'] : [],
+          evidence: hasEvidence ? [{ runId: 'run-1', runHash: 'selected-hash', overlayDigest: 'overlay-digest' }] : [],
+          requirements: [{ id: 'REQ-1', baseStatus: hasEvidence ? 'not_met' : 'not_measured', effectiveStatus: hasEvidence ? 'not_met' : 'not_measured',
+            status: hasEvidence ? 'waived' : 'not_measured', diagnostics: ['<script>diagnostic()</script>'],
+            observations: hasEvidence ? [{ runHash: 'selected-hash', resultId: 'result-1', lane: 'scenario', metric: 'metric-1', path: 'root',
+              sealedState: 'fail', effectiveState: 'fail', overrideEvent: null, value: 0, endedAt: '2026-01-01T00:00:00.000000001Z' }] : [],
+            reviews: [],
+            waivers: hasEvidence ? [
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-active', identity: 'approver-1', assurance: 'signed', expires: '2027-01-01T00:00:00Z', active: true, authorized: true },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-expired', identity: 'approver-1', assurance: 'signed', expires: '2025-01-01T00:00:00Z', active: false, authorized: true },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-untrusted', identity: '<script>claim()</script>', assurance: 'self-attested', expires: '2027-01-01T00:00:00Z', active: true, authorized: false },
+              { runHash: 'selected-hash', requirement: 'REQ-1', event: 'waiver-wrong-permission', identity: 'approver-2', assurance: 'signed', expires: '2027-01-01T00:00:00Z', active: true, authorized: false },
+            ] : [],
+          }],
+        } : null,
+      } } } }); return;
+    }
+    if (/Governance(Metrics|Spans|Fields)/.test(request.query)) {
+      requests.push(request.variables);
+      const metrics = request.query.includes('GovernanceMetrics');
+      const spans = request.query.includes('GovernanceSpans');
+      const items = metrics ? [
+        { resultId: 'result-1', metricId: 'zero-score', ordinal: 0, score: 0, scoreText: null, passed: false, provenance: 'reported' },
+        { resultId: 'result-1', metricId: 'exceptional-score', ordinal: 1, score: null, scoreText: 'NaN', passed: null, provenance: 'reported' },
+      ] : spans ? [{ reportOrdinal: '9223372036854775806', groupId: 'group-1', groupingRevision: 'group-v1', groupingBasis: 'trace',
+        mappingRevision: 'mapping-v1', traceId: 'trace-1', spanId: 'span-1', parentSpanId: '',
+        startNanos: '18446744073709551614', endNanos: '18446744073709551615', resourceIndex: '0', scopeIndex: '1', spanIndex: '2' }]
+        : [{ reportOrdinal: '9223372036854775806', fieldName: 'subject', state: 'conflict', textValue: null,
+          integerValue: '-9223372036854775808', sourcesJson: '[{"value":"<script>bad()</script>"},{"value":"other"}]' }];
+      await route.fulfill({ json: { data: { page: { state: recordsState, code: null,
+        data: ['AVAILABLE', 'EMPTY'].includes(recordsState) ? {
+          indexInstanceId: 'index-test', generation: '9223372036854775807', sourceKind: metrics ? 'aef' : 'observation',
+          verification: metrics ? 'intact' : 'unverified', fingerprint: 'record-fingerprint',
+          nextCursor: recordsState === 'EMPTY' ? null : 'records-next', items: recordsState === 'EMPTY' ? [] : items,
+        } : null,
+      } } } }); return;
+    }
+    if (request.query.includes('GovernanceResultDetail')) {
+      requests.push(request.variables);
+      await route.fulfill({ json: { data: { evidenceResultDetail: {
+        state: detailState, code: null, data: detailState === 'AVAILABLE' ? {
+          sourceId: request.variables.sourceId, resultId: request.variables.resultId,
+          indexInstanceId: 'index-test', indexGeneration: '9223372036854775807',
+          runHash: 'run-hash', snapshotDigest: 'snapshot-digest', policyDigest: 'policy-digest', at: request.variables.at,
+          sealedState: 'fail', effectiveState: 'pass', overrideEvent: 'override-1', unsealedEvents: 2,
+          reviews: [{ target: 'result-1', status: 'approved', event: 'review-1' }],
+          assurance: [{ event: 'override-1', shown: 'signed' }],
+          decisions: [
+            { line: 1, event: 'old-override', kind: 'override', target: 'result-1', at: '2026-02-01T00:00:00Z', identity: 'reviewer-1', assurance: 'self-attested', state: 'fail', reason: '<script>old reason</script>', current: false },
+            { line: 2, event: 'override-1', kind: 'adjudicate', target: 'result-1', at: '2026-01-01T00:00:00Z', identity: 'reviewer-2', assurance: 'signed', state: 'pass', reason: 'current decision', current: true },
+          ],
+          sealedJson: '{"message":"<img src=x onerror=alert(1)>"}',
+        } : null,
+      } } } }); return;
+    }
+    if (request.query.includes('GovernanceResults')) {
+      await route.fulfill({ json: { data: { evidenceResults: {
+        state: 'AVAILABLE', code: null, data: {
+          indexInstanceId: 'index-test', generation: '9223372036854775806', sourceKind: 'aef',
+          verification: 'intact', fingerprint: 'fingerprint-test', nextCursor: null,
+          items: [{ resultId: 'result-1', caseId: null, trial: null, outcome: null }],
+        },
+      } } } }); return;
+    }
+    requests.push(request.variables);
+    if (fail) { await route.fulfill({ status: 503, body: 'Unavailable' }); return; }
+    await route.fulfill({ json: { data: { evidenceSources: {
+      state, code: null,
+      data: ['AVAILABLE', 'EMPTY'].includes(state) ? {
+        indexInstanceId: 'index-test', generation: '9223372036854775807', nextCursor: state === 'EMPTY' ? null : 'page-two',
+        items: state === 'EMPTY' ? [] : [{ sourceId: 'source-1', rootId: 'fixtures', relativePath: '<img src=x onerror=alert(1)>',
+          kind: sourceKind, verification: 'Intact', fingerprint: 'abc', indexedGeneration: '9223372036854775806' }],
+      } : null,
+    } } } });
+  });
+  await page.goto(`http://127.0.0.1:${server.address().port}/governance`);
+  await page.getByText('Connected — evidence sources available', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Governance evidence' }).count(), 1);
+  assert.equal(await page.getByText('9223372036854775807', { exact: true }).count(), 1);
+  assert.equal(await page.locator('main img').count(), 0);
+  assert.equal(await page.getByText('<img src=x onerror=alert(1)>', { exact: true }).count(), 1);
+  await page.getByLabel('Logical root ID').fill(' fixtures ');
+  await page.getByRole('button', { name: 'Apply filter' }).click();
+  await page.getByText('Connected — evidence sources available', { exact: true }).waitFor();
+  assert.equal(requests.at(-1).rootId, 'fixtures');
+  state = 'STALE_CURSOR';
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await page.getByText('The index changed while browsing.', { exact: false }).waitFor();
+  assert.equal(requests.at(-1).cursor, 'page-two');
+  assert.equal(await page.locator('table').count(), 0);
+  state = 'EMPTY';
+  await page.getByRole('button', { name: 'First page' }).click();
+  await page.getByText('Connected — no evidence sources match this selection', { exact: true }).waitFor();
+  assert.equal(requests.at(-1).cursor, null);
+  assert.equal(await page.getByRole('button', { name: 'Next page' }).isDisabled(), true);
+  for (const [nextState, text] of [
+    ['NOT_CONFIGURED', 'Evidence queries are not configured'], ['NOT_FOUND', 'no longer indexed'],
+    ['INVALID_REQUEST', 'was rejected'], ['RESOURCE_LIMIT', 'query budget was reached'],
+    ['UNAVAILABLE', 'evidence index is unavailable'], ['FUTURE_STATE', 'unsupported availability state'],
+  ]) {
+    state = nextState;
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await page.getByRole('status').filter({ hasText: text }).waitFor();
+    assert.equal(await page.locator('table').count(), 0);
+  }
+  state = 'AVAILABLE';
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await page.locator('table').waitFor();
+  fail = true;
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await page.getByRole('status').filter({ hasText: 'Connection failed' }).waitFor();
+  assert.equal(await page.locator('table').count(), 0);
+  fail = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('link', { name: '<img src=x onerror=alert(1)>', exact: true }).click();
+  await page.getByRole('heading', { name: 'Source results', exact: true }).waitFor();
+  await page.getByText('No case (aggregate)', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Not declared', { exact: true }).count(), 1);
+  assert.equal(await page.getByText('Not measured', { exact: true }).count(), 1);
+  await page.getByRole('button', { name: 'result-1', exact: true }).click();
+  const detail = page.getByRole('region', { name: 'Verified result detail' });
+  await detail.getByText('snapshot-digest', { exact: true }).waitFor();
+  await detail.getByRole('alert').waitFor();
+  const timeline = detail.locator('ol > li');
+  assert.equal(await timeline.count(), 2);
+  assert.match(await timeline.nth(0).innerText(), /Line 1: override — Superseded/);
+  assert.match(await timeline.nth(1).innerText(), /Line 2: adjudicate — Current/);
+  assert.equal(await detail.locator('script').count(), 0);
+  assert.equal(await detail.locator('dl').first().getByText('fail', { exact: true }).count(), 1);
+  assert.equal(await detail.locator('dl').first().getByText('pass', { exact: true }).count(), 1);
+  await detail.getByText('Sealed result JSON', { exact: true }).click();
+  assert.match(await detail.locator('pre').innerText(), /<img src=x/);
+  assert.equal(await detail.locator('img').count(), 0);
+  await detail.getByLabel('UTC view time').fill('2026-01-01T00:00:00Z');
+  await detail.getByRole('button', { name: 'Apply time' }).click();
+  await detail.locator('dl').first().getByText('2026-01-01T00:00:00Z', { exact: true }).waitFor();
+  assert.equal(requests.at(-1).at, '2026-01-01T00:00:00Z');
+  detailState = 'UNAVAILABLE';
+  await detail.getByRole('button', { name: 'Re-verify' }).click();
+  await detail.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
+  assert.equal(await detail.getByText('snapshot-digest', { exact: true }).count(), 0);
+  assert.equal(await detail.locator('pre').count(), 0);
+  await page.getByRole('link', { name: 'Metrics', exact: true }).click();
+  await page.getByRole('heading', { name: 'Metric occurrences' }).waitFor();
+  const zero = page.getByRole('row').filter({ hasText: 'zero-score' });
+  await zero.waitFor();
+  assert.equal(await zero.getByRole('cell', { name: '0', exact: true }).count(), 2);
+  assert.equal(await zero.getByRole('cell', { name: 'False', exact: true }).count(), 1);
+  const exceptional = page.getByRole('row').filter({ hasText: 'exceptional-score' });
+  assert.equal(await exceptional.getByRole('cell', { name: 'NaN', exact: true }).count(), 1);
+  assert.equal(await exceptional.getByRole('cell', { name: 'Not declared', exact: true }).count(), 2);
+  recordsState = 'STALE_CURSOR';
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await page.getByRole('status').filter({ hasText: 'The index changed' }).waitFor();
+  assert.equal(requests.at(-1).cursor, 'records-next');
+  assert.equal(await page.locator('table').count(), 0);
+  recordsState = 'EMPTY';
+  await page.getByRole('button', { name: 'First page' }).click();
+  await page.getByRole('status').filter({ hasText: 'No indexed records' }).waitFor();
+  assert.equal(requests.at(-1).cursor, null);
+  recordsState = 'AVAILABLE';
+  await page.getByRole('link', { name: 'Fields', exact: true }).click();
+  await page.getByRole('cell', { name: 'conflict', exact: true }).waitFor();
+  assert.equal(await page.getByRole('cell', { name: '-9223372036854775808', exact: true }).count(), 1);
+  await page.locator('summary').filter({ hasText: 'Source provenance' }).click();
+  assert.match(await page.locator('pre').innerText(), /<script>bad/);
+  assert.equal(await page.locator('main script').count(), 0);
+  await page.getByRole('link', { name: 'Evidence sources', exact: true }).click();
+  sourceKind = 'observation';
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('link', { name: '<img src=x onerror=alert(1)>', exact: true }).click();
+  await page.getByRole('heading', { name: 'Observed spans' }).waitFor();
+  await page.getByRole('cell', { name: '18446744073709551614', exact: true }).waitFor();
+  assert.equal(await page.getByRole('cell', { name: '18446744073709551615', exact: true }).count(), 1);
+  assert.equal(requests.at(-1).cursor, null);
+  await page.getByRole('link', { name: 'Requirements for this source', exact: true }).click();
+  await page.getByRole('heading', { name: 'Requirements status' }).waitFor();
+  assert.equal(await page.getByLabel('Evidence source IDs').inputValue(), 'source-1');
+  assert.equal(await page.getByRole('region', { name: 'Requirement report' }).count(), 0);
+  await page.getByLabel('Subject reference').fill('agent:test');
+  await page.getByLabel('Subject version').fill('v1');
+  await page.getByLabel('UTC view time').fill('2026-01-02T00:00:00.000000001Z');
+  await page.getByLabel('Evidence source IDs').fill('source-1\nsource-1');
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  const report = page.getByRole('region', { name: 'Requirement report' });
+  await report.getByText('catalogue-digest', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, ['source-1']);
+  assert.equal(requests.at(-1).at, '2026-01-02T00:00:00.000000001Z');
+  assert.equal(await report.getByRole('cell', { name: 'not_met', exact: true }).count(), 2);
+  assert.equal(await report.getByRole('cell', { name: 'waived', exact: true }).count(), 1);
+  await report.locator('summary').filter({ hasText: '1 observations' }).click();
+  await report.getByText('<script>diagnostic()</script>', { exact: true }).waitFor();
+  assert.equal(await report.locator('script').count(), 0);
+  await report.locator('summary').filter({ hasText: 'Waiver history (4)' }).click();
+  const activeWaiver = report.locator('dl[aria-label="Waiver waiver-active"]');
+  assert.match(await activeWaiver.innerText(), /Active at view time/);
+  assert.match(await activeWaiver.innerText(), /Authorized for this requirement/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-expired"]').innerText(), /Inactive at view time/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-untrusted"]').innerText(), /self-attested/);
+  assert.match(await report.locator('dl[aria-label="Waiver waiver-wrong-permission"]').innerText(), /Not authorized/);
+  assert.equal(await report.getByText('<script>claim()</script>', { exact: true }).count(), 1);
+  assert.equal(await report.locator('script').count(), 0);
+  await page.getByLabel('Subject version').fill('v2');
+  assert.equal(await report.getByText('agent:test / v1', { exact: true }).count(), 1);
+  await page.getByLabel('Evidence source IDs').fill('');
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await report.getByText('agent:test / v2', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, []);
+  assert.equal(await report.getByRole('cell', { name: 'not_measured', exact: true }).count(), 3);
+  requirementsState = 'UNAVAILABLE';
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await page.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
+  assert.equal(await report.count(), 0);
+  requirementsState = 'STALE_CURSOR';
+  await page.getByRole('button', { name: 'Resolve requirements' }).click();
+  await page.getByRole('status').filter({ hasText: 'Resolve requirements again' }).waitFor();
+  assert.equal(await report.count(), 0);
+  await page.getByRole('link', { name: 'Evidence sources', exact: true }).click();
+  await page.getByRole('link', { name: 'Checkpoint evidence', exact: true }).click();
+  await page.getByRole('heading', { name: 'Checkpoint evidence' }).waitFor();
+  await page.getByLabel('Configured checkpoint').selectOption('release');
+  await page.getByLabel('Evidence source IDs').fill('source-1\nsource-1');
+  await page.getByLabel('UTC view time').fill('2026-02-01T00:00:00.000000009Z');
+  assert.equal(await page.getByRole('region', { name: 'Checkpoint explanation' }).count(), 0);
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  const checkpoint = page.getByRole('region', { name: 'Checkpoint explanation' });
+  await checkpoint.getByText('checkpoint-digest', { exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1).sourceIds, ['source-1']);
+  assert.equal(requests.at(-1).at, '2026-02-01T00:00:00.000000009Z');
+  assert.equal(await checkpoint.getByText('approved', { exact: true }).count(), 1);
+  assert.equal(await checkpoint.getByRole('cell', { name: 'incomparable', exact: true }).count(), 1);
+  assert.equal(await checkpoint.getByText('2026-01-01T00:00:00.000000001Z', { exact: true }).count(), 1);
+  await checkpoint.getByText('No signature envelope supplied.', { exact: true }).waitFor();
+  await checkpoint.getByText('Manifest: decision', { exact: true }).waitFor();
+  await checkpoint.getByText('lanes/quality: lane-result', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: /^Rule parameters$/ }).click();
+  await checkpoint.getByText('See exact integer in original manifest', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: 'Declared evidence references' }).click();
+  await checkpoint.getByText('Baseline: baseline-1 / baseline-hash', { exact: true }).waitFor();
+  await checkpoint.locator('summary').filter({ hasText: 'Original manifest' }).click();
+  assert.match(await checkpoint.locator('pre').innerText(), /9223372036854775807/);
+  assert.equal(await checkpoint.locator('script').count(), 0);
+  checkpointTrust = 'untrusted';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('key-1: UNTRUSTED_KEY — No verified identity', { exact: true }).waitFor();
+  await checkpoint.getByText('Anchored run hashes: None', { exact: true }).waitFor();
+  checkpointTrust = 'trusted';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('Established signers: reviewer:test', { exact: true }).waitFor();
+  await checkpoint.getByText('Anchored run hashes: run-hash', { exact: true }).waitFor();
+  checkpointTrust = 'malformed';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await checkpoint.getByText('Envelope verification: Malformed', { exact: true }).waitFor();
+  checkpointState = 'UNAVAILABLE';
+  await page.getByRole('button', { name: 'Explain checkpoint' }).click();
+  await page.getByRole('status').filter({ hasText: 'Evidence is currently unavailable' }).waitFor();
+  assert.equal(await checkpoint.count(), 0);
+  assert.deepEqual(errors, []);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
+    'Wide observation tables should scroll inside their panel, not widen the page.');
+  console.log('Governance browser acceptance passed: workspace, evidence, requirements, checkpoint declarations/rules/trust, exact values, safe provenance, refusals and stale-data cleanup.');
+} finally {
+  await browser?.close();
+  await new Promise(done => server.close(done));
+}

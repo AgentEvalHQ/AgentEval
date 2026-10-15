@@ -16,7 +16,7 @@ namespace AgentEval.Evals.Agentic.Diagnostics;
 /// <para>Reads ToolExecution entries; skipped when no trace or no tool-execution entries. A run with no
 /// failures scores 1.0 (empty largest cluster).</para>
 /// </summary>
-public sealed class ToolErrorPatternEval : IEval
+public sealed class ToolErrorPatternEval : IEvalConfigurationSource
 {
     private const string KeyValue = "tool_error_pattern";
     private const string NameValue = "Tool Error Pattern";
@@ -39,6 +39,9 @@ public sealed class ToolErrorPatternEval : IEval
     private static string Normalize(string? error) =>
         string.Join(' ', (error ?? "(no message)").Trim().ToLowerInvariant()
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

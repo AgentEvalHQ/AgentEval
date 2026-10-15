@@ -322,6 +322,42 @@ Interpretation:
 - low normal and low oracle suggests answer-model, prompt, or task difficulty dominates;
 - a negative gap warrants investigation; it is not automatically a normal-path win.
 
+## Capturing paired identity and progress
+
+The CLI exposes the same evaluation as `bench longmemeval --paired-oracle`. See
+[paired AEF evidence](paired-evidence.md) for the two-run format, linking and interruption behavior.
+
+Paired results also retain a content-free `Plan`: a unique `PairId`, the selected source input
+digest and ordered question IDs, detached options, and declared answer-model identities. The pair
+ID associates one execution; it is not a content digest and changes on every repeated run.
+The plan survives JSON round trips. It records declarations, not proof that an opaque agent used
+the declared model settings.
+
+For evidence capture that must survive interruption, use the synchronous progress API:
+
+```csharp
+var progress = new LongMemEvalPairedProgress
+{
+    OnPrepared = plan => Console.WriteLine($"Pair: {plan.PairId}"),
+    OnArmPrepared = (arm, plan) =>
+        Console.WriteLine($"{arm}: {plan.QuestionIds.Count} planned questions, {plan.SelectedInputsDigest}"),
+    OnQuestionCompleted = (arm, question) =>
+        Console.WriteLine($"{arm}: observed {question.QuestionId}"),
+    OnArmCompleted = (arm, result) =>
+        Console.WriteLine($"{arm}: completed {result.QuestionResults.Count} questions"),
+};
+var observedPair = await runner.RunPairedWithProgressAsync(
+    normalAgent, normalConfig, answerClient, oracleConfig, options, progress);
+```
+
+The source selection is captured before any answer or judge calls. Normal completion is reported
+before oracle projection or preparation. Each arm's preparation callback identifies the actual
+inputs that arm will execute; the oracle digest can differ because it receives a projection.
+Callbacks can retain completed questions and arms when a later operation fails. Callback exceptions
+propagate, and cancellation after normal completion prevents oracle preparation. Preparation
+snapshots contain no history, answers or gold text; question/result callbacks receive the ordinary
+native result objects and must be handled according to their content settings.
+
 ## Pinning the answer model
 
 `JudgeTemperature` pins the grader. `AnswerTemperature` and `AnswerSeed` pin the

@@ -173,6 +173,24 @@ public sealed class AtomicLlmEval : AtomicEval
     private string RubricDigest => _rubricDigest ??= RubricIdentity.Digest(
         ["atomic-llm-v1", JudgeInputFramingVersion, _promptMaterial, JudgeSeesToolData.ToString(), .. _criteria]);
 
+    /// <summary>Captures the declared instrument without invoking the judge or including prompt/criteria text.</summary>
+    public AtomicLlmDefinition CaptureDefinition() => new()
+    {
+        RubricDigest = RubricDigest,
+        PromptIdentified = _evaluator is AgentEval.Core.IJudgePromptSource,
+        PassThreshold = _passThreshold,
+        FailureSeverity = _failureSeverity,
+        JudgeModel = _judgeModel,
+        JudgeProvider = (_evaluator as AgentEval.Core.IJudgeProviderSource)?.ProviderName,
+        ToolData = JudgeSeesToolData,
+        // Hash the runtime policy too: a custom bound rubric need not come from an embedded assembly resource.
+        ScorePolicyDigest = RubricIdentity.Digest(["atomic-llm.score-policy.v1", JsonSerializer.Serialize(new
+        {
+            Scale = _rubric?.Scale, ReviewAt = _rubric?.ReviewAt, SeverityBands = _rubric?.SeverityBands,
+        })]),
+        EvaluatorType = _evaluator.GetType(),
+    };
+
     /// <inheritdoc/>
     public override async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
     {

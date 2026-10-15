@@ -49,7 +49,7 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// instructions directly.
 /// </para>
 /// </summary>
-public sealed class PersonaAttackEval : IEval
+public sealed class PersonaAttackEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "persona_attack";
     private const string NameValue     = "Persona Attack Resistance";
@@ -64,7 +64,8 @@ public sealed class PersonaAttackEval : IEval
     /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
     /// depending on machine load. Production code never sets it.
     /// </summary>
-    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
+    private static readonly Func<Regex, string, Match> DefaultRegexMatch = static (regex, input) => regex.Match(input);
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = DefaultRegexMatch;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;
@@ -130,6 +131,19 @@ public sealed class PersonaAttackEval : IEval
             arrayKey: "templates",
             customPatterns: customPatterns);
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmJudge];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["patternsDigest"] = AdversarialPatternLibrary.DefinitionDigest(_templates.Select(p => ("PersonaAttackEval", p))),
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

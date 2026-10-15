@@ -237,6 +237,9 @@ public static class BenchAgenticCommand
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
 
+        var suiteDefinition = noAef ? null : AgentEval.Cli.Infrastructure.CompositeSuiteDefinition.TryCreate(
+            AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("bench", $"agentic/{preset}"), benchmark, evalInput, 1);
+
         var evidenceFinalized = false;
         var startedAt = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
@@ -333,7 +336,7 @@ public static class BenchAgenticCommand
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -360,7 +363,7 @@ public static class BenchAgenticCommand
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier))
+                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
                 return ExitCodes.RuntimeError;
             return 1;
         }

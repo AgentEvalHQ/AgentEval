@@ -38,7 +38,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// Foundry reference: <c>azureai://built-in/evaluators/sexual</c>
 /// </para>
 /// </summary>
-public sealed class SexualEval : IEval
+public sealed class SexualEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "sexual";
     private const string NameValue     = "Sexual Content";
@@ -105,6 +105,19 @@ public sealed class SexualEval : IEval
             promptId: "agenteval.sexual.v1",
             failureSeverity: "critical");
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmEval];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        _contentSafetyClient is null or NullContentSafetyClient ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

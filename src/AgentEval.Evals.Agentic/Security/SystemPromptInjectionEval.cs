@@ -23,7 +23,7 @@ namespace AgentEval.Evals.Agentic.Security;
 /// actually captured a system prompt (all null — no signal, as opposed to a captured empty prompt); or
 /// neither a baseline nor a judge is available.</para>
 /// </summary>
-public sealed class SystemPromptInjectionEval : IEval
+public sealed class SystemPromptInjectionEval : IEvalInstrumentSource
 {
     /// <summary>
     /// <see cref="EvalInput.Metadata"/> key carrying the trusted system-prompt baseline (a <see cref="string"/>).
@@ -74,6 +74,25 @@ public sealed class SystemPromptInjectionEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => _judge is null ? [] : [_judge];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration(EvalInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var baseline = TryGetBaseline(input);
+        return new()
+        {
+            ["trustedBaselineDigest"] = baseline is null ? null : "sha256:" + Convert.ToHexString(
+                global::System.Security.Cryptography.SHA256.HashData(global::System.Text.Encoding.UTF8.GetBytes(baseline))).ToLowerInvariant(),
+            ["mode"] = baseline is not null ? "baseline" : _judge is not null ? "judge" : "unavailable",
+        };
+    }
 
     private static string? TryGetBaseline(EvalInput input)
         => input.Metadata is not null

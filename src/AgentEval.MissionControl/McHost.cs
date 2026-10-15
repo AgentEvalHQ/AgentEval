@@ -7,6 +7,7 @@ using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using HttpResults = Microsoft.AspNetCore.Http.Results;
 using ChilliCream.Nitro.App;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -36,6 +37,9 @@ public static class McHost
     /// </summary>
     public static void ConfigureServices(WebApplicationBuilder builder)
     {
+        Hosting.IngestionHosting.Configure(builder);
+        Hosting.OtlpHosting.Configure(builder);
+
         // Evaluator-card registry: loads all EvaluatorCard JSON files at startup
         // from AgentEval.Evals.Agentic's embedded resources. Drives
         // Query.evaluators(...). Plan-08 MC1.5.3.
@@ -80,6 +84,11 @@ public static class McHost
         // subjects. Scoped because it depends on IOutputStoreReader. Plan-08 MC1.4.4.
         builder.Services.AddScoped<ComplianceMatrixService>();
 
+        AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceReadAccess.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceQueryBudget.Configure(builder);
+        AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Configure(builder);
+
         // GraphQL (Hot Chocolate 16, ChilliCream — primary read surface).
         // Plan-07 §3 Challenge 1: hybrid REST + GraphQL split.
         //   Reads (dashboard, compliance matrix, recursive EvalResult tree,
@@ -97,11 +106,11 @@ public static class McHost
             //
             // Phase-8 Task 8.8 — Introspection-in-production decision:
             // The default Hot Chocolate configuration leaves GraphQL introspection
-            // enabled. In a Phase-1 local-only deployment (loopback bind, no auth)
-            // that's intentional: introspection enables the embedded Nitro UI,
+            // enabled. Enabled evidence queries apply EvidenceReadAccess to the entire
+            // GraphQL route, including introspection. Introspection enables the embedded Nitro UI,
             // schema-tooling for SPA development, and `__type` queries that the
-            // Phase-5 5.2 regression tests rely on. There is no risk surface
-            // because the entire endpoint is loopback-only.
+            // Phase-5 5.2 regression tests rely on. Query-disabled legacy deployments
+            // retain their existing deployment access assumptions.
             // Phase 2 of Mission Control (multi-user / auth gates) should:
             //   1. Gate introspection behind an environment flag
             //      (e.g. AGENTEVAL_MC_DISABLE_INTROSPECTION=1).
@@ -146,7 +155,7 @@ public static class McHost
     /// </summary>
     public static void ConfigurePipeline(WebApplication app)
     {
-        // Defense-in-depth response headers. Phase 1 has no auth and the bench
+        // Defense-in-depth response headers. The bench
         // pipeline lets users write arbitrary text into report.html / report.xml,
         // so cap script execution and MIME-sniffing at the response level.
         // The frame-ancestors directive prevents click-jacking against operators
@@ -181,13 +190,9 @@ public static class McHost
                 // ships inline `<script>` / `<style>` blocks WITHOUT nonces or
                 // hashes. Tightening to `'strict-dynamic'` or nonce-only would
                 // break the embedded /graphql Nitro UI.
-                // Risk surface in Phase 1 is low because:
-                //   1. The portal is loopback-only (127.0.0.1, no LAN expose).
-                //   2. There is no auth or multi-tenancy; no third-party content
-                //      reaches the response body.
-                //   3. Browser-rendered REPORT outputs (report.html / xml / sarif)
-                //      are forced to attachment Content-Disposition (Task 7.13)
-                //      so they cannot execute as same-origin script.
+                // Enabled evidence queries enforce the read-access boundary
+                // separately. Report downloads use attachment disposition;
+                // evidence declarations rendered by the SPA must remain escaped.
                 // Phase 2 should tighten when Nitro grows nonce support, OR
                 // gate `unsafe-inline` behind a development-only env flag.
                 headers["Content-Security-Policy"] =
@@ -208,6 +213,9 @@ public static class McHost
                     "frame-ancestors 'none'";
             await next();
         });
+
+        AgentEval.MissionControl.Hosting.EvidenceReadAccess.Use(app);
+        AgentEval.MissionControl.Hosting.EvidenceQueryBudget.Use(app);
 
         // GraphQL endpoint at /graphql. A browser GET to /graphql/ gets Hot Chocolate's
         // Nitro GraphQL IDE (ChilliCream.Nitro.App, successor to BananaCakePop).
@@ -230,6 +238,7 @@ public static class McHost
         });
 
         // REST: minimal binary + version surface (plan-07 §8.2).
+        AgentEval.MissionControl.Hosting.EvidenceNotificationHosting.Map(app);
         // Plan-08 portal-review B4 (T2.2, 2026-05-25): the deployment mode is
         // sourced from configuration (`AgentEval:Mode` / env `AgentEval__Mode`)
         // instead of being hard-coded. Mode A on loopback reports `"local"`;
@@ -267,7 +276,7 @@ public static class McHost
             // SPA needs to see the flag flip without a restart.
             var workspaceInitialized = Directory.Exists(
                 System.IO.Path.Combine(resolvedWorkspaceRoot, ".agenteval"));
-            return Results.Json(new
+            return HttpResults.Json(new
             {
                 mode = resolvedMode,
                 agentEvalVersion = typeof(AgentEval.Output.IOutputStoreReader).Assembly
@@ -282,6 +291,8 @@ public static class McHost
         // REST binary + streaming endpoints (plan-07 §8.2; plan-08 MC1.3.2-6).
         // Reports, traces, PDFs are byte streams — REST not GraphQL.
         app.MapBinaryEndpoints();
+        app.MapIngestionEndpoints();
+        app.MapOtlpEndpoints();
 
         // Plan-08 MC1.8.1: serve the React SPA from wwwroot/ so a single
         // `dotnet run --project src/AgentEval.MissionControl` boots the whole
@@ -331,6 +342,6 @@ public static class McHost
     /// <c>AgentEval.DataLoaders</c> (made visible to MC via <c>InternalsVisibleTo</c>) rather than
     /// re-implementing the walk, so the discovery rule lives in one place.
     /// </remarks>
-    private static string DiscoverWorkspaceRoot(string startDir) =>
+    internal static string DiscoverWorkspaceRoot(string startDir) =>
         AgentEval.Output.WorkspaceRootDiscovery.Find(startDir) ?? startDir;
 }

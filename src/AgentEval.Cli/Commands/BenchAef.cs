@@ -24,12 +24,13 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
-            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On), new AefProbeRunOptions
+            var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
+            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
@@ -45,7 +46,9 @@ internal static class BenchAef
                 JudgeProvider = judgeProvider,
                 TargetMode = targetMode,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
-                ProbesNotRun = scan.SkippedProbes,
+                Definition = definition,
+                ProbesNotRun = definition is null ? scan.SkippedProbes : Math.Max(scan.SkippedProbes,
+                    definition.CaseIds.Count - lines.Select(line => line.CaseId).Distinct(StringComparer.Ordinal).Count()),
                 Lane = family,
                 BenchVerdict = verdict is null ? null : (verdict.Score.Label, verdict.Score.Value),
                 Gate = abortReason is null && verdict is not null ? Gate(verdict.Score.Label, exitCode) : null,
@@ -73,15 +76,24 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
-        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
+        string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
+        System.Text.Json.Nodes.JsonObject? summaryExt = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
-        new(weight, required, onFailure.ToString(), eval is CompositeEval composite
-            ? composite.Components.Select(c => Shape(c.Eval, c.Weight, c.Required, c.OnFailure)).ToList()
-            : []);
+        ShapeCore(eval, weight, required, onFailure, 0);
+
+    private static AefComponentShape ShapeCore(IEval eval, double weight, bool required, ComponentFailureEffect onFailure, int depth)
+    {
+        if (depth > EvalTreeLimits.MaxTreeWalkDepth)
+            throw new ArgumentException("Expected: a bounded evaluation tree. Actual: definition nesting exceeds the limit. Suggestions: remove wrapper cycles or reduce nesting. Because: evidence capture must not overflow the stack.");
+        return eval is IEvalDefinitionWrapper wrapper ? ShapeCore(wrapper.DefinitionInner, weight, required, onFailure, depth + 1)
+            : new(weight, required, onFailure.ToString(), eval is CompositeEval composite
+                ? composite.Components.Select(c => ShapeCore(c.Eval, c.Weight, c.Required, c.OnFailure, depth + 1)).ToList()
+                : []);
+    }
 
     /// <summary>
     /// Writes the run; returns true only when an explicit <paramref name="aef"/> could not be written (the command then
@@ -92,8 +104,8 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -102,8 +114,8 @@ internal static class BenchAef
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
-        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint);
+        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition);
 
     /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
     internal static AefCommandGate Gate(string label, int exitCode) => new()
@@ -120,7 +132,7 @@ internal static class BenchAef
     };
 
     /// <summary>
-    /// bench memory's result as a tree: a case per category, weighted as the overall score weighs them (WeightedSum),
+    /// bench memory's result as a tree: one benchmark case with weighted category children (WeightedSum),
     /// each with the command's own label (pass at 70 and above, warn from 50, fail below), a skipped category skipped and
     /// an errored one error. The one model is the agent and its judge.
     /// </summary>
@@ -196,7 +208,8 @@ internal static class BenchAef
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
+        System.Text.Json.Nodes.JsonObject? summaryExt = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -205,6 +218,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
+                Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
                 Config = new AefRunConfig { Settings = settings },
@@ -220,6 +234,7 @@ internal static class BenchAef
                 Lane = family,
                 SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
                 CaseExt = caseExt,
+                SummaryExt = summaryExt,
                 Gate = exitCode is { } code ? Gate(result.Score.Label, code) : null,
                 AbortReason = abortReason,
                 ExecutionPolicy = requestedTrials is not null || trials is not null
@@ -310,11 +325,28 @@ internal static class BenchAef
                 : q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed ? "error"
                 : outcome is null or AgentEval.Memory.External.Models.TypedMemEvalOutcome.Inconclusive ? "inconclusive"
                 : "scored";
-            if (label == "scored")
+            if (q.TypedOutcome is { } detail)
             {
+                // Keep observed diagnostics even for an inconclusive or unrun question. Never copy answer/evidence text.
+                var diagnostic = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["outcome"] = detail.Outcome.ToString().ToLowerInvariant(),
+                    ["attribution"] = detail.Attribution.ToString().ToLowerInvariant(),
+                    ["attributionLevel"] = detail.AttributionLevel.ToString().ToLowerInvariant(),
+                    ["coverageSource"] = detail.CoverageSource.ToString().ToLowerInvariant(),
+                    ["hasGold"] = detail.HasGold,
+                };
+                if (detail.RealisedGoldCoverage is { } coverage) diagnostic["realisedGoldCoverage"] = coverage;
+                if (detail.DistanceSessions is { } distance) diagnostic["distanceSessions"] = distance;
+                if (string.Equals(vertical, "forgetting", StringComparison.OrdinalIgnoreCase))
+                {
+                    diagnostic["isStaleRecall"] = detail.IsStaleRecall;
+                    diagnostic["isOverForgetting"] = detail.IsOverForgetting;
+                    diagnostic["isMisattributedForgetting"] = detail.IsMisattributedForgetting;
+                }
                 ext[q.QuestionId] = new System.Text.Json.Nodes.JsonObject
                 {
-                    ["agenteval.typedmemeval"] = new System.Text.Json.Nodes.JsonObject { ["outcome"] = outcome!.Value.ToString().ToLowerInvariant() },
+                    ["agenteval.typedmemeval"] = diagnostic,
                 };
             }
 

@@ -34,9 +34,12 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_input_accuracy</c>
 /// </para>
 /// </summary>
-public sealed class ToolInputAccuracyEval : IEval
+public sealed class ToolInputAccuracyEval : IEvalDefinitionWrapper
 {
     private readonly CompositeEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;
@@ -136,8 +139,11 @@ public sealed class ToolInputAccuracyEval : IEval
     /// passing on the judge alone.
     /// </para>
     /// </remarks>
-    private sealed class ToolInputSchemaEval : AtomicCodeEval
+    private sealed class ToolInputSchemaEval : AtomicCodeEval, IEvalConfigurationSource
     {
+        /// <inheritdoc/>
+        public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
+
         public ToolInputSchemaEval()
             : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.3.0") { }
 

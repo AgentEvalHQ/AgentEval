@@ -29,7 +29,7 @@ namespace AgentEval.Evals.Agentic.Calibration;
 /// as context (~$0.01-0.05 per scenario).
 /// </para>
 /// </summary>
-public sealed class SelfCorrectionQualityEval : IEval
+public sealed class SelfCorrectionQualityEval : IEvalDefinitionWrapper
 {
     /// <summary>
     /// Metadata key used to supply the correction turn — re-exported from
@@ -39,6 +39,9 @@ public sealed class SelfCorrectionQualityEval : IEval
     public const string MetadataKey = ConversationHistoryHelper.CorrectionTurnMetadataKey;
 
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

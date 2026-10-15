@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
+  with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
+  or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite
+  digests are preserved. GDPR/EU AI Act capture supported composite graphs before execution and retain
+  their manifests on cancellation. The redteam CLI captures exact prepared probes without regenerating
+  them and separates attacker-driven recipe identity from frozen content. OWASP/MITRE/NIST scan
+  exports also bind prepared probes and resolved verdict presets, including explicit mocks and
+  interrupted runs. Agentic execution, tool-call accuracy, RAG quality, conversational, reasoning and
+  user-experience graphs now expose configured instruments for pre-execution capture, including
+  hashed references. Telemetry and stochastic-stability checks bind budgets and thresholds without
+  binding measured telemetry or prior results into the suite identity. Judge-quality capture binds thresholds
+  and expected calibration labels, excluding observed verdicts and refusing to consume lazy reference inputs. Glass-box diagnostics bind baseline/regex policy and optional judges without
+  adding internal instrument nodes to the planned result roster. Safety/adversarial capture also binds static policies, compiled patterns,
+  scan limits and nested judges; dynamic external dependencies remain unclassified. Explicit composite mocks retain a pre-execution
+  manifest through cancellation, identifying their fixed placeholder judge without claiming an LLM prompt. Interrupted snapshots expand configured wrappers to preserve
+  the same planned tree shape as the evidence writer. Trace-fidelity and workflow-trace-fidelity also bind pre-reconciliation policy and planned checks,
+  excluding observed trace values from suite identity. Other composite producer capture remains in progress.
+
+- **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
+  persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run
+  reports the full digests for plan pinning; old dataset-only pins must be refreshed. Eval parses and identifies
+  one captured snapshot, avoiding a later file reread. Legacy adapter calls remain explicitly dataset-scoped.
+
+- **Requirement catalogues:** `requirements validate` checks an external versioned YAML/JSON catalogue,
+  including explicit selectors, acceptance, aggregation and freshness. Loading is bounded, ambiguous input
+  is refused, and JSON output names the exact source digest. No evidence is modified or agent invoked.
+- **Requirement status:** `requirements status` evaluates explicitly hash-selected sealed AEF runs with
+  exact subject/version binding, declared aggregation and freshness. Reports preserve sealed and opted-in
+  effective status, reviews, scoped signed waiver history, and catalogue/policy/overlay identities.
+
+- **TypedMemEval AEF diagnostics:** per-question extensions retain attribution and its observation level,
+  optional gold coverage and distance, and forgetting flags. Inconclusive/unrun typed outcomes remain visible
+  beside their absent measurement states. Missing coverage is not zero; scoring and gates are unchanged.
+
+- **Single-case benchmark identity:** composite AEF exports now include the sole case key in the suite roster
+  digest. Previously all no-child benchmark results hashed an empty roster. Multi-component digests are unchanged.
+
+- **Run review decisions:** `agenteval decide <run-dir> --kind approve|reject --by <identity> --reason <text>`
+  appends and seals a self-attested review of an intact sealed AEF run, or one result with `--result <id>`.
+  Unknown result IDs are refused before mutation. Original results and gates remain
+  unchanged; unsealed overlay events are refused instead of being adopted into the reviewer's batch.
+  `--kind waive` requires one result or external requirement target, a reason and a future UTC `--expires`;
+  effective views retain expired waivers without changing sealed outcomes.
+  `override` and `adjudicate` require a result, explicit non-pending `--state` and reason; views show the original
+  and effective states without recomputing parents, summaries or gates.
+  Optional `--key` signs only the new batch after key preflight; readers verify the claimed identity using
+  their own trust policy. Missing or mismatched trust does not display verified signing assurance.
+  Incomplete event tails are refused by byte count; failures after writing begins warn that journal recovery
+  may be needed and never report success.
+
 - **Runner endpoint transport:** subject and judge endpoints require HTTPS except for loopback HTTP
   servers. Unsafe remote HTTP is refused during preflight and client construction, before credentials
   can be sent in cleartext.

@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Results.Signatures;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Native;
@@ -60,6 +61,9 @@ public sealed record AefCompositeRunOptions
     /// <summary>The suite's ref: the family and its preset, such as <c>bench:gdpr/standard</c>.</summary>
     public required string SuiteRef { get; init; }
 
+    /// <summary>Full declared composite definition; built from the evaluator/configuration before execution, never from result scores.</summary>
+    public SuiteDefinitionManifest? Definition { get; init; }
+
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
 
@@ -80,6 +84,9 @@ public sealed record AefCompositeRunOptions
     /// (TypedMemEval's typed outcome, say). Never content.
     /// </summary>
     public IReadOnlyDictionary<string, JsonObject>? CaseExt { get; init; }
+
+    /// <summary>Content-free aggregate diagnostics in summary.json.ext; cannot replace the writer's agenteval.bench field.</summary>
+    public JsonObject? SummaryExt { get; init; }
 }
 
 /// <summary>
@@ -168,7 +175,14 @@ public static class AefCompositeRunWriter
         }
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        var summaryExtension = options.SummaryExt?.DeepClone().AsObject() ?? new JsonObject();
+        if (summaryExtension.ContainsKey("agenteval.bench"))
+            throw new ArgumentException("Expected: producer diagnostics outside agenteval.bench. Actual: reserved summary extension supplied. Suggestions: use a distinct namespaced key. Because: diagnostics must not replace the benchmark verdict.");
         var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
+        var binding = AefNativeSuiteDefinition.Bind("composite", options.SuiteRef, preset.Metric.Version,
+            cases.SelectMany(c => Keys(c).Prepend(c.Metric.Key)), options.Definition, storeExtension,
+            options.AbortReason is not null || abortedTrials || emptyResults, executionPolicy: options.ExecutionPolicy,
+            legacyRoster: single ? [preset.Metric.Key] : Keys(preset));
         var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "bench");
         var runId = folder.RunId;
@@ -184,25 +198,19 @@ public static class AefCompositeRunWriter
             CostPolicy = options.CostPolicy,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
-            Suite = new AefSuite
-            {
-                Ref = options.SuiteRef,
-                Version = preset.Metric.Version,
-                Digest = AefProbeRunWriter.RosterDigest(Keys(preset)),
-                Frozen = true,
-                ExecutionPolicy = options.ExecutionPolicy,
-            },
+            Suite = binding.Suite,
             Judges = judges.Count > 0 ? judges : null,   // the models that graded a leaf ([RUN-9])
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
             ContentCapture = options.ContentCapture,
             Execution = new AefExecution { TargetMode = options.TargetMode, Stimulus = AefStimulus.Suite },
-            Ext = storeExtension,
+            Ext = binding.Extensions,
         };
 
         var writer = AefRunWriter.Create(directory, header);
         var presetMeasured = !emptyResults && IsMeasured(StateOf(preset.Score)) && double.IsFinite(preset.Score.Value);
         try
         {
+            binding.Write(writer);
             writer.SetMetrics(
             [
                 new AefMetric
@@ -254,6 +262,14 @@ public static class AefCompositeRunWriter
             if (options.AbortReason is null)
                 options.Gate?.Write(writer, runId, endedAt, cases.Select(c => writer.ResultIdOf(c.Metric.Key, CasePath)).ToList());
 
+            summaryExtension["agenteval.bench"] = new JsonObject
+            {
+                ["preset"] = preset.Metric.Key,
+                ["label"] = preset.Score.Label,
+                ["score"] = presetMeasured ? preset.Score.Value : null,
+                ["strategy"] = preset.Details.AggregationStrategy,
+                ["rulePath"] = preset.Details.Lineage?.RulePath,
+            };
             writer.SetSummary(new AefSummary
             {
                 Usage = options.Usage,
@@ -279,17 +295,7 @@ public static class AefCompositeRunWriter
                     },
                 ])],
                 // The preset's own verdict, which no lane recomputes ([RES-6]): its label, score and the rule that decided it.
-                Ext = new JsonObject
-                {
-                    ["agenteval.bench"] = new JsonObject
-                    {
-                        ["preset"] = preset.Metric.Key,
-                        ["label"] = preset.Score.Label,
-                        ["score"] = presetMeasured ? preset.Score.Value : null,
-                        ["strategy"] = preset.Details.AggregationStrategy,
-                        ["rulePath"] = preset.Details.Lineage?.RulePath,
-                    },
-                },
+                Ext = summaryExtension,
             });
             writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);

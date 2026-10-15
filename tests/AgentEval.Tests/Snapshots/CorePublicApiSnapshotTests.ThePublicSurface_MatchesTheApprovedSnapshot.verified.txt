@@ -938,9 +938,11 @@ sealed class AgentEval.Embeddings.MemoryVectorStore.SearchResult : System.IEquat
     System.Void Deconstruct(out System.String Id, out System.String Text, out System.Single Score, out System.Collections.Generic.Dictionary<System.String, System.Object> Metadata)
     ctor(System.String Id, System.String Text, System.Single Score, System.Collections.Generic.Dictionary<System.String, System.Object> Metadata)
 sealed class AgentEval.Evals.AgentScenarioEval : AgentEval.Evals.IEval
+    AgentEval.Evals.IEval Inner { get; }
     System.String Category { get; }
     System.String Key { get; }
     System.String Name { get; }
+    System.String ScenarioInputDigest { get; }
     System.String Version { get; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     ctor(AgentEval.Core.IEvaluableAgent agent, System.String scenarioInput, AgentEval.Evals.IEval inner)
@@ -957,7 +959,24 @@ abstract class AgentEval.Evals.AtomicEval : AgentEval.Evals.IEval
     System.String Version { get; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     protected ctor(System.String key, System.String name, System.String category, System.String version)
+sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.Evals.AtomicLlmDefinition>
+    AgentEval.Evals.AtomicLlmDefinition <Clone>$()
+    AgentEval.Evals.JudgeToolData ToolData { get; init; }
+    System.Boolean Equals(AgentEval.Evals.AtomicLlmDefinition other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean PromptIdentified { get; init; }
+    System.Double PassThreshold { get; init; }
+    System.Int32 GetHashCode()
+    System.String FailureSeverity { get; init; }
+    System.String JudgeModel { get; init; }
+    System.String JudgeProvider { get; init; }
+    System.String RubricDigest { get; init; }
+    System.String ScorePolicyDigest { get; init; }
+    System.String ToString()
+    System.Type EvaluatorType { get; init; }
+    ctor()
 sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
+    AgentEval.Evals.AtomicLlmDefinition CaptureDefinition()
     AgentEval.Evals.JudgeToolData JudgeSeesToolData { get; init; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     const System.Int32 ToolSectionCharacterLimit
@@ -1026,7 +1045,8 @@ sealed class AgentEval.Evals.EvaluatorCardRegistry
     const System.String ResourceInfix
     ctor(System.Collections.Generic.IEnumerable<System.Reflection.Assembly> sources)
     ctor(System.Reflection.Assembly[] sources)
-sealed class AgentEval.Evals.F1ScoreEval : AgentEval.Evals.AtomicCodeEval, AgentEval.Evals.IEval
+sealed class AgentEval.Evals.F1ScoreEval : AgentEval.Evals.AtomicCodeEval, AgentEval.Evals.IEval, AgentEval.Evals.IEvalConfigurationSource
+    System.Text.Json.Nodes.JsonObject CaptureConfiguration()
     ctor(System.Double passThreshold = 0.5, System.String groundTruth = null)
 interface AgentEval.Evals.IEvalRegistry
     AgentEval.Evals.EvalRegistration TryGet(System.String key)

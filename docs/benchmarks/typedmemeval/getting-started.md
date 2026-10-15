@@ -775,6 +775,7 @@ Pin `AnswerSeed` to measure the memory system's own variance; vary it to measure
 
 ## See also
 
+- [AEF aggregate diagnostics](aef-diagnostics.md) — distance buckets, forgetting counts and interrupted-run semantics.
 - [ADR-026](../../adr/026-typedmemeval-benchmark-family.md) — the design of record, including the
   five places it pushes back on its own brief.
 - [LongMemEval getting started](../longmemeval/getting-started.md) — the harness this family reuses.

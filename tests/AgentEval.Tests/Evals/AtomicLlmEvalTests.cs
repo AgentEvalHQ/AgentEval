@@ -9,6 +9,16 @@ namespace AgentEval.Tests.Evals;
 
 public class AtomicLlmEvalTests
 {
+    [Fact]
+    public void CaptureDefinition_UnknownPrompt_IsExplicitAndRetainsConfiguredThreshold()
+    {
+        var declaration = MakeSut(new FakeEvaluator(), passThreshold: 0.83, judgeModel: "judge").CaptureDefinition();
+        Assert.False(declaration.PromptIdentified);
+        Assert.Equal(0.83, declaration.PassThreshold);
+        Assert.Equal("judge", declaration.JudgeModel);
+        Assert.StartsWith("sha256:", declaration.RubricDigest);
+        Assert.StartsWith("sha256:", declaration.ScorePolicyDigest);
+    }
     // ── Stub ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeEvaluator : AgentEval.Core.IEvaluator

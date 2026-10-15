@@ -16,7 +16,7 @@ namespace AgentEval.Evals.Agentic.Audit;
 /// <c>0.0</c>. <b>Threshold</b>: 1.0. <b>Severity</b> on fail: <c>medium</c>.</para>
 /// <para>Reads ChatTurn Request entries; skipped when no trace or fewer than 2 request entries (nothing to compare).</para>
 /// </summary>
-public sealed class SystemPromptDriftEval : IEval
+public sealed class SystemPromptDriftEval : IEvalConfigurationSource
 {
     private const string KeyValue = "system_prompt_drift";
     private const string NameValue = "System Prompt Drift";
@@ -35,6 +35,9 @@ public sealed class SystemPromptDriftEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

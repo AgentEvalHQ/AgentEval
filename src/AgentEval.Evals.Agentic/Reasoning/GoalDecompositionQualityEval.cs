@@ -40,7 +40,7 @@ namespace AgentEval.Evals.Agentic.Reasoning;
 /// Source: AgentEval-original. Plan 06 §3.3 B3.2.
 /// </para>
 /// </summary>
-public sealed class GoalDecompositionQualityEval : IEval
+public sealed class GoalDecompositionQualityEval : IEvalDefinitionWrapper
 {
     // Structural markers indicating some form of goal breakdown is present.
     private static readonly string[] DecompositionMarkers =
@@ -51,6 +51,9 @@ public sealed class GoalDecompositionQualityEval : IEval
     ];
 
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

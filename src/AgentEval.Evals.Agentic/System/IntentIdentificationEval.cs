@@ -24,9 +24,12 @@ namespace AgentEval.Evals.Agentic.System;
 /// for this sub-evaluator; the criterion decomposition is original AgentEval work.
 /// </para>
 /// </summary>
-public sealed class IntentIdentificationEval : IEval
+public sealed class IntentIdentificationEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

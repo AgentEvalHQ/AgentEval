@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.Indexing</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="EvidenceIndexSchema.sql" />
+    <EmbeddedResource Include="EvidenceIndexSchemaV2.sql" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <ProjectReference Include="../AgentEval.Results/AgentEval.Results.csproj" />
+    <InternalsVisibleTo Include="AgentEval.Indexing.Tests" />
+  </ItemGroup>
+</Project>

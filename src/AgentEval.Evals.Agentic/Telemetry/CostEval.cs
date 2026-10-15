@@ -29,7 +29,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (cost = 0 is always within budget). Document cost-tracking gaps accordingly.
 /// </para>
 /// </summary>
-public sealed class CostEval : IEval
+public sealed class CostEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "cost";
     private const string NameValue     = "Cost";
@@ -75,6 +75,13 @@ public sealed class CostEval : IEval
         _budgetUsd     = budgetUsd;
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["budgetUsd"] = _budgetUsd,
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

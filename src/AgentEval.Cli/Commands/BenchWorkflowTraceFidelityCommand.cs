@@ -86,7 +86,10 @@ public static class BenchWorkflowTraceFidelityCommand
                 + "traces to get real reconciliation.");
         }
 
-        var result = new WorkflowTraceFidelityReconciler(ParsePreset(preset)).ReconcileToEvalResult(wfResult, chatTraces);
+        var resolvedPreset = ParsePreset(preset);
+        var definition = AgentEval.Cli.Infrastructure.TraceSuiteDefinition.Create(preset, resolvedPreset,
+            wfResult.Steps.Select(step => step.ExecutorId).ToArray());
+        var result = new WorkflowTraceFidelityReconciler(resolvedPreset).ReconcileToEvalResult(wfResult, chatTraces);
 
         // ── Persist via the canonical output store (manifest + native report) ──
         string? storeRunId = null;
@@ -95,7 +98,7 @@ public static class BenchWorkflowTraceFidelityCommand
             aef, agentEvalDir, "workflow-trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
             subjectKind: "workflow", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, storeV1: StoreLink());
+            abortReason: reason, storeV1: StoreLink(), definition: definition);
         try
         {
             var store = new FileSystemOutputStore(agentEvalDir);

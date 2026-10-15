@@ -10,6 +10,10 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public class ScanOptions
 {
+    /// <summary>Called once after probes are materialized and limited, before any subject/judge call.
+    /// Use this to capture a definition without generating probes a second time. A callback failure stops execution.</summary>
+    public Action<ScanPlan>? OnPlanPrepared { get; init; }
+
     /// <summary>
     /// Attack types to run. If null or empty, uses all built-in attacks.
     /// </summary>

@@ -27,7 +27,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
 /// </para>
 /// </summary>
-public sealed class ToolLatencyEval : IEval
+public sealed class ToolLatencyEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "tool_latency";
     private const string NameValue     = "Tool Latency";
@@ -76,6 +76,12 @@ public sealed class ToolLatencyEval : IEval
         _data            = data;
         _perToolBudgetMs = perToolBudgetMs;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["perToolBudgetMs"] = _perToolBudgetMs,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

@@ -43,7 +43,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// purely LLM-based Foundry approach (per findings-and-suggestions §7).
 /// </para>
 /// </summary>
-public sealed class SensitiveDataLeakageEval : IEval
+public sealed class SensitiveDataLeakageEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "sensitive_data_leakage";
     private const string NameValue     = "Sensitive Data Leakage";
@@ -134,7 +134,8 @@ public sealed class SensitiveDataLeakageEval : IEval
     /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
     /// depending on machine load. Production code never sets it.
     /// </summary>
-    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
+    private static readonly Func<Regex, string, Match> DefaultRegexMatch = static (regex, input) => regex.Match(input);
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = DefaultRegexMatch;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;
@@ -195,6 +196,22 @@ public sealed class SensitiveDataLeakageEval : IEval
             promptId: "agenteval.sensitive_data_leakage.v1",
             failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmFallback];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+        ["customPatternsDigest"] = "sha256:" + Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(
+            global::System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(_customPatterns.Select(p => new
+            { Pattern = p.ToString(), Options = (int)p.Options, TimeoutTicks = p.MatchTimeout.Ticks }).ToArray()))).ToLowerInvariant(),
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

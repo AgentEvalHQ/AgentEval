@@ -205,6 +205,12 @@ public sealed class RunnerCommandTests : IDisposable
         Assert.Equal(10, (int)report["calls"]!["judge"]!);
         Assert.Equal(130, (int)report["durationRange"]!["high"]!);
         Assert.Equal(2, report["models"]!.AsArray().Count);
+        Assert.Equal(2, report["suites"]!.AsArray().Count);
+        Assert.All(report["suites"]!.AsArray(), suite =>
+        {
+            Assert.Equal("definition", (string?)suite!["identityScope"]);
+            Assert.StartsWith("sha256:", (string?)suite["digest"]);
+        });
         Assert.False(Directory.Exists(Path.Combine(_root, ".agenteval")));
     }
 

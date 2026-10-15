@@ -35,9 +35,12 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// Foundry reference: <c>azureai://built-in/evaluators/protected_material</c>
 /// </para>
 /// </summary>
-public sealed class ProtectedMaterialEval : IEval
+public sealed class ProtectedMaterialEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key      => _inner.Key;

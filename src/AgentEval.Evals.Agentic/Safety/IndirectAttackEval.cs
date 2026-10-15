@@ -53,9 +53,12 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// per findings-and-suggestions §3.
 /// </para>
 /// </summary>
-public sealed class IndirectAttackEval : IEval
+public sealed class IndirectAttackEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key      => _inner.Key;

@@ -16,23 +16,10 @@ namespace AgentEval.MissionControl.GraphQL;
 /// Root GraphQL <c>Query</c> type for Mission Control.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Plan-08 MC1.4.0 baseline scaffolding — only the smoke-test resolvers
-/// (<see cref="Version"/> and <see cref="Ping"/>) ship in this commit.
-/// </para>
-/// <para>
-/// Subsequent plan-08 tasks add the real resolvers:
-/// </para>
-/// <list type="bullet">
-///   <item>MC1.4.2 — solution / subjects / runs / recentRuns (read via <c>IOutputStoreReader</c>)</item>
-///   <item>MC1.4.3 — runCostBreakdown</item>
-///   <item>MC1.4.4 — compliance + cross-regulation</item>
-///   <item>MC1.4.5 — red-team campaigns</item>
-///   <item>MC1.4.6 — recursive <c>EvalResult</c> resolver with depth limit</item>
-///   <item>MC1.5.3 — evaluators (driven by the in-memory <c>EvaluatorCard</c> registry)</item>
-/// </list>
+/// Existing output-store reads and additive shared evidence queries coexist on this root.
+/// Shared evidence resolvers delegate availability, cursor and verification behavior to MissionControl.Core.
 /// </remarks>
-public sealed class Query
+public sealed partial class Query
 {
     /// <summary>
     /// Returns the AgentEval assembly version currently serving this Mission Control instance.

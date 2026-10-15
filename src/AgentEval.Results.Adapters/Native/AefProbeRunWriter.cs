@@ -4,6 +4,7 @@
 
 using System.Text;
 using AgentEval.Results.Signatures;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.Native;
@@ -105,6 +106,9 @@ public sealed record AefProbeRunOptions
     /// <summary>The suite's ref: the probe roster and intensity, such as <c>redteam:default/quick</c>.</summary>
     public required string SuiteRef { get; init; }
 
+    /// <summary>Full declared probe definition captured before execution; absent callers retain explicit observed-roster scope.</summary>
+    public SuiteDefinitionManifest? Definition { get; init; }
+
     /// <summary>Probes planned but not run (FailFast, truncation): they have no lines, and the summary says how many.</summary>
     public int ProbesNotRun { get; init; }
 
@@ -155,6 +159,9 @@ public static class AefProbeRunWriter
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
         var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
+        var binding = AefNativeSuiteDefinition.Bind("probe", options.SuiteRef, AefConverter.Version,
+            lines.Select(l => l.CaseId), options.Definition, storeExtension,
+            options.AbortReason is not null || options.ProbesNotRun > 0, options.Stimulus == AefStimulus.Generated);
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "redteam");
         var runId = folder.RunId;
         var directory = folder.Directory;
@@ -166,17 +173,10 @@ public static class AefProbeRunWriter
             Producer = AefConverter.DefaultProducer,
             Config = options.Config,
             CostPolicy = options.CostPolicy,
-            Ext = storeExtension,
+            Ext = binding.Extensions,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
             Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
-            Suite = new AefSuite
-            {
-                Ref = options.SuiteRef,
-                // The roster is AgentEval's, so its version is AgentEval's; the digest is over the case ids that ran.
-                Version = AefConverter.Version,
-                Digest = RosterDigest(lines.Select(l => l.CaseId)),
-                Frozen = true,
-            },
+            Suite = binding.Suite,
             Judges = options.JudgeModel is not null && lines.Any(l => l.Annotator == AefAnnotatorKind.Llm)
                 ? lines.Where(l => l.Annotator == AefAnnotatorKind.Llm)
                     .Select(l => new AefJudge { Model = options.JudgeModel, Provider = options.JudgeProvider,
@@ -190,6 +190,7 @@ public static class AefProbeRunWriter
         var writer = AefRunWriter.Create(directory, header);
         try
         {
+            binding.Write(writer);
             var metrics = new List<AefMetric>
             {
                 new()

@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Results.Writing;
+using AgentEval.Results.Suites;
 
 namespace AgentEval.Results.Runner;
 
@@ -38,6 +39,8 @@ public interface IAefJobSuite
     string Version { get; }
     /// <summary>The digest of the exact suite content.</summary>
     string Digest { get; }
+    /// <summary>Optional full declared definition; when supplied its content digest must equal Digest and its roster must match Cases.</summary>
+    SuiteDefinitionManifest? Definition => null;
     /// <summary>The root result path, also used for infrastructure errors.</summary>
     string CasePath { get; }
     /// <summary>The cases in execution order.</summary>

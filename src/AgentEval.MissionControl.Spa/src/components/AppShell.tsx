@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router";
+import { Suspense } from "react";
+import { NavLink, Outlet, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard, ShieldCheck, ListChecks, Activity, History, Swords } from "lucide-react";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -7,16 +8,8 @@ import { fetchVersion, formatModeLabel } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { WorkspaceLandingPage } from "@/pages/WorkspaceLandingPage";
 
-// Plan-08 MC1.6.2: shell layout — top nav + left sidebar.
-// Uses Tailwind 4; routes correspond to plan-07 §10.
-// Wraps <Outlet/> in <ErrorBoundary/> per Opus review F14 — a render-time
-// throw in any page renders the boundary's fallback instead of unmounting
-// the whole app.
-//
-// Plan-08 MC1.10.1: first-run landing. Issues a single Query.workspace at
-// shell mount. When `initialized: false`, renders <WorkspaceLandingPage/>
-// in the main slot instead of <Outlet/> — so every route gives the user a
-// "run agenteval init" message instead of broken empty dashboards.
+// Governance queries have their own host configuration and do not require
+// the legacy workspace to be initialized.
 
 interface WorkspaceStateResponse {
   workspace: {
@@ -41,12 +34,14 @@ const navItems = [
   { to: "/subjects", label: "Subjects", icon: ListChecks, end: false },
   { to: "/runs", label: "Runs", icon: History, end: false },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck, end: false },
+  { to: "/governance", label: "Governance", icon: ShieldCheck, end: false },
   { to: "/evaluators", label: "Evaluators", icon: Activity, end: false },
   // T3.6 (2026-05-25) — red-team campaigns list view.
   { to: "/red-team", label: "Red-team", icon: Swords, end: false },
 ];
 
 export function AppShell() {
+  const location = useLocation();
   const wsQ = useQuery({
     queryKey: queryKeys.workspace.state(),
     queryFn: () => gqlRequest<WorkspaceStateResponse>(WORKSPACE_STATE_QUERY),
@@ -62,14 +57,15 @@ export function AppShell() {
   // landing page if uninitialised. On query error we fall back to the
   // outlet — better to show partial functionality than block on a
   // degraded probe.
-  const showLanding = wsQ.data?.workspace.initialized === false;
+  const needsWorkspace = wsQ.data?.workspace.initialized === false;
+  const showLanding = needsWorkspace && !location.pathname.startsWith("/governance");
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       <div className="flex flex-1">
-        <Sidebar disabled={showLanding} />
-        <main className="flex-1 p-6 bg-slate-50">
+        <Sidebar disabled={needsWorkspace} />
+        <main className="flex-1 min-w-0 p-6 bg-slate-50">
           <ErrorBoundary>
             {showLanding && wsQ.data ? (
               <WorkspaceLandingPage
@@ -77,7 +73,9 @@ export function AppShell() {
                 agentEvalVersion={wsQ.data.workspace.agentEvalVersion}
               />
             ) : (
-              <Outlet />
+              <Suspense fallback={<p role="status" className="text-slate-500">Loading page…</p>}>
+                <Outlet />
+              </Suspense>
             )}
           </ErrorBoundary>
         </main>
@@ -120,7 +118,7 @@ function Sidebar({ disabled = false }: { disabled?: boolean }) {
       <ul className="space-y-1 px-2">
         {navItems.map((item) => (
           <li key={item.to}>
-            {disabled ? (
+            {disabled && item.to !== "/governance" ? (
               // Render the same anchor shape but mark it disabled to assistive
               // tech. `aria-disabled` + `tabIndex={-1}` keeps screen-reader
               // semantics ("link, dimmed, disabled") instead of a decorative

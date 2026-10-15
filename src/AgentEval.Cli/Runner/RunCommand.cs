@@ -99,6 +99,12 @@ internal static class RunCommand
             {
                 var analysis = AefJobRunner.Analyze(bytes, manifest, target, options);
                 var description = analysis.Estimate is { } estimate ? target.DescribeEstimate(estimate) : new JsonObject();
+                description["suites"] = new JsonArray(target.Suites.Select(s => (JsonNode?)new JsonObject
+                {
+                    ["ref"] = s.Ref, ["version"] = s.Version, ["digest"] = s.Digest,
+                    ["identityScope"] = s.Definition is null ? "legacy" : "definition",
+                    ["plannedCases"] = s.Cases.Count,
+                }).ToArray());
                 description["accepted"] = analysis.Accepted;
                 if (analysis.Reason is not null) description["reason"] = analysis.Reason;
                 if (analysis.Accepted)

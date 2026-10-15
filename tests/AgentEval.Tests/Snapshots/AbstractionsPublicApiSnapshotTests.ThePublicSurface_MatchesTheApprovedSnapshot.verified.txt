@@ -1033,6 +1033,13 @@ interface AgentEval.Evals.IEval
     String Name { get; }
     String Version { get; }
     Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, CancellationToken ct = default)
+interface AgentEval.Evals.IEvalConfigurationSource : AgentEval.Evals.IEval
+    JsonObject CaptureConfiguration()
+    JsonObject CaptureConfiguration(AgentEval.Evals.EvalInput input)
+interface AgentEval.Evals.IEvalDefinitionWrapper : AgentEval.Evals.IEval
+    AgentEval.Evals.IEval DefinitionInner { get; }
+interface AgentEval.Evals.IEvalInstrumentSource : AgentEval.Evals.IEval, AgentEval.Evals.IEvalConfigurationSource
+    IReadOnlyList<AgentEval.Evals.IEval> DefinitionInstruments { get; }
 interface AgentEval.Evals.IEvalResultRenderer
     String FileExtension { get; }
     String FormatId { get; }
@@ -1420,12 +1427,16 @@ interface AgentEval.Models.IRedTeamResult
     String Summary { get; }
 static class AgentEval.Models.ModelPricing
     const String TableName
+    static AgentEval.Models.ModelPricingSnapshot CaptureSnapshot()
     static Decimal? EstimateCost(String modelName, Int32 inputTokens, Int32 outputTokens)
     static IEnumerable<String> KnownModels { get; }
     static Int32 EstimatePromptTokens(String systemPrompt, String userInput)
     static Int32 EstimateTokensFromText(String text)
     static ValueTuple<Decimal, Decimal, Decimal, Decimal>? GetPricing(String modelName)
     static Void SetPricing(String modelName, Decimal inputPer1K, Decimal outputPer1K)
+sealed class AgentEval.Models.ModelPricingSnapshot
+    IReadOnlyDictionary<String, ValueTuple<Decimal, Decimal>> Rates { get; }
+    ValueTuple<Decimal, Decimal, Decimal, Decimal>? GetPricing(String modelName)
 class AgentEval.Models.ParallelBranch : IEquatable<AgentEval.Models.ParallelBranch>
     AgentEval.Models.ParallelBranch <Clone>$()
     Boolean Equals(AgentEval.Models.ParallelBranch other)

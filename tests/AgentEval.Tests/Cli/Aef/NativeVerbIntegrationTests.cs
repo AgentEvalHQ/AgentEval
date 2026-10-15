@@ -196,7 +196,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             "nist" => await BenchNistCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct),
             "gdpr" => (await BenchCommand.RunGdprAsync("standard", "mock-subject", _root, "test input", null,
-                mock: true, aef: aef, noAef: noAef, ct: ct), null),
+                mock: true, aef: aef, noAef: noAef, ct: ct, runs: 5), null),
             "eu-ai-act" => (await BenchEuAiActCommand.RunAsync("standard", "mock-subject", _root, "test input", null,
                 mock: true, aef: aef, noAef: noAef, ct: ct), null),
             "perf" => (await BenchPerfCommand.RunAsync("latency", "mock-subject", "test input", _root, null,
@@ -232,6 +232,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(aborted);
         var abortedHeader = Document(aborted, "run.json");
         Assert.Equal("mocked", (string?)abortedHeader["execution"]!["targetMode"]);
+        if (family is "gdpr" or "eu-ai-act" or "agentic" or "perf")
+        {
+            Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+            Assert.Equal((string?)header["suite"]!["digest"], (string?)abortedHeader["suite"]!["digest"]);
+            var manifestPath = Path.Combine("ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile);
+            var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(run, manifestPath)));
+            Assert.Equal(File.ReadAllBytes(Path.Combine(run, manifestPath)), File.ReadAllBytes(Path.Combine(aborted, manifestPath)));
+            Assert.Equal(1, (int)manifest.ToJson()["definition"]!["trialsPerCase"]!);
+            if (family != "perf") Assert.Contains("fixed-placeholder", manifest.ToJson().ToJsonString());
+        }
+
         Assert.Equal("aborted", (string?)abortedHeader["status"]);
         Assert.False(File.Exists(Path.Combine(aborted, "gates.ndjson")));
 
@@ -257,6 +268,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var run = Path.GetDirectoryName(file)!;
             AssertIntact(run);
             Assert.Equal("mocked", (string?)Document(run, "run.json")["execution"]!["targetMode"]);
+            AssertAutoAuditDefinition(run, scripted: true);
             var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
             Assert.Equal("inconclusive", (string?)gate["outcome"]);
             Assert.Equal(11, (int)gate["exitCode"]!);
@@ -294,6 +306,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
             var lines = File.Exists(Path.Combine(run, "results.ndjson")) ? File.ReadAllLines(Path.Combine(run, "results.ndjson")) : [];
             Assert.Equal(afterReport, lines.Length > 0);
+            AssertAutoAuditDefinition(run, scripted: true);
         }
     }
 
@@ -317,6 +330,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var dir = Path.GetDirectoryName(header)!;
             AssertIntact(dir);
             Assert.Equal(version, (string?)Document(dir, "run.json")["subject"]!["version"]);
+            AssertAutoAuditDefinition(dir, scripted: mock);
         }
     }
 
@@ -429,7 +443,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var command = EvalCommand.Create();
         var controls = new AefCliOptions(command);
         var options = Options(endpoint.Endpoint);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — AEF signatures require P-256; the key is freshly generated
         var keyPath = Path.Combine(_root, "key.pem");
         File.WriteAllText(keyPath, key.ExportPkcs8PrivateKeyPem());
         var parsed = command.Parse(["--aef-key", keyPath, "--dataset", options.Dataset.FullName]);
@@ -1023,6 +1037,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(attacker.Requests);
         var header = Document(dir, "run.json");
         Assert.Equal("generated", (string?)header["execution"]!["stimulus"]);
+        Assert.False((bool)header["suite"]!["frozen"]!);
+        Assert.Null(header["suite"]!["digest"]);
+        var recipe = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.False(recipe.Frozen);
+        Assert.Equal(recipe.Digest, (string?)header["ext"]!["agenteval.suiteIdentity"]!["digest"]);
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
         var agentUsage = Assert.Single(usage, u => (string?)u!["role"] == "agent")!;
@@ -1083,6 +1103,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal(completedProbes, File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(completedProbes + 1, definition.CaseIds.Count);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.All(File.ReadAllLines(Path.Combine(dir, "results.ndjson")), line =>
             Assert.Equal(10, (long)JsonNode.Parse(line)!["usage"]![0]!["gen_ai.usage.input_tokens"]!));
         Assert.Null(Document(dir, "summary.json")["usage"]![0]!["gen_ai.usage.input_tokens"]);
@@ -1254,6 +1278,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(defaultOutput ? Path.Combine(_root, ".agenteval", "aef") : outputRoot);
         AssertIntact(dir);
+        Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(new[] { "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
@@ -1324,8 +1353,20 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
             Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
             if (File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length > 0) populated++;
+            AssertAutoAuditDefinition(dir, scripted: false);
         }
         Assert.Equal(1, populated);
+    }
+
+    private static void AssertAutoAuditDefinition(string directory, bool scripted)
+    {
+        var header = Document(directory, "run.json");
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var expected = AgentEval.Cli.Infrastructure.AutoAuditSuiteDefinition.Create(scripted);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(expected.Digest, manifest.Digest);
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
     }
 
     [Theory]
@@ -1373,6 +1414,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(workflow ? 1 : 6, definition.CaseIds.Count);
+        Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
@@ -1423,6 +1469,103 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(completed, lines.Count(l => ((string?)l["path"])?.StartsWith("case/", StringComparison.Ordinal) == true));
+        AssertMemoryRecipe(dir);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        await InitCommand.RunAsync("memory-definition", _root);
+        var original = Console.Out;
+        using var cancel = new CancellationTokenSource();
+        using var output = new CancelOnPersistenceWriter(cancel, "Running memory benchmark");
+        using var client = new MemoryReplyClient();
+        var destination = new DirectoryInfo(Path.Combine(_root, "memory-definition"));
+        int exit;
+        try
+        {
+            if (cancelBeforeCalls) Console.SetOut(output);
+            exit = await BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination);
+        }
+        finally { Console.SetOut(original); }
+        Assert.Equal(cancelBeforeCalls ? 1 : 0, exit);
+        var directory = RunDirectory(destination.FullName);
+        AssertIntact(directory);
+        AssertMemoryRecipe(directory);
+        if (cancelBeforeCalls) Assert.Empty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+        else Assert.NotEmpty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+    }
+
+    private static void AssertMemoryRecipe(string directory)
+    {
+        var header = Document(directory, "run.json");
+        Assert.False((bool)header["suite"]!["frozen"]!);
+        Assert.Null(header["suite"]!["digest"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(AgentEval.Cli.Infrastructure.MemorySuiteDefinition.Create("quick", AgentEval.Benchmarks.MemoryBenchmark.Quick, null, "override").Digest,
+            manifest.Digest);
+        Assert.Equal(manifest.Digest, (string?)header["ext"]!["agenteval.suiteIdentity"]!["digest"]);
+        Assert.Equal(new[] { "memory.quick" }, manifest.CaseIds);
+    }
+
+    [Theory]
+    [InlineData("Episodic", false)]
+    [InlineData("Episodic", true)]
+    [InlineData("WorkingMemory", false)]
+    [InlineData("WorkingMemory", true)]
+    [InlineData("Forgetting", false)]
+    [InlineData("Forgetting", true)]
+    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions)
+    {
+        await InitCommand.RunAsync("typed-definition", _root);
+        var descriptor = AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
+            Enum.Parse<AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical>(vertical));
+        using var client = new AgentEval.Testing.ScriptedChatClient();
+        for (var i = 0; i < descriptor.QuestionCount; i++)
+            client.AddText("test answer").AddText("{\"outcome\":\"correct\",\"reasoning\":\"test judge\"}");
+        using var cancel = new CancellationTokenSource();
+        using var output = new CancelOnPersistenceWriter(cancel, "Running ");
+        var previous = Console.Out;
+        var destination = new DirectoryInfo(Path.Combine(_root, "typed-definition"));
+        int exit;
+        try
+        {
+            if (cancelBeforeQuestions) Console.SetOut(output);
+            exit = await BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination);
+        }
+        finally { Console.SetOut(previous); }
+        Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
+        var directory = RunDirectory(destination.FullName);
+        AssertIntact(directory);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        var options = new AgentEval.Memory.External.TypedMemEval.TypedMemEvalOptions().ToExternalOptions(descriptor);
+        var expected = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create("typedmemeval", vertical.ToLowerInvariant(),
+            new AgentEval.Memory.External.Models.ExternalBenchmarkPlan(options,
+                AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.Load(descriptor.Vertical, options),
+                AgentEval.Memory.External.TypedMemEval.TypedMemEvalCorpus.ReadJson(descriptor.Vertical)), null, "override");
+        Assert.Equal(expected.Digest, manifest.Digest);
+        Assert.Equal(descriptor.QuestionCount, manifest.CaseIds.Count);
+        Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
+        var diagnostics = Document(directory, "summary.json")["ext"]![AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.ExtensionKey]!;
+        Assert.Equal(!cancelBeforeQuestions, (bool)diagnostics["complete"]!);
+        Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["observedQuestions"]!);
+        Assert.False((bool)diagnostics["gating"]!);
+        Assert.False(File.Exists(Path.Combine(directory, "gates.ndjson")));
+        if (vertical == "WorkingMemory")
+        {
+            var buckets = diagnostics["byDistanceSessions"]!.AsObject();
+            Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, buckets.Sum(p => (int)p.Value!["n"]!));
+        }
+        if (vertical == "Forgetting")
+        {
+            Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["forgetting"]!["n"]!);
+            Assert.Equal(0, (int)diagnostics["forgetting"]!["staleRecall"]!);
+        }
     }
 
     private sealed class MemoryReplyClient : Microsoft.Extensions.AI.IChatClient
@@ -1477,7 +1620,19 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(observed, (string?)line["caseId"]);
         Assert.Equal("scored", (string?)line["state"]);
         Assert.Equal("correct", (string?)line["ext"]!["agenteval.typedmemeval"]!["outcome"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.True(manifest.Frozen);
+        Assert.Equal(manifest.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
+        Assert.Contains(observed!, manifest.CaseIds);
+        Assert.Equal(AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
+            AgentEval.Memory.External.TypedMemEval.TypedMemEvalVertical.Episodic).QuestionCount, manifest.CaseIds.Count);
         Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+        var diagnostics = Document(dir, "summary.json")["ext"]![AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.ExtensionKey]!;
+        Assert.False((bool)diagnostics["complete"]!);
+        Assert.Equal(1, (int)diagnostics["observedQuestions"]!);
+        Assert.Equal(1, (int)diagnostics["outcomes"]!["correct"]!);
+
     }
 
     [Theory]

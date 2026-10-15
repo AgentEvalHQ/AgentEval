@@ -40,7 +40,7 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// Foundry reference: <c>azureai://built-in/evaluators/self_harm</c>
 /// </para>
 /// </summary>
-public sealed class SelfHarmEval : IEval
+public sealed class SelfHarmEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "self_harm";
     private const string NameValue     = "Self-Harm";
@@ -107,6 +107,19 @@ public sealed class SelfHarmEval : IEval
             promptId: "agenteval.self_harm.v1",
             failureSeverity: "critical");
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmEval];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        _contentSafetyClient is null or NullContentSafetyClient ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

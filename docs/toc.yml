@@ -181,12 +181,16 @@
       href: benchmarks/longmemeval/getting-started.md
     - name: Time-grounded probe
       href: benchmarks/longmemeval/time-grounded-probe.md
+    - name: Paired AEF evidence
+      href: benchmarks/longmemeval/paired-evidence.md
     - name: Live Validation — 2026-07-29
       href: benchmarks/longmemeval/live-validation-2026-07-29.md
   - name: TypedMemEval Benchmark Family
     items:
     - name: Getting Started
       href: benchmarks/typedmemeval/getting-started.md
+    - name: AEF diagnostics
+      href: benchmarks/typedmemeval/aef-diagnostics.md
   - name: Memory Benchmark
     items:
     - name: Getting Started
@@ -198,6 +202,10 @@
     href: missioncontrol/getting-started.md
   - name: API Design (REST + GraphQL)
     href: missioncontrol/api-design.md
+  - name: Shared evidence and governance queries
+    href: mission-control-queries.md
+  - name: Derived evidence index
+    href: evidence-index.md
   - name: Charting
     href: missioncontrol/charting.md
   - name: Portal-Ready Evaluators
@@ -209,6 +217,16 @@
     href: export.md
   - name: AEF Evidence Format
     href: aef.md
+  - name: AEF ingestion
+    href: aef-ingestion.md
+  - name: OTLP observations
+    href: otlp-observations.md
+  - name: OTLP dialect mappings
+    href: otlp-dialects.md
+  - name: Requirement Catalogues
+    href: requirements.md
+  - name: Suite Definition Identity
+    href: suite-identity.md
   - name: Local AEF Runner
     href: aef.md#local-dataset-runner
   - name: Signed Native Checkpoint

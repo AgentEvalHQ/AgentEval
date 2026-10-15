@@ -250,6 +250,7 @@ public class AefOverlayWriterTests
 
         var next = AefOverlayWriter.Open(run.Dir);
         Assert.Equal(unsealed, next.UnsealedAtOpen);
+        Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(appended), next.UnsealedBytesAtOpen);
         next.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "after", id: "ov_2"));
         var batch = next.SealBatch();
 
@@ -273,6 +274,24 @@ public class AefOverlayWriterTests
 
         Assert.Throws<AefWriteException>(() => overlay.SealBatch());
         Assert.False(File.Exists(run.Full("overlays/seal-0001.json")));
+    }
+
+    [Fact]
+    public void SealBatch_AnotherWriterAlreadySealed_RefusesWithoutReplacingItsSeal()
+    {
+        using var run = SealedRun(out _, out _);
+        var stale = AefOverlayWriter.Open(run.Dir);
+        var current = AefOverlayWriter.Open(run.Dir);
+        current.Append(Approve(WriterRun.Alice));
+        current.SealBatch();
+        var seal = File.ReadAllBytes(run.Full("overlays/seal-0001.json"));
+
+        stale.Append(Event(AefOverlayKind.Reject, AefOverlayTarget.TheRun, by: WriterRun.Bob));
+        Assert.Throws<AefWriteException>(() => stale.SealBatch());
+        Assert.Equal(seal, File.ReadAllBytes(run.Full("overlays/seal-0001.json")));
+        var view = EffectiveView.Compute(run.Dir, WriterRun.Start.AddDays(2), null);
+        Assert.Equal("approve", Assert.Single(view.Reviews).Status);
+        Assert.Equal(1, view.UnsealedEvents);
     }
 
     [Fact]

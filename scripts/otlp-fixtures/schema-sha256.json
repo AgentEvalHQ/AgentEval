@@ -1,0 +1,6 @@
+{
+  "opentelemetry/proto/collector/trace/v1/trace_service.proto": "03c8cc4e3e101087d884392d6eda32152ad5cd696e6344f50deaa59804a75c7a",
+  "opentelemetry/proto/common/v1/common.proto": "354d818af9cb0ed67f7447b9cf8408f1ac8911cedea0db73c5309484ec2bcc04",
+  "opentelemetry/proto/resource/v1/resource.proto": "e0a7cdc0ffcfeffaa2606e8611839735ebffaa2d6acdf33e9356f2c48ae692d3",
+  "opentelemetry/proto/trace/v1/trace.proto": "c3fb1385c90b8bc08a2a462e28b5d0c422c7b524a839f75f75e3cd9f64f36956"
+}

@@ -40,10 +40,17 @@ namespace AgentEval.Evals;
 /// into a package that bundles LLM plumbing would be a layering violation.
 /// </para>
 /// </summary>
-public sealed class F1ScoreEval : AtomicCodeEval
+public sealed class F1ScoreEval : AtomicCodeEval, IEvalConfigurationSource
 {
     private readonly double _passThreshold;
     private readonly string? _groundTruth;
+
+    /// <inheritdoc/>
+    public System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+        ["groundTruthDigest"] = _groundTruth is null ? null : RubricIdentity.Digest([_groundTruth]),
+    };
 
     /// <summary>
     /// Initialises a new <see cref="F1ScoreEval"/>.

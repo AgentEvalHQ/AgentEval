@@ -27,9 +27,12 @@ namespace AgentEval.Evals.Agentic.System;
 /// <c>Resources/Prompts/system/intent-resolution.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
-public sealed class IntentResolutionEval : IEval
+public sealed class IntentResolutionEval : IEvalDefinitionWrapper
 {
     private readonly CompositeEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

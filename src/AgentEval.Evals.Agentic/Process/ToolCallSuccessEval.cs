@@ -37,7 +37,7 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_call_success</c>
 /// </para>
 /// </summary>
-public sealed class ToolCallSuccessEval : IEval
+public sealed class ToolCallSuccessEval : IEvalDefinitionWrapper
 {
     private const string KeyValue      = "tool_call_success";
     private const string NameValue     = "Tool Call Success";
@@ -51,6 +51,9 @@ public sealed class ToolCallSuccessEval : IEval
     public const string MetadataStatusKey = "tool_call_statuses";
 
     private readonly AtomicLlmEval _llmFallback;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _llmFallback;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;

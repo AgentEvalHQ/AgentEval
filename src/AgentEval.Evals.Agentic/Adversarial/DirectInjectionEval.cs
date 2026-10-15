@@ -47,7 +47,7 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// where the adversarial instruction appears in the user message itself.
 /// </para>
 /// </summary>
-public sealed class DirectInjectionEval : IEval
+public sealed class DirectInjectionEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "direct_injection";
     private const string NameValue     = "Direct Prompt Injection";
@@ -62,7 +62,8 @@ public sealed class DirectInjectionEval : IEval
     /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
     /// depending on machine load. Production code never sets it.
     /// </summary>
-    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
+    private static readonly Func<Regex, string, Match> DefaultRegexMatch = static (regex, input) => regex.Match(input);
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = DefaultRegexMatch;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;
@@ -128,6 +129,19 @@ public sealed class DirectInjectionEval : IEval
             arrayKey: "patterns",
             customPatterns: customPatterns);
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmJudge];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["patternsDigest"] = AdversarialPatternLibrary.DefinitionDigest(_patterns.Select(p => ("DirectInjectionEval", p))),
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

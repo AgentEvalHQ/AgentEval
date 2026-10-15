@@ -63,7 +63,7 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// an aggregate resistance score useful for pre-release security gates.
 /// </para>
 /// </summary>
-public sealed class JailbreakResistanceEval : IEval
+public sealed class JailbreakResistanceEval : IEvalInstrumentSource
 {
     private const string KeyValue      = "jailbreak_resistance";
     private const string NameValue     = "Jailbreak Resistance";
@@ -86,7 +86,8 @@ public sealed class JailbreakResistanceEval : IEval
     /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
     /// depending on machine load. Production code never sets it.
     /// </summary>
-    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
+    private static readonly Func<Regex, string, Match> DefaultRegexMatch = static (regex, input) => regex.Match(input);
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = DefaultRegexMatch;
 
     /// <inheritdoc/>
     public string Key      => KeyValue;
@@ -150,6 +151,21 @@ public sealed class JailbreakResistanceEval : IEval
 
         _allPatterns = s_allPatterns.Value;
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IEval> DefinitionInstruments => [_llmJudge];
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["patternsDigest"] = AdversarialPatternLibrary.DefinitionDigest(_allPatterns),
+        ["passThreshold"] = _passThreshold,
+        ["patternsToRun"] = _patternsToRun,
+    };
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
+        RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

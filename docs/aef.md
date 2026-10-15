@@ -25,6 +25,59 @@ AgentEval. AEF is made for whoever has to rely on a result:
 | May this version ship? | A **checkpoint**: lanes of evidence with rules. A pure decision function recomputes its outcome from the sealed runs. |
 | Did a reviewer override a result? | **Overlays**: append-only, sealed batches of human decisions on a closed run. The sealed files never change. |
 
+## Record a review decision
+
+```bash
+agenteval decide ./my-run --kind approve --by reviewer-42 --reason "Reviewed the sealed evidence" --json
+agenteval aef view ./my-run --json
+```
+
+`decide` supports `approve` and `reject` for the run, or for one result with `--result <result-id>`.
+The result ID must belong to this run; reviewing it leaves the run's review status unchanged.
+Both require an explicit opaque identity and a
+nonblank reason. Without `--key`, identity is **self-attested**, not authenticated or cryptographically signed. The command
+appends one overlay event and seals its batch; approval does not change the original results, summaries, gates
+or checkpoint outcome. Inspect the effective review status with `aef view`.
+
+Only intact sealed runs are accepted. Existing unsealed overlay bytes, including unfinished event lines, are refused so a review never silently
+adopts another writer's work. Exit 0 means the decision batch was sealed; 1 means integrity or sealing refused
+the decision (including storage/signing failures after writing starts); 2 means an input or preflight storage error. If writing is interrupted, inspect and verify the journal before
+retrying: an event may remain unsealed and has no effective decision status until its batch is sealed.
+
+For a bounded waiver, use `--kind waive` with exactly one `--result <id>` or `--requirement <external-id>`,
+a nonblank reason, and `--expires <UTC-time>` (RFC 3339 ending in `Z`, strictly after the decision time).
+Requirement IDs are external references; the command does not certify that a requirement exists or is satisfied.
+For example:
+
+```bash
+agenteval decide ./my-run --kind waive --requirement REQ-42 --by reviewer-42 --reason "Temporary exception pending retest" --expires 2026-11-01T00:00:00Z
+```
+
+The waiver is active from its decision time up to, but excluding, its expiry. `aef view` retains expired waivers
+as inactive history. Waivers leave sealed result states and gate outcomes unchanged; `--requirement` and
+`--expires` are refused for approval and rejection.
+
+To change a result's **effective** state, use `--kind override` or `--kind adjudicate` with `--result <id>`,
+`--state <state>` and a reason. Accepted states are `passed`, `failed`, `warn`, `inconclusive`, `scored`,
+`not_measured`, `not_applicable`, `skipped` and `error`; `pending` is refused on a closed run.
+The last sealed state decision for that result wins in file order. `aef view` shows both its original sealed
+state and effective state. Parents, summaries, gates and checkpoint outcomes are not recomputed.
+`--state` is refused for other decision kinds.
+
+Add `--key <private-key.pem>` to sign the new decision's batch with an unencrypted PKCS#8 ECDSA P-256 key.
+The key is loaded before any event is appended; missing, malformed and unsupported keys cause no mutation.
+Earlier batches are left untouched. Keep the key outside the run folder.
+
+Signing records a claimed `signed` assurance; it does not authenticate `--by`. The JSON response reports
+`identityVerified: false`. Use `agenteval aef view ./my-run --policy trust-policy.json --json` to verify the
+batch's key against the policy's identity mapping. Without a matching policy, the reader shows the decision
+as self-attested. The private key is never copied into evidence.
+
+For an offline cross-language check after building the CLI, run
+`python scripts/verify-aef-decisions.py --cli src/AgentEval.Cli/bin/Debug/net10.0/AgentEval.Cli.dll`.
+It requires OpenSSL and compares all decision kinds, waiver boundaries and signature trust with the independent
+Python reader, using temporary evidence and a temporary signing key.
+
 ## What a run looks like
 
 ```text
@@ -146,8 +199,12 @@ Endpoint validation happens during plan loading, before credentials or provider 
 
 Suites use `dataset:<relative-path>` with forward slashes, resolved from the plan's directory. JSON, JSONL,
 YAML, CSV and TSV snapshots require explicit unique case IDs; IDs are never trimmed or replaced. The digest
-uses the same LF-normalised bytes as native eval. A supplied plan digest must match; an omitted digest remains
-omitted in the run. Case fields use the ordinary harness's input, expected substring and evaluation criteria.
+now identifies a full [suite definition](suite-identity.md): exact snapshot bytes, planned cases, evaluator
+implementation and applied evaluation policy. `run --dry-run --json` reports each resolved suite digest without
+making requests. Pin that digest in the plan when required. Old dataset-only digests no longer match the dataset
+target's full definition; refresh them through dry-run. A native dataset run records the resolved full digest even
+when the plan leaves it unspecified. Scripted conformance targets retain their existing digest behavior.
+Case fields use the ordinary harness's input, expected substring and evaluation criteria.
 Tool expectations are refused because this adapter cannot enforce them. Criteria require a plan judge.
 The first judge uses the existing default harness prompt; custom rubric digests are refused. A requested judge
 provider must match `openai-compatible` or `azure`, according to its adapter.
@@ -367,7 +424,7 @@ preflight/help side effects and verifies signed identity and unsealed evidence w
 | `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
 | `bench perf`, `trace-fidelity`, `workflow-trace-fidelity` | the family | part of the result (`case`) | Each part beside its own verdict. |
 | `bench longmemeval` | `longmemeval` | question (`case`, its id) | Correct `passed`, wrong `failed`, unscored `not_measured`, unanswered `error`; no question or answer text. |
-| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; the typed outcome (`abstained`, `missed`, …) in `ext`. |
+| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; typed outcomes and structured diagnostics in `ext`. |
 | `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
 
@@ -382,6 +439,14 @@ summary entry per lane, metric and path.
 
 Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
+
+TypedMemEval's `agenteval.typedmemeval` per-question extension retains `outcome`, `attribution`,
+`attributionLevel`, `coverageSource` and `hasGold`. Enum values use lowercase names such as `evidenceabsent`
+and `answercontext`. `realisedGoldCoverage` and `distanceSessions` are present only when supplied;
+unobserved coverage is distinct from observed zero. Forgetting runs also retain `isStaleRecall`,
+`isOverForgetting` and `isMisattributedForgetting`. These diagnostics support grouping questions by distance
+and counting forgetting outcomes; they are not separate aggregate AEF metrics. Inconclusive and unrun outcomes
+remain visible without converting absent measurements into scores. Question, answer and evidence text are excluded.
 Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals when every call reported usage.
 Saved-run notices are best-effort: a broken or closed diagnostic stream does not turn successful publication
 into an AEF write failure. If final benchmark console reporting fails after publication, the command can return
@@ -432,6 +497,12 @@ Eval uses `config.thresholds.case` when every dataset case has the same passing 
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
 come from the evaluation definition, so they remain distinct from the producer package version.
+Without a captured definition, probe and composite suite digests identify only their observed or legacy
+case/component-key roster, including the sole key for a single-case benchmark. Dataset adapter calls
+without a definition retain dataset-byte identity. These compatibility scopes do not establish full
+definition equivalence. Native eval, dataset jobs and supported probe/composite producers capture the
+planned [suite definition](suite-identity.md), including declared configuration and hashed inputs,
+before execution and retain it through interruption. Check the recorded identity scope when comparing runs.
 Agentic runs also record the applied `config.budgetTier`, normalized from the validated filter (`all` for no
 filter), including mocks and aborted evidence. Other benchmark families do not invent a budget tier.
 The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending

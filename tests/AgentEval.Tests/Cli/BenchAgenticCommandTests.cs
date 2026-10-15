@@ -80,8 +80,10 @@ public class BenchAgenticCommandTests : IDisposable
         }
     }
 
-    private sealed class PassingStubEvaluator : IEvaluator
+    private sealed class PassingStubEvaluator : IEvaluator, IJudgePromptSource
     {
+        public string? SystemPromptId => "fixture";
+        public string PromptMaterial => "fixture prompt";
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
         {
             var list = criteria.ToList();
@@ -122,6 +124,7 @@ public class BenchAgenticCommandTests : IDisposable
         Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verified.Outcome);
         Assert.Empty(verified.Problems);
         Assert.Equal("aborted", (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!["status"]);
+        Assert.True(File.Exists(Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
         if (completed == 0)
@@ -133,8 +136,10 @@ public class BenchAgenticCommandTests : IDisposable
         if (completed > 0) Assert.Contains(lines, l => (string?)l["state"] == "passed");
     }
 
-    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator
+    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator, IJudgePromptSource
     {
+        public string? SystemPromptId => "fixture";
+        public string PromptMaterial => "fixture prompt";
         private int _calls;
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
         {
@@ -313,8 +318,52 @@ public class BenchAgenticCommandTests : IDisposable
         var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
         Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);   // it grades an answer, drives no agent
         Assert.Equal("bench:agentic/rag-quality", (string?)header["suite"]!["ref"]);
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
         var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.DoesNotContain("filings", all, StringComparison.Ordinal);   // the graded answer is content
+    }
+
+    [Theory]
+    [InlineData("safety", 12)]
+    [InlineData("adversarial-direct", 3)]
+    public async Task BenchAgentic_SecurityPresets_SealDeclaredInstrumentRoster(string preset, int cases)
+    {
+        InitWorkspace();
+        var aef = new DirectoryInfo(Path.Combine(_root, "security-aef"));
+        var exit = await BenchAgenticCommand.RunAsync(preset: preset, subject: "Security", rootOverride: _root,
+            inputText: SuppliedQuestion, responseText: SuppliedAnswer, evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null, aef: aef);
+        Assert.True(exit is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {exit}.");
+        var run = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(cases, definition.CaseIds.Count);
+        var header = global::System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
+    }
+
+    [Fact]
+    public async Task BenchAgentic_DiagnosticsWithoutTrace_SealsDeclaredUnmeasuredRoster()
+    {
+        InitWorkspace();
+        var aef = new DirectoryInfo(Path.Combine(_root, "diagnostic-aef"));
+        var exit = await BenchAgenticCommand.RunAsync(preset: "glass-box-diagnostics", subject: "Diagnostics", rootOverride: _root,
+            inputText: SuppliedQuestion, responseText: SuppliedAnswer, evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null, aef: aef);
+        Assert.True(exit is 9 or 10 or 11, $"Expected an unmeasured gate; got {exit}.");
+        var run = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+        var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(8, definition.CaseIds.Count);
+        var header = global::System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
     }
 
     [Fact]
@@ -398,6 +447,17 @@ public class BenchAgenticCommandTests : IDisposable
             .ToList();
         Assert.NotEmpty(recorded);
         Assert.All(recorded, t => Assert.Matches(@"""judgeMode""\s*:\s*""none""", t));
+        {
+            var manifest = Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval"),
+                "suite-definition.json", SearchOption.AllDirectories));
+            var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(manifest));
+            Assert.True(definition.Frozen);
+            Assert.Equal(preset == "telemetry" ? 6 : preset == "judge-quality" ? 3 : 1, definition.CaseIds.Count);
+            var runDir = Directory.GetParent(manifest)!.Parent!.Parent!.FullName;
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+                AgentEval.Results.Integrity.AefRunVerifier.Verify(runDir).Outcome);
+        }
+
     }
 
     [Fact]

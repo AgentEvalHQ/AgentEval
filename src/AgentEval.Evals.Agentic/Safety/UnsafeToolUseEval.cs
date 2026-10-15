@@ -43,9 +43,12 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// pure LLM judge: there is no deterministic policy lookup, so every verdict is the judge's.
 /// </para>
 /// </summary>
-public sealed class UnsafeToolUseEval : IEval
+public sealed class UnsafeToolUseEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key      => _inner.Key;

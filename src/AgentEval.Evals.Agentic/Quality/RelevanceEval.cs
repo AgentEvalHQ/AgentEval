@@ -33,9 +33,12 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
-public sealed class RelevanceEval : IEval
+public sealed class RelevanceEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

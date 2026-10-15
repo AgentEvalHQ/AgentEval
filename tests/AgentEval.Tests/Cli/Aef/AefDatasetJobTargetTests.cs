@@ -22,6 +22,26 @@ public sealed class AefDatasetJobTargetTests : IDisposable
     private static readonly AefTime Start = AefTime.Parse("2026-10-12T12:00:00Z");
     private JsonObject? _plan;
     private bool _expectValidStream = true;
+
+    [Fact]
+    public async Task LoadAsync_DefinitionChanges_RefusesOldDatasetOnlyDigestWithoutRequests()
+    {
+        var plan = Plan("http://127.0.0.1:1/v1");
+        var first = await AefDatasetJobTarget.LoadAsync(Bytes(plan), PlanDirectory);
+        Assert.Null(first.RefusalReason);
+        var initial = Assert.Single(first.Suites).Digest;
+        plan["suites"]![0]!["digest"] = AefEvalWriter.DatasetDigest(File.ReadAllBytes(Dataset));
+        var legacy = await AefDatasetJobTarget.LoadAsync(Bytes(plan), PlanDirectory);
+        var refused = AefJobRunner.Analyze(Bytes(plan), Manifest(), legacy, new AefJobOptions { At = Start });
+        Assert.False(refused.Accepted);
+        Assert.Contains("plan's digest", refused.Reason);
+        plan["suites"]![0]!.AsObject().Remove("digest");
+        plan["ext"]!["agenteval.run"]!["outputCap"] = 17;
+        var changedPolicy = await AefDatasetJobTarget.LoadAsync(Bytes(plan), PlanDirectory);
+        Assert.Null(changedPolicy.RefusalReason);
+        Assert.NotEqual(initial, Assert.Single(changedPolicy.Suites).Digest);
+        Assert.False(Directory.Exists(Output));
+    }
     public AefDatasetJobTargetTests()
     {
         Directory.CreateDirectory(PlanDirectory);
@@ -48,7 +68,6 @@ public sealed class AefDatasetJobTargetTests : IDisposable
              "ext":{"agenteval.run":{"inputCap":8192,"outputCap":100,"caseSeconds":30}}}
             """)!.AsObject();
         plan["subject"]!["endpoint"] = endpoint;
-        plan["suites"]![0]!["digest"] = AefEvalWriter.DatasetDigest(File.ReadAllBytes(Dataset));
         return _plan = plan;
     }
     private List<JsonNode> Events() => File.ReadAllLines(Path.Combine(Output, "events.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
@@ -71,6 +90,9 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         var bytes = Bytes(plan);
         var target = await AefDatasetJobTarget.LoadAsync(bytes, PlanDirectory);
         Assert.Null(target.RefusalReason);
+        plan["suites"]![0]!["digest"] = Assert.Single(target.Suites).Digest;
+        bytes = Bytes(plan);
+        target = await AefDatasetJobTarget.LoadAsync(bytes, PlanDirectory);
         var before = Directory.GetFiles(_root, "*", SearchOption.AllDirectories);
         var options = new AefJobOptions { At = Start, Environment = _ => "secret-scoped" };
         var analysis = AefJobRunner.Analyze(bytes, Manifest(), target, options);
@@ -91,6 +113,10 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!;
         Assert.Equal("live", (string?)header["execution"]!["targetMode"]);
         Assert.Equal((string?)plan["suites"]![0]!["digest"], (string?)header["suite"]!["digest"]);
+        Assert.True((bool)header["suite"]!["frozen"]!);
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var manifest = File.ReadAllBytes(Path.Combine(directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile));
+        Assert.Equal(Assert.Single(target.Suites).Definition!.ToBytes(), manifest);
         var summary = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "summary.json")))!;
         Assert.Equal(20, (int)summary["usage"]![0]!["gen_ai.usage.input_tokens"]!);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);

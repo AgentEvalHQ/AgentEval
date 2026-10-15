@@ -21,3 +21,8 @@ samples/interop/assert-ai/example-run/** text eol=lf
 
 # Shell scripts run on Linux runners and in containers: a CR breaks `set -o pipefail`.
 *.sh text eol=lf
+
+# Pinned OTLP schema bytes and independent binary fixtures.
+scripts/otlp-fixtures/proto/**/*.proto text eol=lf
+tests/AgentEval.Results.Tests/Observations/Fixtures/*.pb -text
+tests/AgentEval.Results.Tests/Observations/Fixtures/*.json text eol=lf

@@ -137,6 +137,18 @@ internal static class AdversarialPatternLibrary
         }
     }
 
+    /// <summary>Hashes the ordered, actually compiled policy, including effective regex settings.</summary>
+    internal static string DefinitionDigest(IEnumerable<(string Library, CompiledPattern Pattern)> patterns)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(patterns.Select(p => new
+        {
+            p.Library, p.Pattern.Id, p.Pattern.Severity,
+            Pattern = p.Pattern.Pattern.ToString(), Options = (int)p.Pattern.Pattern.Options,
+            TimeoutTicks = p.Pattern.Pattern.MatchTimeout.Ticks,
+        }).ToArray());
+        return "sha256:" + Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+    }
+
     private static bool TryCompile(string pattern, out Regex? regex)
     {
         try

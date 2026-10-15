@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/schemas/suites/1/definition.schema.json",
+  "title": "AgentEval suite definition manifest 1.0 (external to AEF)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "suiteRef", "definitionVersion", "frozen", "inputs", "definition", "caseIds"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "kind": { "enum": ["dataset", "probe", "composite"] },
+    "suiteRef": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "definitionVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "frozen": { "type": "boolean" },
+    "inputs": {
+      "description": "At most 10,000 named exact input content digests (datasets, prompt material, code/rubric definitions), enforced by the reader. No raw prompt or dataset text is required.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+    },
+    "definition": {
+      "description": "Producer-owned declared evaluation configuration, including thresholds, weighting, aggregation and trial/generation policies. No observed scores, durations or run IDs.",
+      "type": "object", "minProperties": 1
+    },
+    "caseIds": {
+      "description": "Complete planned case roster, not observed results; order has no meaning here. Ordered case content belongs in the hashed inputs.",
+      "type": "array", "maxItems": 100000, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    }
+  }
+}

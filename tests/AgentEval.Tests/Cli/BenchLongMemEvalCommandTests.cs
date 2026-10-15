@@ -64,6 +64,7 @@ public sealed class BenchLongMemEvalCommandTests
         var aefDir = Path.GetDirectoryName(aefRun)!;
         Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(aefDir).Outcome);
         Assert.Contains("\"mocked\"", File.ReadAllText(aefRun));
+        AssertDefinition(aefDir, ["q-empty", "q-no", "q-yes"]);
         var states = File.ReadAllLines(Path.Combine(aefDir, "results.ndjson"))
             .Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]).Order().ToList();
         Assert.Equal(["failed", "not_measured", "passed"], states);
@@ -160,12 +161,82 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
         Assert.Equal(observed, (string?)line["caseId"]);
+        AssertDefinition(dir, ["first", "second"]);
         if (Environment.GetEnvironmentVariable("AEF_VERB_FIXTURES") is { Length: > 0 } retained)
         {
             var destination = Path.Combine(retained, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(destination);
             foreach (var file in Directory.GetFiles(dir)) File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
         }
+    }
+
+    private static void AssertDefinition(string directory, string[] cases)
+    {
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+            directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!;
+        Assert.True(manifest.Frozen);
+        Assert.Equal(cases, manifest.CaseIds);
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_PairedOracle_KeepsNormalExitAndSeparateEvidence(bool noAef)
+    {
+        using var fixture = WorkspaceFixture.Create(Question("q-pair"));
+        using var environment = new EnvironmentVariableScope(LongMemEvalDataLoader.DatasetPathEnvVar, fixture.DatasetPath);
+        using var client = new SequenceChatClient("normal answer", "no", "oracle answer", "yes");
+        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "paired-agent", fixture.Root,
+            client, noAef: noAef, pairedOracle: true));
+        Assert.Equal(ExitCodes.GateFailed, invocation.ExitCode);
+        Assert.Contains("Normal accuracy:", invocation.Output);
+        Assert.Contains("Oracle accuracy:", invocation.Output);
+        Assert.Contains("100.0 percentage points", invocation.Output);
+        var headers = Directory.GetFiles(fixture.Root, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(noAef ? 0 : 2, headers.Length);
+        foreach (var header in headers)
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+                AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(header)!).Outcome);
+        // The paired command does not insert oracle scores into the legacy normal-run store.
+        Assert.Empty(fixture.RunDirectories());
+    }
+
+    [Theory]
+    [InlineData(LongMemEvalArm.Normal)]
+    [InlineData(LongMemEvalArm.Oracle)]
+    public async Task RunAsync_PairedCancellation_RetainsCompletedAndPartialArms(LongMemEvalArm stopArm)
+    {
+        using var fixture = WorkspaceFixture.Create(Question("q1"), Question("q2"));
+        using var environment = new EnvironmentVariableScope(LongMemEvalDataLoader.DatasetPathEnvVar, fixture.DatasetPath);
+        using var cancel = new CancellationTokenSource();
+        using var client = new SequenceChatClient("normal", "no", "normal", "no", "oracle", "yes", "oracle", "yes");
+        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "paired-agent", fixture.Root,
+            client, ct: cancel.Token, pairedOracle: true, onPairedQuestionCompleted: (arm, _) =>
+            { if (arm == stopArm) { cancel.Cancel(); cancel.Token.ThrowIfCancellationRequested(); } }));
+        Assert.Equal(1, invocation.ExitCode);
+        var headers = Directory.GetFiles(fixture.Root, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(stopArm == LongMemEvalArm.Normal ? 1 : 2, headers.Length);
+        foreach (var header in headers)
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+                AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(header)!).Outcome);
+        Assert.Single(headers.Where(h => (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(h))!["status"] == "aborted"));
+    }
+
+    [Fact]
+    public async Task RunAsync_PairedEvidenceDestinationInvalid_ReturnsRuntimeErrorBeforeCalls()
+    {
+        using var fixture = WorkspaceFixture.Create(Question("q1"));
+        using var environment = new EnvironmentVariableScope(LongMemEvalDataLoader.DatasetPathEnvVar, fixture.DatasetPath);
+        using var client = new SequenceChatClient();
+        var destination = Path.Combine(fixture.Root, "occupied");
+        File.WriteAllText(destination, "not a directory");
+        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "paired-agent", fixture.Root,
+            client, aef: new DirectoryInfo(destination), pairedOracle: true));
+        Assert.Equal(ExitCodes.RuntimeError, invocation.ExitCode);
+        Assert.Contains("Paired evidence failed", invocation.Error);
+        Assert.Equal(0, client.Calls);
     }
 
     private static object Question(string id) => new
@@ -213,6 +284,7 @@ public sealed class BenchLongMemEvalCommandTests
     private sealed class SequenceChatClient(params string[] responses) : IChatClient
     {
         private readonly Queue<string> _responses = new(responses);
+        internal int Calls { get; private set; }
 
         public ChatClientMetadata Metadata { get; } =
             new("longmemeval-cli-test", new Uri("http://localhost"), "test-model");
@@ -223,6 +295,7 @@ public sealed class BenchLongMemEvalCommandTests
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
             if (_responses.Count == 0)
                 throw new InvalidOperationException("No response configured.");
             return Task.FromResult(

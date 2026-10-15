@@ -85,6 +85,34 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
         Assert.Equal(11, code);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SuiteIdentity_ChangingTraceObservations_PreservesDeclaredChecks(bool empty)
+    {
+        var trace = new WorkflowTrace { TraceName = "wf", OriginalPrompt = "private prompt", FinalOutput = "private output" };
+        if (!empty) trace.Steps.Add(Step("a", 10, 5, "stop"));
+        async Task<string> Run(string folder)
+        {
+            var path = await WriteTraceAsync(trace);
+            var output = new DirectoryInfo(Path.Combine(_root, folder));
+            await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root, aef: output);
+            var run = Assert.Single(Directory.GetFiles(output.FullName, "run.json", SearchOption.AllDirectories));
+            var dir = Path.GetDirectoryName(run)!;
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+            var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+                Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+            Assert.Single(manifest.CaseIds);
+            Assert.DoesNotContain("private", manifest.ToJson().ToJsonString());
+            using var header = JsonDocument.Parse(File.ReadAllText(run));
+            Assert.Equal(manifest.Digest, header.RootElement.GetProperty("suite").GetProperty("digest").GetString());
+            return manifest.Digest;
+        }
+        var before = await Run("first");
+        trace.ExecutorTraces = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(999, "content_filter") };
+        Assert.Equal(before, await Run("second"));
+    }
+
     [Fact]
     public async Task ItWritesASealedReplayedAefRun()
     {

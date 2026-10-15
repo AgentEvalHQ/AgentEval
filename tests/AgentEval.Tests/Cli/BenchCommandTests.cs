@@ -34,6 +34,27 @@ public class BenchCommandTests : IDisposable
     // ── Helpers ──────────────────────────────────────────────────────────
 
     [Theory]
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    public async Task CompletedComposite_IdentifiedJudge_SealsCapturedDefinition(string family)
+    {
+        InitWorkspace();
+        var aef = new DirectoryInfo(Path.Combine(_root, "defined-aef"));
+        var judge = new PassingStubEvaluator();
+        if (family == "gdpr")
+            await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: judge, responseText: "answer", aef: aef);
+        else
+            await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: judge, responseText: "answer", aef: aef);
+        var header = AefRun(aef.FullName, out var directory);
+        Assert.Equal("completed", (string?)header["status"]);
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(directory, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
+        Assert.Equal(manifest.CaseIds.Count, (int)header["ext"]!["agenteval.observedRoster"]!["count"]!);
+    }
+
+    [Theory]
     [InlineData("gdpr", 0)]
     [InlineData("gdpr", 1)]
     [InlineData("eu-ai-act", 0)]
@@ -58,6 +79,11 @@ public class BenchCommandTests : IDisposable
         var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!;
         Assert.Equal("aborted", (string?)header["status"]);
         Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);
+        Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+        var manifest = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(
+            Path.Combine(dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+        Assert.Equal(manifest.Digest, (string?)header["suite"]!["digest"]);
+        Assert.NotEmpty(manifest.CaseIds);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
         if (completed == 0)
@@ -71,8 +97,10 @@ public class BenchCommandTests : IDisposable
         Assert.DoesNotContain("secret answer", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)), StringComparison.Ordinal);
     }
 
-    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator
+    private sealed class CancellingEvaluator(CancellationTokenSource cancel, int completed) : IEvaluator, IJudgePromptSource
     {
+        public string? SystemPromptId => "fixture";
+        public string PromptMaterial => "fixture prompt";
         private int _calls;
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria,
             CancellationToken cancellationToken = default)
@@ -165,8 +193,10 @@ public class BenchCommandTests : IDisposable
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 
-    private sealed class PassingStubEvaluator : IEvaluator
+    private sealed class PassingStubEvaluator : IEvaluator, IJudgePromptSource
     {
+        public string? SystemPromptId => "fixture";
+        public string PromptMaterial => "fixture prompt";
         public Task<EvaluationResult> EvaluateAsync(
             string input, string output, IEnumerable<string> criteria,
             CancellationToken cancellationToken = default)

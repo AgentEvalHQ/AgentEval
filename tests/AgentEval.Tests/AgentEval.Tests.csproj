@@ -77,6 +77,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Compliance/Gdpr/Calibration/Golden/*.jsonl" />
+    <EmbeddedResource Include="MissionControl/EvidenceSchema.txt" LogicalName="AgentEval.Tests.EvidenceSchema.txt" />
     <EmbeddedResource Include="Compliance/EuAiAct/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="MAF/Gatekeeper/Fixtures/gatekeeper-replay-v1.jsonl"
@@ -108,6 +109,10 @@
     <!-- P1 (ASSERT interop): the sample's logic, so the test runs what the sample runs. -->
     <Compile Include="../../samples/AgentEval.Samples/Interop/01_AssertInterop.Run.cs"
              Link="Samples/01_AssertInterop.Run.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Interop/02_AssertEvidence.cs"
+             Link="Samples/02_AssertEvidence.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Interop/03_AssertMultiturnBenchmark.cs"
+             Link="Samples/03_AssertMultiturnBenchmark.cs" />
   </ItemGroup>
 
 </Project>

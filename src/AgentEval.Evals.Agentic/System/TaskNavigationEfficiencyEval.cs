@@ -44,9 +44,12 @@ namespace AgentEval.Evals.Agentic.System;
 /// The deterministic component uses standard Levenshtein distance.
 /// </para>
 /// </summary>
-public sealed class TaskNavigationEfficiencyEval : IEval
+public sealed class TaskNavigationEfficiencyEval : IEvalDefinitionWrapper
 {
     private readonly CompositeEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;
@@ -116,9 +119,12 @@ public sealed class TaskNavigationEfficiencyEval : IEval
 /// Computes a normalised Levenshtein edit-distance score between the actual tool-call
 /// sequence and the expected action sequence.
 /// </summary>
-internal sealed class ActionSequenceEditDistanceEval : AtomicCodeEval
+internal sealed class ActionSequenceEditDistanceEval : AtomicCodeEval, IEvalConfigurationSource
 {
     private readonly double _passThreshold;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new() { ["passThreshold"] = _passThreshold };
 
     internal ActionSequenceEditDistanceEval(double passThreshold)
         : base("path_edit_distance", "Path Edit Distance", "system-outcome", "1.0.0")

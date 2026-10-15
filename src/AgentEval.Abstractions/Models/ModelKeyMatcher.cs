@@ -23,7 +23,8 @@ internal static class ModelKeyMatcher
     /// Resolves <paramref name="model"/> against <paramref name="table"/>: an exact (case-insensitive)
     /// key match if present, otherwise the LONGEST registered key that is a case-insensitive substring of
     /// <paramref name="model"/> (so "gpt-4o-mini" wins over "gpt-4o" wins over "gpt-4" for a deployment
-    /// name that embeds the longer key). Deterministic regardless of dictionary enumeration order.
+    /// name that embeds the longer key). Equal-length matches use ordinal, case-insensitive key order.
+    /// Deterministic regardless of dictionary enumeration order.
     /// </summary>
     /// <returns><c>true</c> and the matched value, or <c>false</c> when the model is null/blank or unmatched.</returns>
     public static bool TryMatchLongestFirst<T>(
@@ -43,7 +44,8 @@ internal static class ModelKeyMatcher
         foreach (var key in table.Keys)
         {
             if (model.Contains(key, StringComparison.OrdinalIgnoreCase) &&
-                (best is null || key.Length > best.Length))
+                (best is null || key.Length > best.Length ||
+                    (key.Length == best.Length && StringComparer.OrdinalIgnoreCase.Compare(key, best) < 0)))
             {
                 best = key;
             }

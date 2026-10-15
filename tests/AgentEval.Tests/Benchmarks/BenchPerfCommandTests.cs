@@ -65,6 +65,11 @@ public class BenchPerfCommandTests
             var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
             Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
             Assert.Equal("bench:perf/latency", (string?)header["suite"]!["ref"]);
+            Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
+            var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
+                Path.GetDirectoryName(run)!, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
+            Assert.Equal(3, definition.CaseIds.Count);
+            Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
         }
         finally
         {

@@ -33,9 +33,12 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_output_utilization</c>
 /// </para>
 /// </summary>
-public sealed class ToolOutputUtilizationEval : IEval
+public sealed class ToolOutputUtilizationEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

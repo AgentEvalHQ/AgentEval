@@ -27,7 +27,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// to avoid division by zero.
 /// </para>
 /// </summary>
-public sealed class RetryRateEval : IEval
+public sealed class RetryRateEval : IEvalConfigurationSource
 {
     private const string KeyValue      = "retry_rate";
     private const string NameValue     = "Retry Rate";
@@ -73,6 +73,12 @@ public sealed class RetryRateEval : IEval
         _data          = data;
         _passThreshold = passThreshold;
     }
+
+    /// <summary>Captures evaluation policy; measured telemetry and prior results remain subject evidence.</summary>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new()
+    {
+        ["passThreshold"] = _passThreshold,
+    };
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

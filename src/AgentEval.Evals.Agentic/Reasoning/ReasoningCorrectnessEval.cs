@@ -48,7 +48,7 @@ namespace AgentEval.Evals.Agentic.Reasoning;
 /// Source: AgentEval-original. Plan 06 §3.3 B3.3.
 /// </para>
 /// </summary>
-public sealed class ReasoningCorrectnessEval : IEval
+public sealed class ReasoningCorrectnessEval : IEvalDefinitionWrapper
 {
     /// <summary>
     /// Metadata key holding the agent's explicit reasoning trace. When present and non-empty,
@@ -66,6 +66,9 @@ public sealed class ReasoningCorrectnessEval : IEval
     ];
 
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

@@ -32,9 +32,12 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_selection</c>
 /// </para>
 /// </summary>
-public sealed class ToolSelectionEval : IEval
+public sealed class ToolSelectionEval : IEvalDefinitionWrapper
 {
     private readonly AtomicLlmEval _inner;
+
+    /// <inheritdoc/>
+    public IEval DefinitionInner => _inner;
 
     /// <inheritdoc/>
     public string Key => _inner.Key;

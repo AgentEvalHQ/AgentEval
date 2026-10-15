@@ -5,6 +5,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Output;
+using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace AgentEval.MissionControl.Rest;
 
@@ -33,10 +34,10 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
-            if (!FileSystemLayout.IsSafePathSegment(runId)) return Results.BadRequest("Invalid runId.");
-            if (!store.IsAvailable) return Results.NotFound();
+            if (!FileSystemLayout.IsSafePathSegment(runId)) return HttpResults.BadRequest("Invalid runId.");
+            if (!store.IsAvailable) return HttpResults.NotFound();
             var trace = await store.GetTraceAsync(runId, ct);
-            if (trace is null) return Results.NotFound();
+            if (trace is null) return HttpResults.NotFound();
 
             // Serialize on the fly; trace files are typically <1 MB JSON. For
             // large traces (>5 MB compressed), Phase 2's blob-store-backed
@@ -48,7 +49,7 @@ internal static class BinaryEndpoints
             // from treating any reflected XSS-shaped JSON as an HTML render
             // path. Defence-in-depth — the JSON content type already protects.
             var json = JsonSerializer.Serialize(trace, s_traceJson);
-            var result = Results.File(
+            var result = HttpResults.File(
                 System.Text.Encoding.UTF8.GetBytes(json),
                 contentType: "application/json",
                 fileDownloadName: $"agent-trace.{runId}.json");
@@ -62,27 +63,27 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
-            if (!FileSystemLayout.IsSafePathSegment(runId)) return Results.BadRequest("Invalid runId.");
+            if (!FileSystemLayout.IsSafePathSegment(runId)) return HttpResults.BadRequest("Invalid runId.");
             // `format` is also a path segment (`report.{format}`) — a `..`-laced
             // value would escape the reports dir even though IsAllowedReportFormat
             // already rejects it. Defence-in-depth.
-            if (!FileSystemLayout.IsSafePathSegment(format)) return Results.BadRequest("Invalid format.");
+            if (!FileSystemLayout.IsSafePathSegment(format)) return HttpResults.BadRequest("Invalid format.");
             if (!IsAllowedReportFormat(format))
-                return Results.BadRequest($"Unsupported report format '{format}'. Allowed: {string.Join(", ", AllowedReportFormats)}.");
+                return HttpResults.BadRequest($"Unsupported report format '{format}'. Allowed: {string.Join(", ", AllowedReportFormats)}.");
 
             // Mode A: locate via filesystem path. We need the subject (kind + name)
             // to build the path; resolve via the run manifest first.
             if (string.IsNullOrEmpty(store.WorkspaceRoot))
-                return Results.NotFound();
+                return HttpResults.NotFound();
 
             var manifest = await store.GetRunManifestAsync(runId, ct);
-            if (manifest is null) return Results.NotFound();
+            if (manifest is null) return HttpResults.NotFound();
 
             var layout = new FileSystemLayout(store.WorkspaceRoot);
             var subject = manifest.Subject.ToIdentity();
             var path = layout.ReportFile(subject, runId, format);
 
-            if (!File.Exists(path)) return Results.NotFound();
+            if (!File.Exists(path)) return HttpResults.NotFound();
 
             var contentType = ContentTypeFor(format);
             // Force download for browser-rendered formats (html / xml / sarif) so a
@@ -90,7 +91,7 @@ internal static class BinaryEndpoints
             // script against the GraphQL + REST surface. Markdown is safe to inline.
             var inline = format is "markdown" or "md";
             var fileDownloadName = inline ? null : $"report.{format}";
-            var result = Results.File(File.OpenRead(path), contentType, fileDownloadName: fileDownloadName);
+            var result = HttpResults.File(File.OpenRead(path), contentType, fileDownloadName: fileDownloadName);
             return result;
         });
 
@@ -102,10 +103,10 @@ internal static class BinaryEndpoints
             IOutputStoreReader store,
             CancellationToken ct) =>
         {
-            if (!FileSystemLayout.IsSafePathSegment(regulation)) return Results.BadRequest("Invalid regulation.");
-            if (!FileSystemLayout.IsSafePathSegment(subjectName)) return Results.BadRequest("Invalid subjectName.");
-            if (!FileSystemLayout.IsSafePathSegment(ts)) return Results.BadRequest("Invalid timestamp.");
-            if (string.IsNullOrEmpty(store.WorkspaceRoot)) return Results.NotFound();
+            if (!FileSystemLayout.IsSafePathSegment(regulation)) return HttpResults.BadRequest("Invalid regulation.");
+            if (!FileSystemLayout.IsSafePathSegment(subjectName)) return HttpResults.BadRequest("Invalid subjectName.");
+            if (!FileSystemLayout.IsSafePathSegment(ts)) return HttpResults.BadRequest("Invalid timestamp.");
+            if (string.IsNullOrEmpty(store.WorkspaceRoot)) return HttpResults.NotFound();
 
             // Compliance evidence on disk is keyed by subject NAME only — the kind
             // doesn't appear in the path. Try both kinds; whichever resolves wins.
@@ -114,10 +115,10 @@ internal static class BinaryEndpoints
             {
                 var pdfPath = layout.ComplianceReportPdf(regulation, new SubjectIdentity(kind, subjectName), ts);
                 if (File.Exists(pdfPath))
-                    return Results.File(File.OpenRead(pdfPath), "application/pdf");
+                    return HttpResults.File(File.OpenRead(pdfPath), "application/pdf");
             }
             await Task.CompletedTask;  // placate analyser; nothing to await on the not-found path
-            return Results.NotFound();
+            return HttpResults.NotFound();
         });
 
         // ─── MC1.3.5 — compliance evidence JSON schema ───────────────────────
@@ -128,7 +129,7 @@ internal static class BinaryEndpoints
         // so MC stays decoupled from the compliance projects.
         app.MapGet("/api/v1/compliance/{regulation}/schema", (string regulation, CancellationToken ct) =>
         {
-            if (!FileSystemLayout.IsSafePathSegment(regulation)) return Results.BadRequest("Invalid regulation.");
+            if (!FileSystemLayout.IsSafePathSegment(regulation)) return HttpResults.BadRequest("Invalid regulation.");
 
             var resourceName = regulation.ToLowerInvariant() switch
             {
@@ -138,14 +139,14 @@ internal static class BinaryEndpoints
             };
 
             if (resourceName is null)
-                return Results.NotFound($"Unknown regulation: {regulation}. Known regulations: gdpr, eu-ai-act.");
+                return HttpResults.NotFound($"Unknown regulation: {regulation}. Known regulations: gdpr, eu-ai-act.");
 
             var asm = typeof(BinaryEndpoints).Assembly;
             using var stream = asm.GetManifestResourceStream(resourceName);
-            if (stream is null) return Results.NotFound($"Schema resource missing for regulation '{regulation}'.");
+            if (stream is null) return HttpResults.NotFound($"Schema resource missing for regulation '{regulation}'.");
             using var reader = new StreamReader(stream);
             var schema = reader.ReadToEnd();
-            return Results.Content(schema, "application/schema+json");
+            return HttpResults.Content(schema, "application/schema+json");
         });
 
         // ─── MC1.3.6 — subject history JSONL stream ──────────────────────────

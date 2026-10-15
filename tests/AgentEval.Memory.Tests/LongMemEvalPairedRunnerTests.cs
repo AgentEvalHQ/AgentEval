@@ -83,6 +83,12 @@ public sealed class LongMemEvalPairedRunnerTests
         var roundTripped = JsonSerializer.Deserialize<LongMemEvalPairedResult>(
             JsonSerializer.Serialize(paired));
         Assert.NotNull(roundTripped);
+        Assert.Equal(paired.Plan!.PairId, roundTripped.Plan!.PairId);
+        Assert.Equal(paired.Plan.Source.SelectedInputsDigest, roundTripped.Plan.Source.SelectedInputsDigest);
+        Assert.Equal(paired.Plan.Source.QuestionIds, roundTripped.Plan.Source.QuestionIds);
+        var configuration = roundTripped.Plan.Source.Configuration;
+        configuration["MaxQuestions"] = 999;
+        Assert.NotEqual(999, (int?)roundTripped.Plan.Source.Configuration["MaxQuestions"]);
         Assert.Equal(paired.SelectedQuestionIds, roundTripped.SelectedQuestionIds);
         Assert.Equal(100, roundTripped.OracleGapPercentagePoints);
 
@@ -152,6 +158,98 @@ public sealed class LongMemEvalPairedRunnerTests
         Assert.Equal(1, normal.CallCount);
         Assert.Empty(oracle.Calls);
         Assert.Single(judge.Calls);
+    }
+
+    [Fact]
+    public async Task RunPairedWithProgressAsync_CapturesOneSelectionBeforeCallsAndDistinctOracleAfterNormal()
+    {
+        using var dataset = Dataset.Create();
+        var events = new List<string>();
+        var normal = new RecordingAgent(() => { events.Add("normal-call"); return new AgentResponse { Text = "normal answer" }; });
+        var oracle = new RecordingChatClient("same-model", () => { events.Add("oracle-call"); return "oracle answer"; });
+        var judge = new RecordingChatClient("judge-model", () => "no", () => "yes");
+        var runner = LongMemEvalBenchmarkRunner.Create(judge, dataset.Path);
+        LongMemEvalPairedPlan? captured = null;
+        var arms = new Dictionary<LongMemEvalArm, ExternalBenchmarkPlan>();
+        var result = await runner.RunPairedWithProgressAsync(normal, Config("normal", "same-model"), oracle,
+            Config("oracle", "same-model"), Options(dataset.Path), new()
+            {
+                OnPrepared = plan =>
+                {
+                    captured = plan;
+                    events.Add("prepared");
+                    Assert.Equal(0, normal.CallCount);
+                    Assert.Empty(oracle.Calls);
+                    Assert.Empty(judge.Calls);
+                    Assert.DoesNotContain("gold answer", JsonSerializer.Serialize(plan));
+                    Assert.DoesNotContain("oracle evidence", JsonSerializer.Serialize(plan));
+                    // Both arms must use the already selected entries, never re-open the source.
+                    File.WriteAllText(dataset.Path, "[]");
+                    plan.Source.Configuration["MaxQuestions"] = 999;
+                },
+                OnArmPrepared = (arm, plan) => { arms.Add(arm, plan); events.Add(arm + "-prepared"); },
+                OnQuestionCompleted = (arm, question) => { Assert.Equal("q-paired", question.QuestionId); events.Add(arm + "-question"); },
+                OnArmCompleted = (arm, _) => events.Add(arm + "-complete"),
+            });
+        Assert.Same(captured, result.Plan);
+        Assert.Same(captured!.Source, arms[LongMemEvalArm.Normal]);
+        Assert.Equal(new[] { "q-paired" }, result.SelectedQuestionIds);
+        Assert.Equal(arms[LongMemEvalArm.Normal].QuestionIds, arms[LongMemEvalArm.Oracle].QuestionIds);
+        Assert.NotEqual(arms[LongMemEvalArm.Normal].SelectedInputsDigest, arms[LongMemEvalArm.Oracle].SelectedInputsDigest);
+        Assert.Equal("same-model", captured.NormalAnswerModel.ModelId);
+        Assert.Equal("judge-model", captured.JudgeModelId);
+        Assert.Equal(new[] { "prepared", "Normal-prepared", "normal-call", "Normal-question", "Normal-complete",
+            "Oracle-prepared", "oracle-call", "Oracle-question", "Oracle-complete" }, events);
+    }
+
+    [Theory]
+    [InlineData("prepared", 0, 0)]
+    [InlineData("normal-question", 1, 0)]
+    [InlineData("normal-complete", 1, 0)]
+    [InlineData("oracle-prepared", 1, 0)]
+    [InlineData("oracle-question", 1, 1)]
+    public async Task RunPairedWithProgressAsync_ObserverStopsExecution_PreservesOnlyObservedArmProgress(string stop, int normalCalls, int oracleCalls)
+    {
+        using var dataset = Dataset.Create();
+        var normal = new RecordingAgent(() => new AgentResponse { Text = "normal answer" });
+        var oracle = new RecordingChatClient("same-model", () => "oracle answer");
+        var judge = new RecordingChatClient("judge-model", () => "yes", () => "yes");
+        var runner = LongMemEvalBenchmarkRunner.Create(judge, dataset.Path);
+        var questions = new List<LongMemEvalArm>();
+        void Stop(string stage) { if (stage == stop) throw new InvalidOperationException("observer stopped"); }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunPairedWithProgressAsync(normal,
+            Config("normal", "same-model"), oracle, Config("oracle", "same-model"), Options(dataset.Path), new()
+            {
+                OnPrepared = _ => Stop("prepared"),
+                OnArmPrepared = (arm, _) => Stop(arm.ToString().ToLowerInvariant() + "-prepared"),
+                OnQuestionCompleted = (arm, _) => { questions.Add(arm); Stop(arm.ToString().ToLowerInvariant() + "-question"); },
+                OnArmCompleted = (arm, _) => Stop(arm.ToString().ToLowerInvariant() + "-complete"),
+            }));
+        Assert.Equal(normalCalls, normal.CallCount);
+        Assert.Equal(oracleCalls, oracle.Calls.Count);
+        Assert.Equal(normalCalls + oracleCalls, questions.Count);
+    }
+
+    [Fact]
+    public async Task RunPairedWithProgressAsync_CancelAfterNormal_PreventsOraclePreparation()
+    {
+        using var dataset = Dataset.Create();
+        using var cancel = new CancellationTokenSource();
+        var normal = new RecordingAgent(() => new AgentResponse { Text = "normal answer" });
+        var oracle = new RecordingChatClient("same-model", () => "must not run");
+        var judge = new RecordingChatClient("judge-model", () => "yes");
+        var prepared = new List<LongMemEvalArm>();
+        ExternalBenchmarkResult? completedNormal = null;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => LongMemEvalBenchmarkRunner.Create(judge, dataset.Path)
+            .RunPairedWithProgressAsync(normal, Config("normal", "same-model"), oracle, Config("oracle", "same-model"),
+                Options(dataset.Path), new()
+                {
+                    OnArmPrepared = (arm, _) => prepared.Add(arm),
+                    OnArmCompleted = (_, result) => { completedNormal = result; cancel.Cancel(); },
+                }, cancel.Token));
+        Assert.Equal(new[] { LongMemEvalArm.Normal }, prepared);
+        Assert.NotNull(completedNormal);
+        Assert.Empty(oracle.Calls);
     }
 
     private static AgentBenchmarkConfig Config(string name, string modelId) => new()

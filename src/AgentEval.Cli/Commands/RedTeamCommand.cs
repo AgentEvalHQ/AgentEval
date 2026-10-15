@@ -652,8 +652,10 @@ internal static class RedTeamCommand
         // Single ScanOptions construction site (extracted as a seam) so no property — notably AttackerClient — can be
         // silently dropped on a code path such as --verbose (the bug a duplicate construction site once caused).
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
+        AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var scanOptions = BuildScanOptions(opts, attacks, intensity, judgeClient, attackerClient,
-            includeEvidence: selectedTarget?.IncludeEvidence ?? true, onProbeCompleted: partialScan.Add);
+            includeEvidence: selectedTarget?.IncludeEvidence ?? true, onProbeCompleted: partialScan.Add,
+            onPlanPrepared: opts.NoAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ProbeSuiteDefinition.Create(opts, plan, resolvedName));
 
         // 6. Run scan
         if (!opts.Quiet)
@@ -825,7 +827,7 @@ internal static class RedTeamCommand
             };
             var aefFailed = !opts.NoAef && WriteAef(opts, result, resolvedName, selectedTarget is not null,
                 sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live,
-                gate, judgeClient);
+                gate, judgeClient, definition: suiteDefinition);
             if (aefFailed)
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
             if (comparisonError is not null)
@@ -839,7 +841,7 @@ internal static class RedTeamCommand
             if (!opts.NoAef)
                 WriteAef(opts, result ?? partialScan.Snapshot(), resolvedName, selectedTarget is not null,
                     sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live,
-                    gate: null, judgeClient, abortReason: "cancelled");
+                    gate: null, judgeClient, abortReason: "cancelled", definition: suiteDefinition);
             throw;
         }
     }
@@ -849,7 +851,7 @@ internal static class RedTeamCommand
     /// else nothing with a hint. Returns true only when an explicit <c>--aef</c> could not be written (exit 3).
     /// </summary>
     private static bool WriteAef(RedTeamOptions opts, RedTeamResult result, string resolvedName, bool builtInTarget, AefTargetMode targetMode,
-        AefCommandGate? gate, JudgeCallLedger? judge, string? abortReason = null)
+        AefCommandGate? gate, JudgeCallLedger? judge, string? abortReason = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
     {
         var root = EvalAef.Root(opts.Aef);
         if (root is null)
@@ -872,6 +874,7 @@ internal static class RedTeamCommand
                 settings["judgeMode"] = ParseJudgeMode(opts.JudgeMode).ToString().ToLowerInvariant();
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
+                Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "redteam" },
                 Config = new AefRunConfig { Settings = settings },
                 Seal = AefCliOptions.Seal,
@@ -892,7 +895,8 @@ internal static class RedTeamCommand
                 Stimulus = opts.AttackerEndpoint is not null ? AefStimulus.Generated
                     : opts.ImportProbes is not null || opts.Pack is not null ? AefStimulus.External : AefStimulus.Suite,
                 SuiteRef = AefEvalWriter.Ref("redteam", $"{opts.Attacks ?? "default"}/{opts.Intensity}"),
-                ProbesNotRun = result.SkippedProbes,
+                ProbesNotRun = definition is null ? result.SkippedProbes : Math.Max(result.SkippedProbes,
+                    definition.CaseIds.Count - lines.Select(line => line.CaseId).Distinct(StringComparer.Ordinal).Count()),
             }, result.StartedAt, DateTimeOffset.UtcNow);
             if (!opts.Quiet)
             {
@@ -1025,7 +1029,7 @@ internal static class RedTeamCommand
         IChatClient? judgeClient,
         IChatClient? attackerClient,
         bool includeEvidence = true,
-        Action<IAttackType, ProbeResult, bool>? onProbeCompleted = null)
+        Action<IAttackType, ProbeResult, bool>? onProbeCompleted = null, Action<ScanPlan>? onPlanPrepared = null)
     {
         Action<ScanProgress>? onProgress = opts.Verbose && !opts.Quiet
             ? progress => Console.Error.WriteLine(
@@ -1056,6 +1060,7 @@ internal static class RedTeamCommand
             IncludeEvidence = includeEvidence,
             OnProgress = onProgress,
             OnProbeCompleted = onProbeCompleted,
+            OnPlanPrepared = onPlanPrepared,
             BeginProbeScope = RedTeamAef.BeginProbeScope,
             // L21: throttle / timeout escape hatches. TimeoutPerTurn falls back to TimeoutPerProbe when --max-turn-timeout
             // is 0 (set it equal here — same as ScanOptions' own get-fallback).

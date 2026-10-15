@@ -73,8 +73,12 @@ jobs:
         #   signature-vectors/keys/ holds test keys derived from public strings and published so
         #   anyone can check the vectors (its README: never trust them). Data, not code; the tools
         #   that write it stay scanned.
+        # - The three named OTLP JSON fixtures contain synthetic trace IDs; schema-sha256.json
+        #   contains public schema content hashes. These reviewed DS173237 findings are data
+        #   identities, not credentials. JSON cannot carry inline suppression comments.
+        #   Keep these exclusions file-specific; their generators and test code stay scanned.
         # Real source code under src/ and tests/ remains scanned.
-        ignore-globs: "**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json,**/Fixtures/consumer-probe/**,**/contracts/aef/1/conformance/**,**/contracts/aef/1/interop/examples/**"
+        ignore-globs: "**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json,**/Fixtures/consumer-probe/**,**/contracts/aef/1/conformance/**,**/contracts/aef/1/interop/examples/**,**/AgentEval.Results.Tests/Observations/Fixtures/wire-scalars.json,**/AgentEval.Results.Tests/Observations/Fixtures/merge-and-unknown.json,**/AgentEval.Results.Tests/Observations/Fixtures/complete.json,**/scripts/otlp-fixtures/schema-sha256.json"
         # Rule exclusions — informational rules that produce only false
         # positives in this codebase. Real-security rules (DS126858 weak
         # hash, DS148264 weak random, DS425040 untrusted deserialize) stay
@@ -100,18 +104,21 @@ jobs:
     - name: Check for vulnerable NuGet packages
       run: |
         echo "Checking for vulnerable packages..."
-        dotnet list package --vulnerable --include-transitive > vulnerability-report.txt 2>&1 || true
+        dotnet list package --vulnerable --include-transitive > vulnerability-report.txt 2>&1
         
-        if grep -q "The given project has no vulnerable packages" vulnerability-report.txt; then
-          echo "✅ No vulnerable packages found"
-        elif grep -q "has the following vulnerable packages" vulnerability-report.txt; then
+        # A solution report can contain both clean and vulnerable projects.
+        # Reject vulnerable projects before considering any clean-project result.
+        if grep -q "has the following vulnerable packages" vulnerability-report.txt; then
           echo "❌ Vulnerable packages detected:"
           cat vulnerability-report.txt
           echo "::error::Vulnerable dependencies found. Please update affected packages."
           exit 1
+        elif grep -q '^The given project .* has no vulnerable packages' vulnerability-report.txt; then
+          echo "✅ No vulnerable packages found"
         else
-          echo "ℹ️ Unable to determine vulnerability status"
+          echo "::error::Unable to determine vulnerability status"
           cat vulnerability-report.txt
+          exit 1
         fi
 
     - name: Check for hardcoded secrets

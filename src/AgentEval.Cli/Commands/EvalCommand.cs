@@ -368,7 +368,8 @@ internal static class EvalCommand
         }
 
         // 4. Load dataset
-        var testCases = await DatasetLoaderFactory.LoadAsync(opts.Dataset.FullName, ct);
+        var datasetSnapshot = await File.ReadAllBytesAsync(opts.Dataset.FullName, ct);
+        var testCases = await DatasetLoaderFactory.LoadSnapshotAsync(datasetSnapshot, opts.Dataset.Extension, ct: ct);
         if (testCases.Count == 0)
             throw new InvalidOperationException($"Dataset is empty: {opts.Dataset.FullName}");
 
@@ -427,7 +428,7 @@ internal static class EvalCommand
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName,
-                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, judgeLedger, ct);
+                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, judgeLedger, datasetSnapshot, ct);
         }
 
         // 6c. Standard single-run evaluation path
@@ -435,7 +436,7 @@ internal static class EvalCommand
         var completed = new List<TestResult>();
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases,
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases, datasetSnapshot,
                 opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
@@ -616,7 +617,7 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, string? subjectProvider = null)
+    internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -642,6 +643,22 @@ internal static class EvalCommand
                 perCase[ids[i]] = new System.Text.Json.Nodes.JsonObject { ["op"] = ">=", ["value"] = scores[i] };
             settings["caseThresholds"] = perCase;
         }
+        var datasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/');
+        var definitionSettings = new System.Text.Json.Nodes.JsonObject
+        {
+            ["pipeline"] = "eval", ["runs"] = opts.Runs,
+            ["judgeModel"] = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
+            ["judgeProvider"] = opts.JudgeEndpoint is null ? null : "openai-compatible",
+            ["metrics"] = opts.Runs == 1 ? settings["metrics"]?.DeepClone() : null,
+            ["requirePasses"] = opts.Runs > 1 ? AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs) : 1,
+        };
+        if (opts.Runs == 1 && (opts.Metrics?.Split(',').Any(m => m.Trim().StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) ?? false))
+        {
+            definitionSettings["metricJudgeModel"] = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName;
+            definitionSettings["metricJudgeProvider"] = opts.JudgeEndpoint is null ? subjectProvider : "openai-compatible";
+        }
+        var definition = DatasetSuiteDefinition.Create(AefEvalWriter.Ref("dataset", datasetName), "eval-definition-1",
+            datasetSnapshot, EvalAef.CaseIds(cases), definitionSettings);
         return new AefEvalRunOptions
         {
             Cli = AefCliOptions.Provenance ?? new() { Verb = "eval" },
@@ -664,8 +681,9 @@ internal static class EvalCommand
             JudgeUsage = judge is { ReportedUsage: true }
                 ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
                 : null,
-            DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
-            DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
+            DatasetName = datasetName,
+            DatasetBytes = datasetSnapshot,
+            Definition = definition,
         };
     }
     private static AefUsage? AefJudgeUsage(EvalOptions opts, string resolvedName, JudgeCallLedger? judge) =>
@@ -789,6 +807,7 @@ internal static class EvalCommand
         string resolvedName,
         AefTargetMode targetMode,
         JudgeCallLedger? judgeLedger,
+        byte[] datasetSnapshot,
         CancellationToken ct)
     {
         var usageHarness = new CliUsageEvaluationHarness(harness);
@@ -802,7 +821,7 @@ internal static class EvalCommand
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
         var caseIds = EvalAef.CaseIds(datasetTestCases);
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases),
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases, datasetSnapshot),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
             opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 

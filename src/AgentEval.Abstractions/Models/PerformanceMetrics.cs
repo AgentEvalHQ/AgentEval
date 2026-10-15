@@ -240,6 +240,9 @@ public static class ModelPricing
     
     /// <summary>Get all known model names.</summary>
     public static IEnumerable<string> KnownModels => _pricing.Keys;
+
+    /// <summary>Captures the current rates and lookup order for a reproducible evaluation.</summary>
+    public static ModelPricingSnapshot CaptureSnapshot() => new(_pricing.ToArray());
     
     /// <summary>
     /// Estimate token count from text length.

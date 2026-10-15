@@ -19,6 +19,7 @@ using AgentEval.Results.Adapters.StoreV1;
 using AgentEval.Results.Checkpoints;
 using AgentEval.Results.Integrity;
 using AgentEval.Results.Signatures;
+using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Commands;
@@ -27,7 +28,9 @@ namespace AgentEval.Cli.Commands;
 /// <c>agenteval aef</c>: AgentEval Evidence Format 1.0 runs (contracts/aef/1).
 /// <list type="bullet">
 /// <item><c>verify</c>: a run's outcome (§4.5) and every problem;</item>
+/// <item><c>compare-suites</c>: strict full-definition identity, with exit 13 when incomparable;</item>
 /// <item><c>seal</c>: seal a closed run (§4.1), optionally signed;</item>
+/// <item><c>companion create|verify</c>: bind explicit artifact digests to sealed evidence and report separate signature trust;</item>
 /// <item><c>view</c>: a run's effective view with its overlays (§4.3);</item>
 /// <item><c>checkpoint</c>: a checkpoint's problems ([CKP-7], [CKP-8]) and each lane's result (§5.3);</item>
 /// <item><c>export</c>: a run of AgentEval's older output store (store v1, §7.5) as an AEF run;</item>
@@ -41,7 +44,7 @@ namespace AgentEval.Cli.Commands;
 /// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error (for <c>export-otel</c> and
 /// <c>export-inspect</c>, a run it refuses to export too: an invalid one, or one the page's rules refuse).
 /// </summary>
-internal static class AefCommand
+internal static partial class AefCommand
 {
     private static readonly JsonSerializerOptions s_json = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -49,12 +52,15 @@ internal static class AefCommand
     {
         var cmd = new Command("aef", "Work with AEF 1.0 runs (the AgentEval Evidence Format): verify, seal, view, check a checkpoint, export AgentEval's older store, import an ASSERT run, OpenTelemetry events or an Inspect log, export a run as OpenTelemetry events or an Inspect log.");
         cmd.Add(CreateVerify());
+        cmd.Add(CreateCompareSuites());
         cmd.Add(CreateSeal());
+        cmd.Add(CreateCompanion());
         cmd.Add(CreateView());
         cmd.Add(CreateCheckpoint());
         cmd.Add(CreateExport());
         cmd.Add(CreateImport());
         cmd.Add(CreateExportOtel());
+        cmd.Add(CreateExportEvalPort());
         cmd.Add(CreateExportInspect());
         return cmd;
     }
@@ -62,6 +68,47 @@ internal static class AefCommand
     private static Option<bool> JsonOption() => new("--json") { Description = "Print one JSON value on stdout instead of a report." };
 
     private static Option<string?> PolicyOption() => new("--policy") { Description = "A trust policy (JSON: trusted identities and their public keys, SIG-3): says who signed the run, and which identities may redact." };
+
+    private static Command CreateCompareSuites()
+    {
+        var baseline = new Argument<string>("baseline-dir") { Description = "Baseline sealed AEF run folder." };
+        var candidate = new Argument<string>("candidate-dir") { Description = "Candidate sealed AEF run folder." };
+        var baselineHash = new Option<string?>("--baseline-hash") { Description = "Require this exact lowercase baseline seal hash." };
+        var candidateHash = new Option<string?>("--candidate-hash") { Description = "Require this exact lowercase candidate seal hash." };
+        var json = JsonOption();
+        var cmd = new Command("compare-suites", $"Check full frozen suite-definition identity; does not compare scores. Exit 0 when compatible, {ExitCodes.Incomparable} when identity is insufficient or differs, 2 for invalid evidence.");
+        cmd.Add(baseline);
+        cmd.Add(candidate);
+        foreach (var option in new Option[] { baselineHash, candidateHash, json }) cmd.Add(option);
+        cmd.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunCompareSuites(
+            p.GetValue(baseline)!, p.GetValue(candidate)!, p.GetValue(baselineHash), p.GetValue(candidateHash),
+            p.GetValue(json), Console.Out, Console.Error)));
+        return cmd;
+    }
+
+    internal static int RunCompareSuites(string baselineDirectory, string candidateDirectory, string? baselineHash,
+        string? candidateHash, bool asJson, TextWriter stdout, TextWriter stderr)
+    {
+        try
+        {
+            ISuiteIdentityReader reader = new SuiteIdentityReader();
+            ISuiteCompatibilityEvaluator evaluator = new SuiteCompatibilityEvaluator();
+            var report = evaluator.Compare(reader.Read(baselineDirectory, baselineHash), reader.Read(candidateDirectory, candidateHash));
+            if (asJson) stdout.WriteLine(report.ToJson().ToJsonString(s_json));
+            else
+            {
+                stdout.WriteLine($"{(report.Compatible ? "Compatible" : "Incomparable")} ({report.Reason}): {report.Description}");
+                stdout.WriteLine($"Baseline: {report.Baseline.RunHash} ({report.Baseline.Scope}, {report.Baseline.RunStatus})");
+                stdout.WriteLine($"Candidate: {report.Candidate.RunHash} ({report.Candidate.Scope}, {report.Candidate.RunStatus})");
+            }
+            return report.Compatible ? ExitCodes.Success : ExitCodes.Incomparable;
+        }
+        catch (Exception e) when (IsInputError(e))
+        {
+            stderr.WriteLine($"✖ {e.Message}");
+            return ExitCodes.UsageError;
+        }
+    }
 
     // ---- verify --------------------------------------------------------------------------------------------------
 
@@ -552,6 +599,7 @@ internal static class AefCommand
         cmd.Add(assertAi);
         cmd.Add(CreateImportOtel());
         cmd.Add(CreateImportInspect());
+        cmd.Add(CreateImportEvalPort());
         return cmd;
     }
 

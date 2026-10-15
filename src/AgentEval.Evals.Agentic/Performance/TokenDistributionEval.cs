@@ -17,7 +17,7 @@ namespace AgentEval.Evals.Agentic.Performance;
 /// <c>1 - 1/N</c> (0.67 at N=3), so only a genuinely dominant turn fails. <b>Severity</b> on fail: <c>low</c>.</para>
 /// <para>Skipped when no trace or fewer than <b>3</b> turns carry token usage (skew is undefined below 3).</para>
 /// </summary>
-public sealed class TokenDistributionEval : IEval
+public sealed class TokenDistributionEval : IEvalConfigurationSource
 {
     private const string KeyValue = "token_distribution";
     private const string NameValue = "Token Distribution Skew";
@@ -36,6 +36,9 @@ public sealed class TokenDistributionEval : IEval
 
     /// <inheritdoc/>
     public string Version => VersionValue;
+
+    /// <inheritdoc/>
+    public global::System.Text.Json.Nodes.JsonObject CaptureConfiguration() => new();
 
     /// <inheritdoc/>
     public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)

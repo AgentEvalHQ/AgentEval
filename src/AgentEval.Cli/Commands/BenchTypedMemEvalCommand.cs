@@ -190,6 +190,7 @@ public static class BenchTypedMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult? result = null;
+        AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string? storeRunId = null;
@@ -205,7 +206,9 @@ public static class BenchTypedMemEvalCommand
             return BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", verticalName, subject!, subjectVersion,
                 chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
-                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint);
+                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition,
+                summaryExt: AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.Create(result?.QuestionResults ?? completed,
+                    verticalName, complete: reason is null && result?.TypedOutcomes is not null));
         }
         try
         {
@@ -214,7 +217,9 @@ public static class BenchTypedMemEvalCommand
                 {
                     completed.Add(question);
                     onQuestionCompleted?.Invoke(question);
-                }, ct);
+                }, onPrepared: noAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ExternalMemorySuiteDefinition.Create(
+                    "typedmemeval", descriptor.Vertical.ToString().ToLowerInvariant(), plan, chatClientOverride is null ? deployment : null,
+                    chatClientOverride is null ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override"), ct: ct);
             ct.ThrowIfCancellationRequested();
         }
         catch (ArgumentException ex) when (ex.ParamName == "agent")
