@@ -116,8 +116,8 @@ public static class MemoryBenchmarkDemo
         Console.Write($"{result.OverallScore:F1}%");
         Console.ResetColor();
         Console.WriteLine($"  Grade: {result.Grade}  {new string('★', result.Stars)}{new string('☆', 5 - result.Stars)}  {(result.Passed ? "✅ PASSED" : "❌ FAILED")}");
-        if (!result.Passed)
-            SampleOutcome.Fail($"memory benchmark failed: overall {result.OverallScore:F1}%, grade {result.Grade}");
+        // The same rule as G7/G9: skipped or errored categories are not measured, a score below the pass mark fails.
+        MemoryBenchmarkSampleSupport.RecordVerdict(AIConfig.ModelDeployment, result);
         Console.WriteLine();
 
         // Category breakdown

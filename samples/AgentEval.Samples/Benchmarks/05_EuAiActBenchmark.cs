@@ -115,7 +115,7 @@ public static class EuAiActBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("EU AI Act benchmark", result.Score);
+        SampleOutcome.RecordVerdict("EU AI Act benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

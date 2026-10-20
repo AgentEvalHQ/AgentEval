@@ -3,7 +3,6 @@
 extern alias azureidentity;   // disambiguate DefaultAzureCredential (also in Azure.Core via the Foundry beta)
 
 using System.ComponentModel;
-using System.Text.Json;
 using Azure.AI.Projects;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -133,12 +132,9 @@ public static class FoundryHierarchyBenchmarkSample
         };
         var input = testCase.ToEvalInput(run) with
         {
-            ToolDefinitions = tools.OfType<AIFunction>().Select(ToDefinition).ToList(),
+            ToolDefinitions = tools.OfType<AIFunction>().Select(BenchmarkSampleHelpers.ToToolDefinition).ToList(),
         };
-        var calls = input.ToolCalls is { } recorded
-            ? recorded.Count == 0 ? "none" : string.Join(", ", recorded.Select(c => c.Name))
-            : "not recorded";
-        Console.WriteLine($"   Tool calls the agent made: {calls}  (offered: {WeatherTool}, {ActivitiesTool}; fixed fixture data)");
+        Console.WriteLine($"   Tool calls the agent made: {BenchmarkSampleHelpers.DescribeToolCalls(input)}  (offered: {WeatherTool}, {ActivitiesTool}; fixed fixture data)");
 
         EvalResult result = await benchmark.EvaluateAsync(input);
 
@@ -219,12 +215,6 @@ public static class FoundryHierarchyBenchmarkSample
 
     private static IEnumerable<EvalResult> AtomicLeaves(EvalResult node) =>
         node.Details.SubResults is { Count: > 0 } children ? children.SelectMany(AtomicLeaves) : [node];
-
-    /// <summary>A tool as the agent was offered it: name, description and parameter schema.</summary>
-    private static ToolDefinition ToDefinition(AIFunction function) => new(
-        function.Name,
-        function.Description,
-        JsonSerializer.Deserialize<Dictionary<string, object>>(function.JsonSchema.GetRawText()));
 
     [Description("Gets the daily weather forecast for a city.")]
     private static string GetWeatherForecast(

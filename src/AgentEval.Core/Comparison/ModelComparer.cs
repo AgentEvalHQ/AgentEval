@@ -42,6 +42,14 @@ public class ModelComparer : IModelComparer
         
         options ??= ModelComparisonOptions.Default;
         options.Validate();
+
+        // Weights that rest only on cost, with cost analysis off, can rank nothing: refuse before any (paid) run, not after.
+        var weights = options.EffectiveScoringWeights;
+        if (!options.EnableCostAnalysis && weights.Quality + weights.Speed + weights.Reliability <= 0)
+            throw new ArgumentException(
+                "The scoring weights fall only on cost and cost analysis is off (EnableCostAnalysis = false), so no " +
+                "dimension the comparison measures carries weight. Turn cost analysis on or weigh another dimension.",
+                nameof(options));
         
         var stochasticOptions = new StochasticOptions(
             Runs: options.RunsPerModel,
@@ -75,8 +83,18 @@ public class ModelComparer : IModelComparer
                 TotalCost: totalCost));
         }
         
-        // Calculate rankings
-        var rankings = CalculateRankings(modelResults, options.EffectiveScoringWeights);
+        // Calculate rankings. When the runs leave nothing weighted to rank on (weights only on speed/cost and a model
+        // without them), the exception still carries what the runs measured: they may have been paid for.
+        List<ModelRanking> rankings;
+        try
+        {
+            rankings = CalculateRankings(modelResults, weights);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ex.Data["ModelResults"] = modelResults.AsReadOnly();
+            throw;
+        }
         
         return new ModelComparisonResult(
             TestCase: testCase,
@@ -173,7 +191,8 @@ public class ModelComparer : IModelComparer
                 throw new InvalidOperationException(
                     $"No measured dimension carries weight: the scoring weights fall only on {unmeasured}, not measured " +
                     "for every model (a model has no price or cost analysis is off; or none of a model's runs returned, " +
-                    "so it has no latency). Give a measured dimension a weight, or measure every model on it.");
+                    "so it has no latency). Give a measured dimension a weight, or measure every model on it. The " +
+                    "models' measured results are in this exception's Data[\"ModelResults\"].");
             }
             rescale = (measuredWeight + unmeasuredWeight) / measuredWeight;
         }

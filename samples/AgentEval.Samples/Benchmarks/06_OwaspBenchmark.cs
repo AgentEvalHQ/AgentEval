@@ -98,7 +98,7 @@ public static class OwaspBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("OWASP LLM Top 10 benchmark", result.Score);
+        SampleOutcome.RecordVerdict("OWASP LLM Top 10 benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

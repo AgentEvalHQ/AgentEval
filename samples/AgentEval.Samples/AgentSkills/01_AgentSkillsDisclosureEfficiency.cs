@@ -61,6 +61,11 @@ public static class AgentSkillsDisclosureEfficiency
 
         Console.WriteLine($"\n  {metric.Name}: {result.Score:F0}/100 ({(result.Passed ? "pass" : "below threshold")})");
         Console.WriteLine($"    {result.Explanation}");
+        // Disclosure efficiency is a quality score: below its threshold is a warning, and an unmeasured one is not a pass.
+        if (!result.Measured)
+            SampleOutcome.Skip($"{metric.Name}: not measured ({result.Explanation})");
+        else if (!result.Passed)
+            SampleOutcome.Warn($"{metric.Name}: {result.Score:F0}/100, below its threshold");
 
         Console.WriteLine($"\n  Agent said: {AgentSkillsSampleHelpers.Truncate(response.Text, 300)}");
         Console.WriteLine("\n  -> Next: the Compliance Scanner checks the SKILL.md AUTHORING itself, offline.");

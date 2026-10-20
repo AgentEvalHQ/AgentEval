@@ -305,7 +305,8 @@ public class MisinformationMetricTests
         Assert.Contains("TOOL RESULTS THE AI RECEIVED", prompt);
         Assert.Contains("SearchFlights", prompt);
         Assert.Contains("AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h)", prompt);
-        Assert.Contains("supported by that result", prompt);
+        Assert.Contains("is not a fabrication by the AI", prompt);
+        Assert.Contains("<tool_results>", prompt);
     }
 
     [Fact]

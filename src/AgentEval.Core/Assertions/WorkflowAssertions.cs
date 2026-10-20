@@ -744,7 +744,7 @@ public class WorkflowAssertionBuilder
                 failures: failureMessages,
                 expected: "(see failures list)",
                 actual: "(see failures list)",
-                context: _result.ToString(),
+                context: DescribeResult(_result),
                 suggestions: GetSuggestions(),
                 because: becauseClause);
         }
@@ -800,6 +800,36 @@ public class WorkflowAssertionBuilder
         }
 
         return suggestions.Count > 0 ? suggestions.Distinct().ToList() : null;
+    }
+
+    private const int MaxContextExecutors = 12;
+    private const int MaxContextErrors = 3;
+    private const int MaxContextIdLength = 60;
+    private const int MaxContextErrorLength = 120;
+
+    /// <summary>
+    /// A short account of the run for the failure context: the executors in step order, the step count, the total
+    /// duration and the errors. Bounded however long the run was, and never the record's own <c>ToString()</c>,
+    /// which prints <c>Steps = System.Collections.Generic.List`1[...]</c> instead of the steps.
+    /// </summary>
+    private static string DescribeResult(WorkflowExecutionResult result)
+    {
+        var executors = result.Steps.Count == 0
+            ? "(none)"
+            : string.Join(" → ", result.Steps.Take(MaxContextExecutors).Select(s => Truncate(s.ExecutorId, MaxContextIdLength)))
+              + (result.Steps.Count > MaxContextExecutors ? $" → ... (+{result.Steps.Count - MaxContextExecutors} more)" : "");
+
+        var errorCount = result.Errors?.Count ?? 0;
+        var errors = errorCount == 0
+            ? "none"
+            : $"{errorCount}: " + string.Join("; ", result.Errors!.Take(MaxContextErrors)
+                  .Select(e => $"{Truncate(e.ExecutorId, MaxContextIdLength)}: " +
+                               Truncate(e.Message.ReplaceLineEndings(" "), MaxContextErrorLength)))
+              + (errorCount > MaxContextErrors ? $"; ... (+{errorCount - MaxContextErrors} more)" : "");
+
+        return $"Executors: {executors}\n" +
+               $"Steps: {result.Steps.Count}, total duration: {result.TotalDuration.TotalSeconds:F1}s\n" +
+               $"Errors: {errors}";
     }
 
     private static string Truncate(string text, int maxLength)

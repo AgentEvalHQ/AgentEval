@@ -88,6 +88,20 @@ public static class EmbeddingProviderEnvironment
         _ => null,
     };
 
+    // The endpoint a provider's default embedding model is known to be served at. Behind BITDEER_ENDPOINT or
+    // OPENAI_BASE_URL pointed elsewhere (a proxy, a gateway, another host) the catalogue is unknown, and a default there
+    // would be a guessed instrument: the model must be named.
+    private static string? DefaultEndpointOf(InferenceProvider provider) => provider switch
+    {
+        InferenceProvider.Bitdeer => InferenceProviderEnvironment.BitdeerDefaultEndpoint,
+        InferenceProvider.OpenAI => InferenceProviderEnvironment.OpenAIDefaultEndpoint,
+        _ => null,
+    };
+
+    private static bool IsDefaultEndpoint(InferenceProvider provider, Uri? endpoint) =>
+        DefaultEndpointOf(provider) is { } known && endpoint is not null
+        && string.Equals(endpoint.AbsoluteUri.TrimEnd('/'), known.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Every variable this resolver reads, beyond the chat provider's own.</summary>
     public static readonly IReadOnlyList<string> AllEmbeddingVariables =
     [
@@ -111,12 +125,14 @@ public static class EmbeddingProviderEnvironment
 
         var variable = ModelVariableOf(chat.Provider)!;
         var named = getEnvironmentVariable(variable) is { } v && !string.IsNullOrWhiteSpace(v) ? v.Trim() : null;
-        var model = named ?? DefaultModelOf(chat.Provider);
+        var model = named ?? (IsDefaultEndpoint(chat.Provider, chat.Endpoint) ? DefaultModelOf(chat.Provider) : null);
         if (model is null)
         {
-            return NotConfigured(chat, variable,
-                $"Embeddings follow the chat provider ({chat.ProviderTag}), which has no default embedding model: " +
-                $"set {variable} to {WhatToName(chat.Provider)}.");
+            return NotConfigured(chat, variable, DefaultModelOf(chat.Provider) is { } usual
+                ? $"Embeddings follow the chat provider ({chat.ProviderTag}), whose endpoint is not its default one, so " +
+                  $"its usual embedding model ({usual}) may not be served there: set {variable} to a model the endpoint serves."
+                : $"Embeddings follow the chat provider ({chat.ProviderTag}), which has no default embedding model: " +
+                  $"set {variable} to {WhatToName(chat.Provider)}.");
         }
 
         return new(chat.Provider, chat.ProviderTag, chat.DisplayName, chat.Endpoint, chat.ApiKey, model, variable,

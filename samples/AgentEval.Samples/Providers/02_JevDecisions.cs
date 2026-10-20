@@ -40,7 +40,8 @@ namespace AgentEval.Samples.Providers;
 /// </summary>
 public static class JevDecisionsDemo
 {
-    private sealed record Case(string Id, string Query, string Context, string Response, string Expectation);
+    // ExpectPass is the label the case carries by construction: the eval must pass the grounded answer and fail the others.
+    private sealed record Case(string Id, string Query, string Context, string Response, string Expectation, bool ExpectPass);
 
     private const string Ledger = "Ledger extract — invoice 4471: issued 12 April 2026, paid 3 May 2026 by bank transfer, no fees.";
 
@@ -48,17 +49,17 @@ public static class JevDecisionsDemo
     [
         new("grounded", "When and how was invoice 4471 paid?", Ledger,
             "Invoice 4471 was paid on 3 May 2026 by bank transfer, with no fees.",
-            "every claim is in the ledger → expect HIGH P(yes)"),
+            "every claim is in the ledger → expect HIGH P(yes)", ExpectPass: true),
         new("fabricated", "When and how was invoice 4471 paid?", Ledger,
             "Invoice 4471 was paid on 12 June 2026 by credit card; a 2% late fee was added.",
-            "date, method and fee all contradict the ledger → expect LOW P(yes)"),
+            "date, method and fee all contradict the ledger → expect LOW P(yes)", ExpectPass: false),
         // First draft of this line expected a MIDDLING P(yes). Jev returned 0.02 on 2026-09-20, and
         // Jev is right: the question asks whether EVERY claim is supported, and "PayPal" contradicts
         // the ledger. A partially-right answer needs a differently-shaped question, not a softer
         // threshold on this one. Kept as a case because that is the lesson.
         new("partial", "When and how was invoice 4471 paid?", Ledger,
             "Invoice 4471 was paid in May 2026. The payment went through PayPal.",
-            "month right, method WRONG → a strict 'every claim' question should say NO; expect LOW P(yes)"),
+            "month right, method WRONG → a strict 'every claim' question should say NO; expect LOW P(yes)", ExpectPass: false),
     ];
 
     /// <summary>
@@ -248,6 +249,20 @@ public static class JevDecisionsDemo
         var cost = r.Provenance.EstimatedCost;
         Console.WriteLine($"   ▶ {c.Id,-10} P(yes) = {p:F3}  →  {r.Score.Label.ToUpperInvariant(),-4} (threshold {r.Score.Threshold:F2})   {ms:N0} ms");
         Console.WriteLine($"     expected     : {c.Expectation}");
+        // The label was printed and never checked: a judge that passed the fabricated answer still exited 0.
+        switch (r.Score.ReportStatus())
+        {
+            case "ERROR":
+                SampleOutcome.Error($"{c.Id}: the decision call errored ({r.Score.Label})");
+                break;
+            case "SKIPPED":
+                SampleOutcome.Skip($"{c.Id}: no decision was made ({r.Score.Label})");
+                break;
+            default:
+                if (r.Score.Passed != c.ExpectPass)
+                    SampleOutcome.Fail($"{c.Id}: expected the eval to {(c.ExpectPass ? "pass" : "fail")} it, it {(r.Score.Passed ? "passed" : "failed")} it (P(yes) = {p:F3})");
+                break;
+        }
         Console.WriteLine($"     provenance   : [{r.Provenance.Type}] model={r.Provenance.JudgeModel}  tokens={r.Provenance.TokensUsed}  cost=${cost:F7}  confidence={(r.Score.Confidence is null ? "null (noul carries none)" : r.Score.Confidence.Value.ToString("F3"))}");
         Console.WriteLine();
     }

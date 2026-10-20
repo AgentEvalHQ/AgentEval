@@ -128,7 +128,8 @@ public static class ModelComparison
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   ❌ Comparison failed: {ex.Message}");
             Console.ResetColor();
-            SampleOutcome.Skip($"the comparison did not complete: {ex.GetType().Name}: {ex.Message}");
+            // A comparison that threw is an error (a provider call or the comparer failed), not a dimension left unmeasured.
+            SampleOutcome.Error($"the comparison threw: {ex.GetType().Name}: {ex.Message}");
             return;
         }
 
@@ -198,9 +199,18 @@ public static class ModelComparison
         var weights = comparisonOptions.EffectiveScoringWeights;
         var speedMeasured = result.SpeedNotMeasuredReason is null;
         var costMeasured = result.CostNotMeasuredReason is null;
-        // The weights the composite actually used: a dimension not measured is left out and the rest rescaled to sum to 1.
+        // The weights the composite actually used: a dimension not measured is left out and the rest scaled up to the full weight.
         var rescale = weights.TotalWeight / (weights.Quality + weights.Reliability +
                                              (speedMeasured ? weights.Speed : 0) + (costMeasured ? weights.Cost : 0));
+        // ModelComparer names the first-listed model Winner on an exact tie (documented): say it is a tie, as D4 and G7 do.
+        var tied = result.Ranking.Where(r => Math.Abs(r.CompositeScore - result.Winner.CompositeScore) < 1e-9).ToList();
+        if (tied.Count > 1)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   🤝 Tie: {string.Join(" = ", tied.Select(r => r.ModelName))} (composite {result.Winner.CompositeScore:F1}); " +
+                              "no model is ahead, the first listed is shown below.");
+            Console.ResetColor();
+        }
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"   🏆 Recommended Model: {result.Winner.ModelName}");
         Console.ResetColor();

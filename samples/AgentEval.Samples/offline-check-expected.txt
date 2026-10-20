@@ -122,3 +122,13 @@ HealthcareSafetyPackSample                     11  needs a chat provider for the
 AssertInterop                                   0  offline: scripted model, hand-written ASSERT run
 AssertEvidence                                  0  offline: hand-written ASSERT fixture
 AssertMultiturnBenchmark                        0  offline: hand-written multi-turn fixture
+
+# --mock runs (a row id ending in +mock): the sample again, with --mock, so its code past the provider check runs in CI
+# too. Canned replies measure no model: these rows check the samples' wiring, never a result.
+HelloWorld+mock                                0  labelled mock walkthrough
+AgentWithOneTool+mock                          0  labelled mock walkthrough
+AgentWithMultipleTools+mock                    0  labelled mock walkthrough
+PerformanceMetrics+mock                        0  labelled mock walkthrough
+LightPathMAFIntegration+mock                   0  labelled mock walkthrough
+Extensibility+mock                             0  its mock step: a metric must fail the canned wrong answer
+AutoAudit+mock                                 0  three scripted endpoints, labelled

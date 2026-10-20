@@ -44,28 +44,18 @@ public static class GatekeeperMonetaryAndPerCallBudget
             .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment}\n");
 
-        await SafeScene(() => PerToolCallBudgetScene(chatClient));
-        await SafeScene(() => MonetaryLimitScene(chatClient));
-        await SafeScene(() => CombinedAttackScene(chatClient));
+        await SafeScene("per tool call budget", () => PerToolCallBudgetScene(chatClient));
+        await SafeScene("monetary limit", () => MonetaryLimitScene(chatClient));
+        await SafeScene("combined attack", () => CombinedAttackScene(chatClient));
 
         Console.WriteLine("\n=== Monetary + Per-Call Budget Complete ===");
     }
 
     // A real provider may reject adversarial content (HTTP 400 content_filter) or hit a transient error; catch it
     // so one scene can't abort the walkthrough. (That's a provider-side defense, not one of these gates.)
-    private static async Task SafeScene(Func<Task> scene)
-    {
-        try
-        {
-            await scene();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it is an Azure content_filter, that is a provider-side defense; otherwise an unexpected error.)");
-            Console.ResetColor();
-        }
-    }
+    // Each scene's failure is recorded and the next scene still runs: an invariant that does not hold is FAIL, a
+    // provider content filter NOT MEASURED, any other exception an ERROR (GatekeeperLiveMode.RunSceneAsync).
+    private static Task SafeScene(string scene, Func<Task> run) => GatekeeperLiveMode.RunSceneAsync(scene, run);
 
     private static AIFunction RefundTool(List<(string OrderId, decimal Amount)> processed) => AIFunctionFactory.Create(
         (string orderId, decimal amount) =>

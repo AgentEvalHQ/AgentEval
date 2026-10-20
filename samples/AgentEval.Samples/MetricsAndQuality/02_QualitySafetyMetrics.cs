@@ -304,6 +304,17 @@ public static class QualitySafetyMetrics
 
     private static void PrintMetricResult(MetricResult result, string testName, bool expectFail = false)
     {
+        // A judge reply the metric could not parse is a Fail at score 0 in Core: on a planted bad case that read as the
+        // metric catching it. It measured nothing either way.
+        if (MetricMeasurement.CouldNotMeasure(result))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\n      ⚪ {testName}: NOT MEASURED — {Truncate(result.Explanation ?? "no result", 70)}");
+            Console.ResetColor();
+            SampleOutcome.Skip($"{testName}: the metric did not measure it ({result.Explanation ?? "no result"})");
+            return;
+        }
+
         var passed = expectFail ? !result.Passed : result.Passed;
         Console.ForegroundColor = passed ? ConsoleColor.Green : ConsoleColor.Red;
         var icon = result.Passed ? "✅" : "❌";

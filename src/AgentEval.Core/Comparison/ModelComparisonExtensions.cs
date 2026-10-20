@@ -44,7 +44,7 @@ public static class ModelComparisonExtensions
         {
             sb.AppendLine("## 🏆 Winner");
             sb.AppendLine();
-            sb.AppendLine($"> **{result.Winner.ModelName}** achieved the highest composite score of **{result.Winner.CompositeScore:F1}**");
+            sb.AppendLine($"> **{result.Winner.ModelName}** achieved the highest composite score of **{result.Winner.CompositeScore:F1}**{NotMeasuredCaveat(result)}");
             sb.AppendLine();
         }
 
@@ -147,7 +147,7 @@ public static class ModelComparisonExtensions
             sb.AppendLine($"### Test {i + 1}: {result.TestCase.Name}");
             sb.AppendLine();
             sb.AppendLine($"**Input:** `{result.TestCase.Input}`");
-            sb.AppendLine($"**Winner:** {GetMedalEmoji(1)} {result.Winner.ModelName} ({result.Winner.CompositeScore:F1})");
+            sb.AppendLine($"**Winner:** {GetMedalEmoji(1)} {result.Winner.ModelName} ({result.Winner.CompositeScore:F1}){NotMeasuredCaveat(result)}");
             sb.AppendLine();
             sb.AppendLine(result.ToRankingsTable(options));
             sb.AppendLine();
@@ -304,7 +304,7 @@ public static class ModelComparisonExtensions
         sb.AppendLine("### 🤖 Model Comparison Results");
         sb.AppendLine();
         sb.AppendLine($"**Test:** {result.TestCase.Name}");
-        sb.AppendLine($"**Winner:** 🏆 {result.Winner.ModelName} (Score: {result.Winner.CompositeScore:F1})");
+        sb.AppendLine($"**Winner:** 🏆 {result.Winner.ModelName} (Score: {result.Winner.CompositeScore:F1}){NotMeasuredCaveat(result)}");
         sb.AppendLine();
         sb.AppendLine("<details>");
         sb.AppendLine("<summary>View full rankings</summary>");
@@ -338,6 +338,16 @@ public static class ModelComparisonExtensions
             .OrderByDescending(x => x.Wins)
             .ToList();
 
+        // A dimension not measured in a comparison is left out of its composite; say so above the fold, not only in the
+        // collapsed per-test rankings.
+        var partial = results.Count(r => MeasuredDimensions(r) != "quality, speed, cost and reliability");
+        if (partial > 0)
+        {
+            sb.AppendLine($"⚠️ In {partial} of {results.Count} comparison(s) speed or cost was not measured for every model; " +
+                          "those composites weigh only the dimensions that were.");
+            sb.AppendLine();
+        }
+
         sb.AppendLine("**Win Distribution:**");
         foreach (var (model, wins) in winCounts)
         {
@@ -352,7 +362,7 @@ public static class ModelComparisonExtensions
 
         foreach (var result in results)
         {
-            sb.AppendLine($"- **{result.TestCase.Name}**: 🏆 {result.Winner.ModelName} ({result.Winner.CompositeScore:F1})");
+            sb.AppendLine($"- **{result.TestCase.Name}**: 🏆 {result.Winner.ModelName} ({result.Winner.CompositeScore:F1}){NotMeasuredCaveat(result)}");
         }
 
         sb.AppendLine();
@@ -416,6 +426,12 @@ public static class ModelComparisonExtensions
         IReadOnlyList<ModelComparisonResult> results,
         MarkdownExportOptions options)
     {
+        // A composite weighs only the dimensions its comparison measured, so composites from comparisons that measured
+        // different dimensions are not one quantity: their average is n/a and the table is ordered by average rank,
+        // which every comparison measures alike (the rule AvgSpeed and AvgCost follow below).
+        var dimensionSets = results.Select(MeasuredDimensions).Distinct().ToList();
+        var compositesComparable = dimensionSets.Count == 1;
+
         // Calculate average scores across all tests
         var modelScores = results
             .SelectMany(r => r.Ranking)
@@ -423,7 +439,7 @@ public static class ModelComparisonExtensions
             .Select(g => new
             {
                 ModelName = g.Key,
-                AvgComposite = g.Average(r => r.CompositeScore),
+                AvgComposite = compositesComparable ? g.Average(r => r.CompositeScore) : (double?)null,
                 AvgQuality = g.Average(r => r.QualityScore),
                 // An average over only the comparisons that measured a dimension would not be the same average as the
                 // others beside it: n/a unless every comparison measured it.
@@ -432,8 +448,10 @@ public static class ModelComparisonExtensions
                 AvgReliability = g.Average(r => r.ReliabilityScore),
                 AvgRank = g.Average(r => r.Rank)
             })
-            .OrderByDescending(m => m.AvgComposite)
             .ToList();
+        modelScores = compositesComparable
+            ? modelScores.OrderByDescending(m => m.AvgComposite).ToList()
+            : modelScores.OrderBy(m => m.AvgRank).ToList();
 
         var sb = new StringBuilder();
         sb.AppendLine("| Rank | Model | Avg Composite | Avg Quality | Avg Speed | Avg Cost | Avg Reliability | Avg Rank |");
@@ -444,11 +462,11 @@ public static class ModelComparisonExtensions
         {
             var medal = GetMedalEmoji(rank);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "| {0} {1} | {2} | **{3:F1}** | {4:F1} | {5} | {6} | {7:F1} | {8:F2} |",
+                "| {0} {1} | {2} | **{3}** | {4:F1} | {5} | {6} | {7:F1} | {8:F2} |",
                 medal,
                 rank,
                 model.ModelName,
-                model.AvgComposite,
+                FormatScore(model.AvgComposite),
                 model.AvgQuality,
                 FormatScore(model.AvgSpeed),
                 FormatScore(model.AvgCost),
@@ -457,10 +475,46 @@ public static class ModelComparisonExtensions
             rank++;
         }
 
+        if (!compositesComparable)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Avg Composite n/a: the comparisons measured different dimensions (" +
+                          string.Join("; ", dimensionSets) + "), so their composites are not one quantity. " +
+                          "Ordered by average rank.");
+        }
+
         return sb.ToString();
     }
 
     // Not measured prints as n/a: never as 0 (the worst) or 100 (the cheapest, the fastest).
+    // The dimensions a comparison's composite weighed: quality and reliability always, speed and cost when every model
+    // was ranked on them.
+    private static string MeasuredDimensions(ModelComparisonResult result)
+    {
+        var speed = result.Ranking.All(r => r.SpeedScore.HasValue);
+        var cost = result.Ranking.All(r => r.CostScore.HasValue);
+        return (speed, cost) switch
+        {
+            (true, true) => "quality, speed, cost and reliability",
+            (true, false) => "quality, speed and reliability",
+            (false, true) => "quality, cost and reliability",
+            _ => "quality and reliability",
+        };
+    }
+
+    // Beside a winner: what its composite did not weigh, so a win is never read as a win on every dimension.
+    private static string NotMeasuredCaveat(ModelComparisonResult result)
+    {
+        var missing = new[]
+        {
+            result.SpeedNotMeasuredReason is null ? null : "speed",
+            result.CostNotMeasuredReason is null ? null : "cost",
+        }.Where(d => d is not null).ToList();
+        return missing.Count == 0
+            ? ""
+            : $" ({string.Join(" and ", missing)} not measured: the composite weighs {MeasuredDimensions(result)})";
+    }
+
     private static string FormatScore(double? score) =>
         score is { } value ? value.ToString("F1", CultureInfo.InvariantCulture) : "n/a";
 

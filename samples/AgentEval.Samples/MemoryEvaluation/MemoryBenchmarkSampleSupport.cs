@@ -90,8 +90,11 @@ internal static class MemoryBenchmarkSampleSupport
                 $"{label}: {result.UnmeasuredQueries} question(s) the judge did not score are left out of their category scores");
         }
 
-        if (result.IsComplete && result.SkippedCategories.Count == 0 && !result.Passed)
-            SampleOutcome.Warn($"{label} scored {result.OverallScore:F1}% on {result.BenchmarkName}, below the 70% pass mark");
+        // Recall is accuracy, so a score below the pass mark is FAIL, as G3–G6 record it (G2 and G9 used to disagree:
+        // one Quick result was FAIL in G2 and WARN in G9). Over the categories that were measured, when some were not.
+        if (!result.Passed && result.CategoryResults.Any(c => !c.Skipped && !c.Errored))
+            SampleOutcome.Fail($"{label} scored {result.OverallScore:F1}% on {result.BenchmarkName}, below the 70% pass mark" +
+                               (result.IsComplete && result.SkippedCategories.Count == 0 ? "" : " (over the categories that were measured)"));
     }
 
     /// <summary>Prints each category, the skipped and crashed ones with their reason, and what the judge left unscored.</summary>

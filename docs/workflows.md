@@ -140,8 +140,8 @@ public record ExecutorStep
     
     // Output and timing
     public required string Output { get; init; }         // Agent's response
-    public required TimeSpan StartOffset { get; init; }  // When step started
-    public required TimeSpan Duration { get; init; }     // Step execution time
+    public required TimeSpan StartOffset { get; init; }  // When MAF started running the step (from workflow start)
+    public required TimeSpan Duration { get; init; }     // How long MAF ran it (see "Step timing" below)
     
     // Tool usage (if agent used tools)
     public IReadOnlyList<ToolCallRecord>? ToolCalls { get; init; }
@@ -174,7 +174,9 @@ Events are processed by `MAFWorkflowEventBridge` into AgentEval's evaluation mod
 
 MAF raises `ExecutorInvokedEvent` once per delivered message, so an agent bound with `BindAsExecutor` is invoked 2-3 times per turn: first the incoming chat messages, which it only accumulates, then the `TurnToken` that runs the turn. The bridge records **one step per agent turn in a sequential chain**, so a 4-agent chain gives 4 steps. The rule is: everything MAF delivers to one executor within one superstep is one step, and an agent's messages stay in one step until its turn runs. A step is split when the same executor is invoked again in a later superstep — after its turn has run, for an agent; on any later invocation, for a function executor — which is a genuine re-entry such as a self-loop.
 
-Known limits (tracked, not yet fixed): when one agent receives two turns in the **same** superstep (a fan-in where both upstream agents finish together), the two turns are recorded as one step. In **parallel fan-out**, executors in one superstep run concurrently and their streamed text is attributed by stream position, so a branch's output can land in a sibling's step — do not rely on per-step outputs of parallel branches.
+**Step timing.** A step's `StartOffset` and `Duration` are when MAF ran that executor: from the `ExecutorInvokedEvent` that opened the step (its first delivery) until its last delivery's `ExecutorCompletedEvent` or `ExecutorFailedEvent`. The bridge reads each event's time as it arrives, which MAF's default in-process mode streams out as raised, and stamps it on the step's `ExecutorOutputEvent` (`StartOffset` / `Duration`); the adapter records that. For an agent, the first delivery is the chat messages it accumulates, which MAF hands over in the same superstep as the `TurnToken` that runs its turn, so the step starts when the turn does. The start agent's input can land one superstep before its `TurnToken`, and its step then also counts that short wait. In a sequential chain the steps do not overlap, and together they cover the run except MAF's set-up and the moments between supersteps, so `ForExecutor(x).HaveCompletedWithin(limit)` checks that agent's own turn. (Before this, the first step was timed from its own end and measured about 0 ms, so a time limit on it could never fail.) A custom event source that does not set these properties keeps the previous behaviour: steps are timed by when its events arrive.
+
+Known limits (tracked, not yet fixed): when one agent receives two turns in the **same** superstep (a fan-in where both upstream agents finish together), the two turns are recorded as one step. In **parallel fan-out**, executors in one superstep run concurrently and their streamed text is attributed by stream position, so a branch's output can land in a sibling's step — do not rely on per-step outputs or timings of parallel branches. A branch whose end the bridge cannot know (a sibling was invoked while it was still running) is sent untimed and falls back to arrival timing, which is near 0 ms.
 
 ### Timeout Handling
 

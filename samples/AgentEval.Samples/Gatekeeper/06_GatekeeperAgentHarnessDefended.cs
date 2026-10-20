@@ -115,12 +115,9 @@ public static class GatekeeperAgentHarnessDefended
             GateVoice.Speak(trace);
             Console.WriteLine($"   Agent said: {Truncate(response.Text)}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it is an Azure content_filter, that is a provider-side defense; otherwise an unexpected error.)");
-            Console.ResetColor();
-            SampleOutcome.Skip($"{label}: the run threw {ex.GetType().Name}, so the scene was not measured");
+            GatekeeperLiveMode.RecordSceneException(label, ex);
         }
     }
 

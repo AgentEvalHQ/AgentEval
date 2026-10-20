@@ -156,7 +156,7 @@ public static class MemoryBenchmarkReporting
         // ──────────────────────────────────────────────────────────
 
         Console.WriteLine($"Step {step + 1}: Export bridge (CI/CD integration)\n");
-        var leaders = Leaders(allBaselines);
+        var leaders = MemoryComparisonLeaders.Overall(allBaselines);
         var bestBaseline = leaders[0];
         Console.WriteLine($"   Best model: {string.Join(" = ", leaders.Select(b => b.Name))} at {bestBaseline.OverallScore:F1}%" +
                           (leaders.Count > 1 ? " (a tie)" : ""));
@@ -199,30 +199,20 @@ public static class MemoryBenchmarkReporting
             Console.Write("|--------------");
         Console.WriteLine("|------------------|");
 
-        var ties = 0;
         foreach (var dim in comparison.Dimensions)
         {
             Console.Write($"   | {dim.DimensionName,-14} ");
-            double? bestScore = null;
-            var bestNames = new List<string>();
-
             foreach (var bl in comparison.Baselines)
             {
                 // Read the baseline's own scores: the comparer fills a dimension a baseline did not measure with 0,
                 // and a dimension that was not measured is not a 0.
-                if (!bl.DimensionScores.TryGetValue(dim.DimensionName, out var score))
-                {
-                    Console.Write($"| {"n/a",11}  ");
-                    continue;
-                }
-                if (bestScore is null || score > bestScore) { bestScore = score; bestNames = [bl.Name]; }
-                else if (score == bestScore) bestNames.Add(bl.Name);
-                Console.Write($"| {score,10:F1}%  ");
+                Console.Write(bl.DimensionScores.TryGetValue(dim.DimensionName, out var score)
+                    ? $"| {score,10:F1}%  "
+                    : $"| {MemoryComparisonLeaders.NotMeasured,11}  ");
             }
 
             // A tie has no winner: the first model listed used to take it.
-            var winner = bestNames.Count switch { 0 => "n/a", 1 => bestNames[0], _ => "tie" };
-            if (bestNames.Count > 1) ties++;
+            var winner = MemoryComparisonLeaders.Winner(MemoryComparisonLeaders.OnDimension(comparison.Baselines, dim.DimensionName));
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write($"| {Fit(winner, 16),-16} ");
             Console.ResetColor();
@@ -234,13 +224,13 @@ public static class MemoryBenchmarkReporting
             Console.Write("|--------------");
         Console.WriteLine("|------------------|");
 
-        var leaders = Leaders(comparison.Baselines);
+        var leaders = MemoryComparisonLeaders.Overall(comparison.Baselines);
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine(leaders.Count == 1
             ? $"\n   Best overall: {leaders[0].Name}"
             : $"\n   Best overall: a tie — {string.Join(", ", leaders.Select(b => b.Name))} at {leaders[0].OverallScore:F1}%");
         Console.ResetColor();
-        if (ties == comparison.Dimensions.Count && leaders.Count > 1)
+        if (MemoryComparisonLeaders.NoneSeparated(comparison))
             Console.WriteLine("   This preset does not separate these models; a larger one (--preset standard or full) may.");
         if (incomplete.Count > 0)
         {
@@ -249,13 +239,6 @@ public static class MemoryBenchmarkReporting
             Console.ResetColor();
         }
         Console.WriteLine();
-    }
-
-    /// <summary>The baselines sharing the top overall score, in run order: one, or a tie.</summary>
-    private static IReadOnlyList<MemoryBaseline> Leaders(IReadOnlyList<MemoryBaseline> baselines)
-    {
-        var top = baselines.Max(b => b.OverallScore);
-        return baselines.Where(b => b.OverallScore == top).ToList();
     }
 
     private static string Fit(string value, int width) =>

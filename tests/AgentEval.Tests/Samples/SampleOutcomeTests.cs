@@ -144,6 +144,30 @@ public sealed class SampleOutcomeTests : IDisposable
         Assert.Equal(expected, SampleOutcome.ExitCode);
     }
 
+    [Theory]
+    [InlineData("skipped", SampleOutcome.NotMeasured)]
+    [InlineData("error", SampleOutcome.NotMeasured)]
+    [InlineData("inapplicable", SampleOutcome.Completed)]
+    [InlineData("pass", SampleOutcome.Completed)]
+    public void RecordVerdict_OnATree_APassingRootOverAnUntestedLeaf_IsNotMeasured(string leafLabel, int expected)
+    {
+        // A weighted root skips a skipped leaf, so a provider that rejected one probe still left the root PASS and the
+        // run exited 0 over a probe it never tested. Not applicable by design is not a gap.
+        static EvalResult Node(string label, bool passed, params EvalResult[] children) => new(
+            new EvalMetadata(label, $"check {label}", "test", "1.0.0"),
+            new EvalScore(passed ? 1 : 0, null, label, passed, null, "none", null),
+            new EvalDetails(null, null, null, children.Length > 0 ? children : null, null),
+            new EvalProvenance("code", null, null, null, null, 0, false),
+            DateTimeOffset.UnixEpoch);
+        var tree = Node("pass", true, Node("pass", true), Node(leafLabel, leafLabel == "pass"));
+
+        SampleOutcome.RecordVerdict("a benchmark", tree);
+
+        Assert.Equal(expected, SampleOutcome.ExitCode);
+        if (expected == SampleOutcome.NotMeasured)
+            Assert.Contains("1 of 2 checks were not measured", SampleOutcome.Records.Single().Reason);
+    }
+
     [Fact]
     public void ACheckFailure_IsStillAnInvalidOperationException_SoOldCatchSitesKeepWorking()
     {

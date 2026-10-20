@@ -173,8 +173,8 @@ keeps each sample's output (by default under the system temp folder). CI runs it
 | 4 | **Memory DI** | Production DI wiring — `AddAgentEvalMemory()`, `CanRememberAsync()` | Yes | 5 min |
 | 5 | **Cross-Session Memory** | Fact persistence across session resets — compare with / without memory | Yes | 8 min |
 | 6 | **AIContextProvider Memory** | MAF-native memory pipeline — `AIContextProvider` + cross-session evaluation | Yes | 8 min |
-| 7 | **Benchmark Reporting** | Multi-model comparison + interactive HTML pentagon report | Yes ×3 | 15 min |
-| 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset | Yes | 15 min |
+| 7 | **Benchmark Reporting** | Multi-model comparison + interactive HTML pentagon report; `--preset quick` (default) / `standard` / `full`; a tie has no winner | Yes ×2–3 (`*_MODEL_2`, optional `*_MODEL_3`; not measured without a second) | ~2 min per model (Quick); Standard ~40 min per model |
+| 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset; `--preset smoke` (default, 10 questions) / `standard` (50) / `audit-grade` (500) | Yes — one model answers and judges; it must read ~115K-token prompts (delivery is measured) | ~2 min (Smoke); ~6 min (Standard) |
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 | 11 | **TypedMemEval Baseline** | A score beside its chance floor, its own condition's ceiling (V8), and what a *retrieving* system faces — no aggregate score | Yes | 10 min |

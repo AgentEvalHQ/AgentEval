@@ -83,6 +83,7 @@ public static class GatekeeperHelloWorld
         else
         {
             Console.WriteLine("   The model declined to publish the poisoned content this run — nothing for the gate to block (re-run to see the block).");
+            GatekeeperLiveMode.RecordLiveAttack("poisoned publish", blocked: 0, executed: 0);
         }
 
         GateVoice.Speak(trace);

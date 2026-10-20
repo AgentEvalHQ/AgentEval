@@ -120,7 +120,9 @@ public static class LongMemEvalBenchmarkDemo
             PreserveSessionBoundaries = true, // applies to structured injection; TextBlob always marks sessions
             IncludeTimestamps = true,        // temporal context preserved
             DatasetMode = "S",               // ~115K tokens per question
-            RandomSeed = 42                  // reproducible
+            RandomSeed = 42,                 // reproducible
+            // The model judges its own answers, and on a reasoning model the budget pays for its thinking too.
+            JudgeMaxOutputTokens = LongMemEvalSampleSupport.JudgeMaxOutputTokens,
         };
 
         Console.WriteLine($"   Model:     {model} ({AIConfig.ProviderName})");
@@ -135,7 +137,8 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine("Step 2: Running LongMemEval benchmark...\n");
         Console.WriteLine($"   Preset:    {preset} — {(options.MaxQuestions?.ToString() ?? "all")} questions (stratified from 500, seed {options.RandomSeed})");
         Console.WriteLine($"   Mode:      {options.DatasetMode} (~115K tokens of history per question)");
-        Console.WriteLine($"   Judge:     4 task-specific prompt templates covering 6 dataset labels\n");
+        Console.WriteLine($"   Judge:     4 task-specific prompt templates covering 6 dataset labels; " +
+                          $"{options.JudgeMaxOutputTokens} output tokens, thinking included\n");
 
         var result = await runner.RunAsync(agent, config, options);
 

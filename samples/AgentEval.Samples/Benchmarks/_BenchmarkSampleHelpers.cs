@@ -320,6 +320,8 @@ internal static class BenchmarkSampleHelpers
                 // built for) must not lose the canonical run. Surface the
                 // failure but keep the run intact.
                 Console.WriteLine($"   Warning: compliance evidence write failed: {ex.GetType().Name}: {ex.Message}");
+                // The evidence is half of what the GDPR / EU AI Act samples show: its loss is an error, not a pass.
+                SampleOutcome.Error($"compliance evidence write failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -824,6 +826,24 @@ internal static class BenchmarkSampleHelpers
         var chat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
         return new ChatClientEvaluator(chat);
     }
+
+    /// <summary>
+    /// A tool as the agent was offered it: name, description and parameter schema. A tool-accuracy eval checks the
+    /// recorded calls against these; <c>TestCase.ToEvalInput</c> does not carry them, so a sample that offered the tools
+    /// passes them in.
+    /// </summary>
+    public static ToolDefinition ToToolDefinition(AIFunction function) => new(
+        function.Name,
+        function.Description,
+        JsonSerializer.Deserialize<Dictionary<string, object>>(function.JsonSchema.GetRawText()));
+
+    /// <summary>
+    /// The tool calls an input carries, for a console line: their names, "none" when the run recorded that the agent
+    /// called nothing, "not recorded" when nothing recorded the calls.
+    /// </summary>
+    public static string DescribeToolCalls(EvalInput input) => input.ToolCalls is { } recorded
+        ? recorded.Count == 0 ? "none" : string.Join(", ", recorded.Select(c => c.Name))
+        : "not recorded";
 
     // ═══════════════════════════════════════════════════════════════════════════
     //  Per-scenario compliance runner (GDPR / EU AI Act samples)

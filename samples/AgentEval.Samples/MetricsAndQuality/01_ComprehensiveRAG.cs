@@ -279,7 +279,7 @@ public static class ComprehensiveRAG
         foreach (var (name, result) in llmResults)
         {
             var status = Status(result);
-            Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
+            Console.WriteLine($"   │  {name,-30} │  {Score(result),5}  │  {status,-13} │");
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
 
@@ -289,7 +289,7 @@ public static class ComprehensiveRAG
         foreach (var (name, result) in embedResults)
         {
             var status = Status(result);
-            Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
+            Console.WriteLine($"   │  {name,-30} │  {Score(result),5}  │  {status,-13} │");
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
 
@@ -494,12 +494,7 @@ public static class ComprehensiveRAG
     /// the judge's reply did not parse, or the embedding call failed. Core reports the last two as a Fail at 0, so the
     /// sample tells them apart by Core's own wording; a judge that could not grade is not an answer that failed.
     /// </summary>
-    private static bool CouldNotMeasure(MetricResult result) =>
-        !result.Measured
-        || (!result.Passed && result.Explanation is { } why
-            && (why.StartsWith("Unable to evaluate", StringComparison.Ordinal)
-                || why.StartsWith("Embedding generation failed", StringComparison.Ordinal)
-                || why.StartsWith("Failed to generate embeddings", StringComparison.Ordinal)));
+    private static bool CouldNotMeasure(MetricResult result) => MetricMeasurement.CouldNotMeasure(result);
 
     #endregion
 
@@ -541,6 +536,9 @@ public static class ComprehensiveRAG
 
     private static string Status(MetricResult result) =>
         CouldNotMeasure(result) ? "⚪ UNMEASURED" : result.Passed ? "✅ PASSED" : "❌ FAILED";
+
+    // An unmeasured result has no score: "n/a", never the 0.0 Core stores beside it.
+    private static string Score(MetricResult result) => CouldNotMeasure(result) ? "n/a" : result.Score.ToString("F1");
 
     /// <summary>
     /// How many metrics passed, never an average alone: an average of 67 reads like a result while three of five failed.

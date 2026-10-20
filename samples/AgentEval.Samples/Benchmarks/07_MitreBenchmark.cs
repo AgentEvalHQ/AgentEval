@@ -93,7 +93,7 @@ public static class MitreBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("MITRE ATLAS benchmark", result.Score);
+        SampleOutcome.RecordVerdict("MITRE ATLAS benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

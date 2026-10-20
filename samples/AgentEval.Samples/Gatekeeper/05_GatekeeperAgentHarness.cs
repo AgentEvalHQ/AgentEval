@@ -87,7 +87,7 @@ public static class GatekeeperAgentHarness
 
         var blocked = GlassBoxEvidence.FromTrace(trace)?.GateBlockCount ?? 0;
         Console.WriteLine($"   `search` calls that ran: {searches}   (over-budget call that stopped the run: {blocked})");
-        Console.WriteLine($"   {(blocked > 0 ? $"✅ RunBudgetGate terminated the harness at the {Budget}-call budget — the runaway loop is capped" : "the harness stayed under budget on its own this run")}");
+        Console.WriteLine($"   {(searches > Budget ? $"❌ {searches - Budget} search call(s) ran past the {Budget}-call budget" : blocked > 0 ? $"✅ RunBudgetGate terminated the harness at the {Budget}-call budget — the runaway loop is capped" : "➖ the harness stayed under budget on its own this run")}");
         if (searches > Budget)
             SampleOutcome.Fail($"RunBudgetGate: {searches} search calls ran past the {Budget}-call budget");
         else if (blocked == 0)

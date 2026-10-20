@@ -44,7 +44,7 @@ public class ExternalBaselineExtensionsTests
         var baseline = result.ToBaseline("run", Config);
 
         Assert.Contains(
-            "3 of 50 selected questions are not in the score (1 agent error(s), 2 judge-inconclusive): accuracy is over the 47 scored.",
+            "3 of 50 selected questions are not in the score (1 agent error(s), 2 not run or without a judge verdict): accuracy is over the 47 scored.",
             baseline.Recommendations);
     }
 

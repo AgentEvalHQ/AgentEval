@@ -65,6 +65,22 @@ public class EmbeddingProviderEnvironmentTests
     }
 
     [Fact]
+    public void OnANonDefaultEndpoint_TheProvidersUsualModelIsNotAssumed()
+    {
+        // A proxy or gateway's catalogue is unknown: taking bge-m3 or text-embedding-3-small there would be a guess.
+        var bitdeerProxy = Resolve([.. BitdeerVars, ("BITDEER_ENDPOINT", "https://proxy.example/v1")]);
+        var openAIGateway = Resolve([.. OpenAIVars, ("AI_INFERENCE_PROVIDER", "openai"), ("OPENAI_BASE_URL", "https://gateway.example/v1")]);
+        var bitdeerDefaultWithSlash = Resolve([.. BitdeerVars, ("BITDEER_ENDPOINT", InferenceProviderEnvironment.BitdeerDefaultEndpoint + "/")]);
+
+        Assert.False(bitdeerProxy.IsConfigured);
+        Assert.Contains("BITDEER_EMBEDDING_MODEL", bitdeerProxy.Diagnostic);
+        Assert.Contains("not its default one", bitdeerProxy.Diagnostic);
+        Assert.False(openAIGateway.IsConfigured);
+        Assert.Contains("OPENAI_EMBEDDING_MODEL", openAIGateway.Diagnostic);
+        Assert.Equal(EmbeddingProviderEnvironment.BitdeerDefaultModel, bitdeerDefaultWithSlash.Model);
+    }
+
+    [Fact]
     public void OpenAI_DefaultsToTextEmbedding3Small_AndFollowsOpenAIBaseUrl()
     {
         var byDefault = Resolve([.. OpenAIVars, ("AI_INFERENCE_PROVIDER", "openai")]);

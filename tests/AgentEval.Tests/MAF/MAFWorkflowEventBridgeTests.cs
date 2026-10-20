@@ -18,7 +18,7 @@ namespace AgentEval.Tests.MAF;
 /// Tests for <see cref="MAFWorkflowEventBridge"/>.
 /// Verifies translation of MAF workflow events to AgentEval events.
 /// </summary>
-public class MAFWorkflowEventBridgeTests
+public partial class MAFWorkflowEventBridgeTests
 {
     [Fact]
     public async Task StreamAsAgentEvalEvents_ThrowsOnNullWorkflow()
@@ -545,6 +545,85 @@ public class MAFWorkflowEventBridgeTests
         Assert.Empty(MAFWorkflowEventBridge.GetChatProtocolExecutorIds(functionChain));
     }
 
+    // ── Step timing ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task FromMAFWorkflow_SlowFunctionChain_TimesEachStepAsTheExecutorRan()
+    {
+        // Regression: the adapter timed steps by event arrival. A step with no incoming edge (the first one) started
+        // its clock at its first ExecutorOutputEvent, which the bridge only yields once the step has finished, and
+        // stopped it at the edge yielded right after: the first step measured ~0 ms, starting at its own end, however
+        // long it ran, so HaveCompletedWithin on it could never fail.
+        var work = TimeSpan.FromMilliseconds(300);
+        var a = CreateSlowFuncBinding("A", "output-A", work);
+        var b = CreateSlowFuncBinding("B", "output-B", work);
+        var c = CreateSlowFuncBinding("C", "output-C", work);
+        var workflow = new MAFWorkflows.WorkflowBuilder(a)
+            .AddEdge(a, b)
+            .AddEdge(b, c)
+            .WithOutputFrom(c)
+            .Build();
+        var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "slow-chain", ["A", "B", "C"]);
+
+        var result = await adapter.ExecuteWorkflowAsync("start");
+
+        Assert.Null(result.Errors);
+        Assert.Equal(["A", "B", "C"], result.Steps.Select(s => s.ExecutorId).ToArray());
+        AssertStepsTimedPlausibly(result, work, work, work);
+    }
+
+    [Fact]
+    public async Task FromMAFWorkflow_SlowFourAgentChain_TimesEachTurn_AndStepTimeLimitsCanFail()
+    {
+        // The C2/C3 workflow samples' shape: four BindAsExecutor agents whose model round-trips take time. Each step
+        // must span its own turn (all its round-trips), and a per-step time limit must be able to fail: before the
+        // fix the first agent's two round-trips measured ~0 ms (live: C3's TripPlanner, 3 ms), so a 50 ms limit passed.
+        var roundTrip = TimeSpan.FromMilliseconds(100);
+        var (workflow, executorIds) = BuildFourAgentChain(roundTrip);
+        var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "TripPlanner", executorIds, "PromptChaining");
+
+        var result = await adapter.ExecuteWorkflowAsync("Plan a three-day trip to Lisbon");
+
+        Assert.Null(result.Errors);
+        Assert.Equal(executorIds, result.Steps.Select(s => s.ExecutorId).ToArray());
+        // One round-trip per tool call plus the final reply: 1+1, 2+1, 1+1 and 0+1.
+        AssertStepsTimedPlausibly(result, 2 * roundTrip, 3 * roundTrip, 2 * roundTrip, roundTrip);
+
+        var tooTight = result.Should().ForExecutor("TripPlanner").HaveCompletedWithin(TimeSpan.FromMilliseconds(50)).And();
+        Assert.False(tooTight.IsValid);
+        Assert.Contains("Executor 'TripPlanner' took", Assert.Single(tooTight.Failures));
+
+        var generous = result.Should().ForExecutor("TripPlanner").HaveCompletedWithin(TimeSpan.FromSeconds(60)).And();
+        Assert.True(generous.IsValid, string.Join("; ", generous.Failures));
+    }
+
+    /// <summary>
+    /// Asserts the steps are timed as MAF ran them: each step lasts at least half its executor's known work (half,
+    /// because the bridge reads events as they arrive and a loaded test host can delay a read), the steps run in
+    /// order without overlapping inside the run, and together they cover most of the run's total — the rest is MAF
+    /// and bridge overhead before the first step and between supersteps.
+    /// </summary>
+    private static void AssertStepsTimedPlausibly(WorkflowExecutionResult result, params TimeSpan[] workPerStep)
+    {
+        Assert.Equal(workPerStep.Length, result.Steps.Count);
+        var previousEnd = TimeSpan.Zero;
+        for (var i = 0; i < workPerStep.Length; i++)
+        {
+            var step = result.Steps[i];
+            Assert.True(step.Duration >= workPerStep[i] / 2,
+                $"Step {i} ({step.ExecutorId}) lasted {step.Duration.TotalMilliseconds:F0} ms; its executor worked {workPerStep[i].TotalMilliseconds:F0} ms.");
+            Assert.True(step.StartOffset >= previousEnd,
+                $"Step {i} ({step.ExecutorId}) starts at {step.StartOffset.TotalMilliseconds:F0} ms, before the previous step ended at {previousEnd.TotalMilliseconds:F0} ms.");
+            previousEnd = step.StartOffset + step.Duration;
+        }
+
+        Assert.True(previousEnd <= result.TotalDuration,
+            $"The last step ends at {previousEnd.TotalMilliseconds:F0} ms, after the run's total of {result.TotalDuration.TotalMilliseconds:F0} ms.");
+        var stepTotal = TimeSpan.FromTicks(result.Steps.Sum(s => s.Duration.Ticks));
+        Assert.True(stepTotal >= result.TotalDuration / 2,
+            $"The steps add up to {stepTotal.TotalMilliseconds:F0} ms of a {result.TotalDuration.TotalMilliseconds:F0} ms run.");
+    }
+
     // ── Exact MAF event orderings (TranslateEventsAsync) ────────────────
     // These feed the translator the event shapes MAF 1.24 raises (one ExecutorInvokedEvent per delivered
     // message, bracketed by SuperStepStarted/Completed), including orderings a live run produces only
@@ -685,12 +764,12 @@ public class MAFWorkflowEventBridgeTests
     /// agents bound with <c>BindAsExecutor(emitEvents: true)</c> and chained with <c>WorkflowBuilder</c>, each on a
     /// deterministic in-memory chat client (no network, no provider) that calls its tools and then replies.
     /// </summary>
-    private static (MAFWorkflows.Workflow Workflow, string[] ExecutorIds) BuildFourAgentChain()
+    private static (MAFWorkflows.Workflow Workflow, string[] ExecutorIds) BuildFourAgentChain(TimeSpan roundTripDelay = default)
     {
-        var tripPlanner = CreateScriptedAgent("TripPlanner", "GetDestinationInfo").BindAsExecutor(emitEvents: true);
-        var flightReservation = CreateScriptedAgent("FlightReservation", "SearchFlights", "BookFlight").BindAsExecutor(emitEvents: true);
-        var hotelReservation = CreateScriptedAgent("HotelReservation", "BookHotel").BindAsExecutor(emitEvents: true);
-        var presenter = CreateScriptedAgent("Presenter").BindAsExecutor(emitEvents: true);
+        var tripPlanner = CreateScriptedAgent("TripPlanner", roundTripDelay, "GetDestinationInfo").BindAsExecutor(emitEvents: true);
+        var flightReservation = CreateScriptedAgent("FlightReservation", roundTripDelay, "SearchFlights", "BookFlight").BindAsExecutor(emitEvents: true);
+        var hotelReservation = CreateScriptedAgent("HotelReservation", roundTripDelay, "BookHotel").BindAsExecutor(emitEvents: true);
+        var presenter = CreateScriptedAgent("Presenter", roundTripDelay).BindAsExecutor(emitEvents: true);
 
         var workflow = new MAFWorkflows.WorkflowBuilder(tripPlanner)
             .AddEdge(tripPlanner, flightReservation)
@@ -702,12 +781,12 @@ public class MAFWorkflowEventBridgeTests
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }
 
-    private static AIAgent CreateScriptedAgent(string name, params string[] toolNames)
+    private static AIAgent CreateScriptedAgent(string name, TimeSpan roundTripDelay, params string[] toolNames)
     {
         var tools = toolNames
             .Select(toolName => (AITool)AIFunctionFactory.Create((int step) => $"{toolName}-result-{step}", toolName))
             .ToList();
-        return new ChatClientAgent(new BridgeScriptedChatClient(name, toolNames), name: name, tools: tools);
+        return new ChatClientAgent(new BridgeScriptedChatClient(name, toolNames, roundTripDelay), name: name, tools: tools);
     }
 
     private static string[] ToolNames(ExecutorStep step) =>
@@ -793,8 +872,10 @@ internal class FakeStreamableAgentSession : AgentSession
 /// its scripted tools (one call per round-trip, in order), and once every tool has a result it answers with
 /// <see cref="FinalReply"/>. The next action is derived from the conversation it is sent — how many of ITS OWN
 /// tool results it already holds — so whatever history MAF forwards from upstream agents does not disturb it.
+/// Each round-trip takes <paramref name="roundTripDelay"/>, standing in for model latency.
 /// </summary>
-internal sealed class BridgeScriptedChatClient(string agentName, IReadOnlyList<string> toolNames) : IChatClient
+internal sealed class BridgeScriptedChatClient(
+    string agentName, IReadOnlyList<string> toolNames, TimeSpan roundTripDelay = default) : IChatClient
 {
     private int _turns;
 
@@ -815,6 +896,8 @@ internal sealed class BridgeScriptedChatClient(string agentName, IReadOnlyList<s
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await Task.Yield();
+        if (roundTripDelay > TimeSpan.Zero)
+            await Task.Delay(roundTripDelay, cancellationToken);
         var callIdPrefix = agentName + "-call-";
         var completedCalls = messages
             .SelectMany(m => m.Contents)

@@ -94,7 +94,7 @@ public static class PerformanceBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("performance benchmark", result.Score);
+        SampleOutcome.RecordVerdict("performance benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

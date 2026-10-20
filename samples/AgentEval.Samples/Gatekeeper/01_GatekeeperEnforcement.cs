@@ -52,31 +52,21 @@ public static class GatekeeperEnforcement
             .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment}");
 
-        await SafeScene(() => ToolGateScenario(chatClient));
-        await SafeScene(() => MoatEvaluatorScenario(chatClient));
-        await SafeScene(() => CanaryHoneypotScenario(chatClient));
-        await SafeScene(() => ShadowJudgeQuarantineScenario(chatClient));
-        await SafeScene(() => DefenseInDepthScenario(chatClient));
-        await SafeScene(() => MoreGatesScenario(chatClient));
+        await SafeScene("tool gate", () => ToolGateScenario(chatClient));
+        await SafeScene("moat evaluator", () => MoatEvaluatorScenario(chatClient));
+        await SafeScene("canary honeypot", () => CanaryHoneypotScenario(chatClient));
+        await SafeScene("shadow judge quarantine", () => ShadowJudgeQuarantineScenario(chatClient));
+        await SafeScene("defense in depth", () => DefenseInDepthScenario(chatClient));
+        await SafeScene("more gates", () => MoreGatesScenario(chatClient));
 
         Console.WriteLine("\n=== Gatekeeper Enforcement Complete ===");
     }
 
     // A real provider may reject adversarial content with its OWN filter (HTTP 400 content_filter). That's a
     // different (provider-side) defense — catch it so one scene can't abort the walkthrough.
-    private static async Task SafeScene(Func<Task> scene)
-    {
-        try
-        {
-            await scene();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it's an Azure content_filter, that's a provider-side defense; otherwise an unexpected error.)");
-            Console.ResetColor();
-        }
-    }
+    // Each scene's failure is recorded and the next scene still runs: an invariant that does not hold is FAIL, a
+    // provider content filter NOT MEASURED, any other exception an ERROR (GatekeeperLiveMode.RunSceneAsync).
+    private static Task SafeScene(string scene, Func<Task> run) => GatekeeperLiveMode.RunSceneAsync(scene, run);
 
     // ── 1. Tool gate: block a destructive tool before it executes ──
     private static async Task ToolGateScenario(IChatClient chatClient)

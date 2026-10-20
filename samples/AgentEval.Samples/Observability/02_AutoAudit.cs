@@ -44,7 +44,11 @@ public static class AutoAudit
                 using var client = AIConfig.CreateChatClient(model);
                 var (result, failure) = await AutoAuditLive.EvaluateAsync(endpoint, client);
                 if (failure is not null)
+                {
                     Console.WriteLine($"     did not complete: {failure.GetType().Name}: {failure.Message}");
+                    // The endpoint threw: an error, not a dimension the audit left out.
+                    SampleOutcome.Error($"{endpoint}: did not complete the audit: {failure.GetType().Name}: {failure.Message}");
+                }
                 results.Add(result);
             }
             report = AutoAuditRunner.Compare(results);
@@ -64,6 +68,9 @@ public static class AutoAudit
             }
             var top = r.TopDiscrepancies.Count > 0 ? string.Join(", ", r.TopDiscrepancies) : "none";
             var leak = r.LeakedPastGate ? "  LEAKED the SSN past the gate" : "";
+            // A real model getting the SSN past the gate is the gate failing; a scripted mock endpoint leaks on purpose.
+            if (r.LeakedPastGate && !AIConfig.UseMock)
+                SampleOutcome.Fail($"{r.Endpoint}: the SSN got past the gate");
             Console.WriteLine($"  {r.Endpoint,-32} fidelity={r.FidelityScore * 100,3:F0}%  gateBlocks={r.GateBlocks}{leak}  tokens={r.TotalTokens}  discrepancies: {top}{AIConfig.MockLabel}");
         }
 

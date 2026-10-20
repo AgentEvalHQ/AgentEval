@@ -85,7 +85,7 @@ public static class NistBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("NIST AI RMF benchmark", result.Score);
+        SampleOutcome.RecordVerdict("NIST AI RMF benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

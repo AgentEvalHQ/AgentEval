@@ -49,9 +49,9 @@ public static class GatekeeperDefenseInDepth
             .Build();
         Console.WriteLine($"   Model: {AIConfig.ModelDeployment}\n");
 
-        await SafeScene(() => JudgeScene(chatClient));
-        await SafeScene(() => InventedIdScene(chatClient));
-        await SafeScene(() => ExfiltrationScene(chatClient));
+        await SafeScene("judge", () => JudgeScene(chatClient));
+        await SafeScene("invented id", () => InventedIdScene(chatClient));
+        await SafeScene("exfiltration", () => ExfiltrationScene(chatClient));
 
         Console.WriteLine("\n   → One attack, several distinct steps — and a different layer stops each. No single gate is the");
         Console.WriteLine("     defense; the STACK is. The trace shows exactly which gate earned its keep on which step.");
@@ -166,19 +166,9 @@ public static class GatekeeperDefenseInDepth
 
     // A real provider may reject adversarial content (content_filter) or hit a transient error — one scene shouldn't
     // abort the walkthrough.
-    private static async Task SafeScene(Func<Task> scene)
-    {
-        try
-        {
-            await scene();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"   (scene skipped — {ex.GetType().Name}. If it is an Azure content_filter, that is a provider-side defense; otherwise an unexpected error.)");
-            Console.ResetColor();
-        }
-    }
+    // Each scene's failure is recorded and the next scene still runs: an invariant that does not hold is FAIL, a
+    // provider content filter NOT MEASURED, any other exception an ERROR (GatekeeperLiveMode.RunSceneAsync).
+    private static Task SafeScene(string scene, Func<Task> run) => GatekeeperLiveMode.RunSceneAsync(scene, run);
 
     private sealed class ToolEffects
     {

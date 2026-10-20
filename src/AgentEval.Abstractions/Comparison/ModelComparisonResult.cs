@@ -73,8 +73,10 @@ public record ModelComparisonResult(
     /// $0: cost score 100, "cheapest" beside a priced model. When any model has no cost, no model is ranked on cost —
     /// ranking some models on more dimensions than others would not compare them — so every
     /// <see cref="ModelRanking.CostScore"/> is <see langword="null"/> and the composite weighs the dimensions that were
-    /// measured, their weights rescaled to sum to 1. The cost each model did record stays on
-    /// <see cref="ModelResult.AverageCost"/>.
+    /// measured, their weights scaled up to the full weight. The cost each model did record stays on
+    /// <see cref="ModelResult.AverageCost"/>. The reason names the cause it can see: cost analysis off, a model none of
+    /// whose runs recorded performance data (its runs failed, or performance is not tracked), or a model with performance
+    /// data and no cost (no price for the model).
     /// </remarks>
     public string? CostNotMeasuredReason
     {
@@ -87,9 +89,16 @@ public record ModelComparisonResult(
             if (!Options.EnableCostAnalysis)
                 return $"cost analysis is off (EnableCostAnalysis = false), so {composite}.";
 
-            var unpriced = ModelResults.Where(m => m.AverageCost is null).Select(m => m.ModelName).ToList();
-            return unpriced.Count > 0
-                ? $"no cost was recorded for {string.Join(", ", unpriced)} (no price for the model), so {composite}."
+            var uncosted = ModelResults.Where(m => m.AverageCost is null).ToList();
+            var noData = uncosted.Where(m => !HasPerformanceData(m)).Select(m => m.ModelName).ToList();
+            var unpriced = uncosted.Where(HasPerformanceData).Select(m => m.ModelName).ToList();
+            var causes = new List<string>();
+            if (unpriced.Count > 0)
+                causes.Add($"no cost was recorded for {string.Join(", ", unpriced)} (no price for the model)");
+            if (noData.Count > 0)
+                causes.Add($"no run of {string.Join(", ", noData)} recorded performance data (its runs failed, or performance is not tracked)");
+            return causes.Count > 0
+                ? $"{string.Join("; ", causes)}, so {composite}."
                 : $"a model has no cost, so {composite}.";
         }
     }
@@ -98,12 +107,12 @@ public record ModelComparisonResult(
     /// Why speed was not measured for this comparison, or <see langword="null"/> when every model is ranked on it.
     /// </summary>
     /// <remarks>
-    /// A run records its latency only when the agent call returns (and performance is tracked), so a model none of
-    /// whose runs completed has no latency. Earlier versions averaged that to zero and ranked the model as the fastest,
-    /// speed score 100: with speed-focused weights a model that never answered could win. Speed follows the cost rule:
-    /// when any model has no latency, every <see cref="ModelRanking.SpeedScore"/> is <see langword="null"/> and the
-    /// composite weighs the dimensions that were measured, their weights rescaled to sum to 1. Such a model is still
-    /// ranked on quality and reliability, which count every run, failed ones included.
+    /// A model has no latency when none of its runs recorded performance data: performance is not tracked, or (with the
+    /// non-streaming harness) none of its runs returned. Earlier versions averaged that to zero and ranked the model as
+    /// the fastest, speed score 100: with speed-focused weights a model that never answered could win. Speed follows the
+    /// cost rule: when any model has no latency, every <see cref="ModelRanking.SpeedScore"/> is <see langword="null"/>
+    /// and the composite weighs the dimensions that were measured, their weights scaled up to the full weight. Such a
+    /// model is still ranked on quality and reliability, which count every run, failed ones included.
     /// </remarks>
     public string? SpeedNotMeasuredReason
     {
@@ -114,7 +123,7 @@ public record ModelComparisonResult(
 
             var untimed = ModelResults.Where(m => m.AverageLatency is null).Select(m => m.ModelName).ToList();
             var who = untimed.Count > 0 ? $"no run of {string.Join(", ", untimed)}" : "no run of a model";
-            return $"{who} recorded a latency (a run records one only when the agent call returns), so no model is " +
+            return $"{who} recorded a latency (its runs failed, or performance is not tracked), so no model is " +
                    $"ranked on speed; {CompositeNote}.";
         }
     }
@@ -130,9 +139,12 @@ public record ModelComparisonResult(
                 measured.Add("speed");
             if (Ranking.All(r => r.CostScore is not null))
                 measured.Add("cost");
-            return $"the composite weighs {string.Join(", ", measured)} and reliability, their weights rescaled to sum to 1";
+            return $"the composite weighs {string.Join(", ", measured)} and reliability, their weights scaled up to the full weight";
         }
     }
+
+    private static bool HasPerformanceData(ModelResult model) =>
+        model.StochasticResult.IndividualResults.Any(r => r.Performance is not null);
 
     // Not measured prints as n/a: never as 100 or 0.
     private static string Format(double? score) => score is { } value ? value.ToString("F1") : "n/a";
@@ -145,8 +157,8 @@ public record ModelComparisonResult(
 /// <param name="ModelName">Human-readable model name.</param>
 /// <param name="StochasticResult">Full stochastic test result.</param>
 /// <param name="AverageLatency">
-/// Average response latency over the runs that recorded one, or <see langword="null"/> when none did: a run records its
-/// latency only when the agent call returns. Not measured is not zero (see
+/// Average response latency over the runs that recorded one, or <see langword="null"/> when none did (performance not
+/// tracked, or, with the non-streaming harness, no run returned). Not measured is not zero (see
 /// <see cref="ModelComparisonResult.SpeedNotMeasuredReason"/>).
 /// </param>
 /// <param name="AverageCost">Average cost per run (if available).</param>

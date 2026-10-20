@@ -53,6 +53,18 @@ internal static class OfflineSampleCheck
     /// <param name="Id">The stable id the table is keyed by.</param>
     public sealed record CatalogueEntry(string Label, string Id);
 
+    /// <summary>
+    /// The suffix of a row that runs its sample with <c>--mock</c> as well: <c>HelloWorld+mock 0</c>. Most samples stop at
+    /// "no provider" offline, so their code past that point never ran in CI; the ones with a labelled mock walkthrough
+    /// (Getting Started, Extensibility, Auto-Audit) run it for free this way. Such a row is extra: the sample still needs
+    /// its plain row.
+    /// </summary>
+    public const string MockSuffix = "+mock";
+
+    // AIConfig.MockVariable, which --mock sets in the child. Spelled out: the test project compiles this file without
+    // AIConfig.
+    private const string MockVariable = "AGENTEVAL_SAMPLES_MOCK";
+
     /// <summary>What one sample run produced.</summary>
     public sealed record RunResult(CatalogueEntry Sample, int? ExitCode, bool TimedOut, TimeSpan Elapsed, string LogFile);
 
@@ -102,16 +114,22 @@ internal static class OfflineSampleCheck
         foreach (var duplicate in duplicates)
             problems.Add($"two catalogue entries share the id {duplicate.Key} ({string.Join(", ", duplicate.Select(c => c.Label))})");
 
-        var rows = table.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rows = table.Where(e => !IsMockRow(e)).Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var sample in catalogue.Where(c => !rows.Contains(c.Id)))
             problems.Add($"{sample.Label} {sample.Id} has no row in {ExpectationsFileName}: add one with the exit code it gives offline");
 
         var ids = catalogue.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in table.Where(e => !ids.Contains(e.Id)))
+        foreach (var row in table.Where(e => !ids.Contains(SampleIdOf(e))))
             problems.Add($"{ExpectationsFileName} has a row for {row.Id}, which is not in the catalogue: remove it or fix the id");
 
         return problems;
     }
+
+    /// <summary>True for a <see cref="MockSuffix"/> row.</summary>
+    public static bool IsMockRow(Expectation row) => row.Id.EndsWith(MockSuffix, StringComparison.OrdinalIgnoreCase);
+
+    // The sample a row runs: its id, without the mock suffix.
+    private static string SampleIdOf(Expectation row) => IsMockRow(row) ? row.Id[..^MockSuffix.Length] : row.Id;
 
     /// <summary>The name of every variable in <paramref name="environment"/> the check strips. Names only, never values.</summary>
     public static IReadOnlyList<string> ProviderVariables(IEnumerable<string> environment) =>
@@ -121,7 +139,9 @@ internal static class OfflineSampleCheck
     public static IReadOnlyList<string> ProviderVariablesInThisProcess() =>
         ProviderVariables(Environment.GetEnvironmentVariables().Keys.Cast<string>())
             .Where(name => !string.Equals(name, ChildMarkerVariable, StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(name, "AGENTEVAL_SAMPLES_NONINTERACTIVE", StringComparison.OrdinalIgnoreCase))
+                        && !string.Equals(name, "AGENTEVAL_SAMPLES_NONINTERACTIVE", StringComparison.OrdinalIgnoreCase)
+                        // set by the child itself from a +mock row's --mock: canned replies, no provider
+                        && !string.Equals(name, MockVariable, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
     /// <summary>
@@ -134,7 +154,8 @@ internal static class OfflineSampleCheck
     /// <param name="hostArguments">Arguments before <c>--sample &lt;id&gt;</c> (the assembly path when the host is <c>dotnet</c>).</param>
     /// <param name="timeout">How long one sample may run before it counts as a hang and is killed.</param>
     /// <param name="logDirectory">Where each sample's output is written; also holds the samples' working directory.</param>
-    /// <param name="only">Sample ids to run; null runs them all.</param>
+    /// <param name="only">Sample ids or menu labels to run; null runs them all. An id or label that names no sample is a
+    /// usage error (exit 2), so a typo never passes as "0/0 exited as expected".</param>
     public static async Task<int> RunAsync(
         IReadOnlyList<CatalogueEntry> catalogue,
         string expectationsFile,
@@ -167,11 +188,30 @@ internal static class OfflineSampleCheck
         var stripped = ProviderVariables(Environment.GetEnvironmentVariables().Keys.Cast<string>());
         Console.WriteLine($"   stripped : {stripped.Count} provider or sample-switch variable(s) from every sample's environment\n");
 
-        var selected = catalogue.Where(c => only is null || only.Contains(c.Id)).ToList();
-        var mismatches = new List<(RunResult Run, string Why)>();
-        foreach (var sample in selected)
+        bool Names(CatalogueEntry c, string wanted) =>
+            string.Equals(c.Id, wanted, StringComparison.OrdinalIgnoreCase) || string.Equals(c.Label, wanted, StringComparison.OrdinalIgnoreCase);
+        var unknown = only?.Where(o => !catalogue.Any(c => Names(c, o))).ToList() ?? [];
+        if (unknown.Count > 0)
         {
-            var run = await RunOneAsync(sample, host, hostArguments, timeout, logDirectory, workingDirectory);
+            Console.WriteLine($"   ✘ --only names no sample: {string.Join(", ", unknown)} (see --list-samples)");
+            return SampleOutcome.UsageError;
+        }
+
+        var selected = catalogue.Where(c => only is null || only.Any(o => Names(c, o))).ToList();
+        if (selected.Count == 0)
+        {
+            Console.WriteLine("   ✘ no sample selected");
+            return SampleOutcome.UsageError;
+        }
+        // Each selected sample plainly, then the ones with a +mock row again with --mock.
+        var runs = selected.Select(c => (Sample: c, Mock: false))
+            .Concat(selected.Where(c => expected.ContainsKey(c.Id + MockSuffix)).Select(c => (Sample: c, Mock: true)))
+            .ToList();
+        var mismatches = new List<(RunResult Run, string Why)>();
+        foreach (var (entry, mock) in runs)
+        {
+            var sample = mock ? entry with { Label = entry.Label + MockSuffix, Id = entry.Id + MockSuffix } : entry;
+            var run = await RunOneAsync(sample, host, hostArguments, timeout, logDirectory, workingDirectory, entry.Id, mock);
             var row = expected.GetValueOrDefault(sample.Id);
             var why = Judge(run, row);
             var mark = why is null ? "✔" : "✘";
@@ -183,7 +223,8 @@ internal static class OfflineSampleCheck
         }
 
         Console.WriteLine();
-        Console.WriteLine($"Offline sample check: {selected.Count - mismatches.Count}/{selected.Count} sample(s) exited as expected" +
+        Console.WriteLine($"Offline sample check: {runs.Count - mismatches.Count}/{runs.Count} run(s) exited as expected " +
+                          $"({selected.Count} sample(s), {runs.Count - selected.Count} also with --mock)" +
                           (problems.Count > 0 ? $"; {problems.Count} table problem(s)" : "") + ".");
         foreach (var problem in problems)
             Console.WriteLine($"   ✘ {problem}");
@@ -224,7 +265,7 @@ internal static class OfflineSampleCheck
 
     private static async Task<RunResult> RunOneAsync(
         CatalogueEntry sample, string host, IReadOnlyList<string> hostArguments, TimeSpan timeout,
-        string logDirectory, string workingDirectory)
+        string logDirectory, string workingDirectory, string sampleId, bool mock)
     {
         var logFile = Path.Combine(logDirectory, $"{sample.Label}-{sample.Id}.log");
         var start = new ProcessStartInfo
@@ -241,7 +282,9 @@ internal static class OfflineSampleCheck
         foreach (var argument in hostArguments)
             start.ArgumentList.Add(argument);
         start.ArgumentList.Add("--sample");
-        start.ArgumentList.Add(sample.Id);
+        start.ArgumentList.Add(sampleId);
+        if (mock)
+            start.ArgumentList.Add("--mock");
 
         foreach (var name in ProviderVariables(start.Environment.Keys))
             start.Environment.Remove(name);
@@ -279,12 +322,23 @@ internal static class OfflineSampleCheck
             {
                 process.Kill(entireProcessTree: true);
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
             {
-                // It exited between the deadline and the kill.
+                // It exited between the deadline and the kill, or a child could not be killed; the bounded wait below
+                // still returns.
             }
 
-            await process.WaitForExitAsync();
+            // Bounded: a grandchild that escaped the kill and still holds the output pipe must not hang the check
+            // until the job's own time limit.
+            using var drain = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(drain.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine($"   (the killed sample's output pipe did not close within 30 s; its log may be incomplete)");
+            }
         }
 
         // WaitForExitAsync returns once the output pipes close, so the log is complete here.

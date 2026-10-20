@@ -188,4 +188,67 @@ internal static class GatekeeperLiveMode
         Console.ResetColor();
         SampleOutcome.Skip($"{scene}: {why}");
     }
+
+    /// <summary>
+    /// Runs one live scene so a failure in it is recorded and the next scene still runs. A scene's own invariant that
+    /// does not hold (<see cref="SampleCheckFailedException"/>) is FAIL; a provider's content filter refusing the prompt
+    /// (Azure's <c>content_filter</c>) is a provider-side defense, so the gate was not exercised: NOT MEASURED; any other
+    /// exception is an ERROR, never a skip. Cancellation is not caught. The samples' scene wrappers used to print
+    /// "(scene skipped …)" for every exception and record nothing, so a live run exited 0 over a real bug.
+    /// </summary>
+    /// <param name="scene">The scene, as the sample names it.</param>
+    /// <param name="run">The scene.</param>
+    public static async Task RunSceneAsync(string scene, Func<Task> run)
+    {
+        try
+        {
+            await run();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            RecordSceneException(scene, ex);
+        }
+    }
+
+    /// <summary>
+    /// Prints and records an exception a live scene threw, by the rule of <see cref="RunSceneAsync"/>: an invariant that
+    /// did not hold is FAIL, a provider content filter NOT MEASURED, anything else an ERROR.
+    /// </summary>
+    public static void RecordSceneException(string scene, Exception ex)
+    {
+        switch (ex)
+        {
+            case SampleCheckFailedException:
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"   ❌ {scene}: {ex.Message}");
+                Console.ResetColor();
+                SampleOutcome.Fail($"{scene}: {ex.Message}");
+                break;
+            case var _ when IsContentFilter(ex):
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine($"   ➖ {scene}: the provider's content filter refused the prompt — a provider-side defense, so the gate was not exercised.");
+                Console.ResetColor();
+                SampleOutcome.Skip($"{scene}: the provider's content filter refused the prompt, so the gate was not exercised");
+                break;
+            default:
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"   ❌ {scene}: the scene threw {ex.GetType().Name}: {ex.Message}");
+                Console.ResetColor();
+                SampleOutcome.Error($"{scene}: the scene threw {ex.GetType().Name}: {ex.Message}");
+                break;
+        }
+    }
+
+    // Azure OpenAI's content filter answers 400 with code content_filter ("…content management policy…").
+    private static bool IsContentFilter(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e.Message.Contains("content_filter", StringComparison.OrdinalIgnoreCase)
+                || e.Message.Contains("content management policy", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
 }

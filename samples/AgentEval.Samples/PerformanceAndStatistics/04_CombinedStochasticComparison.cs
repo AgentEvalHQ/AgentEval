@@ -135,7 +135,8 @@ public static class CombinedStochasticComparison
             catch (Exception ex)
             {
                 Console.WriteLine($"      ❌ Error: {ex.Message}\n");
-                // Skip this model if it fails completely; the comparison below says what it lacks.
+                // A model whose runs threw is an error, not a skip; the comparison below covers the rest.
+                SampleOutcome.Error($"{factory.ModelName}: its runs threw {ex.GetType().Name}: {ex.Message}");
             }
         }
 

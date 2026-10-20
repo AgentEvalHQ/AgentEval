@@ -107,6 +107,45 @@ public sealed class OfflineSampleCheckTests
     }
 
     [Fact]
+    public void CoverageProblems_AMockRow_IsExtra_AndMustNameASample()
+    {
+        var catalogue = new[] { new OfflineSampleCheck.CatalogueEntry("A1", "HelloWorld") };
+        var table = OfflineSampleCheck.Parse("HelloWorld 11 x\nHelloWorld+mock 0 y\nGhost+mock 0 z");
+
+        var problems = OfflineSampleCheck.CoverageProblems(catalogue, table);
+
+        // The +mock row does not stand in for the plain one, and one for a sample that does not exist is stale.
+        Assert.Equal(["HelloWorld+mock"], table.Where(OfflineSampleCheck.IsMockRow).Select(r => r.Id).Take(1));
+        Assert.DoesNotContain(problems, p => p.Contains("HelloWorld has no row", StringComparison.Ordinal));
+        Assert.Contains(problems, p => p.Contains("row for Ghost+mock", StringComparison.Ordinal));
+        Assert.Single(problems);
+        Assert.Contains(problems, p => p.Contains("Ghost", StringComparison.Ordinal));
+        Assert.NotEmpty(OfflineSampleCheck.CoverageProblems(catalogue, OfflineSampleCheck.Parse("HelloWorld+mock 0 y")));
+    }
+
+    [Fact]
+    public async Task RunAsync_AnOnlyThatNamesNoSample_IsAUsageError_NotAnEmptyPass()
+    {
+        // "--only C4" used to match ids only, ran nothing and printed "0/0 sample(s) exited as expected", exit 0.
+        var dir = Directory.CreateTempSubdirectory("offline-only-");
+        try
+        {
+            var table = Path.Combine(dir.FullName, OfflineSampleCheck.ExpectationsFileName);
+            await File.WriteAllTextAsync(table, "HelloWorld 11 x\n");
+            var catalogue = new[] { new OfflineSampleCheck.CatalogueEntry("A1", "HelloWorld") };
+
+            var exit = await OfflineSampleCheck.RunAsync(catalogue, table, "no-such-host", [], TimeSpan.FromSeconds(5),
+                Path.Combine(dir.FullName, "logs"), new HashSet<string>(["C4"], StringComparer.OrdinalIgnoreCase));
+
+            Assert.Equal(SampleOutcome.UsageError, exit);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Judge_FailsAHangACrashAndAnUnexpectedCode_AndPassesOnlyTheExpectedOne()
     {
         var sample = new OfflineSampleCheck.CatalogueEntry("C2", "WorkflowEvaluationReal");

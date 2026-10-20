@@ -22,9 +22,11 @@ namespace AgentEval.Samples;
 /// a model it does not serve. Not measured is never 0.
 /// </para>
 /// <para>
-/// When a run records several outcomes the worst wins: error, failed, then not measured, then warning. A finding the
-/// sample exists to show (a red-team probe that gets through, a planted regression caught) is the sample
-/// working; record <see cref="Fail"/> only when the sample's own check did not hold.
+/// When a run records several outcomes the worst wins: error, failed, then not measured, then warning. Record
+/// <see cref="Fail"/> when the sample's own check did not hold. A sample that frames a scan or a gate as the check on
+/// the agent under test (the red-team samples E2/E3 and L3, a Gatekeeper gate) fails when that check fails: an attack
+/// that gets through is FAIL there. A failure the sample plants on purpose to show its detection (a planted regression
+/// a snapshot test catches, a scripted attack the gate blocks) is the sample working, and records nothing.
 /// </para>
 /// </remarks>
 internal static class SampleOutcome
@@ -77,6 +79,37 @@ internal static class SampleOutcome
                 Skip($"{what}: the run measured nothing (root {root.Label})");
                 break;
         }
+    }
+
+    /// <summary>
+    /// Records a benchmark's verdict from its whole result tree: the root's verdict as <see cref="RecordVerdict(string, EvalScore)"/>
+    /// does, and NOT MEASURED when any check below it was skipped or errored. A weighted root skips such leaves, so a
+    /// provider or judge that rejected some probes still left a PASS root, and the run exited 0 over probes it never
+    /// tested. A leaf labelled <c>inapplicable</c> (not applicable by design, e.g. NIST's governance functions) is not a
+    /// gap and is not counted.
+    /// </summary>
+    /// <param name="what">The benchmark, for the reason line.</param>
+    /// <param name="result">The benchmark's result tree.</param>
+    public static void RecordVerdict(string what, EvalResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        RecordVerdict(what, result.Score);
+        if (result.Score.ReportStatus() is "ERROR" or "SKIPPED")
+            return;
+
+        var leaves = Leaves(result).ToList();
+        var unmeasured = leaves
+            .Where(l => l.Score.Label.ToLowerInvariant() is "skipped" or "error")
+            .Select(l => l.Metric.Name)
+            .ToList();
+        if (unmeasured.Count > 0)
+        {
+            var named = string.Join(", ", unmeasured.Take(5)) + (unmeasured.Count > 5 ? $" and {unmeasured.Count - 5} more" : "");
+            Skip($"{what}: {unmeasured.Count} of {leaves.Count} checks were not measured (skipped or errored): {named}");
+        }
+
+        static IEnumerable<EvalResult> Leaves(EvalResult node) =>
+            node.Details.SubResults is { Count: > 0 } children ? children.SelectMany(Leaves) : [node];
     }
 
     /// <summary>The exit code for what this run recorded so far.</summary>

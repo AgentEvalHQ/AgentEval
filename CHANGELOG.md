@@ -57,6 +57,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   injection), and the 3-run eval's verdict was `RESULT: CHECK`: the Level 1 oracle needs an attempt and
   held 1/3.
 
+- **Samples say what they found in their exit code:** a sample of `samples/AgentEval.Samples` that printed
+  ❌ FAILED, or stopped because no provider was configured, exited 0, so a sweep or a CI job read failures
+  and skips as passes. Every sample now records its verdict, and the run ends with a `Sample result:` line
+  and the CLI's codes: 0 completed (no failed check, warning or skip), 1 a check failed, 3 the sample threw,
+  10 a quality score below its threshold, 11 not measured (no provider or key, a model the provider does
+  not serve, a live attack the model never attempted). A security gate or scan that fails on the agent
+  under test is a failure; a failure a sample plants to show its detection is not. Samples can be run by
+  a stable id (`--sample WorkflowWithTools`, `--list-samples`). The new free `--offline-check` runs every
+  sample with no provider, and the Getting Started, Extensibility and Auto-Audit samples again with
+  `--mock`, and compares each exit code with `samples/AgentEval.Samples/offline-check-expected.txt`; it
+  runs in the offline samples CI job and fails on a crash, a hang, an unexpected code or a sample with no
+  row. Live Gatekeeper scenes record a failed invariant as a failure and any other exception as an error
+  (they printed "scene skipped" and exited 0); a provider content filter is not measured.
+
+- **The misinformation and groundedness judges see what the tools returned:** a fact the agent repeated
+  from a tool result, such as a flight list its search tool returned, was judged a fabrication, because
+  the judges were shown only the retrieved context. They are now sent the tool results (from
+  `EvaluationContext.ToolUsage`), between `<tool_results>` tags no value can close, labelled as data and
+  bounded (2,000 characters a value, 16,000 the section, 50 calls; values share the room, so a short
+  result is never pushed out by long ones). A call's arguments are not sent: they are the agent's own text
+  and would let it supply its own evidence. When no tool returned anything the prompt, and its digest, are
+  unchanged. Tool results now reach the judge's host with the rest of the prompt.
+
+- **Model comparison no longer ranks a dimension it did not measure (breaking):** a model without a price
+  was ranked as costing $0 (cost score 100, the "cheapest"), and a model none of whose runs returned as
+  latency 0 (the "fastest"). When any model lacks cost or latency, no model is scored on that dimension and
+  the composite scales the other weights up to the full weight. `ModelRanking.CostScore` and `SpeedScore`
+  are now `double?` and `ModelResult.AverageLatency` is `TimeSpan?` (`null` = not measured); the new
+  `CostNotMeasuredReason` and `SpeedNotMeasuredReason` name the cause (no price, no performance data, or
+  cost analysis off), reports print `n/a`, and each winner line says what its composite did not weigh. The
+  multi-test report no longer averages composites that weighed different dimensions. Weights that rest
+  only on cost with cost analysis off are refused before any run; weights left with nothing measured after
+  the runs still throw, with the measured results in the exception's `Data["ModelResults"]`.
+
+- **Workflow step timings are real:** the first step of a Microsoft Agent Framework workflow was timed
+  from its own end, so it showed about 0 ms and `ForExecutor(...).HaveCompletedWithin(...)` on it could
+  never fail. A step now runs from the delivery that started it until its last delivery finished; in a
+  sequential workflow the steps add up to nearly the whole run. Event sources can report this timing
+  through the new optional `ExecutorOutputEvent.StartOffset` and `Duration`. A workflow assertion failure
+  shows a short summary of the run instead of a raw dump of the result record.
+
+- **LongMemEval baselines count scored questions:** a baseline's per-category count is the number of scored
+  questions, not selected ones, and its recommendations say how many selected questions are not in the
+  score (agent errors, and questions not run or without a judge verdict).
+
+- **Samples on Bitdeer:** embeddings follow `AI_INFERENCE_PROVIDER` like chat (`BITDEER_EMBEDDING_MODEL`,
+  default `BAAI/bge-m3` on Bitdeer's own endpoint; `OPENAI_EMBEDDING_MODEL`; Azure, Foundry,
+  OpenAI-compatible hosts and any non-default endpoint must name the model), so B1 Comprehensive RAG runs
+  on Bitdeer. D3, D4, D6 and G7 compare models and stop as not measured, naming `BITDEER_MODEL_2` / `_3`,
+  when one model is configured; D6 names its arms by model, D3 and D4 report ties. G7 labels baselines by
+  the model that ran and defaults to the Quick preset; G8 and H9 count every question, check the history
+  reached the model and give the LongMemEval judge 1,024 output tokens (a reasoning judge ran out at the
+  default 256 and dropped preference questions); G9 runs Quick when non-interactive; G10 stops as not
+  measured when the provider does not serve the paper's gpt-4o. H3 and H12 graded tool-call accuracy on an
+  agent with no tools and now give the agent tools; H11 grades what MAF's evaluate path carries. A judge
+  reply that could not be parsed is not measured in B1, B2 and B4 (it read as a correct detection). C2
+  and C3 show 4 steps; on GLM-5.3-Flash C3 passes and C2 fails its own 3-minute limit (239 s).
+
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
   or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite

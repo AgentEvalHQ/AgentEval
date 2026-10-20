@@ -96,8 +96,13 @@ public static partial class WorkflowMessageHandlerExecutors
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   ❌ Workflow test failed: {ex.Message}");
             Console.ResetColor();
+            // The one model-free workflow sample, so the offline check sees its failures: a throw is an error, not a pass.
+            SampleOutcome.Error($"the workflow test threw: {ex.Message}");
             return;
         }
+
+        // Same verdict rules as C2/C3: no execution result is an error, a failed harness check a failure.
+        WorkflowEvaluationReal.RecordHarnessVerdict(testResult);
 
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
@@ -180,12 +185,7 @@ public static partial class WorkflowMessageHandlerExecutors
             }
             catch (WorkflowAssertionException ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Workflow assertion failed: {ex.Message}");
-                if (ex.Data.Contains("Suggestions"))
-                    Console.WriteLine($"   💡 Suggestion: {ex.Data["Suggestions"]}");
-                Console.ResetColor();
-                Console.WriteLine();
+                WorkflowEvaluationReal.PrintAssertionFailure(ex);
             }
         }
 

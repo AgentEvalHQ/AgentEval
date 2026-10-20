@@ -7,13 +7,14 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Samples;
 
 /// <summary>
-/// What G8 (LongMemEval Benchmark) and G10 (LongMemEval Baseline Repro) share: every selected question accounted for,
-/// the per-type table with what each accuracy is over, and a measurement of what the answer prompts delivered.
+/// What G8 (LongMemEval Benchmark), G10 (LongMemEval Baseline Repro) and H9 (Benchmarks: LongMemEval) share: every
+/// selected question accounted for, the per-type table with what each accuracy is over, and a measurement of what the
+/// answer prompts delivered.
 /// </summary>
 /// <remarks>
-/// Until 2026-10 both samples printed a per-type count of SELECTED questions beside an accuracy over SCORED ones, and
-/// G10's summary had no agent-error count: on a provider without its model, all 50 questions errored and the summary
-/// read "0/0 scored, 50 selected, 0 inconclusive".
+/// Until 2026-10 these samples printed a per-type count of SELECTED questions beside an accuracy over SCORED ones, and
+/// had no agent-error count: on a provider without its model, all 50 of G10's questions errored and the summary read
+/// "0/0 scored, 50 selected, 0 inconclusive".
 /// </remarks>
 internal static class LongMemEvalSampleSupport
 {
@@ -22,6 +23,15 @@ internal static class LongMemEvalSampleSupport
     /// English chat text runs about four characters per token on the common tokenizers; eight is half the haystack gone.
     /// </summary>
     public const double TruncationCharactersPerToken = 8.0;
+
+    /// <summary>
+    /// The judge's output-token budget in G8 and H9, where the configured model judges its own answers. The budget
+    /// includes a reasoning model's thinking: at the library default of 256, GLM-5.3-Flash ran out of budget on the long
+    /// single-session-preference rubric prompts (<c>finish_reason=length</c>, an empty reply), so those questions came
+    /// back judge-inconclusive and dropped out of the accuracy. A judge that answers "yes" or "no" stops long before
+    /// either cap; the effective value is stamped on every run's options.
+    /// </summary>
+    public const int JudgeMaxOutputTokens = 1024;
 
     /// <summary>Every selected question, accounted for: a selected count is not a scored count.</summary>
     public static void PrintAccounting(ExternalBenchmarkResult result)

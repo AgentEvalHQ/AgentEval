@@ -105,6 +105,70 @@ public class ModelComparerNotMeasuredTests
             ("b", "B", MeanScore: 80, PassRate: 1.0, LatencyMs: 200, Cost: null)));
 
         Assert.Contains("No measured dimension carries weight", ex.Message);
+        // The runs happened (and may have been paid for): what they measured travels with the exception.
+        var measured = Assert.IsAssignableFrom<IReadOnlyList<ModelResult>>(ex.Data["ModelResults"]);
+        Assert.Equal(["A", "B"], measured.Select(m => m.ModelName));
+    }
+
+    [Fact]
+    public async Task WeightsOnCostAlone_WithCostAnalysisOff_AreRefusedBeforeAnyRun()
+    {
+        var factories = new IAgentFactory[]
+        {
+            new DelegateAgentFactory("a", "A", () => throw new InvalidOperationException("no agent is created")),
+            new DelegateAgentFactory("b", "B", () => throw new InvalidOperationException("no agent is created")),
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => new ModelComparer(new NoRunAllowedRunner())
+            .CompareModelsAsync(factories, Case, new ModelComparisonOptions(RunsPerModel: 2,
+                ScoringWeights: new ScoringWeights(Quality: 0, Speed: 0, Cost: 1.0, Reliability: 0),
+                EnableCostAnalysis: false)));
+
+        Assert.Contains("cost analysis is off", ex.Message);
+    }
+
+    [Fact]
+    public async Task TheCostReason_NamesTheCause_NoPriceOrNoPerformanceData()
+    {
+        // Priced-less but timed: a missing price. Untimed: its runs left no performance data, which no price would fix.
+        var result = await CompareAsync(ScoringWeights.Default,
+            ("timed", "Timed", MeanScore: 90, PassRate: 1.0, LatencyMs: 200, Cost: null),
+            ("dead", "Dead", MeanScore: 0, PassRate: 0.0, LatencyMs: null, Cost: null));
+
+        Assert.Contains("no cost was recorded for Timed (no price for the model)", result.CostNotMeasuredReason);
+        Assert.Contains("no run of Dead recorded performance data", result.CostNotMeasuredReason);
+        Assert.DoesNotContain("Dead (no price", result.CostNotMeasuredReason);
+        Assert.Contains("scaled up to the full weight", result.CostNotMeasuredReason);
+    }
+
+    [Fact]
+    public async Task TheWinnerLines_SayWhatTheCompositeDidNotWeigh()
+    {
+        var result = await CompareAsync(ScoringWeights.Default,
+            ("a", "GLM", MeanScore: 90, PassRate: 1.0, LatencyMs: 200, Cost: null),
+            ("b", "DeepSeek", MeanScore: 70, PassRate: 1.0, LatencyMs: 400, Cost: null));
+
+        const string caveat = "(cost not measured: the composite weighs quality, speed and reliability)";
+        Assert.Contains(caveat, result.ToGitHubComment());
+        Assert.Contains(caveat, result.ToMarkdown());
+        Assert.Contains(caveat, new[] { result }.ToGitHubComment());
+    }
+
+    [Fact]
+    public async Task TheAggregate_DoesNotAverageCompositesThatWeighedDifferentDimensions()
+    {
+        // Case 1 measures cost, case 2 does not: a composite over four dimensions and one over three are not one quantity.
+        var priced = await CompareAsync(ScoringWeights.CostFocused,
+            ("x", "X", MeanScore: 90, PassRate: 1.0, LatencyMs: 200, Cost: 0.010m),
+            ("y", "Y", MeanScore: 80, PassRate: 1.0, LatencyMs: 200, Cost: 0.001m));
+        var unpriced = await CompareAsync(ScoringWeights.CostFocused,
+            ("x", "X", MeanScore: 90, PassRate: 1.0, LatencyMs: 200, Cost: 0.010m),
+            ("y", "Y", MeanScore: 80, PassRate: 1.0, LatencyMs: 200, Cost: null));
+
+        var markdown = new[] { priced, unpriced }.ToMarkdown();
+        Assert.Contains("Avg Composite n/a: the comparisons measured different dimensions", markdown);
+        Assert.Contains("| **n/a** |", markdown);
+        Assert.Contains("⚠️ In 1 of 2 comparison(s) speed or cost was not measured", new[] { priced, unpriced }.ToGitHubComment());
     }
 
     [Fact]
@@ -199,6 +263,18 @@ public class ModelComparerNotMeasuredTests
 
         return new ModelComparer(runner).CompareModelsAsync(factories, Case,
             new ModelComparisonOptions(RunsPerModel: 2, ScoringWeights: weights, EnableCostAnalysis: enableCostAnalysis));
+    }
+
+    /// <summary>A runner the comparison must not reach: any run fails the test.</summary>
+    private sealed class NoRunAllowedRunner : IStochasticRunner
+    {
+        public Task<StochasticResult> RunStochasticTestAsync(
+            IEvaluableAgent agent, TestCase testCase, StochasticOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new Xunit.Sdk.XunitException("a run started");
+
+        public Task<StochasticResult> RunStochasticTestAsync(
+            IAgentFactory factory, TestCase testCase, StochasticOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new Xunit.Sdk.XunitException("a run started");
     }
 
     /// <summary>

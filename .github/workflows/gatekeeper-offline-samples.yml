@@ -13,7 +13,13 @@ on:
   pull_request:
     paths:
       - 'samples/AgentEval.Samples/**'
+      # inputs the samples build from or read: a project reference, copied skills, datasets, interop fixtures
+      - 'samples/AgentEval.HealthcareSafetyPack/**'
+      - 'samples/AgentEval.AgentSkillsEval/skills/**'
+      - 'samples/datasets/**'
+      - 'samples/interop/**'
       - 'src/**'
+      - 'global.json'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'AgentEval.sln'
@@ -22,7 +28,13 @@ on:
     branches: [ main ]
     paths:
       - 'samples/AgentEval.Samples/**'
+      # inputs the samples build from or read: a project reference, copied skills, datasets, interop fixtures
+      - 'samples/AgentEval.HealthcareSafetyPack/**'
+      - 'samples/AgentEval.AgentSkillsEval/skills/**'
+      - 'samples/datasets/**'
+      - 'samples/interop/**'
       - 'src/**'
+      - 'global.json'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'AgentEval.sln'
@@ -74,7 +86,8 @@ jobs:
           --offline-check --timeout 180 --logs "${{ runner.temp }}/offline-check"
 
       - name: Upload the offline check's per-sample logs
-        if: failure()
+        # also when the job was cancelled or hit its time limit: a hang is exactly when the logs are needed
+        if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: offline-sample-check-logs

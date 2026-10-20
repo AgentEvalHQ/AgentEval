@@ -56,7 +56,7 @@ Rankings:
    🥇 GPT-4o - Score: 75.0 (Quality: 100.0, Speed: 0.0, Cost: n/a, Reliability: 100.0)
    🥈 GPT-4o Mini - Score: 50.0 (Quality: 0.0, Speed: 100.0, Cost: n/a, Reliability: 100.0)
 
-Cost: not measured — no cost was recorded for GPT-4o, GPT-4o Mini (no price for the model), so no model is ranked on cost; the composite weighs quality, speed and reliability, their weights rescaled to sum to 1.
+Cost: not measured — no cost was recorded for GPT-4o, GPT-4o Mini (no price for the model), so no model is ranked on cost; the composite weighs quality, speed and reliability, their weights scaled up to the full weight.
 
 Recommendation: Use GPT-4o
 ```
@@ -189,7 +189,7 @@ Console.WriteLine($"Winner: {result.Winner.ModelName}");
 2. Each model gets four raw numbers: mean score (quality), average latency (speed), average estimated cost per run (cost) and pass rate (reliability).
 3. Each raw number is rescaled to 0–100 across the models **in this comparison**: the best model gets 100 and the worst 0, with lower latency and lower cost counting as better. With one model, or when every model has the same value, every model gets 100.
 4. `CompositeScore` = Quality × `ScoringWeights.Quality` + Speed × `Speed` + Cost × `Cost` + Reliability × `Reliability`, with default weights 0.4 / 0.2 / 0.2 / 0.2. `Ranking` sorts by composite score, highest first; on a tie the factory listed first ranks first. `Winner` is `Ranking[0]`.
-5. **Speed and cost count only when every model has them.** Quality and reliability count every run, failed ones included. Latency and cost come from the runs that returned: a model none of whose runs returned has no latency, and a model with no price (or a run with `EnableCostAnalysis` off) has no cost. Neither is "0 ms" or "$0". When any model lacks one, no model is scored on that dimension, its `SpeedScore` or `CostScore` is `null` for every model, and the composite weighs the dimensions that were measured, their weights rescaled to sum to 1 (default weights without cost become 0.5 / 0.25 / 0.25). Scoring only the models that have a dimension would rank the models on different dimensions. `SpeedNotMeasuredReason` and `CostNotMeasuredReason` say which models lacked it. Weights that fall only on unmeasured dimensions leave nothing to rank on, and the comparison throws `InvalidOperationException`.
+5. **Speed and cost count only when every model has them.** Quality and reliability count every run, failed ones included. Latency and cost come from the runs that recorded performance data: a model none of whose runs did (performance not tracked, or, with the non-streaming harness, no run returned) has no latency, and a model with no price (or a run with `EnableCostAnalysis` off) has no cost. Neither is "0 ms" or "$0". When any model lacks one, no model is scored on that dimension, its `SpeedScore` or `CostScore` is `null` for every model, and the composite weighs the dimensions that were measured, their weights scaled up to the full weight (default weights without cost become 0.5 / 0.25 / 0.25). Scoring only the models that have a dimension would rank the models on different dimensions. `SpeedNotMeasuredReason` and `CostNotMeasuredReason` say which models lacked it. Weights that fall only on unmeasured dimensions leave nothing to rank on, and the comparison throws `InvalidOperationException`.
 
 What follows from this:
 
@@ -511,8 +511,11 @@ foreach (var r in results)
     Console.WriteLine($"{r.TestCase.Name}:");
     Console.WriteLine($"  Mean score: {before.MeanScore:F1} -> {after.MeanScore:F1}");
     Console.WriteLine($"  Pass rate:  {before.PassRate:P0} -> {after.PassRate:P0}");
-    Console.WriteLine($"  Latency:    {before.AverageLatency?.TotalSeconds:F2}s -> {after.AverageLatency?.TotalSeconds:F2}s");
+    Console.WriteLine($"  Latency:    {Seconds(before.AverageLatency)} -> {Seconds(after.AverageLatency)}");
 }
+
+// AverageLatency is null when no run recorded one: print n/a, not "s".
+static string Seconds(TimeSpan? latency) => latency is { } t ? $"{t.TotalSeconds:F2}s" : "n/a";
 ```
 
 ### Scenario 2: Cost Reduction

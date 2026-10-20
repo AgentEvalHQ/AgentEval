@@ -114,7 +114,7 @@ public static class GdprBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
-        SampleOutcome.RecordVerdict("GDPR benchmark", result.Score);
+        SampleOutcome.RecordVerdict("GDPR benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

@@ -211,7 +211,7 @@ public static class MemoryBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
-        SampleOutcome.RecordVerdict("memory benchmark", evalTree.Score);
+        SampleOutcome.RecordVerdict("memory benchmark", evalTree);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

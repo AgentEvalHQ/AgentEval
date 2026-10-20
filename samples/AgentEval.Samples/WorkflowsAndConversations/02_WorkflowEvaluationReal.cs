@@ -162,53 +162,50 @@ public static class WorkflowEvaluationReal
 
         Console.WriteLine("📝 Step 6: Workflow assertions...\n");
 
-        if (testResult.ExecutionResult != null)
+        if (testResult.ExecutionResult is { } executed)
+        {
+            // Three independent blocks, each its own try: one failed block (the total time, on a slow model) used to
+            // skip the per-executor and graph checks after it, so they were never reported.
+            Check("Basic workflow structure", () => executed.Should()
+                .HaveStepCount(4, because: "pipeline has 4 distinct stages")
+                .HaveExecutedInOrder("Planner", "Researcher", "Writer", "Editor")
+                .HaveCompletedWithin(TimeSpan.FromMinutes(3), because: "reasonable time for content generation")
+                .HaveNoErrors(because: "clean execution is required")
+                .HaveNonEmptyOutput()
+                .Validate());
+
+            Check("Per-executor", () => executed.Should()
+                .ForExecutor("Planner")
+                    .HaveNonEmptyOutput()
+                    .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "planning should be reasonably fast")
+                    .And()
+                .ForExecutor("Researcher")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .ForExecutor("Writer")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .ForExecutor("Editor")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .Validate());
+
+            Check("Graph structure and routing", () => executed.Should()
+                .HaveGraphStructure()
+                .HaveNodes("Planner", "Researcher", "Writer", "Editor")
+                .HaveEntryPoint("Planner", because: "planning is the starting point")
+                .HaveTraversedEdge("Researcher", "Writer")
+                .HaveUsedEdgeType(EdgeType.Sequential)
+                .HaveExecutionPath("Planner", "Researcher", "Writer", "Editor")
+                .Validate());
+        }
+
+        static void Check(string block, Action validate)
         {
             try
             {
-                var result = testResult.ExecutionResult;
-
-                // Basic workflow structure assertions
-                result.Should()
-                    .HaveStepCount(4, because: "pipeline has 4 distinct stages")
-                    .HaveExecutedInOrder("Planner", "Researcher", "Writer", "Editor")
-                    .HaveCompletedWithin(TimeSpan.FromMinutes(3), because: "reasonable time for content generation")
-                    .HaveNoErrors(because: "clean execution is required")
-                    .HaveNonEmptyOutput()
-                    .Validate();
-
-                Console.WriteLine("   ✅ Basic workflow structure assertions PASSED!\n");
-
-                // Per-executor assertions
-                result.Should()
-                    .ForExecutor("Planner")
-                        .HaveNonEmptyOutput()
-                        .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "planning should be reasonably fast")
-                        .And()
-                    .ForExecutor("Researcher")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .ForExecutor("Writer")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .ForExecutor("Editor")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .Validate();
-
-                Console.WriteLine("   ✅ Per-executor assertions PASSED!\n");
-
-                // Graph structure assertions
-                result.Should()
-                    .HaveGraphStructure()
-                    .HaveNodes("Planner", "Researcher", "Writer", "Editor")
-                    .HaveEntryPoint("Planner", because: "planning is the starting point")
-                    .HaveTraversedEdge("Researcher", "Writer")
-                    .HaveUsedEdgeType(EdgeType.Sequential)
-                    .HaveExecutionPath("Planner", "Researcher", "Writer", "Editor")
-                    .Validate();
-
-                Console.WriteLine("   ✅ Graph structure and routing assertions PASSED!\n");
+                validate();
+                Console.WriteLine($"   ✅ {block} assertions PASSED!\n");
             }
             catch (WorkflowAssertionException ex)
             {
