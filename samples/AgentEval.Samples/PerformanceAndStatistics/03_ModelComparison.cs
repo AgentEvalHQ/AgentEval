@@ -41,18 +41,25 @@ public static class ModelComparison
         {
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   ⚠️  This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
-        
+
+        var models = ComparisonModels.Distinct(
+            AIConfig.ModelDeployment, AIConfig.SecondaryModelDeployment, AIConfig.TertiaryModelDeployment);
+
         // Print endpoint for verification
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
-        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment}");
-        Console.WriteLine($"   🤖 Model 2: {AIConfig.SecondaryModelDeployment}");
-        Console.WriteLine($"   🤖 Model 3: {AIConfig.TertiaryModelDeployment}\n");
-        
+        for (var i = 0; i < models.Count; i++)
+            Console.WriteLine($"   🤖 Model {i + 1}: {models[i]}");
+        Console.WriteLine();
+
+        if (!ComparisonModels.Require("D3", models))
+            return;
+
         Console.WriteLine("📝 Step 1: Creating agent factories...\n");
-        
-        var factories = CreateFactories();
+
+        var factories = CreateFactories(models);
         foreach (var factory in factories)
         {
             Console.WriteLine($"   ✓ {factory.ModelName} ({factory.ModelId})");
@@ -121,52 +128,95 @@ public static class ModelComparison
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   ❌ Comparison failed: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Skip($"the comparison did not complete: {ex.GetType().Name}: {ex.Message}");
             return;
         }
-        
+
         Console.WriteLine($"   ✓ Compared {result.ModelResults.Count} models\n");
-        
+
         Console.WriteLine("📝 Step 6: Rankings (by composite score)\n");
-        
+
+        var nameWidth = Math.Max(11, result.Ranking.Max(r => r.ModelName.Length));
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("   Rank │ Model       │ Composite │ Quality │ Speed │ Cost │ Reliability");
-        Console.WriteLine("   ─────┼─────────────┼───────────┼─────────┼───────┼──────┼────────────");
+        Console.WriteLine($"   Rank │ {"Model".PadRight(nameWidth)} │ Composite │ Quality │ Speed │ Cost │ Reliability");
+        Console.WriteLine($"   ─────┼─{new string('─', nameWidth)}─┼───────────┼─────────┼───────┼──────┼────────────");
         Console.ResetColor();
-        
+
         foreach (var ranking in result.Ranking)
         {
             var medal = ranking.Rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{ranking.Rank}" };
-            Console.WriteLine($"   {medal,-4} │ {ranking.ModelName,-11} │ {ranking.CompositeScore,9:F1} │ {ranking.QualityScore,7:F1} │ {ranking.SpeedScore,5:F1} │ {ranking.CostScore,4:F1} │ {ranking.ReliabilityScore,8:F1}");
+            Console.WriteLine($"   {medal,-4} │ {ranking.ModelName.PadRight(nameWidth)} │ {ranking.CompositeScore,9:F1} │ {ranking.QualityScore,7:F1} │ {FormatScore(ranking.SpeedScore),5} │ {FormatScore(ranking.CostScore),4} │ {ranking.ReliabilityScore,8:F1}");
         }
         Console.WriteLine();
-        
+
+        // Not measured is not 100 or 0: before, a model none of whose runs returned scored Speed 100 (the "fastest"),
+        // and an unpriced model Cost 100 (the "cheapest"). An unmeasured dimension is never a clean result.
+        if (result.SpeedNotMeasuredReason is { } speedNotMeasured)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   ⚠️  Speed n/a — not measured: {speedNotMeasured}\n");
+            Console.ResetColor();
+            SampleOutcome.Skip($"speed not measured: {speedNotMeasured}");
+        }
+
+        if (result.CostNotMeasuredReason is { } costNotMeasured)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   ⚠️  Cost n/a — not measured: {costNotMeasured}");
+            Console.ResetColor();
+            // What pricing exists: ModelPricing's table and ModelPricing.SetPricing. The harness prices every run at
+            // EvaluationOptions.ModelName, one name for all models (the primary, above), so there is no per-model price
+            // to feed the comparison; BITDEER_PRICE_*_PER_1M prices one model, in sample N1 only.
+            Console.WriteLine($"      To rank on cost, {AIConfig.ModelDeployment} needs a price: ModelPricing.SetPricing(model, inputPer1K, outputPer1K).");
+            Console.WriteLine("      This sample prices every model's runs at that one rate, so a priced cost here compares token use, not");
+            Console.WriteLine("      prices (docs/model-comparison.md, \"Cost is priced from one model name\").\n");
+            SampleOutcome.Skip($"cost not measured: {costNotMeasured}");
+        }
+        else
+        {
+            Console.WriteLine($"   (Cost: every model's runs are priced at {AIConfig.ModelDeployment}'s rate, so it compares token use, not prices.)\n");
+        }
+
         Console.WriteLine("📝 Step 7: Cost Analysis\n");
         
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("   Model       │ Avg Cost/Call │ Total Cost │ Pass Rate │ Avg Latency");
-        Console.WriteLine("   ────────────┼───────────────┼────────────┼───────────┼────────────");
+        Console.WriteLine($"   {"Model".PadRight(nameWidth)} │ Avg Cost/Call │ Total Cost │ Pass Rate │ Avg Latency");
+        Console.WriteLine($"   {new string('─', nameWidth)}─┼───────────────┼────────────┼───────────┼────────────");
         Console.ResetColor();
-        
+
         foreach (var modelResult in result.ModelResults.OrderBy(m => m.AverageCost ?? decimal.MaxValue))
         {
             var avgCost = modelResult.AverageCost.HasValue ? $"${modelResult.AverageCost:F4}" : "N/A";
             var totalCost = modelResult.TotalCost.HasValue ? $"${modelResult.TotalCost:F4}" : "N/A";
-            Console.WriteLine($"   {modelResult.ModelName,-11} │ {avgCost,13} │ {totalCost,10} │ {modelResult.PassRate,9:P0} │ {modelResult.AverageLatency.TotalMilliseconds,8:F0}ms");
+            var latency = modelResult.AverageLatency is { } l ? $"{l.TotalMilliseconds:F0}ms" : "N/A";
+            Console.WriteLine($"   {modelResult.ModelName.PadRight(nameWidth)} │ {avgCost,13} │ {totalCost,10} │ {modelResult.PassRate,9:P0} │ {latency,10}");
         }
         Console.WriteLine();
-        
+
         Console.WriteLine("📝 Step 8: Winner Recommendation\n");
-        
+
+        var weights = comparisonOptions.EffectiveScoringWeights;
+        var speedMeasured = result.SpeedNotMeasuredReason is null;
+        var costMeasured = result.CostNotMeasuredReason is null;
+        // The weights the composite actually used: a dimension not measured is left out and the rest rescaled to sum to 1.
+        var rescale = weights.TotalWeight / (weights.Quality + weights.Reliability +
+                                             (speedMeasured ? weights.Speed : 0) + (costMeasured ? weights.Cost : 0));
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"   🏆 Recommended Model: {result.Winner.ModelName}");
         Console.ResetColor();
         Console.WriteLine();
         Console.WriteLine($"   Composite Score: {result.Winner.CompositeScore:F1} / 100");
-        Console.WriteLine($"   ├─ Quality:     {result.Winner.QualityScore:F1} (weight: 60%)");
-        Console.WriteLine($"   ├─ Speed:       {result.Winner.SpeedScore:F1} (weight: 15%)");
-        Console.WriteLine($"   ├─ Cost:        {result.Winner.CostScore:F1} (weight: 10%)");
-        Console.WriteLine($"   └─ Reliability: {result.Winner.ReliabilityScore:F1} (weight: 15%)");
+        Console.WriteLine($"   ├─ Quality:     {result.Winner.QualityScore:F1} (weight: {weights.Quality * rescale:P0})");
+        Console.WriteLine(speedMeasured
+            ? $"   ├─ Speed:       {result.Winner.SpeedScore:F1} (weight: {weights.Speed * rescale:P0})"
+            : $"   ├─ Speed:       n/a  (not measured: left out of the composite)");
+        Console.WriteLine(costMeasured
+            ? $"   ├─ Cost:        {result.Winner.CostScore:F1} (weight: {weights.Cost * rescale:P0})"
+            : $"   ├─ Cost:        n/a  (not measured: left out of the composite)");
+        Console.WriteLine($"   └─ Reliability: {result.Winner.ReliabilityScore:F1} (weight: {weights.Reliability * rescale:P0})");
         Console.WriteLine();
+
+        RecordChecks(result);
         
         Console.WriteLine("📝 Step 9: Export to Markdown\n");
         
@@ -197,36 +247,32 @@ public static class ModelComparison
         PrintFooter(result.Winner.ModelName);
     }
     
-    private static List<IAgentFactory> CreateFactories()
+    private static List<IAgentFactory> CreateFactories(IReadOnlyList<string> models) =>
+        models.Select(model => (IAgentFactory)new DelegateAgentFactory(model, model, () => CreateAgentWithTool(model)))
+              .ToList();
+
+    // Each model's pass/fail on the test case is the comparison's data, printed above; a weak model losing is the
+    // sample working. What the sample itself must not report cleanly: a recommendation resting on a model that failed
+    // the check, or a comparison in which no model answered correctly at all (a wiring fault until shown otherwise).
+    private static void RecordChecks(ModelComparisonResult result)
     {
-        var factories = new List<IAgentFactory>
+        if (result.ModelResults.All(m => m.StochasticResult.PassedCount == 0))
         {
-            new DelegateAgentFactory(
-                AIConfig.ModelDeployment,
-                AIConfig.ModelDeployment,
-                () => CreateAgentWithTool(AIConfig.ModelDeployment))
-        };
-        
-        if (!string.IsNullOrEmpty(AIConfig.SecondaryModelDeployment) && 
-            AIConfig.SecondaryModelDeployment != AIConfig.ModelDeployment)
-        {
-            factories.Add(new DelegateAgentFactory(
-                AIConfig.SecondaryModelDeployment,
-                AIConfig.SecondaryModelDeployment,
-                () => CreateAgentWithTool(AIConfig.SecondaryModelDeployment)));
+            SampleOutcome.Fail("no model passed a single run of the test case (contains '714', calls CalculatorTool): " +
+                               "there is no correct answer to rank");
+            return;
         }
-        
-        if (!string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
-            AIConfig.TertiaryModelDeployment != AIConfig.ModelDeployment)
+
+        var winner = result.ModelResults.First(m => m.ModelId == result.Winner.ModelId);
+        var runs = winner.StochasticResult.IndividualResults.Count;
+        if (winner.StochasticResult.PassedCount < runs)
         {
-            factories.Add(new DelegateAgentFactory(
-                AIConfig.TertiaryModelDeployment,
-                AIConfig.TertiaryModelDeployment,
-                () => CreateAgentWithTool(AIConfig.TertiaryModelDeployment)));
+            SampleOutcome.Warn($"the recommended model {winner.ModelName} passed {winner.StochasticResult.PassedCount}/{runs} " +
+                               "runs of the test case");
         }
-        
-        return factories;
     }
+
+    private static string FormatScore(double? score) => score is { } value ? $"{value:F1}" : "n/a";
     
     private static IEvaluableAgent CreateAgentWithTool(string deployment)
     {

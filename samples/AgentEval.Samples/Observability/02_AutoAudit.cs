@@ -51,6 +51,10 @@ public static class AutoAudit
             Console.WriteLine();
         }
 
+        // One endpoint that did not finish leaves the others ranked; none finishing leaves nothing to rank.
+        if (report.Ranking.Count == 0 || report.Ranking.All(r => !r.Completed))
+            SampleOutcome.Skip("no audited endpoint completed the task, so nothing was ranked");
+
         foreach (var r in report.Ranking)
         {
             if (!r.Completed)

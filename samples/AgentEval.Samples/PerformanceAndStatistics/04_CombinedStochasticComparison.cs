@@ -40,18 +40,26 @@ public static class CombinedStochasticComparison
         {
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   ⚠️  This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
-        
+
+        // The primary against the third model (on Azure: gpt-4.1 by default), or the second when no distinct third is set.
+        var models = ComparisonModels.Distinct(
+            AIConfig.ModelDeployment, AIConfig.TertiaryModelDeployment, AIConfig.SecondaryModelDeployment).Take(2).ToList();
+
         // Print endpoint for verification
         Console.WriteLine($"   🔗 Endpoint: {AIConfig.Endpoint}");
-        Console.WriteLine($"   🤖 Model 1: {AIConfig.ModelDeployment}");
-        Console.WriteLine($"   🤖 Model 2: {AIConfig.TertiaryModelDeployment}\n");
-        
+        for (var i = 0; i < models.Count; i++)
+            Console.WriteLine($"   🤖 Model {i + 1}: {models[i]}");
+        Console.WriteLine();
+
+        if (!ComparisonModels.Require("D4", models))
+            return;
 
         Console.WriteLine("📝 Step 1: Creating agent factories for 2 models...\n");
-        
-        var factories = CreateFactories();
+
+        var factories = CreateFactories(models);
         foreach (var factory in factories)
         {
             Console.WriteLine($"   ✓ {factory.ModelName} ({factory.ModelId})");
@@ -65,7 +73,7 @@ public static class CombinedStochasticComparison
         {
             TrackTools = true,
             TrackPerformance = true,
-            ModelName = AIConfig.ModelDeployment // Will be overridden by factory
+            ModelName = AIConfig.ModelDeployment // not per factory: every model's runs are priced at this name's rate
         });
         Console.WriteLine("   ✓ Stochastic runner ready\n");
         
@@ -127,16 +135,24 @@ public static class CombinedStochasticComparison
             catch (Exception ex)
             {
                 Console.WriteLine($"      ❌ Error: {ex.Message}\n");
-                // Skip this model if it fails completely
+                // Skip this model if it fails completely; the comparison below says what it lacks.
             }
         }
-        
+
         Console.WriteLine("📝 Step 6: Comparing models side-by-side...\n");
-        
+
         if (modelResults.Count == 0)
         {
             Console.WriteLine("   ⚠️ No models completed successfully\n");
+            SampleOutcome.Skip("no model completed its runs: nothing was compared");
             return;
+        }
+
+        if (modelResults.Count < factories.Count)
+        {
+            var missing = factories.Select(f => f.ModelName).Except(modelResults.Select(m => m.ModelName));
+            SampleOutcome.Skip($"not every model completed its runs ({string.Join(", ", missing)} did not): " +
+                               "the comparison covers only the rest");
         }
         
         // Use extension method for comparison table
@@ -157,33 +173,37 @@ public static class CombinedStochasticComparison
         }
         
         Console.WriteLine("📝 Step 8: Determining winner...\n");
-        
-        var winner = DetermineWinner(modelResults);
-        
-        PrintFooter(winner);
+
+        if (modelResults.Count < 2)
+        {
+            Console.WriteLine("   No winner: only one model completed, so there is nothing to compare it with.\n");
+            return;
+        }
+
+        var winners = DetermineWinners(modelResults);
+
+        // Each model's pass rate is the comparison's data; what must not read as a clean result is a winner that missed
+        // the 80% threshold, or a comparison in which no model answered correctly at all.
+        if (modelResults.All(m => m.Result.PassedCount == 0))
+        {
+            SampleOutcome.Fail("no model passed a single run of the test case (123 + 456 = 579 via CalculatorTool): " +
+                               "there is no correct answer to rank");
+        }
+        else
+        {
+            foreach (var (name, result) in modelResults.Where(m => winners.Contains(m.ModelName) && !m.Result.Passed))
+            {
+                SampleOutcome.Warn($"the winner {name} passed {result.PassedCount}/{result.IndividualResults.Count} " +
+                                   $"runs, below the {stochasticOptions.SuccessRateThreshold:P0} threshold");
+            }
+        }
+
+        PrintFooter(winners);
     }
     
-    private static List<IAgentFactory> CreateFactories()
-    {
-        var factories = new List<IAgentFactory>
-        {
-            new DelegateAgentFactory(
-                AIConfig.ModelDeployment,
-                AIConfig.ModelDeployment,
-                () => CreateAgentWithTool(AIConfig.ModelDeployment))
-        };
-        
-        if (!string.IsNullOrEmpty(AIConfig.TertiaryModelDeployment) && 
-            AIConfig.TertiaryModelDeployment != AIConfig.ModelDeployment)
-        {
-            factories.Add(new DelegateAgentFactory(
-                AIConfig.TertiaryModelDeployment,
-                AIConfig.TertiaryModelDeployment,
-                () => CreateAgentWithTool(AIConfig.TertiaryModelDeployment)));
-        }
-        
-        return factories;
-    }
+    private static List<IAgentFactory> CreateFactories(IReadOnlyList<string> models) =>
+        models.Select(model => (IAgentFactory)new DelegateAgentFactory(model, model, () => CreateAgentWithTool(model)))
+              .ToList();
     
     private static IEvaluableAgent CreateAgentWithTool(string deployment)
     {
@@ -214,33 +234,41 @@ public static class CombinedStochasticComparison
         return $"{a} {operation} {b} = {result}";
     }
     
-    private static string DetermineWinner(
+    private static IReadOnlyList<string> DetermineWinners(
         List<(string ModelName, StochasticResult Result)> modelResults)
     {
-        // Simple scoring: pass rate * mean score - (cost impact)
+        // Simple scoring: pass rate * mean score; on a tie, the cheaper model — but only when every model has a cost.
+        // An unpriced model read as $0 used to win every tie as the "cheapest". A tie cost cannot break stays a tie:
+        // the first model listed is not the winner.
+        var costKnown = modelResults.All(m => m.Result.CostStats is not null);
         var scored = modelResults
             .Select(m => new
             {
                 Model = m.ModelName,
                 Score = m.Result.Statistics.PassRate * m.Result.Statistics.MeanScore,
                 PassRate = m.Result.Statistics.PassRate,
-                Cost = m.Result.CostStats?.Mean ?? 0
+                Cost = costKnown ? m.Result.CostStats!.Mean : 0
             })
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.Cost)
             .ToList();
-        
+
         Console.WriteLine("   🏆 Model Ranking (by quality score):\n");
-        
+        if (!costKnown)
+            Console.WriteLine("   (cost not measured for every model: a tie is not broken on cost)\n");
+
         for (int i = 0; i < scored.Count; i++)
         {
-            var rank = i == 0 ? "🥇" : i == 1 ? "🥈" : "🥉";
+            // Tied models share a place.
+            var place = scored.FindIndex(x => Math.Abs(x.Score - scored[i].Score) < 1e-9 && x.Cost == scored[i].Cost);
+            var rank = place == 0 ? "🥇" : place == 1 ? "🥈" : "🥉";
             Console.WriteLine($"   {rank} {scored[i].Model}");
             Console.WriteLine($"      Score: {scored[i].Score:F1}  Pass Rate: {scored[i].PassRate:P0}");
             Console.WriteLine();
         }
-        
-        return scored.Count > 0 ? scored[0].Model : "None";
+
+        var top = scored[0];
+        return scored.Where(x => Math.Abs(x.Score - top.Score) < 1e-9 && x.Cost == top.Cost).Select(x => x.Model).ToList();
     }
     
     private static void PrintHeader()
@@ -255,12 +283,15 @@ public static class CombinedStochasticComparison
         """);
     }
     
-    private static void PrintFooter(string winner)
+    private static void PrintFooter(IReadOnlyList<string> winners)
     {
+        var headline = winners.Count == 1
+            ? $"🏆 Winner: {winners[0],-49}"
+            : $"🤝 Tie: {string.Join(" = ", winners),-52}";
         Console.WriteLine($"""
               ╔═══════════════════════════════════════════════════════════════╗
-              ║  🏆 Winner: {winner,-49} ║
-              ║  Based on pass rate, quality score, and cost efficiency       ║
+              ║  {headline} ║
+              ║  Based on pass rate and quality score; cost breaks a tie      ║
               ╚═══════════════════════════════════════════════════════════════╝
               """);
     }

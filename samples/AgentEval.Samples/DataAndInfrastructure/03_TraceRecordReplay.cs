@@ -37,6 +37,7 @@ public static class TraceRecordReplay
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

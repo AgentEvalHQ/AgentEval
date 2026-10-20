@@ -32,6 +32,7 @@ public static class CalibratedEvaluatorDemo
             Console.WriteLine("   ❌ This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("      Set a provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig).");
             Console.ResetColor();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

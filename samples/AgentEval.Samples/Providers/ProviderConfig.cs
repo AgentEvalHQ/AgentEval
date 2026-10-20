@@ -90,6 +90,8 @@ internal static class ProviderConfig
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
+        // Every caller stops after this box.
+        SampleOutcome.Skip("no Bitdeer key: BITDEER_API_KEY is not set");
     }
 
     // ── Jev ──────────────────────────────────────────────────────────────────
@@ -142,6 +144,8 @@ internal static class ProviderConfig
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
         Console.WriteLine();
+        // Every caller stops after this box.
+        SampleOutcome.Skip("no decision-model key: neither TYPESAFE_API_KEY nor OPENROUTER_API_KEY is set");
     }
 
     /// <summary>
@@ -235,6 +239,8 @@ internal static class ProviderConfig
         Console.WriteLine("   ── DRY RUN: every payload below is rendered through the real serializer; NOTHING is sent. ──");
         Console.ResetColor();
         Console.WriteLine();
+        // A dry run renders what would be sent and stops: it is the setup checked, not a measurement.
+        SampleOutcome.Skip("--dry-run: every payload was rendered and nothing was sent, so nothing was measured");
     }
 
     private static string? Env(string name)

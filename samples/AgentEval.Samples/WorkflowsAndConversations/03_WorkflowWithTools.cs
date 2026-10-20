@@ -36,6 +36,7 @@ public static class WorkflowWithTools
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -104,11 +105,14 @@ public static class WorkflowWithTools
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("   💡 Tip: Ensure your model supports tool calling.");
+            SampleOutcome.Error($"the workflow run threw: {ex.Message}");
             return;
         }
 
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
+
+        WorkflowEvaluationReal.RecordHarnessVerdict(testResult);
 
         if (testResult.ExecutionResult != null)
         {
@@ -130,8 +134,7 @@ public static class WorkflowWithTools
 
                 if (!string.IsNullOrEmpty(step.Output))
                 {
-                    var snippet = step.Output.Length > 120 ? step.Output[..117] + "..." : step.Output;
-                    Console.WriteLine($"         → \"{snippet}\"");
+                    Console.WriteLine($"         → \"{WorkflowEvaluationReal.Snippet(step.Output, 120)}\"");
                 }
                 Console.WriteLine();
             }
@@ -158,8 +161,7 @@ public static class WorkflowWithTools
                     foreach (var tc in step.ToolCalls!)
                     {
                         var duration = tc.Duration?.TotalMilliseconds ?? 0;
-                        var resultSnippet = tc.Result?.ToString() ?? "(no result)";
-                        if (resultSnippet.Length > 80) resultSnippet = resultSnippet[..77] + "...";
+                        var resultSnippet = tc.Result?.ToString() is { } text ? WorkflowEvaluationReal.Snippet(text, 80) : "(no result)";
                         Console.WriteLine($"      🔧 {tc.Name} ({duration:F0}ms) → {resultSnippet}");
                     }
                 }
@@ -255,9 +257,11 @@ public static class WorkflowWithTools
                 }
                 else
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("   ⚠️ Tool-level assertions SKIPPED (no tool events captured).\n");
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("   ❌ Tool-level assertions could not run: no tool call was captured.\n");
                     Console.ResetColor();
+                    SampleOutcome.Fail(
+                        $"no tool call was captured; the test expects {string.Join(", ", testCase.ExpectedTools!)}");
                 }
 
                 // Graph structure assertions
@@ -276,12 +280,7 @@ public static class WorkflowWithTools
             }
             catch (WorkflowAssertionException ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Workflow assertion failed: {ex.Message}");
-                if (ex.Data.Contains("Suggestions"))
-                    Console.WriteLine($"   💡 Suggestion: {ex.Data["Suggestions"]}");
-                Console.ResetColor();
-                Console.WriteLine();
+                WorkflowEvaluationReal.PrintAssertionFailure(ex);
             }
         }
 

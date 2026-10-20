@@ -278,8 +278,9 @@ public static class Extensibility
         var letterMetric = new LetterCountAccuracyMetric(targetWord, targetLetter);
 
         // Steps 1-6 needed no model; this one does. With no provider it stops here and says how to configure
-        // one (or to pass --mock); it never swaps in a canned reply on its own.
-        if (!AIConfig.StartModelSample())
+        // one (or to pass --mock); it never swaps in a canned reply on its own. The registries, the sample's
+        // main point, already ran, so the stop is not recorded as NOT MEASURED for the whole run.
+        if (!AIConfig.StartModelSample(recordSkip: false))
             return;
 
         string agentResponse;
@@ -329,6 +330,13 @@ public static class Extensibility
             Console.WriteLine($"❌ FAILED (score={result.Score}){AIConfig.MockLabel}");
         }
         Console.ResetColor();
+
+        // The mock's canned "2" is a labelled wrong answer: the metric failing it is the demonstration, and passing
+        // it would be the defect. A real model's wrong count is the model failing the accuracy check.
+        if (AIConfig.UseMock && result.Passed)
+            SampleOutcome.Fail("the letter-count metric passed the canned wrong answer");
+        else if (!AIConfig.UseMock && !result.Passed)
+            SampleOutcome.Fail($"letter count: the model answered \"{agentResponse}\", the ground truth is {correctCount}");
         Console.WriteLine($"      Explanation: {result.Explanation}");
 
         if (result.Details != null)

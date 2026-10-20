@@ -29,6 +29,7 @@ public static class AgentSkillsComplianceScanner
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -49,6 +50,8 @@ public static class AgentSkillsComplianceScanner
         var highCount = report.Findings.Count(f => f.Severity == Severity.High);
         Console.WriteLine($"\n  [{(report.IsCompliant ? "PASS" : "FAIL")}] IsCompliant == true " +
             $"({report.Findings.Count} finding(s), {highCount} High)");
+        if (!report.IsCompliant)
+            SampleOutcome.Fail($"the expense-report skill is not compliant: {report.Findings.Count} finding(s), {highCount} High");
 
         Console.WriteLine("\n  -> Next: the Skill Security Index joins THIS report with the efficiency metric into one score.");
         Console.WriteLine("\n=== Agent Skills Compliance Scanner Complete ===");

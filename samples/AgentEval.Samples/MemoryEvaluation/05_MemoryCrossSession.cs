@@ -38,6 +38,7 @@ public static class MemoryCrossSession
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Cross-session evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -94,8 +95,25 @@ public static class MemoryCrossSession
         // Step 5: Show comparison
         Console.WriteLine("📝 Step 5: Comparison Summary\n");
         PrintComparison(basicResult, persistentResult);
+        RecordVerdict(basicResult, persistentResult);
 
         PrintKeyTakeaways();
+    }
+
+    // The history-only agent is the control: it must lose the facts across a reset, or the resets did not happen
+    // and the persistent agent's pass would mean nothing. Only then does the persistent agent's result count.
+    private static void RecordVerdict(CrossSessionResult control, CrossSessionResult persistent)
+    {
+        if (!control.SessionResetSupported || !persistent.SessionResetSupported)
+        {
+            SampleOutcome.Skip("an agent does not support session reset, so cross-session recall was not measured");
+            return;
+        }
+
+        if (control.Passed)
+            SampleOutcome.Fail("the history-only control kept its facts across session resets: the resets did not isolate it");
+        if (!persistent.Passed)
+            SampleOutcome.Fail($"the persistent-memory agent lost facts across resets ({persistent.RetainedCount}/{persistent.FactResults.Count} retained)");
     }
 
     private static void PrintCrossSessionResult(string agentName, CrossSessionResult result)

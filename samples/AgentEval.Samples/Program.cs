@@ -23,7 +23,14 @@ public static class Program
     //  Sample catalogue — one record per group, samples in order
     // ──────────────────────────────────────────────────────────
 
-    private record SampleEntry(string Name, string Description, Func<Task> Run, bool Recommended = false);
+    private record SampleEntry(string Name, string Description, Func<Task> Run, bool Recommended = false)
+    {
+        /// <summary>
+        /// The sample's stable id: its class name. Unlike the flattened menu number it does not shift when a sample is
+        /// added, so <c>--sample</c> and the offline check's expected-codes table key on it.
+        /// </summary>
+        public string Id => Run.Method.DeclaringType?.Name ?? Name;
+    }
     private record SampleGroup(
         char Key,
         string Name,
@@ -134,7 +141,7 @@ public static class Program
         [
             new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool (offline; API tour)",     GlassBoxFullStack.RunAsync),
             new("Auto-Audit",                "Ranked honesty/safety/cost over your configured models (--mock: 3 scripted endpoints, labelled)", AutoAudit.RunAsync),
-            new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs Azure)", RealVsFrameworkTravelAgent.RunAsync),
+            new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs a model provider)", RealVsFrameworkTravelAgent.RunAsync),
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
 
@@ -316,6 +323,31 @@ public static class Program
         {
             _interactive = false;
             Environment.ExitCode = await RunGatekeeperOfflineSuiteAsync();
+            return;
+        }
+
+        // CI/non-interactive: every sample in its own process, no provider, exit codes compared with a checked-in table.
+        if (args.Any(a => string.Equals(a, "--offline-check", StringComparison.OrdinalIgnoreCase)))
+        {
+            _interactive = false;
+            Environment.ExitCode = await RunOfflineCheckAsync(args);
+            return;
+        }
+
+        // The stable ids `--sample` and the offline check key on, beside their menu labels.
+        if (args.Any(a => string.Equals(a, "--list-samples", StringComparison.OrdinalIgnoreCase)))
+        {
+            foreach (var (label, entry) in Catalogue())
+                Console.WriteLine($"{label,-5} {entry.Id,-42} {entry.Name}");
+            return;
+        }
+
+        // One sample by its stable id (`--sample WorkflowWithTools`) or its menu label (`--sample C3`).
+        var sampleIndex = Array.FindIndex(args, a => string.Equals(a, "--sample", StringComparison.OrdinalIgnoreCase));
+        if (sampleIndex >= 0)
+        {
+            _interactive = false;
+            await RunSampleById(sampleIndex + 1 < args.Length ? args[sampleIndex + 1] : "");
             return;
         }
 
@@ -526,18 +558,37 @@ public static class Program
         Console.ResetColor();
         Console.WriteLine();
 
+        SampleOutcome.Reset();
+        int exitCode;
         try
         {
             await entry.Run();
+            exitCode = SampleOutcome.ExitCode;
+        }
+        catch (SampleCheckFailedException ex)
+        {
+            // The sample ran and its own check did not hold (a Gatekeeper invariant): a FAIL, not a crash.
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"\n  ❌ Check failed: {ex.Message}");
+            Console.ResetColor();
+            SampleOutcome.Fail(ex.Message);
+            exitCode = SampleOutcome.ExitCode;
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"\n  ❌ Error: {ex.Message}");
             Console.ResetColor();
-            // A sample that fails says so to whatever ran it: `dotnet run -- <n>` used to exit 0 over a thrown ❌.
-            Environment.ExitCode = 1;
+            SampleOutcome.Error($"the sample threw {ex.GetType().Name}: {ex.Message}");
+            exitCode = SampleOutcome.RuntimeError;
         }
+
+        // A sample says what it found to whatever ran it: `dotnet run -- <n>` used to exit 0 over a printed
+        // ❌ FAILED. Running several from the menu keeps the worst.
+        Console.WriteLine();
+        foreach (var line in SampleOutcome.Describe(exitCode, AIConfig.UseMock))
+            Console.WriteLine($"  {line}");
+        Environment.ExitCode = SampleOutcome.Worse(Environment.ExitCode, exitCode);
 
         Console.WriteLine("\n  Press any key to continue...");
         if (_interactive) Console.ReadKey(true);
@@ -593,9 +644,18 @@ public static class Program
         foreach (var (id, name, run) in suite)
         {
             Console.WriteLine($"\n════════ Gatekeeper offline suite · {id} {name} ════════");
+            SampleOutcome.Reset();
             try
             {
                 await run();
+                // A sample that records a failure, a warning or a skip without throwing has not passed either.
+                if (SampleOutcome.ExitCode != SampleOutcome.Completed)
+                {
+                    failures.Add($"{id} {name}");
+                    Console.WriteLine($"  ✘ {id} {name}: {string.Join("; ", SampleOutcome.Describe(SampleOutcome.ExitCode))}");
+                    continue;
+                }
+
                 Console.WriteLine($"  ✔ {id} {name} passed");
             }
             catch (Exception ex)
@@ -615,6 +675,73 @@ public static class Program
     }
 
     // ──────────────────────────────────────────────────────────
+    //  Stable ids: --sample <id|label>, --list-samples, --offline-check
+    // ──────────────────────────────────────────────────────────
+
+    /// <summary>Every sample with its menu label (<c>C2</c>: group key and position), in menu order.</summary>
+    private static IEnumerable<(string Label, SampleEntry Entry)> Catalogue() =>
+        Groups.SelectMany(g => g.Samples.Select((s, i) => ($"{g.Key}{i + 1}", s)));
+
+    private static async Task RunSampleById(string key)
+    {
+        var match = Catalogue().FirstOrDefault(c =>
+            string.Equals(c.Entry.Id, key, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(c.Label, key, StringComparison.OrdinalIgnoreCase));
+        if (match.Entry is null)
+        {
+            Console.WriteLine($"  ❌ No sample '{key}'. Pass a stable id or a menu label; `--list-samples` prints both.");
+            Environment.ExitCode = SampleOutcome.UsageError;
+            return;
+        }
+
+        // Under the offline check a sample must not reach a provider, whatever the shell holds: refuse rather than spend.
+        if (Environment.GetEnvironmentVariable(OfflineSampleCheck.ChildMarkerVariable) == "1"
+            && OfflineSampleCheck.ProviderVariablesInThisProcess() is { Count: > 0 } leaked)
+        {
+            Console.WriteLine($"  ❌ Offline check: provider variable(s) reached the sample: {string.Join(", ", leaked)}. Refusing to run.");
+            Environment.ExitCode = SampleOutcome.UsageError;
+            return;
+        }
+
+        await RunEntry(match.Entry);
+    }
+
+    /// <summary>
+    /// <c>--offline-check [--timeout &lt;seconds&gt;] [--logs &lt;dir&gt;] [--only id,id]</c>: see <see cref="OfflineSampleCheck"/>.
+    /// </summary>
+    private static Task<int> RunOfflineCheckAsync(string[] args)
+    {
+        string? Value(string flag)
+        {
+            var i = Array.FindIndex(args, a => string.Equals(a, flag, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        }
+
+        var timeout = int.TryParse(Value("--timeout"), out var seconds) && seconds > 0
+            ? TimeSpan.FromSeconds(seconds)
+            : OfflineSampleCheck.DefaultTimeout;
+        var logs = Value("--logs")
+            ?? Path.Combine(Path.GetTempPath(), "agenteval-offline-check", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
+        var only = Value("--only")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Start each sample the way this process was started: through its apphost, or `dotnet <assembly>`.
+        var processPath = Environment.ProcessPath ?? "dotnet";
+        var throughDotnet = string.Equals(Path.GetFileNameWithoutExtension(processPath), "dotnet", StringComparison.OrdinalIgnoreCase);
+        IReadOnlyList<string> hostArguments = throughDotnet ? [typeof(Program).Assembly.Location] : [];
+
+        var catalogue = Catalogue().Select(c => new OfflineSampleCheck.CatalogueEntry(c.Label, c.Entry.Id)).ToList();
+        return OfflineSampleCheck.RunAsync(
+            catalogue,
+            Path.Combine(AppContext.BaseDirectory, OfflineSampleCheck.ExpectationsFileName),
+            processPath,
+            hostArguments,
+            timeout,
+            logs,
+            only);
+    }
+
+    // ──────────────────────────────────────────────────────────
     //  Legacy: dotnet run -- <n>
     // ──────────────────────────────────────────────────────────
 
@@ -624,7 +751,7 @@ public static class Program
         if (n < 1 || n > all.Count)
         {
             Console.WriteLine($"  ❌ Sample {n} not found. Valid range: 1–{all.Count}");
-            Environment.ExitCode = 2;
+            Environment.ExitCode = SampleOutcome.UsageError;
             return;
         }
         await RunEntry(all[n - 1]);

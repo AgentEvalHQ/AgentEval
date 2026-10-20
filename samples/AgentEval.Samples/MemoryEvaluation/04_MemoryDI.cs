@@ -39,6 +39,7 @@ public static class MemoryDI
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   DI registration needs a real IChatClient for the LLM judge.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -101,6 +102,8 @@ public static class MemoryDI
 
         Console.WriteLine($"   CanRememberAsync: Score={canRememberResult.OverallScore:F1}% " +
             $"({(canRememberResult.OverallScore >= 80 ? "✅ Remembered" : "❌ Forgot")})");
+        if (canRememberResult.OverallScore < 80)
+            SampleOutcome.Fail($"CanRememberAsync: the blood type was not recalled (score {canRememberResult.OverallScore:F1}%)");
 
         // One-liner: test recall through noise
         var noiseResult = await agent.CanRememberThroughNoiseAsync(

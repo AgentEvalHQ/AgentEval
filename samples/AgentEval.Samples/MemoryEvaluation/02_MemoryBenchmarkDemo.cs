@@ -38,6 +38,7 @@ public static class MemoryBenchmarkDemo
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory benchmarks use an LLM judge — they cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -115,6 +116,8 @@ public static class MemoryBenchmarkDemo
         Console.Write($"{result.OverallScore:F1}%");
         Console.ResetColor();
         Console.WriteLine($"  Grade: {result.Grade}  {new string('★', result.Stars)}{new string('☆', 5 - result.Stars)}  {(result.Passed ? "✅ PASSED" : "❌ FAILED")}");
+        if (!result.Passed)
+            SampleOutcome.Fail($"memory benchmark failed: overall {result.OverallScore:F1}%, grade {result.Grade}");
         Console.WriteLine();
 
         // Category breakdown

@@ -84,8 +84,12 @@ public static class ModelComparisonExtensions
             sb.AppendLine($"| Dimension | Weight |");
             sb.AppendLine($"|-----------|--------|");
             sb.AppendLine($"| Quality | {weights.Quality:P0} |");
-            sb.AppendLine($"| Speed | {weights.Speed:P0} |");
-            sb.AppendLine($"| Cost | {weights.Cost:P0} |");
+            sb.AppendLine(result.SpeedNotMeasuredReason is null
+                ? $"| Speed | {weights.Speed:P0} |"
+                : $"| Speed | {weights.Speed:P0}, not measured: left out of the composite |");
+            sb.AppendLine(result.CostNotMeasuredReason is null
+                ? $"| Cost | {weights.Cost:P0} |"
+                : $"| Cost | {weights.Cost:P0}, not measured: left out of the composite |");
             sb.AppendLine($"| Reliability | {weights.Reliability:P0} |");
             sb.AppendLine();
         }
@@ -177,15 +181,27 @@ public static class ModelComparisonExtensions
         {
             var medal = GetMedalEmoji(ranking.Rank);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "| {0} {1} | {2} | **{3:F1}** | {4:F1} | {5:F1} | {6:F1} | {7:F1} |",
+                "| {0} {1} | {2} | **{3:F1}** | {4:F1} | {5} | {6} | {7:F1} |",
                 medal,
                 ranking.Rank,
                 ranking.ModelName,
                 ranking.CompositeScore,
                 ranking.QualityScore,
-                ranking.SpeedScore,
-                ranking.CostScore,
+                FormatScore(ranking.SpeedScore),
+                FormatScore(ranking.CostScore),
                 ranking.ReliabilityScore));
+        }
+
+        if (result.SpeedNotMeasuredReason is { } slow)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Speed n/a: not measured — {slow}");
+        }
+
+        if (result.CostNotMeasuredReason is { } why)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Cost n/a: not measured — {why}");
         }
 
         return sb.ToString();
@@ -209,7 +225,7 @@ public static class ModelComparisonExtensions
         {
             var passRateFormatted = $"{modelResult.PassRate:P1}";
             var meanScoreFormatted = $"{modelResult.MeanScore:F1}";
-            var latencyFormatted = FormatDuration(modelResult.AverageLatency);
+            var latencyFormatted = modelResult.AverageLatency is { } latency ? FormatDuration(latency) : "N/A";
             var avgCostFormatted = modelResult.AverageCost.HasValue 
                 ? $"${modelResult.AverageCost:F4}" 
                 : "N/A";
@@ -409,8 +425,10 @@ public static class ModelComparisonExtensions
                 ModelName = g.Key,
                 AvgComposite = g.Average(r => r.CompositeScore),
                 AvgQuality = g.Average(r => r.QualityScore),
-                AvgSpeed = g.Average(r => r.SpeedScore),
-                AvgCost = g.Average(r => r.CostScore),
+                // An average over only the comparisons that measured a dimension would not be the same average as the
+                // others beside it: n/a unless every comparison measured it.
+                AvgSpeed = g.All(r => r.SpeedScore.HasValue) ? g.Average(r => r.SpeedScore!.Value) : (double?)null,
+                AvgCost = g.All(r => r.CostScore.HasValue) ? g.Average(r => r.CostScore!.Value) : (double?)null,
                 AvgReliability = g.Average(r => r.ReliabilityScore),
                 AvgRank = g.Average(r => r.Rank)
             })
@@ -426,14 +444,14 @@ public static class ModelComparisonExtensions
         {
             var medal = GetMedalEmoji(rank);
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "| {0} {1} | {2} | **{3:F1}** | {4:F1} | {5:F1} | {6:F1} | {7:F1} | {8:F2} |",
+                "| {0} {1} | {2} | **{3:F1}** | {4:F1} | {5} | {6} | {7:F1} | {8:F2} |",
                 medal,
                 rank,
                 model.ModelName,
                 model.AvgComposite,
                 model.AvgQuality,
-                model.AvgSpeed,
-                model.AvgCost,
+                FormatScore(model.AvgSpeed),
+                FormatScore(model.AvgCost),
                 model.AvgReliability,
                 model.AvgRank));
             rank++;
@@ -441,6 +459,10 @@ public static class ModelComparisonExtensions
 
         return sb.ToString();
     }
+
+    // Not measured prints as n/a: never as 0 (the worst) or 100 (the cheapest, the fastest).
+    private static string FormatScore(double? score) =>
+        score is { } value ? value.ToString("F1", CultureInfo.InvariantCulture) : "n/a";
 
     private static string GetMedalEmoji(int rank) => rank switch
     {

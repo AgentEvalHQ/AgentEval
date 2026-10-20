@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using Azure.AI.OpenAI;
 using AgentEval.Core;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Extensions;
 using AgentEval.Benchmarks;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Reporting;
+using AgentEval.Providers;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
@@ -16,17 +16,25 @@ namespace AgentEval.Samples;
 /// Sample G7: Memory Benchmark Reporting &amp; Multi-Model Comparison
 ///
 /// This demonstrates:
-/// - Running the Standard benchmark across 3 models (GPT-4o-mini, GPT-4o, GPT-4.1)
-/// - Comparing model capabilities with the same system prompt
-/// - Saving baselines with model-specific metadata
+/// - Running one memory benchmark preset across the models you configured (Quick by default)
+/// - Comparing model capabilities with the same system prompt and the same judge
+/// - Saving baselines named after the model that actually ran
 /// - Generating an interactive HTML report with overlaid pentagons
 /// - Using the export bridge (.ToEvaluationReport()) for CI/CD integration
 ///
-/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
-/// Optional: AZURE_OPENAI_DEPLOYMENT_2 (default: gpt-4o-mini), AZURE_OPENAI_DEPLOYMENT_3 (default: gpt-4.1)
+/// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig) — and a second
+/// model to compare: the provider's <c>*_MODEL_2</c> (and optionally <c>*_MODEL_3</c>), or
+/// <c>AZURE_OPENAI_DEPLOYMENT_2</c> / <c>_3</c>. Only models the environment names run; a provider's default second
+/// model is not one of them. Preset: <c>--preset quick|standard|full</c> (or the H-group tier names), default Quick.
 /// </summary>
+/// <remarks>
+/// Until 2026-10 this sample labelled its three runs "GPT-4o-mini", "GPT-4o" and "GPT-4.1" whatever ran, sent the literal
+/// <c>gpt-4o</c> as the second model, and always ran Standard: on Bitdeer it saved GLM-5.3-Flash's scores under GPT names.
+/// </remarks>
 public static class MemoryBenchmarkReporting
 {
+    private const string AgentName = "MemoryAgent";
+
     private const string SystemPrompt = """
         You are a helpful assistant with excellent memory.
         IMPORTANT: Remember ALL facts the user tells you. When asked about something
@@ -44,47 +52,58 @@ public static class MemoryBenchmarkReporting
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory benchmarks use an LLM judge.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
         // ──────────────────────────────────────────────────────────
-        //  Step 1: Set up models and runner
+        //  Step 1: The models to compare, the preset, one judge
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 1: Creating benchmark runner for 3 models...\n");
+        // Only the models the environment names. The provider's fallback second and third models are defaults nobody
+        // configured (the primary again, or on Azure deployments that may not exist), and a baseline must carry the
+        // name of the model that produced it.
+        var models = InferenceProviderEnvironment.NamedModels(AIConfig.Settings, Environment.GetEnvironmentVariable);
+        if (!ComparisonModels.Require("G7 Benchmark Reporting", models))
+            return;
 
-        var store = new JsonFileBaselineStore();
-
-        // The 3 models to compare — weakest to strongest
-        // Uses AIConfig deployment names (env vars or defaults: gpt-4o-mini, gpt-4o, gpt-4.1)
-        var models = new[]
+        var benchmark = MemoryBenchmarkSampleSupport.ResolveBenchmark();
+        if (benchmark is null)
         {
-            (Name: "GPT-4o-mini", Deployment: AIConfig.SecondaryModelDeployment),
-            (Name: "GPT-4o",      Deployment: "gpt-4o"),
-            (Name: "GPT-4.1",     Deployment: AIConfig.TertiaryModelDeployment),
-        };
+            Console.WriteLine("\n   Cancelled: nothing ran.\n");
+            SampleOutcome.Skip("cancelled at the preset menu: no model ran");
+            return;
+        }
 
-        Console.WriteLine($"   Endpoint:   {AIConfig.Endpoint}");
-        foreach (var m in models)
-            Console.WriteLine($"   Model: {m.Name,-12} → deployment: {m.Deployment}");
+        // One judge for every model: the comparison then varies the model under test and nothing else. Each model
+        // judging its own answers would also vary the judge.
+        var judgeModel = models[0];
+
+        Console.WriteLine($"Step 1: Creating benchmark runner for {models.Count} models...\n");
+        Console.WriteLine($"   Provider:   {AIConfig.ProviderName} ({AIConfig.Endpoint})");
+        Console.WriteLine($"   Preset:     {benchmark.Name} ({benchmark.Categories.Count} categories)" +
+                          (benchmark.Name == MemoryBenchmark.Quick.Name ? "  — --preset standard or full for more" : ""));
+        Console.WriteLine($"   Judge:      {judgeModel} (the same judge scores every model)");
+        foreach (var model in models)
+            Console.WriteLine($"   Model:      {model}");
         Console.WriteLine();
 
+        var store = new JsonFileBaselineStore();
+        var runner = MemoryBenchmarkRunner.Create(AIConfig.CreateChatClient(judgeModel));
         var allBaselines = new List<MemoryBaseline>();
+        var incomplete = new List<string>();
 
         // ──────────────────────────────────────────────────────────
-        //  Step 2-4: Run Standard benchmark for each model
+        //  Step 2…: Run the preset for each model
         // ──────────────────────────────────────────────────────────
 
-        for (int i = 0; i < models.Length; i++)
+        for (int i = 0; i < models.Count; i++)
         {
             var model = models[i];
-            Console.WriteLine($"Step {i + 2}: Running Standard benchmark — {model.Name}...\n");
+            Console.WriteLine($"Step {i + 2}: Running {benchmark.Name} benchmark — {model}...\n");
 
-            var chatClient = AIConfig.CreateChatClient(model.Deployment);
-            var runner = MemoryBenchmarkRunner.Create(chatClient);
-
-            var agent = chatClient.AsEvaluableAgent(
-                name: "MemoryAgent",
+            var agent = AIConfig.CreateChatClient(model).AsEvaluableAgent(
+                name: AgentName,
                 systemPrompt: SystemPrompt,
                 includeHistory: true);
 
@@ -96,19 +115,25 @@ public static class MemoryBenchmarkReporting
                 Console.Write($"\r   [{p.CompletedCategories}/{p.TotalCategories}] {p.CategoryName}: {status} | {elapsed} elapsed | {remaining} remaining   ");
             });
 
-            var result = await runner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard, progress);
+            var result = await runner.RunBenchmarkAsync(agent, benchmark, progress);
             Console.WriteLine(); // Clear progress line
-            PrintResult(model.Name, result);
+            PrintResult(model, result);
+            MemoryBenchmarkSampleSupport.RecordVerdict(model, result);
+            if (!result.IsComplete || result.SkippedCategories.Count > 0)
+                incomplete.Add(model);
 
             var config = new AgentBenchmarkConfig
             {
-                AgentName = "MemoryAgent",
-                ModelId = model.Deployment,
+                AgentName = AgentName,
+                ModelId = model,
                 ReducerStrategy = "None (memory-optimized prompt)",
                 MemoryProvider = "InMemoryChatHistory"
             };
 
-            var baseline = result.ToBaseline(model.Name, config, tags: [model.Deployment]);
+            var baseline = result.ToBaseline(
+                model, config,
+                description: $"{benchmark.Name} preset on {AIConfig.ProviderName}, judged by {judgeModel}",
+                tags: [model, AIConfig.ProviderTag, benchmark.Name.ToLowerInvariant()]);
             await store.SaveAsync(baseline);
             allBaselines.Add(baseline);
 
@@ -116,41 +141,36 @@ public static class MemoryBenchmarkReporting
         }
 
         // ──────────────────────────────────────────────────────────
-        //  Step 5: Compare all 3 models
+        //  Compare the models
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 5: Comparing models...\n");
+        var step = models.Count + 2;
+        Console.WriteLine($"Step {step}: Comparing models...\n");
 
         var comparer = new BaselineComparer();
         var comparison = comparer.Compare(allBaselines);
-        PrintComparison(comparison, allBaselines);
+        PrintComparison(comparison, incomplete);
 
         // ──────────────────────────────────────────────────────────
-        //  Step 6: Export bridge — integrate with CI/CD
+        //  Export bridge — integrate with CI/CD
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 6: Export bridge (CI/CD integration)\n");
-        var bestBaseline = allBaselines.OrderByDescending(b => b.OverallScore).First();
-        Console.WriteLine($"   Best model: {bestBaseline.Name} at {bestBaseline.OverallScore:F1}%");
+        Console.WriteLine($"Step {step + 1}: Export bridge (CI/CD integration)\n");
+        var leaders = Leaders(allBaselines);
+        var bestBaseline = leaders[0];
+        Console.WriteLine($"   Best model: {string.Join(" = ", leaders.Select(b => b.Name))} at {bestBaseline.OverallScore:F1}%" +
+                          (leaders.Count > 1 ? " (a tie)" : ""));
         Console.WriteLine($"   Grade: {bestBaseline.Grade}  Stars: {new string('*', bestBaseline.Stars)}{new string('o', 5 - bestBaseline.Stars)}");
         Console.WriteLine("   Ready for: JsonExporter, CsvExporter, JUnitXmlExporter, MarkdownExporter\n");
 
         // ──────────────────────────────────────────────────────────
-        //  Step 7: Open the HTML report
+        //  The HTML report
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("Step 7: Opening HTML Report...\n");
-        var serverProcess = store.OpenReport("MemoryAgent");
+        Console.WriteLine($"Step {step + 2}: HTML Report...\n");
+        MemoryBenchmarkSampleSupport.ServeOrPrintReport(store, AgentName);
 
-        if (serverProcess != null)
-        {
-            Console.WriteLine("   Press Enter to stop the server and exit...");
-            Console.ReadLine();
-            serverProcess.Kill();
-            serverProcess.Dispose();
-        }
-
-        PrintKeyTakeaways();
+        PrintKeyTakeaways(models.Count);
     }
 
     private static void PrintResult(string label, MemoryBenchmarkResult result)
@@ -162,29 +182,16 @@ public static class MemoryBenchmarkReporting
         Console.ResetColor();
         Console.WriteLine($"  Grade: {result.Grade}  {new string('*', result.Stars)}{new string('o', 5 - result.Stars)}");
 
-        foreach (var cat in result.CategoryResults.Where(c => !c.Skipped))
-        {
-            Console.ForegroundColor = cat.Score >= 80 ? ConsoleColor.Green :
-                                      cat.Score >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-            Console.Write($"     {cat.CategoryName,-24} {cat.Score,6:F1}%");
-            Console.ResetColor();
-            Console.WriteLine();
-        }
+        MemoryBenchmarkSampleSupport.PrintCategories(result);
         Console.WriteLine();
     }
 
-    private static void PrintComparison(MemoryBaselineComparison comparison, List<MemoryBaseline> baselines)
+    private static void PrintComparison(MemoryBaselineComparison comparison, IReadOnlyList<string> incomplete)
     {
-        if (comparison.Baselines.Count < 2)
-        {
-            Console.WriteLine("   Need at least 2 baselines to compare.\n");
-            return;
-        }
-
         // Header
         Console.Write("   | Dimension      ");
         foreach (var bl in comparison.Baselines)
-            Console.Write($"| {bl.Name,-12} ");
+            Console.Write($"| {Fit(bl.Name, 12),-12} ");
         Console.WriteLine("| Winner           |");
 
         Console.Write("   |----------------");
@@ -192,21 +199,32 @@ public static class MemoryBenchmarkReporting
             Console.Write("|--------------");
         Console.WriteLine("|------------------|");
 
+        var ties = 0;
         foreach (var dim in comparison.Dimensions)
         {
             Console.Write($"   | {dim.DimensionName,-14} ");
-            double bestScore = 0;
-            string bestName = "";
+            double? bestScore = null;
+            var bestNames = new List<string>();
 
             foreach (var bl in comparison.Baselines)
             {
-                var score = dim.Scores.GetValueOrDefault(bl.Id, 0);
-                if (score > bestScore) { bestScore = score; bestName = bl.Name; }
+                // Read the baseline's own scores: the comparer fills a dimension a baseline did not measure with 0,
+                // and a dimension that was not measured is not a 0.
+                if (!bl.DimensionScores.TryGetValue(dim.DimensionName, out var score))
+                {
+                    Console.Write($"| {"n/a",11}  ");
+                    continue;
+                }
+                if (bestScore is null || score > bestScore) { bestScore = score; bestNames = [bl.Name]; }
+                else if (score == bestScore) bestNames.Add(bl.Name);
                 Console.Write($"| {score,10:F1}%  ");
             }
 
+            // A tie has no winner: the first model listed used to take it.
+            var winner = bestNames.Count switch { 0 => "n/a", 1 => bestNames[0], _ => "tie" };
+            if (bestNames.Count > 1) ties++;
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"| {bestName,-16} ");
+            Console.Write($"| {Fit(winner, 16),-16} ");
             Console.ResetColor();
             Console.WriteLine("|");
         }
@@ -216,28 +234,48 @@ public static class MemoryBenchmarkReporting
             Console.Write("|--------------");
         Console.WriteLine("|------------------|");
 
-        var best = comparison.Baselines.First(bl => bl.Id == comparison.BestBaselineId);
+        var leaders = Leaders(comparison.Baselines);
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"\n   Best overall: {best.Name}");
+        Console.WriteLine(leaders.Count == 1
+            ? $"\n   Best overall: {leaders[0].Name}"
+            : $"\n   Best overall: a tie — {string.Join(", ", leaders.Select(b => b.Name))} at {leaders[0].OverallScore:F1}%");
         Console.ResetColor();
+        if (ties == comparison.Dimensions.Count && leaders.Count > 1)
+            Console.WriteLine("   This preset does not separate these models; a larger one (--preset standard or full) may.");
+        if (incomplete.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"   Not a like-for-like comparison: {string.Join(", ", incomplete)} did not measure every category or question.");
+            Console.ResetColor();
+        }
         Console.WriteLine();
     }
 
-    private static void PrintKeyTakeaways()
+    /// <summary>The baselines sharing the top overall score, in run order: one, or a tie.</summary>
+    private static IReadOnlyList<MemoryBaseline> Leaders(IReadOnlyList<MemoryBaseline> baselines)
+    {
+        var top = baselines.Max(b => b.OverallScore);
+        return baselines.Where(b => b.OverallScore == top).ToList();
+    }
+
+    private static string Fit(string value, int width) =>
+        value.Length <= width ? value : value[..(width - 1)] + "…";
+
+    private static void PrintKeyTakeaways(int modelCount)
     {
         Console.WriteLine();
         Console.WriteLine(new string('=', 70));
         Console.WriteLine("KEY TAKEAWAYS:");
-        Console.WriteLine("   * Multi-model comparison: same prompt, 3 models, side-by-side");
+        Console.WriteLine($"   * Multi-model comparison: same prompt, same judge, {modelCount} models, side-by-side");
         Console.WriteLine("   * Which model led each category is in the comparison table above: measured in");
         Console.WriteLine("     this run, on this benchmark, not assumed from the model names");
-        Console.WriteLine("   * MemoryBenchmarkRunner.Create(chatClient) — zero boilerplate");
+        Console.WriteLine("   * MemoryBenchmarkRunner.Create(judgeClient) — zero boilerplate");
         Console.WriteLine("   * .ToBaseline(name, config) snapshots scores + full agent metadata");
         Console.WriteLine("   * ConfigurationId routes: same config -> timeline, different -> radar");
         Console.WriteLine("   * .ToEvaluationReport() bridges to all 6 AgentEval exporters");
-        Console.WriteLine("   * Standard = 8 categories: Retention, Temporal, Noise, Depth, Updates,");
-        Console.WriteLine("     MultiTopic, Abstention, Preference");
-        Console.WriteLine("   * Report pentagon overlays all 3 models for instant visual comparison");
+        Console.WriteLine("   * Quick = 3 categories; Standard = 8 (Retention, Temporal, Noise, Depth, Updates,");
+        Console.WriteLine("     MultiTopic, Abstention, Preference); Full = 12");
+        Console.WriteLine("   * Report pentagon overlays every model for instant visual comparison");
         Console.WriteLine("   * In production, use DI: services.AddAgentEvalMemory()");
     }
 
@@ -247,7 +285,7 @@ public static class MemoryBenchmarkReporting
         Console.WriteLine("===================================================================");
         Console.WriteLine("AgentEval Memory — Sample G7: Multi-Model Benchmark Comparison");
         Console.WriteLine("===================================================================");
-        Console.WriteLine("Run Standard benchmark across 3 models, compare & report.");
+        Console.WriteLine("Run one benchmark preset across your configured models, compare & report.");
         Console.WriteLine();
     }
 }

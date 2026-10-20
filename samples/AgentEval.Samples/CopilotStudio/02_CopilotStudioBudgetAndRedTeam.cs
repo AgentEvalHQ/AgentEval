@@ -58,6 +58,7 @@ public static class CopilotStudioBudgetAndRedTeam
         if (string.IsNullOrWhiteSpace(configPath) || !understood)
         {
             PrintMissingSetupWarning();
+            SampleOutcome.Skip("no live Copilot Studio agent: set COPILOTSTUDIO_CONFIG_PATH and COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true");
             return;
         }
 
@@ -69,6 +70,7 @@ public static class CopilotStudioBudgetAndRedTeam
         catch (InvalidOperationException ex)
         {
             Console.WriteLine($"   ❌ Config error: {ex.Message}");
+            SampleOutcome.Error($"the Copilot Studio config could not be loaded: {ex.Message}");
             return;
         }
 
@@ -88,11 +90,20 @@ public static class CopilotStudioBudgetAndRedTeam
         {
             await scene();
         }
+        catch (AgentEvalAssertionException ex)
+        {
+            // An assertion the scene makes did not hold: that is the check failing, not the scene being skipped.
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   ❌ assertion failed — {ex.Message.Split('\n')[0]}");
+            Console.ResetColor();
+            SampleOutcome.Fail($"assertion failed: {ex.Message.Split('\n')[0]}");
+        }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine($"   (scene skipped — {ex.GetType().Name}: {ex.Message})");
             Console.ResetColor();
+            SampleOutcome.Error($"a scene threw {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -115,6 +126,7 @@ public static class CopilotStudioBudgetAndRedTeam
         {
             await agent.InvokeAsync("Tell me more, in detail.");
             Console.WriteLine("     (no exception this run — the estimate may not have reached the cap yet; this is turn-count-based, not deterministic across all tenants)");
+            SampleOutcome.Skip("the 1-credit cap did not trip this run, so budget enforcement was not exercised");
         }
         catch (CopilotStudioBudgetExceededException ex)
         {
@@ -139,6 +151,7 @@ public static class CopilotStudioBudgetAndRedTeam
         if (rawClient is null)
         {
             Console.WriteLine("   (raw client not captured this run — wrapChatClient's hook didn't fire as expected)");
+            SampleOutcome.Skip("the raw client was not captured, so the credit-budget assertion did not run");
             return;
         }
 
@@ -161,6 +174,8 @@ public static class CopilotStudioBudgetAndRedTeam
 
         var resisted = await agent.CanResistAsync(Attack.PromptInjection);
         Console.WriteLine($"   Prompt Injection: {(resisted ? "✅ Resisted" : "❌ Vulnerable")}");
+        if (!resisted)
+            SampleOutcome.Fail("the live Copilot Studio agent did not resist the prompt-injection probe");
         Console.WriteLine("   This is the SAME extension method RedTeamBasic (SafetyAndSecurity) runs against an Azure");
         Console.WriteLine("   OpenAI agent — CanResistAsync doesn't know or care that IEvaluableAgent here is backed by");
         Console.WriteLine("   a live Copilot Studio conversation instead of a stateless chat completion.");
@@ -182,6 +197,7 @@ public static class CopilotStudioBudgetAndRedTeam
         if (firstAgentResponse is null)
         {
             Console.WriteLine("   (no response captured this run — skipping)");
+            SampleOutcome.Skip("no response was captured, so conversation identity was not measured");
             return;
         }
 
@@ -199,6 +215,7 @@ public static class CopilotStudioBudgetAndRedTeam
         if (secondAgentResponse is null)
         {
             Console.WriteLine("   (no response captured this run — skipping)");
+            SampleOutcome.Skip("no response was captured, so conversation identity was not measured");
             return;
         }
 

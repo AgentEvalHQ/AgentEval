@@ -76,6 +76,7 @@ internal static class JudgeVsJudgeDemo
             Console.WriteLine("   ⚠ No generative judge is configured (AI_INFERENCE_PROVIDER). N3 compares two judges; it needs both.");
             Console.WriteLine($"     {AIConfig.Settings.Diagnostic}");
             Console.ResetColor();
+            SampleOutcome.Skip("no generative judge configured: Judge vs Judge compares two judges and needs both");
             return;
         }
 
@@ -85,6 +86,7 @@ internal static class JudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   ⚠ Golden directory not found. Run from the repository (looked for {GoldenRelativePath} above the working and base directories) or pass --golden DIR.");
             Console.ResetColor();
+            SampleOutcome.Skip($"the golden directory {GoldenRelativePath} was not found");
             return;
         }
 
@@ -131,7 +133,7 @@ internal static class JudgeVsJudgeDemo
             new Arm("A", "generative", AIConfig.ModelIdentity, generative),
             new Arm("B", "decision", $"{jevOptions.Model}@{jevOptions.ProviderName}", jev),
         }.Where(a => opts.Arms.Contains(a.Id)).ToArray();
-        if (arms.Length == 0) { Console.WriteLine("   ⚠ --arms selected no judge (use A, B or A,B)."); return; }
+        if (arms.Length == 0) { Console.WriteLine("   ⚠ --arms selected no judge (use A, B or A,B)."); SampleOutcome.Skip("--arms selected no judge"); return; }
         Console.WriteLine($"   Arms         : {string.Join(" + ", arms.Select(a => a.Id + " " + a.Label))}{(arms.Length == 1 ? "   (one arm: no judge-vs-judge comparison, only that arm's own figures and repeat stability)" : "")}");
         Console.WriteLine();
 
@@ -159,6 +161,7 @@ internal static class JudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠ The first case did not reach a judge on at least one arm. Stopping before the rest — fix the wiring first.");
             Console.ResetColor();
+            SampleOutcome.Error("the first case did not reach a judge on at least one arm");
             return;
         }
 

@@ -132,6 +132,8 @@ class AgentEval.Comparison.ModelComparisonResult : IEquatable<AgentEval.Comparis
     IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking { get; init; }
     IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults { get; init; }
     Int32 GetHashCode()
+    String CostNotMeasuredReason { get; }
+    String SpeedNotMeasuredReason { get; }
     String Summary { get; }
     String ToString()
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, out IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, out AgentEval.Comparison.ModelRanking Winner, out AgentEval.Comparison.ModelComparisonOptions Options)
@@ -153,17 +155,17 @@ class AgentEval.Comparison.ModelRanking : IEquatable<AgentEval.Comparison.ModelR
     Boolean Equals(AgentEval.Comparison.ModelRanking other)
     Boolean Equals(Object obj)
     Double CompositeScore { get; init; }
-    Double CostScore { get; init; }
     Double QualityScore { get; init; }
     Double ReliabilityScore { get; init; }
-    Double SpeedScore { get; init; }
+    Double? CostScore { get; init; }
+    Double? SpeedScore { get; init; }
     Int32 GetHashCode()
     Int32 Rank { get; init; }
     String ModelId { get; init; }
     String ModelName { get; init; }
     String ToString()
-    Void Deconstruct(out String ModelId, out String ModelName, out Double CompositeScore, out Double QualityScore, out Double SpeedScore, out Double CostScore, out Double ReliabilityScore, out Int32 Rank)
-    ctor(String ModelId, String ModelName, Double CompositeScore, Double QualityScore, Double SpeedScore, Double CostScore, Double ReliabilityScore, Int32 Rank)
+    Void Deconstruct(out String ModelId, out String ModelName, out Double CompositeScore, out Double QualityScore, out Double? SpeedScore, out Double? CostScore, out Double ReliabilityScore, out Int32 Rank)
+    ctor(String ModelId, String ModelName, Double CompositeScore, Double QualityScore, Double? SpeedScore, Double? CostScore, Double ReliabilityScore, Int32 Rank)
 class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelResult>
     AgentEval.Comparison.ModelResult <Clone>$()
     AgentEval.Comparison.StochasticResult StochasticResult { get; init; }
@@ -178,9 +180,9 @@ class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelRe
     String ModelId { get; init; }
     String ModelName { get; init; }
     String ToString()
-    TimeSpan AverageLatency { get; init; }
-    Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
-    ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan AverageLatency, Decimal? AverageCost, Decimal? TotalCost)
+    TimeSpan? AverageLatency { get; init; }
+    Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan? AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
+    ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan? AverageLatency, Decimal? AverageCost, Decimal? TotalCost)
 class AgentEval.Comparison.ScoringWeights : IEquatable<AgentEval.Comparison.ScoringWeights>
     AgentEval.Comparison.ScoringWeights <Clone>$()
     Boolean Equals(AgentEval.Comparison.ScoringWeights other)

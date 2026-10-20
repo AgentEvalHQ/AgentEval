@@ -41,6 +41,7 @@ public static class OwaspBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H6 — OWASP");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -97,6 +98,7 @@ public static class OwaspBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("OWASP LLM Top 10 benchmark", result.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

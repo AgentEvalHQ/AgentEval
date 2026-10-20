@@ -36,6 +36,7 @@ public static class MemoryScenariosDemo
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory evaluators use an LLM judge — they cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -92,6 +93,8 @@ public static class MemoryScenariosDemo
         Console.WriteLine($"   Failure Point: {(result.FailurePoint.HasValue ? $"at depth {result.FailurePoint}" : "none (all passed!)")}");
         Console.WriteLine($"   Overall Score: {result.OverallScore:F1}%");
         Console.WriteLine($"   Passed: {(result.Passed ? "✅ Yes" : "❌ No")}\n");
+        if (!result.Passed)
+            SampleOutcome.Fail($"reach-back: '{fact.Content}' was not recalled reliably (score {result.OverallScore:F1}%, failure point {result.FailurePoint?.ToString() ?? "none"})");
 
         Console.WriteLine("   Depth Breakdown:");
         foreach (var dr in result.DepthResults)
@@ -145,6 +148,8 @@ public static class MemoryScenariosDemo
         Console.WriteLine($"   Retained: {result.RetainedCount} | Lost: {result.LostCount}");
         Console.WriteLine($"   Critical Loss: {(result.HasCriticalLoss ? "⚠️ YES" : "✅ No")}");
         Console.WriteLine($"   Passed: {(result.Passed ? "✅ Yes" : "❌ No")}\n");
+        if (!result.Passed)
+            SampleOutcome.Fail($"reducer: fidelity {result.FidelityScore:F1}%, {result.LostCount} fact(s) lost{(result.HasCriticalLoss ? ", including a critical one" : "")}");
 
         Console.WriteLine("   Per-Fact Results:");
         foreach (var fr in result.FactResults)

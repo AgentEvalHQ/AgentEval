@@ -51,6 +51,7 @@ public static class EuAiActBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H5 — EU AI ACT");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -114,6 +115,7 @@ public static class EuAiActBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("EU AI Act benchmark", result.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

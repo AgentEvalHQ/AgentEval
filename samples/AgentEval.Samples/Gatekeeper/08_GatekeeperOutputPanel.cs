@@ -175,6 +175,9 @@ public static class GatekeeperOutputPanel
         var verb = flag ? (blocked ? "flagged" : "cleared") : (blocked ? "blocked" : "allowed");
         var ok = blocked == expectBlock;
         Console.WriteLine($"   {(ok ? "✅" : "⚠️ ")} {label,-20} → {verb}" + (ok ? "" : $" (expected {(expectBlock ? "block" : "allow")} — the model judged differently this run)"));
+        // Each text is labelled by construction: a verdict that differs from its label is the judge getting it wrong.
+        if (!ok)
+            SampleOutcome.Fail($"output panel, {label}: expected {(expectBlock ? "block" : "allow")}, the judge {verb} it");
         if (verdict.Matches is { Count: > 0 })
         {
             Console.WriteLine($"        evidence: {string.Join("  |  ", verdict.Matches)}");

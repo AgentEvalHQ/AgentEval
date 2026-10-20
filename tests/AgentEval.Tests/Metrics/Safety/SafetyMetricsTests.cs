@@ -106,12 +106,62 @@ public class GroundednessMetricTests
         // Arrange
         var fakeClient = new FakeChatClient("{}");
         var metric = new GroundednessMetric(fakeClient);
-        
+
         // Assert
         Assert.True(metric.Categories.HasFlag(MetricCategory.Safety));
         Assert.True(metric.Categories.HasFlag(MetricCategory.RAG));
         Assert.True(metric.Categories.HasFlag(MetricCategory.RequiresContext));
         Assert.True(metric.Categories.HasFlag(MetricCategory.LLMEvaluated));
+    }
+
+    // The same gap as misinformation (2026-10 Bitdeer sweep): a fact the agent took from a tool read as fabricated
+    // beside a retrieved context that did not contain it, because the judge was never sent the tool results.
+    [Fact]
+    public async Task EvaluateAsync_ToolResults_AreSentBesideTheRetrievedContext()
+    {
+        var fakeClient = new FakeChatClient("""{"score": 95, "fabricatedElements": []}""");
+        var metric = new GroundednessMetric(fakeClient);
+
+        await metric.EvaluateAsync(new EvaluationContext
+        {
+            Input = "What is the weather in Paris, and is the Louvre open?",
+            Output = "It is 18°C and sunny in Paris. The Louvre is open until 18:00.",
+            Context = "The Louvre is open daily except Tuesday, 09:00-18:00.",
+            ToolUsage = WeatherToolUsage(),
+        });
+
+        var prompt = fakeClient.LastPrompt!;
+        Assert.Contains("The Louvre is open daily except Tuesday", prompt);
+        Assert.Contains("TOOL RESULTS THE AI RECEIVED", prompt);
+        Assert.Contains("Paris: 18°C, sunny", prompt);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ToolResultsAlone_DoNotMakeItMeasurable()
+    {
+        // Groundedness is defined on a retrieved context; tool results are added to it, never a substitute for it.
+        var fakeClient = new FakeChatClient("""{"score": 95}""");
+        var metric = new GroundednessMetric(fakeClient);
+
+        var result = await metric.EvaluateAsync(new EvaluationContext
+        {
+            Input = "What is the weather in Paris?",
+            Output = "It is 18°C and sunny in Paris.",
+            ToolUsage = WeatherToolUsage(),
+        });
+
+        Assert.False(result.Measured);
+        Assert.Equal(0, fakeClient.CallCount);
+    }
+
+    private static AgentEval.Models.ToolUsageReport WeatherToolUsage()
+    {
+        var usage = new AgentEval.Models.ToolUsageReport();
+        usage.AddCall(new AgentEval.Models.ToolCallRecord
+        {
+            Name = "GetWeather", CallId = "w1", Order = 1, Result = "Paris: 18°C, sunny", WasExecuted = true,
+        });
+        return usage;
     }
 }
 

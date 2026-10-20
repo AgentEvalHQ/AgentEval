@@ -88,6 +88,7 @@ public static class LongMemEvalBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H9 — LongMemEval");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -110,6 +111,7 @@ public static class LongMemEvalBenchmarkSample
             Console.WriteLine("   For development / CI use --preset smoke (10Q) or --preset standard (50Q) —");
             Console.WriteLine("   both pick up the canonical local dataset automatically.");
             Console.ResetColor();
+            SampleOutcome.Skip($"the audit-grade preset needs {LongMemEvalDataLoader.DatasetPathEnvVar}, which is not set");
             return;
         }
 
@@ -173,6 +175,7 @@ public static class LongMemEvalBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   LongMemEval preset selection failed: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Skip($"LongMemEval preset selection failed: {ex.Message}");
             return;
         }
 
@@ -195,6 +198,7 @@ public static class LongMemEvalBenchmarkSample
         catch (LongMemEvalDatasetNotFoundException ex)
         {
             PrintDatasetMissingBox(ex);
+            SampleOutcome.Skip("the LongMemEval dataset was not found");
             return;
         }
         catch (FileNotFoundException ex) when (ex.Message.Contains("LongMemEval", StringComparison.OrdinalIgnoreCase))
@@ -203,6 +207,7 @@ public static class LongMemEvalBenchmarkSample
             // typed exception (e.g. from a custom DatasetPath override pointing at a
             // missing file) — still render the friendly box rather than the menu crash.
             PrintDatasetMissingBox(ex);
+            SampleOutcome.Skip("the LongMemEval dataset was not found");
             return;
         }
         catch (Exception ex)
@@ -210,6 +215,7 @@ public static class LongMemEvalBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   LongMemEval run failed: {ex.GetType().Name}: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Error($"the LongMemEval run threw {ex.GetType().Name}: {ex.Message}");
             return;
         }
 
@@ -278,6 +284,7 @@ public static class LongMemEvalBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
+        SampleOutcome.RecordVerdict("LongMemEval benchmark", evalTree.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

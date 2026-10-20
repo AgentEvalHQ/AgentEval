@@ -21,8 +21,9 @@ public class CategoryScoreEntry
 
     /// <summary>
     /// Number of items behind this score. External-benchmark baselines set it to the category's
-    /// question count. The native memory benchmark's <c>ToBaseline</c> does not set it, so native
-    /// baselines carry the default of 1 whatever the preset ran.
+    /// scored question count, the score's denominator; a selected question that errored or got no
+    /// verdict is not behind the score. The native memory benchmark's <c>ToBaseline</c> does not set it,
+    /// so native baselines carry the default of 1 whatever the preset ran.
     /// </summary>
     public int ScenarioCount { get; init; } = 1;
 

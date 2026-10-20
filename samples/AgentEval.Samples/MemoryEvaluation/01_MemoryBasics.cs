@@ -35,6 +35,7 @@ public static class MemoryBasics
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint) to evaluate memory.");
             Console.WriteLine("   Memory evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -120,6 +121,7 @@ public static class MemoryBasics
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Fail($"memory assertion failed: {ex.Message}");
         }
 
         Console.WriteLine();

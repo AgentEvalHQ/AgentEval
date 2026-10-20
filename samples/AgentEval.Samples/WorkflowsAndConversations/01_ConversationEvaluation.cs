@@ -32,6 +32,7 @@ public static class ConversationEvaluation
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -103,6 +104,9 @@ public static class ConversationEvaluation
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Write("❌ FAILED");
+            var failed = result.Assertions.Where(a => !a.Passed).Select(a => a.Name).ToList();
+            SampleOutcome.Fail($"conversation '{result.TestCase.Name}' failed" +
+                (result.Error is not null ? $": {result.Error}" : failed.Count > 0 ? $": {string.Join(", ", failed)}" : ""));
         }
         Console.ResetColor();
         Console.WriteLine($" ({result.Duration.TotalMilliseconds:F0}ms)\n");

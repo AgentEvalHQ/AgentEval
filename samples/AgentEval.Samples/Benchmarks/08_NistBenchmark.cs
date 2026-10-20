@@ -34,6 +34,7 @@ public static class NistBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H8 — NIST AI RMF");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -84,6 +85,7 @@ public static class NistBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("NIST AI RMF benchmark", result.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

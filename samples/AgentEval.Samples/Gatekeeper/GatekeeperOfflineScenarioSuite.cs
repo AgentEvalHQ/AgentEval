@@ -554,7 +554,7 @@ internal static class GatekeeperOfflineScenarioSuite
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Offline Gatekeeper oracle failed: " + message + ".");
+            throw new SampleCheckFailedException("Offline Gatekeeper oracle failed: " + message + ".");
         }
     }
 

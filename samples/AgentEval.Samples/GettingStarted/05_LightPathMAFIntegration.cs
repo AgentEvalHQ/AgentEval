@@ -75,10 +75,12 @@ public static class LightPathMAFIntegration
             }
         }
 
-        results.AssertAllPassed();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"\n   ✅ results.AssertAllPassed() — no exception thrown!{AIConfig.MockLabel}\n");
-        Console.ResetColor();
+        if (AssertAllPassed(results, "agentic", SampleOutcome.Fail))
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"\n   ✅ results.AssertAllPassed() — no exception thrown!{AIConfig.MockLabel}\n");
+            Console.ResetColor();
+        }
 
         // ════════════════════════════════════════════════════════════
         // DEMO 2: Multiple evaluators — AgentEval + MEAI side by side
@@ -120,6 +122,7 @@ public static class LightPathMAFIntegration
                     }
                 }
             }
+            RecordFailures(r, $"evaluator {i + 1}", SampleOutcome.Fail);
         }
         Console.WriteLine();
 
@@ -164,10 +167,13 @@ public static class LightPathMAFIntegration
                 }
             }
 
-            qualityResults.AssertAllPassed();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n   ✅ Quality evaluation passed!\n");
-            Console.ResetColor();
+            // A quality score below its threshold is a warning; an accuracy or safety failure below is a failed check.
+            if (AssertAllPassed(qualityResults, "quality", SampleOutcome.Warn))
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("\n   ✅ Quality evaluation passed!\n");
+                Console.ResetColor();
+            }
 
             // Safety
             Console.WriteLine("   🔄 Running Safety evaluation (3 LLM-as-judge metrics)...\n");
@@ -185,13 +191,17 @@ public static class LightPathMAFIntegration
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
                         Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
+                        if (num.Interpretation?.Failed == true)
+                            Console.WriteLine($"         ↳ {Truncate(num.Interpretation.Reason ?? num.Reason ?? "", 300)}");
                     }
                 }
             }
-            safetyResults.AssertAllPassed();
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n   ✅ Safety evaluation passed!\n");
-            Console.ResetColor();
+            if (AssertAllPassed(safetyResults, "safety", SampleOutcome.Fail))
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("\n   ✅ Safety evaluation passed!\n");
+                Console.ResetColor();
+            }
         }
         else
         {
@@ -229,6 +239,45 @@ public static class LightPathMAFIntegration
     // A metric that was not measured carries no value (its reason says why), so there is no score to print.
     private static string FormatScore(NumericMetric num) =>
         num.Value is { } v ? $"{v:F1}/5.0" : "no value";
+
+    // results.AssertAllPassed() is the CI gate this sample shows: it throws when any metric failed. The throw is caught
+    // here and each failure recorded, so the run says which check failed (and which was not measured) instead of
+    // ending as a crash at the first one.
+    private static bool AssertAllPassed(AgentEvalResults results, string what, Action<string> recordFailure)
+    {
+        try
+        {
+            results.AssertAllPassed();
+            return true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"\n   ❌ results.AssertAllPassed() threw: {ex.Message.ReplaceLineEndings(" ")}{AIConfig.MockLabel}\n");
+            Console.ResetColor();
+            RecordFailures(results, what, recordFailure);
+            return false;
+        }
+    }
+
+    // A failed metric with no value was not measured (its reason says why): never a pass, and not a failed check either.
+    private static void RecordFailures(AgentEvalResults results, string what, Action<string> recordFailure)
+    {
+        foreach (var item in results.Items)
+        {
+            foreach (var (name, metric) in item.Metrics)
+            {
+                if (metric is not NumericMetric num || num.Interpretation?.Failed != true)
+                    continue;
+
+                var reason = Truncate(num.Interpretation.Reason ?? num.Reason ?? "", 200);
+                if (num.Value is null)
+                    SampleOutcome.Skip($"{what} {name} not measured: {reason}");
+                else
+                    recordFailure($"{what} {name} = {num.Value:F1}/5.0: {reason}");
+            }
+        }
+    }
 
     // ════════════════════════════════════════════════════════════════════
     // AGENT & TOOLS

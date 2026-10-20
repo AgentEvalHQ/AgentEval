@@ -69,6 +69,7 @@ public static class JudgeCalibration
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
             PrintKeyTakeaways();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

@@ -161,6 +161,7 @@ public static class GlmBitdeerProviderDemo
             }
             Console.WriteLine();
             PrintTakeaways(dryRun: true);
+            SampleOutcome.Skip("--dry-run: every payload was rendered and nothing was sent, so nothing was measured");
             return;
         }
 
@@ -202,6 +203,7 @@ public static class GlmBitdeerProviderDemo
             Console.WriteLine($"     subject said : \"{Trim(reply.Text, 90)}\"   ({subjectMs:N0} ms, {reply.TokenUsage?.PromptTokens ?? 0}+{reply.TokenUsage?.CompletionTokens ?? 0} tok)");
             PrintTree(result, indent: "     ", price is not null);
             Console.WriteLine($"     composite    : {result.Score.Value:F3} {result.Score.Label.ToUpperInvariant()}   (judge round-trip {judgeMs:N0} ms)");
+            SampleOutcome.RecordVerdict($"ledger answer {c.Id}", result.Score);
             Console.WriteLine();
 
             // The composite's own provenance carries no tokens; the judge's live on the atomic-llm leaf. Summing the

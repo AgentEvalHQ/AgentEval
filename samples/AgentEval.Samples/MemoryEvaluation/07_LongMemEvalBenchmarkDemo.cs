@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using Azure.AI.OpenAI;
 using AgentEval.Core;
 using AgentEval.Memory.External;
 using AgentEval.Memory.External.LongMemEval;
 using AgentEval.Memory.External.Models;
 using AgentEval.Memory.Models;
 using AgentEval.Memory.Reporting;
+using AgentEval.Samples.Benchmarks;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
@@ -18,9 +18,13 @@ namespace AgentEval.Samples;
 /// Demonstrates research-grade memory evaluation using the official LongMemEval methodology:
 /// - Stratified sampling across all 6 question types
 /// - Type-specific judge prompts matching the official evaluation
-/// - Session boundary + timestamp preservation in history injection
-/// - Binary scoring (0/1) comparable to published results (GPT-4o = 57.7%)
-/// - 2 LLM calls per question (query + judge) via history injection
+/// - The paper's prompt format: every haystack session, with its date, in the user message (TextBlob)
+/// - Binary scoring (0/1), the paper's metric
+/// - 2 LLM calls per question (answer + judge)
+/// - The answer prompts measured on their way to the provider, so the run shows the haystack reached the model
+///
+/// Preset (<c>--preset</c>, default Smoke): Smoke 10 questions, Standard 50, Audit-Grade all 500. S-mode haystacks
+/// are about 115K tokens each, so every question sends that much.
 ///
 /// <para>
 /// Renamed from <c>LongMemEvalBenchmark</c> to <c>LongMemEvalBenchmarkDemo</c> in
@@ -43,6 +47,8 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class LongMemEvalBenchmarkDemo
 {
+    private const string AgentName = "LongMemEval-Agent";
+
     private static readonly string DatasetPath = Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
         "src", "AgentEval.Memory", "Data", "longmemeval", "longmemeval_s_cleaned.json"));
@@ -54,6 +60,7 @@ public static class LongMemEvalBenchmarkDemo
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -68,6 +75,7 @@ public static class LongMemEvalBenchmarkDemo
             Console.WriteLine("   https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/tree/main");
             Console.WriteLine("   Place longmemeval_s_cleaned.json in:");
             Console.WriteLine("   src/AgentEval.Memory/Data/longmemeval/");
+            SampleOutcome.Skip($"the LongMemEval dataset is not at {DatasetPath}");
             return;
         }
 
@@ -77,46 +85,57 @@ public static class LongMemEvalBenchmarkDemo
 
         Console.WriteLine("Step 1: Creating LongMemEval runner and agent...\n");
 
-        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        var model = AIConfig.ModelDeployment;
 
-        var runner = LongMemEvalBenchmarkRunner.Create(chatClient, DatasetPath);
+        // The answer model's client is metered: each prompt's size as sent, and as the provider counted it. The judge
+        // gets its own client so only answer prompts are measured.
+        var answerClient = new PromptSizeMeter(AIConfig.CreateChatClient(model));
+        var runner = LongMemEvalBenchmarkRunner.Create(AIConfig.CreateChatClient(model), DatasetPath);
 
-        var agent = chatClient.AsEvaluableAgent(
-            name: "LongMemEval-Agent",
+        var agent = answerClient.AsEvaluableAgent(
+            name: AgentName,
             systemPrompt: "You are a helpful assistant. Answer questions based on our conversation history.",
             includeHistory: true);
 
         var config = new AgentBenchmarkConfig
         {
-            AgentName = "LongMemEval-Agent",
-            ModelId = AIConfig.ModelDeployment,
+            AgentName = AgentName,
+            ModelId = model,
             ReducerStrategy = "None",
-            MemoryProvider = "InMemoryChatHistory (history injection)"
+            // The options below leave HistoryInjectionMode at its default, TextBlob. This used to say
+            // "InMemoryChatHistory (history injection)", which is not how the history reached the model.
+            MemoryProvider = "TextBlob (every session in the user message)"
         };
 
-        Console.WriteLine($"   Model: {AIConfig.ModelDeployment}");
-        Console.WriteLine($"   History injection: {agent is IHistoryInjectableAgent}");
-        Console.WriteLine("   Scoring: Binary (0/1) matching official LongMemEval methodology\n");
-
-        // ──────────────────────────────────────────────────────────
-        //  Step 2: Configure and run benchmark
-        // ──────────────────────────────────────────────────────────
-
+        var preset = BenchmarkSampleHelpers.ResolvePreset();
         var options = new ExternalBenchmarkOptions
         {
-            MaxQuestions = 50,               // ~8 per type via stratified sampling
+            MaxQuestions = preset switch
+            {
+                SamplePreset.AuditGrade => null,   // all 500
+                SamplePreset.Standard => 50,       // ~8 per type via stratified sampling
+                _ => 10,
+            },
             StratifiedSampling = true,       // proportional across all 6 types
-            PreserveSessionBoundaries = true, // session markers in history
+            PreserveSessionBoundaries = true, // applies to structured injection; TextBlob always marks sessions
             IncludeTimestamps = true,        // temporal context preserved
             DatasetMode = "S",               // ~115K tokens per question
             RandomSeed = 42                  // reproducible
         };
 
+        Console.WriteLine($"   Model:     {model} ({AIConfig.ProviderName})");
+        Console.WriteLine($"   Judge:     {model} — the model judges its own answers; the paper's judge was GPT-4o");
+        Console.WriteLine($"   History:   {options.HistoryInjectionMode} — every session, with its date, in the user message (the paper's format)");
+        Console.WriteLine("   Scoring:   Binary (0/1), the official LongMemEval metric\n");
+
+        // ──────────────────────────────────────────────────────────
+        //  Step 2: Configure and run benchmark
+        // ──────────────────────────────────────────────────────────
+
         Console.WriteLine("Step 2: Running LongMemEval benchmark...\n");
-        Console.WriteLine($"   Questions: {options.MaxQuestions} (stratified from 500)");
-        Console.WriteLine($"   Mode: {options.DatasetMode} (~115K tokens per question)");
-        Console.WriteLine($"   Session boundaries: preserved  |  Timestamps: included");
-        Console.WriteLine($"   Judge: 4 task-specific prompt templates covering 6 dataset labels\n");
+        Console.WriteLine($"   Preset:    {preset} — {(options.MaxQuestions?.ToString() ?? "all")} questions (stratified from 500, seed {options.RandomSeed})");
+        Console.WriteLine($"   Mode:      {options.DatasetMode} (~115K tokens of history per question)");
+        Console.WriteLine($"   Judge:     4 task-specific prompt templates covering 6 dataset labels\n");
 
         var result = await runner.RunAsync(agent, config, options);
 
@@ -129,29 +148,29 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine("Step 3: Results Summary\n");
 
         Console.Write($"   Overall accuracy:      ");
-        PrintScore(result.OverallAccuracy);
-        Console.WriteLine($" ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)\n");
+        LongMemEvalSampleSupport.PrintScore(result.OverallAccuracy);
+        Console.WriteLine($" ({result.CorrectQuestions}/{result.ScoredQuestions} scored correct)");
+        LongMemEvalSampleSupport.PrintAccounting(result);
 
         Console.Write($"   Task-averaged accuracy: ");
-        PrintScore(result.TaskAveragedAccuracy);
+        LongMemEvalSampleSupport.PrintScore(result.TaskAveragedAccuracy);
         Console.WriteLine(" (macro-average of per-type accuracies)\n");
 
-        // Per-type breakdown
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        Console.WriteLine("   | Question Type                    | Count  | Accuracy |");
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        foreach (var (typeName, typeResult) in result.PerTypeResults.OrderBy(kv => kv.Key))
-        {
-            Console.Write($"   | {typeName,-32} | {typeResult.TotalQuestions,6} | ");
-            PrintScore(typeResult.Accuracy);
-            Console.WriteLine(" |");
-        }
-        Console.WriteLine("   +----------------------------------+--------+----------+");
+        LongMemEvalSampleSupport.PrintPerTypeTable(result);
 
-        // Reference scores
-        Console.WriteLine("\n   Reference (LongMemEval paper, S mode):");
-        foreach (var (model, score) in LongMemEvalReferenceScores.OverallAccuracy)
-            Console.WriteLine($"     {model,-25} {score:F1}%");
+        // Did the haystack reach the model? Measured on the answer calls, not assumed from the dataset.
+        var truncated = LongMemEvalSampleSupport.PrintHaystackDelivery(answerClient.Calls);
+
+        // Reference scores: context, not a comparison.
+        Console.WriteLine("\n   Published reference (LongMemEval paper):");
+        foreach (var (referenceModel, score) in LongMemEvalReferenceScores.OverallAccuracy)
+            Console.WriteLine($"     {referenceModel,-25} {score:F1}%");
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine($"   Not like-for-like: the paper scored 500 questions with GPT-4o as the judge; this run scored {result.ScoredQuestions}");
+        Console.WriteLine($"   with {model} judging its own answers. G10 reproduces the paper's GPT-4o setup.");
+        Console.ResetColor();
+
+        LongMemEvalSampleSupport.RecordVerdict(result, truncated);
 
         // ──────────────────────────────────────────────────────────
         //  Step 4: Save baseline
@@ -159,10 +178,17 @@ public static class LongMemEvalBenchmarkDemo
 
         Console.WriteLine("\nStep 4: Saving baseline...\n");
 
+        if (result.ScoredQuestions == 0)
+        {
+            Console.WriteLine("   Not saved: no question was scored, so there is no accuracy to keep.");
+            return;
+        }
+
         var baseline = result.ToBaseline(
-            $"LongMemEval-S {options.MaxQuestions}q (stratified)",
+            $"LongMemEval-S {result.SelectedQuestions}q (stratified)",
             config,
-            tags: ["longmemeval", "cross-platform", "binary-scoring"],
+            description: $"{result.ScoredQuestions} of {result.SelectedQuestions} questions scored; judged by {model}",
+            tags: ["longmemeval", "cross-platform", "binary-scoring", model, AIConfig.ProviderTag],
             pentagonMapperFull: LongMemEvalPentagonMapper.Consolidate);
 
         var store = new JsonFileBaselineStore();
@@ -173,21 +199,6 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine($"   Pentagon dimensions: {string.Join(", ", baseline.DimensionScores.Select(kv => $"{kv.Key}={kv.Value:F0}%"))}");
 
         PrintKeyTakeaways();
-    }
-
-    private static void PrintScore(double? score)
-    {
-        if (score is not { } value)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  n/a ");
-            Console.ResetColor();
-            return;
-        }
-        Console.ForegroundColor = value >= 70 ? ConsoleColor.Green :
-                                  value >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{value,5:F1}%");
-        Console.ResetColor();
     }
 
     private static void PrintHeader()
@@ -201,7 +212,7 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine("  - Stratified sampling across all 6 question types");
         Console.WriteLine("  - 4 task-specific judge prompt templates (official methodology)");
         Console.WriteLine("  - Session boundary + timestamp preservation");
-        Console.WriteLine("  - Binary scoring comparable to published results");
+        Console.WriteLine("  - Binary scoring, the paper's metric");
         Console.WriteLine();
     }
 
@@ -210,12 +221,13 @@ public static class LongMemEvalBenchmarkDemo
         Console.WriteLine();
         Console.WriteLine(new string('=', 70));
         Console.WriteLine("KEY TAKEAWAYS:");
-        Console.WriteLine("   * LongMemEval: 500 questions, 6 types, ~120K tokens per haystack");
-        Console.WriteLine("   * History injection: 2 LLM calls/question (0 for context setup)");
+        Console.WriteLine("   * LongMemEval: 500 questions, 6 types, ~115K tokens per haystack (S mode)");
+        Console.WriteLine("   * TextBlob: the whole history in the user message, 2 LLM calls/question");
+        Console.WriteLine("   * Haystack delivery is measured: prompt tokens as the provider counted them");
         Console.WriteLine("   * Stratified sampling: all 6 types tested proportionally");
         Console.WriteLine("   * Type-specific judges: temporal tolerance, preference flexibility");
-        Console.WriteLine("   * Binary scoring: comparable to GPT-4o = 57.7% (published)");
-        Console.WriteLine("   * Session boundaries + timestamps preserved in context");
+        Console.WriteLine("   * Binary scoring; a published figure compares only under its judge and question set");
+        Console.WriteLine("   * Every selected question is accounted for: scored, inconclusive or errored");
         Console.WriteLine("   * Use ExternalBaselineExtensions.ToBaseline() for reporting");
     }
 }

@@ -34,6 +34,7 @@ public static class AgentSkillsSkillGate
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -78,6 +79,7 @@ public static class AgentSkillsSkillGate
             {
                 BuildGatedAgent(chatClient, skillPath, rugPulledSkills, baselinePath);
                 Console.WriteLine("    [FAIL] Construction succeeded — SkillGate should have refused this (unexpected).");
+                SampleOutcome.Fail("SkillGate let an agent with a drifted skill construct: it should have failed closed");
             }
             catch (SkillDriftException ex)
             {

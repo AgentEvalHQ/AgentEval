@@ -94,6 +94,13 @@
          drift apart. Same pattern as ReliabilityRaceStatistics above. -->
     <Compile Include="../../samples/AgentEval.Samples/EvalJoin/01_EvalWithChanceFloor.cs"
              Link="Samples/01_EvalWithChanceFloor.cs" />
+    <!-- A linked sample records its verdict through SampleOutcome, so the runner's exit-code contract is compiled
+         here too and tested as shipped. OfflineSampleCheck is the CI check's table parser and verdict rule. Neither
+         depends on AIConfig or the catalogue. -->
+    <Compile Include="../../samples/AgentEval.Samples/SampleOutcome.cs"
+             Link="Samples/SampleOutcome.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/OfflineSampleCheck.cs"
+             Link="Samples/OfflineSampleCheck.cs" />
 
     <!-- 2.1: the TravelDemo deterministic eval, compiled here so its tests bind the shipped
          type rather than a copy. -->
@@ -113,6 +120,9 @@
              Link="Samples/02_AssertEvidence.cs" />
     <Compile Include="../../samples/AgentEval.Samples/Interop/03_AssertMultiturnBenchmark.cs"
              Link="Samples/03_AssertMultiturnBenchmark.cs" />
+    <!-- The samples' embedding-provider selection (SDK-free), so its tests bind the shipped rules. -->
+    <Compile Include="../../samples/AgentEval.Samples/EmbeddingProviderEnvironment.cs"
+             Link="Samples/EmbeddingProviderEnvironment.cs" />
   </ItemGroup>
 
 </Project>

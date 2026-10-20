@@ -77,7 +77,7 @@ public static class GatekeeperHelloWorld
         else if (published > 0)
         {
             Console.WriteLine($"   ❌ write_page ran {published}× — the poisoned publish was NOT blocked");
-            throw new InvalidOperationException(
+            throw new SampleCheckFailedException(
                 "Gatekeeper Hello World failed: the poisoned publish executed without a recorded block.");
         }
         else

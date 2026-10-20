@@ -47,6 +47,7 @@ public static class BenchmarkSystem
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -86,9 +87,15 @@ public static class BenchmarkSystem
             var input = new EvalInput(Query: prompt, Response: responseText);
             var result = await preset.EvaluateAsync(input);
 
-            var icon = result.Score.Passed ? "PASS" : "FAIL";
+            // A score the preset could not measure is neither a pass nor a fail: label it, never count it as either.
+            var measured = result.Score.Measurement == AgentEval.Evals.Meta.MeasurementState.Measured;
+            var icon = !measured ? "N/M " : result.Score.Passed ? "PASS" : "FAIL";
             Console.WriteLine($"   [{icon}] [{i + 1,2}/{prompts.Count}] {Truncate(prompt, 60)}  score={result.Score.Value:F2}");
             if (result.Score.Passed) passed++;
+            if (!measured)
+                SampleOutcome.Skip($"prompt {i + 1}: the tool-call-accuracy preset could not measure it ({result.Score.Measurement})");
+            else if (!result.Score.Passed)
+                SampleOutcome.Fail($"prompt {i + 1}: tool-call accuracy {result.Score.Value:F2} did not pass ({Truncate(prompt, 40)})");
         }
 
         // ── Summary ─────────────────────────────────────────────────────────────
@@ -193,7 +200,7 @@ public static class BenchmarkSystem
     /// </summary>
     private static async Task<List<string>> LoadPromptsFromJsonl(string fileName)
     {
-        var path = ResolveDatasetPath(fileName)
+        var path = DatasetLoaders.ResolveDatasetPath(fileName)
             ?? throw new FileNotFoundException(
                 $"Benchmark dataset not found: {fileName}. " +
                 $"Ensure the file exists in samples/datasets/. " +
@@ -201,22 +208,6 @@ public static class BenchmarkSystem
 
         var dataset = await DatasetLoaderFactory.LoadAsync(path);
         return dataset.Select(dc => dc.Input).ToList();
-    }
-
-    /// <summary>
-    /// Resolves a dataset file path relative to the samples/datasets directory.
-    /// </summary>
-    private static string? ResolveDatasetPath(string fileName)
-    {
-        // Try relative to the project output directory
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
-
-        // Try relative to working directory (repo root)
-        path = Path.Combine("samples", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
-
-        return null;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

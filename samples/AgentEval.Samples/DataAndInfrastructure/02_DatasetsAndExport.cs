@@ -36,6 +36,7 @@ public static class DatasetsAndExport
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -55,11 +56,8 @@ public static class DatasetsAndExport
     {
         Console.WriteLine("📝 Step 1: Loading dataset with DatasetLoaderFactory...\n");
 
-        var datasetPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "datasets", "rag-qa.yaml");
-        if (!File.Exists(datasetPath))
-        {
-            datasetPath = Path.Combine("samples", "datasets", "rag-qa.yaml");
-        }
+        var datasetPath = DatasetLoaders.ResolveDatasetPath("rag-qa.yaml")
+            ?? throw new FileNotFoundException("Dataset not found: samples/datasets/rag-qa.yaml");
 
         Console.WriteLine($"   Dataset: {datasetPath}");
         var loader = DatasetLoaderFactory.CreateFromExtension(".yaml");
@@ -102,6 +100,8 @@ public static class DatasetsAndExport
             Console.ForegroundColor = passed ? ConsoleColor.Green : ConsoleColor.Red;
             Console.WriteLine(passed ? $"✅ ({sw.ElapsedMilliseconds}ms)" : $"❌ ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
+            if (!passed)
+                SampleOutcome.Fail($"[{tc.Id}] the reply does not contain the expected \"{tc.ExpectedOutput}\"");
 
             testResults.Add(new TestResultSummary
             {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Metrics.RAG;
@@ -22,11 +21,17 @@ namespace AgentEval.Samples;
 /// - PART 6: Information Retrieval metrics (Recall@K, MRR - FREE code-based metrics)
 /// 
 /// Environment Variables Required:
-/// - AZURE_OPENAI_ENDPOINT: Your Azure OpenAI endpoint
-/// - AZURE_OPENAI_API_KEY: Your Azure OpenAI API key
-/// - AZURE_OPENAI_DEPLOYMENT: Chat model (e.g., gpt-4o)
-/// - AZURE_OPENAI_EMBEDDING_DEPLOYMENT: Embedding model (e.g., text-embedding-ada-002)
-/// 
+/// - A chat provider (AI_INFERENCE_PROVIDER and its variables; see AIConfig)
+/// - An embedding model on the SAME provider: BITDEER_EMBEDDING_MODEL (default BAAI/bge-m3),
+///   OPENAI_EMBEDDING_MODEL (default text-embedding-3-small), or, with no default,
+///   AZURE_OPENAI_EMBEDDING_DEPLOYMENT, FOUNDRY_EMBEDDING_MODEL, OPENAI_COMPATIBLE_EMBEDDING_MODEL
+///
+/// The embedding thresholds (70 / 50 / 50) are raw cosine similarity × 100, fixed in Core. Cosine ranges
+/// differ by embedding model, so a score means something only next to the model that produced it; the
+/// sample prints the model with the scores. Measured on BAAI/bge-m3 (2026-10-21), they separate on-topic
+/// from off-topic text but not a right answer from a wrong one on the same topic: the reference scored
+/// 77 against "Lyon is the capital ... the Colosseum, Big Ben" and 33 against an unrelated sentence.
+///
 /// ⏱️ Time to understand: 15 minutes
 /// </summary>
 public static class ComprehensiveRAG
@@ -48,9 +53,16 @@ public static class ComprehensiveRAG
     {
         PrintHeader();
 
-        if (!AIConfig.IsConfigured || !AIConfig.IsEmbeddingConfigured)
+        if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
+            return;
+        }
+        if (!AIConfig.IsEmbeddingConfigured)
+        {
+            PrintMissingCredentialsBox();
+            SampleOutcome.Skip($"no embedding model configured: {AIConfig.EmbeddingSettings.Diagnostic}");
             return;
         }
 
@@ -74,7 +86,7 @@ public static class ComprehensiveRAG
         if (embeddings == null || embeddings.Count == 0)
         {
             throw new InvalidOperationException($"Embedding generation returned no results for {texts.Length} documents. " +
-                "Check your Azure OpenAI embedding deployment configuration.");
+                $"Check the embedding model ({AIConfig.EmbeddingSettings.ModelIdentity}).");
         }
         
         if (embeddings.Count != texts.Length)
@@ -200,12 +212,16 @@ public static class ComprehensiveRAG
         PrintMetricResult(correctnessResult, "Answer Correctness");
         llmResults.Add(("Answer Correctness", correctnessResult));
 
-        PrintSectionComplete($"LLM-based evaluation complete! Average: {llmResults.Average(r => r.Result.Score):F1}/100");
+        PrintSectionSummary("LLM-based evaluation", llmResults);
 
         Console.WriteLine("\n⚡ PART 4: EMBEDDING-BASED EVALUATION (3 Metrics)\n");
 
         Console.WriteLine("   💡 Embedding-based metrics use vector similarity - much faster and cheaper!");
-        Console.WriteLine("   💰 Cost: ~$0.0001 per evaluation | ⏱️ Latency: ~0.1 seconds each\n");
+        Console.WriteLine("   💰 Cost: ~$0.0001 per evaluation | ⏱️ Latency: ~0.1 seconds each");
+        Console.WriteLine($"   🔢 Embedding model: {AIConfig.EmbeddingSettings.ModelIdentity}. Score = cosine similarity × 100, passing");
+        Console.WriteLine("      at 70 (answer) and 50 (context) for every model. Cosine ranges differ by model, so compare");
+        Console.WriteLine("      these scores only with scores from the same model. They measure topical closeness: a wrong");
+        Console.WriteLine("      answer on the same topic can still pass, which is what Answer Correctness (3.5) is for.\n");
 
         var embedResults = new List<(string Name, MetricResult Result)>();
 
@@ -233,7 +249,7 @@ public static class ComprehensiveRAG
         PrintMetricResult(qcResult, "Query-Context Similarity");
         embedResults.Add(("Query-Context", qcResult));
 
-        PrintSectionComplete($"Embedding-based evaluation complete! Average: {embedResults.Average(r => r.Result.Score):F1}/100");
+        PrintSectionSummary("Embedding-based evaluation", embedResults);
 
         Console.WriteLine("\n💰 PART 5: COST OPTIMIZATION COMPARISON\n");
 
@@ -262,7 +278,7 @@ public static class ComprehensiveRAG
         Console.WriteLine("   ├─────────────────────────────────────────────────────────────┤");
         foreach (var (name, result) in llmResults)
         {
-            var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
+            var status = Status(result);
             Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
@@ -272,10 +288,22 @@ public static class ComprehensiveRAG
         Console.WriteLine("   ├─────────────────────────────────────────────────────────────┤");
         foreach (var (name, result) in embedResults)
         {
-            var status = result.Passed ? "✅ PASSED" : "❌ FAILED";
+            var status = Status(result);
             Console.WriteLine($"   │  {name,-30} │  {result.Score,5:F1}  │  {status,-13} │");
         }
         Console.WriteLine("   └─────────────────────────────────────────────────────────────┘\n");
+
+        // The verdict. A failed accuracy dimension (the answer is not grounded in its context, or does not match the
+        // reference) fails the run; a quality dimension below its threshold warns and names it.
+        RecordOutcome("Faithfulness", faithResult, accuracy: true);
+        RecordOutcome("Relevance", relevResult, accuracy: false);
+        RecordOutcome("Context Precision", precisionResult, accuracy: false);
+        RecordOutcome("Context Recall", recallResult, accuracy: false);
+        RecordOutcome("Answer Correctness", correctnessResult, accuracy: true);
+        var embeddingModel = $" on {AIConfig.EmbeddingSettings.ModelIdentity}";
+        RecordOutcome("Answer Similarity", simResult, accuracy: false, embeddingModel);
+        RecordOutcome("Response-Context Similarity", rcResult, accuracy: false, embeddingModel);
+        RecordOutcome("Query-Context Similarity", qcResult, accuracy: false, embeddingModel);
 
         // Print optimization strategies
         Console.WriteLine(@"
@@ -337,6 +365,10 @@ public static class ComprehensiveRAG
         Console.WriteLine($"      Passed: {irMrrResult.Passed}");
         Console.WriteLine($"      Explanation: {irMrrResult.Explanation}");
 
+        // The retrieval ranked by the embedding model: below threshold is a retrieval-quality warning.
+        RecordOutcome("Recall@3", irRecallResult, accuracy: false, embeddingModel);
+        RecordOutcome("MRR", irMrrResult, accuracy: false, embeddingModel);
+
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────┐
    │  IR METRIC     │ COST  │ WHAT IT MEASURES                          │
@@ -387,10 +419,10 @@ public static class ComprehensiveRAG
         Console.WriteLine("   • AnswerCorrectness/Similarity = end-to-end quality");
 
         Console.WriteLine("\n🔧 ENVIRONMENT VARIABLES REQUIRED:");
-        Console.WriteLine("   • AZURE_OPENAI_ENDPOINT - Your Azure OpenAI endpoint");
-        Console.WriteLine("   • AZURE_OPENAI_API_KEY - Your API key");
-        Console.WriteLine("   • AZURE_OPENAI_DEPLOYMENT - Chat model (e.g., gpt-4o)");
-        Console.WriteLine("   • AZURE_OPENAI_EMBEDDING_DEPLOYMENT - Embedding model (e.g., text-embedding-ada-002)");
+        Console.WriteLine("   • AI_INFERENCE_PROVIDER and that provider's variables - the chat model (see AIConfig)");
+        Console.WriteLine("   • The embedding model on the same provider - BITDEER_EMBEDDING_MODEL (default BAAI/bge-m3),");
+        Console.WriteLine("     OPENAI_EMBEDDING_MODEL (default text-embedding-3-small), AZURE_OPENAI_EMBEDDING_DEPLOYMENT,");
+        Console.WriteLine("     FOUNDRY_EMBEDDING_MODEL or OPENAI_COMPATIBLE_EMBEDDING_MODEL (no default)");
 
         Console.WriteLine("\n🎉 Sample complete!\n");
     }
@@ -409,11 +441,10 @@ public static class ComprehensiveRAG
 
     private static IAgentEvalEmbeddings CreateEmbeddingClient()
     {
-        // Embeddings are Azure-only in these samples (IsEmbeddingConfigured requires the Azure trio),
-        // whichever provider serves the chat model.
-        Console.WriteLine($"   ℹ️  Using Azure OpenAI embeddings: {AIConfig.EmbeddingDeployment}\n");
-        var embeddingClient = AIConfig.CreateAzureOpenAIClient().GetEmbeddingClient(AIConfig.EmbeddingDeployment);
-        return new MEAIEmbeddingAdapter(embeddingClient.AsIEmbeddingGenerator());
+        // Embeddings follow the chat provider: same host, same key, the model from that provider's variable.
+        Console.WriteLine($"   🔗 Chat: {AIConfig.Describe()}");
+        Console.WriteLine($"   🔢 Embeddings: {AIConfig.DescribeEmbeddings()}\n");
+        return new MEAIEmbeddingAdapter(AIConfig.CreateEmbeddingGenerator());
     }
 
     private static void PrintMissingCredentialsBox()
@@ -421,19 +452,54 @@ public static class ComprehensiveRAG
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(@"
    ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  ⚠️  SKIPPING SAMPLE B1 - Credentials Required                            │
+   │  ⚠️  SKIPPING SAMPLE B1 - needs a chat model AND an embedding model        │
    ├─────────────────────────────────────────────────────────────────────────────┤
-   │  This sample requires both chat and embedding Azure OpenAI deployments.    │
-   │                                                                             │
-   │  Set these environment variables:                                           │
-   │    AZURE_OPENAI_ENDPOINT              - Your Azure OpenAI endpoint          │
-   │    AZURE_OPENAI_API_KEY               - Your API key                        │
-   │    AZURE_OPENAI_DEPLOYMENT            - Chat model (e.g., gpt-4o)           │
-   │    AZURE_OPENAI_EMBEDDING_DEPLOYMENT  - Embedding model (e.g., ada-002)     │
+   │  Embeddings follow AI_INFERENCE_PROVIDER, on the chat provider's host:      │
+   │    BITDEER_EMBEDDING_MODEL              default BAAI/bge-m3                 │
+   │    OPENAI_EMBEDDING_MODEL               default text-embedding-3-small      │
+   │    AZURE_OPENAI_EMBEDDING_DEPLOYMENT    required                            │
+   │    FOUNDRY_EMBEDDING_MODEL              required                            │
+   │    OPENAI_COMPATIBLE_EMBEDDING_MODEL    required                            │
    └─────────────────────────────────────────────────────────────────────────────┘
 ");
         Console.ResetColor();
+        var why = AIConfig.IsConfigured ? AIConfig.EmbeddingSettings.Diagnostic : AIConfig.Settings.Diagnostic;
+        if (why is not null)
+            Console.WriteLine($"   ↳ {why}\n");
     }
+
+    /// <summary>
+    /// Records one metric's verdict. A failed accuracy dimension fails the run; a failed quality dimension warns,
+    /// naming it; a metric that produced no measurement is recorded as not measured, never as either.
+    /// </summary>
+    private static void RecordOutcome(string name, MetricResult result, bool accuracy, string? where = null)
+    {
+        if (CouldNotMeasure(result))
+        {
+            SampleOutcome.Skip($"{name}{where}: not measured — {result.Explanation}");
+            return;
+        }
+        if (result.Passed)
+            return;
+
+        var reason = $"{name} {result.Score:F1}/100{where} did not pass: {Truncate(result.Explanation ?? "", 160)}";
+        if (accuracy)
+            SampleOutcome.Fail(reason);
+        else
+            SampleOutcome.Warn(reason);
+    }
+
+    /// <summary>
+    /// True when a metric could not produce a measurement: an input was not supplied (<see cref="MetricResult.Measured"/>),
+    /// the judge's reply did not parse, or the embedding call failed. Core reports the last two as a Fail at 0, so the
+    /// sample tells them apart by Core's own wording; a judge that could not grade is not an answer that failed.
+    /// </summary>
+    private static bool CouldNotMeasure(MetricResult result) =>
+        !result.Measured
+        || (!result.Passed && result.Explanation is { } why
+            && (why.StartsWith("Unable to evaluate", StringComparison.Ordinal)
+                || why.StartsWith("Embedding generation failed", StringComparison.Ordinal)
+                || why.StartsWith("Failed to generate embeddings", StringComparison.Ordinal)));
 
     #endregion
 
@@ -455,15 +521,44 @@ public static class ComprehensiveRAG
 
     private static void PrintMetricResult(MetricResult result, string metricName)
     {
-        var icon = result.Passed ? "✅" : "❌";
-        Console.ForegroundColor = result.Passed ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"      {icon} {metricName}: {result.Score:F1}/100");
+        if (CouldNotMeasure(result))
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"      ⚪ {metricName}: not measured");
+        }
+        else
+        {
+            Console.ForegroundColor = result.Passed ? ConsoleColor.Green : ConsoleColor.Red;
+            Console.WriteLine($"      {(result.Passed ? "✅" : "❌")} {metricName}: {result.Score:F1}/100");
+        }
         Console.ResetColor();
 
         if (!string.IsNullOrEmpty(result.Explanation))
         {
             Console.WriteLine($"         📝 {Truncate(result.Explanation, 70)}");
         }
+    }
+
+    private static string Status(MetricResult result) =>
+        CouldNotMeasure(result) ? "⚪ UNMEASURED" : result.Passed ? "✅ PASSED" : "❌ FAILED";
+
+    /// <summary>
+    /// How many metrics passed, never an average alone: an average of 67 reads like a result while three of five failed.
+    /// The average covers only the measured metrics; a not-measured placeholder 0 is no score.
+    /// </summary>
+    private static void PrintSectionSummary(string section, List<(string Name, MetricResult Result)> results)
+    {
+        var measured = results.Where(r => !CouldNotMeasure(r.Result)).ToList();
+        var passed = measured.Count(r => r.Result.Passed);
+        var notMeasured = results.Count - measured.Count;
+        var summary = $"{section}: {passed} of {results.Count} passed"
+            + (notMeasured > 0 ? $", {notMeasured} not measured" : "")
+            + (measured.Count > 0 ? $" (average of the measured {measured.Average(r => r.Result.Score):F1}/100)" : "");
+
+        var allPassed = passed == results.Count;
+        Console.ForegroundColor = allPassed ? ConsoleColor.Green : ConsoleColor.Yellow;
+        Console.WriteLine($"\n   {(allPassed ? "✅" : "⚠️")} {summary}");
+        Console.ResetColor();
     }
 
     private static void PrintSectionComplete(string message)

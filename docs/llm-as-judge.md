@@ -32,6 +32,8 @@ All metrics prefixed with `llm_` use an `IChatClient` as a judge. They send stru
 | `MisinformationMetric` | `llm_misinformation` | Responsible AI |
 | `BiasMetric` | `llm_bias` | Responsible AI |
 
+`llm_misinformation` and `llm_groundedness` judge whether a claim is supported, so they are also sent what the agent's tools returned (`EvaluationContext.ToolUsage`). The MAF harness fills it, and so do the MEAI adapters when the conversation they are given carries the tool turns: `AsAgentEvaluator()` forwards them, MAF's own MEAI overload of `agent.EvaluateAsync` passes only the final reply. A fact the agent repeated from a tool result is evidence, not a fabrication. Groundedness still needs a retrieved context to be measured; tool results are added to it, not a substitute for it.
+
 ### Usage
 
 ```csharp

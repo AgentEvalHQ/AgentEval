@@ -20,7 +20,7 @@ namespace AgentEval.Samples;
 /// - Direct reading method (no Chain-of-Note) — matches "direct" in paper
 /// - GPT-4o as both reader and judge (matching official evaluation)
 /// - S mode (~115K tokens, ~40 sessions per question)
-/// - 100 questions (stratified) for practical run time with meaningful statistics
+/// - 50 questions (stratified) for practical run time; MaxQuestions = null runs all 500
 ///
 /// Paper reference scores (S mode, full-history long-context, 500 questions):
 ///   GPT-4o direct:  60.6%    (Fig 3b — "direct" = plain question, no intermediate reasoning)
@@ -41,7 +41,9 @@ namespace AgentEval.Samples;
 /// - Download longmemeval_s_cleaned.json from HuggingFace
 /// - Place in: src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json
 /// - a model provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
-/// - the "gpt-4o" model on that provider (the paper's baseline; another model is a run, not a reproduction)
+/// - the "gpt-4o" model on that provider (the paper's baseline; another model is a run, not a reproduction).
+///   One short call checks it first: a provider without it (Bitdeer, for one) records NOT MEASURED and spends nothing
+///   more; G8 measures the configured model instead.
 ///
 /// Attribution: LongMemEval by Di Wu et al. (ICLR 2025)
 /// https://github.com/xiaowu0162/LongMemEval
@@ -59,6 +61,7 @@ public static class LongMemEvalBaselineRepro
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -73,6 +76,7 @@ public static class LongMemEvalBaselineRepro
             Console.WriteLine("   https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/tree/main");
             Console.WriteLine("   Place longmemeval_s_cleaned.json in:");
             Console.WriteLine("   src/AgentEval.Memory/Data/longmemeval/");
+            SampleOutcome.Skip($"the LongMemEval dataset is not at {DatasetPath}");
             return;
         }
 
@@ -87,12 +91,33 @@ public static class LongMemEvalBaselineRepro
         const string modelDeployment = "gpt-4o";
         var chatClient = AIConfig.CreateChatClient(modelDeployment);
 
-        var runner = LongMemEvalBenchmarkRunner.Create(chatClient, DatasetPath);
+        // The paper's model, or no run. On a provider without it every question used to fail and the report read
+        // "0/0 scored, 50 selected": 50 questions gone from the accounting. A run on another model is not this
+        // reproduction, so the sample stops here rather than substituting one.
+        Console.WriteLine($"   Checking that {AIConfig.ProviderName} serves {modelDeployment} (one short call)...");
+        if (await WhyPaperModelUnavailableAsync(chatClient, modelDeployment) is { } unavailable)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"   ⏭️  {AIConfig.ProviderName} did not serve the paper's model {modelDeployment}: {unavailable}");
+            Console.ResetColor();
+            Console.WriteLine("   This sample reproduces the paper's GPT-4o baseline; the same run on another model is not that");
+            Console.WriteLine($"   reproduction. G8 (LongMemEval Benchmark) measures {AIConfig.ModelDeployment} on the same benchmark.\n");
+            SampleOutcome.Skip(
+                $"{AIConfig.ProviderName} did not serve the paper's model {modelDeployment} ({unavailable}); " +
+                "a run on another model is not this reproduction");
+            return;
+        }
+        Console.WriteLine($"   {modelDeployment} answered.\n");
+
+        // The answer client is metered (each prompt's size as sent and as the provider counted it); the judge, the
+        // same model as in the paper, gets its own client so only answer prompts are measured.
+        var answerClient = new PromptSizeMeter(chatClient);
+        var runner = LongMemEvalBenchmarkRunner.Create(AIConfig.CreateChatClient(modelDeployment), DatasetPath);
 
         // Use TextBlob injection — history goes into the user message as a text blob,
         // matching the paper's "full-history-session" reading method.
         // This also ensures MAF AIContextProviders see the history content.
-        var agent = chatClient.AsEvaluableAgent(
+        var agent = answerClient.AsEvaluableAgent(
             name: $"LongMemEval-{modelDeployment}",
             systemPrompt: "You are a helpful assistant. Answer questions based on our conversation history.",
             includeHistory: true);
@@ -127,7 +152,7 @@ public static class LongMemEvalBaselineRepro
         };
 
         Console.WriteLine("Step 2: Running LongMemEval (paper-matching config)...\n");
-        Console.WriteLine($"   Questions:  {options.MaxQuestions} (stratified from 500)");
+        Console.WriteLine($"   Questions:  {options.MaxQuestions?.ToString() ?? "all 500"} (stratified from 500)");
         Console.WriteLine($"   Mode:       {options.DatasetMode} (~115K tokens per question)");
         Console.WriteLine($"   Injection:  TextBlob (history in user message)");
         Console.WriteLine($"   Seed:       {options.RandomSeed}");
@@ -150,13 +175,12 @@ public static class LongMemEvalBaselineRepro
         Console.WriteLine("Step 3: Results vs Paper Baselines\n");
 
         Console.Write($"   Your result ({modelDeployment}): ");
-        PrintScore(result.OverallAccuracy);
-        Console.WriteLine(
-            $" ({result.CorrectQuestions}/{result.ScoredQuestions} scored, " +
-            $"{result.SelectedQuestions} selected, {result.InconclusiveQuestions} inconclusive)");
+        LongMemEvalSampleSupport.PrintScore(result.OverallAccuracy);
+        Console.WriteLine($" ({result.CorrectQuestions}/{result.ScoredQuestions} scored correct)");
+        LongMemEvalSampleSupport.PrintAccounting(result);
 
         Console.Write($"   Task-averaged:               ");
-        PrintScore(result.TaskAveragedAccuracy);
+        LongMemEvalSampleSupport.PrintScore(result.TaskAveragedAccuracy);
         Console.WriteLine(" (macro-average of per-type)\n");
 
         // Paper comparison table
@@ -168,7 +192,7 @@ public static class LongMemEvalBaselineRepro
         Console.Write($"► YOUR RESULT ({modelDeployment,-15})     ");
         Console.ResetColor();
         Console.Write("│ ");
-        PrintScore(result.OverallAccuracy);
+        LongMemEvalSampleSupport.PrintScore(result.OverallAccuracy);
         Console.Write(" ");
         Console.WriteLine("│");
         Console.WriteLine("   ├─────────────────────────────────────┼──────────┤");
@@ -182,16 +206,11 @@ public static class LongMemEvalBaselineRepro
 
         // Per-type breakdown
         Console.WriteLine("   Per-Type Breakdown:");
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        Console.WriteLine("   | Question Type                    | Count  | Accuracy |");
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        foreach (var (typeName, typeResult) in result.PerTypeResults.OrderBy(kv => kv.Key))
-        {
-            Console.Write($"   | {typeName,-32} | {typeResult.TotalQuestions,6} | ");
-            PrintScore(typeResult.Accuracy);
-            Console.WriteLine(" |");
-        }
-        Console.WriteLine("   +----------------------------------+--------+----------+");
+        LongMemEvalSampleSupport.PrintPerTypeTable(result);
+
+        // GPT-4o's context window is 128K tokens and an S-mode haystack is about 115K: measured, not assumed.
+        var truncated = LongMemEvalSampleSupport.PrintHaystackDelivery(answerClient.Calls);
+        LongMemEvalSampleSupport.RecordVerdict(result, truncated);
 
         // ──────────────────────────────────────────────────────────
         //  Step 4: Save baseline with paper-repro tag
@@ -199,9 +218,16 @@ public static class LongMemEvalBaselineRepro
 
         Console.WriteLine("\nStep 4: Saving baseline...\n");
 
+        if (result.ScoredQuestions == 0)
+        {
+            Console.WriteLine("   Not saved: no question was scored, so there is no accuracy to keep.");
+            return;
+        }
+
         var baseline = result.ToBaseline(
-            $"LongMemEval-S {options.MaxQuestions}q TextBlob ({modelDeployment})",
+            $"LongMemEval-S {result.SelectedQuestions}q TextBlob ({modelDeployment})",
             config,
+            description: $"{result.ScoredQuestions} of {result.SelectedQuestions} questions scored",
             tags: ["longmemeval", "paper-repro", "textblob", "direct-reading", modelDeployment],
             pentagonMapperFull: LongMemEvalPentagonMapper.Consolidate);
 
@@ -215,20 +241,29 @@ public static class LongMemEvalBaselineRepro
         PrintKeyTakeaways(modelDeployment, result.OverallAccuracy);
     }
 
-    private static void PrintScore(double? score)
+    /// <summary>
+    /// One short call to the paper's model before the long ones. Null when the provider served it; otherwise why not:
+    /// the call failed (the provider has no such model), or the reply names a different model.
+    /// </summary>
+    private static async Task<string?> WhyPaperModelUnavailableAsync(IChatClient client, string model)
     {
-        if (score is not { } value)
+        try
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  n/a ");
-            Console.ResetColor();
-            return;
+            var reply = await client.GetResponseAsync("Reply with the word OK.", new ChatOptions { MaxOutputTokens = 16 });
+            return reply.ModelId is { } served && !IsPaperModel(served)
+                ? $"asked for {model}, the reply came from {served}"
+                : null;
         }
-        Console.ForegroundColor = value >= 70 ? ConsoleColor.Green :
-                                  value >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{value,5:F1}%");
-        Console.ResetColor();
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return LongMemEvalSampleSupport.Describe(ex);
+        }
     }
+
+    /// <summary>gpt-4o or a dated gpt-4o snapshot; gpt-4o-mini is a different model.</summary>
+    private static bool IsPaperModel(string served) =>
+        served.StartsWith("gpt-4o", StringComparison.OrdinalIgnoreCase) &&
+        !served.StartsWith("gpt-4o-mini", StringComparison.OrdinalIgnoreCase);
 
     private static void PrintHeader()
     {

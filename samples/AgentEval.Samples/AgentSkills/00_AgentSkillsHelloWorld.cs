@@ -31,6 +31,7 @@ public static class AgentSkillsHelloWorld
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

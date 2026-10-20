@@ -159,6 +159,7 @@ public static class GatekeeperBeachhead
         if (!report.IsInlineReady)
         {
             Console.WriteLine("   (Honest outcome: on this gold set + model, the judge did not earn promotion. That's the harness working.)");
+            SampleOutcome.Skip("the judge did not earn inline promotion on this model, so inline enforcement was not exercised");
             return;
         }
 

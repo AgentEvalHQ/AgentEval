@@ -29,6 +29,7 @@ public static class AgentSkillsDisclosureEfficiency
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

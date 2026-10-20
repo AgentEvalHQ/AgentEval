@@ -1,0 +1,124 @@
+# What every sample in the menu must exit with when it runs OFFLINE: no model provider configured,
+# non-interactive, stdin closed. `dotnet run --project samples/AgentEval.Samples -- --offline-check`
+# runs each sample in its own process and compares its exit code with this table (CI does too:
+# .github/workflows/gatekeeper-offline-samples.yml). It strips every provider variable first, so it is free.
+#
+# Key: the sample's stable id, its class name. `--list-samples` prints every id beside its menu label.
+# It is not the menu number, which shifts when a sample is added.
+#
+# Exit codes: 0 completed (no failed check, warning or skip recorded), 1 a check the sample makes failed,
+# 10 a quality score below its threshold (WARN), 11 not measured (a provider, a key or a dataset is
+# missing). 3 (the sample threw) and a hang are never expected: they fail the check.
+#
+# A sample that needs a model expects 11. A sample that runs offline expects its real verdict, normally 0.
+# A sample added to the menu without a row here fails the check, and so does a row with no sample.
+#
+# id                                         exit  why
+HelloWorld                                     11  needs a chat provider (--mock gives a labelled walkthrough)
+AgentWithOneTool                               11  needs a chat provider
+AgentWithMultipleTools                         11  needs a chat provider
+PerformanceMetrics                             11  needs a chat provider
+LightPathMAFIntegration                        11  needs a chat provider
+AgentSessionLifecycle                          11  needs a chat provider
+AdvancedMAFFeatures                            11  needs a chat provider
+ComprehensiveRAG                               11  needs a chat provider and an embedding model
+QualitySafetyMetrics                           11  needs a chat provider for the judges
+JudgeCalibration                               11  needs a chat provider for the judges
+ResponsibleAI                                  11  needs a chat provider for the judges
+CalibratedEvaluatorDemo                        11  needs a chat provider for the judges
+ConversationEvaluation                         11  needs a chat provider
+WorkflowEvaluationReal                         11  needs a chat provider (4-agent workflow)
+WorkflowWithTools                              11  needs a chat provider (4-agent workflow with tools)
+WorkflowMessageHandlerExecutors                 0  offline: source-generated executors, no model
+PerformanceProfiling                           11  needs a chat provider
+StochasticEvaluation                           11  needs a chat provider
+ModelComparison                                11  needs a chat provider and more than one model
+CombinedStochasticComparison                   11  needs a chat provider and more than one model
+StreamingVsAsyncPerformance                    11  needs a chat provider
+ReliabilityRace                                11  needs a chat provider and two models
+PolicySafetyEvaluation                         11  needs a chat provider
+RedTeamBasic                                   11  needs a chat provider (the agent under attack)
+RedTeamAdvanced                                11  needs a chat provider (the agent under attack)
+SnapshotTesting                                11  needs a chat provider
+DatasetsAndExport                              11  needs a chat provider
+TraceRecordReplay                              11  needs a chat provider to record
+BenchmarkSystem                                11  needs a chat provider for the agent and the judge
+DatasetLoaders                                  0  offline: loads the datasets under samples/datasets
+Extensibility                                   0  offline registries; its optional last step needs a model and is not the point
+CrossFrameworkEvaluation                       11  needs a chat provider
+MemoryBasics                                   11  needs a chat provider for the agent and the memory judge
+MemoryBenchmarkDemo                            11  needs a chat provider
+MemoryScenariosDemo                            11  needs a chat provider
+MemoryDI                                       11  needs a chat provider
+MemoryCrossSession                             11  needs a chat provider
+MemoryAIContextProvider                        11  needs a chat provider
+MemoryBenchmarkReporting                       11  needs a chat provider
+LongMemEvalBenchmarkDemo                       11  needs a chat provider
+RunSingleBenchmark                             11  needs a chat provider
+LongMemEvalBaselineRepro                       11  needs a chat provider
+TypedMemEvalBaselineDemo                       11  needs a chat provider
+RegistryDiscoveryBenchmark                      0  offline: walks the benchmark registry
+PerformanceBenchmarkSample                     11  needs a chat provider
+AgenticBenchmarkSample                         11  needs a chat provider
+GdprBenchmarkSample                            11  needs a chat provider
+EuAiActBenchmarkSample                         11  needs a chat provider
+OwaspBenchmarkSample                           11  needs a chat provider
+MitreBenchmarkSample                           11  needs a chat provider
+NistBenchmarkSample                            11  needs a chat provider
+LongMemEvalBenchmarkSample                     11  needs a chat provider
+MemoryBenchmarkSample                          11  needs a chat provider
+FoundryHybridBenchmarkSample                   11  needs a chat provider and an Azure AI Foundry project
+FoundryHierarchyBenchmarkSample                11  needs a chat provider and an Azure AI Foundry project
+ReportBrowserBenchmark                          0  offline: lists the reports already on disk
+GlassBoxFullStack                               0  offline API tour
+AutoAudit                                      11  needs a chat provider (--mock gives three scripted endpoints)
+RealVsFrameworkTravelAgent                     11  needs a chat provider
+RealVsFrameworkWorkflow                         0  offline: scripted workflow
+GatekeeperHelloWorld                            0  offline: the scripted path checks the gate's mechanics
+GatekeeperEnforcement                           0  offline: scripted path
+GatekeeperMafHarness                            0  offline: scripted path
+GatekeeperToolApproval                          0  offline: scripted path
+GatekeeperBeachhead                             0  offline: scripted path
+GatekeeperAgentHarness                          0  offline: scripted path
+GatekeeperAgentHarnessDefended                  0  offline: scripted path
+GatekeeperDefenseInDepth                        0  offline: scripted path
+GatekeeperOutputPanel                           0  offline: scripted path
+GatekeeperMonetaryAndPerCallBudget              0  offline: scripted path
+GatekeeperExplainabilityAndTrust                0  offline: scripted path
+GatekeeperA2ABoundary                          11  needs a chat provider and a consented remote A2A agent
+GatekeeperMockedDangerousTools                  0  offline by design
+GatekeeperPoisonedToolKillChain                 0  offline: scripted path
+GatekeeperHarnessOwnedToolMisuse                0  offline: scripted path
+GatekeeperJailbreakAndToolAbuse                 0  offline: scripted path
+GatekeeperToolResultAdmission                   0  offline: scripted path
+GatekeeperHostedToolCoverageBoundary            0  offline by design
+GatekeeperBulkheadIsolation                     0  offline by design
+GatekeeperStatefulTimeline                      0  offline by design
+GatekeeperSameBatchRace                         0  offline by design
+GatekeeperSecurityGraphIncident                 0  offline by design
+GatekeeperHttpWireBoundary                      0  offline by design: a fake HTTP handler, no network
+GatekeeperDynamicContextProviderBoundary        0  offline by design
+GatekeeperCrescendoTrajectory                   0  offline: scripted path
+GatekeeperSessionIdentityTakeover               0  offline by design
+GatekeeperManifestProvenanceDrift               0  offline by design
+GatekeeperApprovalDecisionMatrix                0  offline: scripted path
+GatekeeperToolResultBehavioralAnomaly           0  offline by design
+AgentSkillsHelloWorld                          11  needs a chat provider
+AgentSkillsDisclosureEfficiency                11  needs a chat provider
+AgentSkillsComplianceScanner                   11  the scan is static, but it builds its scan-context agent on a chat provider
+AgentSkillsSecurityIndex                       11  needs a chat provider
+AgentSkillsSkillGate                           11  needs a chat provider
+CopilotStudioHelloWorld                        11  needs a live Copilot Studio agent and consent
+CopilotStudioWalkthrough                       11  needs a live Copilot Studio agent and consent
+CopilotStudioBudgetAndRedTeam                  11  needs a live Copilot Studio agent and consent
+EvalWithChanceFloor                             0  offline: a real MAF agent over a scripted model
+DeterministicBenchmark                          0  offline: deterministic arms
+GlmBitdeerProviderDemo                         11  needs BITDEER_API_KEY
+JevDecisionsDemo                               11  needs TYPESAFE_API_KEY or OPENROUTER_API_KEY
+JudgeVsJudgeDemo                               11  needs a decision-model key and a chat provider
+MemoryJudgeVsJudgeDemo                         11  needs a decision-model key and a chat provider
+JudgeReferenceExperimentDemo                   11  needs a decision-model key
+HealthcareSafetyPackSample                     11  needs a chat provider for the agent and the judges
+AssertInterop                                   0  offline: scripted model, hand-written ASSERT run
+AssertEvidence                                  0  offline: hand-written ASSERT fixture
+AssertMultiturnBenchmark                        0  offline: hand-written multi-turn fixture

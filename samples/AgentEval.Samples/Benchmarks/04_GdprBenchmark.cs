@@ -52,6 +52,7 @@ public static class GdprBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H4 — GDPR");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -113,6 +114,7 @@ public static class GdprBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("GDPR benchmark", result.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

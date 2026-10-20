@@ -37,6 +37,7 @@ public static class AgenticBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H3 — AGENTIC");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -87,6 +88,7 @@ public static class AgenticBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("agentic benchmark", result.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

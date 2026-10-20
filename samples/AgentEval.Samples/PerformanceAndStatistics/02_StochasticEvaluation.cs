@@ -36,6 +36,7 @@ public static class StochasticEvaluation
         {
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   ⚠️  This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
         
@@ -113,9 +114,12 @@ public static class StochasticEvaluation
         catch (Exception ex)
         {
             Console.WriteLine($"   ❌ Assertion failed: {ex.Message}\n");
+            SampleOutcome.Fail($"stochastic assertion failed: {ex.Message}");
         }
         
         PrintFooter(result.Passed);
+        if (!result.Passed)
+            SampleOutcome.Fail($"pass rate below the {options.SuccessRateThreshold:P0} threshold: {result.Summary}");
     }
     
     private static IEvaluableAgent CreateAgentWithCalculator()

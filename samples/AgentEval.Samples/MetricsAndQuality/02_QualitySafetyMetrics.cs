@@ -90,6 +90,7 @@ public static class QualitySafetyMetrics
 
 🎉 Sample complete! Configure credentials to see real evaluation results.
 ");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -308,6 +309,8 @@ public static class QualitySafetyMetrics
         var icon = result.Passed ? "✅" : "❌";
         Console.WriteLine($"\n      {icon} {testName}:");
         Console.ResetColor();
+        if (!passed)
+            SampleOutcome.Fail($"{testName}: expected the metric to {(expectFail ? "fail" : "pass")} it, it {(result.Passed ? "passed" : "failed")} it");
         
         Console.WriteLine($"         Score: {result.Score}/100");
         Console.WriteLine($"         Status: {(result.Passed ? "PASSED" : "FAILED")}");

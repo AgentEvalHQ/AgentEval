@@ -37,6 +37,7 @@ public static class AdvancedMAFFeatures
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -66,10 +67,12 @@ public static class AdvancedMAFFeatures
         Console.WriteLine($"   Turn 1: {Truncate(r1.Text, 100)}");
         var r2 = await historyAgent.RunAsync("What is my favorite color?", historySession);
         Console.WriteLine($"   Turn 2: {Truncate(r2.Text, 100)}");
-        Console.ForegroundColor = r2.Text?.Contains("blue", StringComparison.OrdinalIgnoreCase) == true
-            ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"   ✅ History retained across turns\n");
+        var historyRetained = r2.Text?.Contains("blue", StringComparison.OrdinalIgnoreCase) == true;
+        Console.ForegroundColor = historyRetained ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine(historyRetained ? "   ✅ History retained across turns\n" : "   ❌ History not retained: turn 2 did not recall 'blue'\n");
         Console.ResetColor();
+        if (!historyRetained)
+            SampleOutcome.Fail("chat history: turn 2 did not recall the favourite colour from turn 1");
 
         // ─── Feature 2: Middleware Pipeline ───────────────────────────────────
         Console.WriteLine("📝 Feature 2: Middleware Pipeline — .AsBuilder().Use(runFunc, runStreamingFunc)\n");
@@ -138,6 +141,7 @@ public static class AdvancedMAFFeatures
             Console.WriteLine($"   {Truncate(structuredResponse.Text, 120)}");
             Console.WriteLine("   💡 Tip: set ResponseFormat = ChatResponseFormat.ForJsonSchema<T>() for stronger enforcement\n");
             Console.ResetColor();
+            SampleOutcome.Fail("structured output: the reply did not deserialize into CityInfo");
         }
 
         // ─── Feature 4: ApprovalRequiredAIFunction ────────────────────────────

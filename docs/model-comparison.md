@@ -53,13 +53,15 @@ Illustrative output (two models, nothing priced the runs):
    Test: "Can I return an opened item after 20 days?"
 
 Rankings:
-   🥇 GPT-4o - Score: 80.0 (Quality: 100.0, Speed: 0.0, Cost: 100.0, Reliability: 100.0)
-   🥈 GPT-4o Mini - Score: 60.0 (Quality: 0.0, Speed: 100.0, Cost: 100.0, Reliability: 100.0)
+   🥇 GPT-4o - Score: 75.0 (Quality: 100.0, Speed: 0.0, Cost: n/a, Reliability: 100.0)
+   🥈 GPT-4o Mini - Score: 50.0 (Quality: 0.0, Speed: 100.0, Cost: n/a, Reliability: 100.0)
+
+Cost: not measured — no cost was recorded for GPT-4o, GPT-4o Mini (no price for the model), so no model is ranked on cost; the composite weighs quality, speed and reliability, their weights rescaled to sum to 1.
 
 Recommendation: Use GPT-4o
 ```
 
-Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And both models score 100 on cost because no run was priced ([Cost is priced from one model name](#what-the-ranking-does-not-tell-you)).
+Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And cost is `n/a` because no run was priced ([Cost is priced from one model name](#what-the-ranking-does-not-tell-you)): a model with no cost is not ranked as the cheapest, and the composite leaves cost out.
 
 ---
 
@@ -141,7 +143,7 @@ public record ModelResult(
     string ModelId,
     string ModelName,
     StochasticResult StochasticResult,         // every run, and their statistics
-    TimeSpan AverageLatency,
+    TimeSpan? AverageLatency,                  // null when no run returned (none recorded a latency)
     decimal? AverageCost,                      // null when no run carried a cost estimate
     decimal? TotalCost);                       // plus PassRate, MeanScore, StandardDeviation
 
@@ -150,11 +152,13 @@ public record ModelRanking(
     string ModelName,
     double CompositeScore,
     double QualityScore,
-    double SpeedScore,
-    double CostScore,
+    double? SpeedScore,                        // null when speed was not measured (see below)
+    double? CostScore,                         // null when cost was not measured (see below)
     double ReliabilityScore,
     int Rank);                                 // 1 = best
 ```
+
+`ModelComparisonResult.SpeedNotMeasuredReason` and `CostNotMeasuredReason` are `null` when every model was ranked on that dimension, and otherwise say why none was.
 
 ### Accessing Detailed Results
 
@@ -162,15 +166,16 @@ public record ModelRanking(
 foreach (var model in result.ModelResults)
 {
     var cost = model.AverageCost is { } c ? $"${c:F4}" : "not measured";
+    var latency = model.AverageLatency is { } l ? $"{l.TotalSeconds:F2}s" : "not measured";
     Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, mean score {model.MeanScore:F1} " +
-                      $"(SD {model.StandardDeviation:F1}), latency {model.AverageLatency.TotalSeconds:F2}s, cost/run {cost}");
+                      $"(SD {model.StandardDeviation:F1}), latency {latency}, cost/run {cost}");
 }
 
 foreach (var ranking in result.Ranking)
 {
     Console.WriteLine($"#{ranking.Rank} {ranking.ModelName}: composite {ranking.CompositeScore:F1} " +
-                      $"(quality {ranking.QualityScore:F1}, speed {ranking.SpeedScore:F1}, " +
-                      $"cost {ranking.CostScore:F1}, reliability {ranking.ReliabilityScore:F1})");
+                      $"(quality {ranking.QualityScore:F1}, speed {ranking.SpeedScore?.ToString("F1") ?? "n/a"}, " +
+                      $"cost {ranking.CostScore?.ToString("F1") ?? "n/a"}, reliability {ranking.ReliabilityScore:F1})");
 }
 
 Console.WriteLine($"Winner: {result.Winner.ModelName}");
@@ -184,6 +189,7 @@ Console.WriteLine($"Winner: {result.Winner.ModelName}");
 2. Each model gets four raw numbers: mean score (quality), average latency (speed), average estimated cost per run (cost) and pass rate (reliability).
 3. Each raw number is rescaled to 0–100 across the models **in this comparison**: the best model gets 100 and the worst 0, with lower latency and lower cost counting as better. With one model, or when every model has the same value, every model gets 100.
 4. `CompositeScore` = Quality × `ScoringWeights.Quality` + Speed × `Speed` + Cost × `Cost` + Reliability × `Reliability`, with default weights 0.4 / 0.2 / 0.2 / 0.2. `Ranking` sorts by composite score, highest first; on a tie the factory listed first ranks first. `Winner` is `Ranking[0]`.
+5. **Speed and cost count only when every model has them.** Quality and reliability count every run, failed ones included. Latency and cost come from the runs that returned: a model none of whose runs returned has no latency, and a model with no price (or a run with `EnableCostAnalysis` off) has no cost. Neither is "0 ms" or "$0". When any model lacks one, no model is scored on that dimension, its `SpeedScore` or `CostScore` is `null` for every model, and the composite weighs the dimensions that were measured, their weights rescaled to sum to 1 (default weights without cost become 0.5 / 0.25 / 0.25). Scoring only the models that have a dimension would rank the models on different dimensions. `SpeedNotMeasuredReason` and `CostNotMeasuredReason` say which models lacked it. Weights that fall only on unmeasured dimensions leave nothing to rank on, and the comparison throws `InvalidOperationException`.
 
 What follows from this:
 
@@ -192,8 +198,8 @@ What follows from this:
 
 ### What the Ranking Does Not Tell You
 
-- **Cost is priced from one model name.** The harness estimates a run's cost from its token counts and the price of `EvaluationOptions.ModelName` in `ModelPricing`. `StochasticRunner` passes the same `EvaluationOptions` for every model, so every model is priced at that one model's rate, and the cost dimension then compares token usage, not prices. With no `ModelName` (as in the examples above), or a name missing from the price table, no run is priced: `AverageCost` is `null` for every model and every model gets the same cost score, 100. To compare prices, price each model's tokens at its own rate ([Cost-Quality Tradeoffs](#cost-quality-tradeoffs)), or set the cost weight to 0.
-- **Missing data scores as best.** A run records latency and cost only when the agent call returns. A model whose every run throws has an average latency of zero and no cost, which the ranking treats as fastest and cheapest. Its quality and reliability scores will be 0, but check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before trusting its rank.
+- **Cost is priced from one model name.** The harness estimates a run's cost from its token counts and the price of `EvaluationOptions.ModelName` in `ModelPricing`. `StochasticRunner` passes the same `EvaluationOptions` for every model, so every model is priced at that one model's rate, and the cost dimension then compares token usage, not prices. With no `ModelName` (as in the examples above), or a name missing from the price table, no run is priced: `AverageCost` is `null` for every model and cost is not measured (step 5). To compare prices, price each model's tokens at its own rate ([Cost-Quality Tradeoffs](#cost-quality-tradeoffs)), or set the cost weight to 0.
+- **Latency and cost cover only the runs that returned.** A model whose every run throws has neither, so speed and cost are not measured for the whole comparison (step 5) and it is ranked on quality and reliability alone, where its failed runs count. A model with only some failed runs is timed and priced on the runs that returned: check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before reading its speed.
 - **Weights are not checked.** `ModelComparer` does not call `ScoringWeights.Validate()`. Weights that do not sum to 1 change the scale of `CompositeScore`, which is then no longer 0–100. Call `Validate()` on your weights yourself.
 - **Tokens may be estimated.** When the provider returns no token usage, the harness estimates tokens from the text (`PerformanceMetrics.TokensAreEstimated`), and a cost built on them is an estimate of an estimate.
 
@@ -505,7 +511,7 @@ foreach (var r in results)
     Console.WriteLine($"{r.TestCase.Name}:");
     Console.WriteLine($"  Mean score: {before.MeanScore:F1} -> {after.MeanScore:F1}");
     Console.WriteLine($"  Pass rate:  {before.PassRate:P0} -> {after.PassRate:P0}");
-    Console.WriteLine($"  Latency:    {before.AverageLatency.TotalSeconds:F2}s -> {after.AverageLatency.TotalSeconds:F2}s");
+    Console.WriteLine($"  Latency:    {before.AverageLatency?.TotalSeconds:F2}s -> {after.AverageLatency?.TotalSeconds:F2}s");
 }
 ```
 

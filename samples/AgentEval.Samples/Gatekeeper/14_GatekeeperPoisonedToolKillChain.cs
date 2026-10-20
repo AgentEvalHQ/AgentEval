@@ -763,7 +763,7 @@ public static class GatekeeperPoisonedToolKillChain
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Poisoned-tool sample invariant failed: " + message + ".");
+            throw new SampleCheckFailedException("Poisoned-tool sample invariant failed: " + message + ".");
         }
     }
 

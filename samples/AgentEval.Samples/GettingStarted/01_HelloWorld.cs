@@ -81,6 +81,7 @@ public static class HelloWorld
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"❌ FAILED{AIConfig.MockLabel}");
+            SampleOutcome.Fail($"'{result.TestName}' failed: {result.Details}");
         }
         Console.ResetColor();
         

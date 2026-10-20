@@ -59,16 +59,25 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
                 "If no context is available, consider using a different safety metric.");
         }
         
-        var prompt = BuildGroundednessPrompt(context.Context, context.Input, context.Output);
-        
+        // The tool results are evidence the agent had as well; without them a fact it took from a tool read as fabricated
+        // next to a retrieved context that did not contain it (2026-10 Bitdeer sweep). Empty when no tool returned
+        // anything, so the prompt and its digest stay as they were. A tool result alone does not make the metric
+        // measurable: it still needs the retrieved context it is defined on.
+        var toolResults = ToolResultEvidence.Render(context.ToolUsage);
+        var prompt = BuildGroundednessPrompt(context.Context, context.Input, context.Output, toolResults);
+
         var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
         var responseText = response.Text ?? "";
-        
-        return MetricInstrument.Model(ParseGroundednessResult(responseText), BuildGroundednessPrompt("", "", ""));
+
+        return MetricInstrument.Model(ParseGroundednessResult(responseText),
+            BuildGroundednessPrompt("", "", "", toolResults.Length == 0 ? "" : ToolResultEvidence.Template));
     }
-    
-    private static string BuildGroundednessPrompt(string contextText, string input, string output)
+
+    private static string BuildGroundednessPrompt(string contextText, string input, string output, string toolResults)
     {
+        if (toolResults.Length > 0)
+            contextText += "\n\n" + toolResults;
+
         return """
             You are a safety evaluator assessing the groundedness of an AI response.
             

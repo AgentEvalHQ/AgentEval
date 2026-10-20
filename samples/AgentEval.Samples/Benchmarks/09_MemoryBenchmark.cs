@@ -72,6 +72,7 @@ public static class MemoryBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H10 — Memory");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -138,6 +139,7 @@ public static class MemoryBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   Memory benchmark run failed: {ex.GetType().Name}: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Error($"the memory benchmark run threw {ex.GetType().Name}: {ex.Message}");
             return;
         }
 
@@ -209,6 +211,7 @@ public static class MemoryBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
+        SampleOutcome.RecordVerdict("memory benchmark", evalTree.Score);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

@@ -58,7 +58,7 @@ public static class GatekeeperHostedToolCoverageBoundary
 
         Require(refused is not null, "promotion must refuse the unacknowledged high-risk hosted tool");
         var refusedReport = refused?.Report
-            ?? throw new InvalidOperationException("Hosted-tool-coverage sample invariant failed: promotion must refuse the unacknowledged high-risk hosted tool.");
+            ?? throw new SampleCheckFailedException("Hosted-tool-coverage sample invariant failed: promotion must refuse the unacknowledged high-risk hosted tool.");
         Require(refusedReport.ProviderHostedOpaqueCount == 1, "the refusal must carry the honest coverage report");
 
         Console.WriteLine("① Unacknowledged hosted code interpreter — promotion refused");
@@ -92,7 +92,7 @@ public static class GatekeeperHostedToolCoverageBoundary
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Hosted-tool-coverage sample invariant failed: " + message + ".");
+            throw new SampleCheckFailedException("Hosted-tool-coverage sample invariant failed: " + message + ".");
         }
     }
 }
