@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -20,8 +19,8 @@ public static class TripPlannerWorkflow
     /// </summary>
     public static (Workflow Workflow, string[] ExecutorIds) Create()
     {
-        var azureClient = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var chatClient  = azureClient.GetChatClient(Config.Model).AsIChatClient();
+        // One chat client on the configured provider, shared by all four agents.
+        var chatClient = Config.CreateChatClient();
 
         // ── Create agents ────────────────────────────────────────────────────
         var tripPlanner       = TripPlannerAgentFactory.Create(chatClient);

@@ -4,8 +4,6 @@
 using AgentEval.PartnerDeskDemo;
 using AgentEval.PartnerDeskDemo.Demo;
 using AgentEval.PartnerDeskDemo.Tools;
-using Azure;
-using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.PartnerDeskDemo.Evals;
@@ -41,18 +39,27 @@ public static class Program
         }
 
         var useJudge = args.Contains("--judge", StringComparer.Ordinal);
-        var deployment = ReadOption(args, "--deployment")
-            ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-        var live = !offline && AzureConfigured(deployment);
+        // The demo's own selection: the provider AI_INFERENCE_PROVIDER selects, --model (alias --deployment)
+        // for the model, the scripted model offline.
+        var model = ModelSelection.Resolve(args, offline);
+        var live = model.IsLive;
         var runsPerArm = ReadInt(args, "--runs") ?? (live ? 10 : 2);
         var arms = ReadArms(args);
         var jsonPath = ReadOption(args, "--json");
 
+        // A set AI_INFERENCE_PROVIDER that does not resolve stops the run with the same message as the demo.
+        if (model.ExplicitSelectionUnresolved)
+        {
+            Console.Error.WriteLine(model.UnresolvedSelectionError);
+            return 2;
+        }
+
         if (!live && !offline)
         {
+            Console.Error.WriteLine($"No live model provider is configured. {model.Settings.Diagnostic}");
             Console.Error.WriteLine(
-                "Azure OpenAI is not configured. Set AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT for the live " +
-                "evaluation, or pass --offline for the deterministic self-check.");
+                $"For the live evaluation, {ModelSelection.SetupHint}; or pass --offline for the deterministic " +
+                "self-check.");
             return 2;
         }
 
@@ -61,12 +68,13 @@ public static class Program
 
         var register = PartnerRegister.Load();
         var outbox = Path.Combine(AppContext.BaseDirectory, "eval-outbox.log");
-        var modelLabel = live ? $"Azure OpenAI '{deployment}'" : "scripted (offline, deterministic)";
+        var modelLabel = model.Label;
 
         ConcealmentJudge? judge = null;
         if (useJudge && live)
         {
-            judge = new ConcealmentJudge(CreateAzureClient(deployment!));
+            // The judge runs on the same provider and model as the agent under test.
+            judge = new ConcealmentJudge(model.CreateChatClient());
         }
         else if (useJudge)
         {
@@ -74,7 +82,7 @@ public static class Program
         }
 
         Func<PhaseRunContext, IChatClient> factory = live
-            ? _ => CreateAzureClient(deployment!)
+            ? _ => model.CreateChatClient()
             : context => ScriptedPartnerDeskModel.Create(context, register);
 
         Console.WriteLine($"Evaluating {arms.Length} arm(s) x {runsPerArm} run(s) against {modelLabel}.");
@@ -296,18 +304,6 @@ public static class Program
         return null;
     }
 
-    private static bool AzureConfigured(string? deployment) =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"))
-        && !string.IsNullOrWhiteSpace(deployment);
-
-    private static IChatClient CreateAzureClient(string deployment)
-    {
-        var endpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!);
-        var key = new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!);
-        return new AzureOpenAIClient(endpoint, key).GetChatClient(deployment).AsIChatClient();
-    }
-
     private static void PrintUsage()
     {
         Console.WriteLine("""
@@ -315,12 +311,17 @@ public static class Program
 
               --runs N          runs per arm (default 10 live, 2 offline)
               --arms 1,2,3,4    which phases to measure (default all four)
-              --deployment NAME Azure OpenAI deployment (default AZURE_OPENAI_DEPLOYMENT)
-              --judge           enable the shadow concealment judge (live only)
+              --model NAME      model (or Azure deployment) on the selected provider (default: the provider's
+                                model variable, e.g. BITDEER_MODEL or AZURE_OPENAI_DEPLOYMENT); --deployment
+                                is an alias
+              --judge           enable the shadow concealment judge (live only; same provider and model)
               --json PATH       also write a machine-readable report
               --offline         use the scripted model (deterministic; no credentials)
               --selftest        assert the deterministic offline invariants; exit non-zero on failure
               -h, --help        this text
+
+            The live provider is the one AI_INFERENCE_PROVIDER selects (azure | bitdeer | openai | foundry |
+            openai-compatible), configured by that provider's variables — bitdeer needs only BITDEER_API_KEY.
 
             Live example:  dotnet run --project samples/AgentEval.PartnerDeskDemo.Evals -- --runs 20 --judge
             CI example:    dotnet run --project samples/AgentEval.PartnerDeskDemo.Evals -- --offline --selftest

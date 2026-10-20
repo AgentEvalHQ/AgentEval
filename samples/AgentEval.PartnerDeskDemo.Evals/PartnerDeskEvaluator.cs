@@ -25,7 +25,7 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
     private readonly Action<string> _progress;
 
     /// <summary>Creates an evaluator over a chat-client factory, an outbox path, the register, and options.</summary>
-    /// <param name="chatClientFactory">Supplies the model per run: live Azure OpenAI, or scripted.</param>
+    /// <param name="chatClientFactory">Supplies the model per run: live (<see cref="ModelSelection"/>) or scripted.</param>
     /// <param name="outboxPath">The local file the faked email tool appends to.</param>
     /// <param name="register">The loaded partner register.</param>
     /// <param name="judge">An optional shadow concealment judge; disclosure is only scored when supplied.</param>

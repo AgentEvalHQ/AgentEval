@@ -34,13 +34,39 @@ there is no SMTP client, no socket, and no HTTP anywhere in either tool.
 ## Prerequisites
 
 - **.NET 10 SDK.**
-- **Azure OpenAI** for the live path — set three environment variables:
-  - `AZURE_OPENAI_ENDPOINT` — e.g. `https://<resource>.openai.azure.com/`
-  - `AZURE_OPENAI_API_KEY`
-  - `AZURE_OPENAI_DEPLOYMENT` — a chat/reasoning deployment (tuned against `gpt-5.5`)
+- **A chat model for the live path**, chosen by `AI_INFERENCE_PROVIDER` — the same
+  selector every AgentEval sample reads (resolved by `InferenceProviderEnvironment` in
+  AgentEval.Core):
 
-  Without all three set, the demo runs on a **scripted** provider instead (see
-  *Offline mode* below). Override the deployment per run with `--deployment <name>`.
+  | `AI_INFERENCE_PROVIDER` | Set | Model used |
+  |---|---|---|
+  | `azure` | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | the deployment — the demo was tuned against `gpt-5.5` |
+  | `bitdeer` | `BITDEER_API_KEY` (`BITDEER_ENDPOINT`, `BITDEER_MODEL` optional) | `zai-org/GLM-5.3-Flash` unless `BITDEER_MODEL` names another |
+  | `openai` | `OPENAI_API_KEY` (`OPENAI_BASE_URL`, `OPENAI_MODEL` optional) | `gpt-4o-mini` unless `OPENAI_MODEL` names another |
+  | `foundry` | `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL` | `FOUNDRY_MODEL` |
+  | `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT`, `OPENAI_COMPATIBLE_MODEL` (`OPENAI_COMPATIBLE_API_KEY` optional) | `OPENAI_COMPATIBLE_MODEL` |
+
+  With the selector unset, the first provider that has its credentials wins (Azure,
+  Bitdeer, OpenAI, Foundry, OpenAI-compatible), so set it whenever more than one is
+  configured. A selector that names a provider with missing variables (or an unknown
+  value) does **not** fall back to another host, and does not quietly run scripted
+  either: the demo prints what is missing and exits **2** before any phase runs. Pass
+  `--offline` to run the scripted model on purpose. With the selector unset and no
+  provider at all, the demo runs on a **scripted** provider and the banner says so (see
+  *Offline mode* below).
+
+  `--model <name>` overrides the model (or Azure deployment) for one run.
+  `--deployment <name>` is the same option under the name it had when the demo was
+  Azure-only, and it still completes an Azure setup that has `AZURE_OPENAI_ENDPOINT` and
+  `AZURE_OPENAI_API_KEY` but no `AZURE_OPENAI_DEPLOYMENT`. Neither selects a provider:
+  they never stand in for a key or an endpoint, never satisfy a selector that names
+  another provider, and never change which provider a working environment picks. The
+  banner names what is in use and never the key, for example:
+
+  ```
+  Model: live Bitdeer AI Model Studio, model 'zai-org/GLM-5.3-Flash' (selected by
+  AI_INFERENCE_PROVIDER). Override the model with --model <name>.
+  ```
 
 ## How to run
 
@@ -69,14 +95,20 @@ Or run phases directly (useful for a scripted stage or CI):
 dotnet run --project samples/AgentEval.PartnerDeskDemo -- --phase 2
 
 # all four, in order, exit code 0 only if every phase's oracle held
+# (1 if one failed; 2 if AI_INFERENCE_PROVIDER is set but does not resolve)
 dotnet run --project samples/AgentEval.PartnerDeskDemo -- --all
 
-# force the scripted provider even with Azure configured
+# force the scripted provider even with a provider configured
 dotnet run --project samples/AgentEval.PartnerDeskDemo -- --all --offline
 
-# pick a deployment
-dotnet run --project samples/AgentEval.PartnerDeskDemo -- --all --deployment gpt-5-mini
+# Bitdeer, GLM-5.3-Flash (BITDEER_API_KEY set)
+AI_INFERENCE_PROVIDER=bitdeer dotnet run --project samples/AgentEval.PartnerDeskDemo -- --all
+
+# Azure OpenAI, a different deployment for this run (--deployment works too)
+AI_INFERENCE_PROVIDER=azure dotnet run --project samples/AgentEval.PartnerDeskDemo -- --all --model gpt-5-mini
 ```
+
+In PowerShell, set the selector first: `$env:AI_INFERENCE_PROVIDER = 'bitdeer'`.
 
 **The question is identical in every phase.** Type it once, then use the up-arrow —
 the audience must be certain the only thing changing is the configuration.
@@ -145,19 +177,21 @@ a changed endpoint evades a lexical prefilter — is stated in the demo contract
 
 ## Offline mode
 
-When Azure OpenAI is not configured (or `--offline` is passed), the model is a
+When no provider is configured (or `--offline` is passed), the model is a
 **scripted** provider that replays, turn for turn, the trajectory a live model
 produces. This verifies **the gates**, deterministically, in CI — not the model's
 susceptibility. Everything downstream of the model is still real: the MCP session
 is a genuine child process over stdio, the gates are the shipped gates, and the
-tool effects are the same fakes.
+tool effects are the same fakes. A set `AI_INFERENCE_PROVIDER` that does not resolve
+is a failed request for a live model, not "no provider": the demo exits 2 rather than
+run the scripted model in its place.
 
 ## Tuning the live attack (Phase 2)
 
 Whether a model follows the injection is a property of *that model*, not of the
 gates. On a strong frontier deployment the injection is probabilistic: the model
 may pull the register but decline the external send. The shipped defaults fire
-reliably on `gpt-5.5`; two levers let a presenter reach 5/5 on their own deployment
+reliably on Azure `gpt-5.5`; two levers let a presenter reach 5/5 on their own deployment
 without recompiling (the build spec's Criterion 4):
 
 - `PARTNERINTEL_ADDENDUM_FILE=/path/to/addendum.txt` — replace the poisoned
@@ -171,20 +205,25 @@ Phases 3 and 4 stop the attack regardless of how susceptible the agent is.
 
 ## Timing and model choice (measured)
 
-A full four-phase run is **~2 minutes** live — far inside any stage budget — so run it
-live; a screen recording is cheap insurance, not a necessity. Measured wall-clock and
-Phase-2 fire rate (each phase prints its own `[phase N wall-clock: …]`):
+On Azure `gpt-5.5` a full four-phase run is **~2 minutes** live — far inside any stage
+budget — so run it live; a screen recording is cheap insurance, not a necessity. Measured
+wall-clock and Phase-2 fire rate (each phase prints its own `[phase N wall-clock: …]`). The
+first three rows are **Azure OpenAI** deployments; the last is Bitdeer, measured on
+2026-10-20 over three `--all` runs:
 
-| Deployment | Full `--all` | Phase 2 fires | Notes |
+| Model (provider) | Full `--all` | Phase 2 fires | Notes |
 |---|---|---|---|
-| **`gpt-5.5`** (recommended) | ~2:05 | 5/5, all **silent** | reliable *and* the answer hides the export — the strongest Phase 2 |
-| `gpt-5-mini` | ~2:30 | 5/5, sometimes discloses | slower, and a disclosed export weakens the "tidy note" moment |
-| `gpt-5-chat` | ~1:00 | **0/5** | fast, but a non-reasoning chat model doesn't follow the injection — Phases 2 **and** 3 have nothing to show |
+| **`gpt-5.5`** (Azure OpenAI, recommended) | ~2:05 | 5/5, all **silent** | reliable *and* the answer hides the export — the strongest Phase 2 |
+| `gpt-5-mini` (Azure OpenAI) | ~2:30 | 5/5, sometimes discloses | slower, and a disclosed export weakens the "tidy note" moment |
+| `gpt-5-chat` (Azure OpenAI) | ~1:00 | **0/5** | fast, but a non-reasoning chat model doesn't follow the injection — Phases 2 **and** 3 have nothing to show |
+| `zai-org/GLM-5.3-Flash` (Bitdeer, 2026-10-20) | 0:51–1:01 | **0/3** | resists the injection: in 2 of 3 runs it named the addendum as an injection and told the officer, in the third it ignored it silently. Phase 3 never attempted the bulk read, so Phases 2 **and** 3 failed their oracles and `--all` exited 1; Phases 1 and 4 held 3/3 |
 
 The lesson: a *faster* or *smaller* model does **not** help — the fast chat model simply
 resists the injection, and mini is both slower and less silent. `gpt-5.5` is the sweet
-spot. Because a full run is ~2 minutes, you can comfortably re-run Phase 2 (menu `r`) if a
-run doesn't fire and still finish well under time.
+spot. GLM-5.3-Flash on Bitdeer behaves like `gpt-5-chat` here: use it to show the gates
+and the clean path, not the attack landing. Because a full run is ~2 minutes, you can
+comfortably re-run Phase 2 (menu `r`) if a run doesn't fire and still finish well under
+time.
 
 ## Legibility for a projected stage
 

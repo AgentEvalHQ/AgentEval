@@ -34,7 +34,7 @@
       "externalEffects": [
         "a real MCP session over stdio to a PartnerIntel server started as a child process of this demo",
         "faked local tools only: an in-memory partner register and an outbox.log file; no database, SMTP, socket, or outbound network",
-        "live Azure OpenAI when AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT are configured; a scripted provider otherwise"
+        "a live chat model on the provider AI_INFERENCE_PROVIDER selects (Azure OpenAI, Bitdeer, OpenAI, Foundry or an OpenAI-compatible endpoint) when that provider is configured; a scripted provider when none is configured or with --offline (a set AI_INFERENCE_PROVIDER that does not resolve exits 2 instead)"
       ],
       "guarantee": "Level 1 refuses the register export and the external recipient before either tool executes, while recording that the agent attempted them; Level 2 additionally withholds the poisoned MCP result from model context and refuses the next call to that server at admission once the source is contained.",
       "nonGuarantee": "The result gate is a bounded lexical prefilter over configured markers: a competent paraphrase evades it, and it runs after the MCP call, so it protects model context rather than the supplier's own side effects. The offline path fixes the model's trajectory and therefore proves gate behaviour, not model susceptibility. No claim is made about what the agent's prose tells the user.",

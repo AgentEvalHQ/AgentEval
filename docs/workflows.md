@@ -165,12 +165,16 @@ AgentEval captures these MAF workflow events:
 | MAF Event | Purpose |
 |-----------|----------|
 | `SuperStepStartedEvent` | Workflow superstep begins |
-| `ExecutorInvokedEvent` | Agent begins processing |
+| `ExecutorInvokedEvent` | A message is delivered to an executor |
 | `AgentResponseUpdateEvent` | Streaming token from LLM |
-| `ExecutorCompletedEvent` | Agent finishes processing |
+| `ExecutorCompletedEvent` | The executor finished handling that message |
 | `SuperStepCompletedEvent` | Workflow superstep ends |
 
 Events are processed by `MAFWorkflowEventBridge` into AgentEval's evaluation model.
+
+MAF raises `ExecutorInvokedEvent` once per delivered message, so an agent bound with `BindAsExecutor` is invoked 2-3 times per turn: first the incoming chat messages, which it only accumulates, then the `TurnToken` that runs the turn. The bridge records **one step per agent turn in a sequential chain**, so a 4-agent chain gives 4 steps. The rule is: everything MAF delivers to one executor within one superstep is one step, and an agent's messages stay in one step until its turn runs. A step is split when the same executor is invoked again in a later superstep — after its turn has run, for an agent; on any later invocation, for a function executor — which is a genuine re-entry such as a self-loop.
+
+Known limits (tracked, not yet fixed): when one agent receives two turns in the **same** superstep (a fan-in where both upstream agents finish together), the two turns are recorded as one step. In **parallel fan-out**, executors in one superstep run concurrently and their streamed text is attributed by stream position, so a branch's output can land in a sibling's step — do not rely on per-step outputs of parallel branches.
 
 ### Timeout Handling
 

@@ -30,13 +30,22 @@ namespace AgentEval.MAF;
 /// <para>
 /// <b>ChatProtocol requirement:</b> MAF's <c>AIAgentHostExecutor</c> (created by
 /// <c>BindAsExecutor</c>) uses <c>ChatProtocolExecutor</c> internally, which requires:
-/// (1) Input as <see cref="ChatMessage"/> (not plain string — string messages are silently dropped), and
+/// (1) Input as <see cref="ChatMessage"/> (a plain string is accepted only when the executor sets a string
+/// message role, as MAF 1.24's <c>AIAgentHostExecutor</c> does; a <c>ChatProtocolExecutor</c> without one drops it), and
 /// (2) A <see cref="MAFWorkflows.TurnToken"/> to trigger actual LLM processing.
 /// This bridge sends both automatically. The <c>TurnToken</c> is forwarded downstream
 /// through the workflow chain, so only the initial send is needed.
 /// This pattern works with both <c>BindAsExecutor(emitEvents: true)</c> and
 /// implicit <c>AIAgent → ExecutorBinding</c> conversion, since <c>TurnToken(emitEvents: true)</c>
 /// overrides the binding's default.
+/// </para>
+/// <para>
+/// <b>Step boundaries:</b> MAF raises an <c>ExecutorInvokedEvent</c> for every message it delivers, so one agent
+/// turn shows up as 2-3 invocations of the same executor (the incoming chat messages, which only accumulate, and
+/// the <c>TurnToken</c> that runs the turn). The bridge reports one step per executor activation: deliveries to
+/// the open executor within one superstep, plus a chat-protocol executor's deliveries up to the turn they lead
+/// to, are one step. Only a re-invocation in a LATER superstep, once the open step has run, is a re-entry
+/// (a self-loop or a route back) and starts a new step.
 /// </para>
 /// </remarks>
 public static class MAFWorkflowEventBridge
@@ -62,21 +71,6 @@ public static class MAFWorkflowEventBridge
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(input);
 
-        // Helper to translate full MAF IDs to clean names
-        string NormalizeId(string id) =>
-            executorIdMap is not null && executorIdMap.TryGetValue(id, out var clean) ? clean : id;
-
-        // Track state for event translation
-        string? previousExecutorId = null;
-        string? currentExecutorId = null;
-        var outputAccumulator = new StringBuilder();
-        bool workflowOutputReceived = false;
-        var sw = Stopwatch.StartNew();
-
-        // Track pending tool calls: FunctionCallContent arrives first, FunctionResultContent later.
-        // We buffer the call and yield a complete ExecutorToolCallEvent only when the result arrives.
-        var pendingToolCalls = new Dictionary<string, (string ExecutorId, string ToolName, string? CallId, IDictionary<string, object?>? Arguments, TimeSpan StartTime)>();
-
         // Start the MAF workflow execution via InProcessExecution.
         // Detect if workflow uses ChatProtocol (AIAgent-based executors via BindAsExecutor)
         // to determine the correct input type and whether a TurnToken is needed.
@@ -84,11 +78,16 @@ public static class MAFWorkflowEventBridge
         var protocol = await workflow.DescribeProtocolAsync(cancellationToken).ConfigureAwait(false);
         bool isChatProtocol = MAFWorkflows.ChatProtocolExtensions.IsChatProtocol(protocol);
 
+        // Which executors take TURNS (accumulate chat messages, run on a TurnToken) — needed to tell one turn's
+        // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
+        // run starts so a reflection failure cannot leak a started run.
+        var chatProtocolExecutorIds = GetChatProtocolExecutorIds(workflow);
+
         MAFWorkflows.StreamingRun run;
         if (isChatProtocol)
         {
-            // AIAgentHostExecutor (from BindAsExecutor) requires ChatMessage input — plain strings
-            // are silently dropped because ChatProtocolExecutor has no string handler by default.
+            // Send a ChatMessage: every ChatProtocolExecutor accumulates one, while a plain string is accepted
+            // only when the executor sets a string message role (AIAgentHostExecutor does in MAF 1.24).
             run = await MAFWorkflows.InProcessExecution
                 .RunStreamingAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -116,16 +115,76 @@ public static class MAFWorkflowEventBridge
             await run.TrySendMessageAsync(new MAFWorkflows.TurnToken(emitEvents: true)).ConfigureAwait(false);
         }
 
+        await foreach (var evt in TranslateEventsAsync(
+            run.WatchStreamAsync(cancellationToken), chatProtocolExecutorIds, executorIdMap, cancellationToken)
+            .ConfigureAwait(false))
+        {
+            yield return evt;
+        }
+    }
+
+    /// <summary>
+    /// Translates a MAF workflow event stream into AgentEval <see cref="WorkflowEvent"/> records — the
+    /// translation half of <see cref="StreamAsAgentEvalEvents"/>, split out so the step-boundary rules can be
+    /// exercised against exact MAF event orderings (e.g. the off-thread input race) that a live run only
+    /// produces nondeterministically.
+    /// </summary>
+    /// <param name="mafEvents">The MAF event stream (normally <c>StreamingRun.WatchStreamAsync</c>).</param>
+    /// <param name="chatProtocolExecutorIds">
+    /// Raw MAF IDs of the executors that implement the chat protocol (<see cref="MAFWorkflows.ChatProtocolExecutor"/>).
+    /// </param>
+    /// <param name="executorIdMap">Optional full-ID → clean-name map, as for <see cref="StreamAsAgentEvalEvents"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
+        IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
+        IReadOnlySet<string> chatProtocolExecutorIds,
+        IReadOnlyDictionary<string, string>? executorIdMap = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(mafEvents);
+        ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
+
+        // Helper to translate full MAF IDs to clean names
+        string NormalizeId(string id) =>
+            executorIdMap is not null && executorIdMap.TryGetValue(id, out var clean) ? clean : id;
+
+        // Track state for event translation
+        string? previousExecutorId = null;
+        string? currentExecutorId = null;
+        var outputAccumulator = new StringBuilder();
+        bool workflowOutputReceived = false;
+        var sw = Stopwatch.StartNew();
+
+        // Step-boundary state for the OPEN step (the current executor's activation).
+        // superStep counts MAF SuperStepStartedEvents; openStepSuperStep is the superstep of the open step's most
+        // recent delivery; openStepAwaitingTurn is true while the open step belongs to a chat-protocol executor
+        // that has so far only been handed messages to accumulate (its turn has not run yet).
+        var superStep = 0;
+        var openStepSuperStep = 0;
+        var openStepAwaitingTurn = false;
+
+        // Track pending tool calls: FunctionCallContent arrives first, FunctionResultContent later.
+        // We buffer the call and yield a complete ExecutorToolCallEvent only when the result arrives.
+        var pendingToolCalls = new Dictionary<string, (string ExecutorId, string ToolName, string? CallId, IDictionary<string, object?>? Arguments, TimeSpan StartTime)>();
+
         // Watch the MAF event stream and translate each event
-        await foreach (var mafEvent in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var mafEvent in mafEvents.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
             switch (mafEvent)
             {
                 // ── Executor lifecycle events ──────────────────────────────
 
                 case MAFWorkflows.ExecutorInvokedEvent invoked:
-                    // A new executor is starting. If we had a previous one, flush it.
+                    // MAF raises one ExecutorInvokedEvent per DELIVERED MESSAGE, not per executor run, so an
+                    // invocation of the executor that is already open is not by itself a new step. An agent
+                    // executor (BindAsExecutor → a ChatProtocolExecutor) is handed 2-3 messages per turn — the
+                    // input / forwarded chat messages, which it only accumulates, then the TurnToken that runs
+                    // the turn — and all of them are that ONE turn. A step is one ACTIVATION: what MAF delivers
+                    // to the executor within one superstep (MAF's BSP unit; messages sent in superstep N are
+                    // only delivered in N+1, so nothing can route back into an executor within its superstep).
                     var normalizedInvokedId = NormalizeId(invoked.ExecutorId);
+                    var invokedIsChatProtocol = chatProtocolExecutorIds.Contains(invoked.ExecutorId);
+                    var opensStep = currentExecutorId != normalizedInvokedId;
                     if (currentExecutorId != null && currentExecutorId != normalizedInvokedId)
                     {
                         // Flush accumulated output for the previous executor
@@ -141,16 +200,22 @@ public static class MAFWorkflowEventBridge
 
                         outputAccumulator.Clear();
                     }
-                    else if (currentExecutorId == normalizedInvokedId)
+                    else if (currentExecutorId == normalizedInvokedId
+                        && superStep > openStepSuperStep
+                        && !openStepAwaitingTurn)
                     {
                         // 15: a DIRECT SELF-LOOP — an executor's own edge routes back to itself (e.g. a
-                        // retry/refine step), so this ExecutorInvokedEvent re-invokes the SAME executor ID.
-                        // Neither branch above fires for this case, which used to silently merge this
-                        // invocation's streaming output into the SAME accumulator as the PRIOR invocation's
-                        // output (folding two steps into one ExecutorOutputEvent) and never emit an
-                        // EdgeTraversedEvent(A, A) — the self-loop transition was invisible. Flush the prior
-                        // invocation's output as its own step (with the self-edge) before starting a clean
-                        // accumulator for this invocation, mirroring the flush-then-edge order above.
+                        // retry/refine step), so this ExecutorInvokedEvent re-invokes the SAME executor ID in a
+                        // LATER superstep, after its open step has run. Neither branch above fires for this case,
+                        // which used to silently merge this invocation's streaming output into the SAME
+                        // accumulator as the PRIOR invocation's output (folding two steps into one
+                        // ExecutorOutputEvent) and never emit an EdgeTraversedEvent(A, A) — the self-loop
+                        // transition was invisible. Flush the prior invocation's output as its own step (with the
+                        // self-edge) before starting a clean accumulator for this invocation, mirroring the
+                        // flush-then-edge order above.
+                        // The superstep + turn guard keeps this branch to GENUINE re-entries: without it every
+                        // extra message delivery of one agent turn was flushed as a self-loop step, so a 4-agent
+                        // BindAsExecutor chain reported 11 steps, 7 of them empty.
                         yield return new ExecutorOutputEvent(
                             currentExecutorId,
                             outputAccumulator.ToString());
@@ -161,12 +226,25 @@ public static class MAFWorkflowEventBridge
                             EdgeType.Sequential);
 
                         outputAccumulator.Clear();
+                        opensStep = true;
                     }
                     else if (currentExecutorId == null && previousExecutorId == null)
                     {
                         // Very first executor — no edge to emit
                         outputAccumulator.Clear();
                     }
+                    // Otherwise: another delivery within the open step's activation — the same superstep, or a
+                    // chat-protocol executor whose turn has not run yet. That second case is how the bridge's
+                    // own input arrives: InProcessExecution runs the workflow off-thread, so the input
+                    // ChatMessage and the TurnToken sent after it can land in different supersteps. It stays
+                    // one step; nothing to flush.
+
+                    // A chat-protocol step keeps awaiting its turn only while every delivery so far was a
+                    // message the protocol merely accumulates; the TurnToken (or any other message) runs it.
+                    openStepAwaitingTurn = (opensStep || openStepAwaitingTurn)
+                        && invokedIsChatProtocol
+                        && IsChatProtocolAccumulation(invoked.Data);
+                    openStepSuperStep = superStep;
 
                     previousExecutorId = currentExecutorId;
                     currentExecutorId = normalizedInvokedId;
@@ -350,9 +428,13 @@ public static class MAFWorkflowEventBridge
                         errorData?.GetType().Name);
                     break;
 
-                // ── SuperStep events (informational, no direct mapping) ──
+                // ── SuperStep events (no direct mapping) ──
 
                 case MAFWorkflows.SuperStepStartedEvent:
+                    // Superstep boundaries delimit executor activations — see the ExecutorInvokedEvent case.
+                    superStep++;
+                    break;
+
                 case MAFWorkflows.SuperStepCompletedEvent:
                 case MAFWorkflows.WorkflowStartedEvent:
                 case MAFWorkflows.WorkflowWarningEvent:
@@ -375,6 +457,35 @@ public static class MAFWorkflowEventBridge
             yield return new WorkflowCompleteEvent();
         }
     }
+
+    /// <summary>
+    /// The raw MAF IDs of the workflow's executors that implement the chat protocol — every
+    /// <see cref="MAFWorkflows.ChatProtocolExecutor"/>, which includes each agent bound with <c>BindAsExecutor</c>
+    /// (an <c>AIAgentBinding</c> declares <c>AIAgentHostExecutor</c> as its executor type before it is instantiated).
+    /// </summary>
+    internal static HashSet<string> GetChatProtocolExecutorIds(MAFWorkflows.Workflow workflow)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (id, binding) in workflow.ReflectExecutors())
+        {
+            if (binding.ExecutorType is { } executorType
+                && typeof(MAFWorkflows.ChatProtocolExecutor).IsAssignableFrom(executorType))
+            {
+                ids.Add(id);
+            }
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="message"/> is one a <see cref="MAFWorkflows.ChatProtocolExecutor"/> only ACCUMULATES
+    /// for its next turn (its <see cref="ChatMessage"/>, chat-message-collection and — when the executor sets a
+    /// string message role, as <c>AIAgentHostExecutor</c> does — <see cref="string"/> handlers), as opposed to the
+    /// <see cref="MAFWorkflows.TurnToken"/> that runs the turn or any other message.
+    /// </summary>
+    private static bool IsChatProtocolAccumulation(object? message) =>
+        message is ChatMessage or IEnumerable<ChatMessage> or string;
 
     /// <summary>
     /// Attempts to extract text from an executor's completed result or event data.

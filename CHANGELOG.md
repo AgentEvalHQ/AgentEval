@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Workflow steps are one per agent turn again:** since #129, `MAFWorkflowAdapter.FromMAFWorkflow`
+  recorded every message MAF delivers to an executor as a step. An agent bound with `BindAsExecutor`
+  receives 2-3 messages per turn (the chat messages it only collects, then the `TurnToken` that runs it),
+  so a 4-agent chain reported 11 steps, 7 of them empty, on any provider, and `HaveStepCount`,
+  `HaveExecutedInOrder`, `ForExecutor(...).HaveNonEmptyOutput()` and the harness's `StrictExecutorOrder`
+  check failed (TravelDemo Eval 2 and Eval 5, samples C2 and C3). `MAFWorkflowEventBridge` now counts
+  everything MAF delivers to one executor in one superstep as one step, and keeps an agent's messages
+  together until its turn runs. An executor invoked again in a later superstep (a self-loop) is still its
+  own step with its A→A edge. Known limits, documented in `docs/workflows.md`: two turns of one agent in
+  the same superstep (fan-in) are one step, and parallel fan-out attributes streamed text by stream
+  position (pre-existing).
+
+- **TravelDemo on any provider, model hidden on stage:** `samples/AgentEval.TravelDemo` and
+  `.TravelDemo.Evals` were Azure OpenAI only. They now follow `AI_INFERENCE_PROVIDER` with
+  `InferenceProviderEnvironment`'s rules (copied, because the demo agent takes no AgentEval dependency;
+  `.Evals` stops with exit 2 if the copy drifts from Core, and `--selftest` checks parity offline). The
+  judge is always the agent's model. The console and `--log` hide the provider, model and endpoint by
+  default, error text included; `--show-model` or `TRAVELDEMO_SHOW_MODEL=1` shows them and `--hide-model`
+  wins over both. Snapshots record the provider and model, and Eval 3 withholds its verdict across
+  different or unrecorded models. A failed model call or judge is reported as not measured, never as a
+  score of 0, a hypothesis verdict or a saved snapshot; Eval 4/5 keep errored runs out of their
+  statistics and never PASS with one. An Eval 5 run passes only when the workflow's structural checks and
+  its score both pass (it used to read the score alone), and Eval 2 prints one RESULT over structure and
+  quality. Demo 2 prints the final itinerary again, and the stochastic summary prints each eval's own
+  threshold. Verdicts never hide a failed dimension: Eval 1 labels its box as the quality gate and ends
+  with a RESULT line (a tool, order, policy or response failure is FAIL, a failed quality gate is WARN,
+  unmeasured is INCOMPLETE / NOT MEASURED) and makes no hypothesis claim when no tool was called;
+  snapshots record `StructurePassed`, `Result` and `UnscoredRuns` (older files read as not recorded); Eval
+  3 withholds its verdict when either side failed or did not record its checks or a stochastic run had no
+  judge score, and confirms on spread only when the workflow met its own pass threshold; a no-output run
+  counts as failed; a failed structure stays FAIL when the judge fails. In hidden mode a provider's HTTP
+  error shows only its status and error code. `--model` without a value exits 2. On Bitdeer
+  GLM-5.3-Flash (2026-10-20): Eval 2 PASS (4 steps) and Eval 5 5/5 PASS; Eval 1 reports FAIL when the
+  agent books without asking (GLM confirmed 2 of 5 bookings).
+
+- **PartnerDesk demo on any provider:** `samples/AgentEval.PartnerDeskDemo` and its `.Evals` project
+  were Azure OpenAI only. They now run on the provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI,
+  Bitdeer, OpenAI, Foundry, OpenAI-compatible), resolved by `InferenceProviderEnvironment`; the banner
+  names the provider and model, never the key. `--model` names the model. `--deployment` still works as
+  an alias and completes an Azure setup that has `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` but
+  no `AZURE_OPENAI_DEPLOYMENT`, when no other provider resolves; neither option stands in for a key, an
+  endpoint or another provider's selection. A set `AI_INFERENCE_PROVIDER` that does not resolve (missing
+  variables, unknown value, refused endpoint) stops both the demo and the eval with exit 2 and the
+  resolver's reason (a new exit code for the demo); `--offline` runs the scripted model on purpose. With
+  the selector unset and no provider configured, the demo still runs the scripted model and its banner
+  says so, while the eval exits 2 unless `--offline` is passed. The eval's shadow judge uses the same
+  provider and model. On Bitdeer GLM-5.3-Flash (2026-10-20), Phase 2 fired 0/3 (the model resists this
+  injection), and the 3-run eval's verdict was `RESULT: CHECK`: the Level 1 oracle needs an attempt and
+  held 1/3.
+
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
   or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite

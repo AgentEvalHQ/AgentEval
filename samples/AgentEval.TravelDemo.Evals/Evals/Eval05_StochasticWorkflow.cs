@@ -2,7 +2,6 @@
 // Copyright (c) 2026 ECS2026 Demo
 
 using AgentEval.MAF;
-using Azure.AI.OpenAI;
 using AgentEval.TravelDemo.Workflows;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -23,6 +22,10 @@ namespace AgentEval.TravelDemo.Evals;
 /// Compare the score spread with Eval 04 to test the hypothesis:
 ///   Workflow spread should be NARROWER than single-agent spread.
 ///
+/// A run passes only when the harness's structural checks (executor order, expected tools, duration,
+/// no errors) AND the judge's score pass. A run whose agent call, workflow or judge failed is not
+/// measured: kept out of the statistics, counted, and never part of a clean PASS (<see cref="RunClassifier"/>).
+///
 /// ⏱️ Runtime: ~8–15 minutes (5 × ~90–180s workflow runs + 5 judge calls)
 /// 💰 Cost: 5 × 4-agent workflow calls + 5 × small judge calls (~$0.15–$0.50)
 /// </summary>
@@ -42,10 +45,13 @@ public static class Eval05_StochasticWorkflow
             return;
         }
 
+        Config.PrintTarget();
+        Console.WriteLine();
+
         Console.WriteLine("  Building TripPlanner Workflow + ChatClientEvaluator...\n");
 
-        var azureClient     = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var evaluatorClient = azureClient.GetChatClient(Config.Model).AsIChatClient();
+        // Judge on the same provider + model as the workflow's agents.
+        var evaluatorClient = Config.CreateChatClient();
         var evaluator       = new ChatClientEvaluator(evaluatorClient);
         var harness         = new WorkflowEvaluationHarness(verbose: false);
 
@@ -59,8 +65,7 @@ public static class Eval05_StochasticWorkflow
         Console.WriteLine("  ⏳ Each run ~90–180s — total ~8–15 minutes...\n");
         Console.WriteLine("  " + new string('─', 70));
 
-        var scores     = new List<int>();
-        int passedCount = 0;
+        var outcomes = new List<RunOutcome>();
 
         for (int run = 1; run <= Runs; run++)
         {
@@ -69,6 +74,7 @@ public static class Eval05_StochasticWorkflow
             Console.ResetColor();
 
             var runStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            WorkflowTestResult? testResult = null;
 
             try
             {
@@ -92,39 +98,36 @@ public static class Eval05_StochasticWorkflow
                                            "SearchHotel", "BookHotel"]
                 };
 
-                var testResult = await harness.RunWorkflowTestAsync(
+                testResult = await harness.RunWorkflowTestAsync(
                     workflowAdapter, testCase,
                     new WorkflowTestOptions { Timeout = TimeSpan.FromMinutes(5) });
 
-                if (testResult.ExecutionResult is not { } execResult || string.IsNullOrWhiteSpace(execResult.FinalOutput))
+                // A run that errored (the adapter records a failed agent call instead of throwing) or produced no
+                // output is settled here, without the judge.
+                var settled = RunClassifier.BeforeJudging(run, testResult, ex => Config.Redact(ex), Config.Redact);
+                if (settled is not null)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"  ❌ Run {run} — workflow produced no output");
-                    Console.ResetColor();
-                    scores.Add(0);
+                    runStopwatch.Stop();
+                    outcomes.Add(settled);
+                    PrintRun(settled, testResult, runStopwatch.Elapsed);
                     continue;
                 }
 
                 // ── Judge with top-3 criteria ──────────────────────────────────
                 var evalResult = await evaluator.EvaluateAsync(
                     input:    input,
-                    output:   execResult.FinalOutput,
+                    output:   testResult.ExecutionResult!.FinalOutput,
                     criteria: TravelEvalCriteria.Stochastic);
 
-                int score = evalResult.OverallScore;
-                bool passed = score >= PassingScore;
-                if (passed) passedCount++;
-                scores.Add(score);
-
+                // The run passes only when the harness's structural checks (executor order, expected tools, …)
+                // AND the judge's score pass — the score alone used to decide, so a failed structure showed ✅.
+                var outcome = RunClassifier.AfterJudging(run, testResult, evalResult, PassingScore);
                 runStopwatch.Stop();
-                var icon = passed ? "✅" : "❌";
-                Console.ForegroundColor = passed ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine($"  {icon} Run {run}/{Runs} — score: {score,3}/100  " +
-                                  $"(elapsed: {runStopwatch.Elapsed.TotalSeconds:F0}s)");
-                Console.ResetColor();
+                outcomes.Add(outcome);
+                PrintRun(outcome, testResult, runStopwatch.Elapsed);
 
                 // Show per-criterion summary for this run
-                if (evalResult.CriteriaResults is { Count: > 0 } criteria)
+                if (outcome.Score is not null && evalResult.CriteriaResults is { Count: > 0 } criteria)
                 {
                     foreach (var cr in criteria)
                     {
@@ -139,75 +142,130 @@ public static class Eval05_StochasticWorkflow
             }
             catch (Exception ex)
             {
+                // The workflow harness threw: not measured — not a score of 0. The JUDGE threw: the run is checked like
+                // a judged one — a failed structure is a measured FAIL (unscored), a sound one is not measured.
                 runStopwatch.Stop();
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"  ❌ Run {run} failed: {ex.Message}");
-                Console.ResetColor();
-                scores.Add(0);
+                var outcome = testResult is null
+                    ? RunOutcome.NotMeasured(run, $"the workflow run failed: {Config.Redact(ex)}")
+                    : RunClassifier.JudgeThrew(run, testResult, Config.Redact(ex));
+                outcomes.Add(outcome);
+                PrintRun(outcome, testResult, runStopwatch.Elapsed);
             }
         }
 
         Console.WriteLine("\n  " + new string('─', 70) + "\n");
 
         // ── Print stochastic summary ─────────────────────────────────────────────
-        double passRate = Runs > 0 ? (double)passedCount / Runs : 0;
+        var tally  = new StochasticTally(outcomes, Threshold);
+        var scores = tally.Scores;
 
         EvalPrinter.PrintStochasticSummary(
-            architecture:  "Workflow (TripPlanner — 4 agents)",
-            runs:          Runs,
-            scores:        scores,
-            passRate:      passRate,
-            overallPassed: passRate >= Threshold,
-            label:         "Eval 05 — Stochastic Workflow (5 runs · top-3 criteria)");
+            architecture: "Workflow (TripPlanner — 4 agents)",
+            tally:        tally,
+            passingScore: PassingScore,
+            label:        "Eval 05 — Stochastic Workflow (5 runs · top-3 criteria)");
 
         // ── Verdict ──────────────────────────────────────────────────────────────
-        bool overallPassed = passRate >= Threshold;
-        Console.ForegroundColor = overallPassed ? ConsoleColor.Green : ConsoleColor.Yellow;
-        Console.WriteLine(overallPassed
-            ? $"  ✅ Workflow meets {Threshold * 100:F0}% consistency threshold"
-              + $"  ({passedCount}/{Runs} runs passed)"
-            : $"  ⚠️  Workflow below {Threshold * 100:F0}% threshold "
-              + $"({passedCount}/{Runs} runs passed)");
+        // A run counts as passed only when structure AND score passed; an unmeasured run rules out a clean pass.
+        Console.ForegroundColor = tally.Verdict switch
+        {
+            StochasticVerdict.Pass => ConsoleColor.Green,
+            StochasticVerdict.Fail => ConsoleColor.Red,
+            _                      => ConsoleColor.Yellow,
+        };
+        Console.WriteLine(tally.Verdict switch
+        {
+            StochasticVerdict.Pass =>
+                $"  ✅ Workflow meets {Threshold * 100:F0}% consistency threshold  ({tally.PassedCount}/{tally.Total} runs passed structure + score)",
+            StochasticVerdict.Fail =>
+                $"  ❌ Workflow below {Threshold * 100:F0}% threshold ({tally.PassedCount}/{tally.Measured} measured runs passed structure + score)",
+            StochasticVerdict.Incomplete =>
+                $"  ⚠️  INCOMPLETE — {tally.Errored} of {tally.Total} runs not measured; {tally.PassedCount}/{tally.Measured} measured runs passed. No PASS.",
+            _ =>
+                "  ⚠️  NOT MEASURED — no run produced a verdict.",
+        });
         Console.ResetColor();
+        int structuralFailures = outcomes.Count(o => o.Measured && o.StructureFailed);
+        if (structuralFailures > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"     {structuralFailures} measured run(s) failed the harness's structural checks, whatever their score.");
+            Console.ResetColor();
+        }
+        if (tally.Unscored > 0)
+        {
+            // A run with no output (or a failed structure the judge gave no verdict on) is a FAILED run — counted above —
+            // with no score: the spread below covers the other runs only, so it cannot speak for consistency.
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"     {tally.Unscored} measured run(s) had no judge score: counted as FAILED in the pass rate; " +
+                              $"the spread covers {scores.Count} of {tally.Total} runs, so Eval 3 gives no consistency verdict.");
+            Console.ResetColor();
+        }
 
         if (scores.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"\n  💡 Score range {scores.Min()}–{scores.Max()} (spread = {scores.Max() - scores.Min()})");
+            Console.WriteLine($"\n  💡 Score range {scores.Min()}–{scores.Max()} (spread = {scores.Max() - scores.Min()}, " +
+                              $"over {scores.Count} of {tally.Total} runs — judged runs only)");
             Console.WriteLine($"     Compare with Eval 04 single-agent spread to evaluate the hypothesis.");
             Console.ResetColor();
         }
         // ── Persist stochastic snapshot for Eval03 comparison ──────────────────
-        if (scores.Count > 0)
+        if (scores.Count == 0)
         {
-            double mean = scores.Average();
-            EvalResultStore.SaveStochastic("eval05_stochastic_workflow", new StochasticSnapshot
-            {
-                Architecture = "Workflow (TripPlanner — 4 agents)",
-                Label        = "Eval 05 — Stochastic Workflow (5 runs · top-3 criteria)",
-                Runs         = Runs,
-                PassRate     = passRate,
-                Passed       = overallPassed,
-                PassedCount  = passedCount,
-                MinScore     = scores.Min(),
-                MaxScore     = scores.Max(),
-                MeanScore    = mean,
-                Scores       = scores
-            });
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  📁 Stochastic snapshot saved → {EvalResultStore.StorageLocation}");
-            Console.WriteLine($"     Run Eval 3 to compare spread with Eval 04 (single agent).");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("\n  ⚠️  Snapshot NOT saved — no run produced a score; Eval 3 keeps the previous one.");
             Console.ResetColor();
-        }    }
-
-    private static void PrintMissingCredentials()
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(@"
-  ⚠️  Skipping Eval 05 — Azure OpenAI credentials required.
-");
+            return;
+        }
+        EvalResultStore.SaveStochastic("eval05_stochastic_workflow", new StochasticSnapshot
+        {
+            Architecture = "Workflow (TripPlanner — 4 agents)",
+            Label        = "Eval 05 — Stochastic Workflow (5 runs · top-3 criteria)",
+            ProviderTag  = EvalResultStore.CurrentProviderTag,   // provenance: recorded even when the console hides it
+            Model        = EvalResultStore.CurrentModel,
+            Runs         = tally.Total,
+            ErroredRuns  = tally.Errored,
+            UnscoredRuns = tally.Unscored,   // failed runs with no score: Eval 3 withholds the consistency verdict
+            PassRate     = tally.PassRate,
+            Passed       = tally.Verdict == StochasticVerdict.Pass,
+            PassedCount  = tally.PassedCount,
+            MinScore     = scores.Min(),
+            MaxScore     = scores.Max(),
+            MeanScore    = scores.Average(),
+            Scores       = [.. scores]
+        });
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"  📁 Stochastic snapshot saved → {EvalResultStore.StorageLocation}");
+        if (tally.Errored > 0)
+            Console.WriteLine($"     It records {tally.Errored} unmeasured run(s); Eval 3 gives no verdict on it.");
+        Console.WriteLine($"     Run Eval 3 to compare spread with Eval 04 (single agent).");
         Console.ResetColor();
     }
+
+    /// <summary>One run's line: ✅ only when structure AND score passed; the failed checks listed; never a 0 for an error.</summary>
+    private static void PrintRun(RunOutcome outcome, WorkflowTestResult? testResult, TimeSpan elapsed)
+    {
+        if (!outcome.Measured)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"  ⚠️  Run {outcome.Run}/{Runs} — NOT MEASURED: {EvalPrinter.OneLine(outcome.NotMeasuredReason)}  " +
+                              $"(elapsed: {elapsed.TotalSeconds:F0}s)");
+            Console.ResetColor();
+            return;
+        }
+
+        var score = outcome.Score is { } s ? $"{s,3}/100" : "  —";
+        Console.ForegroundColor = outcome.Passed ? ConsoleColor.Green : ConsoleColor.Red;
+        Console.WriteLine($"  {(outcome.Passed ? "✅" : "❌")} Run {outcome.Run}/{Runs} — score: {score}  " +
+                          $"(elapsed: {elapsed.TotalSeconds:F0}s){(outcome.FailureReason is { } why ? $"  — {why}" : "")}");
+        // Each failed harness check's own message (executor ids, tool names) — redacted like every printed message.
+        foreach (var failed in testResult?.AssertionResults?.Where(a => !a.Passed) ?? [])
+            Console.WriteLine($"       • {failed.AssertionName}: {EvalPrinter.OneLine(Config.Redact(failed.FailureMessage))}");
+        Console.ResetColor();
+    }
+
+    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Eval 05");
 
     private static void PrintHeader()
     {
