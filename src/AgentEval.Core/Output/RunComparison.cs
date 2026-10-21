@@ -72,8 +72,8 @@ public sealed record ComparabilityAxis(
 public sealed record ScenarioComparison(
     string ScenarioId,
     IReadOnlyList<ComparabilityAxis> Axes,
-    double BaselineScore,
-    double CandidateScore,
+    double? BaselineScore,
+    double? CandidateScore,
     bool BaselinePassed,
     bool CandidatePassed,
     bool BaselineHasUsableFloor,
@@ -90,12 +90,12 @@ public sealed record ScenarioComparison(
 
     /// <summary>
     /// Whether the baseline's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>). An errored,
-    /// skipped or unjudged scenario's score is a placeholder.
+    /// skipped or unjudged scenario's score is null.
     /// </summary>
-    public bool BaselineMeasured { get; init; } = true;
+    public bool BaselineMeasured => BaselineScore is not null;
 
     /// <summary>Whether the candidate's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>).</summary>
-    public bool CandidateMeasured { get; init; } = true;
+    public bool CandidateMeasured => CandidateScore is not null;
 
     /// <summary>True when both runs measured this scenario, so <see cref="ScoreDelta"/> is a difference of two scores.</summary>
     public bool BothMeasured => BaselineMeasured && CandidateMeasured;
@@ -103,7 +103,7 @@ public sealed record ScenarioComparison(
     /// <summary>
     /// Candidate minus baseline. Meaningful only when the comparison is COMPARABLE and <see cref="BothMeasured"/>.
     /// </summary>
-    public double ScoreDelta => CandidateScore - BaselineScore;
+    public double? ScoreDelta => CandidateScore - BaselineScore;
 
     /// <summary>True when both runs recorded a floor a delta can be read against.</summary>
     public bool DeltaHasAFloor => BaselineHasUsableFloor && CandidateHasUsableFloor;
@@ -247,17 +247,17 @@ public sealed record RunComparison(
     }
 
     /// <summary>
-    /// The mean score delta over the matched scenarios both runs measured; <c>NaN</c> when there is none. ⚠ Read it
+    /// The mean score delta over the matched scenarios both runs measured; <see langword="null"/> when there is none. ⚠ Read it
     /// only when <see cref="Verdict"/> is <see cref="ComparisonVerdict.Comparable"/>; the renderer prints nothing
     /// derived from it otherwise. A scenario either run did not measure is left out and listed in
     /// <see cref="NotMeasuredScenarios"/>: its placeholder 0 would report a score change nobody measured.
     /// </summary>
-    public double MeanScoreDelta
+    public double? MeanScoreDelta
     {
         get
         {
             var measured = Scenarios.Where(s => s.BothMeasured).ToList();
-            return measured.Count == 0 ? double.NaN : measured.Average(s => s.ScoreDelta);
+            return measured.Count == 0 ? null : measured.Average(s => s.ScoreDelta);
         }
     }
 
@@ -383,11 +383,7 @@ public sealed record RunComparison(
             b.Passed,
             fa?.ChanceFloor?.IsUsableAsABar == true,
             fb?.ChanceFloor?.IsUsableAsABar == true,
-            selfGraded)
-        {
-            BaselineMeasured = ScenarioMeasurement.IsMeasured(a),
-            CandidateMeasured = ScenarioMeasurement.IsMeasured(b),
-        };
+            selfGraded);
     }
 
     // ── Axis constructors. Each encodes the same three-state rule, once. ─────────────────────

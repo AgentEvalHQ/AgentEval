@@ -102,12 +102,12 @@ public static class EvalResultPersistence
             Input: input ?? "",
             Output: json,
             Passed: result.Score.Passed,
-            Score: result.Score.Value,
+            Score: result.Score.MeasuredValue(),
             Metrics: metrics,
             Assertions: assertions
                 ?? AgentEval.Assertions.AgentEvalScope.Current?.Results
                 ?? Array.Empty<AssertionResult>(),
-            Duration: TimeSpan.Zero,
+            Duration: null,
             EstimatedCost: result.Provenance.EstimatedCost) // null stays null: not priced, never $0
         {
             // Null when no input was supplied — and null must be read as "nobody computed one",
@@ -120,8 +120,7 @@ public static class EvalResultPersistence
             // V1's whole claim: comparability data belongs on the RUN, not in a manifest.
             Comparability = ComparabilityOf(result, subjectModel),
 
-            // An errored, skipped or unjudged leaf is stored as Score 0 / Passed false; this says the 0 is a
-            // placeholder, so `compare` never averages it. Null (a measurement) keeps the file as it was.
+            // Preserve why the score is absent, separately from the nullable numeric reading.
             Measurement = ScenarioMeasurement.Of(result.Score.CensusBucket()),
         };
     }

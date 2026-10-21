@@ -189,7 +189,7 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Output.BaselineComparison"] = "DTO of the store's run-vs-baseline deltas, taken only over metrics both summaries carry (rows B-7 keep a placeholder out)",
         ["AgentEval.Output.EvidenceSummary"] = "count: controls passed, warned and failed",
         ["AgentEval.Output.RunSummary"] = "DTO: summary.json; rows B-7 check what the writers put in Metrics",
-        ["AgentEval.Output.ScenarioResult"] = "data: one scenario; Measurement marks one not measured (row B-4)",
+        ["AgentEval.Output.ScenarioResult"] = "data: one scenario; nullable Score normalizes unmeasured legacy placeholders and Duration is nullable (row B-4, T86b)",
         ["AgentEval.Snapshots.SemanticComparisonResult"] = "compares one response with one snapshot; no aggregate",
         ["AgentEval.Snapshots.SnapshotComparisonResult"] = "compares one response with one snapshot; no aggregate",
 
@@ -278,7 +278,7 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Comparison.StatisticsCalculator"] = "placeholder plus flag: statistics of an empty sample carry SampleSize 0 (row B-2)",
         ["AgentEval.Core.AgentEvalPluginBase"] = "plugin base class; aggregates nothing",
         ["AgentEval.Core.CriterionText"] = "matches a judge's echo of a criterion; produces no score",
-        ["AgentEval.Evals.EvalResultPersistence"] = "maps an EvalResult tree to ScenarioResults, carrying not measured as Measurement (row B-4)",
+        ["AgentEval.Evals.EvalResultPersistence"] = "maps an EvalResult tree to ScenarioResults, carrying not measured as null Score plus Measurement (row B-4, T86b)",
         ["AgentEval.Evals.SeverityRollup"] = "max severity: 'none' over nothing, which no verdict reads alone (CompositeEval guards nothing measured, rows A1)",
         ["AgentEval.Guardrails.Judges.CalibrationReport"] = "calibration of one gate axis over its gold set; the fleet index leaves an absent axis out (row A14)",
         ["AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport"] = "DTO of GatekeeperFleetHealthIndex (row A14)",

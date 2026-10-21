@@ -361,9 +361,9 @@ public class RunComparisonTests
             [Scenario("a", score: 0.6, passed: true), Scenario("b", score: 0.5, passed: false)]);
 
         Assert.Equal(ComparisonVerdict.Comparable, c.Verdict);
-        Assert.Equal(0.2, c.Scenarios[0].ScoreDelta, 12);
-        Assert.Equal(-0.4, c.Scenarios[1].ScoreDelta, 12);
-        Assert.Equal(-0.1, c.MeanScoreDelta, 12);
+        Assert.Equal(0.2, c.Scenarios[0].ScoreDelta!.Value, 12);
+        Assert.Equal(-0.4, c.Scenarios[1].ScoreDelta!.Value, 12);
+        Assert.Equal(-0.1, c.MeanScoreDelta!.Value, 12);
         Assert.Equal(1, c.Recovered);
         Assert.Equal(1, c.Regressed);
     }

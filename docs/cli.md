@@ -425,6 +425,11 @@ Warnings (e.g. a subject folder with a missing `subject.json`) do not affect the
 
 ### `agenteval compare`
 
+Scenario scores and deltas are nullable. If either side did not measure a scenario, the table shows
+`n/m` for that score and `n/a` for its delta. JSON includes explicit null `baseline`, `candidate` and
+`delta` fields where absent. The library's `RunComparison.MeanScoreDelta` is null when no matched pair
+was measured; a genuinely zero delta stays zero. Comparability checks and regression exit rules still apply.
+
 Compare two runs from the `.agenteval/` store, and print score deltas only when the two runs can be shown to
 have measured the same thing.
 

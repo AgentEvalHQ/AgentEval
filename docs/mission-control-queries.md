@@ -1,5 +1,11 @@
 # Shared Mission Control queries
 
+Scenario `score` and `duration` fields are nullable. A missing score is not zero or a failed result; use
+`measurement` (`not_measured` / `not_applicable`) to explain absence. The run detail page labels these
+states. A recorded zero score or duration remains zero. Legacy numeric scores explicitly marked
+unmeasured are normalized to null when read.
+
+
 ## Implemented UI and desktop scope
 
 The governance views described here are part of the existing React web app,

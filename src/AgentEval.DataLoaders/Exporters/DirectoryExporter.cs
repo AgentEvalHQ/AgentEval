@@ -182,17 +182,14 @@ public sealed class DirectoryExporter : IResultExporter
                 Input: "",
                 Output: result.Output ?? "",
                 Passed: result.Passed,
-                // ScenarioResult.Score is not nullable: a test with no score is stored with a placeholder 0 and marked
-                // not measured below. A duration of zero is the store's "not recorded" (read back as null).
-                Score: result.Score ?? 0,
+                Score: result.Score,
                 Metrics: result.MetricScores,
                 Assertions: BuildAssertions(result),
-                Duration: result.DurationMs is { } durationMs ? TimeSpan.FromMilliseconds(durationMs) : TimeSpan.Zero,
+                Duration: result.DurationMs is { } durationMs ? TimeSpan.FromMilliseconds(durationMs) : null,
                 // The report carries no cost: not priced (null), never a $0 the test did not measure.
                 EstimatedCost: null)
             {
-                // A test with no verdict, or with no score at all, is stored with a placeholder 0; this keeps `compare`
-                // from averaging it.
+                // An absent verdict cannot supply a comparable score.
                 Measurement = result.NotMeasured || result.Score is null ? ScenarioMeasurement.NotMeasured : null,
             };
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);

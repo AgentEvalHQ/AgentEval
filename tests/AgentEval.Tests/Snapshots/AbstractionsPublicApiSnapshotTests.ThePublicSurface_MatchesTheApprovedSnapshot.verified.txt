@@ -2245,8 +2245,8 @@ sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.Scena
     Boolean Equals(AgentEval.Output.ScenarioResult other)
     Boolean Equals(Object obj)
     Boolean Passed { get; init; }
-    Double Score { get; init; }
     Double? EstimatedCost { get; init; }
+    Double? Score { get; init; }
     IReadOnlyDictionary<String, Double> Metrics { get; init; }
     IReadOnlyList<AgentEval.Output.AssertionResult> Assertions { get; init; }
     Int32 GetHashCode()
@@ -2257,9 +2257,9 @@ sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.Scena
     String Output { get; init; }
     String StimulusHash { get; init; }
     String ToString()
-    TimeSpan Duration { get; init; }
-    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan Duration, out Double? EstimatedCost)
-    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan Duration, Double? EstimatedCost)
+    TimeSpan? Duration { get; init; }
+    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double? Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan? Duration, out Double? EstimatedCost)
+    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double? Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan? Duration, Double? EstimatedCost)
 sealed class AgentEval.Output.SolutionInfo : IEquatable<AgentEval.Output.SolutionInfo>
     AgentEval.Output.SolutionInfo <Clone>$()
     Boolean Equals(AgentEval.Output.SolutionInfo other)

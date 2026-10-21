@@ -459,7 +459,7 @@ public static class StoreV1Exporter
             Ext = new JsonObject { [ExtName] = ScenarioExt(scenario, capture) },
             Lane = lane,
             Severity = severity,
-            DurationMs = scenario.Duration > TimeSpan.Zero ? scenario.Duration.TotalMilliseconds : null,
+            DurationMs = scenario.Duration is { } duration && duration >= TimeSpan.Zero ? duration.TotalMilliseconds : null,
             // A cost not priced (null) writes no usage: absent, never a $0 the run did not report.
             Usage = scenario.EstimatedCost is double cost && cost > 0 && double.IsFinite(cost)
                 ? [new AefUsage { Role = AefUsageRole.Other, CostUsd = cost, CostSource = "AgentEval store v1 estimate (ScenarioResult.EstimatedCost)" }]
@@ -515,6 +515,12 @@ public static class StoreV1Exporter
     {
         if (tree is null)
         {
+            if (!ScenarioMeasurement.IsMeasured(scenario))
+            {
+                var absence = scenario.Measurement == ScenarioMeasurement.NotApplicable ? AefState.NotApplicable : AefState.NotMeasured;
+                return (absence, "AgentEval store v1: the scenario has no measured score (measurement: "
+                    + (scenario.Measurement ?? "unrecorded") + ").", null);
+            }
             return (scenario.Passed ? AefState.Passed : AefState.Failed, null, null);
         }
 
@@ -561,9 +567,9 @@ public static class StoreV1Exporter
     private static List<AefScore> Scores(ScenarioResult scenario)
     {
         var scores = new List<AefScore>();
-        if (double.IsFinite(scenario.Score))
+        if (scenario.Score is { } score && double.IsFinite(score))
         {
-            scores.Add(new AefScore { Metric = ScoreMetric, Value = scenario.Score });
+            scores.Add(new AefScore { Metric = ScoreMetric, Value = score });
         }
 
         foreach (var (name, value) in scenario.Metrics)
@@ -612,7 +618,7 @@ public static class StoreV1Exporter
         {
             Strategy = AefAggregationStrategy.Own,
             Threshold = facts?.EffectiveBar,
-            Score = IsMeasured(state) && double.IsFinite(scenario.Score) ? scenario.Score : null,
+            Score = IsMeasured(state) && scenario.Score is { } score && double.IsFinite(score) ? score : null,
             RulePath = IsMeasured(state) ? AefRulePath.Threshold : AefRulePath.NothingMeasured,
             Measured = measured,
             Total = children.Count,
@@ -654,7 +660,7 @@ public static class StoreV1Exporter
         {
             ["name"] = scenario.Name,
             ["passed"] = scenario.Passed,
-            ["score"] = double.IsFinite(scenario.Score) ? scenario.Score : null,
+            ["score"] = scenario.Score is { } score && double.IsFinite(score) ? score : null,
         };
         if (capture == AefContentCapture.On && scenario.StimulusHash is { } stimulus)
         {

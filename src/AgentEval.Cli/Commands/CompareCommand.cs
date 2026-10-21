@@ -31,14 +31,13 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class CompareCommand
 {
-    // Matches FileSystemOutputStore's write options. A reader configured differently from the
-    // writer is the "asserted against a copy of its settings" defect ADR-031 records for S2, so the
-    // round trip is covered by a test that reads a file the real store wrote.
+    // Read store files with their property naming and enum conventions. Comparison output includes
+    // explicit nulls so an absent baseline, candidate or delta remains visible.
     private static readonly JsonSerializerOptions s_json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
@@ -215,8 +214,8 @@ public static class CompareCommand
         foreach (var s in comparison.Scenarios)
         {
             // A side that did not measure the scenario has a placeholder score: no number, no delta.
-            string baselineCell = s.BaselineMeasured ? s.BaselineScore.ToString("F4", CultureInfo.InvariantCulture) : "n/m";
-            string candidateCell = s.CandidateMeasured ? s.CandidateScore.ToString("F4", CultureInfo.InvariantCulture) : "n/m";
+            string baselineCell = s.BaselineScore?.ToString("F4", CultureInfo.InvariantCulture) ?? "n/m";
+            string candidateCell = s.CandidateScore?.ToString("F4", CultureInfo.InvariantCulture) ?? "n/m";
             string deltaCell = s.BothMeasured ? FormatDelta(s.ScoreDelta) : "n/a";
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  {Fit(s.ScenarioId, 40),-40}  {baselineCell,8}  {candidateCell,9}  {deltaCell,9}"));
@@ -409,7 +408,7 @@ public static class CompareCommand
     /// a zero and a number too small to show:
     /// </para>
     /// <list type="bullet">
-    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.
+    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is null when there is nothing to average → <c>n/a</c>.
     ///   Live in the report since T13-5: a comparable run whose every shared scenario was not measured on one side
     ///   has no measured pair to average. See the remark below.</item>
     ///   <item><b>exactly zero</b> — the runs scored identically → <c>0.0000</c>, unchanged.</item>
@@ -417,22 +416,8 @@ public static class CompareCommand
     ///   both the sign and the magnitude. "Smaller than the display can show" is not "zero".</item>
     /// </list>
     /// <para>
-    /// ⚠ <b>WAVE 11 CORRECTION.</b> <see cref="RunComparison.MeanScoreDelta"/> is <c>NaN</c> exactly
-    /// when <c>Scenarios.Count == 0</c>, and that same count forces
-    /// <see cref="ComparisonVerdict.Incomparable"/>, which returns from <c>Render</c> before the
-    /// scenario table, the legend and the mean line are written. <b>The report therefore never printed
-    /// <c>NaN</c> here and cannot print <c>n/a</c> either</b> — the absence case is a state of THIS
-    /// FUNCTION, not a state of the report, and MEASUREMENT_STATUS §72's claim that the report's
-    /// absence rendering "changed NaN → n/a" overstates what was reachable. The coupling that makes
-    /// it dead is asserted by
-    /// <c>TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst</c>,
-    /// so if it is ever broken the branch goes live and that test says so.
-    /// </para>
-    /// <para>
-    /// T13-5 made the branch live by a second route: the mean now averages only the scenarios BOTH runs measured, so a
-    /// comparable pair of runs whose every shared scenario errored, was skipped or had no judge verdict on one side has
-    /// a <c>NaN</c> mean, and the report prints <c>n/a</c> for it. That is the honest rendering: there was no measured
-    /// pair to average. The empty-comparison coupling above still holds.
+    /// An empty comparison refuses before rendering a table. A comparable pair with no jointly measured scenarios
+    /// can still reach the table and displays n/a for its mean; neither case invents a delta.
     /// </para>
     /// <para>
     /// The sub-precision case is decided by FORMATTING FIRST and asking whether the result reads as a
@@ -440,10 +425,11 @@ public static class CompareCommand
     /// about where <c>F4</c> rounds and could disagree with it at the boundary.
     /// </para>
     /// </remarks>
-    /// <param name="delta">The delta to render.</param>
+    /// <param name="reading">The delta to render, or null when absent.</param>
     /// <returns>The rendered delta.</returns>
-    internal static string FormatDelta(double delta)
+    internal static string FormatDelta(double? reading)
     {
+        if (reading is not { } delta) return "n/a";
         // ABSENCE. Not a small number, not a zero: there was nothing to average.
         if (double.IsNaN(delta)) return "n/a";
 
@@ -459,9 +445,9 @@ public static class CompareCommand
             : fixedPoint;
     }
 
-    /// <summary>True when <paramref name="delta"/> is real but too small for the fixed-point column.</summary>
-    private static bool IsBelowDisplayPrecision(double delta) =>
-        !double.IsNaN(delta) && delta != 0.0
+    /// <summary>True when <paramref name="reading"/> is real but too small for the fixed-point column.</summary>
+    private static bool IsBelowDisplayPrecision(double? reading) =>
+        reading is { } delta && !double.IsNaN(delta) && delta != 0.0
         && delta.ToString("F4", CultureInfo.InvariantCulture) is "0.0000" or "-0.0000";
 
     private static string Fit(string text, int width) =>

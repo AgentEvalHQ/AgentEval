@@ -1350,7 +1350,7 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
     System.Collections.Generic.IReadOnlyList<System.String> CandidateOnly { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> NotMeasuredScenarios { get; }
     System.Collections.Generic.IReadOnlyList<System.String> RefusalReasons { get; }
-    System.Double MeanScoreDelta { get; }
+    System.Double? MeanScoreDelta { get; }
     System.Int32 GetHashCode()
     System.Int32 Recovered { get; }
     System.Int32 Regressed { get; }
@@ -1362,11 +1362,11 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
 sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.Output.ScenarioComparison>
     AgentEval.Output.ScenarioComparison <Clone>$()
     System.Boolean BaselineHasUsableFloor { get; init; }
-    System.Boolean BaselineMeasured { get; init; }
+    System.Boolean BaselineMeasured { get; }
     System.Boolean BaselinePassed { get; init; }
     System.Boolean BothMeasured { get; }
     System.Boolean CandidateHasUsableFloor { get; init; }
-    System.Boolean CandidateMeasured { get; init; }
+    System.Boolean CandidateMeasured { get; }
     System.Boolean CandidatePassed { get; init; }
     System.Boolean DeltaHasAFloor { get; }
     System.Boolean Equals(AgentEval.Output.ScenarioComparison other)
@@ -1375,14 +1375,14 @@ sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.O
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Blocking { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Unpinned { get; }
-    System.Double BaselineScore { get; init; }
-    System.Double CandidateScore { get; init; }
-    System.Double ScoreDelta { get; }
+    System.Double? BaselineScore { get; init; }
+    System.Double? CandidateScore { get; init; }
+    System.Double? ScoreDelta { get; }
     System.Int32 GetHashCode()
     System.String ScenarioId { get; init; }
     System.String ToString()
-    System.Void Deconstruct(out System.String ScenarioId, out System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, out System.Double BaselineScore, out System.Double CandidateScore, out System.Boolean BaselinePassed, out System.Boolean CandidatePassed, out System.Boolean BaselineHasUsableFloor, out System.Boolean CandidateHasUsableFloor, out System.Boolean JudgeGradedItsOwnSubject)
-    ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double BaselineScore, System.Double CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
+    System.Void Deconstruct(out System.String ScenarioId, out System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, out System.Double? BaselineScore, out System.Double? CandidateScore, out System.Boolean BaselinePassed, out System.Boolean CandidatePassed, out System.Boolean BaselineHasUsableFloor, out System.Boolean CandidateHasUsableFloor, out System.Boolean JudgeGradedItsOwnSubject)
+    ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double? BaselineScore, System.Double? CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
 enum AgentEval.Providers.InferenceProvider
     None
     AzureOpenAI

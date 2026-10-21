@@ -29,6 +29,12 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   for zero runs; `StochasticResult.PassRateOverAllRuns` supplies the shared reliability denominator.
   Assertions reject missing readings, and tables/CLI show absence instead of zero.
 
+- **Breaking:** stored scenario `Score` and `Duration` are nullable, with explicit JSON nulls. Unmeasured
+  and not-applicable legacy placeholders read back as null. Scenario comparison scores and deltas are
+  nullable, including the mean when no pair was measured. Compare JSON carries explicit absence; AEF
+  conversion and legacy indexing preserve unmeasured states. Mission Control exposes nullable GraphQL
+  fields and labels unmeasured scenarios. Recorded zero scores and durations remain values.
+
 - **What 1.0 promises** (README, "Feature Maturity"): semantic versioning for the public API of the
   `AgentEval` library and for the CLI's documented commands, options and exit codes, except types marked
   `[Experimental]` and the fronts labelled Beta or Experimental. Core evaluation and red team are Stable at

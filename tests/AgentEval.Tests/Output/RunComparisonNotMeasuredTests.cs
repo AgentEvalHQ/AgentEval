@@ -31,7 +31,7 @@ public class RunComparisonNotMeasuredTests
             [Scenario("X", 0.0, passed: false, ScenarioMeasurement.NotMeasured)]);
 
         Assert.Equal(ComparisonVerdict.Comparable, c.Verdict);
-        Assert.True(double.IsNaN(c.MeanScoreDelta));
+        Assert.Null(c.MeanScoreDelta);
         Assert.Equal(["X"], c.NotMeasuredScenarios);
         Assert.False(c.Scenarios.Single().BothMeasured);
     }
@@ -43,7 +43,7 @@ public class RunComparisonNotMeasuredTests
             [Scenario("X", 0.5, passed: true), Scenario("Y", 0.9, passed: true)],
             [Scenario("X", 0.7, passed: true), Scenario("Y", 0.0, passed: false, ScenarioMeasurement.NotMeasured)]);
 
-        Assert.Equal(0.2, c.MeanScoreDelta, 10);
+        Assert.Equal(0.2, c.MeanScoreDelta!.Value, 10);
         Assert.Equal(["Y"], c.NotMeasuredScenarios);
     }
 
@@ -66,7 +66,7 @@ public class RunComparisonNotMeasuredTests
             [Scenario("X", 0.9, passed: true)],
             [Scenario("X", 0.0, passed: false)]);
 
-        Assert.Equal(-0.9, c.MeanScoreDelta, 10);
+        Assert.Equal(-0.9, c.MeanScoreDelta!.Value, 10);
         Assert.Empty(c.NotMeasuredScenarios);
     }
 

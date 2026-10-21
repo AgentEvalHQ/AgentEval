@@ -754,7 +754,7 @@ internal static class NothingMeasuredCensusRows
     {
         var comparison = RunComparison.Of([Scenario("s1", 0, measured: false)], [Scenario("s1", 0, measured: false)]);
 
-        NoReading.NaN(comparison.MeanScoreDelta, "B-4");
+        NoReading.Number(comparison.MeanScoreDelta, "B-4");
         Assert.Equal(["s1"], comparison.NotMeasuredScenarios);
         return Task.CompletedTask;
     }
@@ -763,7 +763,7 @@ internal static class NothingMeasuredCensusRows
     {
         var comparison = RunComparison.Of([Scenario("s1", 0.8, measured: true)], [Scenario("s1", 0.9, measured: true)]);
 
-        Assert.Equal(0.1, comparison.MeanScoreDelta, 6);
+        Assert.Equal(0.1, comparison.MeanScoreDelta!.Value, 6);
         return Task.CompletedTask;
     }
 

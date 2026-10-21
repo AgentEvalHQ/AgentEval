@@ -58,8 +58,9 @@ interface RunDetailResponse {
     id: string;
     name: string;
     passed: boolean;
-    score: number;
-    duration: string;
+    score: number | null;
+    measurement: string | null;
+    duration: string | null;
     estimatedCost: number;
   }[];
   runCostBreakdown: {
@@ -104,6 +105,7 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
       name
       passed
       score
+      measurement
       duration
       estimatedCost
     }
@@ -327,7 +329,11 @@ export function RunDetailPage() {
                           {formatCost(s.estimatedCost)}
                         </td>
                         <td className="px-4 py-2 text-center">
-                          {s.passed ? (
+                          {s.measurement === "not_applicable" ? (
+                            <span className="text-slate-600 font-medium text-xs">NOT APPLICABLE</span>
+                          ) : s.score == null || s.measurement === "not_measured" ? (
+                            <span className="text-slate-600 font-medium text-xs">NOT MEASURED</span>
+                          ) : s.passed ? (
                             <span className="text-green-700 font-medium text-xs">PASS</span>
                           ) : (
                             <span className="text-red-700 font-medium text-xs">FAIL</span>

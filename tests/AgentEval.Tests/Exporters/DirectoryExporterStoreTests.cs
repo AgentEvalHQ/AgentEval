@@ -11,6 +11,32 @@ namespace AgentEval.Tests.Exporters;
 
 public class DirectoryExporterStoreTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExportThroughStore_AbsentOrZeroReadings_PreservesTheDistinction(bool measured)
+    {
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "test");
+        var manifest = await store.StartRunAsync(subject, new("test", ".", "offline", null, null, "eval"));
+        var report = new EvaluationReport
+        {
+            Name = "test", TotalTests = 1,
+            TestResults = [new TestResultSummary
+            {
+                Name = "case", Score = measured ? 0 : null, DurationMs = measured ? 0 : null,
+                NotMeasured = !measured,
+            }],
+        };
+        await new DirectoryExporter().ExportThroughStoreAsync(store, subject, manifest, report);
+        var scenarios = new List<ScenarioResult>();
+        await foreach (var item in store.GetScenarioResultsAsync(manifest.Run.RunId)) scenarios.Add(item);
+        var scenario = Assert.Single(scenarios);
+        Assert.Equal(measured ? (double?)0 : null, scenario.Score);
+        Assert.Equal(measured ? (TimeSpan?)TimeSpan.Zero : null, scenario.Duration);
+        Assert.Equal(measured, ScenarioMeasurement.IsMeasured(scenario));
+    }
+
     [Fact]
     public async Task ExportThroughStore_WritesScenariosAndCompletesRun()
     {
