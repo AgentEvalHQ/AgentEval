@@ -533,6 +533,10 @@ public static class MAFWorkflowEventBridge
             }
         }
 
+        // MAF can end its event stream normally when cancelled. Preserve cancellation so the
+        // harness can distinguish a timeout from a completed workflow with partial evidence.
+        cancellationToken.ThrowIfCancellationRequested();
+
         // If the stream ended without a WorkflowOutputEvent, still flush (or close the open step, as above) and complete
         if (!workflowOutputReceived)
         {
