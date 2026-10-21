@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that (HTTP 400 or 422); and with no reasoning field, the provider's default, when it rejects both (a model
   with no reasoning setting). The level that worked is remembered per provider, endpoint and model for the
   rest of the process; code that sets `ChatOptions.Reasoning` keeps its own level and is never retried.
+  Not wrapped: the AEF dataset runner (`agenteval run --plan`), whose clients make one attempt per call so
+  its call budget holds; they run at the provider's default.
   Bitdeer rejects `none` and accepts `low`, which turns GLM-5.3-Flash's reasoning off: on an
   article-length answer it had spent two thirds of its output tokens reasoning and taken 2.2 times as long.
   Sample C2 (Real MAF Workflow, four agents writing an article, a 180 s limit) now passes on GLM in 62 s
