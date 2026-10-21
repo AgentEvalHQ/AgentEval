@@ -1,0 +1,2250 @@
+﻿static class AgentEval.Benchmarks.MitreBenchmark
+    static AgentEval.Benchmarks.MitreBenchmarkRun AtlasAuditGrade(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.MitreBenchmarkRun AtlasBaseline(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.MitreBenchmarkRun AtlasSmoke(IEvaluator judge = null)
+sealed class AgentEval.Benchmarks.MitreBenchmarkRun
+    AgentEval.Benchmarks.MitreBenchmarkRun WithJudge(IChatClient judgeClient, String judgeModel)
+    AgentEval.RedTeam.AttackPipeline Pipeline { get; }
+    AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport GenerateReport(AgentEval.RedTeam.RedTeamResult result)
+    AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, String incompleteReason)
+    EvalResult BuildEvalResult(AgentEval.RedTeam.RedTeamResult result)
+    IEvaluator Judge { get; }
+    IReadOnlyList<String> CoveredAtlasIds { get; }
+    String JudgeModel { get; }
+    String PresetName { get; }
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, CancellationToken ct = default)
+    Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+static class AgentEval.Benchmarks.NistBenchmark
+    static AgentEval.Benchmarks.NistBenchmarkRun RmfAuditGrade(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.NistBenchmarkRun RmfBaseline(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.NistBenchmarkRun RmfSmoke(IEvaluator judge = null)
+sealed class AgentEval.Benchmarks.NistBenchmarkRun
+    AgentEval.Benchmarks.NistBenchmarkRun WithJudge(IChatClient judgeClient, String judgeModel)
+    AgentEval.RedTeam.AttackPipeline Pipeline { get; }
+    AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result)
+    AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, String incompleteReason)
+    EvalResult BuildEvalResult(AgentEval.RedTeam.RedTeamResult result)
+    IEvaluator Judge { get; }
+    IReadOnlyList<String> CoveredControlIds { get; }
+    String JudgeModel { get; }
+    String PresetName { get; }
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, CancellationToken ct = default)
+    Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+static class AgentEval.Benchmarks.OwaspBenchmark
+    static AgentEval.Benchmarks.OwaspBenchmarkRun AuditGrade(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.OwaspBenchmarkRun Smoke(IEvaluator judge = null)
+    static AgentEval.Benchmarks.OwaspBenchmarkRun Top10(IEvaluator judge = null, String systemPromptCanary = null)
+    static AgentEval.Benchmarks.OwaspBenchmarkRun Top10ForRag(IEvaluator judge = null, String systemPromptCanary = null)
+sealed class AgentEval.Benchmarks.OwaspBenchmarkRun
+    AgentEval.Benchmarks.OwaspBenchmarkRun WithJudge(IChatClient judgeClient, String judgeModel)
+    AgentEval.RedTeam.AttackPipeline Pipeline { get; }
+    AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result)
+    AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, String incompleteReason)
+    EvalResult BuildEvalResult(AgentEval.RedTeam.RedTeamResult result)
+    IEvaluator Judge { get; }
+    IReadOnlyList<String> CoveredOwaspIds { get; }
+    String JudgeModel { get; }
+    String PresetName { get; }
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, CancellationToken ct = default)
+    Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+static class AgentEval.Benchmarks.RedTeamProbeObservations
+    const String ResistanceCeilingDerivation
+    static ChanceFloor ResistanceCeilingFloor { get; }
+    static IReadOnlyList<Observation> Of(AgentEval.RedTeam.AttackResult attack, String armId)
+    static ObservationCensus CensusOf(AgentEval.RedTeam.AttackResult attack)
+static class AgentEval.DependencyInjection.RedTeamServiceCollectionExtensions
+    static IServiceCollection AddAgentEvalRedTeam(IServiceCollection services, IEnumerable<AgentEval.RedTeam.IAttackType> attacks = null)
+enum AgentEval.RedTeam.AgentToolCapability
+    None
+    FunctionCalling
+    InstrumentedTools
+    MultiTurnTools
+    ToolOutputInjection
+static class AgentEval.RedTeam.Attack
+    static AgentEval.RedTeam.IAttackType ByName(String name)
+    static AgentEval.RedTeam.IAttackType Crescendo { get; }
+    static AgentEval.RedTeam.IAttackType DataPoisoning { get; }
+    static AgentEval.RedTeam.IAttackType EncodingEvasion { get; }
+    static AgentEval.RedTeam.IAttackType ExcessiveAgency { get; }
+    static AgentEval.RedTeam.IAttackType IndirectInjection { get; }
+    static AgentEval.RedTeam.IAttackType InferenceAPIAbuse { get; }
+    static AgentEval.RedTeam.IAttackType InsecureOutput { get; }
+    static AgentEval.RedTeam.IAttackType Jailbreak { get; }
+    static AgentEval.RedTeam.IAttackType Misinformation { get; }
+    static AgentEval.RedTeam.IAttackType PIILeakage { get; }
+    static AgentEval.RedTeam.IAttackType Pair { get; }
+    static AgentEval.RedTeam.IAttackType PromptInjection { get; }
+    static AgentEval.RedTeam.IAttackType SkillInjection { get; }
+    static AgentEval.RedTeam.IAttackType SupplyChain { get; }
+    static AgentEval.RedTeam.IAttackType SystemPromptExtraction { get; }
+    static AgentEval.RedTeam.IAttackType Tap { get; }
+    static AgentEval.RedTeam.IAttackType ToolEscalation { get; }
+    static AgentEval.RedTeam.IAttackType VectorEmbedding { get; }
+    static IReadOnlyList<AgentEval.RedTeam.IAttackType> All { get; }
+    static IReadOnlyList<AgentEval.RedTeam.IAttackType> AllMvp { get; }
+    static IReadOnlyList<AgentEval.RedTeam.IAttackType> ByOwaspId(String owaspId)
+    static IReadOnlyList<AgentEval.RedTeam.IAttackType> RosterWithCanary(String systemPromptCanary)
+    static IReadOnlyList<String> AvailableNames { get; }
+    static IReadOnlyList<String> MvpNames { get; }
+    static IReadOnlyList<String> OptInNames { get; }
+sealed class AgentEval.RedTeam.AttackPipeline
+    AgentEval.RedTeam.AttackPipeline BeginProbeScope(Func<AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.AttackProbe, Boolean, IDisposable> factory)
+    AgentEval.RedTeam.AttackPipeline OnPlanPrepared(Action<AgentEval.RedTeam.ScanPlan> callback)
+    AgentEval.RedTeam.AttackPipeline OnProbeCompleted(Action<AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.ProbeResult, Boolean> callback)
+    AgentEval.RedTeam.AttackPipeline WithAllAttacks()
+    AgentEval.RedTeam.AttackPipeline WithAttack(AgentEval.RedTeam.IAttackType attack)
+    AgentEval.RedTeam.AttackPipeline WithAttack<TAttack>()
+    AgentEval.RedTeam.AttackPipeline WithAttacker(IChatClient attackerClient)
+    AgentEval.RedTeam.AttackPipeline WithAttacks(AgentEval.RedTeam.IAttackType[] attacks)
+    AgentEval.RedTeam.AttackPipeline WithChainedTransform(AgentEval.RedTeam.Transforms.IProbeTransformer[] transformers)
+    AgentEval.RedTeam.AttackPipeline WithChainedTransform(Boolean keepOriginal, AgentEval.RedTeam.Transforms.IProbeTransformer[] transformers)
+    AgentEval.RedTeam.AttackPipeline WithDelayBetweenProbes(TimeSpan delay)
+    AgentEval.RedTeam.AttackPipeline WithEvidence(Boolean includeEvidence = true)
+    AgentEval.RedTeam.AttackPipeline WithFailFast(Boolean failFast = true)
+    AgentEval.RedTeam.AttackPipeline WithIntensity(AgentEval.RedTeam.Intensity intensity)
+    AgentEval.RedTeam.AttackPipeline WithJudge(IChatClient judgeClient)
+    AgentEval.RedTeam.AttackPipeline WithMaxConversationDuration(TimeSpan maxConversationDuration)
+    AgentEval.RedTeam.AttackPipeline WithMaxProbesPerAttack(Int32 max)
+    AgentEval.RedTeam.AttackPipeline WithMvpAttacks()
+    AgentEval.RedTeam.AttackPipeline WithParallelism(Int32 parallelism)
+    AgentEval.RedTeam.AttackPipeline WithProgress(IProgress<AgentEval.RedTeam.ScanProgress> progress)
+    AgentEval.RedTeam.AttackPipeline WithTimeout(TimeSpan timeout)
+    AgentEval.RedTeam.AttackPipeline WithTimeoutPerProbe(TimeSpan timeout)
+    AgentEval.RedTeam.AttackPipeline WithTimeoutPerTurn(TimeSpan timeoutPerTurn)
+    AgentEval.RedTeam.AttackPipeline WithTransform(AgentEval.RedTeam.Transforms.IProbeTransformer[] transformers)
+    AgentEval.RedTeam.AttackPipeline WithTransform(Boolean keepOriginal, AgentEval.RedTeam.Transforms.IProbeTransformer[] transformers)
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbePreview()
+    Int32 TotalProbeCount { get; }
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, CancellationToken cancellationToken = default)
+    static AgentEval.RedTeam.AttackPipeline Create()
+class AgentEval.RedTeam.AttackProbe : IEquatable<AgentEval.RedTeam.AttackProbe>
+    AgentEval.RedTeam.AttackProbe <Clone>$()
+    AgentEval.RedTeam.Difficulty Difficulty { get; init; }
+    AgentEval.RedTeam.InjectionSurface? Surface { get; init; }
+    Boolean Equals(AgentEval.RedTeam.AttackProbe other)
+    Boolean Equals(Object obj)
+    IReadOnlyDictionary<String, Object> Metadata { get; init; }
+    IReadOnlyList<String> ExpectedTokens { get; init; }
+    Int32 GetHashCode()
+    String AttackName { get; init; }
+    String Id { get; init; }
+    String Prompt { get; init; }
+    String Source { get; init; }
+    String Technique { get; init; }
+    String ToString()
+    const String StructurallyUntestableMetadataKey
+    ctor()
+class AgentEval.RedTeam.AttackResult
+    AgentEval.RedTeam.Severity HighestSeverity { get; }
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    Boolean MeasuredNothing { get; }
+    Boolean Passed { get; }
+    Double AttackSuccessRate { get; }
+    Double ConclusiveAttackSuccessRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.ProbeResult> ProbeResults { get; init; }
+    Int32 AmbiguousCount { get; }
+    Int32 ConclusiveCount { get; }
+    Int32 ErroredCount { get; }
+    Int32 InconclusiveCount { get; init; }
+    Int32 ResistedCount { get; init; }
+    Int32 SucceededCount { get; init; }
+    Int32 TimedOutCount { get; }
+    Int32 TotalCount { get; }
+    Int32 TransportErrorCount { get; }
+    String AttackDisplayName { get; init; }
+    String AttackName { get; init; }
+    String NotMeasurableReason { get; init; }
+    String OwaspId { get; init; }
+    String[] MitreAtlasIds { get; init; }
+    ctor()
+static class AgentEval.RedTeam.AttackTypeExtensions
+    static IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.IAttackType attackType)
+    static IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.IAttackType attackType, AgentEval.RedTeam.Intensity intensity, Int32 maxProbes)
+sealed class AgentEval.RedTeam.AttackTypeRegistry : AgentEval.RedTeam.IAttackTypeRegistry
+    AgentEval.RedTeam.IAttackType Get(String name)
+    AgentEval.RedTeam.IAttackType GetRequired(String name)
+    Boolean Contains(String name)
+    IEnumerable<AgentEval.RedTeam.IAttackType> GetAll()
+    IEnumerable<AgentEval.RedTeam.IAttackType> GetByOwaspId(String owaspId)
+    Int32 Count { get; }
+    Void Register(AgentEval.RedTeam.IAttackType attackType)
+    ctor()
+    ctor(IEnumerable<AgentEval.RedTeam.IAttackType> additionalAttacks)
+sealed class AgentEval.RedTeam.AttackerPlanner
+    Task<String> NextAsync(AgentEval.RedTeam.AttackerTurnRequest request, CancellationToken cancellationToken = default)
+    ctor(IChatClient attacker)
+enum AgentEval.RedTeam.AttackerStrategy
+    Crescendo
+    Pair
+    Tap
+sealed class AgentEval.RedTeam.AttackerTurnRequest : IEquatable<AgentEval.RedTeam.AttackerTurnRequest>
+    AgentEval.RedTeam.AttackerStrategy Strategy { get; init; }
+    AgentEval.RedTeam.AttackerTurnRequest <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.AttackerTurnRequest other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<Turn> Transcript { get; init; }
+    Int32 GetHashCode()
+    Int32 TurnIndex { get; init; }
+    String LastReply { get; init; }
+    String LastVerdict { get; init; }
+    String Objective { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.AttackerUnavailableException : Exception, ISerializable
+    String Category { get; }
+    ctor(String category, Exception inner)
+sealed class AgentEval.RedTeam.Attacks.CrescendoAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IMultiTurnAttack
+    AgentEval.RedTeam.IConvergenceDetector ConvergenceDetector { get; }
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    Boolean UsesAttacker { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    Int32 MaxTurns { get; }
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    Task<String> NextTurnAsync(AgentEval.RedTeam.MultiTurnContext context, CancellationToken cancellationToken = default)
+    const String RungsMetadataKey
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.DataPoisoningAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    const String FalseFactMetadataKey
+    const String MarkerMetadataKey
+    const String TrueFactMetadataKey
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.EncodingEvasionAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.ExcessiveAgencyAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IToolAwareAttack
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.InContextPoisonEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.IndirectInjectionAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IToolAwareAttack
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.InferenceAPIAbuseAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.InsecureOutputAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.JailbreakAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.MisinformationAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    const String EntityMetadataKey
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.NonexistentEntityEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.PIILeakageAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.PairAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IMultiTurnAttack
+    AgentEval.RedTeam.IConvergenceDetector ConvergenceDetector { get; }
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    Boolean UsesAttacker { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    Int32 MaxTurns { get; }
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    Task<String> NextTurnAsync(AgentEval.RedTeam.MultiTurnContext context, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.PromptInjectionAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.RegistryBackedSupplyChainEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.Evaluators.IPackageRegistry registry)
+sealed class AgentEval.RedTeam.Attacks.SkillInjectionAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IToolAwareAttack
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.SupplyChainAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    const String PackageMetadataKey
+    ctor()
+    ctor(AgentEval.RedTeam.Evaluators.IPackageRegistry packageRegistry)
+sealed class AgentEval.RedTeam.Attacks.SystemPromptExtractionAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String NotMeasurableReason { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor(String systemPromptCanary = null)
+    static IReadOnlyList<AgentEval.RedTeam.AttackProbe> WithCanaries(IEnumerable<AgentEval.RedTeam.AttackProbe> probes)
+sealed class AgentEval.RedTeam.Attacks.TapAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.ITreeAttack
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    Int32 Beam { get; }
+    Int32 Branching { get; }
+    Int32 MaxDepth { get; }
+    Int32 MaxNodes { get; }
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String Objective(AgentEval.RedTeam.AttackProbe seed)
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.ToolEscalationAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IMultiTurnAttack, AgentEval.RedTeam.IToolAwareAttack
+    AgentEval.RedTeam.IConvergenceDetector ConvergenceDetector { get; }
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+    Int32 MaxTurns { get; }
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    Task<String> NextTurnAsync(AgentEval.RedTeam.MultiTurnContext context, CancellationToken cancellationToken = default)
+    const String RungsMetadataKey
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.ToolEscalationEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(String[] forbiddenTools)
+sealed class AgentEval.RedTeam.Attacks.TyposquatRecommendationEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.VectorEmbeddingAttack : AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.IToolAwareAttack
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Attacks.VectorEmbeddingEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    const String RagToolTechnique
+    ctor(String marker, String retrieveTool)
+class AgentEval.RedTeam.Baseline.AttackBaselineResult : IEquatable<AgentEval.RedTeam.Baseline.AttackBaselineResult>
+    AgentEval.RedTeam.Baseline.AttackBaselineResult <Clone>$()
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Baseline.AttackBaselineResult other)
+    Boolean Equals(Object obj)
+    Double Rate { get; }
+    IReadOnlyDictionary<String, AgentEval.RedTeam.EvidenceFidelity> FailedProbeFidelities { get; init; }
+    IReadOnlyList<String> FailedProbeIds { get; init; }
+    Int32 GetHashCode()
+    Int32 ResistedCount { get; init; }
+    Int32 TotalCount { get; init; }
+    String AttackDisplayName { get; init; }
+    String AttackName { get; init; }
+    String OwaspId { get; init; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.AttackComparison : IEquatable<AgentEval.RedTeam.Baseline.AttackComparison>
+    AgentEval.RedTeam.Baseline.AttackComparison <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Baseline.AttackComparison other)
+    Boolean Equals(Object obj)
+    Double BaselineRate { get; init; }
+    Double CurrentRate { get; init; }
+    Double RateDelta { get; }
+    Double StableBand { get; init; }
+    IReadOnlyList<String> NewFailures { get; init; }
+    IReadOnlyList<String> Resolved { get; init; }
+    Int32 GetHashCode()
+    String AttackDisplayName { get; init; }
+    String AttackName { get; init; }
+    String StatusEmoji { get; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.BaselineAssertions
+    AgentEval.RedTeam.Baseline.BaselineAssertions And()
+    AgentEval.RedTeam.Baseline.BaselineAssertions HaveNoNewVulnerabilities(String because = null)
+    AgentEval.RedTeam.Baseline.BaselineAssertions HaveNoRegressionForAttack(String attackName, String because = null)
+    AgentEval.RedTeam.Baseline.BaselineAssertions HaveOverallScoreNotDecreasedBy(Double maxDecrease, String because = null)
+    AgentEval.RedTeam.Baseline.BaselineAssertions NotBeRegression(String because = null)
+    Void ThrowIfFailed()
+    ctor(AgentEval.RedTeam.Baseline.RedTeamComparison comparison)
+static class AgentEval.RedTeam.Baseline.BaselineComparisonExtensions
+    static AgentEval.RedTeam.Baseline.BaselineAssertions Should(AgentEval.RedTeam.Baseline.RedTeamComparison comparison)
+static class AgentEval.RedTeam.Baseline.BaselineSerializer
+    static AgentEval.RedTeam.Baseline.RedTeamBaseline FromJson(String json)
+    static String ToJson(AgentEval.RedTeam.Baseline.RedTeamBaseline baseline)
+    static Task SaveAsync(AgentEval.RedTeam.Baseline.RedTeamBaseline baseline, String path, CancellationToken cancellationToken = default)
+    static Task<AgentEval.RedTeam.Baseline.RedTeamBaseline> LoadAsync(String path, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Baseline.ComparisonThresholds : IEquatable<AgentEval.RedTeam.Baseline.ComparisonThresholds>
+    AgentEval.RedTeam.Baseline.ComparisonThresholds <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Baseline.ComparisonThresholds other)
+    Boolean Equals(Object obj)
+    Double AttackRateStableBand { get; init; }
+    Double RegressionCoverageDrop { get; init; }
+    Double RegressionScoreDrop { get; init; }
+    Double StableScoreBand { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    ctor()
+    static AgentEval.RedTeam.Baseline.ComparisonThresholds Default { get; }
+class AgentEval.RedTeam.Baseline.FidelityEscalation : IEquatable<AgentEval.RedTeam.Baseline.FidelityEscalation>
+    AgentEval.RedTeam.Baseline.FidelityEscalation <Clone>$()
+    AgentEval.RedTeam.EvidenceFidelity From { get; init; }
+    AgentEval.RedTeam.EvidenceFidelity To { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Baseline.FidelityEscalation other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String AttackName { get; init; }
+    String ProbeId { get; init; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.NewVulnerability : IEquatable<AgentEval.RedTeam.Baseline.NewVulnerability>
+    AgentEval.RedTeam.Baseline.NewVulnerability <Clone>$()
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Baseline.NewVulnerability other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String AttackName { get; init; }
+    String ProbeId { get; init; }
+    String Reason { get; init; }
+    String Technique { get; init; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.NotReTestedAttack : IEquatable<AgentEval.RedTeam.Baseline.NotReTestedAttack>
+    AgentEval.RedTeam.Baseline.NotReTestedAttack <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Baseline.NotReTestedAttack other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int32 KnownVulnerabilities { get; init; }
+    String AttackName { get; init; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.RedTeamBaseline : IEquatable<AgentEval.RedTeam.Baseline.RedTeamBaseline>
+    AgentEval.RedTeam.Baseline.RedTeamBaseline <Clone>$()
+    AgentEval.RedTeam.Intensity Intensity { get; init; }
+    AgentEval.RedTeam.JudgeMode? GradingMode { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Baseline.RedTeamBaseline other)
+    Boolean Equals(Object obj)
+    DateTimeOffset CapturedAt { get; init; }
+    Double AttackSuccessRate { get; init; }
+    Double OverallScore { get; init; }
+    Double? ConclusiveScore { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Baseline.AttackBaselineResult> AttackResults { get; init; }
+    IReadOnlyList<String> KnownVulnerabilities { get; init; }
+    Int32 GetHashCode()
+    Int32 SucceededProbes { get; init; }
+    Int32 TotalProbes { get; init; }
+    String AgentName { get; init; }
+    String Notes { get; init; }
+    String ToString()
+    String Version { get; init; }
+    Task SaveAsync(String path, CancellationToken cancellationToken = default)
+    ctor()
+    static AgentEval.RedTeam.Baseline.RedTeamBaseline FromResult(AgentEval.RedTeam.RedTeamResult result, String version, String notes = null)
+    static Task<AgentEval.RedTeam.Baseline.RedTeamBaseline> LoadAsync(String path, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Baseline.RedTeamBaselineComparer
+    AgentEval.RedTeam.Baseline.RedTeamComparison Compare(AgentEval.RedTeam.RedTeamResult current, AgentEval.RedTeam.Baseline.RedTeamBaseline baseline, AgentEval.RedTeam.Baseline.ComparisonThresholds thresholds = null, Boolean requireMatchingIntensity = true)
+    ctor()
+class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTeam.Baseline.RedTeamComparison>
+    AgentEval.RedTeam.Baseline.ComparisonThresholds Thresholds { get; init; }
+    AgentEval.RedTeam.Baseline.RedTeamBaseline Baseline { get; init; }
+    AgentEval.RedTeam.Baseline.RedTeamComparison <Clone>$()
+    AgentEval.RedTeam.Baseline.RegressionStatus Status { get; }
+    AgentEval.RedTeam.RedTeamResult Current { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Baseline.RedTeamComparison other)
+    Boolean Equals(Object obj)
+    Boolean GradingModeMismatch { get; init; }
+    Boolean IsImprovement { get; }
+    Boolean IsRegression { get; }
+    Boolean IsStable { get; }
+    Double AttackSuccessRateDelta { get; }
+    Double BaselineCoverage { get; }
+    Double ConclusiveScoreDelta { get; }
+    Double CoverageDrop { get; }
+    Double ScoreDelta { get; }
+    IReadOnlyList<AgentEval.RedTeam.Baseline.AttackComparison> AttackComparisons { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Baseline.FidelityEscalation> FidelityEscalations { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Baseline.NewVulnerability> NewVulnerabilities { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Baseline.NotReTestedAttack> NotReTested { get; init; }
+    IReadOnlyList<String> PersistentVulnerabilities { get; init; }
+    IReadOnlyList<String> ResolvedVulnerabilities { get; init; }
+    Int32 GetHashCode()
+    String StatusEmoji { get; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Baseline.RedTeamRegressionException : Exception, ISerializable
+    AgentEval.RedTeam.Baseline.RedTeamComparison Comparison { get; }
+    ctor(String message, AgentEval.RedTeam.Baseline.RedTeamComparison comparison)
+static class AgentEval.RedTeam.Baseline.RedTeamResultBaselineExtensions
+    static AgentEval.RedTeam.Baseline.RedTeamBaseline ToBaseline(AgentEval.RedTeam.RedTeamResult result, String version, String notes = null)
+    static AgentEval.RedTeam.Baseline.RedTeamComparison CompareToBaseline(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Baseline.RedTeamBaseline baseline, AgentEval.RedTeam.Baseline.ComparisonThresholds thresholds = null, Boolean requireMatchingIntensity = true)
+    static Task SaveAsBaselineAsync(AgentEval.RedTeam.RedTeamResult result, String path, String version, String notes = null, CancellationToken cancellationToken = default)
+enum AgentEval.RedTeam.Baseline.RegressionStatus
+    Stable
+    Improved
+    Degraded
+    Regression
+sealed class AgentEval.RedTeam.Benchmarks.BenchmarkPack : IEquatable<AgentEval.RedTeam.Benchmarks.BenchmarkPack>
+    AgentEval.RedTeam.Benchmarks.BenchmarkPack <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Benchmarks.BenchmarkPack other)
+    Boolean Equals(Object obj)
+    Boolean RequiresLicenseAcceptance { get; init; }
+    Int32 GetHashCode()
+    String DataUrl { get; init; }
+    String Description { get; init; }
+    String Format { get; init; }
+    String HomeUrl { get; init; }
+    String License { get; init; }
+    String LicenseUrl { get; init; }
+    String Name { get; init; }
+    String OwaspLlmId { get; init; }
+    String PromptField { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.Benchmarks.LicenseNotAcceptedException : Exception, ISerializable
+    AgentEval.RedTeam.Benchmarks.BenchmarkPack Pack { get; }
+    ctor(AgentEval.RedTeam.Benchmarks.BenchmarkPack pack)
+static class AgentEval.RedTeam.Benchmarks.PackCatalog
+    static AgentEval.RedTeam.Benchmarks.BenchmarkPack Find(String name)
+    static AgentEval.RedTeam.Benchmarks.BenchmarkPack ForUrl(String url)
+    static IReadOnlyList<AgentEval.RedTeam.Benchmarks.BenchmarkPack> All { get; }
+    static String Names { get; }
+sealed class AgentEval.RedTeam.Benchmarks.PackDownloader : IDisposable
+    Task<AgentEval.RedTeam.Importers.ImportedProbeAttack> DownloadAsync(AgentEval.RedTeam.Benchmarks.BenchmarkPack pack, Boolean licenseAccepted, CancellationToken cancellationToken = default)
+    Void Dispose()
+    ctor(HttpClient httpClient = null, AgentEval.RedTeam.Importers.IProbeDatasetImporter importer = null, TimeSpan? timeout = null)
+sealed class AgentEval.RedTeam.BenignClassBreakdown : IEquatable<AgentEval.RedTeam.BenignClassBreakdown>
+    AgentEval.RedTeam.BenignClassBreakdown <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.BenignClassBreakdown other)
+    Boolean Equals(Object obj)
+    Int32 Answered { get; init; }
+    Int32 GetHashCode()
+    Int32 Inconclusive { get; init; }
+    Int32 Refused { get; init; }
+    Int32 Total { get; init; }
+    String Class { get; init; }
+    String ToString()
+    Void Deconstruct(out String Class, out Int32 Total, out Int32 Refused, out Int32 Answered, out Int32 Inconclusive)
+    ctor(String Class, Int32 Total, Int32 Refused, Int32 Answered, Int32 Inconclusive)
+static class AgentEval.RedTeam.BenignControls.BenignControlCorpus
+    const String ClassMetadataKey
+    static Boolean IsConclusive(AgentEval.RedTeam.EvaluationOutcome outcome)
+    static Boolean IsFalsePositive(AgentEval.RedTeam.EvaluationOutcome outcome)
+    static IEnumerable<AgentEval.RedTeam.AttackProbe> All()
+static class AgentEval.RedTeam.BenignControls.BenignControlCorpus.Classes
+    const String BenignRoleplay
+    const String CredentialHygiene
+    const String EncodingUtility
+    const String FileOperations
+    const String ImperativePhrasing
+    const String PiiHandling
+    const String SecurityDiscussion
+enum AgentEval.RedTeam.Calibration.CalibrationBand
+    Undefined
+    UnusuallyVulnerable
+    WithinNormalRange
+    UnusuallyRobust
+sealed class AgentEval.RedTeam.Calibration.CalibrationEntry : IEquatable<AgentEval.RedTeam.Calibration.CalibrationEntry>
+    AgentEval.RedTeam.Calibration.CalibrationBand Band { get; init; }
+    AgentEval.RedTeam.Calibration.CalibrationEntry <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Calibration.CalibrationEntry other)
+    Boolean Equals(Object obj)
+    Double Mean { get; init; }
+    Double Score { get; init; }
+    Double StdDev { get; init; }
+    Double? ZScore { get; init; }
+    Int32 GetHashCode()
+    String AttackName { get; init; }
+    String Interpretation { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.Calibration.CalibrationProfile : IEquatable<AgentEval.RedTeam.Calibration.CalibrationProfile>
+    AgentEval.RedTeam.Calibration.CalibrationProfile <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Calibration.CalibrationProfile other)
+    Boolean Equals(Object obj)
+    IReadOnlyDictionary<String, AgentEval.RedTeam.Calibration.CalibrationStat> Attacks { get; init; }
+    Int32 GetHashCode()
+    Int32 SampleSize { get; init; }
+    String Source { get; init; }
+    String ToString()
+    ctor()
+    static AgentEval.RedTeam.Calibration.CalibrationProfile FromJson(String json)
+    static Task<AgentEval.RedTeam.Calibration.CalibrationProfile> LoadAsync(String path, CancellationToken cancellationToken = default)
+sealed class AgentEval.RedTeam.Calibration.CalibrationReport : IEquatable<AgentEval.RedTeam.Calibration.CalibrationReport>
+    AgentEval.RedTeam.Calibration.CalibrationReport <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Calibration.CalibrationReport other)
+    Boolean Equals(Object obj)
+    Boolean IsLowConfidence { get; }
+    Double Threshold { get; init; }
+    IEnumerable<AgentEval.RedTeam.Calibration.CalibrationEntry> UnusuallyVulnerable { get; }
+    IReadOnlyList<AgentEval.RedTeam.Calibration.CalibrationEntry> Entries { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Calibration.UncalibratedAttack> Uncalibrated { get; init; }
+    Int32 GetHashCode()
+    Int32 SampleSize { get; init; }
+    String Source { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.Calibration.CalibrationStat : IEquatable<AgentEval.RedTeam.Calibration.CalibrationStat>
+    AgentEval.RedTeam.Calibration.CalibrationStat <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Calibration.CalibrationStat other)
+    Boolean Equals(Object obj)
+    Double Mean { get; init; }
+    Double StdDev { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    ctor()
+static class AgentEval.RedTeam.Calibration.Calibrator
+    const Double DefaultThreshold
+    const Int32 LowConfidenceSampleSize
+    static AgentEval.RedTeam.Calibration.CalibrationReport Calibrate(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Calibration.CalibrationProfile profile, Double threshold = 2)
+sealed class AgentEval.RedTeam.Calibration.UncalibratedAttack : IEquatable<AgentEval.RedTeam.Calibration.UncalibratedAttack>
+    AgentEval.RedTeam.Calibration.UncalibratedAttack <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Calibration.UncalibratedAttack other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String AttackName { get; init; }
+    String Reason { get; init; }
+    String ToString()
+    Void Deconstruct(out String AttackName, out String Reason)
+    ctor(String AttackName, String Reason)
+sealed class AgentEval.RedTeam.CanaryTool
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    Func<IReadOnlyDictionary<String, Object>, CancellationToken, Task<String>> Execute { get; init; }
+    String Description { get; init; }
+    String ForbiddenCategory { get; init; }
+    String Name { get; init; }
+    ctor()
+sealed class AgentEval.RedTeam.CanaryToolChatClientAgent : AgentEval.RedTeam.IToolCapableAgent, IEvaluableAgent
+    AgentEval.RedTeam.AgentToolCapability Capabilities { get; }
+    String Name { get; }
+    Task<AgentResponse> InvokeAsync(String prompt, CancellationToken cancellationToken = default)
+    Task<AgentResponse> InvokeWithToolsAsync(String prompt, IReadOnlyList<AgentEval.RedTeam.CanaryTool> tools, CancellationToken cancellationToken = default)
+    ctor(IChatClient client, String name = "CanaryToolChatClient", String systemPrompt = null)
+sealed class AgentEval.RedTeam.ConjunctionGate : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(String label, AgentEval.RedTeam.EvaluationOutcome result, AgentEval.RedTeam.IProbeEvaluator[] checks)
+struct AgentEval.RedTeam.ConvergenceDecision : IEquatable<AgentEval.RedTeam.ConvergenceDecision>
+    AgentEval.RedTeam.ConvergenceSignal Signal { get; init; }
+    Boolean Equals(AgentEval.RedTeam.ConvergenceDecision other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Reason { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.RedTeam.ConvergenceSignal Signal, out String Reason)
+    ctor(AgentEval.RedTeam.ConvergenceSignal Signal, String Reason)
+    static AgentEval.RedTeam.ConvergenceDecision Continue
+enum AgentEval.RedTeam.ConvergenceSignal
+    Continue
+    SucceededStop
+    RefusalLockStop
+enum AgentEval.RedTeam.ConversationFidelity
+    Native
+    Flattened
+sealed class AgentEval.RedTeam.DataPoisoningDecomposedEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator falseFactJudge)
+static class AgentEval.RedTeam.DecomposedGraders
+    const String InferenceCompromisePrompt
+    const String RefusalPrompt
+    static AgentEval.RedTeam.IProbeEvaluator BuildInferenceAbuseFlat(IChatClient judge)
+    static AgentEval.RedTeam.IProbeEvaluator BuildInferenceAbuseTree(IChatClient judge)
+    static AgentEval.RedTeam.IProbeEvaluator BuildInsecureOutputFlat(IChatClient judge)
+    static AgentEval.RedTeam.IProbeEvaluator BuildInsecureOutputTree(IChatClient judge)
+    static AgentEval.RedTeam.IProbeEvaluator TryBuildFor(String oracle, IChatClient judge)
+    static AgentEval.RedTeam.IProbeEvaluator TryBuildToolAwareFor(String oracle, AgentEval.RedTeam.IProbeEvaluator inner, IChatClient judge)
+sealed class AgentEval.RedTeam.DefaultConvergenceDetector : AgentEval.RedTeam.IConvergenceDetector
+    AgentEval.RedTeam.ConvergenceDecision Evaluate(AgentEval.RedTeam.MultiTurnContext context, AgentResponse response, AgentEval.RedTeam.EvaluationResult turnResult)
+    Int32 RefusalLockThreshold { get; init; }
+    ctor()
+    static AgentEval.RedTeam.DefaultConvergenceDetector Instance
+enum AgentEval.RedTeam.Difficulty
+    Easy
+    Moderate
+    Hard
+enum AgentEval.RedTeam.EvaluationOutcome
+    Succeeded
+    Resisted
+    Inconclusive
+struct AgentEval.RedTeam.EvaluationResult : IEquatable<AgentEval.RedTeam.EvaluationResult>
+    AgentEval.RedTeam.EvaluationOutcome Outcome { get; init; }
+    AgentEval.RedTeam.GradingProvenanceKind? GradedBy { get; init; }
+    Boolean AttackResisted { get; }
+    Boolean AttackSucceeded { get; }
+    Boolean Equals(AgentEval.RedTeam.EvaluationResult other)
+    Boolean Equals(Object obj)
+    Boolean IsInconclusive { get; }
+    Double Confidence { get; init; }
+    IReadOnlyDictionary<String, Object> Metadata { get; init; }
+    IReadOnlyList<String> MatchedItems { get; init; }
+    Int32 GetHashCode()
+    String Reason { get; init; }
+    String RubricDigest { get; init; }
+    String ToString()
+    static AgentEval.RedTeam.EvaluationResult Inconclusive(String reason, IReadOnlyDictionary<String, Object> metadata = null, Double confidence = 0.5)
+    static AgentEval.RedTeam.EvaluationResult Resisted(String reason, IReadOnlyDictionary<String, Object> metadata = null, Double confidence = 1)
+    static AgentEval.RedTeam.EvaluationResult Succeeded(String reason, IReadOnlyList<String> matchedItems = null, IReadOnlyDictionary<String, Object> metadata = null, Double confidence = 1)
+sealed class AgentEval.RedTeam.Evaluators.AllowlistPackageRegistry : AgentEval.RedTeam.Evaluators.IPackageRegistry
+    Boolean Exists(String packageName, AgentEval.RedTeam.Evaluators.PackageEcosystem ecosystem)
+    ctor(IReadOnlyDictionary<AgentEval.RedTeam.Evaluators.PackageEcosystem, IEnumerable<String>> allowlists)
+class AgentEval.RedTeam.Evaluators.CompositeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    IReadOnlyList<AgentEval.RedTeam.IProbeEvaluator> Evaluators { get; }
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.Evaluators.CompositeEvaluator.AggregationStrategy strategy, AgentEval.RedTeam.IProbeEvaluator[] evaluators)
+    ctor(AgentEval.RedTeam.IProbeEvaluator[] evaluators)
+enum AgentEval.RedTeam.Evaluators.CompositeEvaluator.AggregationStrategy
+    Any
+    All
+    Majority
+class AgentEval.RedTeam.Evaluators.ContainsTokenEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    IReadOnlyList<String> Tokens { get; }
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(StringComparison comparison, Boolean normalizeNfkc, String[] tokens)
+    ctor(StringComparison comparison, String[] tokens)
+    ctor(String[] tokens)
+sealed class AgentEval.RedTeam.Evaluators.DecodeMatchEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(IReadOnlyList<String> triggers)
+sealed class AgentEval.RedTeam.Evaluators.ExcessiveAgencyEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Evaluators.FidelityCompositeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator behavioral, AgentEval.RedTeam.IProbeEvaluator verbalFallback)
+sealed class AgentEval.RedTeam.Evaluators.HttpPackageRegistry : AgentEval.RedTeam.Evaluators.IPackageRegistry, IDisposable
+    Boolean Exists(String packageName, AgentEval.RedTeam.Evaluators.PackageEcosystem ecosystem)
+    Void Dispose()
+    ctor(HttpClient httpClient = null, TimeSpan? timeout = null)
+interface AgentEval.RedTeam.Evaluators.IPackageRegistry
+    Boolean Exists(String packageName, AgentEval.RedTeam.Evaluators.PackageEcosystem ecosystem)
+class AgentEval.RedTeam.Evaluators.InferenceAbuseEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+    ctor(Int32 excessiveContentThreshold)
+sealed class AgentEval.RedTeam.Evaluators.InsecureOutputEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.RedTeam.Evaluators.LLMJudgeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    Task<String> ExplainAsync(AgentEval.RedTeam.AttackProbe probe, String response, AgentEval.RedTeam.EvaluationOutcome outcome, AgentEval.RedTeam.EvidenceFidelity fidelity, CancellationToken cancellationToken = default)
+    const String UserPromptTemplateVersion
+    ctor(IChatClient chatClient, AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
+class AgentEval.RedTeam.Evaluators.LLMJudgeOptions
+    Int32 MaxTokens { get; init; }
+    Single Temperature { get; init; }
+    String CustomSystemPrompt { get; init; }
+    String CustomUserPromptTemplate { get; init; }
+    ctor()
+sealed class AgentEval.RedTeam.Evaluators.LikertJudgeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    const String LikertScoreKey
+    const String RationaleKey
+    ctor(IChatClient chatClient, AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
+class AgentEval.RedTeam.Evaluators.NegationEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    AgentEval.RedTeam.IProbeEvaluator Inner { get; }
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner)
+static class AgentEval.RedTeam.Evaluators.NegationEvaluatorExtensions
+    static AgentEval.RedTeam.Evaluators.NegationEvaluator Negate(AgentEval.RedTeam.IProbeEvaluator evaluator)
+enum AgentEval.RedTeam.Evaluators.PackageEcosystem
+    Python
+    JavaScript
+    DotNet
+sealed class AgentEval.RedTeam.Evaluators.PackageHallucinationDetector : AgentEval.RedTeam.IProbeEvaluator
+    IReadOnlyList<String> ExtractPackageNames(String response)
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.Evaluators.PackageEcosystem ecosystem, AgentEval.RedTeam.Evaluators.IPackageRegistry registry)
+sealed class AgentEval.RedTeam.Evaluators.RefusalDetector : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+    static Boolean IsRefusal(String response, out String matched)
+sealed class AgentEval.RedTeam.Evaluators.RefusalGatedEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner)
+class AgentEval.RedTeam.Evaluators.RegexMatchEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    IReadOnlyList<Regex> Patterns { get; }
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(Regex[] patterns)
+    ctor(String[] patterns)
+    ctor(TimeSpan matchTimeout, String[] patterns)
+    static TimeSpan DefaultMatchTimeout
+static class AgentEval.RedTeam.Evaluators.SensitiveDataPatterns
+    const String ApiKey
+    const String CreditCard
+    const String Email
+    const String IPv4
+    const String SSN
+    const String USPhone
+    static AgentEval.RedTeam.Evaluators.RegexMatchEvaluator CreatePIIEvaluator()
+    static AgentEval.RedTeam.Evaluators.RegexMatchEvaluator CreateSecretsEvaluator()
+sealed class AgentEval.RedTeam.Evaluators.ToolInvocationEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> forbiddenTools)
+enum AgentEval.RedTeam.EvidenceFidelity
+    Verbal
+    IntentToAct
+    Behavioral
+static class AgentEval.RedTeam.Gatekeeper.CanaryLure
+    static IReadOnlyList<AITool> Tools(AgentEval.RedTeam.CanaryTool[] canaries)
+    static IReadOnlyList<AITool> Tools(IEnumerable<AgentEval.RedTeam.CanaryTool> canaries)
+sealed class AgentEval.RedTeam.Gatekeeper.CanaryToolGate : IToolGate
+    GateCost Cost { get; }
+    String PolicyName { get; }
+    ToolGatePolicy MinimumPolicy { get; }
+    ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<AgentEval.RedTeam.CanaryTool> canaries)
+sealed class AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome : IEquatable<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome>
+    AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome <Clone>$()
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation Observation { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<String> Notes { get; init; }
+    Int32 Attempted { get; init; }
+    Int32 Blocked { get; }
+    Int32 Executed { get; init; }
+    Int32 GetHashCode()
+    Int32 PlantSessionSinkCalls { get; init; }
+    Int32 Trial { get; init; }
+    String PlantedBy { get; init; }
+    String ScenarioId { get; init; }
+    String ToString()
+    Void Deconstruct(out String ScenarioId, out Int32 Trial, out String PlantedBy, out Int32 Attempted, out Int32 Executed, out Int32 PlantSessionSinkCalls, out AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation Observation, out IReadOnlyList<String> Notes)
+    ctor(String ScenarioId, Int32 Trial, String PlantedBy, Int32 Attempted, Int32 Executed, Int32 PlantSessionSinkCalls, AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation Observation, IReadOnlyList<String> Notes)
+sealed class AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningHarness
+    Task<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningRunResult> RunAsync(CancellationToken cancellationToken = default)
+    ctor(IChatClient model, AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningOptions options = null)
+    static IChatClient CreateScriptedModel()
+    static IReadOnlyList<String> SinkTools
+sealed class AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningOptions : IEquatable<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningOptions>
+    AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningOptions <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningOptions other)
+    Boolean Equals(Object obj)
+    Boolean Scripted { get; init; }
+    IProgress<String> Progress { get; init; }
+    Int32 GetHashCode()
+    Int32 MaxOutputTokens { get; init; }
+    Int32 MaxToolIterations { get; init; }
+    Int32 Trials { get; init; }
+    String ToString()
+    TimeSpan ModelCallTimeout { get; init; }
+    ctor()
+sealed class AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningRunResult : IEquatable<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningRunResult>
+    AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningRunResult <Clone>$()
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus Corpus { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch Batch { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningRunResult other)
+    Boolean Equals(Object obj)
+    EvalResult Composite { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome> Cases { get; init; }
+    Int32 GetHashCode()
+    String Mode { get; init; }
+    String PolicyFingerprint { get; init; }
+    String ScriptsFingerprint { get; init; }
+    String ToString()
+    Void Deconstruct(out String Mode, out String PolicyFingerprint, out String ScriptsFingerprint, out AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus Corpus, out IReadOnlyList<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome> Cases, out AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch Batch, out EvalResult Composite)
+    ctor(String Mode, String PolicyFingerprint, String ScriptsFingerprint, AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus Corpus, IReadOnlyList<AgentEval.RedTeam.Gatekeeper.MemorySecurity.MemoryPoisoningCaseOutcome> Cases, AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch Batch, EvalResult Composite)
+sealed class AgentEval.RedTeam.Gatekeeper.ProbeEvaluatorGate : IToolGate
+    GateCost Cost { get; }
+    String PolicyName { get; }
+    ToolGatePolicy MinimumPolicy { get; }
+    ValueTask<ToolGateVerdict> InspectAsync(GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator evaluator, GateCost cost, String policyName = null)
+static class AgentEval.RedTeam.GraderFactory
+    static AgentEval.RedTeam.Evaluators.LLMJudgeOptions OptionsFor(AgentEval.RedTeam.JudgeRubric rubric, String oracle = null)
+    static AgentEval.RedTeam.IProbeEvaluator For(AgentEval.RedTeam.IAttackType attack, AgentEval.RedTeam.ScanOptions options)
+sealed class AgentEval.RedTeam.GraderProvenance : IEquatable<AgentEval.RedTeam.GraderProvenance>
+    AgentEval.RedTeam.EvaluationOutcome JudgeOutcome { get; init; }
+    AgentEval.RedTeam.EvaluationOutcome KeywordOutcome { get; init; }
+    AgentEval.RedTeam.GraderProvenance <Clone>$()
+    AgentEval.RedTeam.GradingProvenanceKind ShippedBy { get; init; }
+    AgentEval.RedTeam.OracleEvidenceClass EvidenceClass { get; init; }
+    Boolean Disagreed { get; }
+    Boolean Equals(AgentEval.RedTeam.GraderProvenance other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String RubricDigest { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.RedTeam.EvaluationOutcome KeywordOutcome, out AgentEval.RedTeam.EvaluationOutcome JudgeOutcome, out AgentEval.RedTeam.OracleEvidenceClass EvidenceClass, out AgentEval.RedTeam.GradingProvenanceKind ShippedBy)
+    ctor(AgentEval.RedTeam.EvaluationOutcome KeywordOutcome, AgentEval.RedTeam.EvaluationOutcome JudgeOutcome, AgentEval.RedTeam.OracleEvidenceClass EvidenceClass, AgentEval.RedTeam.GradingProvenanceKind ShippedBy)
+static class AgentEval.RedTeam.GradingMetadata
+    const String EvidenceClassKey
+    const String FidelityKey
+    const String GraderProvenanceKey
+    static AgentEval.RedTeam.EvaluationResult WithEvidenceClass(AgentEval.RedTeam.EvaluationResult result, AgentEval.RedTeam.OracleEvidenceClass evidenceClass)
+    static AgentEval.RedTeam.EvidenceFidelity FidelityOf(AgentEval.RedTeam.EvaluationResult result)
+    static AgentEval.RedTeam.GraderProvenance ProvenanceOf(AgentEval.RedTeam.EvaluationResult result)
+    static AgentEval.RedTeam.OracleEvidenceClass EvidenceClassOf(AgentEval.RedTeam.EvaluationResult result)
+enum AgentEval.RedTeam.GradingProvenanceKind
+    Heuristic
+    Judge
+    Classifier
+sealed class AgentEval.RedTeam.GroundTruthStanceEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(IChatClient judge)
+interface AgentEval.RedTeam.IAgentConversation : IAsyncDisposable
+    AgentEval.RedTeam.ConversationFidelity Fidelity { get; }
+    Boolean CarriesTools { get; }
+    IReadOnlyList<Turn> History { get; }
+    Task<AgentResponse> SendAsync(String userMessage, CancellationToken cancellationToken = default)
+    Task<AgentResponse> SendAsync(String userMessage, IReadOnlyList<AgentEval.RedTeam.CanaryTool> tools, CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String NotMeasurableReason { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+interface AgentEval.RedTeam.IAttackTypeRegistry
+    AgentEval.RedTeam.IAttackType Get(String name)
+    AgentEval.RedTeam.IAttackType GetRequired(String name)
+    Boolean Contains(String name)
+    IEnumerable<AgentEval.RedTeam.IAttackType> GetAll()
+    IEnumerable<AgentEval.RedTeam.IAttackType> GetByOwaspId(String owaspId)
+    Void Register(AgentEval.RedTeam.IAttackType attackType)
+interface AgentEval.RedTeam.IConvergenceDetector
+    AgentEval.RedTeam.ConvergenceDecision Evaluate(AgentEval.RedTeam.MultiTurnContext context, AgentResponse response, AgentEval.RedTeam.EvaluationResult turnResult)
+interface AgentEval.RedTeam.IConversableAgent : IEvaluableAgent
+    Task<AgentEval.RedTeam.IAgentConversation> StartConversationAsync(CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.IMultiTurnAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IConvergenceDetector ConvergenceDetector { get; }
+    Boolean UsesAttacker { get; }
+    Int32 MaxTurns { get; }
+    Task<String> NextTurnAsync(AgentEval.RedTeam.MultiTurnContext context, CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.IRedTeamRunner
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options, IProgress<AgentEval.RedTeam.ScanProgress> progress, CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.IToolAwareAttack : AgentEval.RedTeam.IAttackType
+    IReadOnlyList<AgentEval.RedTeam.CanaryTool> GetCanaryTools(AgentEval.RedTeam.Intensity intensity)
+interface AgentEval.RedTeam.IToolCapableAgent : IEvaluableAgent
+    AgentEval.RedTeam.AgentToolCapability Capabilities { get; }
+    Task<AgentResponse> InvokeWithToolsAsync(String prompt, IReadOnlyList<AgentEval.RedTeam.CanaryTool> tools, CancellationToken cancellationToken = default)
+interface AgentEval.RedTeam.ITreeAttack : AgentEval.RedTeam.IAttackType
+    Int32 Beam { get; }
+    Int32 Branching { get; }
+    Int32 MaxDepth { get; }
+    Int32 MaxNodes { get; }
+    String Objective(AgentEval.RedTeam.AttackProbe seed)
+sealed class AgentEval.RedTeam.Importers.CsvProbeDatasetImporter : AgentEval.RedTeam.Importers.IProbeDatasetImporter
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> Import(String content, String datasetName)
+    String Format { get; }
+    ctor(String promptColumn, String idColumn = null)
+interface AgentEval.RedTeam.Importers.IProbeDatasetImporter
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> Import(String content, String datasetName)
+    String Format { get; }
+sealed class AgentEval.RedTeam.Importers.ImportedProbeAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor(String name, IReadOnlyList<AgentEval.RedTeam.AttackProbe> probes, String owaspLlmId = "LLM01", AgentEval.RedTeam.Severity severity = Severity.Medium)
+sealed class AgentEval.RedTeam.Importers.ImportedProbeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Importers.JsonProbeDatasetImporter : AgentEval.RedTeam.Importers.IProbeDatasetImporter
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> Import(String content, String datasetName)
+    String Format { get; }
+    const String DatasetKey
+    const String LicenseKey
+    ctor(String promptField = "prompt", String idField = null)
+sealed class AgentEval.RedTeam.InjectingChatClient : DelegatingChatClient, IChatClient, IDisposable
+    IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
+    Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
+    ctor(IChatClient inner, String payload, AgentEval.RedTeam.InjectionSurface surface)
+enum AgentEval.RedTeam.InjectionSurface
+    UserMessage
+    ToolOutput
+    RetrievedDocument
+    SkillInstruction
+    SkillResource
+sealed class AgentEval.RedTeam.InstrumentedCanaryAgent : AgentEval.RedTeam.IToolCapableAgent, IEvaluableAgent
+    AgentEval.RedTeam.AgentToolCapability Capabilities { get; }
+    String Name { get; }
+    Task<AgentResponse> InvokeAsync(String prompt, CancellationToken cancellationToken = default)
+    Task<AgentResponse> InvokeWithToolsAsync(String prompt, IReadOnlyList<AgentEval.RedTeam.CanaryTool> tools, CancellationToken cancellationToken = default)
+    ctor(IChatClient client, String name = "InstrumentedCanaryAgent", String systemPrompt = null, Int32 maxToolTurns = 5)
+enum AgentEval.RedTeam.Intensity
+    Quick
+    Moderate
+    Comprehensive
+sealed class AgentEval.RedTeam.JudgeBackedEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner, IChatClient judge, AgentEval.RedTeam.JudgeMode mode, AgentEval.RedTeam.Evaluators.LLMJudgeOptions rubric, Boolean includeEvidence, TimeSpan? judgeTimeout)
+enum AgentEval.RedTeam.JudgeMode
+    Fallback
+    Primary
+enum AgentEval.RedTeam.JudgeRubric
+    Strict
+    Lenient
+    EvidenceAnchored
+enum AgentEval.RedTeam.MemorySecurity.MemoryAttackDeliverySurface
+    Conversation
+    BrowserDocument
+    Email
+    CloudTool
+    LocalMcp
+    HostedMcp
+    ContextProvider
+    DirectStore
+enum AgentEval.RedTeam.MemorySecurity.MemoryAttackObjective
+    None
+    PoisonPersistence
+    DelayedActivation
+    CrossScopeLeak
+    UnsafeToolAction
+    Exfiltration
+    UnauthorizedOverwrite
+    TrustEscalation
+    RetrievalCrowdOut
+    ResourceFlood
+    TamperAcceptance
+    AttributionFailure
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryAuditabilityEval : AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval, IEval
+    ctor()
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryInfluenceSafetyEval : AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval, IEval
+    ctor()
+static class AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibration
+    static AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationReport Evaluate(IEnumerable<AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationCase> cases, Int32 minimumReviewedCases = 40, Double minimumAccuracyLowerBound = 0.8, Double maximumFalsePositiveUpperBound = 0.1, Double maximumFalseNegativeUpperBound = 0.1)
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationCase : IEquatable<AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationCase>
+    AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationCase <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationCase other)
+    Boolean Equals(Object obj)
+    Boolean GoldUnsafe { get; init; }
+    Boolean Reviewed { get; init; }
+    Boolean? PredictedUnsafe { get; init; }
+    Int32 GetHashCode()
+    String CaseId { get; init; }
+    String ToString()
+    Void Deconstruct(out String CaseId, out Boolean GoldUnsafe, out Boolean? PredictedUnsafe, out Boolean Reviewed)
+    ctor(String CaseId, Boolean GoldUnsafe, Boolean? PredictedUnsafe, Boolean Reviewed)
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationReport : IEquatable<AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationReport>
+    AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationReport <Clone>$()
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport Accuracy { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalseNegativeRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalsePositiveRate { get; init; }
+    Boolean Equals(AgentEval.RedTeam.MemorySecurity.MemoryJudgeCalibrationReport other)
+    Boolean Equals(Object obj)
+    Boolean ReadyForPromotion { get; init; }
+    IReadOnlyList<String> BlockingReasons { get; init; }
+    Int32 GetHashCode()
+    Int32 InconclusiveCount { get; init; }
+    Int32 ReviewedConclusiveCount { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 ReviewedConclusiveCount, out Int32 InconclusiveCount, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport Accuracy, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalsePositiveRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalseNegativeRate, out Boolean ReadyForPromotion, out IReadOnlyList<String> BlockingReasons)
+    ctor(Int32 ReviewedConclusiveCount, Int32 InconclusiveCount, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport Accuracy, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalsePositiveRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport FalseNegativeRate, Boolean ReadyForPromotion, IReadOnlyList<String> BlockingReasons)
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryPoisonContainmentEval : AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval, IEval
+    ctor()
+enum AgentEval.RedTeam.MemorySecurity.MemoryPoisonWriteChannel
+    DirectInjection
+    PolicySatisfaction
+    SummarySurvival
+    ProcedurePromotion
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryScopeIsolationEval : AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval, IEval
+    ctor()
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus
+    IReadOnlyList<AgentEval.RedTeam.MemorySecurity.MemorySecurityScenario> Scenarios { get; }
+    String CorpusId { get; }
+    String Fingerprint { get; }
+    String Version { get; }
+    const Int32 MaximumScenarios
+    ctor(String corpusId, String version, IEnumerable<AgentEval.RedTeam.MemorySecurity.MemorySecurityScenario> scenarios)
+    static AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus Default { get; }
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReport : IEquatable<AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReport>
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReport <Clone>$()
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ActivationRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport AttackSuccessRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecall { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecallPrecision { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignWriteAcceptanceRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ExfiltrationRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport PersistenceRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ScopeLeakRate { get; init; }
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport UnsafeActionRate { get; init; }
+    Boolean Equals(AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReport other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String CorpusFingerprint { get; init; }
+    String CorpusId { get; init; }
+    String PolicyFingerprint { get; init; }
+    String ToString()
+    Void Deconstruct(out String CorpusId, out String CorpusFingerprint, out String PolicyFingerprint, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport AttackSuccessRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport PersistenceRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ActivationRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ScopeLeakRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport UnsafeActionRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ExfiltrationRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignWriteAcceptanceRate, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecallPrecision, out AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecall)
+    ctor(String CorpusId, String CorpusFingerprint, String PolicyFingerprint, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport AttackSuccessRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport PersistenceRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ActivationRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ScopeLeakRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport UnsafeActionRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport ExfiltrationRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignWriteAcceptanceRate, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecallPrecision, AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport BenignRecall)
+static class AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReporter
+    static AgentEval.RedTeam.MemorySecurity.MemorySecurityCalibrationReport Build(AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch batch)
+    static ValueTuple<Double, Double> WilsonInterval(Int32 numerator, Int32 denominator, Double z = 1.959963984540054)
+abstract class AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval : AtomicCodeEval, IEval
+    protected EvalResult Error(String reason)
+    protected EvalResult Verdict(Boolean passed, String severity, String message, IReadOnlyDictionary<String, Double> dimensions = null)
+    protected ctor(String key, String name)
+    protected static Boolean Has(AgentEval.RedTeam.MemorySecurity.MemorySecurityScenario scenario, AgentEval.RedTeam.MemorySecurity.MemoryAttackObjective objective)
+static class AgentEval.RedTeam.MemorySecurity.MemorySecurityCompositeEvals
+    static CompositeEval Create()
+static class AgentEval.RedTeam.MemorySecurity.MemorySecurityEvalInputExtensions
+    const String MetadataKey
+    static EvalInput WithMemorySecurityBatch(EvalInput input, AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch batch)
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityEvaluationBatch
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus Corpus { get; }
+    IReadOnlyList<AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation> Observations { get; }
+    String PolicyFingerprint { get; }
+    const Int32 MaximumObservations
+    ctor(AgentEval.RedTeam.MemorySecurity.MemorySecurityAttackCorpus corpus, IEnumerable<AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation> observations, String policyFingerprint)
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport : IEquatable<AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport>
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.MemorySecurity.MemorySecurityMetricReport other)
+    Boolean Equals(Object obj)
+    Double Estimate { get; init; }
+    Double LowerBound { get; init; }
+    Double UpperBound { get; init; }
+    Int32 ConclusiveDenominator { get; init; }
+    Int32 GetHashCode()
+    Int32 InconclusiveCount { get; init; }
+    Int32 Numerator { get; init; }
+    String Name { get; init; }
+    String ToString()
+    Void Deconstruct(out String Name, out Int32 Numerator, out Int32 ConclusiveDenominator, out Int32 InconclusiveCount, out Double Estimate, out Double LowerBound, out Double UpperBound)
+    ctor(String Name, Int32 Numerator, Int32 ConclusiveDenominator, Int32 InconclusiveCount, Double Estimate, Double LowerBound, Double UpperBound)
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation : IEquatable<AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation>
+    AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation other)
+    Boolean Equals(Object obj)
+    Boolean IsBenignControl { get; }
+    Boolean? Activated { get; }
+    Boolean? Attributed { get; }
+    Boolean? CrossScopeLeak { get; }
+    Boolean? Exfiltration { get; }
+    Boolean? PoisonPersisted { get; }
+    Boolean? ResourceFlood { get; }
+    Boolean? RetrievalCrowdOut { get; }
+    Boolean? RolledBack { get; }
+    Boolean? TamperAccepted { get; }
+    Boolean? TrustEscalation { get; }
+    Boolean? UnauthorizedOverwrite { get; }
+    Boolean? UnsafeToolAction { get; }
+    Boolean? WriteAccepted { get; }
+    Int32 ExpectedRelevantItems { get; }
+    Int32 GetHashCode()
+    Int32 RelevantItems { get; }
+    Int32 ReturnedItems { get; }
+    String ScenarioId { get; }
+    String ToString()
+    ctor(String scenarioId, Boolean isBenignControl, Boolean? writeAccepted = null, Boolean? poisonPersisted = null, Boolean? activated = null, Boolean? crossScopeLeak = null, Boolean? unsafeToolAction = null, Boolean? exfiltration = null, Boolean? unauthorizedOverwrite = null, Boolean? trustEscalation = null, Boolean? retrievalCrowdOut = null, Boolean? resourceFlood = null, Boolean? tamperAccepted = null, Boolean? attributed = null, Boolean? rolledBack = null, Int32 relevantItems = 0, Int32 returnedItems = 0, Int32 expectedRelevantItems = 0)
+sealed class AgentEval.RedTeam.MemorySecurity.MemorySecurityScenario
+    AgentEval.RedTeam.MemorySecurity.MemoryAttackDeliverySurface PlantSurface { get; }
+    AgentEval.RedTeam.MemorySecurity.MemoryAttackDeliverySurface TriggerSurface { get; }
+    AgentEval.RedTeam.MemorySecurity.MemoryAttackObjective Objectives { get; }
+    AgentEval.RedTeam.MemorySecurity.MemoryPoisonWriteChannel WriteChannel { get; }
+    Boolean IsBenignControl { get; }
+    Int32 DormancySessions { get; }
+    String Id { get; }
+    String PlantInput { get; }
+    String Title { get; }
+    String TriggerInput { get; }
+    ctor(String id, String title, AgentEval.RedTeam.MemorySecurity.MemoryPoisonWriteChannel writeChannel, AgentEval.RedTeam.MemorySecurity.MemoryAttackDeliverySurface plantSurface, AgentEval.RedTeam.MemorySecurity.MemoryAttackDeliverySurface triggerSurface, String plantInput, String triggerInput, Int32 dormancySessions, AgentEval.RedTeam.MemorySecurity.MemoryAttackObjective objectives, Boolean isBenignControl = false)
+sealed class AgentEval.RedTeam.MemorySecurity.MemoryUtilityEval : AgentEval.RedTeam.MemorySecurity.MemorySecurityCodeEval, IEval
+    ctor(Double threshold = 0.8)
+sealed class AgentEval.RedTeam.MisinformationEntityJudge : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(IChatClient judge, String name, Func<String, String> promptForEntity)
+    static String ConfabPrompt(String entity)
+    static String DenialPrompt(String entity)
+sealed class AgentEval.RedTeam.MultiTurnContext : IEquatable<AgentEval.RedTeam.MultiTurnContext>
+    AgentEval.RedTeam.AttackProbe Seed { get; init; }
+    AgentEval.RedTeam.ConversationFidelity Fidelity { get; init; }
+    AgentEval.RedTeam.MultiTurnContext <Clone>$()
+    AgentResponse LastResponse { get; init; }
+    Boolean Equals(AgentEval.RedTeam.MultiTurnContext other)
+    Boolean Equals(Object obj)
+    IChatClient AttackerClient { get; init; }
+    IReadOnlyList<Turn> History { get; init; }
+    Int32 GetHashCode()
+    Int32 TurnIndex { get; init; }
+    String LastVerdict { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.MultiTurnResult
+    AgentEval.RedTeam.ConversationFidelity ConversationFidelity { get; init; }
+    AgentEval.RedTeam.EvaluationOutcome Outcome { get; init; }
+    AgentEval.RedTeam.EvidenceFidelity Fidelity { get; init; }
+    AgentEval.RedTeam.GraderProvenance Grading { get; init; }
+    Boolean AttackerDriven { get; init; }
+    Boolean WasTruncated { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.EvaluationResult> PerTurnResults { get; init; }
+    IReadOnlyList<Turn> Transcript { get; init; }
+    Int32 TurnsUsed { get; init; }
+    Int32? DecidingTurn { get; init; }
+    Int32? NodesExplored { get; init; }
+    String Reason { get; init; }
+    ctor()
+enum AgentEval.RedTeam.OracleEvidenceClass
+    Structural
+    Semantic
+sealed class AgentEval.RedTeam.OutcomeFilterEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner, AgentEval.RedTeam.EvaluationOutcome allowed)
+class AgentEval.RedTeam.Output.RedTeamConsoleTheme
+    String Bold { get; }
+    String Colorize(String text, AgentEval.RedTeam.Severity severity)
+    String Critical { get; }
+    String Dim { get; }
+    String Failure { get; }
+    String High { get; }
+    String Info { get; }
+    String Low { get; }
+    String Medium { get; }
+    String Pending { get; }
+    String RateIcon(Double rate, Boolean useEmoji)
+    String Reset { get; }
+    String StatusIcon(Boolean passed, Boolean useEmoji)
+    String Success { get; }
+    String Underline { get; }
+    String Warning { get; }
+    ctor(Boolean useColors = true)
+class AgentEval.RedTeam.Output.RedTeamOutputFormatter
+    Void Print(AgentEval.RedTeam.RedTeamResult result)
+    ctor(AgentEval.RedTeam.Output.RedTeamOutputOptions options = null, TextWriter writer = null)
+class AgentEval.RedTeam.Output.RedTeamOutputOptions : IEquatable<AgentEval.RedTeam.Output.RedTeamOutputOptions>
+    AgentEval.RedTeam.Output.RedTeamOutputOptions <Clone>$()
+    AgentEval.RedTeam.Output.VerbosityLevel Verbosity { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Output.RedTeamOutputOptions other)
+    Boolean Equals(Object obj)
+    Boolean ShowSecurityReferences { get; init; }
+    Boolean ShowSensitiveContent { get; init; }
+    Boolean UseColors { get; init; }
+    Boolean UseEmoji { get; init; }
+    Int32 GetHashCode()
+    Int32 MaxWidth { get; init; }
+    String ToString()
+    ctor()
+    static AgentEval.RedTeam.Output.RedTeamOutputOptions CI { get; }
+    static AgentEval.RedTeam.Output.RedTeamOutputOptions Debug { get; }
+    static AgentEval.RedTeam.Output.RedTeamOutputOptions Default { get; }
+static class AgentEval.RedTeam.Output.RedTeamResultExtensions
+    static String ToFormattedString(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Output.RedTeamOutputOptions options = null)
+    static Void Print(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Output.RedTeamOutputOptions options = null)
+    static Void Print(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Output.VerbosityLevel verbosity)
+    static Void PrintFull(AgentEval.RedTeam.RedTeamResult result)
+    static Void PrintSummary(AgentEval.RedTeam.RedTeamResult result)
+enum AgentEval.RedTeam.Output.VerbosityLevel
+    Minimal
+    Summary
+    Detailed
+    Full
+sealed class AgentEval.RedTeam.PlannedAttack : IEquatable<AgentEval.RedTeam.PlannedAttack>
+    AgentEval.RedTeam.IAttackType Attack { get; init; }
+    AgentEval.RedTeam.PlannedAttack <Clone>$()
+    Boolean Control { get; init; }
+    Boolean Equals(AgentEval.RedTeam.PlannedAttack other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out AgentEval.RedTeam.IAttackType Attack, out IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes, out Boolean Control)
+    ctor(AgentEval.RedTeam.IAttackType Attack, IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes, Boolean Control = false)
+enum AgentEval.RedTeam.ProbeErrorKind
+    None
+    Timeout
+    Transport
+    Execution
+static class AgentEval.RedTeam.ProbeEvaluatorExtensions
+    static AgentEval.RedTeam.EvaluationResult Evaluate(AgentEval.RedTeam.IProbeEvaluator evaluator, AgentEval.RedTeam.AttackProbe probe, String response)
+    static Task<Boolean> DidAttackSucceedAsync(AgentEval.RedTeam.IProbeEvaluator evaluator, AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+static class AgentEval.RedTeam.ProbeLabelSource
+    const String Human
+    const String MetadataKey
+    const String SyntheticTemplate
+    const String Unspecified
+    static Boolean TryGetImportedDataset(String labelSource, out String datasetName)
+    static String Imported(String datasetName)
+    static String Of(AgentEval.RedTeam.AttackProbe probe)
+class AgentEval.RedTeam.ProbeResult : IEquatable<AgentEval.RedTeam.ProbeResult>
+    AgentEval.RedTeam.ConversationFidelity? ConversationFidelity { get; init; }
+    AgentEval.RedTeam.Difficulty Difficulty { get; init; }
+    AgentEval.RedTeam.EvaluationOutcome Outcome { get; init; }
+    AgentEval.RedTeam.EvidenceFidelity Fidelity { get; init; }
+    AgentEval.RedTeam.GraderProvenance Grading { get; init; }
+    AgentEval.RedTeam.GradingProvenanceKind? GradedBy { get; init; }
+    AgentEval.RedTeam.InjectionSurface? Surface { get; init; }
+    AgentEval.RedTeam.ProbeErrorKind ErrorKind { get; init; }
+    AgentEval.RedTeam.ProbeResult <Clone>$()
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    Boolean AttackerDriven { get; init; }
+    Boolean Equals(AgentEval.RedTeam.ProbeResult other)
+    Boolean Equals(Object obj)
+    Boolean GraderDisagreed { get; }
+    Boolean HasError { get; }
+    Boolean IsAmbiguous { get; }
+    Boolean IsTimeout { get; }
+    IReadOnlyList<String> MatchedItems { get; init; }
+    Int32 GetHashCode()
+    Int32? DecidingTurn { get; init; }
+    Int32? NodesExplored { get; init; }
+    Int32? TurnsUsed { get; init; }
+    RequestPermissibility Expectation { get; init; }
+    String Error { get; init; }
+    String ProbeId { get; init; }
+    String Prompt { get; init; }
+    String Rationale { get; init; }
+    String Reason { get; init; }
+    String Response { get; init; }
+    String RubricDigest { get; init; }
+    String Technique { get; init; }
+    String ToString()
+    TimeSpan? Duration { get; init; }
+    ctor()
+static class AgentEval.RedTeam.ProbeToolCalls
+    static Boolean ExecutedForbiddenTool(AgentResponse response, IEnumerable<String> forbidden)
+    static Boolean InvokedAnyTool(AgentResponse response)
+    static Boolean InvokedForbiddenTool(AgentResponse response, IEnumerable<String> forbidden)
+    static IReadOnlyList<ToolCallRecord> ForbiddenCalls(AgentResponse response, IEnumerable<String> forbidden)
+    static ToolUsageReport Extract(AgentResponse response)
+sealed class AgentEval.RedTeam.ReasonRedactingEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner)
+class AgentEval.RedTeam.RedTeamAssertionException : AgentEvalAssertionException, ISerializable
+    IReadOnlyList<String> CompromisedAttacks { get; init; }
+    IReadOnlyList<String> CompromisedProbes { get; init; }
+    ctor(String message)
+    static AgentEval.RedTeam.RedTeamAssertionException Create(String message, String expected = null, String actual = null, IReadOnlyList<String> compromisedAttacks = null, IReadOnlyList<String> compromisedProbes = null, IReadOnlyList<String> suggestions = null, String because = null)
+sealed class AgentEval.RedTeam.RedTeamAssertions
+    AgentEval.RedTeam.RedTeamAssertions And()
+    AgentEval.RedTeam.RedTeamAssertions BeConclusive(Double maxInconclusiveFraction = 0.5, String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveASRBelow(Double threshold, String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveAttackASRBelow(String attackName, Double threshold, String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveMinimumScore(Double minimumScore, String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveNoCompromisesFor(String owaspId, String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveNoExecutionErrors(String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HaveNoHighSeverityCompromises(String because = null)
+    AgentEval.RedTeam.RedTeamAssertions HavePassed(String because = null, Double maxInconclusiveFraction = 0.5)
+    AgentEval.RedTeam.RedTeamAssertions HaveResistedAttack(String attackName, String because = null)
+    const Double DefaultMaxInconclusiveFraction
+    ctor(AgentEval.RedTeam.RedTeamResult result)
+static class AgentEval.RedTeam.RedTeamIntegration
+    static IServiceCollection AddRedTeam(IServiceCollection services)
+    static Task<AgentEval.RedTeam.RedTeamResult> ComprehensiveRedTeamScanAsync(IEvaluableAgent agent, IProgress<AgentEval.RedTeam.ScanProgress> progress = null, Boolean includeEvidence = false, CancellationToken cancellationToken = default)
+    static Task<AgentEval.RedTeam.RedTeamResult> ModerateRedTeamScanAsync(IEvaluableAgent agent, IProgress<AgentEval.RedTeam.ScanProgress> progress = null, Boolean includeEvidence = false, CancellationToken cancellationToken = default)
+    static Task<AgentEval.RedTeam.RedTeamResult> QuickRedTeamScanAsync(IEvaluableAgent agent, Boolean includeEvidence = false, CancellationToken cancellationToken = default)
+    static Task<AgentEval.RedTeam.RedTeamResult> RedTeamAsync(IEvaluableAgent agent, AgentEval.RedTeam.IAttackType[] attacks)
+    static Task<AgentEval.RedTeam.RedTeamResult> RedTeamAsync(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options, CancellationToken cancellationToken = default)
+    static Task<Boolean> CanResistAsync(IEvaluableAgent agent, AgentEval.RedTeam.IAttackType attack, AgentEval.RedTeam.Intensity intensity = Intensity.Quick)
+class AgentEval.RedTeam.RedTeamResult : IRedTeamResult
+    AgentEval.RedTeam.Reporting.FalsePositiveRate OverRefusal { get; }
+    AgentEval.RedTeam.ScanOptions Options { get; init; }
+    AgentEval.RedTeam.Severity HighestCompromisedSeverity { get; }
+    AgentEval.RedTeam.Verdict Verdict { get; }
+    Boolean HasExecutionErrors { get; }
+    Boolean IsOverRefusalMeasured { get; }
+    Boolean Passed { get; }
+    Boolean WasTruncated { get; init; }
+    DateTimeOffset CompletedAt { get; init; }
+    DateTimeOffset StartedAt { get; init; }
+    Double AttackSuccessRate { get; }
+    Double ConclusiveAttackSuccessRate { get; }
+    Double ConclusiveRate { get; }
+    Double ConclusiveScore { get; }
+    Double Coverage { get; }
+    Double InconclusiveRate { get; }
+    Double OverallScore { get; }
+    IEnumerable<AgentEval.RedTeam.AttackResult> FailedAttacks { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackResult> AttackResults { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.BenignClassBreakdown> OverRefusalByClass { get; }
+    IReadOnlyList<AgentEval.RedTeam.ProbeResult> BenignControlResults { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.SurfaceBreakdown> BySurface { get; }
+    Int32 AmbiguousProbes { get; }
+    Int32 BenignControlsPlanned { get; init; }
+    Int32 ConclusiveProbes { get; }
+    Int32 ErroredProbes { get; init; }
+    Int32 InconclusiveProbes { get; init; }
+    Int32 PlannedProbes { get; }
+    Int32 ResistedProbes { get; init; }
+    Int32 SkippedProbes { get; init; }
+    Int32 SucceededProbes { get; init; }
+    Int32 TimedOutProbes { get; }
+    Int32 TotalProbes { get; init; }
+    Int32 TransportErrorProbes { get; }
+    String AgentName { get; init; }
+    String BenignControlsNotRunReason { get; init; }
+    String OverRefusalSummary { get; }
+    String Summary { get; }
+    TimeSpan Duration { get; init; }
+    const Double PartialPassScoreThreshold
+    const Int32 MinimumBenignControlsForRate
+    ctor()
+static class AgentEval.RedTeam.RedTeamResultAssertionExtensions
+    static AgentEval.RedTeam.RedTeamAssertions Should(AgentEval.RedTeam.RedTeamResult result)
+sealed class AgentEval.RedTeam.RedTeamRunner : AgentEval.RedTeam.IRedTeamRunner
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.RedTeamResult> ScanAsync(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options, IProgress<AgentEval.RedTeam.ScanProgress> progress, CancellationToken cancellationToken = default)
+    ctor()
+sealed class AgentEval.RedTeam.Reporting.BypassClassBreakdown : IEquatable<AgentEval.RedTeam.Reporting.BypassClassBreakdown>
+    AgentEval.RedTeam.Reporting.BypassClassBreakdown <Clone>$()
+    AgentEval.RedTeam.Reporting.WilsonInterval SuccessRate { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Reporting.BypassClassBreakdown other)
+    Boolean Equals(Object obj)
+    Boolean IsMeasured { get; }
+    Int32 Conclusive { get; init; }
+    Int32 GetHashCode()
+    Int32 Inconclusive { get; init; }
+    Int32 Succeeded { get; init; }
+    String BypassClass { get; init; }
+    String ToString()
+    Void Deconstruct(out String BypassClass, out Int32 Succeeded, out Int32 Conclusive, out Int32 Inconclusive, out AgentEval.RedTeam.Reporting.WilsonInterval SuccessRate)
+    const String Untransformed
+    ctor(String BypassClass, Int32 Succeeded, Int32 Conclusive, Int32 Inconclusive, AgentEval.RedTeam.Reporting.WilsonInterval SuccessRate)
+    static IReadOnlyList<AgentEval.RedTeam.Reporting.BypassClassBreakdown> FromResults(IEnumerable<AgentEval.RedTeam.ProbeResult> results)
+enum AgentEval.RedTeam.Reporting.Compliance.CategoryTestStatus
+    Tested
+    NotTested
+    NotApplicable
+    Inconclusive
+static class AgentEval.RedTeam.Reporting.Compliance.ComplianceDisclaimer
+    const String Heading
+    const String OneLine
+    const String Text
+    static String ToMarkdown()
+class AgentEval.RedTeam.Reporting.Compliance.ComplianceFinding
+    AgentEval.RedTeam.Severity Severity { get; init; }
+    String AttackName { get; init; }
+    String AttackPrompt { get; init; }
+    String Description { get; init; }
+    String Evidence { get; init; }
+    String Id { get; init; }
+    String ProbeId { get; init; }
+    String Rationale { get; init; }
+    String Reason { get; init; }
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions
+    Boolean IncludeDetailedFindings { get; init; }
+    Boolean IncludeEvidence { get; init; }
+    Boolean IncludeRecommendations { get; init; }
+    String IncompleteReason { get; init; }
+    String OrganizationName { get; init; }
+    String Title { get; init; }
+    const String TruncatedIncompleteReason
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary
+    Double OverallPassRate { get; init; }
+    Int32 CriticalFindings { get; init; }
+    Int32 HighFindings { get; init; }
+    Int32 LowFindings { get; init; }
+    Int32 MediumFindings { get; init; }
+    Int32 PassedCategories { get; init; }
+    Int32 TestedCategories { get; init; }
+    Int32 TotalCategories { get; init; }
+    Int32 TotalFindings { get; }
+    ctor()
+enum AgentEval.RedTeam.Reporting.Compliance.ControlEvaluationStatus
+    Effective
+    PartiallyEffective
+    NeedsImprovement
+    NotEvaluated
+    NotApplicable
+enum AgentEval.RedTeam.Reporting.Compliance.ControlFidelity
+    Tested
+    Supporting
+    Governance
+class AgentEval.RedTeam.Reporting.Compliance.ControlMapping : IEquatable<AgentEval.RedTeam.Reporting.Compliance.ControlMapping>
+    AgentEval.RedTeam.Reporting.Compliance.ControlFidelity Fidelity { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.ControlMapping <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.Compliance.ControlMapping other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String ControlId { get; init; }
+    String ControlName { get; init; }
+    String Description { get; init; }
+    String Framework { get; init; }
+    String ToString()
+    String[] OwaspCategories { get; init; }
+    String[] RelevantAttacks { get; init; }
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.ControlMappingCrosswalk
+    static String[] DeriveOwaspCategories(IEnumerable<String> relevantAttacks)
+class AgentEval.RedTeam.Reporting.Compliance.ControlStatus
+    AgentEval.RedTeam.Reporting.Compliance.ControlEvaluationStatus Status { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.ControlMapping Control { get; init; }
+    Boolean NotMeasurable { get; init; }
+    Boolean RanInconclusive { get; }
+    Double Coverage { get; }
+    Double PassRate { get; }
+    IReadOnlyList<String> Observations { get; init; }
+    IReadOnlyList<String> TestedAttacks { get; init; }
+    Int32 ConclusiveTests { get; init; }
+    Int32 FailedTests { get; }
+    Int32 PassedTests { get; init; }
+    Int32 TotalTests { get; init; }
+    String EvidenceSummary { get; init; }
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.CsfControls
+    const String Framework
+    static AgentEval.RedTeam.Reporting.Compliance.ControlMapping[] All
+static class AgentEval.RedTeam.Reporting.Compliance.FrameworkCrosswalk
+    static IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlMapping> AllControls
+    static IReadOnlyList<String> Frameworks { get; }
+interface AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; }
+    Double ComplianceRate { get; }
+    String AgentName { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; }
+    String ToJson()
+    String ToMarkdown()
+interface AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<TReport>
+    TReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+static class AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceExtensions
+    static AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReport ToISO27001ComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    static Task SaveISO27001ComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; init; }
+    DateTimeOffset? AssessmentDate { get; init; }
+    Double ComplianceRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.NonConformity> NonConformities { get; init; }
+    IReadOnlyList<String> Recommendations { get; init; }
+    String AgentName { get; init; }
+    String Disclaimer { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; init; }
+    String Scope { get; init; }
+    String ToJson()
+    String ToMarkdown()
+    Task SaveAsync(String filePath, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReporter : AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReport>
+    AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    Task SaveReportAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    const String Regulation
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.ISO27001Controls
+    static AgentEval.RedTeam.Reporting.Compliance.ControlMapping[] All
+    static IEnumerable<AgentEval.RedTeam.Reporting.Compliance.ControlMapping> AccessControls { get; }
+    static IEnumerable<AgentEval.RedTeam.Reporting.Compliance.ControlMapping> TechnologyControls { get; }
+static class AgentEval.RedTeam.Reporting.Compliance.Iso42001Controls
+    const String Framework
+    static AgentEval.RedTeam.Reporting.Compliance.ControlMapping[] All
+static class AgentEval.RedTeam.Reporting.Compliance.MITREATLASComplianceExtensions
+    static AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport ToMITREATLASComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    static Task SaveMITREATLASComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; init; }
+    Double ComplianceRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.MITRETechniqueStatus> Techniques { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.TacticCoverage> Tactics { get; init; }
+    IReadOnlyList<String> Recommendations { get; init; }
+    Int32 InconclusiveCount { get; }
+    Int32 NotApplicableCount { get; }
+    Int32 NotTestedCount { get; }
+    Int32 TestedCount { get; }
+    String AgentEvalVersion { get; init; }
+    String AgentName { get; init; }
+    String Disclaimer { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; init; }
+    String ToJson()
+    String ToMarkdown()
+    Task SaveAsync(String filePath, CancellationToken cancellationToken = default)
+    TimeSpan ScanDuration { get; init; }
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.MITREATLASReporter : AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport>
+    AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    Task SaveReportAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    Task<ComplianceEvidence> SaveReportWithEvidenceAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    const String Regulation
+    ctor()
+    static IReadOnlyDictionary<String, String> TacticCatalog { get; }
+    static IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique> TechniqueCatalog { get; }
+sealed class AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique : IEquatable<AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique>
+    AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique other)
+    Boolean Equals(Object obj)
+    Boolean IsApplicable { get; init; }
+    Int32 GetHashCode()
+    String Description { get; init; }
+    String Id { get; init; }
+    String Name { get; init; }
+    String TacticId { get; init; }
+    String TacticName { get; init; }
+    String ToString()
+    Void Deconstruct(out String Id, out String Name, out String TacticId, out String TacticName, out String Description, out Boolean IsApplicable)
+    ctor(String Id, String Name, String TacticId, String TacticName, String Description, Boolean IsApplicable)
+class AgentEval.RedTeam.Reporting.Compliance.MITRETechniqueStatus
+    AgentEval.RedTeam.Reporting.Compliance.TechniqueTestStatus Status { get; init; }
+    Double PassRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ComplianceFinding> Findings { get; init; }
+    Int32 ConclusiveTests { get; init; }
+    Int32 FailedTests { get; }
+    Int32 PassedTests { get; init; }
+    Int32 TotalTests { get; init; }
+    String Description { get; init; }
+    String Id { get; init; }
+    String Name { get; init; }
+    String ReferenceUrl { get; }
+    String TacticId { get; init; }
+    String TacticName { get; init; }
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceExtensions
+    static AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport ToNistAiRmfComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; init; }
+    Double ComplianceRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
+    IReadOnlyList<String> Recommendations { get; init; }
+    String AgentName { get; init; }
+    String Disclaimer { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; init; }
+    String ToJson()
+    String ToMarkdown()
+    Task SaveAsync(String filePath, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReporter : AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport>
+    AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    Task SaveReportAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    const String Regulation
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfControls
+    const String Framework
+    static AgentEval.RedTeam.Reporting.Compliance.ControlMapping[] All
+class AgentEval.RedTeam.Reporting.Compliance.NonConformity
+    AgentEval.RedTeam.Reporting.Compliance.NonConformitySeverity Severity { get; init; }
+    Int32 Id { get; init; }
+    String ControlId { get; init; }
+    String CorrectiveAction { get; init; }
+    String Finding { get; init; }
+    String RiskDescription { get; init; }
+    ctor()
+enum AgentEval.RedTeam.Reporting.Compliance.NonConformitySeverity
+    Observation
+    Minor
+    Major
+class AgentEval.RedTeam.Reporting.Compliance.OWASPCategoryStatus
+    AgentEval.RedTeam.Reporting.Compliance.CategoryTestStatus Status { get; init; }
+    Double PassRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ComplianceFinding> Findings { get; init; }
+    Int32 ConclusiveTests { get; init; }
+    Int32 FailedTests { get; }
+    Int32 PassedTests { get; init; }
+    Int32 TotalTests { get; init; }
+    String Description { get; init; }
+    String Id { get; init; }
+    String Name { get; init; }
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceExtensions
+    static AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport ToOWASPComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    static Task SaveOWASPComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; init; }
+    Double ComplianceRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.OWASPCategoryStatus> Categories { get; init; }
+    IReadOnlyList<String> Recommendations { get; init; }
+    Int32 InconclusiveCount { get; }
+    Int32 NotApplicableCount { get; }
+    Int32 NotTestedCount { get; }
+    Int32 TestedCount { get; }
+    String AgentEvalVersion { get; init; }
+    String AgentName { get; init; }
+    String Disclaimer { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; init; }
+    String ToJson()
+    String ToMarkdown()
+    Task SaveAsync(String filePath, CancellationToken cancellationToken = default)
+    TimeSpan ScanDuration { get; init; }
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReporter : AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport>
+    AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    Task SaveReportAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    Task<ComplianceEvidence> SaveReportWithEvidenceAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    const String Regulation
+    ctor()
+    static IReadOnlyDictionary<String, Boolean> CategoryApplicability { get; }
+    static IReadOnlyList<String> AllCategoryIds { get; }
+enum AgentEval.RedTeam.Reporting.Compliance.RiskLevel
+    Low
+    Moderate
+    High
+    Critical
+static class AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceExtensions
+    static AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReport ToSOC2ComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    static Task SaveSOC2ComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
+    AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    DateTimeOffset GeneratedAt { get; init; }
+    DateTimeOffset? PeriodEnd { get; init; }
+    DateTimeOffset? PeriodStart { get; init; }
+    Double ComplianceRate { get; }
+    IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
+    IReadOnlyList<String> Recommendations { get; init; }
+    String AgentName { get; init; }
+    String Disclaimer { get; }
+    String FrameworkName { get; }
+    String FrameworkVersion { get; init; }
+    String ToJson()
+    String ToMarkdown()
+    Task SaveAsync(String filePath, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReporter : AgentEval.RedTeam.Reporting.Compliance.IComplianceReporter<AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReport>
+    AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReport GenerateReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
+    Task SaveReportAsync(IOutputStore store, SubjectIdentity subject, String sourceRunId, AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken ct = default)
+    const String Regulation
+    ctor()
+static class AgentEval.RedTeam.Reporting.Compliance.SOC2Controls
+    static AgentEval.RedTeam.Reporting.Compliance.ControlMapping[] All
+    static IEnumerable<AgentEval.RedTeam.Reporting.Compliance.ControlMapping> SecurityControls { get; }
+class AgentEval.RedTeam.Reporting.Compliance.TacticCoverage
+    Double CoveragePercent { get; }
+    Int32 PassedCount { get; init; }
+    Int32 TestedCount { get; init; }
+    Int32 TotalCount { get; init; }
+    String Id { get; init; }
+    String Name { get; init; }
+    ctor()
+enum AgentEval.RedTeam.Reporting.Compliance.TechniqueTestStatus
+    Tested
+    NotTested
+    NotApplicable
+    Inconclusive
+sealed class AgentEval.RedTeam.Reporting.FalsePositiveRate : IEquatable<AgentEval.RedTeam.Reporting.FalsePositiveRate>
+    AgentEval.RedTeam.Reporting.FalsePositiveRate <Clone>$()
+    AgentEval.RedTeam.Reporting.WilsonInterval Rate { get; init; }
+    Boolean Equals(AgentEval.RedTeam.Reporting.FalsePositiveRate other)
+    Boolean Equals(Object obj)
+    Boolean IsMeasured { get; }
+    Double PerThousand { get; }
+    Int32 BenignTotal { get; init; }
+    Int32 Flagged { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out Int32 Flagged, out Int32 BenignTotal, out AgentEval.RedTeam.Reporting.WilsonInterval Rate)
+    ctor(Int32 Flagged, Int32 BenignTotal, AgentEval.RedTeam.Reporting.WilsonInterval Rate)
+    static AgentEval.RedTeam.Reporting.FalsePositiveRate Compute(Int32 flaggedBenign, Int32 conclusiveBenign)
+interface AgentEval.RedTeam.Reporting.IReportExporter
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+sealed class AgentEval.RedTeam.Reporting.JUnitReportExporter : AgentEval.RedTeam.Reporting.IReportExporter
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+    ctor()
+    ctor(AgentEval.RedTeam.Reporting.ReportRedaction redaction)
+sealed class AgentEval.RedTeam.Reporting.JsonReportExporter : AgentEval.RedTeam.Reporting.IReportExporter
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+    ctor()
+    ctor(AgentEval.RedTeam.Reporting.ReportRedaction redaction)
+sealed class AgentEval.RedTeam.Reporting.MarkdownReportExporter : AgentEval.RedTeam.Reporting.IReportExporter
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+    ctor()
+    ctor(AgentEval.RedTeam.Reporting.ReportRedaction redaction)
+class AgentEval.RedTeam.Reporting.Pdf.BrandingOptions : IEquatable<AgentEval.RedTeam.Reporting.Pdf.BrandingOptions>
+    AgentEval.RedTeam.Reporting.Pdf.BrandingOptions <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.Pdf.BrandingOptions other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String FontFamily { get; init; }
+    String PrimaryColor { get; init; }
+    String SecondaryColor { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver : IFontResolver, IFontResolverMarker
+    Byte[] GetFont(String faceName)
+    FontResolverInfo ResolveTypeface(String familyName, Boolean isBold, Boolean isItalic)
+    ctor()
+    static AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver Instance { get; }
+    static Void Register()
+enum AgentEval.RedTeam.Reporting.Pdf.PageSize
+    A4
+    Letter
+    Legal
+class AgentEval.RedTeam.Reporting.Pdf.PdfReportGenerator : AgentEval.RedTeam.Reporting.IReportExporter
+    Byte[] GenerateExecutiveReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null)
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+    Task SaveAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions : IEquatable<AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions>
+    AgentEval.RedTeam.RedTeamResult BaselineResults { get; init; }
+    AgentEval.RedTeam.Reporting.Pdf.BrandingOptions Branding { get; init; }
+    AgentEval.RedTeam.Reporting.Pdf.PageSize PageSize { get; init; }
+    AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions other)
+    Boolean Equals(Object obj)
+    Boolean IncludeDetailedResults { get; init; }
+    Boolean IncludeTrends { get; init; }
+    Int32 GetHashCode()
+    String AgentName { get; init; }
+    String AgentVersion { get; init; }
+    String Author { get; init; }
+    String CompanyLogoPath { get; init; }
+    String CompanyName { get; init; }
+    String Subject { get; init; }
+    String ToString()
+    ctor()
+class AgentEval.RedTeam.Reporting.Pdf.RiskScoreCalculator
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel GetRiskLevel(Int32 score)
+    AgentEval.RedTeam.Reporting.Pdf.RiskSummary GetSummary(AgentEval.RedTeam.RedTeamResult result)
+    Int32 CalculateScore(AgentEval.RedTeam.RedTeamResult result)
+    ctor()
+class AgentEval.RedTeam.Reporting.Pdf.RiskSummary : IEquatable<AgentEval.RedTeam.Reporting.Pdf.RiskSummary>
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel Level { get; init; }
+    AgentEval.RedTeam.Reporting.Pdf.RiskSummary <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.Pdf.RiskSummary other)
+    Boolean Equals(Object obj)
+    Boolean IsAssessable { get; }
+    Double OwaspCoveragePercent { get; init; }
+    Int32 CriticalFindings { get; init; }
+    Int32 FailedProbes { get; init; }
+    Int32 GetHashCode()
+    Int32 HighFindings { get; init; }
+    Int32 InconclusiveProbes { get; init; }
+    Int32 LowFindings { get; init; }
+    Int32 MediumFindings { get; init; }
+    Int32 PassedProbes { get; init; }
+    Int32 Score { get; init; }
+    Int32 TotalFindings { get; }
+    Int32 TotalProbes { get; init; }
+    String ToString()
+    ctor()
+static class AgentEval.RedTeam.Reporting.ProbeExpectation
+    const String Attack
+    const String BenignControl
+    const String MetadataKey
+    static RequestPermissibility PermissibilityOf(AgentEval.RedTeam.AttackProbe probe)
+    static String Of(AgentEval.RedTeam.AttackProbe probe)
+sealed class AgentEval.RedTeam.Reporting.ReportRedaction : IEquatable<AgentEval.RedTeam.Reporting.ReportRedaction>
+    AgentEval.RedTeam.Reporting.ReportRedaction <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.Reporting.ReportRedaction other)
+    Boolean Equals(Object obj)
+    Boolean IncludeAttackText { get; init; }
+    Int32 GetHashCode()
+    String Apply(String text)
+    String ToString()
+    Void Deconstruct(out Boolean IncludeAttackText)
+    const String RedactedMarker
+    ctor(Boolean IncludeAttackText = true)
+    static AgentEval.RedTeam.Reporting.ReportRedaction Full { get; }
+    static AgentEval.RedTeam.Reporting.ReportRedaction MetadataOnly { get; }
+sealed class AgentEval.RedTeam.Reporting.SarifReportExporter : AgentEval.RedTeam.Reporting.IReportExporter
+    String Export(AgentEval.RedTeam.RedTeamResult result)
+    String FileExtension { get; }
+    String FormatName { get; }
+    String MimeType { get; }
+    Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
+    ctor()
+    ctor(AgentEval.RedTeam.Reporting.ReportRedaction redaction)
+struct AgentEval.RedTeam.Reporting.WilsonInterval : IEquatable<AgentEval.RedTeam.Reporting.WilsonInterval>
+    Boolean Equals(AgentEval.RedTeam.Reporting.WilsonInterval other)
+    Boolean Equals(Object obj)
+    Boolean IsMeasured { get; }
+    Double Estimate { get; init; }
+    Double Lower { get; init; }
+    Double Upper { get; init; }
+    Int32 GetHashCode()
+    Int32 Successes { get; init; }
+    Int32 Total { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 Successes, out Int32 Total, out Double Estimate, out Double Lower, out Double Upper)
+    ctor(Int32 Successes, Int32 Total, Double Estimate, Double Lower, Double Upper)
+    static AgentEval.RedTeam.Reporting.WilsonInterval Compute(Int32 successes, Int32 total, Double z = 1.959963984540054)
+class AgentEval.RedTeam.ScanOptions
+    Action<AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.ProbeResult, Boolean> OnProbeCompleted { get; init; }
+    Action<AgentEval.RedTeam.ScanPlan> OnPlanPrepared { get; init; }
+    Action<AgentEval.RedTeam.ScanProgress> OnProgress { get; init; }
+    AgentEval.RedTeam.Intensity Intensity { get; init; }
+    AgentEval.RedTeam.JudgeMode Mode { get; init; }
+    AgentEval.RedTeam.JudgeRubric Rubric { get; init; }
+    Boolean ExplainFindings { get; init; }
+    Boolean FailFast { get; init; }
+    Boolean IncludeEvidence { get; init; }
+    Boolean RunBenignControls { get; init; }
+    Func<AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.AttackProbe, Boolean, IDisposable> BeginProbeScope { get; init; }
+    IChatClient AttackerClient { get; init; }
+    IChatClient JudgeClient { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.IAttackType> AttackTypes { get; init; }
+    Int32 MaxProbesPerAttack { get; init; }
+    Int32 Parallelism { get; init; }
+    Int32 ProgressReportInterval { get; init; }
+    TimeProvider TimeProvider { get; init; }
+    TimeSpan DelayBetweenProbes { get; init; }
+    TimeSpan MaxConversationDuration { get; init; }
+    TimeSpan TimeoutPerProbe { get; init; }
+    TimeSpan TimeoutPerTurn { get; init; }
+    TimeSpan? JudgeTimeout { get; init; }
+    TimeSpan? OverallTimeout { get; init; }
+    ctor()
+    static AgentEval.RedTeam.ScanOptions Comprehensive { get; }
+    static AgentEval.RedTeam.ScanOptions Default { get; }
+    static AgentEval.RedTeam.ScanOptions Quick { get; }
+sealed class AgentEval.RedTeam.ScanPlan : IEquatable<AgentEval.RedTeam.ScanPlan>
+    AgentEval.RedTeam.ScanOptions Options { get; init; }
+    AgentEval.RedTeam.ScanPlan <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.ScanPlan other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.RedTeam.PlannedAttack> Attacks { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out AgentEval.RedTeam.ScanOptions Options, out IReadOnlyList<AgentEval.RedTeam.PlannedAttack> Attacks)
+    ctor(AgentEval.RedTeam.ScanOptions Options, IReadOnlyList<AgentEval.RedTeam.PlannedAttack> Attacks)
+struct AgentEval.RedTeam.ScanProgress : IEquatable<AgentEval.RedTeam.ScanProgress>
+    AgentEval.RedTeam.EvaluationOutcome? LastOutcome { get; init; }
+    Boolean Equals(AgentEval.RedTeam.ScanProgress other)
+    Boolean Equals(Object obj)
+    Double CurrentSuccessRate { get; }
+    Double PercentComplete { get; }
+    Int32 CompletedProbes { get; init; }
+    Int32 GetHashCode()
+    Int32 ResistedCount { get; init; }
+    Int32 SucceededCount { get; init; }
+    Int32 TotalProbes { get; init; }
+    String CurrentAttack { get; init; }
+    String CurrentProbe { get; init; }
+    String StatusEmoji { get; }
+    String ToString()
+    TimeSpan Elapsed { get; init; }
+    TimeSpan? EstimatedRemaining { get; }
+    Void Deconstruct(out Int32 CompletedProbes, out Int32 TotalProbes, out String CurrentAttack, out String CurrentProbe, out TimeSpan Elapsed, out Int32 ResistedCount, out Int32 SucceededCount, out AgentEval.RedTeam.EvaluationOutcome? LastOutcome)
+    ctor(Int32 CompletedProbes, Int32 TotalProbes, String CurrentAttack, String CurrentProbe, TimeSpan Elapsed, Int32 ResistedCount = 0, Int32 SucceededCount = 0, AgentEval.RedTeam.EvaluationOutcome? LastOutcome = null)
+enum AgentEval.RedTeam.Severity
+    Informational
+    Low
+    Medium
+    High
+    Critical
+sealed class AgentEval.RedTeam.SuccessOnlyConvergenceDetector : AgentEval.RedTeam.IConvergenceDetector
+    AgentEval.RedTeam.ConvergenceDecision Evaluate(AgentEval.RedTeam.MultiTurnContext context, AgentResponse response, AgentEval.RedTeam.EvaluationResult turnResult)
+    ctor()
+    static AgentEval.RedTeam.SuccessOnlyConvergenceDetector Instance
+sealed class AgentEval.RedTeam.SurfaceBreakdown : IEquatable<AgentEval.RedTeam.SurfaceBreakdown>
+    AgentEval.RedTeam.InjectionSurface Surface { get; init; }
+    AgentEval.RedTeam.SurfaceBreakdown <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.SurfaceBreakdown other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int32 Inconclusive { get; init; }
+    Int32 Resisted { get; init; }
+    Int32 Succeeded { get; init; }
+    Int32 Total { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.RedTeam.InjectionSurface Surface, out Int32 Total, out Int32 Succeeded, out Int32 Resisted, out Int32 Inconclusive)
+    ctor(AgentEval.RedTeam.InjectionSurface Surface, Int32 Total, Int32 Succeeded, Int32 Resisted, Int32 Inconclusive)
+enum AgentEval.RedTeam.SutTier
+    TextOnly
+    FunctionCalling
+    InstrumentedAgent
+sealed class AgentEval.RedTeam.TapNode : IEquatable<AgentEval.RedTeam.TapNode>
+    AgentEval.RedTeam.TapNode <Clone>$()
+    AgentEval.RedTeam.TapNode Extend(String prompt, String reply, String verdict, Double score)
+    Boolean Equals(AgentEval.RedTeam.TapNode other)
+    Boolean Equals(Object obj)
+    Double Score { get; init; }
+    IReadOnlyList<Turn> Path { get; init; }
+    Int32 GetHashCode()
+    String LastReply { get; init; }
+    String LastVerdict { get; init; }
+    String ToString()
+    ctor()
+    static AgentEval.RedTeam.TapNode Root()
+static class AgentEval.RedTeam.TierNegotiator
+    static AgentEval.RedTeam.EvidenceFidelity FidelityFor(AgentEval.RedTeam.SutTier tier)
+    static AgentEval.RedTeam.SutTier Classify(IEvaluableAgent agent)
+sealed class AgentEval.RedTeam.TimeoutEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    String Name { get; }
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    ctor(AgentEval.RedTeam.IProbeEvaluator inner, TimeSpan timeout)
+sealed class AgentEval.RedTeam.Transforms.AsciiDecimalTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.AtbashTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.Base32Transformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.Base64Transformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.BinaryTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.CaesarTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+enum AgentEval.RedTeam.Transforms.DifficultyDelta
+    Same
+    Raise
+    Lower
+static class AgentEval.RedTeam.Transforms.Encoders
+    static String AsciiDecimal(String value)
+    static String Atbash(String value)
+    static String Base32(String value)
+    static String Base64(String value)
+    static String Binary(String value)
+    static String Caesar(String value, Int32 shift)
+    static String Fullwidth(String value)
+    static String Hex(String value)
+    static String HtmlDecimalEntities(String value)
+    static String HtmlHexEntities(String value)
+    static String Leetspeak(String value)
+    static String Morse(String value)
+    static String Octal(String value)
+    static String Reversed(String value)
+    static String Rot13(String value)
+    static String UnicodeEscapes(String value)
+    static String UrlAllBytes(String value)
+    static String XorHex(String value, Byte key)
+abstract class AgentEval.RedTeam.Transforms.EncodingTransformer : AgentEval.RedTeam.Transforms.IProbeTransformer
+    AgentEval.RedTeam.Transforms.DifficultyDelta DifficultyImpact { get; }
+    IEnumerable<AgentEval.RedTeam.AttackProbe> Transform(AgentEval.RedTeam.AttackProbe probe)
+    String Instruction { protected get; }
+    String Name { get; }
+    protected String Encode(String payload)
+    protected ctor()
+sealed class AgentEval.RedTeam.Transforms.FullwidthTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.HexTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.HtmlEntitiesTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.HtmlHexEntitiesTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+interface AgentEval.RedTeam.Transforms.IProbeTransformer
+    AgentEval.RedTeam.Transforms.DifficultyDelta DifficultyImpact { get; }
+    IEnumerable<AgentEval.RedTeam.AttackProbe> Transform(AgentEval.RedTeam.AttackProbe probe)
+    String Name { get; }
+sealed class AgentEval.RedTeam.Transforms.LeetspeakTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    AgentEval.RedTeam.Transforms.DifficultyDelta DifficultyImpact { get; }
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.MorseTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    AgentEval.RedTeam.Transforms.DifficultyDelta DifficultyImpact { get; }
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.OctalTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.ReversedTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.Rot13Transformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+enum AgentEval.RedTeam.Transforms.TransformMode
+    Expand
+    Chain
+static class AgentEval.RedTeam.Transforms.TransformProvenance
+    const String ChainKey
+    const String PayloadKey
+    const String SeedIdKey
+    static AgentEval.RedTeam.Difficulty Bump(AgentEval.RedTeam.Difficulty difficulty, AgentEval.RedTeam.Transforms.DifficultyDelta delta)
+    static IReadOnlyDictionary<String, Object> Stamp(AgentEval.RedTeam.AttackProbe seed, String transformName, String output)
+    static String PayloadOf(AgentEval.RedTeam.AttackProbe probe)
+    static String SuffixId(String id, String transformName)
+sealed class AgentEval.RedTeam.Transforms.TransformedAttack : AgentEval.RedTeam.IAttackType
+    AgentEval.RedTeam.IProbeEvaluator GetEvaluator()
+    AgentEval.RedTeam.Severity DefaultSeverity { get; }
+    IReadOnlyList<AgentEval.RedTeam.AttackProbe> GetProbes(AgentEval.RedTeam.Intensity intensity)
+    String Description { get; }
+    String DisplayName { get; }
+    String Name { get; }
+    String OwaspLlmId { get; }
+    String[] MitreAtlasIds { get; }
+    ctor(AgentEval.RedTeam.IAttackType inner, IReadOnlyList<AgentEval.RedTeam.Transforms.IProbeTransformer> transformers, AgentEval.RedTeam.Transforms.TransformMode mode, Boolean keepOriginal = false)
+static class AgentEval.RedTeam.Transforms.Transformers
+    static IReadOnlyList<AgentEval.RedTeam.Transforms.IProbeTransformer> AllEncodings { get; }
+    static IReadOnlyList<AgentEval.RedTeam.Transforms.IProbeTransformer> LossyEncodings { get; }
+    static IReadOnlyList<AgentEval.RedTeam.Transforms.IProbeTransformer> ReversibleEncodings { get; }
+sealed class AgentEval.RedTeam.Transforms.UnicodeEscapesTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.UrlEncodingTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.Transforms.XorTransformer : AgentEval.RedTeam.Transforms.EncodingTransformer, AgentEval.RedTeam.Transforms.IProbeTransformer
+    String Name { get; }
+    ctor()
+sealed class AgentEval.RedTeam.TreeOrchestrator
+    Task<AgentEval.RedTeam.MultiTurnResult> RunAsync(AgentEval.RedTeam.ITreeAttack attack, AgentEval.RedTeam.AttackProbe seed, AgentEval.RedTeam.IProbeEvaluator evaluator, CancellationToken cancellationToken)
+    ctor(IEvaluableAgent target, AgentEval.RedTeam.ScanOptions options)
+sealed class AgentEval.RedTeam.TurnOrchestrator
+    Task<AgentEval.RedTeam.MultiTurnResult> RunAsync(AgentEval.RedTeam.IMultiTurnAttack attack, AgentEval.RedTeam.AttackProbe seed, AgentEval.RedTeam.IProbeEvaluator evaluator, CancellationToken cancellationToken)
+    ctor(IEvaluableAgent agent, AgentEval.RedTeam.ScanOptions options)
+enum AgentEval.RedTeam.Verdict
+    Pass
+    Fail
+    PartialPass
+    Inconclusive
