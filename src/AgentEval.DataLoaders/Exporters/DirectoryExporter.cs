@@ -186,7 +186,8 @@ public sealed class DirectoryExporter : IResultExporter
                 Metrics: result.MetricScores,
                 Assertions: BuildAssertions(result),
                 Duration: TimeSpan.FromMilliseconds(result.DurationMs),
-                EstimatedCost: 0)
+                // The report carries no cost: not priced (null), never a $0 the test did not measure.
+                EstimatedCost: null)
             {
                 // A test with no verdict is stored with a placeholder 0; this keeps `compare` from averaging it.
                 Measurement = result.NotMeasured ? ScenarioMeasurement.NotMeasured : null,

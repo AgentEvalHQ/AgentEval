@@ -44,9 +44,11 @@ public class MemoryEvaluationResult
     public int TokensUsed { get; init; }
 
     /// <summary>
-    /// Estimated cost of the evaluation (in USD).
+    /// Estimated cost of the evaluation's judge calls (in USD), priced from the token counts the provider reported at
+    /// the judge model's rate. <see langword="null"/> when it was not priced: a judge call reported no usage, or the
+    /// model has no known rate. Never a flat made-up rate, and never 0 for "not priced".
     /// </summary>
-    public decimal EstimatedCost { get; init; }
+    public decimal? EstimatedCost { get; init; }
 
     /// <summary>
     /// Name of the scenario that was evaluated.

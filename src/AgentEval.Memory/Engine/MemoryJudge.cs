@@ -59,14 +59,15 @@ public class MemoryJudge : IMemoryJudge
             
             var responseText = chatResponse.Text ?? "";
 
-            // Extract actual token usage from the response when available
-            var actualTokens = ExtractTokenUsage(chatResponse);
+            // Extract actual token usage from the response when available, and the model that answered (to price it)
+            var actualUsage = ExtractTokenUsage(chatResponse);
+            var judgeModel = chatResponse.ModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
 
             // Parse the structured response
             var judgmentData = ParseJudgmentResponse(responseText);
 
             // Convert to our result format
-            var result = ConvertToJudgmentResult(judgmentData, query, actualTokens);
+            var result = ConvertToJudgmentResult(judgmentData, query, actualUsage, judgeModel);
             
             _logger.LogDebug("Memory judgment completed: {Score}% ({FoundCount} found, {MissingCount} missing)",
                 result.Score, result.FoundFacts.Count, result.MissingFacts.Count);
@@ -324,33 +325,30 @@ Be strict — any specific fabricated detail (a name, address, number, food item
     }
 
     /// <summary>
-    /// Extracts actual token usage from the ChatResponse when available.
+    /// Extracts actual token usage from the ChatResponse when available: both counts, or null. A missing count is not 0,
+    /// so usage with only one of them (or only a total) is not reported usage.
     /// </summary>
-    private static int ExtractTokenUsage(ChatResponse response)
+    private static (int Input, int Output)? ExtractTokenUsage(ChatResponse response)
     {
-        if (response.Usage is { } usage)
-        {
-            var input = (int)(usage.InputTokenCount ?? 0);
-            var output = (int)(usage.OutputTokenCount ?? 0);
-            if (input > 0 || output > 0)
-                return input + output;
-        }
-        return 0;
+        if (response.Usage is { InputTokenCount: { } i, OutputTokenCount: { } o } && (i > 0 || o > 0))
+            return ((int)Math.Min(i, int.MaxValue), (int)Math.Min(o, int.MaxValue));
+        return null;
     }
 
     /// <summary>
     /// Converts parsed LLM judgment data to our result format.
     /// </summary>
-    private MemoryJudgmentResult ConvertToJudgmentResult(JudgmentResponseData data, MemoryQuery query, int actualTokens)
+    private MemoryJudgmentResult ConvertToJudgmentResult(
+        JudgmentResponseData data, MemoryQuery query, (int Input, int Output)? actualUsage, string? judgeModel)
     {
         // Match fact contents to original MemoryFact objects
         var foundFacts = MatchFactsByContent(data.FoundFacts, query.ExpectedFacts);
         var missingFacts = MatchFactsByContent(data.MissingFacts, query.ExpectedFacts);
         var forbiddenFound = MatchFactsByContent(data.ForbiddenFound, query.ForbiddenFacts);
 
-        // Use actual token counts when available, fall back to estimation
-        var tokensUsed = actualTokens > 0
-            ? actualTokens
+        // Use actual token counts when available, fall back to estimation (an estimate is never priced)
+        var tokensUsed = actualUsage is { } u
+            ? (int)Math.Min((long)u.Input + u.Output, int.MaxValue)
             : EstimateTokenUsage(query, data.Explanation ?? "");
 
         // A reply with no score, a non-finite one, or one off the documented 0-100 scale measured nothing: its reply could
@@ -369,7 +367,10 @@ Be strict — any specific fabricated detail (a name, address, number, food item
             Explanation = offScale
                 ? $"Not measured: the judge's score {data.Score!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off the 0-100 scale."
                 : data.Explanation,
-            TokensUsed = tokensUsed
+            TokensUsed = tokensUsed,
+            InputTokens = actualUsage?.Input,
+            OutputTokens = actualUsage?.Output,
+            JudgeModel = judgeModel,
         };
     }
 

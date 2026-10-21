@@ -467,16 +467,9 @@ public static class MAFWorkflowEventBridge
                         : agentResponse.Response.Text;
                     outputAccumulator.Clear();
 
-                    // Extract token usage from AgentResponse.Usage
-                    TokenUsage? responseUsage = null;
-                    if (agentResponse.Response.Usage is { } usage)
-                    {
-                        responseUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.OutputTokenCount ?? 0)
-                        };
-                    }
+                    // Extract token usage from AgentResponse.Usage: null unless both counts were reported (a missing
+                    // count is not 0).
+                    var responseUsage = TokenUsageMapping.FromUsage(agentResponse.Response.Usage);
 
                     // Extract finish reason (ChatFinishReason.ToString())
                     var finishReason = agentResponse.Response.FinishReason?.ToString();

@@ -70,16 +70,9 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         
         var response = await _agent.RunAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
-        // Extract token usage from AgentResponse.Usage property
-        TokenUsage? tokenUsage = null;
-        if (response.Usage != null)
-        {
-            tokenUsage = new TokenUsage
-            {
-                PromptTokens = (int)(response.Usage.InputTokenCount ?? 0),
-                CompletionTokens = (int)(response.Usage.OutputTokenCount ?? 0)
-            };
-        }
+        // Extract token usage from AgentResponse.Usage property: null unless both counts were reported (a missing
+        // count is not 0), so the harness labels its own estimate instead of pricing a 0 as real.
+        var tokenUsage = TokenUsageMapping.FromUsage(response.Usage);
         
         return new AgentResponse
         {
@@ -141,11 +134,8 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
                     
                     // Check for UsageContent if provider sends it in streaming
                     case UsageContent usage:
-                        capturedUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.Details.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.Details.OutputTokenCount ?? 0)
-                        };
+                        // Null unless both counts were reported: a missing count is not 0.
+                        capturedUsage = TokenUsageMapping.FromUsage(usage.Details);
                         break;
                 }
             }

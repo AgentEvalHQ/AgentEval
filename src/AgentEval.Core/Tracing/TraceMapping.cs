@@ -28,12 +28,10 @@ internal static class TraceMapping
         Arguments = call.Arguments is null ? null : JsonSerializer.Serialize(call.Arguments),
     };
 
-    /// <summary>Maps MEAI usage (long counts) to the trace model (int), or null when absent.</summary>
-    public static TraceTokenUsage? ToTokenUsage(UsageDetails? usage) => usage is null
-        ? null
-        : new TraceTokenUsage
-        {
-            PromptTokens = (int)(usage.InputTokenCount ?? 0),
-            CompletionTokens = (int)(usage.OutputTokenCount ?? 0),
-        };
+    /// <summary>Maps MEAI usage (long counts) to the trace model (int), or null when absent or when either count is
+    /// missing: a missing count is not 0 (<see cref="AgentEval.Core.TokenUsageMapping"/>).</summary>
+    public static TraceTokenUsage? ToTokenUsage(UsageDetails? usage) =>
+        AgentEval.Core.TokenUsageMapping.Counts(usage) is { } c
+            ? new TraceTokenUsage { PromptTokens = c.Prompt, CompletionTokens = c.Completion }
+            : null;
 }

@@ -66,6 +66,8 @@ public class DirectoryExporterStoreTests
             scenarios.Add(sr);
 
         Assert.Equal(2, scenarios.Count);
+        // T63 / T13-9: the report carries no cost, so none is stored. Every scenario used to be written with $0.
+        Assert.All(scenarios, s => Assert.Null(s.EstimatedCost));
     }
 
     [Fact]

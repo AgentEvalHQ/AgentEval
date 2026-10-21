@@ -172,7 +172,8 @@ public sealed class AtomicLlmEval : AtomicEval
     /// against a regional Azure deployment with regional pricing, or when overriding cost
     /// in a test fixture. The delegate receives the judge model identifier
     /// (<paramref name="judgeModel"/>) and returns a <see cref="JudgeCostMap.ModelRate"/>.
-    /// When <c>null</c> (default), falls back to <see cref="JudgeCostMap.GetRate(string?)"/>.
+    /// When <c>null</c> (default), falls back to <see cref="JudgeCostMap.GetRate(string?)"/>; a judge model that
+    /// table has no rate for leaves the cost not priced (<see cref="EvalProvenance.EstimatedCost"/> null).
     /// </param>
     public AtomicLlmEval(
         AgentEval.Core.IEvaluator evaluator,
@@ -285,27 +286,31 @@ public sealed class AtomicLlmEval : AtomicEval
 
         var er = await _evaluator.EvaluateAsync(judgeInput, input.Response, _criteria, ct);
 
-        // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage
-        // so composite cost rollups stop summing to $0. When the underlying IEvaluator does
-        // not report token counts (e.g. test fakes, non-chat evaluators), tokensUsed stays
-        // null and estimatedCost stays 0 — matching the pre-1.7 behaviour for those paths.
+        // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage.
+        // Not priced is null, never $0: an IEvaluator that reports no token counts (test fakes,
+        // non-chat evaluators), or only one of the two, and a judge model with no rate leave the
+        // cost unknown. A missing count is not a zero count.
         long? inputTokens = er.InputTokenCount;
         long? outputTokens = er.OutputTokenCount;
         int? tokensUsed = null;
-        double estimatedCost = 0;
+        double? estimatedCost = null;
         if (inputTokens is not null || outputTokens is not null)
         {
             var inT = inputTokens ?? 0;
             var outT = outputTokens ?? 0;
-            if (_rateResolver is not null)
+            if (inputTokens is null || outputTokens is null)
+            {
+                // One count unreported: no complete cost.
+            }
+            else if (_rateResolver is not null)
             {
                 // LR7-F1: per-instance resolver wins over the static JudgeCostMap.
                 // Lets a tenant override list price with a negotiated rate without
                 // forking or mutating the process-global rate table.
                 var rate = _rateResolver(_judgeModel);
-                if (inT > 0 || outT > 0)
-                    estimatedCost = (Math.Max(0, inT) / 1000.0) * rate.InputRatePer1K
-                                  + (Math.Max(0, outT) / 1000.0) * rate.OutputRatePer1K;
+                estimatedCost = inT > 0 || outT > 0
+                    ? (Math.Max(0, inT) / 1000.0) * rate.InputRatePer1K + (Math.Max(0, outT) / 1000.0) * rate.OutputRatePer1K
+                    : 0;
             }
             else
             {

@@ -339,7 +339,8 @@ public sealed class OwaspBenchmarkRun
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0.0,
+                // Complete or absent: null when a judge graded any leaf (its calls are not priced here), never $0.
+                EstimatedCost: CostRollup.Aggregate(leaves).EstimatedCost,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

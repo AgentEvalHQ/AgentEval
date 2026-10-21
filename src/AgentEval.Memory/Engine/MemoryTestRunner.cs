@@ -55,7 +55,9 @@ public class MemoryTestRunner : IMemoryTestRunner
         
         var stopwatch = Stopwatch.StartNew();
         var totalTokens = 0;
-        
+        // The judge calls' cost: complete or absent. One unpriced call (no usage reported, no known rate) makes it null.
+        decimal? totalCost = 0m;
+
         _logger.LogInformation("Starting memory evaluation scenario: {ScenarioName}", scenario.Name);
 
         try
@@ -85,9 +87,10 @@ public class MemoryTestRunner : IMemoryTestRunner
             
             foreach (var query in scenario.Queries)
             {
-                var queryResult = await EvaluateQueryAsync(agent, query, contextBlob, cancellationToken);
+                var (queryResult, judgeCost) = await EvaluateQueryAsync(agent, query, contextBlob, cancellationToken);
                 queryResults.Add(queryResult);
                 totalTokens += queryResult.TokensUsed;
+                totalCost = totalCost is { } sum && judgeCost is { } cost ? sum + cost : null;
                 
                 _logger.LogDebug("Query '{Question}' scored {Score:F1}%", 
                     query.Question, queryResult.Score);
@@ -96,7 +99,7 @@ public class MemoryTestRunner : IMemoryTestRunner
             stopwatch.Stop();
             
             // Phase 3: Aggregate results
-            var result = AggregateResults(scenario, queryResults, stopwatch.Elapsed, totalTokens);
+            var result = AggregateResults(scenario, queryResults, stopwatch.Elapsed, totalTokens, totalCost);
             
             _logger.LogInformation("Memory evaluation completed: {ScenarioName} - Overall Score: {Score:F1}% ({Passed}/{Total} queries passed)",
                 scenario.Name, result.OverallScore, result.PassedQueries, result.TotalQueries);
@@ -235,8 +238,8 @@ public class MemoryTestRunner : IMemoryTestRunner
     /// Evaluates a single memory query against the agent.
     /// When contextBlob is provided, it is prepended to the query (text-blob injection).
     /// </summary>
-    private async Task<MemoryQueryResult> EvaluateQueryAsync(
-        IEvaluableAgent agent, 
+    private async Task<(MemoryQueryResult Result, decimal? JudgeCost)> EvaluateQueryAsync(
+        IEvaluableAgent agent,
         MemoryQuery query,
         string? contextBlob,
         CancellationToken cancellationToken)
@@ -258,7 +261,7 @@ public class MemoryTestRunner : IMemoryTestRunner
             
             queryStopwatch.Stop();
             
-            return new MemoryQueryResult
+            return (new MemoryQueryResult
             {
                 Query = query,
                 Response = response.Text,
@@ -270,7 +273,7 @@ public class MemoryTestRunner : IMemoryTestRunner
                 Explanation = judgmentResult.Explanation,
                 Duration = queryStopwatch.Elapsed,
                 TokensUsed = judgmentResult.TokensUsed
-            };
+            }, PriceJudgment(judgmentResult));
         }
         catch (Exception ex)
         {
@@ -280,13 +283,33 @@ public class MemoryTestRunner : IMemoryTestRunner
     }
 
     /// <summary>
+    /// The USD cost of one judge call: the token counts its provider reported, at the judge model's rate
+    /// (<see cref="AgentEval.Models.ModelPricing"/>, else <see cref="AgentEval.Evals.JudgeCostMap"/>). Null — not
+    /// priced — when the counts were not reported (an estimate is never priced), the model is unknown, or neither table
+    /// has a rate for it. There is no flat fallback rate (this was $0.003 per 1K tokens for every model).
+    /// </summary>
+    internal static decimal? PriceJudgment(MemoryJudgmentResult judgment)
+    {
+        if (judgment.InputTokens is not { } input || judgment.OutputTokens is not { } output)
+            return null;
+        if (AgentEval.Models.ModelPricing.EstimateCost(judgment.JudgeModel, input, output) is { } priced)
+            return priced;
+        if (string.IsNullOrWhiteSpace(judgment.JudgeModel))
+            return null;
+        return AgentEval.Evals.JudgeCostMap.EstimateCost(judgment.JudgeModel, input, output) is { } judged
+            ? (decimal)judged
+            : null;
+    }
+
+    /// <summary>
     /// Aggregates individual query results into a comprehensive evaluation result.
     /// </summary>
     private static MemoryEvaluationResult AggregateResults(
-        MemoryTestScenario scenario, 
-        IReadOnlyList<MemoryQueryResult> queryResults, 
-        TimeSpan totalDuration, 
-        int totalTokens)
+        MemoryTestScenario scenario,
+        IReadOnlyList<MemoryQueryResult> queryResults,
+        TimeSpan totalDuration,
+        int totalTokens,
+        decimal? estimatedCost)
     {
         var allFoundFacts = queryResults.SelectMany(r => r.FoundFacts).Distinct().ToList();
         var allMissingFacts = queryResults.SelectMany(r => r.MissingFacts).Distinct().ToList();
@@ -300,11 +323,8 @@ public class MemoryTestRunner : IMemoryTestRunner
         // as MemoryEvaluationResult.UnmeasuredQueries).
         var measured = queryResults.Where(r => r.Measured).ToList();
         var overallScore = measured.Count > 0 ? measured.Average(r => r.Score) : 0;
-        
-        // Cost estimation: $0.003 per 1K tokens (approximate, varies by model/provider).
-        // Users should compute exact costs from TokensUsed with their own pricing.
-        var estimatedCost = totalTokens * 0.003m / 1000m;
-        
+
+        // estimatedCost is the judge calls' priced total, or null when any call was not priced (PriceJudgment).
         return new MemoryEvaluationResult
         {
             OverallScore = overallScore,

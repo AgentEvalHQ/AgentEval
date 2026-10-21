@@ -75,6 +75,21 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
     memory baseline comparer and its report (`NotMeasuredBy`, `OmittedAxes`) no longer score what they could not check.
     A red-team scan with no conclusive probe no longer scores 100 (`ConclusiveProbes`), and a comparison against a run
     that measured nothing is refused (`IsComparable`, `RegressionStatus.Incomparable`).
+  - **Cost is never made up (breaking):** an unknown, null or blank judge model is not priced; it got gpt-4o-mini's
+    rate. `JudgeCostMap.GetRate` returns `ModelRate?`, `EstimateCost` returns `double?`, and `DefaultInputRatePer1K`/
+    `DefaultOutputRatePer1K` are removed (`GetRate(m) is not null` says whether a model is priced).
+    `EvalProvenance.EstimatedCost` and `ScenarioResult.EstimatedCost` are `double?` (written as `"estimatedCost": null`;
+    the eval-result schema accepts null, old files stay valid). A total is complete or absent: `CostRollup.Aggregate`
+    returns `(double? EstimatedCost, bool AllCacheHits, IReadOnlyList<string> Unpriced)`, so composites, judge panels,
+    `bench --runs`, the benchmark and MAF result trees, the safety classifiers and the exporters report "not priced"
+    instead of a partial or $0 total. `MemoryEvaluationResult.EstimatedCost` is `decimal?`: memory runs price judge
+    calls at the judge model's rate from reported usage, or report null (the flat $0.003/1K rate is gone), and
+    `HaveCostLessThan` on an unpriced cost is inconclusive in a collecting scope and fails outside one. Token usage
+    that lacks the input or the output count is no longer reported as 0 (chat-client and MAF adapters, the workflow
+    bridge, traces); the harness estimates it and labels it estimated, and its estimate of completion tokens now
+    counts the response (it was always 0). `bench performance`'s cost is not measured when a response reported no
+    usage (`CostBenchmarkResult.ResponsesWithoutUsage`). HTML and PDF reports print "not priced"; Mission Control's
+    cost breakdown counts unpriced leaves (`unpricedCount`).
   - **Exit codes and exports (behaviour change):** `eval` (single run, `--runs`, `--metrics`, `--golden`), the calibrate
     commands and the composite `bench` commands exit **11** when nothing failed but something was not measured; they
     exited 0, 1 or 10. A refused red-team comparison exits 13. JUnit and TRX export a case with no verdict as an error

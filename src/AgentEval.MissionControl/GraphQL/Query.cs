@@ -502,6 +502,7 @@ public sealed partial class Query
         if (manifest is null) return null;
 
         double trivial = 0, low = 0, medium = 0, high = 0, unknown = 0, legacyFlat = 0;
+        int unpriced = 0;
 
         await foreach (var scenario in store.GetScenarioResultsAsync(runId, ct))
         {
@@ -515,7 +516,9 @@ public sealed partial class Query
             var tree = EvalResultPersistence.FromScenarioResult(scenario);
             if (tree is null)
             {
-                legacyFlat += scenario.EstimatedCost;
+                // Not priced is counted, never added as $0.
+                if (scenario.EstimatedCost is { } flatCost) legacyFlat += flatCost;
+                else unpriced++;
                 continue;
             }
 
@@ -523,7 +526,7 @@ public sealed partial class Query
             // Composites have EstimatedCost == 0; only LLM/code leaves carry real cost.
             // The tree is authoritative — supersedes scenario.EstimatedCost (which is
             // the root composite's provenance, often 0 for trees).
-            WalkAndAccumulate(tree, ref trivial, ref low, ref medium, ref high, ref unknown);
+            WalkAndAccumulate(tree, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced);
         }
 
         // Invariant: total = sum(byTier) + unknown + legacyFlat. Computed last so callers
@@ -535,7 +538,10 @@ public sealed partial class Query
             ByTier: new CostByTier(trivial, low, medium, high),
             UnknownKeyCost: unknown,
             LegacyFlatCost: legacyFlat,
-            FilteredOut: Array.Empty<string>());
+            FilteredOut: Array.Empty<string>())
+        {
+            UnpricedCount = unpriced,
+        };
     }
 
     /// <summary>Max recursion depth for tree walks — protects against
@@ -553,10 +559,28 @@ public sealed partial class Query
         ref double unknown,
         int depth = 0)
     {
+        int unpriced = 0;
+        WalkAndAccumulate(node, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced, depth);
+    }
+
+    /// <summary>As above, also counting the leaves whose cost was not priced (<see cref="EvalProvenance.EstimatedCost"/>
+    /// null) into <paramref name="unpriced"/>: they are counted, never summed as $0. A composite whose cost is null
+    /// because a part was not priced is not counted itself; its unpriced leaves are.</summary>
+    internal static void WalkAndAccumulate(
+        EvalResult node,
+        ref double trivial,
+        ref double low,
+        ref double medium,
+        ref double high,
+        ref double unknown,
+        ref int unpriced,
+        int depth = 0)
+    {
         if (depth > MaxTreeWalkDepth) return;
 
-        var cost = node.Provenance.EstimatedCost;
-        if (cost > 0)
+        if (node.Provenance.EstimatedCost is null && node.Details.SubResults is not { Count: > 0 })
+            unpriced++;
+        if (node.Provenance.EstimatedCost is double cost && cost > 0)
         {
             // Lookup by metric key. Unknown keys default to Medium per
             // EvaluatorCostMap.GetTier — but we want to flag them as
@@ -582,7 +606,7 @@ public sealed partial class Query
         {
             foreach (var child in children)
             {
-                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown, depth + 1);
+                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced, depth + 1);
             }
         }
     }

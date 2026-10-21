@@ -155,7 +155,9 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                     // Fallback: estimate tokens from text when provider doesn't return usage
                     // This is common with Azure OpenAI via MAF SDK
                     metrics.PromptTokens = ModelPricing.EstimatePromptTokens(null, testCase.Input);
-                    metrics.CompletionTokens = ModelPricing.EstimateTokensFromText(result.ActualOutput);
+                    // The response text, as the streaming path does: result.ActualOutput is not set until below, so
+                    // this estimated 0 completion tokens on every run and priced them.
+                    metrics.CompletionTokens = ModelPricing.EstimateTokensFromText(response.Text);
                     metrics.TokensAreEstimated = true;
                 }
                 

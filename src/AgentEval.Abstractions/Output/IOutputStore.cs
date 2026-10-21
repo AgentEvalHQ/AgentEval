@@ -104,6 +104,8 @@ public sealed record RedTeamCampaignContext(string Name, IReadOnlyList<SubjectId
 public sealed record RedTeamFindings(IReadOnlyList<object> Items);
 
 /// <summary>Result of a single scenario evaluation within a run.</summary>
+/// <remarks><see cref="EstimatedCost"/> is USD, or <see langword="null"/> when the scenario's cost was not priced
+/// (no usage reported, no rate for the model, or an unpriced part); 0 is a real cost of nothing.</remarks>
 public sealed record ScenarioResult(
     string Id,
     string Name,
@@ -114,7 +116,7 @@ public sealed record ScenarioResult(
     IReadOnlyDictionary<string, double> Metrics,
     IReadOnlyList<AssertionResult> Assertions,
     TimeSpan Duration,
-    double EstimatedCost)
+    double? EstimatedCost)
 {
     /// <summary>
     /// A stable digest of the stimulus in <see cref="Input"/>, or <see langword="null"/> when the

@@ -11,11 +11,11 @@ namespace AgentEval.Evals;
 /// <remarks>
 /// <para>
 /// Rates are USD per 1,000 tokens. The table covers common Azure OpenAI / OpenAI
-/// judge deployments shipped with the v0.8.1-beta benchmarks. Unknown model keys
-/// fall back to <see cref="DefaultInputRatePer1K"/> / <see cref="DefaultOutputRatePer1K"/>
-/// — a conservative gpt-4o-mini-grade rate that produces a useful order-of-magnitude
-/// signal rather than the misleading $0 the composite cost rollup currently sums to
-/// (v1.1 task 1.7 / 6-plan F-002).
+/// judge deployments shipped with the v0.8.1-beta benchmarks. A model the table does not
+/// know has no rate: <see cref="GetRate"/> and <see cref="EstimateCost"/> return
+/// <see langword="null"/> (not priced), as <c>ModelPricing</c> does. They used to fall back
+/// to a gpt-4o-mini rate, so an Ollama, Mistral or deployment-named judge was given a price
+/// nobody had set.
 /// </para>
 /// <para>
 /// Consumers shipping their own judge models can extend the table via
@@ -28,12 +28,6 @@ namespace AgentEval.Evals;
 /// </remarks>
 public static class JudgeCostMap
 {
-    /// <summary>Default input rate per 1,000 tokens (USD) when the model is unknown.</summary>
-    public const double DefaultInputRatePer1K = 0.00015;
-
-    /// <summary>Default output rate per 1,000 tokens (USD) when the model is unknown.</summary>
-    public const double DefaultOutputRatePer1K = 0.00060;
-
     /// <summary>Per-model pricing record. Rates are USD per 1,000 tokens.</summary>
     /// <param name="InputRatePer1K">USD per 1K input (prompt) tokens.</param>
     /// <param name="OutputRatePer1K">USD per 1K output (completion) tokens.</param>
@@ -65,8 +59,7 @@ public static class JudgeCostMap
         // Substring-matched, so "typesafe/jev-1.13-20260917" and "jev-latest" both resolve here.
         ["jev"]                      = new(0.000042, 0.0),
         // Bitdeer AI chat models (a GLM judge on Bitdeer): the prices bitdeer.ai/en/pricing/ai-models charged on
-        // 2026-10-21, sale prices where the page shows one. Until then these judges fell back to the gpt-4o-mini-grade
-        // default rate. ModelPricing has the list prices beside each row.
+        // 2026-10-21, sale prices where the page shows one. ModelPricing has the list prices beside each row.
         ["zai-org/GLM-5.3-Flash"]    = new(0.000083, 0.000275),
         ["zai-org/GLM-5.3"]          = new(0.00063, 0.00198),
         ["deepseek-ai/DeepSeek-V4.1-Flash"] = new(0.000144, 0.000576),
@@ -85,8 +78,8 @@ public static class JudgeCostMap
     /// <summary>
     /// Returns the per-1K input/output rates for <paramref name="judgeModel"/>.
     /// Tries an exact match first, then a substring match against registered keys.
-    /// Falls back to <see cref="DefaultInputRatePer1K"/> / <see cref="DefaultOutputRatePer1K"/>
-    /// when no match is found or when <paramref name="judgeModel"/> is null/whitespace.
+    /// Returns <see langword="null"/> when no match is found or when <paramref name="judgeModel"/>
+    /// is null/whitespace: an unknown model has no price, and none is made up.
     /// </summary>
     /// <param name="judgeModel">
     /// The judge model identifier as plumbed through <c>AtomicLlmEval.judgeModel</c>.
@@ -95,24 +88,25 @@ public static class JudgeCostMap
     /// <c>"gpt-4o-mini-2024-07-18"</c>.
     /// </param>
     /// <returns>
-    /// The matched <see cref="ModelRate"/>, or the default rate when <paramref name="judgeModel"/>
+    /// The matched <see cref="ModelRate"/>, or <see langword="null"/> when <paramref name="judgeModel"/>
     /// is null / whitespace / unknown.
     /// </returns>
-    public static ModelRate GetRate(string? judgeModel)
+    public static ModelRate? GetRate(string? judgeModel)
     {
         // ARC-07: exact-then-longest-substring match via the single shared matcher (same rule as
-        // ModelPricing.GetPricing — BUG-11), then fall back to the default rate on a miss (this table,
-        // unlike ModelPricing, never returns null — see DefaultInputRatePer1K remarks).
+        // ModelPricing.GetPricing — BUG-11). A miss is null, as in ModelPricing: not priced, never a default rate.
         return AgentEval.Models.ModelKeyMatcher.TryMatchLongestFirst(s_rates, judgeModel, out var rate)
             ? rate
-            : new ModelRate(DefaultInputRatePer1K, DefaultOutputRatePer1K);
+            : null;
     }
 
     internal static IEnumerable<KeyValuePair<string, ModelRate>> Rates => s_rates;
 
     /// <summary>
-    /// Returns <c>true</c> when <paramref name="judgeModel"/> has an explicit registration
-    /// (exact key) — useful for distinguishing fallback-priced runs from priced-as-configured runs.
+    /// Returns <c>true</c> when <paramref name="judgeModel"/> is itself a key of the table (exact key,
+    /// case-insensitive). It does not say whether the model is priced: <see cref="GetRate"/> also matches
+    /// substrings, so <c>"gpt-4o-mini-2024-07-18"</c> is priced while this returns <c>false</c>.
+    /// Test <c>GetRate(judgeModel) is not null</c> for that.
     /// </summary>
     /// <param name="judgeModel">The judge model identifier.</param>
     /// <returns><c>true</c> if registered; <c>false</c> when null, whitespace, or unknown.</returns>
@@ -133,16 +127,19 @@ public static class JudgeCostMap
 
     /// <summary>
     /// Computes the USD cost for the given input/output token counts at the rate registered
-    /// for <paramref name="judgeModel"/> (or the default rate when unknown).
+    /// for <paramref name="judgeModel"/>.
     /// </summary>
     /// <param name="judgeModel">The judge model identifier.</param>
     /// <param name="inputTokens">Input (prompt) token count.</param>
     /// <param name="outputTokens">Output (completion) token count.</param>
-    /// <returns>Estimated cost in USD. Returns 0 when both token counts are non-positive.</returns>
-    public static double EstimateCost(string? judgeModel, long inputTokens, long outputTokens)
+    /// <returns>
+    /// Estimated cost in USD; 0 when both token counts are non-positive (nothing was spent), and
+    /// <see langword="null"/> (not priced) when <paramref name="judgeModel"/> has no rate.
+    /// </returns>
+    public static double? EstimateCost(string? judgeModel, long inputTokens, long outputTokens)
     {
         if (inputTokens <= 0 && outputTokens <= 0) return 0;
-        var rate = GetRate(judgeModel);
+        if (GetRate(judgeModel) is not { } rate) return null;
         var inT = Math.Max(0, inputTokens);
         var outT = Math.Max(0, outputTokens);
         return (inT / 1000.0) * rate.InputRatePer1K + (outT / 1000.0) * rate.OutputRatePer1K;

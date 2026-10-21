@@ -69,7 +69,7 @@
         "judgePanelSize": { "type": ["integer", "null"], "minimum": 1 },
         "rubricDigest":  { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "tokensUsed":    { "type": ["integer", "null"] },
-        "estimatedCost": { "type": "number", "minimum": 0 },
+        "estimatedCost": { "type": ["number", "null"], "minimum": 0 },
         "cacheHit":      { "type": "boolean" }
       }
     },

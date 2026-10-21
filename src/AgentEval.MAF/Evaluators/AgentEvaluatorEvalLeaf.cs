@@ -129,9 +129,11 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
                 // Keep the provider's per-metric breakdown as a sub-tree so the hierarchy shows depth.
                 SubResults: tree.Details.SubResults,
                 AggregationStrategy: tree.Details.AggregationStrategy),
+            // The provider reports no usage here: its judge calls are not priced (null, never $0) — the bridged tree's
+            // own total, complete or absent.
             Provenance: new EvalProvenance(
                 Type: "atomic-llm", JudgeModel: _judgeModel, PromptId: null, PromptHash: null,
-                TokensUsed: null, EstimatedCost: 0, CacheHit: false),
+                TokensUsed: null, EstimatedCost: tree.Provenance.EstimatedCost, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -142,7 +144,8 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
         Metric: new EvalMetadata(Key, Name, Category, Version),
         Score: new EvalScore(0.0, Ordinal: null, Label: "error", Passed: false, Threshold: _threshold, Severity: "none", Confidence: null),
         Details: new EvalDetails(null, new[] { new EvalEvidence("provider", Key, reason) }, null, null, null),
-        Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, 0, false),
+        // What a failed provider run spent is unknown: not priced (null), never $0.
+        Provenance: new EvalProvenance("atomic-llm", _judgeModel, null, null, null, null, false),
         EvaluatedAt: DateTimeOffset.UtcNow);
 
     // A provider that was intentionally skipped (e.g. known-bug bypass) is surfaced as a neutral

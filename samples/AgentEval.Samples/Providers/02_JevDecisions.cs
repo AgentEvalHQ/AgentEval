@@ -263,7 +263,7 @@ public static class JevDecisionsDemo
                     SampleOutcome.Fail($"{c.Id}: expected the eval to {(c.ExpectPass ? "pass" : "fail")} it, it {(r.Score.Passed ? "passed" : "failed")} it (P(yes) = {p:F3})");
                 break;
         }
-        Console.WriteLine($"     provenance   : [{r.Provenance.Type}] model={r.Provenance.JudgeModel}  tokens={r.Provenance.TokensUsed}  cost=${cost:F7}  confidence={(r.Score.Confidence is null ? "null (noul carries none)" : r.Score.Confidence.Value.ToString("F3"))}");
+        Console.WriteLine($"     provenance   : [{r.Provenance.Type}] model={r.Provenance.JudgeModel}  tokens={r.Provenance.TokensUsed}  cost={(cost is { } usd ? $"${usd:F7}" : "not priced")}  confidence={(r.Score.Confidence is null ? "null (noul carries none)" : r.Score.Confidence.Value.ToString("F3"))}");
         Console.WriteLine();
     }
 

@@ -193,8 +193,9 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
             recommendations = recommendations is null ? [note] : [.. recommendations, note];
         }
 
-        var cost = panelResults.Sum(r => r.Provenance.EstimatedCost)
-                 + (adjudicatorResult?.Provenance.EstimatedCost ?? 0.0);
+        // Panel plus adjudicator, complete or absent: one judge that was not priced makes the total null. A nullable Sum
+        // skipped it, and the adjudicator's missing cost read as $0.
+        var cost = CostRollup.Aggregate(allSubResults).EstimatedCost;
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
@@ -239,7 +240,7 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 Summary = note,
             },
             Provenance: new("multi-judge-adjudicated", null, null, null, null,
-                panelResults.Sum(r => r.Provenance.EstimatedCost), false) { JudgePanelSize = _judges.Count },
+                CostRollup.Aggregate(panelResults).EstimatedCost, false) { JudgePanelSize = _judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -260,7 +261,7 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 Summary = note,
             },
             Provenance: new("multi-judge-adjudicated", null, null, null, null,
-                panelResults.Sum(r => r.Provenance.EstimatedCost), false) { JudgePanelSize = _judges.Count },
+                CostRollup.Aggregate(panelResults).EstimatedCost, false) { JudgePanelSize = _judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

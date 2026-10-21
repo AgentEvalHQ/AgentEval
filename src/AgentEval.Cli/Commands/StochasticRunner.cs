@@ -67,7 +67,8 @@ internal static class StochasticBenchRunner
             {
                 Summary = note,
             },
-            Provenance: new("composite", null, null, null, null, results.Sum(r => r.Provenance.EstimatedCost), false),
+            // Complete or absent: a nullable Sum skipped a trial that was not priced and read as the runs' cost.
+            Provenance: new("composite", null, null, null, null, CostRollup.Aggregate(results).EstimatedCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -86,7 +87,7 @@ internal static class StochasticBenchRunner
         {
             Score = score,
             Details = new EvalDetails(null, null, null, rollups, "MajorityVote") { Summary = note },
-            Provenance = new EvalProvenance("composite", null, null, null, null, trials.Sum(t => t.Provenance.EstimatedCost), false),
+            Provenance = new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(trials).EstimatedCost, false),
             EvaluatedAt = DateTimeOffset.UtcNow,
         };
     }

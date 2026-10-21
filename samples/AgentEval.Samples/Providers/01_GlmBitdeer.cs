@@ -120,14 +120,14 @@ public static class GlmBitdeerProviderDemo
             name: agentName,
             systemPrompt: "You answer questions using ONLY the ledger extract in the user message. Be brief.");
 
-        // When the run is not priced, the in-memory results carry EstimatedCost = 0, which EvalProvenance
-        // cannot distinguish from "free". This sample persists nothing, prints "not priced" instead of
-        // a dollar figure, and says so here; a run that must be persisted should set the price variables.
-        Func<string?, JudgeCostMap.ModelRate> rate = price is { } pr
+        // When the run is not priced, no rate resolver is passed and the judge leaf's EstimatedCost is null (not
+        // priced) unless JudgeCostMap has a row for the model: EvalProvenance says "not priced", never $0. This
+        // sample prints "not priced" instead of a dollar figure.
+        Func<string?, JudgeCostMap.ModelRate>? rate = price is { } pr
             ? _ => new JudgeCostMap.ModelRate(pr.InputPer1K, pr.OutputPer1K)
-            : _ => new JudgeCostMap.ModelRate(0, 0);
+            : null;
         if (price is null)
-            Console.WriteLine("   ⚠ Unpriced run: EstimatedCost in the in-memory results is 0 because no rate is known, not because the calls were free. Nothing is persisted.\n");
+            Console.WriteLine("   ⚠ Unpriced run: the judge's EstimatedCost is null (not priced) because no rate is known; it is not $0.\n");
 
         // One judge leaf for every case: AtomicLlmEval passes EvalInput.Context to its judge, so the ledger
         // reaches it from the input rather than from a per-case wrapper. (It did not always: this sample used
@@ -166,7 +166,7 @@ public static class GlmBitdeerProviderDemo
         }
 
         var totalTokens = 0L;
-        var totalCost = 0.0;
+        double? totalCost = 0.0; // complete or absent: one unpriced leaf makes it null
         for (var i = 0; i < Cases.Length; i++)
         {
             var c = Cases[i];
@@ -211,11 +211,11 @@ public static class GlmBitdeerProviderDemo
             foreach (var leaf in result.Details.SubResults ?? [])
             {
                 totalTokens += leaf.Provenance.TokensUsed ?? 0;
-                totalCost += leaf.Provenance.EstimatedCost;
+                totalCost = totalCost is { } sum && leaf.Provenance.EstimatedCost is { } leafCost ? sum + leafCost : null;
             }
         }
 
-        Console.WriteLine($"   Σ judge tokens: {totalTokens:N0}   Σ judge cost: {(price is null ? "not priced" : $"${totalCost:F6}")}\n");
+        Console.WriteLine($"   Σ judge tokens: {totalTokens:N0}   Σ judge cost: {(totalCost is { } tc ? $"${tc:F6}" : "not priced")}\n");
         PrintTakeaways(dryRun: false);
     }
 
@@ -239,7 +239,7 @@ public static class GlmBitdeerProviderDemo
     {
         foreach (var leaf in result.Details.SubResults ?? [])
         {
-            var cost = priced ? $"  ${leaf.Provenance.EstimatedCost:F6}" : "";
+            var cost = leaf.Provenance.EstimatedCost is { } c ? (priced ? $"  ${c:F6}" : "") : "  not priced";
             var tokens = leaf.Provenance.TokensUsed is { } t ? $"  {t} tok" : "";
             var judge = leaf.Provenance.JudgeModel is { } j ? $"  judge={j}" : "";
             Console.WriteLine($"{indent}├─ {leaf.Metric.Key,-24} {leaf.Score.Value:F3} {leaf.Score.Label,-5} [{leaf.Provenance.Type}]{judge}{tokens}{cost}");

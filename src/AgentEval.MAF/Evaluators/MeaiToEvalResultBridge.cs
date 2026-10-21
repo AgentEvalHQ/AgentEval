@@ -196,7 +196,9 @@ public static class MeaiToEvalResultBridge
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0,
+                // MEAI hands this bridge no usage: an LLM-judged metric is not priced (null, never $0); a code metric
+                // spent nothing.
+                EstimatedCost: isLlm ? null : 0,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
@@ -218,7 +220,7 @@ public static class MeaiToEvalResultBridge
                 SubResults: null,
                 AggregationStrategy: null) { Summary = message },
             Provenance: new EvalProvenance(isLlm ? "atomic-llm" : "atomic-code", isLlm ? judgeModel : null,
-                null, null, null, 0, false),
+                null, null, null, isLlm ? null : 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -248,7 +250,7 @@ public static class MeaiToEvalResultBridge
                 Recommendations: null,
                 SubResults: subs,
                 AggregationStrategy: "mean-of-measured"),
-            Provenance: new EvalProvenance("composite", null, null, null, null, 0, false),
+            Provenance: new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(subs).EstimatedCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

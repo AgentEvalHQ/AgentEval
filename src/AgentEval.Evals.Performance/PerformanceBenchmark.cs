@@ -351,6 +351,7 @@ public class PerformanceBenchmark
         var results = new List<(string Prompt, AgentResponse Response)>();
         var totalInputTokens = 0;
         var totalOutputTokens = 0;
+        var responsesWithoutUsage = 0;
         var errors = new List<Exception>();
 
         foreach (var prompt in prompts)
@@ -364,6 +365,10 @@ public class PerformanceBenchmark
                 {
                     totalInputTokens += response.TokenUsage.InputTokens;
                     totalOutputTokens += response.TokenUsage.OutputTokens;
+                }
+                else
+                {
+                    responsesWithoutUsage++;
                 }
             }
             catch (Exception ex)
@@ -404,8 +409,16 @@ public class PerformanceBenchmark
                 "Check PerformanceBenchmarkEvaluateOptions.CostModelName for a typo (e.g. 'gpt-4o', not 'gpt4o'), " +
                 "pass a known model id, or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
         }
+        else if (responsesWithoutUsage > 0)
+        {
+            LogWarning(
+                $"[perf-cost] WARNING: {responsesWithoutUsage} of {results.Count} responses reported no token usage. " +
+                "Cost is not measured: their tokens are unknown, not zero, so no cost is reported and the cost check is skipped.");
+        }
 
-        var estimatedCost = pricing != null
+        // Not measured is null, never $0: no price for the model, no prompt that returned (nothing to price), or a
+        // response that reported no usage (its tokens are unknown, so the total would be priced short).
+        var estimatedCost = pricing != null && results.Count > 0 && responsesWithoutUsage == 0
             ? (totalInputTokens / 1_000_000m * pricing.Value.InputPricePerMillion) +
               (totalOutputTokens / 1_000_000m * pricing.Value.OutputPricePerMillion)
             : (decimal?)null;
@@ -420,6 +433,7 @@ public class PerformanceBenchmark
             TotalInputTokens = totalInputTokens,
             TotalOutputTokens = totalOutputTokens,
             TotalTokens = totalInputTokens + totalOutputTokens,
+            ResponsesWithoutUsage = responsesWithoutUsage,
             EstimatedCostUSD = estimatedCost,
             AverageInputTokensPerPrompt = results.Count > 0
                 ? (double)totalInputTokens / results.Count
@@ -718,11 +732,15 @@ public class PerformanceBenchmark
     {
         if (r.EstimatedCostUSD is null || r.SuccessfulPrompts == 0)
         {
-            // No price for the model, or no prompt returned: the cost was not measured. Skipped, so it neither passes
-            // nor counts toward the composite, and no $0 is reported. The token counts were measured and are kept.
+            // No prompt returned, a response reported no usage, or no price for the model: the cost was not measured.
+            // Skipped, so it neither passes nor counts toward the composite, and no $0 is reported. The token counts
+            // that were reported are kept.
             var reason = r.SuccessfulPrompts == 0
                 ? $"Cost not measured: none of {r.TotalPrompts} prompts returned ({r.Errors.Count} errors), so there is " +
                   "no usage to price."
+                : r.ResponsesWithoutUsage > 0
+                ? $"Cost not measured: {r.ResponsesWithoutUsage} of {r.SuccessfulPrompts} responses reported no token " +
+                  "usage, so their tokens are unknown (not zero). Use an agent whose provider reports usage."
                 : $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
                   "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
             return new EvalResult(
@@ -954,6 +972,14 @@ public class CostBenchmarkResult
     public int TotalInputTokens { get; init; }
     public int TotalOutputTokens { get; init; }
     public int TotalTokens { get; init; }
+
+    /// <summary>Successful responses that reported no token usage. Any makes the cost not measured.</summary>
+    public int ResponsesWithoutUsage { get; init; }
+
+    /// <summary>
+    /// Estimated cost in USD, or <see langword="null"/> when not measured: no price for the model, no prompt
+    /// returned, or a response reported no usage. Never $0 for "not measured".
+    /// </summary>
     public decimal? EstimatedCostUSD { get; init; }
     
     public double AverageInputTokensPerPrompt { get; init; }
@@ -964,5 +990,5 @@ public class CostBenchmarkResult
         $"  Prompts: {SuccessfulPrompts}/{TotalPrompts}\n" +
         $"  Tokens: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens} total\n" +
         $"  Avg per prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
-        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: Unknown pricing");
+        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: not measured (no price, no usage reported, or no prompt returned)");
 }

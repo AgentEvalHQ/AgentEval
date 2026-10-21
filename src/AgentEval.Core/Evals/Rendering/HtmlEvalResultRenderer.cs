@@ -191,8 +191,11 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
                 WriteMetaPair(sb, "Prompt", node.Provenance.PromptId!);
             if (node.Provenance.TokensUsed is { } tokens)
                 WriteMetaPair(sb, "Tokens", tokens.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            if (node.Provenance.EstimatedCost > 0)
-                WriteMetaPair(sb, "Est. cost (USD)", node.Provenance.EstimatedCost.ToString("F4", System.Globalization.CultureInfo.InvariantCulture));
+            // Not priced (null) is said, never hidden like a free check's 0 — and never printed as $0.
+            if (node.Provenance.EstimatedCost is null)
+                WriteMetaPair(sb, "Est. cost (USD)", "not priced");
+            else if (node.Provenance.EstimatedCost is double cost and > 0)
+                WriteMetaPair(sb, "Est. cost (USD)", cost.ToString("F4", System.Globalization.CultureInfo.InvariantCulture));
             WriteMetaPair(sb, "Cache hit", node.Provenance.CacheHit ? "yes" : "no");
             sb.Append("</dl>\n</div>\n");
         }

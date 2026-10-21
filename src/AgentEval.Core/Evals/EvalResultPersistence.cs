@@ -108,7 +108,7 @@ public static class EvalResultPersistence
                 ?? AgentEval.Assertions.AgentEvalScope.Current?.Results
                 ?? Array.Empty<AssertionResult>(),
             Duration: TimeSpan.Zero,
-            EstimatedCost: result.Provenance.EstimatedCost)
+            EstimatedCost: result.Provenance.EstimatedCost) // null stays null: not priced, never $0
         {
             // Null when no input was supplied — and null must be read as "nobody computed one",
             // never as "the inputs match". StimulusHash.SameStimulus refuses a null on either side

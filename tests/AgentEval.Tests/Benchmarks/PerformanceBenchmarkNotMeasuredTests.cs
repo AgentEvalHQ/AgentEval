@@ -94,6 +94,58 @@ public class PerformanceBenchmarkNotMeasuredTests
         Assert.True(result.Details.Dimensions!.ContainsKey("p99_ms"));
     }
 
+    [Fact]
+    public async Task EveryCallFails_TheCostResultIsNotMeasured_NotZero()
+    {
+        // The leaf was already skipped, but the public result still said $0 for a run that priced nothing.
+        var cost = await Benchmark(new FailingAgent(failFirst: int.MaxValue)).RunCostBenchmarkAsync(["hi", "there"], "gpt-4o");
+
+        Assert.Equal(0, cost.SuccessfulPrompts);
+        Assert.Null(cost.EstimatedCostUSD);
+    }
+
+    [Fact]
+    public async Task ResponsesWithoutUsage_CostIsNotMeasured_NotAZeroDollarPass()
+    {
+        // T13-7 item 3: a priced model whose responses carry no usage priced 0 tokens: $0, and the cost leaf read PASS 1.0.
+        var agent = new NoUsageAgent();
+
+        var cost = await Benchmark(agent).RunCostBenchmarkAsync(["hi"], "gpt-4o");
+        var result = await Benchmark(agent).EvaluateAsync(new EvalInput("hi"));
+
+        Assert.Null(cost.EstimatedCostUSD);
+        Assert.Equal(1, cost.ResponsesWithoutUsage);
+        var leaf = result.Details.SubResults!.Single(r => r.Metric.Key == "perf_cost");
+        Assert.Equal("skipped", leaf.Score.Label);
+        Assert.False(leaf.Score.Passed);
+        Assert.False(leaf.Score.CountsTowardAggregate());
+        Assert.False(leaf.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.Contains("reported no token usage", leaf.Details.Recommendations![0]);
+    }
+
+    [Fact]
+    public async Task UsageReported_CostIsMeasured()
+    {
+        // Guard: a response with usage on a priced model is priced, and the leaf scores it.
+        var cost = await Benchmark(new FailingAgent(failFirst: 0)).RunCostBenchmarkAsync(["hi"], "gpt-4o");
+        var result = await Benchmark(new FailingAgent(failFirst: 0)).EvaluateAsync(new EvalInput("hi"));
+
+        Assert.NotNull(cost.EstimatedCostUSD);
+        Assert.Equal(0, cost.ResponsesWithoutUsage);
+        var leaf = result.Details.SubResults!.Single(r => r.Metric.Key == "perf_cost");
+        Assert.NotEqual("skipped", leaf.Score.Label);
+        Assert.True(leaf.Details.Dimensions!.ContainsKey("cost_usd"));
+    }
+
+    /// <summary>Answers every call, on a priced model, without reporting token usage.</summary>
+    private sealed class NoUsageAgent : IEvaluableAgent
+    {
+        public string Name => "NoUsageAgent";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AgentResponse { Text = "ok", ModelId = "gpt-4o", TokenUsage = null });
+    }
+
     /// <summary>Fails its first <c>failFirst</c> calls (an unreachable endpoint), then answers with usage.</summary>
     private sealed class FailingAgent(int failFirst) : IEvaluableAgent
     {

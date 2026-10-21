@@ -11,7 +11,7 @@ namespace AgentEval.MissionControl.GraphQL;
 /// Per-cost-tier breakdown of a run's estimated cost. Drives the
 /// <c>&lt;CostTierBreakdownChart/&gt;</c> stacked bar in plan-07 §10.
 /// </summary>
-/// <param name="TotalCost">Sum of <see cref="EvalProvenance.EstimatedCost"/> across every leaf in the recursive <c>EvalResult</c> tree of every scenario.</param>
+/// <param name="TotalCost">Sum of <see cref="EvalProvenance.EstimatedCost"/> across every leaf in the recursive <c>EvalResult</c> tree of every scenario. Priced costs only: when <see cref="UnpricedCount"/> is above 0, some leaves were not priced and this is not the run's full cost.</param>
 /// <param name="ByTier">Per-cost-tier sub-totals. The four tiers always appear; tiers with zero cost have value 0.</param>
 /// <param name="UnknownKeyCost">Sum of leaf costs whose evaluator key did not resolve in <see cref="EvaluatorCostMap"/> — informational, surfaced separately so users notice unregistered evaluators ("modern entries without category mapping").</param>
 /// <param name="LegacyFlatCost">Sum of scenario costs from PRE-v0.8.1-beta evidence that lacks a recursive <c>EvalResult</c> tree (the Output field is a flat agent response rather than a structured composite). These scenarios cannot be attributed per-leaf because the tier-aware path requires the tree shape; surfaced separately so operators can see how much of the total is "blind" cost from the legacy serializer. T3.5.</param>
@@ -21,7 +21,15 @@ public sealed record RunCostBreakdown(
     CostByTier ByTier,
     double UnknownKeyCost,
     double LegacyFlatCost,
-    IReadOnlyList<string> FilteredOut);
+    IReadOnlyList<string> FilteredOut)
+{
+    /// <summary>
+    /// Leaves (and flat scenarios) whose cost was not priced: no usage reported, or no rate for the model. They are
+    /// counted here, never summed as $0, so when this is above 0 <see cref="TotalCost"/> is the priced part only, not
+    /// the run's cost.
+    /// </summary>
+    public int UnpricedCount { get; init; }
+}
 
 /// <summary>Tier-keyed cost sub-totals.</summary>
 public sealed record CostByTier(

@@ -383,9 +383,13 @@ internal static class JudgeVsJudgeDemo
         var latencies = jevTraces.Select(t => (double)t.LatencyMs).OrderBy(x => x).ToList();
         var jevIn = jevTraces.Sum(t => t.InputTokens);
         var jevOut = jevTraces.Sum(t => t.OutputTokens);
-        // Provider-reported cost when it exists (OpenRouter); otherwise the repo's one price table, keyed by the requested model.
-        var jevCost = jevTraces.Any(t => t.Cost is not null) ? jevTraces.Sum(t => t.Cost ?? 0) : JudgeCostMap.EstimateCost(jevOptions.Model, jevIn, jevOut);
-        var jevCostPerCase = comparable.Count(r => r.Arm == "B") is var nB && nB > 0 ? jevCost / nB : 0;
+        // Provider-reported cost when every request reported one (OpenRouter); otherwise the repo's one price table, keyed
+        // by the requested model, which is null (not priced) for a model it has no rate for. A request with no reported
+        // cost is never summed as $0.
+        double? jevCost = jevTraces.Count > 0 && jevTraces.All(t => t.Cost is not null)
+            ? jevTraces.Sum(t => t.Cost!.Value)
+            : JudgeCostMap.EstimateCost(jevOptions.Model, jevIn, jevOut);
+        double? jevCostPerCase = comparable.Count(r => r.Arm == "B") is var nB && nB > 0 ? jevCost / nB : null;
 
         // Negated vs positive criteria on pass-labelled cases (H7)
         var passInputs = comparable.Where(r => r.Arm == "B" && r.ExpectedVerdict == "pass").Select(r => (r.Input, r.Output)).ToHashSet();
@@ -433,7 +437,7 @@ internal static class JudgeVsJudgeDemo
 
     private static IReadOnlyList<HypothesisRow> Hypotheses(
         IReadOnlyList<GroupSummaryRow> byFile, GroupSummaryRow overall, IReadOnlyList<CaseRecord> comparable, Arm[] arms,
-        IReadOnlyDictionary<string, double?> flips, IReadOnlyList<double> jevLatencies, double jevCostPerCase,
+        IReadOnlyDictionary<string, double?> flips, IReadOnlyList<double> jevLatencies, double? jevCostPerCase,
         IReadOnlyList<double> negated, IReadOnlyList<double> positive, int repeats)
     {
         var rows = new List<HypothesisRow>();
@@ -506,7 +510,7 @@ internal static class JudgeVsJudgeDemo
             {
                 var p50 = Percentile(jevLatencies, 0.5); var p90 = Percentile(jevLatencies, 0.9);
                 var verdict = p50 < 400 && p90 < 800 && jevCostPerCase < 0.0002 ? "confirmed" : (p50 > 600 || jevCostPerCase > 0.0005) ? "refuted" : "open";
-                rows.Add(new("H5", verdict, $"Jev per request p50 {p50:N0} ms, p90 {p90:N0} ms; est. cost per case ${jevCostPerCase:F6} at list price (confirm: <400 / <800 / <$0.0002)"));
+                rows.Add(new("H5", verdict, $"Jev per request p50 {p50:N0} ms, p90 {p90:N0} ms; est. cost per case {Usd(jevCostPerCase, "F6")} at list price (confirm: <400 / <800 / <$0.0002)"));
             }
         }
         // H6 — repeat stability
@@ -547,7 +551,7 @@ internal static class JudgeVsJudgeDemo
         Console.WriteLine();
         if (!double.IsNaN(report.JudgeAgreement)) Console.WriteLine($"   judge-vs-judge agreement (same label on the same case): {report.JudgeAgreement:P1}");
         foreach (var (arm, flip) in report.FlipsByArm) if (flip is { } f) Console.WriteLine($"   verdict flips across repeats, arm {arm}: {f:P1}");
-        Console.WriteLine($"   Jev requests {report.JevRequests:N0}   p50 {report.JevP50Ms:N0} ms   p90 {report.JevP90Ms:N0} ms   tokens {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out   est. ${report.JevCost:F4} total, ${report.JevCostPerCase:F6}/case   models echoed: {string.Join(", ", report.JevModels)}");
+        Console.WriteLine($"   Jev requests {report.JevRequests:N0}   p50 {report.JevP50Ms:N0} ms   p90 {report.JevP90Ms:N0} ms   tokens {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out   est. {Usd(report.JevCost, "F4")} total, {Usd(report.JevCostPerCase, "F6")}/case   models echoed: {string.Join(", ", report.JevModels)}");
         Console.WriteLine();
         Console.WriteLine("   Hypotheses (pre-registered in the Jev factsheet §7):");
         foreach (var h in report.Hypotheses)
@@ -603,7 +607,7 @@ internal static class JudgeVsJudgeDemo
         md.AppendLine();
         if (!double.IsNaN(report.JudgeAgreement)) md.AppendLine($"Judge-vs-judge agreement: {report.JudgeAgreement:P1}. " + string.Join(" ", report.FlipsByArm.Where(kv => kv.Value is not null).Select(kv => $"Flips across repeats, arm {kv.Key}: {kv.Value:P1}.")));
         md.AppendLine();
-        md.AppendLine($"Jev: {report.JevRequests} requests, p50 {report.JevP50Ms:N0} ms, p90 {report.JevP90Ms:N0} ms, {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out, est. ${report.JevCost:F4} (${report.JevCostPerCase:F6}/case), models echoed: {string.Join(", ", report.JevModels)}");
+        md.AppendLine($"Jev: {report.JevRequests} requests, p50 {report.JevP50Ms:N0} ms, p90 {report.JevP90Ms:N0} ms, {report.JevInputTokens:N0} in / {report.JevOutputTokens:N0} out, est. {Usd(report.JevCost, "F4")} ({Usd(report.JevCostPerCase, "F6")}/case), models echoed: {string.Join(", ", report.JevModels)}");
         md.AppendLine();
         md.AppendLine("| hypothesis | verdict | detail |");
         md.AppendLine("|---|---|---|");
@@ -712,11 +716,14 @@ internal static class JudgeVsJudgeDemo
     private sealed record ArmStatsRow(int N, int Errors, double Accuracy, double Kappa, double FalsePass, double FalseFail, double WithinBand, double Brier, double BrierOnRight, double SharpWhenWrong, double P50Ms, double P90Ms, int Tokens);
     private sealed record GroupSummaryRow(string Name, int N, IReadOnlyDictionary<string, ArmStatsRow> Arms);
     private sealed record HypothesisRow(string Id, string Verdict, string Detail);
+    // A cost nobody priced reads "not priced", never "$" followed by nothing or $0.
+    private static string Usd(double? value, string format) => value is { } v ? "$" + v.ToString(format) : "not priced";
+
     private sealed record Report(
         GroupSummaryRow Overall, IReadOnlyList<GroupSummaryRow> ByFile, IReadOnlyList<GroupSummaryRow> ByKey, int Excluded,
         IReadOnlyList<string> UndispatchedKeys, int UndispatchedCases, double JudgeAgreement,
         IReadOnlyDictionary<string, double?> FlipsByArm, double JevP50Ms, double JevP90Ms, int JevRequests, long JevInputTokens, long JevOutputTokens,
-        double JevCost, double JevCostPerCase, IReadOnlyList<string> JevModels, int NegatedCriteria, int PositiveCriteria, IReadOnlyList<HypothesisRow> Hypotheses);
+        double? JevCost, double? JevCostPerCase, IReadOnlyList<string> JevModels, int NegatedCriteria, int PositiveCriteria, IReadOnlyList<HypothesisRow> Hypotheses);
 
     private sealed record N3Options(int Repeats, int? Limit, string[]? Files, int Parallel, string? OutDir, string? GoldenDir, string[] Arms)
     {

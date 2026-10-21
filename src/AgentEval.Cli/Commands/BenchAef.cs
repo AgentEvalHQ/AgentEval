@@ -147,7 +147,8 @@ internal static class BenchAef
                 // No severity: the benchmark grades a score, it does not say how bad a low one is.
                 new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, label == "pass" ? "none" : "", null),
                 new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
+                // A category the benchmark's judge graded is not priced here (null, never $0); a skipped one spent nothing.
+                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, c.Skipped ? 0 : null, false),
                 DateTimeOffset.UtcNow);
         }).ToList();
         // One case, the benchmark, with its categories as weighted parts below it: the weights reach the run as each
@@ -161,7 +162,7 @@ internal static class BenchAef
                 Measurement = incomplete ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
             new EvalDetails(null, null, null, categories, "WeightedSum"),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(categories).EstimatedCost, false),
             DateTimeOffset.UtcNow);
         var root = new EvalResult(benchmark.Metric, benchmark.Score, new EvalDetails(null, null, null, [benchmark], null), benchmark.Provenance, DateTimeOffset.UtcNow);
         return (root, new AefComponentShape(1, true, "Averaged",
@@ -191,7 +192,8 @@ internal static class BenchAef
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
                 new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
+                // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
+                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, q.JudgeLlmCallCount > 0 ? null : 0, false),
                 DateTimeOffset.UtcNow);
         }).ToList();
         // No accuracy means no question was scored, and an INCONCLUSIVE verdict (nothing scored, or an interrupted run)
@@ -204,7 +206,7 @@ internal static class BenchAef
                 Measurement = scored ? AgentEval.Evals.Meta.MeasurementState.Measured : AgentEval.Evals.Meta.MeasurementState.NotMeasured,
             },
             new EvalDetails(null, null, null, questions, null),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(questions).EstimatedCost, false),
             DateTimeOffset.UtcNow);
     }
 
@@ -376,7 +378,8 @@ internal static class BenchAef
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
                 new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
+                // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
+                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, q.JudgeLlmCallCount > 0 ? null : 0, false),
                 DateTimeOffset.UtcNow);
         }).ToList();
         var root = new EvalResult(
@@ -386,7 +389,7 @@ internal static class BenchAef
                 Measurement = overallScore is null ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
             new EvalDetails(null, null, null, questions, null),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(questions).EstimatedCost, false),
             DateTimeOffset.UtcNow);
         return (root, ext);
     }

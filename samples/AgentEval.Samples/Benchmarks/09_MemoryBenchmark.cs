@@ -319,7 +319,7 @@ public static class MemoryBenchmarkSample
                     PromptId: null,
                     PromptHash: null,
                     TokensUsed: null,
-                    EstimatedCost: 0,
+                    EstimatedCost: null, // the category's judge calls are not priced here: null, never $0
                     CacheHit: false),
                 EvaluatedAt: now));
         }
@@ -364,7 +364,7 @@ public static class MemoryBenchmarkSample
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0,
+                EstimatedCost: CostRollup.Aggregate(categoryNodes).EstimatedCost, // complete or absent
                 CacheHit: false),
             EvaluatedAt: now);
     }

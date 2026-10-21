@@ -238,8 +238,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                     col.Item().Text($"Prompt ID: {leaf.Provenance.PromptId}").FontSize(10);
                 if (leaf.Provenance.TokensUsed is { } tokens)
                     col.Item().Text($"Tokens: {tokens}").FontSize(10);
-                if (leaf.Provenance.EstimatedCost > 0)
-                    col.Item().Text($"Est. cost (USD): {leaf.Provenance.EstimatedCost:F4}").FontSize(10);
+                // Not priced (null) is said, never hidden like a free check's 0 and never printed as $0.
+                if (leaf.Provenance.EstimatedCost is null)
+                    col.Item().Text("Est. cost (USD): not priced").FontSize(10);
+                else if (leaf.Provenance.EstimatedCost is double cost && cost > 0)
+                    col.Item().Text($"Est. cost (USD): {cost:F4}").FontSize(10);
                 col.Item().Text($"Cache hit: {(leaf.Provenance.CacheHit ? "yes" : "no")}").FontSize(10);
             }
 

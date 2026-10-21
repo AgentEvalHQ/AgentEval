@@ -18,6 +18,9 @@ internal class MockTestableAgent : IEvaluableAgent
     private readonly (string Name, Dictionary<string, object?> Args)[] _toolCalls;
     
     public string Name { get; }
+
+    /// <summary>The usage each response reports; null (the default) reports none, so a cost cannot be measured.</summary>
+    public TokenUsage? TokenUsage { get; init; }
     
     public MockTestableAgent(
         string name, 
@@ -62,7 +65,8 @@ internal class MockTestableAgent : IEvaluableAgent
         return Task.FromResult(new AgentResponse
         {
             Text = _responseText,
-            RawMessages = messages
+            RawMessages = messages,
+            TokenUsage = TokenUsage
         });
     }
 }

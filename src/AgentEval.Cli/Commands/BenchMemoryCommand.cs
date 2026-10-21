@@ -230,7 +230,8 @@ public static class BenchMemoryCommand
                     },
                     Assertions: [],
                     Duration: category.Duration,
-                    EstimatedCost: 0.0), ct);
+                    // The category's judge calls are not priced: null (not priced), never $0; a skipped one spent nothing.
+                    EstimatedCost: category.Skipped ? 0.0 : null), ct);
             }
 
             await store.CompleteRunAsync(manifest, summary, ct);

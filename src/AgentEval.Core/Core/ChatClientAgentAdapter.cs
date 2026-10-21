@@ -110,11 +110,8 @@ public class ChatClientAgentAdapter
                 {
                     if (content is UsageContent usage)
                     {
-                        capturedUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.Details.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.Details.OutputTokenCount ?? 0)
-                        };
+                        // Null unless both counts were reported: a missing count is not 0.
+                        capturedUsage = TokenUsageMapping.FromUsage(usage.Details);
                     }
                     else if (content is FunctionCallContent call)
                     {
@@ -298,15 +295,6 @@ public class ChatClientAgentAdapter
         return messages;
     }
 
-    private static TokenUsage? ConvertTokenUsage(UsageDetails? usage)
-    {
-        if (usage == null)
-            return null;
-
-        return new TokenUsage
-        {
-            PromptTokens = (int)(usage.InputTokenCount ?? 0),
-            CompletionTokens = (int)(usage.OutputTokenCount ?? 0)
-        };
-    }
+    // Null unless both counts were reported: a missing count is not 0 (TokenUsageMapping).
+    private static TokenUsage? ConvertTokenUsage(UsageDetails? usage) => TokenUsageMapping.FromUsage(usage);
 }

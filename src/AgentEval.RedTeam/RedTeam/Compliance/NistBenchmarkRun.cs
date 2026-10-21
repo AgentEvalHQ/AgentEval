@@ -250,7 +250,8 @@ public sealed class NistBenchmarkRun
                 Summary = withheldNote,
             },
             // The judge model only when one graded the attacks (WithJudge); never the unused IEvaluator.
-            Provenance: new("composite", judgeModel, null, null, null, 0.0, false),
+            // Complete or absent: null when a judge graded any leaf (its calls are not priced here), never $0.
+            Provenance: new("composite", judgeModel, null, null, null, CostRollup.Aggregate(leaves).EstimatedCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

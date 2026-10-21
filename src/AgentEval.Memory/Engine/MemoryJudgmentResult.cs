@@ -47,4 +47,21 @@ public class MemoryJudgmentResult
     /// Number of tokens used for this judgment.
     /// </summary>
     public int TokensUsed { get; init; }
+
+    /// <summary>
+    /// Input tokens the provider reported for the judge call; <see langword="null"/> when it did not report both counts
+    /// (<see cref="TokensUsed"/> is then an estimate, and the call is not priced).
+    /// </summary>
+    public int? InputTokens { get; init; }
+
+    /// <summary>
+    /// Output tokens the provider reported for the judge call; <see langword="null"/> when it did not report both counts.
+    /// </summary>
+    public int? OutputTokens { get; init; }
+
+    /// <summary>
+    /// The model that answered the judge call (the response's model id, else the client's default), when known. With
+    /// <see cref="InputTokens"/> and <see cref="OutputTokens"/> it prices the call.
+    /// </summary>
+    public string? JudgeModel { get; init; }
 }

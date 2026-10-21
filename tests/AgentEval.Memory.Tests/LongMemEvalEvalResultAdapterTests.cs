@@ -132,7 +132,47 @@ public sealed class LongMemEvalEvalResultAdapterTests
         Assert.False(report.Score.Passed);
     }
 
-    private static ExternalBenchmarkResult Result(params QuestionResult[] questions)
+    [Fact]
+    public void ToEvalResult_NoRunCost_IsNotPriced_NotZero()
+    {
+        // T63 / T13-9: the root wrote `EstimatedCostUsd ?? 0`, and every judged node 0: free.
+        var native = Result(Question("q-pass", true, JudgeOutcomeStatus.Yes, "question"));
+
+        var report = LongMemEvalEvalResultAdapter.ToEvalResult(native, "smoke");
+
+        Assert.Null(native.EstimatedCostUsd);
+        Assert.Null(report.Provenance.EstimatedCost);
+        var type = Assert.Single(report.Details.SubResults!);
+        Assert.Null(type.Provenance.EstimatedCost);
+        Assert.Null(Assert.Single(type.Details.SubResults!).Provenance.EstimatedCost); // a judged question, not priced
+    }
+
+    [Fact]
+    public void ToEvalResult_ARunCost_IsCarriedThrough()
+    {
+        var native = Result(0.42, Question("q-pass", true, JudgeOutcomeStatus.Yes, "question"));
+
+        var report = LongMemEvalEvalResultAdapter.ToEvalResult(native, "smoke");
+
+        Assert.Equal(0.42, report.Provenance.EstimatedCost);
+    }
+
+    [Fact]
+    public void ToEvalResult_AQuestionNoJudgeWasCalledFor_SpentNothing()
+    {
+        // Guard: no judge call is a real 0, not "not priced".
+        var unjudged = Question("q-unjudged", null, JudgeOutcomeStatus.Empty, "question", judgeLlmCallCount: 0);
+
+        var report = LongMemEvalEvalResultAdapter.ToEvalResult(Result(unjudged), "smoke");
+
+        var type = Assert.Single(report.Details.SubResults!);
+        Assert.Equal(0.0, Assert.Single(type.Details.SubResults!).Provenance.EstimatedCost);
+        Assert.Equal(0.0, type.Provenance.EstimatedCost);
+    }
+
+    private static ExternalBenchmarkResult Result(params QuestionResult[] questions) => Result(null, questions);
+
+    private static ExternalBenchmarkResult Result(double? estimatedCostUsd, params QuestionResult[] questions)
     {
         var scored = questions.Count(q => q.Correct.HasValue);
         var correct = questions.Count(q => q.Correct is true);
@@ -168,6 +208,7 @@ public sealed class LongMemEvalEvalResultAdapterTests
             QuestionResults = questions,
             Duration = TimeSpan.FromSeconds(1),
             TotalLlmCalls = questions.Sum(q => q.AgentLlmCallCount + q.JudgeLlmCallCount),
+            EstimatedCostUsd = estimatedCostUsd,
             Options = new ExternalBenchmarkOptions(),
         };
     }
@@ -179,7 +220,8 @@ public sealed class LongMemEvalEvalResultAdapterTests
         string question,
         QuestionEvidenceEnvelope? evidence = null,
         QuestionEvidenceDiagnostics? diagnostics = null,
-        string? safeFailureCode = null) =>
+        string? safeFailureCode = null,
+        int judgeLlmCallCount = 1) =>
         new()
         {
             QuestionId = id,
@@ -191,7 +233,7 @@ public sealed class LongMemEvalEvalResultAdapterTests
             RawScore = correct switch { true => 100, false => 0, null => null },
             JudgeStatus = judgeStatus,
             AgentLlmCallCount = 1,
-            JudgeLlmCallCount = 1,
+            JudgeLlmCallCount = judgeLlmCallCount,
             JudgeTokensUsed = 10,
             Evidence = evidence,
             EvidenceDiagnostics = diagnostics,

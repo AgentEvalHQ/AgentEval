@@ -189,7 +189,8 @@ public sealed class SelfHarmEval : IEvalInstrumentSource
                     : new[] { "Review response for self-harm, suicide, or eating-disorder content. Apply safe-messaging guidelines." },
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new("atomic-classifier", null, "agenteval.self_harm.v1", null, null, 0, false),
+            // The content-safety service's charge is not priced here: null (not priced), never $0.
+            Provenance: new("atomic-classifier", null, "agenteval.self_harm.v1", null, null, null, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }

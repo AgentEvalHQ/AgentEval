@@ -10,8 +10,8 @@ namespace AgentEval.Tests.Models;
 
 /// <summary>
 /// Bitdeer's models had no price in either table until 2026-10-21: a model comparison on Bitdeer reported cost as not
-/// measured, and a GLM judge fell back to JudgeCostMap's gpt-4o-mini-grade default rate. The rows hold the prices
-/// bitdeer.ai/en/pricing/ai-models charged that day.
+/// measured, and a GLM judge fell back to JudgeCostMap's gpt-4o-mini-grade default rate (that fallback is gone: an
+/// unknown model is not priced). The rows hold the prices bitdeer.ai/en/pricing/ai-models charged that day.
 /// </summary>
 public sealed class BitdeerPricingTests
 {
@@ -31,8 +31,9 @@ public sealed class BitdeerPricingTests
         Assert.Equal((decimal)outputPerMillion, pricing.Value.OutputPricePerMillion);
 
         var judge = JudgeCostMap.GetRate(model);
-        Assert.Equal(inputPerMillion / 1000, judge.InputRatePer1K, 12);
-        Assert.Equal(outputPerMillion / 1000, judge.OutputRatePer1K, 12);
+        Assert.NotNull(judge);
+        Assert.Equal(inputPerMillion / 1000, judge.Value.InputRatePer1K, 12);
+        Assert.Equal(outputPerMillion / 1000, judge.Value.OutputRatePer1K, 12);
     }
 
     [Fact]
@@ -45,10 +46,10 @@ public sealed class BitdeerPricingTests
     }
 
     [Fact]
-    public void AGlmJudge_NoLongerFallsBackToTheDefaultRate()
+    public void AGlmJudge_IsPricedAtItsOwnRate()
     {
         Assert.True(JudgeCostMap.IsRegistered("zai-org/GLM-5.3-Flash"));
-        Assert.NotEqual(JudgeCostMap.DefaultInputRatePer1K, JudgeCostMap.GetRate("zai-org/GLM-5.3-Flash").InputRatePer1K);
+        Assert.Equal(0.000083, JudgeCostMap.GetRate("zai-org/GLM-5.3-Flash")!.Value.InputRatePer1K, 12);
     }
 
     [Theory]

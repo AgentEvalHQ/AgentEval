@@ -64,7 +64,10 @@ public class MicrosoftEvaluatorAdapterEvalTests
     public async Task MicrosoftEvaluator_ProducesEvalResult()
     {
         // The §8 acceptance test: atomic-llm provenance and a real, non-zero cost.
-        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4, "Fluent prose.")), JudgeWithUsage(), name: "Fluency");
+        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4, "Fluent prose.")), JudgeWithUsage(), name: "Fluency")
+        {
+            JudgeModel = "gpt-4o-mini",
+        };
         IEval eval = adapter;
 
         var result = await eval.EvaluateAsync(Input);
@@ -72,8 +75,8 @@ public class MicrosoftEvaluatorAdapterEvalTests
         Assert.Equal("atomic-llm", result.Provenance.Type);
         Assert.Equal(1200, result.Provenance.TokensUsed);
         Assert.True(result.Provenance.EstimatedCost > 0, "cost must be derived from the tokens the judge spent");
-        Assert.Equal(JudgeCostMap.EstimateCost("scripted", 1000, 200), result.Provenance.EstimatedCost, precision: 12);
-        Assert.Equal("scripted", result.Provenance.JudgeModel);
+        Assert.Equal(JudgeCostMap.EstimateCost("gpt-4o-mini", 1000, 200)!.Value, result.Provenance.EstimatedCost!.Value, precision: 12);
+        Assert.Equal("gpt-4o-mini", result.Provenance.JudgeModel);
         Assert.False(result.Provenance.CacheHit);
 
         // 4 on the 1..5 scale is 0.75 on 0..1; default threshold 70 → pass.
@@ -100,12 +103,44 @@ public class MicrosoftEvaluatorAdapterEvalTests
     }
 
     [Fact]
+    public async Task JudgeModelWithNoRate_IsNotPriced()
+    {
+        // The scripted judge reports model "scripted", which has no rate. Before T07 it was priced at the
+        // gpt-4o-mini fallback rate; now the tokens are reported and the cost is not priced (null), never made up.
+        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4)), JudgeWithUsage(), name: "Fluency");
+
+        var result = await ((IEval)adapter).EvaluateAsync(Input);
+
+        Assert.Equal("scripted", result.Provenance.JudgeModel);
+        Assert.Equal(1200, result.Provenance.TokensUsed);
+        Assert.Null(result.Provenance.EstimatedCost);
+    }
+
+    [Fact]
+    public async Task JudgeCallWithOneCountMissing_IsNotPriced()
+    {
+        // A missing output count is not 0 output tokens: the call is not priced rather than priced on its input only.
+        var judge = new ScriptedChatClient().AddText("{\"score\": 4}", inTok: 1000, outTok: null);
+        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4)), judge, name: "Fluency")
+        {
+            JudgeModel = "gpt-4o-mini",
+        };
+
+        var result = await ((IEval)adapter).EvaluateAsync(Input);
+
+        Assert.Null(result.Provenance.EstimatedCost);
+    }
+
+    [Fact]
     public async Task NullNumericScore_IsAnErrorLeaf_NotAZeroGrade()
     {
         // The MEAI first-class "no value produced" (unparseable judge output, content filter).
         // On the IMetric path this became Fail(score: 0) + Details["indeterminate"]. On the IEval
         // path it is the same shape AtomicLlmEval uses for a judge that could not speak.
-        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(null)), JudgeWithUsage(), name: "Fluency");
+        var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(null)), JudgeWithUsage(), name: "Fluency")
+        {
+            JudgeModel = "gpt-4o-mini",
+        };
 
         var result = await ((IEval)adapter).EvaluateAsync(Input);
 
@@ -150,16 +185,16 @@ public class MicrosoftEvaluatorAdapterEvalTests
     }
 
     [Fact]
-    public async Task NoUsageReported_CostIsZero_AndTokensAreNull_NotFabricated()
+    public async Task NoUsageReported_IsNotPriced_AndTokensAreNull_NotFabricated()
     {
         // A judge that reports no usage yields no tokens and no cost — the same convention as
-        // AtomicLlmEval. Never invent a spend.
+        // AtomicLlmEval. Never invent a spend, and never call it free: the cost is not priced (null), not $0.
         var adapter = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(5)), new ScriptedChatClient().AddText("ok"), name: "Fluency");
 
         var result = await ((IEval)adapter).EvaluateAsync(Input);
 
         Assert.Null(result.Provenance.TokensUsed);
-        Assert.Equal(0, result.Provenance.EstimatedCost);
+        Assert.Null(result.Provenance.EstimatedCost);
         Assert.Equal("atomic-llm", result.Provenance.Type);
     }
 
@@ -189,14 +224,17 @@ public class MicrosoftEvaluatorAdapterEvalTests
     {
         // The point of the retarget: a first-party M.E.AI evaluator can now sit in a CompositeEval
         // beside AgentEval's own leaves, with its cost rolled up.
-        var leaf = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4)), JudgeWithUsage(), name: "Fluency");
+        var leaf = new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(() => Numeric(4)), JudgeWithUsage(), name: "Fluency")
+        {
+            JudgeModel = "gpt-4o-mini",
+        };
         var composite = new CompositeEval("c", "C", "test", "1.0.0", new EvalComponent[] { new(leaf) }, WeightedSumAggregation.Instance, threshold: 0.5);
 
         var result = await composite.EvaluateAsync(Input);
 
         Assert.Equal("pass", result.Score.Label);
         Assert.Equal(0.75, result.Score.Value, precision: 10);
-        Assert.Equal(JudgeCostMap.EstimateCost("scripted", 1000, 200), result.Provenance.EstimatedCost, precision: 12);
+        Assert.Equal(JudgeCostMap.EstimateCost("gpt-4o-mini", 1000, 200)!.Value, result.Provenance.EstimatedCost!.Value, precision: 12);
         Assert.Equal("atomic-llm", result.Details.SubResults![0].Provenance.Type);
     }
 

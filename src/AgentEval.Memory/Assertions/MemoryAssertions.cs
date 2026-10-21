@@ -242,7 +242,7 @@ public class MemoryEvaluationAssertions
         {
             var suggestions = new List<string>
             {
-                $"Cost estimate: ${_result.EstimatedCost:F4}, Queries: {_result.TotalQueries}",
+                $"Cost estimate: {FormatCost(_result.EstimatedCost)}, Queries: {_result.TotalQueries}",
                 "Consider using string-based matching for simple fact verification",
                 "Reduce scenario complexity or query count to lower token usage"
             };
@@ -262,16 +262,46 @@ public class MemoryEvaluationAssertions
     /// <summary>
     /// Asserts that the memory evaluation cost less than the specified amount.
     /// </summary>
+    /// <remarks>
+    /// A cost that was not priced (<see cref="MemoryEvaluationResult.EstimatedCost"/> null: no usage reported, or no
+    /// rate for the judge model) cannot show the budget was kept. Inside a collecting scope the check is inconclusive;
+    /// outside one it fails, since nothing could record an undecided result and a silent pass would claim the budget.
+    /// </remarks>
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveCostLessThan(decimal maxCost, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        if (_result.EstimatedCost > maxCost)
+        if (_result.EstimatedCost is not { } cost)
+        {
+            const string why = "the cost was not priced (the judge's usage was not reported, or its model has no known rate)";
+            if (probe.IsActive)
+            {
+                probe.MarkInconclusive($"The memory evaluation's cost budget could not be checked: {why}.");
+            }
+            else
+            {
+                AgentEvalScope.FailWith(new MemoryAssertionException(
+                    $"Expected memory evaluation to cost less than ${maxCost:F4}, but {why}",
+                    expected: $"Cost < ${maxCost:F4}",
+                    actual: "Cost = not priced",
+                    suggestions: new[]
+                    {
+                        "Use a judge whose provider reports token usage",
+                        "Register the judge model's rate with ModelPricing.SetPricing or JudgeCostMap.Register"
+                    },
+                    because: because
+                ));
+            }
+
+            return probe.Complete(this);
+        }
+
+        if (cost > maxCost)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
-                $"Expected memory evaluation to cost less than ${maxCost:F4}, but cost ${_result.EstimatedCost:F4}",
+                $"Expected memory evaluation to cost less than ${maxCost:F4}, but cost ${cost:F4}",
                 expected: $"Cost < ${maxCost:F4}",
-                actual: $"Cost = ${_result.EstimatedCost:F4}",
+                actual: $"Cost = ${cost:F4}",
                 suggestions: new[] 
                 {
                     $"Tokens used: {_result.TokensUsed}, Queries: {_result.TotalQueries}",
@@ -280,9 +310,13 @@ public class MemoryEvaluationAssertions
                 because: because
             ));
         }
-        
+
         return probe.Complete(this);
     }
+
+    // Not priced is said in words, never printed as $0 (an empty interpolation of a null decimal read as "$").
+    private static string FormatCost(decimal? cost) =>
+        cost is { } c ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"${c:F4}") : "not priced";
 }
 
 /// <summary>

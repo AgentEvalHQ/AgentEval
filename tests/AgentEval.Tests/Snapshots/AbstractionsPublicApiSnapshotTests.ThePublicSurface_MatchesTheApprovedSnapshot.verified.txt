@@ -892,7 +892,7 @@ sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalPro
     Boolean CacheHit { get; init; }
     Boolean Equals(AgentEval.Evals.EvalProvenance other)
     Boolean Equals(Object obj)
-    Double EstimatedCost { get; init; }
+    Double? EstimatedCost { get; init; }
     Int32 GetHashCode()
     Int32? JudgePanelSize { get; init; }
     Int32? TokensUsed { get; init; }
@@ -903,8 +903,8 @@ sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalPro
     String RubricDigest { get; init; }
     String ToString()
     String Type { get; init; }
-    Void Deconstruct(out String Type, out String JudgeModel, out String PromptId, out String PromptHash, out Int32? TokensUsed, out Double EstimatedCost, out Boolean CacheHit)
-    ctor(String Type, String JudgeModel, String PromptId, String PromptHash, Int32? TokensUsed, Double EstimatedCost, Boolean CacheHit)
+    Void Deconstruct(out String Type, out String JudgeModel, out String PromptId, out String PromptHash, out Int32? TokensUsed, out Double? EstimatedCost, out Boolean CacheHit)
+    ctor(String Type, String JudgeModel, String PromptId, String PromptHash, Int32? TokensUsed, Double? EstimatedCost, Boolean CacheHit)
 static class AgentEval.Evals.EvalReportHelpers
     static AgentEval.Evals.EvalResult FindByKey(AgentEval.Evals.EvalResult root, String key, Int32 depth = 0)
     static String Capitalize(String s)
@@ -1066,11 +1066,9 @@ interface AgentEval.Evals.IEvalResultRenderer
     String FormatId { get; }
     Task<Byte[]> RenderAsync(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options, CancellationToken ct = default)
 static class AgentEval.Evals.JudgeCostMap
-    const Double DefaultInputRatePer1K
-    const Double DefaultOutputRatePer1K
-    static AgentEval.Evals.JudgeCostMap.ModelRate GetRate(String judgeModel)
+    static AgentEval.Evals.JudgeCostMap.ModelRate? GetRate(String judgeModel)
     static Boolean IsRegistered(String judgeModel)
-    static Double EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
+    static Double? EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
     static Void Register(String judgeModel, Double inputRatePer1K, Double outputRatePer1K)
 struct AgentEval.Evals.JudgeCostMap.ModelRate : IEquatable<AgentEval.Evals.JudgeCostMap.ModelRate>
     Boolean Equals(AgentEval.Evals.JudgeCostMap.ModelRate other)
@@ -2241,8 +2239,8 @@ sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.Scena
     Boolean Equals(AgentEval.Output.ScenarioResult other)
     Boolean Equals(Object obj)
     Boolean Passed { get; init; }
-    Double EstimatedCost { get; init; }
     Double Score { get; init; }
+    Double? EstimatedCost { get; init; }
     IReadOnlyDictionary<String, Double> Metrics { get; init; }
     IReadOnlyList<AgentEval.Output.AssertionResult> Assertions { get; init; }
     Int32 GetHashCode()
@@ -2254,8 +2252,8 @@ sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.Scena
     String StimulusHash { get; init; }
     String ToString()
     TimeSpan Duration { get; init; }
-    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan Duration, out Double EstimatedCost)
-    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan Duration, Double EstimatedCost)
+    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan Duration, out Double? EstimatedCost)
+    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan Duration, Double? EstimatedCost)
 sealed class AgentEval.Output.SolutionInfo : IEquatable<AgentEval.Output.SolutionInfo>
     AgentEval.Output.SolutionInfo <Clone>$()
     Boolean Equals(AgentEval.Output.SolutionInfo other)

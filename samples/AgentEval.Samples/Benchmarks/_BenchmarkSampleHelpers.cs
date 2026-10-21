@@ -1197,7 +1197,7 @@ internal static class BenchmarkSampleHelpers
         }
 
         var (score, severity) = composite.Aggregation.Aggregate(subs, components);
-        var (cost, allCacheHits) = CostRollup.Aggregate(subs);
+        var (cost, allCacheHits, _) = CostRollup.Aggregate(subs);
 
         // Severity rollup honours optional components — same logic as CompositeEval.
         var verdictSeverity = severity;

@@ -209,7 +209,7 @@ public sealed class CompositeEval : IEval
         }
 
         var (score, severity) = Aggregation.Aggregate(subs, Components);
-        var (cost, allCacheHits) = CostRollup.Aggregate(subs);
+        var (cost, allCacheHits, _) = CostRollup.Aggregate(subs);
 
         // Severity rollup honours EvalComponent.Required: an optional component
         // that fails should not propagate its severity to the composite verdict.

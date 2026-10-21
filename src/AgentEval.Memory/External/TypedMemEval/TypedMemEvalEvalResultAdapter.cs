@@ -157,7 +157,8 @@ public static class TypedMemEvalEvalResultAdapter
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0,
+                // Complete or absent: null when any judge call below was not priced.
+                EstimatedCost: CostRollup.Aggregate(verticalNodes).EstimatedCost,
                 CacheHit: false),
             EvaluatedAt: now);
     }
@@ -593,7 +594,8 @@ public static class TypedMemEvalEvalResultAdapter
                 PromptId: question.QuestionId,
                 PromptHash: null,
                 TokensUsed: question.JudgeTokensUsed,
-                EstimatedCost: 0,
+                // No judge call spent nothing; a judge call is not priced here (no rate is looked up), so it is null.
+                EstimatedCost: question.JudgeLlmCallCount > 0 ? null : 0,
                 CacheHit: false),
             EvaluatedAt: now);
     }
@@ -671,7 +673,8 @@ public static class TypedMemEvalEvalResultAdapter
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0,
+                // Complete or absent: null when any judge call below was not priced.
+                EstimatedCost: CostRollup.Aggregate(subResults ?? []).EstimatedCost,
                 CacheHit: false),
             EvaluatedAt: now);
     }

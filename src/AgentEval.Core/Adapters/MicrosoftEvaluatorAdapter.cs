@@ -234,13 +234,16 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     {
         var judgeModel = JudgeModel ?? meter.ObservedModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
 
+        // Not priced is null, never $0: a judge call that reported no usage, or only one of the two counts, leaves the
+        // total incomplete, and a judge model with no rate has no price.
         int? tokensUsed = null;
-        double estimatedCost = 0;
+        double? estimatedCost = null;
         if (meter.HasUsage)
         {
             var total = meter.InputTokens + meter.OutputTokens;
             tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
-            estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
+            if (meter.UsageComplete)
+                estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
         }
 
         return new EvalProvenance(
@@ -292,41 +295,73 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     {
         private readonly object _gate = new();
 
+        private int _calls;
+        private int _callsWithBothCounts;
+
         public long InputTokens { get; private set; }
         public long OutputTokens { get; private set; }
         public bool HasUsage { get; private set; }
         public string? ObservedModelId { get; private set; }
 
+        /// <summary>True when every judge call reported both its input and its output token count.</summary>
+        public bool UsageComplete
+        {
+            get { lock (_gate) return _calls > 0 && _callsWithBothCounts == _calls; }
+        }
+
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             var response = await inner.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
-            Record(response.Usage, response.ModelId);
+            var (sawInput, sawOutput) = Record(response.Usage, response.ModelId);
+            EndCall(sawInput, sawOutput);
             return response;
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            await foreach (var update in inner.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
+            bool sawInput = false, sawOutput = false;
+            try
             {
-                foreach (var content in update.Contents)
+                await foreach (var update in inner.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
                 {
-                    if (content is UsageContent usage)
-                        Record(usage.Details, update.ModelId);
+                    foreach (var content in update.Contents)
+                    {
+                        if (content is UsageContent usage)
+                        {
+                            var (i, o) = Record(usage.Details, update.ModelId);
+                            sawInput |= i;
+                            sawOutput |= o;
+                        }
+                    }
+                    if (update.ModelId is not null)
+                        Record(null, update.ModelId);
+                    yield return update;
                 }
-                if (update.ModelId is not null)
-                    Record(null, update.ModelId);
-                yield return update;
+            }
+            finally
+            {
+                EndCall(sawInput, sawOutput);
             }
         }
 
-        private void Record(UsageDetails? usage, string? modelId)
+        private (bool SawInput, bool SawOutput) Record(UsageDetails? usage, string? modelId)
         {
             lock (_gate)
             {
                 if (modelId is not null) ObservedModelId ??= modelId;
-                if (usage is null) return;
+                if (usage is null) return (false, false);
                 if (usage.InputTokenCount is { } i) { InputTokens += i; HasUsage = true; }
                 if (usage.OutputTokenCount is { } o) { OutputTokens += o; HasUsage = true; }
+                return (usage.InputTokenCount is not null, usage.OutputTokenCount is not null);
+            }
+        }
+
+        private void EndCall(bool sawInput, bool sawOutput)
+        {
+            lock (_gate)
+            {
+                _calls++;
+                if (sawInput && sawOutput) _callsWithBothCounts++;
             }
         }
 
