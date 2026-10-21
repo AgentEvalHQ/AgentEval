@@ -94,7 +94,7 @@ internal static class ProviderConfig
         var client = new OpenAIClient(
             new ApiKeyCredential(key),
             new OpenAIClientOptions { Endpoint = endpoint, Transport = new HttpClientPipelineTransport(CreateWireLoggedHttpClient(key)) });
-        return client.GetChatClient(BitdeerModel).AsIChatClient();
+        return client.GetChatClient(BitdeerModel).AsIChatClient().WithMinimalReasoning();
     }
 
     public static void PrintMissingBitdeerWarning()

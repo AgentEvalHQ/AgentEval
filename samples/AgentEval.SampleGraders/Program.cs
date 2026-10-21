@@ -15,6 +15,7 @@ using AgentEval.SampleGraders;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
+using AgentEval.Core;
 
 int runs = ParseRuns(args, defaultRuns: 5);
 (IChatClient judge, bool isReal) = BuildJudge();
@@ -113,7 +114,7 @@ static (IChatClient judge, bool isReal) BuildJudge()
     if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(key))
     {
         var client = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
-        return (client.GetChatClient(deployment).AsIChatClient(), true);
+        return (client.GetChatClient(deployment).AsIChatClient().WithMinimalReasoning(), true);
     }
     return (new HeuristicJudgeChatClient(), false);
 }

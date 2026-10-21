@@ -80,7 +80,7 @@ internal static class Program
         var azure = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
 
         // A real MAF agent (Azure-backed IChatClient -> AIAgent) + a judge IChatClient.
-        AIAgent agent = azure.GetChatClient(deployment).AsIChatClient().AsAIAgent(
+        AIAgent agent = azure.GetChatClient(deployment).AsIChatClient().WithMinimalReasoning().AsAIAgent(
             name: "TravelLightPathAgent",
             instructions: """
                 You are a travel booking assistant. When asked to find flights or hotels,
@@ -88,7 +88,7 @@ internal static class Program
                 """,
             tools: [AIFunctionFactory.Create(SearchFlights), AIFunctionFactory.Create(SearchHotels)]);
 
-        IChatClient judge = azure.GetChatClient(deployment).AsIChatClient();
+        IChatClient judge = azure.GetChatClient(deployment).AsIChatClient().WithMinimalReasoning();
         var chatConfig = new ChatConfiguration(judge);
 
         var subject = new SubjectIdentity(

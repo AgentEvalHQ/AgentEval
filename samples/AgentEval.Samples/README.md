@@ -70,11 +70,13 @@ read. The codes are the CLI's:
 | 2 | — | No sample with that number or id. |
 | 3 | ERROR | The sample threw, or caught an error that stopped it (a provider call that failed mid-run). |
 | 10 | WARN | A quality score fell below its threshold; everything the sample checks was measured. |
-| 11 | NOT MEASURED | The sample could not measure what it shows: no provider, a missing key, dataset or capability, a model that never attempted the attack a gate exists to stop, or a `--dry-run`. Not measured is never 0. |
+| 11 | NOT MEASURED | The sample could not measure what it shows: no provider, a missing key, dataset or capability, a model that never attempted the attack a gate exists to stop, a `--dry-run`, or a `--mock` run's canned replies. Not measured is never 0. |
 
 When a run records several outcomes the worst wins: ERROR, then FAIL, then NOT MEASURED, then WARN. A finding the
 sample exists to show (a planted regression caught, a gate blocking the attack) is the sample working and exits 0.
-A `--mock` run is labelled "mock run: canned replies, not a measurement" on its result line.
+A `--mock` run is labelled "mock run: canned replies, not a measurement" on its result line and exits 11: canned
+replies measure no model. Extensibility (F6) is the exception: its main point, the metric registries, runs offline, so
+its `--mock` run exits as its run without a provider does (0).
 
 ### Check every sample offline, for free
 
@@ -385,6 +387,9 @@ dotnet run -- 105   # Healthcare Safety Pack  (O1)
 Every sample obtains its model through one factory, `AIConfig.CreateChatClient()`, so the whole
 catalogue runs on whichever host **`AI_INFERENCE_PROVIDER`** selects, without touching a sample.
 Keys for several providers can be configured at once; the selector decides which one is used.
+That factory also turns reasoning off: a request goes out with `reasoning_effort: none`, at `low` when the
+provider rejects `none` (Bitdeer does), and with the provider's default when it rejects both. A sample that sets
+`ChatOptions.Reasoning` keeps its own level ([details](../../docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to)).
 
 | `AI_INFERENCE_PROVIDER` | Variables | Defaults |
 |---|---|---|

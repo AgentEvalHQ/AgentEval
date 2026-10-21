@@ -7,6 +7,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.PartnerDeskDemo.Demo;
 
@@ -201,14 +202,14 @@ public sealed class ModelSelection
             // Azure OpenAI and a Foundry resource's OpenAI-compatible endpoint speak the same protocol.
             return new AzureOpenAIClient(Settings.Endpoint!, new AzureKeyCredential(Settings.ApiKey!))
                 .GetChatClient(Model!)
-                .AsIChatClient();
+                .AsIChatClient().WithMinimalReasoning();
         }
 
         // Bitdeer, OpenAI and any OpenAI-compatible host.
         var options = new OpenAIClientOptions { Endpoint = Settings.Endpoint };
         return new OpenAIClient(new ApiKeyCredential(Settings.ApiKey!), options)
             .GetChatClient(Model!)
-            .AsIChatClient();
+            .AsIChatClient().WithMinimalReasoning();
     }
 
     private static string? ReadOption(IReadOnlyList<string> args, string name)

@@ -8,6 +8,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.HealthcareSafetyPack;
 
@@ -51,12 +52,12 @@ public static class Config
         {
             return new AzureOpenAIClient(endpoint, new AzureKeyCredential(apiKey))
                 .GetChatClient(Model)
-                .AsIChatClient();
+                .AsIChatClient().WithMinimalReasoning();
         }
 
         return new OpenAIClient(new ApiKeyCredential(apiKey), new OpenAIClientOptions { Endpoint = endpoint })
             .GetChatClient(Model)
-            .AsIChatClient();
+            .AsIChatClient().WithMinimalReasoning();
     }
 
     /// <summary>The message to show when no provider is configured.</summary>

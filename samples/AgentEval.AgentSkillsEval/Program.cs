@@ -79,7 +79,7 @@ public static class Program
 
         var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
             .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
+            .AsIChatClient().WithMinimalReasoning();
         Console.WriteLine($"Model: {AIConfig.ModelDeployment}");
         Console.WriteLine($"Skill fixture: {skillPath}\n");
 
@@ -104,7 +104,7 @@ public static class Program
         PrintScene("Run 7 (Phase 4a/4b)", "Skill Health & Security Index + hash-pin drift detection (deterministic, no LLM call)");
 
         var scanAgent = new ChatClientAgent(
-            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient().WithMinimalReasoning(),
             new ChatClientAgentOptions { Name = "ScannerAgent" });
 
         using var source = new AgentFileSkillsSource(skillPath);
@@ -259,7 +259,7 @@ public static class Program
         // ScanFileSkillsAsync needs an AIAgent only to build the AgentSkillsSourceContext MAF's
         // GetSkillsAsync requires; no model call is made by the scan itself. A minimal agent is enough.
         var scanAgent = new ChatClientAgent(
-            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient().WithMinimalReasoning(),
             new ChatClientAgentOptions { Name = "ScannerAgent" });
 
         // skillPath is the SAME single-skill directory Run 1-3's AgentSkillsProvider(skillPath, ...) already

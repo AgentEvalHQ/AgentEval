@@ -2,6 +2,7 @@
 // Copyright (c) 2026 ECS2026 Demo
 
 using AgentEval.Assertions;
+using Microsoft.Extensions.AI;
 
 namespace AgentEval.TravelDemo.Evals;
 
@@ -22,6 +23,7 @@ public static class TravelDemoSelfTest
         ParityMatrix();
         NamedResolutionCases();
         DriftReportHidesTheProvider();
+        ReasoningLevelsMatchCore();
         Console.WriteLine("  ── What the console may show ──");
         ShowModelPrecedence();
         RedactionCoversInnerExceptions();
@@ -49,6 +51,61 @@ public static class TravelDemoSelfTest
 
         Console.WriteLine(_failures == 0 ? "  TravelDemo selftest OK" : $"  TravelDemo selftest FAILED ({_failures} check(s))");
         return _failures == 0 ? 0 : 1;
+    }
+
+    // The agent's copy of MinimalReasoningChatClient sends what Core's sends: none, low when the provider rejects none,
+    // the provider's default when it rejects both, the remembered level on the next call, and a level the code set as set.
+    private static void ReasoningLevelsMatchCore()
+    {
+        ReasoningEffort?[][] cases = [[], [ReasoningEffort.None], [ReasoningEffort.None, ReasoningEffort.Low]];
+        foreach (var rejects in cases)
+        {
+            var travel = LevelsSent(inner => new AgentEval.TravelDemo.MinimalReasoningChatClient(inner), rejects);
+            var core = LevelsSent(inner => new AgentEval.Core.MinimalReasoningChatClient(inner), rejects);
+            Check($"reasoning, provider rejects [{Names(rejects)}] → [{Names(travel)}] as in Core",
+                  travel.SequenceEqual(core), $"core sent [{Names(core)}]");
+        }
+
+        static string Names(IEnumerable<ReasoningEffort?> levels) =>
+            string.Join(", ", levels.Select(l => l?.ToString().ToLowerInvariant() ?? "default"));
+    }
+
+    private static List<ReasoningEffort?> LevelsSent(Func<IChatClient, IChatClient> wrap, ReasoningEffort?[] rejects)
+    {
+        var provider = new ReasoningLevelRecorder(rejects);
+        var client = wrap(provider);
+        client.GetResponseAsync("hi").GetAwaiter().GetResult();
+        client.GetResponseAsync("hi").GetAwaiter().GetResult();
+        client.GetResponseAsync("hi", new ChatOptions { Reasoning = new ReasoningOptions { Effort = ReasoningEffort.High } })
+              .GetAwaiter().GetResult();
+        return provider.Levels;
+    }
+
+    /// <summary>A provider that records each request's reasoning level and rejects the given ones with HTTP 400.</summary>
+    private sealed class ReasoningLevelRecorder(ReasoningEffort?[] rejects) : IChatClient
+    {
+        private readonly ChatClientMetadata _metadata = new("selftest", new Uri($"https://selftest-{Guid.NewGuid():N}.test/"), "model");
+
+        public List<ReasoningEffort?> Levels { get; } = [];
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var level = options?.Reasoning?.Effort;
+            Levels.Add(level);
+            if (rejects.Contains(level))
+                throw new HttpRequestException("invalid request", null, System.Net.HttpStatusCode.BadRequest);
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType == typeof(ChatClientMetadata) ? _metadata : null;
+
+        public void Dispose() { }
     }
 
     private static void Check(string name, bool ok, string? detail = null)

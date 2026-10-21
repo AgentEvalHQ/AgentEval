@@ -9,6 +9,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.Samples;
 
@@ -102,14 +103,14 @@ public static class AIConfig
             // Azure OpenAI and a Foundry resource's OpenAI-compatible endpoint speak the same protocol.
             return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!), new AzureOpenAIClientOptions { Transport = transport })
                 .GetChatClient(resolved)
-                .AsIChatClient();
+                .AsIChatClient().WithMinimalReasoning();
         }
 
         // Bitdeer, OpenAI and any OpenAI-compatible host: the same construction the CLI's
         // EndpointFactory.CreateOpenAICompatible uses for --endpoint --model --api-key.
         return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint, Transport = transport })
             .GetChatClient(resolved)
-            .AsIChatClient();
+            .AsIChatClient().WithMinimalReasoning();
     }
 
     /// <summary>
@@ -248,7 +249,7 @@ public static class AIConfig
     /// </summary>
     /// <param name="recordSkip">
     /// False when the model step is an optional last step and the sample's main point already ran offline: the
-    /// stop is then printed but not recorded as NOT MEASURED for the whole run.
+    /// stop, or a mock run of that step, is then printed but not recorded as NOT MEASURED for the whole run.
     /// </param>
     public static bool StartModelSample(bool recordSkip = true)
     {
@@ -258,6 +259,10 @@ public static class AIConfig
             Console.WriteLine("   🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.");
             Console.ResetColor();
             Console.WriteLine();
+            // Canned replies measure no model, so the run is NOT MEASURED (exit 11), never exit 0 (owner, 2026-10-21).
+            // A check the mock run makes and fails still fails the run: FAIL outranks NOT MEASURED.
+            if (recordSkip)
+                SampleOutcome.Skip("mock run (--mock): canned replies, nothing here measured a model");
             return true;
         }
 

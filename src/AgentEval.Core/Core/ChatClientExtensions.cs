@@ -45,4 +45,16 @@ public static class ChatClientExtensions
     {
         return new ChatClientAgentAdapter(chatClient, name, systemPrompt, chatOptions, includeHistory);
     }
+
+    /// <summary>
+    /// Wraps <paramref name="chatClient"/> so a request that sets no reasoning level of its own is sent at the lowest
+    /// level the provider accepts: none, else low, else the provider's default. See <see cref="MinimalReasoningChatClient"/>.
+    /// </summary>
+    /// <param name="chatClient">The provider's chat client.</param>
+    /// <returns>The wrapped client; <paramref name="chatClient"/> itself when it is already wrapped.</returns>
+    public static IChatClient WithMinimalReasoning(this IChatClient chatClient)
+    {
+        ArgumentNullException.ThrowIfNull(chatClient);
+        return chatClient as MinimalReasoningChatClient ?? new MinimalReasoningChatClient(chatClient);
+    }
 }

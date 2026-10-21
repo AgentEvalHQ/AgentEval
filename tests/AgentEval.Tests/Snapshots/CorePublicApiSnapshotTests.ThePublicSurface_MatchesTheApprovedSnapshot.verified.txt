@@ -717,6 +717,7 @@ class AgentEval.Core.ChatClientEvaluator : AgentEval.Core.IEvaluator, AgentEval.
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.String systemPrompt, System.String systemPromptId)
 static class AgentEval.Core.ChatClientExtensions
     static AgentEval.Core.IStreamableAgent AsEvaluableAgent(Microsoft.Extensions.AI.IChatClient chatClient, System.String name = "Agent", System.String systemPrompt = null, Microsoft.Extensions.AI.ChatOptions chatOptions = null, System.Boolean includeHistory = false)
+    static Microsoft.Extensions.AI.IChatClient WithMinimalReasoning(Microsoft.Extensions.AI.IChatClient chatClient)
 sealed class AgentEval.Core.ConsoleAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
@@ -779,6 +780,11 @@ sealed class AgentEval.Core.MicrosoftLoggingAdapter : AgentEval.Core.IAgentEvalL
     ctor(Microsoft.Extensions.Logging.ILogger logger)
     static AgentEval.Core.MicrosoftLoggingAdapter Create(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.String categoryName = "AgentEval")
     static AgentEval.Core.MicrosoftLoggingAdapter Create<T>(Microsoft.Extensions.Logging.ILogger<T> logger)
+sealed class AgentEval.Core.MinimalReasoningChatClient : Microsoft.Extensions.AI.DelegatingChatClient, Microsoft.Extensions.AI.IChatClient, System.IDisposable
+    Microsoft.Extensions.AI.ReasoningEffort? CurrentLevel { get; }
+    System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
+    System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
+    ctor(Microsoft.Extensions.AI.IChatClient innerClient)
 sealed class AgentEval.Core.NullAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)

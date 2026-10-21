@@ -54,6 +54,19 @@ before this variable existed.
 and the reason, never its value, because a configured URL can carry a token in its user-info, query or
 fragment and the diagnostic reaches stderr.
 
+**Reasoning is off by default.** Every chat client the CLI, the samples and the demos build from these
+variables sends a request that sets no reasoning level of its own with `reasoning_effort: none`. When the
+provider rejects that as an invalid request (HTTP 400 or 422) it sends it again at `low`, and when the
+provider rejects both (a model with no reasoning setting, such as gpt-4o) with no reasoning field, which
+is the provider's default. The level that worked is remembered per provider, endpoint and model for the rest
+of the process, so a rejected level costs one failed call per model. Code that sets `ChatOptions.Reasoning`
+keeps its own level. In your own code, `chatClient.WithMinimalReasoning()` (`AgentEval.Core`) does the same.
+The exception is the AEF dataset runner (`agenteval run --plan`): its clients make at most one attempt per call so
+the per-role call budget holds, and they run at the provider's default reasoning.
+Why: on Bitdeer, GLM-5.3-Flash at its default reasoning spent two thirds of its output tokens thinking and
+took 2.2 times as long on an article-length answer (2026-10-21); Bitdeer rejects `none` and accepts `low`,
+which turns GLM's reasoning off. Results measured before 2026-10-21 ran at each provider's default.
+
 *Provider selection was added in v0.41.0-beta. Before that the CLI assumed Azure OpenAI.*
 
 ### `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY`, `AZURE_OPENAI_JUDGE_DEPLOYMENT`

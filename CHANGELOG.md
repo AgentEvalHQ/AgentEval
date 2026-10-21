@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Reasoning is off by default:** every chat client the samples, the TravelDemo and PartnerDesk demos, the
+  other sample projects and the CLI build from the provider variables is wrapped in the new
+  `MinimalReasoningChatClient` (`chatClient.WithMinimalReasoning()`, `AgentEval.Core`). A request that sets
+  no reasoning level of its own goes out with `reasoning_effort: none`; at `low` when the provider rejects
+  that (HTTP 400 or 422); and with no reasoning field, the provider's default, when it rejects both (a model
+  with no reasoning setting). The level that worked is remembered per provider, endpoint and model for the
+  rest of the process; code that sets `ChatOptions.Reasoning` keeps its own level and is never retried.
+  Bitdeer rejects `none` and accepts `low`, which turns GLM-5.3-Flash's reasoning off: on an
+  article-length answer it had spent two thirds of its output tokens reasoning and taken 2.2 times as long.
+  Sample C2 (Real MAF Workflow, four agents writing an article, a 180 s limit) now passes on GLM in 62 s
+  (it failed at 195-239 s). The TravelDemo agent carries a copy (it takes no AgentEval dependency) that
+  `--selftest` checks against Core's. Results measured before this change ran at each provider's default.
+
+- **A `--mock` run exits 11 (not measured):** canned replies measure no model, so a Getting Started sample
+  (A1-A5) or Auto-Audit (I2) run with `--mock` exits 11 instead of 0. A check the mock run makes and fails
+  still exits 1. Extensibility (F6) keeps exit 0: its main point, the metric registries, runs offline.
+
 - **Bitdeer models are priced; each model in a comparison at its own rate:** `ModelPricing` and
   `JudgeCostMap` carry the prices bitdeer.ai/en/pricing/ai-models charged on 2026-10-21 for every model
   Bitdeer serves (GLM-5.3-Flash, GLM-5.3, DeepSeek-V4-Flash, DeepSeek-V4.1-Flash, Qwen3.8-27B,

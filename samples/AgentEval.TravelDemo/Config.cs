@@ -463,14 +463,15 @@ public static class Config
 
         if (s.UsesAzureProtocol)
         {
-            return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!))
+            return new MinimalReasoningChatClient(new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!))
                 .GetChatClient(Model)
-                .AsIChatClient();
+                .AsIChatClient());
         }
 
-        return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint })
+        // Reasoning at the lowest level the provider accepts (none, else low), as AgentEval's own factories send it.
+        return new MinimalReasoningChatClient(new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint })
             .GetChatClient(Model)
-            .AsIChatClient();
+            .AsIChatClient());
     }
 
     // ── Resolution (a copy of Core's InferenceProviderEnvironment rules) ──────

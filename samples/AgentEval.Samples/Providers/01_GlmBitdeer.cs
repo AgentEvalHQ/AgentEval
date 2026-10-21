@@ -92,7 +92,7 @@ public static class GlmBitdeerProviderDemo
         // ── Step 1: the client — the same construction the CLI's --endpoint path uses ────────
         Console.WriteLine("📝 Step 1: Build the IChatClient (OpenAI client, Bitdeer base URL)\n");
         var chat = ProviderConfig.CreateBitdeerChatClient();
-        Console.WriteLine("   ✓ new OpenAIClient(key, new() { Endpoint = <bitdeer> }).GetChatClient(model).AsIChatClient()");
+        Console.WriteLine("   ✓ new OpenAIClient(key, new() { Endpoint = <bitdeer> }).GetChatClient(model).AsIChatClient().WithMinimalReasoning()");
         Console.WriteLine("   ✓ identical to: agenteval eval --endpoint <bitdeer> --model <model> --api-key <key>\n");
 
         // ── Step 2: one smoke call — the \"one real item\" stage ─────────────────────────────

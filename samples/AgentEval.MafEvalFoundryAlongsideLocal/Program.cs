@@ -192,7 +192,7 @@ static IChatClient CreateJudgeChatClient()
     var ep = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT not set (judge model).");
     var key = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY") ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY not set.");
     var dep = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o-mini";
-    return new AzureOpenAIClient(new Uri(ep), new AzureKeyCredential(key)).GetChatClient(dep).AsIChatClient();
+    return new AzureOpenAIClient(new Uri(ep), new AzureKeyCredential(key)).GetChatClient(dep).AsIChatClient().WithMinimalReasoning();
 }
 
 static AIAgent CreateFallbackAzureOpenAIAgent() =>

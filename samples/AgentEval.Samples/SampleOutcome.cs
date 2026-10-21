@@ -19,7 +19,7 @@ namespace AgentEval.Samples;
 /// or id does not exist; <c>3</c> the sample threw, or caught an error that stopped it (<see cref="Error"/>);
 /// <c>10</c> a quality score fell below its threshold (WARN);
 /// <c>11</c> the sample could not measure what it demonstrates — no provider, a capability the provider lacks,
-/// a model it does not serve. Not measured is never 0.
+/// a model it does not serve, or canned replies in a <c>--mock</c> run. Not measured is never 0.
 /// </para>
 /// <para>
 /// When a run records several outcomes the worst wins: error, failed, then not measured, then warning. Record

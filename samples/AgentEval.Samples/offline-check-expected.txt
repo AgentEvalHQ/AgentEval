@@ -125,10 +125,10 @@ AssertMultiturnBenchmark                        0  offline: hand-written multi-t
 
 # --mock runs (a row id ending in +mock): the sample again, with --mock, so its code past the provider check runs in CI
 # too. Canned replies measure no model: these rows check the samples' wiring, never a result.
-HelloWorld+mock                                0  labelled mock walkthrough
-AgentWithOneTool+mock                          0  labelled mock walkthrough
-AgentWithMultipleTools+mock                    0  labelled mock walkthrough
-PerformanceMetrics+mock                        0  labelled mock walkthrough
-LightPathMAFIntegration+mock                   0  labelled mock walkthrough
+HelloWorld+mock                                11  labelled mock walkthrough
+AgentWithOneTool+mock                          11  labelled mock walkthrough
+AgentWithMultipleTools+mock                    11  labelled mock walkthrough
+PerformanceMetrics+mock                        11  labelled mock walkthrough
+LightPathMAFIntegration+mock                   11  labelled mock walkthrough
 Extensibility+mock                             0  its mock step: a metric must fail the canned wrong answer
-AutoAudit+mock                                 0  three scripted endpoints, labelled
+AutoAudit+mock                                 11  three scripted endpoints, labelled
