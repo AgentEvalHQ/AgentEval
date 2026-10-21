@@ -118,7 +118,7 @@ internal static class NothingMeasuredCensusRows
             B2Nothing, B2Twin, B2Partly));
         rows.Add(new("B-3", typeof(ModelComparer), "no run of any model measured", "refused, with the results attached",
             B3Nothing, B3Twin));
-        rows.Add(new("B-4", typeof(RunComparison), "no scenario measured on either side", "mean delta NaN, all listed",
+        rows.Add(new("B-4", typeof(RunComparison), "no scenario measured on either side", "mean delta null, all listed",
             B4Nothing, B4Twin, B4Partly));
         rows.Add(new("B-5", typeof(GoldenTraceComparer), "a case with no verdict on either side",
             "NotMeasured, not a regression", B5Nothing, B5Twin));

@@ -162,8 +162,7 @@ public sealed class NothingMeasuredAggregationCensusTests
 
     /// <summary>
     /// Discovered types that need no row, each with the reason. A reason is one line: a count (a zero is a true zero),
-    /// config, a DTO of a row's producer, a verifier or writer that computes no number, or a placeholder that a flag
-    /// already marks as no reading.
+    /// config, a DTO of a row's producer, a verifier or writer that computes no number, or a nullable reading.
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, string> Justified = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -275,7 +274,7 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Benchmarks.AutoAuditReport"] = "DTO of AutoAuditRunner (row B-13)",
         ["AgentEval.Comparison.DefaultStatisticsCalculator"] = "adapter over StatisticsCalculator; the stochastic runner passes measured runs only (row B-2)",
         ["AgentEval.Comparison.ModelComparisonExtensions"] = "Markdown of a ModelComparisonResult; T71 prints n/a for a model with no measured run",
-        ["AgentEval.Comparison.StatisticsCalculator"] = "placeholder plus flag: statistics of an empty sample carry SampleSize 0 (row B-2)",
+        ["AgentEval.Comparison.StatisticsCalculator"] = "nullable statistics: empty samples have no aggregate, and spread/CI require two samples (row B-2, StochasticStatisticsNullableTests)",
         ["AgentEval.Core.AgentEvalPluginBase"] = "plugin base class; aggregates nothing",
         ["AgentEval.Core.CriterionText"] = "matches a judge's echo of a criterion; produces no score",
         ["AgentEval.Evals.EvalResultPersistence"] = "maps an EvalResult tree to ScenarioResults, carrying not measured as null Score plus Measurement (row B-4, T86b)",
@@ -334,6 +333,14 @@ public sealed class NothingMeasuredAggregationCensusTests
         // Each rule finds something, or a rule could silently stop matching.
         foreach (var rule in new[] { "R1", "R2", "R3", "R4" })
             Assert.Contains(discovered.Values, rules => rules.Split(',').Contains(rule));
+    }
+
+    [Fact]
+    public void NoJustifiedReason_IsAPlaceholderPlusFlag()
+    {
+        var placeholders = Justified.Where(entry => entry.Value.Contains("placeholder plus flag", StringComparison.OrdinalIgnoreCase));
+        Assert.True(!placeholders.Any(), "Use a nullable reading or prove a measured value, rather than exempting a placeholder: " +
+            string.Join(", ", placeholders.Select(entry => entry.Key)));
     }
 
     // ── B9: run summaries ────────────────────────────────────────────────────
