@@ -190,7 +190,8 @@ public static class ModelComparison
             var avgCost = modelResult.AverageCost.HasValue ? $"${modelResult.AverageCost:F4}" : "N/A";
             var totalCost = modelResult.TotalCost.HasValue ? $"${modelResult.TotalCost:F4}" : "not priced";
             var latency = modelResult.AverageLatency is { } l ? $"{l.TotalMilliseconds:F0}ms" : "N/A";
-            Console.WriteLine($"   {modelResult.ModelName.PadRight(nameWidth)} │ {avgCost,13} │ {totalCost,10} │ {modelResult.PassRate,9:P0} │ {latency,10}");
+            var passRate = modelResult.PassRate?.ToString("P0") ?? "n/a";
+            Console.WriteLine($"   {modelResult.ModelName.PadRight(nameWidth)} │ {avgCost,13} │ {totalCost,10} │ {passRate,9} │ {latency,10}");
         }
         foreach (var model in result.ModelResults)
         {

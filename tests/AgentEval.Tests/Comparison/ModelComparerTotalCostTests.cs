@@ -162,7 +162,7 @@ public sealed class ModelComparerTotalCostTests
         {
             var runs = factory.ModelId == "subject" ? subject : new[] { Priced(0.01m), Priced(0.01m), Priced(0.01m) };
             var measured = runs.Count(r => r.Error is null && !r.JudgeFailed);
-            var stats = new StochasticStatistics(1, 80, 80, 0, 80, 80, 80, 80, 80, null, measured);
+            var stats = measured > 0 ? new StochasticStatistics(1, 80, 80, 0, 80, 80, 80, 80, 80, null, measured) : null;
             return Task.FromResult(new StochasticResult(testCase, runs, stats, options ?? new StochasticOptions(), Passed: true));
         }
     }

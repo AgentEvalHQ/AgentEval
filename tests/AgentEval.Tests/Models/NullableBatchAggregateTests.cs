@@ -231,9 +231,9 @@ public class NullableBatchAggregateTests
     private static StochasticResult Stochastic(params TestResult[] runs) => new(
         new TestCase { Name = "t", Input = "q" },
         runs,
-        new StochasticStatistics(PassRate: 1, MeanScore: 90, MedianScore: 90, StandardDeviation: 0, MinScore: 90,
+        runs.Any(StochasticResult.IsMeasured) ? new StochasticStatistics(PassRate: 1, MeanScore: 90, MedianScore: 90, StandardDeviation: 0, MinScore: 90,
             MaxScore: 90, Percentile25: 90, Percentile75: 90, Percentile95: 90, ConfidenceInterval: null,
-            SampleSize: runs.Count(StochasticResult.IsMeasured)),
+            SampleSize: runs.Count(StochasticResult.IsMeasured)) : null,
         new StochasticOptions(Runs: runs.Length, SuccessRateThreshold: 0.6),
         Passed: true);
 

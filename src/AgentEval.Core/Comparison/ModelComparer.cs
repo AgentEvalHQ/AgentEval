@@ -173,9 +173,7 @@ public class ModelComparer : IModelComparer
         // throws rather than rank on a made-up 0 if that ever changes.
         var qualityScores = NormalizeScores(results.Select(r => r.MeanScore!.Value).ToList(), higherIsBetter: true);
         var reliabilityScores = NormalizeScores(
-            results.Select(r => r.StochasticResult.IndividualResults.Count > 0
-                ? (double)r.StochasticResult.PassedCount / r.StochasticResult.IndividualResults.Count
-                : 0).ToList(),
+            results.Select(r => r.PassRate!.Value).ToList(),
             higherIsBetter: true);
 
         // A dimension is scored only when it was measured for every model; scoring only the models that have it would

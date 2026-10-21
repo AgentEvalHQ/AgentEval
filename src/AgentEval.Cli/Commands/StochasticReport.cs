@@ -48,7 +48,7 @@ internal static class StochasticReport
         var tests = results.Select(r => Map(r, suiteName)).ToList();
         // A test whose unmeasured runs leave its verdict open (undecided, or nothing measured) is skipped, not failed. The
         // score averages the tests that measured at least one run; one with none has no score.
-        var scored = results.Where(r => r.MeasuredCount > 0).ToList();
+        var scored = results.Where(r => r.MeasuredCount > 0 && r.Statistics is not null).ToList();
         return new EvaluationReport
         {
             Name = string.Create(CultureInfo.InvariantCulture, $"{suiteName} (stochastic, {runs} runs per test)"),
@@ -58,7 +58,7 @@ internal static class StochasticReport
             PassedTests = tests.Count(t => t.Passed),
             FailedTests = tests.Count(t => !t.Passed && !t.Skipped),
             SkippedTests = tests.Count(t => t.Skipped),
-            OverallScore = scored.Count > 0 ? scored.Average(r => r.Statistics.MeanScore) : null,
+            OverallScore = scored.Count > 0 ? scored.Average(r => r.Statistics!.MeanScore) : null,
             Agent = agentName is null && modelName is null && endpoint is null
                 ? null
                 : new AgentInfo { Name = agentName, Model = modelName, Endpoint = endpoint },
@@ -74,10 +74,10 @@ internal static class StochasticReport
 
     private static TestResultSummary Map(StochasticResult result, string suiteName)
     {
-        var stats = result.Statistics;
+        var stats = result.MeasuredCount > 0 ? result.Statistics : null;
         var runs = result.IndividualResults.Count;
         // Over every run, as the verdict is decided: a run that was not measured is not passed.
-        var passRate = runs > 0 ? (double)result.PassedCount / runs * 100 : 0;
+        var passRate = result.PassRateOverAllRuns * 100;
         var threshold = result.Options.SuccessRateThreshold * 100;
         var verdict = result.Verdict;
         var noVerdict = verdict is StochasticVerdict.Undecided or StochasticVerdict.NotMeasured;
@@ -87,10 +87,9 @@ internal static class StochasticReport
             [RunsMetric] = runs,
             [RunsPassedMetric] = result.PassedCount,
             [RunsNotMeasuredMetric] = result.NotMeasuredCount,
-            [PassRateMetric] = passRate,
         };
-        if (result.MeasuredCount > 0)
-            metrics[ScoreSdMetric] = stats.StandardDeviation;   // the spread of nothing is not 0
+        if (passRate is { } rate) metrics[PassRateMetric] = rate;
+        if (stats?.StandardDeviation is { } deviation) metrics[ScoreSdMetric] = deviation;
 
         return new TestResultSummary
         {
@@ -98,7 +97,7 @@ internal static class StochasticReport
             Category = suiteName,
             // The mean over the measured runs; none when no run was measured (the test is then skipped). The duration
             // sums the timed runs; none when no run was timed.
-            Score = result.MeasuredCount > 0 ? stats.MeanScore : null,
+            Score = stats?.MeanScore,
             Passed = result.Passed,
             NotMeasured = noVerdict,
             Skipped = noVerdict,
@@ -122,14 +121,16 @@ internal static class StochasticReport
 
     private static string Describe(StochasticResult result)
     {
-        var stats = result.Statistics;
+        var stats = result.MeasuredCount > 0 ? result.Statistics : null;
         var runs = result.IndividualResults.Count;
         var sb = new StringBuilder();
-        var passPercent = runs > 0 ? (double)result.PassedCount / runs * 100 : 0;
+        var passPercent = result.PassRateOverAllRuns is { } rate
+            ? (rate * 100).ToString("F1", CultureInfo.InvariantCulture) + "%"
+            : "n/a";
         var notMeasured = result.NotMeasuredCount > 0 ? $", {result.NotMeasuredCount} not measured" : "";
         sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-            $"{runs} runs, {result.PassedCount} passed ({passPercent:F1}%){notMeasured}; the threshold is {result.Options.SuccessRateThreshold * 100:F0}%."));
-        if (result.MeasuredCount == 0)
+            $"{runs} runs, {result.PassedCount} passed ({passPercent}){notMeasured}; the threshold is {result.Options.SuccessRateThreshold * 100:F0}%."));
+        if (stats is null)
         {
             sb.AppendLine("Score: not measured (no run produced a verdict).");
         }
@@ -138,7 +139,11 @@ internal static class StochasticReport
             // Over the measured runs only.
             sb.Append(string.Create(CultureInfo.InvariantCulture,
                 $"Score over {result.MeasuredCount} measured run(s): mean {stats.MeanScore:F1}, median {stats.MedianScore:F1}, " +
-                $"SD {stats.StandardDeviation:F1}, min {stats.MinScore}, max {stats.MaxScore}"));
+                $"min {stats.MinScore}, max {stats.MaxScore}"));
+            if (stats.StandardDeviation is { } sd)
+                sb.Append(string.Create(CultureInfo.InvariantCulture, $", SD {sd:F1}"));
+            else
+                sb.Append(", SD n/a (insufficient samples or statistical analysis disabled)");
             if (stats.ConfidenceInterval is { } ci)
                 sb.Append(string.Create(CultureInfo.InvariantCulture,
                     $"; {ci.Level * 100:F0}% CI for the mean [{ci.Lower:F1}, {ci.Upper:F1}]"));

@@ -37,7 +37,7 @@ public enum StochasticVerdict
 /// <param name="IndividualResults">Results from each individual run, measured or not.</param>
 /// <param name="Statistics">
 /// Statistical analysis of the measured runs only: a run that errored or whose judge produced no verdict carries a
-/// placeholder score of 0, and is not a sample (see <see cref="NotMeasuredCount"/>).
+/// placeholder score of 0, and is not a sample (see <see cref="NotMeasuredCount"/>). Null when none was measured.
 /// </param>
 /// <param name="Options">Options used for this stochastic run.</param>
 /// <param name="Passed">
@@ -47,7 +47,7 @@ public enum StochasticVerdict
 public record StochasticResult(
     TestCase TestCase,
     IReadOnlyList<TestResult> IndividualResults,
-    StochasticStatistics Statistics,
+    StochasticStatistics? Statistics,
     StochasticOptions Options,
     bool Passed)
 {
@@ -68,6 +68,11 @@ public record StochasticResult(
     /// Number of individual runs that passed.
     /// </summary>
     public int PassedCount => IndividualResults.Count(r => r.Passed);
+
+    /// <summary>Share of all runs that passed, including unmeasured runs in the denominator; null when there are no runs.</summary>
+    public double? PassRateOverAllRuns => IndividualResults.Count > 0
+        ? (double)PassedCount / IndividualResults.Count
+        : null;
 
     /// <summary>
     /// Number of measured runs that failed. A run that was not measured is not a failure (<see cref="NotMeasuredCount"/>).
@@ -298,7 +303,7 @@ public record StochasticResult(
             .GroupBy(m => m.MetricName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,
-                g => DistributionStatisticsFactory.Create(g.Select(m => m.Score).ToList()),
+                g => DistributionStatisticsFactory.Create(g.Select(m => m.Score).ToList())!,
                 StringComparer.OrdinalIgnoreCase);
         
         return metrics;
@@ -308,31 +313,41 @@ public record StochasticResult(
 /// <summary>
 /// Statistical analysis of stochastic test results, over the measured runs only: from the stochastic runner, a run
 /// that errored or whose judge produced no verdict is not a sample.
-/// With no run measured, <paramref name="SampleSize"/> is 0 and every other value is a placeholder.
+/// At least one run must be measured; otherwise <see cref="StochasticResult.Statistics"/> is null.
 /// </summary>
 /// <param name="PassRate">Share of the measured runs that passed (0.0-1.0). Not the verdict: see <see cref="StochasticResult.Verdict"/>.</param>
 /// <param name="MeanScore">Average score across the measured runs.</param>
 /// <param name="MedianScore">Median score across the measured runs.</param>
-/// <param name="StandardDeviation">Standard deviation of scores.</param>
+/// <param name="StandardDeviation">Sample standard deviation, null below two samples or when analysis is disabled.</param>
 /// <param name="MinScore">Minimum score observed.</param>
 /// <param name="MaxScore">Maximum score observed.</param>
-/// <param name="Percentile25">25th percentile score.</param>
-/// <param name="Percentile75">75th percentile score.</param>
-/// <param name="Percentile95">95th percentile score.</param>
-/// <param name="ConfidenceInterval">Confidence interval for the mean; <see langword="null"/> when no run was measured.</param>
+/// <param name="Percentile25">25th percentile score, null when analysis is disabled.</param>
+/// <param name="Percentile75">75th percentile score, null when analysis is disabled.</param>
+/// <param name="Percentile95">95th percentile score, null when analysis is disabled.</param>
+/// <param name="ConfidenceInterval">Confidence interval for the mean; null below two samples or when analysis is disabled.</param>
 /// <param name="SampleSize">Number of samples used: the measured runs.</param>
 public record StochasticStatistics(
     double PassRate,
     double MeanScore,
     double MedianScore,
-    double StandardDeviation,
+    double? StandardDeviation,
     int MinScore,
     int MaxScore,
-    double Percentile25,
-    double Percentile75,
-    double Percentile95,
+    double? Percentile25,
+    double? Percentile75,
+    double? Percentile95,
     ConfidenceInterval? ConfidenceInterval,
-    int SampleSize);
+    int SampleSize)
+{
+    private readonly int _sampleSize = RequireSample(SampleSize);
+
+    /// <summary>Number of measured samples; must be positive, including when copying the record.</summary>
+    public int SampleSize { get => _sampleSize; init => _sampleSize = RequireSample(value); }
+
+    private static int RequireSample(int value) => value > 0
+        ? value
+        : throw new ArgumentOutOfRangeException(nameof(SampleSize), value, "At least one measured sample is required; use null for no statistics.");
+}
 
 /// <summary>
 /// Represents a confidence interval for a statistic.

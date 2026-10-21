@@ -27,49 +27,49 @@ public sealed class DefaultStatisticsCalculator : IStatisticsCalculator
     public DefaultStatisticsCalculator() { }
 
     /// <inheritdoc />
-    public double Mean(IReadOnlyList<double> values) 
+    public double? Mean(IReadOnlyList<double> values)
         => StatisticsCalculator.Mean(values);
 
     /// <inheritdoc />
-    public double Median(IReadOnlyList<double> values) 
+    public double? Median(IReadOnlyList<double> values)
         => StatisticsCalculator.Median(values);
 
     /// <inheritdoc />
-    public double StandardDeviation(IReadOnlyList<double> values) 
+    public double? StandardDeviation(IReadOnlyList<double> values)
         => StatisticsCalculator.StandardDeviation(values);
 
     /// <inheritdoc />
-    public double Percentile(IReadOnlyList<double> values, double percentile) 
+    public double? Percentile(IReadOnlyList<double> values, double percentile)
         => StatisticsCalculator.Percentile(values, percentile);
 
     /// <inheritdoc />
-    public ConfidenceInterval CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95) 
+    public ConfidenceInterval? CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95)
         => StatisticsCalculator.CalculateConfidenceInterval(values, confidenceLevel);
 
     /// <inheritdoc />
-    public double CalculatePassRate(IReadOnlyList<bool> results) 
+    public double? CalculatePassRate(IReadOnlyList<bool> results)
         => StatisticsCalculator.CalculatePassRate(results);
 
     /// <inheritdoc />
-    public StochasticStatistics CreateStatistics(
+    public StochasticStatistics? CreateStatistics(
         IReadOnlyList<int> scores,
         IReadOnlyList<bool> passResults,
-        double confidenceLevel = 0.95) 
+        double confidenceLevel = 0.95)
         => StatisticsCalculator.CreateStatistics(scores, passResults, confidenceLevel);
 
     /// <inheritdoc />
-    public DistributionStatistics CreateDistribution(IReadOnlyList<double> values) 
+    public DistributionStatistics? CreateDistribution(IReadOnlyList<double> values)
         => DistributionStatisticsFactory.Create(values);
-    
+
     /// <inheritdoc />
-    public DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values) 
+    public DistributionStatistics? CreateDistribution(IReadOnlyList<TimeSpan> values)
         => DistributionStatisticsFactory.Create(values);
-    
+
     /// <inheritdoc />
-    public DistributionStatistics CreateDistribution(IReadOnlyList<int> values) 
+    public DistributionStatistics? CreateDistribution(IReadOnlyList<int> values)
         => DistributionStatisticsFactory.Create(values);
-    
+
     /// <inheritdoc />
-    public DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values) 
+    public DistributionStatistics? CreateDistribution(IReadOnlyList<decimal> values)
         => DistributionStatisticsFactory.Create(values);
 }

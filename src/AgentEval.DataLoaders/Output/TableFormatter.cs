@@ -41,21 +41,21 @@ public static class TableFormatter
         
         // The score and pass-rate rows are over the measured runs (Samples); a run that errored or got no verdict is not
         // one, and with none measured there is nothing to show but n/a.
-        var measured = result.Statistics.SampleSize > 0;
+        var scoreStats = result.MeasuredCount > 0 ? result.Statistics : null;
 
         // Score row
         if (options.ShowScore)
         {
-            if (measured)
+            if (scoreStats is not null)
             {
-                var scoreVariance = CalculateVariancePercent(result.Statistics.MinScore, result.Statistics.MaxScore, result.Statistics.MeanScore);
+                var scoreVariance = CalculateVariancePercent(scoreStats.MinScore, scoreStats.MaxScore, scoreStats.MeanScore);
                 writer.WriteLine($"{indent}{{0,-25}} {{1,10}} {{2,10}} {{3,10:F1}} {{4,10}} {{5,10}}",
                     "Score",
-                    result.Statistics.MinScore,
-                    result.Statistics.MaxScore,
-                    result.Statistics.MeanScore,
+                    scoreStats.MinScore,
+                    scoreStats.MaxScore,
+                    scoreStats.MeanScore,
                     FormatVarianceWithColor(scoreVariance, options.UseColors),
-                    result.Statistics.SampleSize);
+                    scoreStats.SampleSize);
             }
             else
             {
@@ -341,7 +341,7 @@ public static class TableFormatter
             sb.Append(modelName.PadRight(modelColWidth));
             
             // Over the measured runs; a model none of whose runs was measured has no pass rate or score to show.
-            var measured = result.Statistics.SampleSize > 0;
+            var scoreStats = result.MeasuredCount > 0 ? result.Statistics : null;
             if (options.ShowPassRate)
             {
                 sb.Append(" | ");
@@ -351,7 +351,7 @@ public static class TableFormatter
             if (options.ShowScore)
             {
                 sb.Append(" | ");
-                sb.Append((measured ? $"{result.Statistics.MeanScore:F1}" : "N/A").PadLeft(6));
+                sb.Append((scoreStats is not null ? $"{scoreStats.MeanScore:F1}" : "N/A").PadLeft(6));
             }
 
             if (options.ShowDuration)
@@ -581,7 +581,7 @@ public static class TableFormatter
     // Pass rate over every run, a crashed or unjudged one included: it counts against reliability, as in
     // ModelResult.PassRate (D-15). Scores stay over the measured runs.
     private static string PassRateOverEveryRun(StochasticResult result) =>
-        result.IndividualResults.Count > 0
-            ? $"{(double)result.PassedCount / result.IndividualResults.Count * 100:F0}%"
+        result.PassRateOverAllRuns is { } rate
+            ? $"{rate * 100:F0}%"
             : "N/A";
 }

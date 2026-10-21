@@ -168,12 +168,12 @@ public sealed class NothingMeasuredAggregationCensusTests
     internal static readonly IReadOnlyDictionary<string, string> Justified = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         // Abstractions
-        ["AgentEval.Comparison.DistributionStatistics"] = "placeholder plus flag: SampleSize 0 marks an empty sample (T71 makes the StochasticResult members that returned one null)",
-        ["AgentEval.Comparison.DistributionStatisticsFactory"] = "factory: an empty list gives SampleSize 0, the documented flag",
+        ["AgentEval.Comparison.DistributionStatistics"] = "non-empty distribution: positive SampleSize is enforced; an empty factory input returns null (T86a)",
+        ["AgentEval.Comparison.DistributionStatisticsFactory"] = "factory: an empty list returns null (T86a)",
         ["AgentEval.Comparison.ModelComparisonOptions"] = "config: runs per model and weights",
         ["AgentEval.Comparison.ModelComparisonResult"] = "DTO of ModelComparer (row B-3), built only when a model was measured",
         ["AgentEval.Comparison.ModelRanking"] = "DTO of ModelComparer (row B-3): only measured models are ranked",
-        ["AgentEval.Comparison.StochasticStatistics"] = "placeholder plus flag: SampleSize 0, and the result's Verdict is NotMeasured (row B-2)",
+        ["AgentEval.Comparison.StochasticStatistics"] = "non-empty statistics: positive SampleSize is enforced; no measured run means null statistics (row B-2, T86a)",
         ["AgentEval.Comparison.ToolUsageSummary"] = "DTO of StochasticResult.GetToolUsageSummary; T71 makes its rates null when no run tracked tools",
         ["AgentEval.Core.EvaluationResult"] = "placeholder plus flag: an evaluator's OverallScore with EvaluationFailed set is no reading",
         ["AgentEval.Evals.EvalDetails"] = "data: carries a result's sub-results and computes nothing",

@@ -161,8 +161,9 @@ var result = await runner.RunStochasticTestAsync(
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.8));
 
 // Analyze: min, max, mean, std dev
-result.Statistics.Mean.Should().BeGreaterThan(75);
-result.Statistics.StandardDeviation.Should().BeLessThan(15);
+result.Should()
+    .HaveMeanScoreAtLeast(75)
+    .HaveStandardDeviationAtMost(15); // fails as not measured if statistics are unavailable
 ```
 
 ---

@@ -188,6 +188,8 @@ Console.WriteLine($"Winner: {result.Winner.ModelName}");
 
 ## How the Scores Are Computed
 
+`Statistics` is null when no run was measured. Standard deviation and confidence intervals are null with fewer than two measured runs, and spread/percentiles are null when statistical analysis is disabled. `ModelResult.PassRate` is null when there are no runs; otherwise it counts every run in the denominator, including errors.
+
 A total cost is available only when every run carries a price. Missing prices or crashed runs leave `TotalCost` null, with `TotalCostNotPricedReason` explaining why. `AverageCost` remains the mean over `PricedRunCount` priced runs; the detailed table labels that sample size when it is partial. A recorded zero cost remains zero.
 
 1. Each model runs `RunsPerModel` times through the stochastic runner. `ModelResult.StochasticResult` keeps every run (`IndividualResults`) and their statistics.
@@ -199,7 +201,7 @@ A total cost is available only when every run carries a price. Missing prices or
 What follows from this:
 
 - **The scores are relative.** A speed score of 0 means "slowest of these models", not "slow". Adding or removing a model changes every model's scores.
-- **Small differences use the whole scale.** Two models with mean scores of 91.0 and 90.5 get quality scores of 100 and 0. Check `ModelResults` and the confidence interval in `StochasticResult.Statistics.ConfidenceInterval` before treating a rank as a real difference.
+- **Small differences use the whole scale.** Two models with mean scores of 91.0 and 90.5 get quality scores of 100 and 0. Check `ModelResults` and the confidence interval in `StochasticResult.Statistics?.ConfidenceInterval` before treating a rank as a real difference.
 
 ### What the Ranking Does Not Tell You
 
@@ -624,7 +626,7 @@ weights.Validate();
 | Which model ranked first? | `result.Winner` |
 | How did each model score on each dimension? | `result.Ranking` |
 | What were the raw numbers? | `result.ModelResults`: pass rate, mean score, SD, latency, cost |
-| Is a difference real or noise? | `model.StochasticResult.Statistics.ConfidenceInterval`, and enough runs |
+| Is a difference real or noise? | `model.StochasticResult.Statistics?.ConfidenceInterval`, and enough runs |
 | Which model won across a suite? | `results.ToMarkdown()`: wins and average scores |
 | What does each model cost? | Its own tokens at its own rate: `ModelPricing.EstimateCost` |
 

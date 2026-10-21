@@ -67,11 +67,11 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveMeanScoreAtLeast(double minimumScore, string? because = null)
     {
-        ThrowIfNotMeasured("mean score", because);
-        if (_result.Statistics.MeanScore < minimumScore)
+        var stats = RequireStatistics("mean score", because);
+        if (stats.MeanScore < minimumScore)
         {
             throw new StochasticAssertionException(
-                $"Expected mean score >= {minimumScore:F2}, but was {_result.Statistics.MeanScore:F2}." +
+                $"Expected mean score >= {minimumScore:F2}, but was {stats.MeanScore:F2}." +
                 (because != null ? $" because {because}" : ""));
         }
         
@@ -87,11 +87,12 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveStandardDeviationAtMost(double maxStandardDeviation, string? because = null)
     {
-        ThrowIfNotMeasured("standard deviation", because);
-        if (_result.Statistics.StandardDeviation > maxStandardDeviation)
+        var stats = RequireStatistics("standard deviation", because);
+        var deviation = RequireReading(stats.StandardDeviation, "standard deviation", because);
+        if (deviation > maxStandardDeviation)
         {
             throw new StochasticAssertionException(
-                $"Expected standard deviation <= {maxStandardDeviation:F2}, but was {_result.Statistics.StandardDeviation:F2}. " +
+                $"Expected standard deviation <= {maxStandardDeviation:F2}, but was {deviation:F2}. " +
                 "Results are too inconsistent." +
                 (because != null ? $" because {because}" : ""));
         }
@@ -107,11 +108,11 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveMedianScoreAtLeast(double minimumScore, string? because = null)
     {
-        ThrowIfNotMeasured("median score", because);
-        if (_result.Statistics.MedianScore < minimumScore)
+        var stats = RequireStatistics("median score", because);
+        if (stats.MedianScore < minimumScore)
         {
             throw new StochasticAssertionException(
-                $"Expected median score >= {minimumScore:F2}, but was {_result.Statistics.MedianScore:F2}." +
+                $"Expected median score >= {minimumScore:F2}, but was {stats.MedianScore:F2}." +
                 (because != null ? $" because {because}" : ""));
         }
         
@@ -127,11 +128,12 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HavePercentile95AtLeast(double minimumScore, string? because = null)
     {
-        ThrowIfNotMeasured("95th percentile", because);
-        if (_result.Statistics.Percentile95 < minimumScore)
+        var stats = RequireStatistics("95th percentile", because);
+        var percentile = RequireReading(stats.Percentile95, "95th percentile", because);
+        if (percentile < minimumScore)
         {
             throw new StochasticAssertionException(
-                $"Expected 95th percentile >= {minimumScore:F2}, but was {_result.Statistics.Percentile95:F2}." +
+                $"Expected 95th percentile >= {minimumScore:F2}, but was {percentile:F2}." +
                 (because != null ? $" because {because}" : ""));
         }
         
@@ -147,11 +149,11 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveMinScoreAtLeast(int minimumScore, string? because = null)
     {
-        ThrowIfNotMeasured("minimum score", because);
-        if (_result.Statistics.MinScore < minimumScore)
+        var stats = RequireStatistics("minimum score", because);
+        if (stats.MinScore < minimumScore)
         {
             throw new StochasticAssertionException(
-                $"Expected minimum score >= {minimumScore}, but was {_result.Statistics.MinScore}. " +
+                $"Expected minimum score >= {minimumScore}, but was {stats.MinScore}. " +
                 "At least one run performed below the threshold." +
                 (because != null ? $" because {because}" : ""));
         }
@@ -167,19 +169,15 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveConfidenceIntervalLowerBoundAtLeast(double minimumLowerBound, string? because = null)
     {
-        ThrowIfNotMeasured("confidence interval", because);
-        if (_result.Statistics.ConfidenceInterval == null)
-        {
-            throw new StochasticAssertionException(
-                "Confidence interval was not calculated. Enable statistical analysis in options.");
-        }
-        
-        if (_result.Statistics.ConfidenceInterval.Lower < minimumLowerBound)
+        var stats = RequireStatistics("confidence interval", because);
+        var interval = stats.ConfidenceInterval ?? throw MissingStatistic("confidence interval", because);
+
+        if (interval.Lower < minimumLowerBound)
         {
             throw new StochasticAssertionException(
                 $"Expected confidence interval lower bound >= {minimumLowerBound:F2}, " +
-                $"but was {_result.Statistics.ConfidenceInterval.Lower:F2}. " +
-                $"Full CI: {_result.Statistics.ConfidenceInterval}" +
+                $"but was {interval.Lower:F2}. " +
+                $"Full CI: {interval}" +
                 (because != null ? $" because {because}" : ""));
         }
         
@@ -215,18 +213,35 @@ public class StochasticAssertions
         return this;
     }
 
+    [StackTraceHidden]
+    private Comparison.StochasticStatistics RequireStatistics(string what, string? because)
+    {
+        ThrowIfNotMeasured(what, because);
+        return _result.Statistics ?? throw MissingStatistic(what, because);
+    }
+
+    [StackTraceHidden]
+    private static double RequireReading(double? value, string what, string? because) =>
+        value ?? throw MissingStatistic(what, because);
+
+    private static StochasticAssertionException MissingStatistic(string what, string? because) => new(
+        $"Expected a measured {what}. Actual: not measured (insufficient measured runs, or statistical analysis was disabled). " +
+        "Suggestions: collect at least two measured runs and enable statistical analysis." +
+        (because != null ? $" because {because}" : ""));
+
     // Every score statistic is over the measured runs only. A run that errored or got no verdict might have scored
     // anything, so a score assertion on a result with one is not measured: it throws rather than pass on the runs that
     // happened to be measured. Strict on purpose (no clean PASS that hides an unmeasured run).
     [StackTraceHidden]
     private void ThrowIfNotMeasured(string what, string? because)
     {
-        if (_result.NotMeasuredCount == 0)
+        if (_result.NotMeasuredCount == 0 && _result.IndividualResults.Count > 0)
             return;
 
         throw new StochasticAssertionException(
-            $"Expected the {what} over every run, but it was not measured: {_result.NotMeasuredCount} of " +
-            $"{_result.IndividualResults.Count} runs produced no verdict (errored, or the judge produced none)." +
+            $"Expected the {what} over every run. Actual: not measured: {_result.NotMeasuredCount} of " +
+            $"{_result.IndividualResults.Count} runs produced no verdict (errored, or the judge produced none). " +
+            "Suggestions: run at least one evaluation and resolve every missing verdict." +
             (because != null ? $" because {because}" : ""));
     }
     
@@ -239,14 +254,15 @@ public class StochasticAssertions
     [StackTraceHidden]
     public StochasticAssertions HaveCoefficientOfVariationAtMost(double maxCoefficientOfVariation, string? because = null)
     {
-        ThrowIfNotMeasured("coefficient of variation", because);
-        if (_result.Statistics.MeanScore == 0)
+        var stats = RequireStatistics("coefficient of variation", because);
+        var deviation = RequireReading(stats.StandardDeviation, "coefficient of variation", because);
+        if (stats.MeanScore == 0)
         {
             throw new StochasticAssertionException(
                 "Cannot calculate coefficient of variation with mean score of 0.");
         }
         
-        double cv = _result.Statistics.StandardDeviation / _result.Statistics.MeanScore;
+        double cv = deviation / stats.MeanScore;
         
         if (cv > maxCoefficientOfVariation)
         {

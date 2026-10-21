@@ -46,6 +46,7 @@ public class StochasticNotMeasuredTests
         // Today: mean 60, min 0, sample 3, SD 51.96.
         var result = await RunAsync(0.6, Pass(), Errored(), Pass());
 
+        Assert.NotNull(result.Statistics);
         Assert.Equal(90, result.Statistics.MeanScore);
         Assert.Equal(90, result.Statistics.MinScore);
         Assert.Equal(2, result.Statistics.SampleSize);
@@ -60,6 +61,7 @@ public class StochasticNotMeasuredTests
     {
         var result = await RunAsync(0.6, Pass(), JudgeFailed(), Pass());
 
+        Assert.NotNull(result.Statistics);
         Assert.Equal(90, result.Statistics.MeanScore);
         Assert.Equal(2, result.Statistics.SampleSize);
         Assert.Equal(1.0, result.Statistics.PassRate);
@@ -71,8 +73,7 @@ public class StochasticNotMeasuredTests
     {
         var result = await RunAsync(0.6, Errored(), Errored(), Errored());
 
-        Assert.Equal(0, result.Statistics.SampleSize);
-        Assert.Null(result.Statistics.ConfidenceInterval);   // today (0, 0, 0.95)
+        Assert.Null(result.Statistics);
         Assert.Equal(StochasticVerdict.NotMeasured, result.Verdict);
         Assert.False(result.Passed);
         Assert.DoesNotContain("FAILED", result.Summary);
@@ -99,6 +100,7 @@ public class StochasticNotMeasuredTests
 
         Assert.False(result.Passed);
         Assert.Equal(StochasticVerdict.Undecided, result.Verdict);
+        Assert.NotNull(result.Statistics);
         Assert.Equal(1.0, result.Statistics.PassRate);   // over the one measured run: not the verdict
     }
 
@@ -134,6 +136,7 @@ public class StochasticNotMeasuredTests
 
         Assert.Equal(passed, result.Passed);
         Assert.Equal(passed ? StochasticVerdict.Passed : StochasticVerdict.Failed, result.Verdict);
+        Assert.NotNull(result.Statistics);
         Assert.Equal(5, result.Statistics.SampleSize);
     }
 
@@ -331,7 +334,8 @@ public class StochasticNotMeasuredTests
         var result = await Compare(harness, "steady", "crashy");
 
         var crashy = result.ModelResults.Single(m => m.ModelName == "Crashy");
-        Assert.Equal(2.0 / 3, crashy.PassRate, 6);
+        Assert.Equal(2.0 / 3, crashy.PassRate!.Value, 6);
+        Assert.NotNull(crashy.StochasticResult.Statistics);
         Assert.Equal(1.0, crashy.StochasticResult.Statistics.PassRate);   // the measured runs' share, unchanged
         Assert.Equal(90, crashy.MeanScore);
     }

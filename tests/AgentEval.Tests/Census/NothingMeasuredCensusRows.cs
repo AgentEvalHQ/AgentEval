@@ -672,14 +672,14 @@ internal static class NothingMeasuredCensusRows
 
         Assert.Equal(StochasticVerdict.NotMeasured, result.Verdict);
         Assert.False(result.Passed);
-        Assert.Equal(0, result.Statistics.SampleSize);
-        Assert.Null(result.Statistics.ConfidenceInterval);
+        Assert.Null(result.Statistics);
     }
 
     private static async Task B2Twin()
     {
         var result = await Stochastic(Runs.Scored(90), Runs.Scored(90), Runs.Scored(90));
 
+        Assert.NotNull(result.Statistics);
         Assert.Equal(3, result.Statistics.SampleSize);
         Assert.Equal(90, result.Statistics.MeanScore);
     }
@@ -689,6 +689,8 @@ internal static class NothingMeasuredCensusRows
         // StochasticOptions needs at least 3 runs, so the measured-only set has three and the mixed one adds an error.
         var mixed = await Stochastic(Runs.Scored(90), Runs.Errored(), Runs.Scored(80), Runs.Scored(85));
         var alone = await Stochastic(Runs.Scored(90), Runs.Scored(80), Runs.Scored(85));
+        Assert.NotNull(alone.Statistics);
+        Assert.NotNull(mixed.Statistics);
         return (mixed.Statistics.MeanScore, alone.Statistics.MeanScore);
     }
 

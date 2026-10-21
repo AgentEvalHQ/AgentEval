@@ -270,7 +270,7 @@ public static class CombinedStochasticComparison
             .Select(m => new
             {
                 Model = m.ModelName,
-                Score = (double)m.Result.PassedCount / m.Result.IndividualResults.Count * m.Result.Statistics.MeanScore,
+                Score = (double)m.Result.PassedCount / m.Result.IndividualResults.Count * m.Result.Statistics!.MeanScore,
                 PassRate = (double)m.Result.PassedCount / m.Result.IndividualResults.Count,
                 Cost = costKnown ? m.Result.CostStats!.Mean : 0
             })

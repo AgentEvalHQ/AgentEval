@@ -221,11 +221,11 @@ public static class ModelComparisonExtensions
         sb.AppendLine("| Model | Pass Rate | Mean Score | Avg Latency | Avg Cost | Total Cost |");
         sb.AppendLine("|-------|-----------|------------|-------------|----------|------------|");
 
-        foreach (var modelResult in result.ModelResults.OrderByDescending(PassShareOfAllRuns))
+        foreach (var modelResult in result.ModelResults.OrderByDescending(m => m.PassRate))
         {
             // The pass rate over every run, as reliability is ranked: a run that was not measured did not pass. The mean
             // score is over the measured runs; with none it is not measured.
-            var passRateFormatted = $"{PassShareOfAllRuns(modelResult):P1}";
+            var passRateFormatted = modelResult.PassRate is { } rate ? $"{rate:P1}" : "n/a";
             var meanScoreFormatted = modelResult.MeanScore is { } meanScore
                 ? $"{meanScore:F1}"
                 : "n/a";
@@ -269,29 +269,29 @@ public static class ModelComparisonExtensions
 
         foreach (var modelResult in result.ModelResults.OrderByDescending(m => m.MeanScore))
         {
-            var stats = modelResult.StochasticResult.Statistics;
-            if (stats.SampleSize == 0)
+            var stats = modelResult.StochasticResult.MeasuredCount > 0 ? modelResult.StochasticResult.Statistics : null;
+            if (stats is null)
             {
                 // No measured run: every statistic would be the 0 of an empty sample.
                 sb.AppendLine($"| {modelResult.ModelName} | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |");
                 continue;
             }
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                "| {0} | {1:F1} | {2:F1} | {3:F2} | {4} | {5} | {6:F1} | {7:F1} | {8:F1} |",
+                "| {0} | {1:F1} | {2:F1} | {3} | {4} | {5} | {6} | {7} | {8} |",
                 modelResult.ModelName,
                 stats.MeanScore,
                 stats.MedianScore,
-                stats.StandardDeviation,
+                stats.StandardDeviation?.ToString("F2", CultureInfo.InvariantCulture) ?? "n/a",
                 stats.MinScore,
                 stats.MaxScore,
-                stats.Percentile25,
-                stats.Percentile75,
-                stats.Percentile95));
+                stats.Percentile25?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a",
+                stats.Percentile75?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a",
+                stats.Percentile95?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a"));
         }
 
         // Add confidence intervals if available
         var hasConfidenceIntervals = result.ModelResults.Any(m => 
-            m.StochasticResult.Statistics.ConfidenceInterval != null);
+            m.StochasticResult.MeasuredCount > 0 && m.StochasticResult.Statistics?.ConfidenceInterval != null);
 
         if (hasConfidenceIntervals)
         {
@@ -301,8 +301,8 @@ public static class ModelComparisonExtensions
 
             foreach (var modelResult in result.ModelResults)
             {
-                var ci = modelResult.StochasticResult.Statistics.ConfidenceInterval;
-                if (ci != null)
+                var ci = modelResult.StochasticResult.Statistics?.ConfidenceInterval;
+                if (modelResult.StochasticResult.MeasuredCount > 0 && ci != null)
                 {
                     sb.AppendLine($"- **{modelResult.ModelName}**: {ci}");
                 }
@@ -542,12 +542,6 @@ public static class ModelComparisonExtensions
             ? caveat
             : caveat + $" (not ranked: {string.Join(", ", unranked)}, none of whose runs was measured)";
     }
-
-    // Reliability as the ranking reads it: the share of every run that passed, a run that was not measured included.
-    private static double PassShareOfAllRuns(ModelResult model) =>
-        model.StochasticResult.IndividualResults.Count > 0
-            ? (double)model.StochasticResult.PassedCount / model.StochasticResult.IndividualResults.Count
-            : 0;
 
     private static string FormatScore(double? score) =>
         score is { } value ? value.ToString("F1", CultureInfo.InvariantCulture) : "n/a";

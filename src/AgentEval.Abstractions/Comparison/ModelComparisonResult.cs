@@ -236,23 +236,21 @@ public record ModelResult(
     /// <summary>
     /// Pass rate for this model over every run, measured or not: a run that errored or got no verdict from the judge did
     /// not pass, and the model is less reliable for it (decision D-15). <see cref="StochasticResult.Statistics"/>'s
-    /// pass rate is over the measured runs only.
+    /// pass rate is over the measured runs only. Null when there are no runs.
     /// </summary>
-    public double PassRate => StochasticResult.IndividualResults.Count > 0
-        ? (double)StochasticResult.PassedCount / StochasticResult.IndividualResults.Count
-        : 0;
+    public double? PassRate => StochasticResult.PassRateOverAllRuns;
 
     /// <summary>
     /// Mean score for this model over its measured runs, or <see langword="null"/> when none was measured
     /// (<see cref="StochasticResult.MeasuredCount"/> is 0).
     /// </summary>
-    public double? MeanScore => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics.MeanScore : null;
+    public double? MeanScore => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics?.MeanScore : null;
 
     /// <summary>
-    /// Standard deviation of scores over the measured runs, or <see langword="null"/> when none was measured: the
+    /// Standard deviation of scores over the measured runs, or <see langword="null"/> below two measured runs or with analysis disabled: the
     /// spread of nothing is not 0.
     /// </summary>
-    public double? StandardDeviation => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics.StandardDeviation : null;
+    public double? StandardDeviation => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics?.StandardDeviation : null;
 }
 
 /// <summary>
