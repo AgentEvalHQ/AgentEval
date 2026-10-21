@@ -53,8 +53,8 @@ public static class AutoAuditRunner
         return new AutoAuditEndpointResult(
             endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate)
         {
-            // The same test ReconcileToEvalResult applies: no model response at the chat boundary, nothing reconciled.
-            FidelityMeasured = TraceFidelityRunner.HasChatTruth(chatBoundary),
+            // A clean measured subset cannot establish complete fidelity when a class was unchecked.
+            FidelityMeasured = TraceFidelityRunner.HasChatTruth(chatBoundary) && fidelity.Discrepancies.All(d => d.Measured),
             TokensReported = tokensReported,
         };
     }

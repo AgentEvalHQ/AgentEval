@@ -64,10 +64,16 @@ public static class AutoAuditDemo
         string endpoint, bool retry, bool leak, CancellationToken cancellationToken)
     {
         var scripted = new ScriptedChatClient();
-        scripted.AddToolCall("c1", "Lookup", new Dictionary<string, object?>());
+        // Every scripted turn carries usage so the demo isolates tool/finish discrepancies.
+        var lookup = new ScriptedTurn
+        {
+            ToolCallId = "c1", ToolName = "Lookup", ToolArgs = new Dictionary<string, object?>(),
+            FinishReason = ChatFinishReason.ToolCalls, InputTokens = 20, OutputTokens = 5,
+        };
+        scripted.Add(lookup);
         if (retry)
         {
-            scripted.AddToolCall("c1", "Lookup", new Dictionary<string, object?>());   // silent retry
+            scripted.Add(lookup);   // silent retry
         }
 
         if (leak)

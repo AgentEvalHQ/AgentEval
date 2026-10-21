@@ -73,6 +73,29 @@ public class AutoAuditNotMeasuredTests
         Assert.DoesNotContain("100%", row);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(30)]
+    public void Evaluate_WithIncompleteUsage_CannotWinOnCleanFidelity(int? knownTokens)
+    {
+        var chat = new AgentTrace();
+        chat.Entries.Add(TraceEntry.ForChatResponse(0, "inv", "ok", 5, null, null, "stop", null));
+        if (knownTokens is { } tokens)
+            chat.Entries.Add(TraceEntry.ForChatResponse(1, "inv", "ok", 5,
+                new TraceTokenUsage { PromptTokens = tokens, CompletionTokens = 0 }, null, "stop", null));
+        var agent = AgentBoundary();
+        agent.Performance = new TracePerformance { TotalPromptTokens = knownTokens ?? 0, TotalCompletionTokens = 0 };
+
+        var result = AutoAuditRunner.Evaluate("incomplete", agent, chat);
+        var report = AutoAuditRunner.Compare([result]);
+
+        Assert.False(result.FidelityMeasured);
+        Assert.Null(report.Winner);
+        Assert.Contains("not measured", report.ToMarkdown());
+        Assert.DoesNotContain("100%", report.ToMarkdown());
+    }
+
     [Fact]
     public void OnlyEndpointsWithNoChatBoundaryTruth_HaveNoWinner()
     {

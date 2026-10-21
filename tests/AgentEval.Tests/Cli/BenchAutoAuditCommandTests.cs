@@ -21,7 +21,11 @@ public sealed class BenchAutoAuditCommandTests
     /// <summary>Calls the Lookup tool, then answers; <paramref name="answer"/> decides whether the SSN is repeated.</summary>
     private static ScriptedChatClient Model(string answer) =>
         new ScriptedChatClient()
-            .AddToolCall("c1", "Lookup", new Dictionary<string, object?> { ["customerId"] = "4471" })
+            .Add(new ScriptedTurn
+            {
+                ToolCallId = "c1", ToolName = "Lookup", ToolArgs = new Dictionary<string, object?> { ["customerId"] = "4471" },
+                FinishReason = ChatFinishReason.ToolCalls, InputTokens = 20, OutputTokens = 5,
+            })
             .AddText(answer, inTok: 120, outTok: 30);
 
     private static async Task<(int Exit, string Stdout, string Stderr)> RunAsync(Func<Task<int>> run)

@@ -35,8 +35,8 @@ public sealed record AutoAuditEndpointResult(
 
     /// <summary>
     /// Whether <see cref="FidelityScore"/> is a measurement. <see langword="false"/> when the chat-boundary trace holds no
-    /// model response to reconcile against (the recorder was not wired, or the endpoint answered without a model call):
-    /// nothing then disagrees, so the score reads 1.0 without having been measured.
+    /// model response to reconcile against, or a discrepancy class could not be checked (for example, incomplete token
+    /// usage). A clean measured subset cannot establish complete fidelity or win the comparison.
     /// </summary>
     public bool FidelityMeasured { get; init; } = true;
 
