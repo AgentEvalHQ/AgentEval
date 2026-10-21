@@ -6,9 +6,14 @@ using System.Text;
 using System.Text.Json.Nodes;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
+using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Evals.Agentic.System;
 using AgentEval.Tests.Agentic.Golden;
 using AgentEval.Tests.Interop.AssertAi;
+using Microsoft.Extensions.AI;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic.Calibration;
@@ -104,6 +109,72 @@ public sealed class CalibrationEntrySystemMessageTests : IDisposable
         Assert.Equal(Instructions, (string)withRules[0]!["edit"]!["message"]!["content"]!);
         var withoutRules = JsonNode.Parse(rows[1])!["events"]!.AsArray();
         Assert.Equal(["add_message", "add_message"], withoutRules.Select(e => (string)e!["edit"]!["type"]!));
+    }
+
+    [Fact]
+    public async Task NoShippedGolden_LeavesAJudgeUnmeasuredForWantOfTheAgentsInstructions()
+    {
+        var registry = new EvalRegistry();
+        AgenticEvalRegistration.RegisterInto(registry);
+        var entries = (await new CalibrationDatasetLoader().LoadAllFromAssemblyAsync(GetType().Assembly))
+            .SelectMany(d => d.Entries).ToList();
+        var keys = registry.All.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = new List<string>();
+
+        foreach (var entry in entries.Where(e => keys.Contains(e.EvaluatorKey)))
+        {
+            var eval = registry.Resolve(entry.EvaluatorKey, new RecordingScoreEvaluator(100), judgeModel: null)!;
+            var result = await eval.EvaluateAsync(entry.ToEvalInput());
+            missing.AddRange(MissingInstructions(result).Select(r => $"{entry.ScenarioId}/{r.Metric.Key}"));
+        }
+
+        // Prove the detector catches the missing-data path, even after the corpus is repaired.
+        var control = entries.First(e => e.EvaluatorKey == "task_adherence");
+        var probe = await new TaskAdherenceEval(new RecordingScoreEvaluator(100))
+            .EvaluateAsync(control.ToEvalInput() with { SystemMessage = null });
+        Assert.Equal(4, MissingInstructions(probe).Count());
+        Assert.True(missing.Count == 0, "Rule judges lack instructions: " + string.Join(", ", missing));
+    }
+
+    [Fact]
+    public async Task Calibrate_ShowsEveryTaskAdherenceRuleJudge_TheGoldensInstructions_AndScoresEveryRecord()
+    {
+        AgenticEvalRegistration.Register();
+        var datasets = (await new CalibrationDatasetLoader().LoadAllFromAssemblyAsync(GetType().Assembly))
+            .Select(d => new CalibrationDataset(d.CategoryKey, d.Entries.Where(e => e.EvaluatorKey == "task_adherence").ToList()))
+            .Where(d => d.Entries.Count > 0).ToList();
+        var entries = datasets.SelectMany(d => d.Entries).ToList();
+        Assert.Equal(4, entries.Count);
+        using var client = new AgentEval.Tests.Evals.RubricJudgeTests.RecordingChatClient(
+            _ => """{"score":97,"label":"pass","reasoning":"r","criteria_results":[],"evidence":[]}""");
+        var judge = new ChatClientEvaluator(client);
+        var report = await new CalibrationRunner(key => key == "task_adherence" ? new TaskAdherenceEval(judge) : null)
+            .RunAsync(datasets);
+
+        var system = report.PerCategory["system"];
+        Assert.Equal(4, system.EntryCount);
+        Assert.Equal(0, system.NotMeasured);
+        Assert.Empty(system.ExcludedKeys);
+        Assert.Equal(20, client.Calls.Count);
+        Assert.Equal(new[] { "cal-tad-001", "cal-tad-002", "cal-tad-003", "cal-tad-004" }, entries.Select(e => e.ScenarioId).Order());
+        foreach (var entry in entries)
+        {
+            var instructions = entry.ToEvalInput().SystemMessage;
+            Assert.False(string.IsNullOrWhiteSpace(instructions));
+            Assert.Equal(4, client.Calls.Count(call => call.Any(m => m.Role == ChatRole.User
+                && m.Text.Contains("<agent_instructions>", StringComparison.Ordinal)
+                && m.Text.Contains(instructions!, StringComparison.Ordinal))));
+        }
+    }
+
+    private static IEnumerable<EvalResult> MissingInstructions(EvalResult result)
+    {
+        if (result.Score.Label == "skipped"
+            && result.Details.Summary?.Contains("EvalInput.SystemMessage is empty", StringComparison.Ordinal) == true)
+            yield return result;
+        foreach (var child in result.Details.SubResults ?? [])
+            foreach (var missing in MissingInstructions(child))
+                yield return missing;
     }
 
     private static string GoldenLine(string id, string? systemMessage)

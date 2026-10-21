@@ -224,7 +224,7 @@ public class GoldenReachabilityTests
     }
 
     // Exactly as CalibrationRunner builds it: the reference answer (B12a), the context, the tool calls and the
-    // conversation history.
+    // conversation history and the agent's system message.
     private static EvalInput ToInput(CalibrationEntry e) => e.ToEvalInput();
 
     private static IReadOnlyList<CalibrationEntry> GoldenEntries()
@@ -273,9 +273,8 @@ public class GoldenReachabilityTests
     /// </summary>
     /// <remarks>
     /// <c>unsafe_tool_use</c>: <c>UnsafeToolUseEval</c> skips unless <c>EvalInput.ToolCalls</c> is
-    /// non-empty; <c>CalibrationEntry</c> carries <c>Input</c> and <c>AgentResponse</c> and nothing
-    /// else, and <c>CalibrationRunner</c> builds <c>new EvalInput(Query, Response)</c>. All 20 of its
-    /// goldens are skipped, in both verdict directions.
+    /// non-empty. Although <c>CalibrationEntry</c> now carries tool calls, none of this key's 20
+    /// shipped goldens supplies them. All 20 are skipped, in both verdict directions.
     /// <para>
     /// <c>tool_input_accuracy</c> is NOT exempt, though <c>CalibrationEntry</c> cannot carry the tool definitions its
     /// required schema check reads (2.1.0, #203 review B3): a FAILING judge still decides it (a measured required failure
@@ -671,6 +670,47 @@ public class GoldenReachabilityTests
             Assert.Equal("fail", failed.Score.Label);
             Assert.Equal(Reach.Withheld, passing);
         }
+    }
+
+    [Fact]
+    public async Task TaskAdherence_OnItsGoldens_CanPassAndFail()
+    {
+        var registry = Populated();
+        var entries = GoldenEntries().Where(e => e.EvaluatorKey == "task_adherence").ToList();
+        Assert.Equal(4, entries.Count);
+        foreach (var entry in entries)
+        {
+            var (failing, failed) = await ClassifyAsync(registry, entry.EvaluatorKey, ToInput(entry), judgeScore: 10);
+            var (passing, passed) = await ClassifyAsync(registry, entry.EvaluatorKey, ToInput(entry), judgeScore: 100);
+            Assert.Equal(Reach.Judged, failing);
+            Assert.Equal("fail", failed.Score.Label);
+            Assert.Equal(Reach.Judged, passing);
+            Assert.Equal("pass", passed.Score.Label);
+        }
+    }
+
+    [Fact]
+    public async Task EveryRecordThatReachesAVerdictInOnlyOneJudgeDirection_IsOnTheRecordedCensus()
+    {
+        var registry = Populated();
+        var keys = registry.All.Select(e => e.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var actual = new List<string>();
+        foreach (var entry in GoldenEntries().Where(e => keys.Contains(e.EvaluatorKey)))
+        {
+            var (low, _) = await ClassifyAsync(registry, entry.EvaluatorKey, ToInput(entry), judgeScore: 10);
+            var (high, _) = await ClassifyAsync(registry, entry.EvaluatorKey, ToInput(entry), judgeScore: 100);
+            if (IsEvidence(low) != IsEvidence(high))
+                actual.Add($"{entry.ScenarioId}={(IsEvidence(low) ? "fail-only" : "pass-only")}");
+        }
+
+        // Tool schema definitions are absent from these goldens: required schema checks withhold
+        // a passing aggregate. This records that known gap; it does not exempt it from the bar.
+        string[] expected =
+        [
+            "cal-tca-001=fail-only", "cal-tca-002=fail-only", "cal-tca-003=fail-only",
+            "cal-tia-001=fail-only", "cal-tia-002=fail-only", "cal-tia-003=fail-only", "cal-tia-004=fail-only",
+        ];
+        Assert.True(expected.Order().SequenceEqual(actual.Order()), "One-direction census: " + string.Join(", ", actual.Order()));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

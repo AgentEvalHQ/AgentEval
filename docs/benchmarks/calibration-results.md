@@ -73,6 +73,8 @@ its gate and two are INCOMPLETE.
 | UX | PASS | 100.0% | 1.000 | 8 | default |
 | Memory | SKIP | — | — | 21 carved out | not calibrated |
 
+The System row predates the 2026-10-21 rewrite of its four Task Adherence cases (`cal-tad-001` through `cal-tad-004`). Their rule judges were not shown the agent's instructions in the 2026-10-06 run. The rewritten cases have not been re-measured; the figures above describe the earlier corpus.
+
 - **Process** disagreed with the labels on 4 of 13 cases, one each for tool selection, tool output utilization, tool
   call success and tool efficiency. It also failed its gate before the judges received their rubrics (76.9%, κ
   0.494).

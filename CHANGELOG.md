@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Everything below ships as **1.0.0-rc.1**, the release candidate for AgentEval 1.0: a prerelease for
 feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, with its date, on release.
 
+- Task Adherence calibration cases now carry the agent's instructions separately from the user query,
+  with distinct `cal-tad-*` IDs. Offline tests verify both verdict directions and delivery to every rule
+  judge. Published calibration figures remain historical and have not been re-measured.
+
 - **What 1.0 promises** (README, "Feature Maturity"): semantic versioning for the public API of the
   `AgentEval` library and for the CLI's documented commands, options and exit codes, except types marked
   `[Experimental]` and the fronts labelled Beta or Experimental. Core evaluation and red team are Stable at
