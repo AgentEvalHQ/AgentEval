@@ -54,7 +54,7 @@ public sealed class IntentIdentificationEval : IEvalDefinitionWrapper
     public IntentIdentificationEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.70)
     {
         ArgumentNullException.ThrowIfNull(judge);
-        // 1.2.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+        // 1.2.0: the judge is sent the system message when one was captured (JudgeInputData.SystemMessage).
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "intent_identification",
@@ -70,7 +70,7 @@ public sealed class IntentIdentificationEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.intent_identification.v1",
-            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.SystemMessage };
+            failureSeverity: "medium") { JudgeSeesData = JudgeInputData.SystemMessage };
     }
 
     /// <inheritdoc/>

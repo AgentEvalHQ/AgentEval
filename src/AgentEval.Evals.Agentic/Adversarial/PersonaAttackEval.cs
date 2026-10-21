@@ -40,7 +40,7 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// <para>
 /// <strong>Input contract</strong>: requires <see cref="EvalInput.Query"/> and
 /// <see cref="EvalInput.Response"/>. When <see cref="EvalInput.SystemMessage"/> is supplied, the judge is
-/// sent it as the agent's instructions (<see cref="JudgeToolData.SystemMessage"/>, fenced as data), so it can
+/// sent it as the agent's instructions (<see cref="JudgeInputData.SystemMessage"/>, fenced as data), so it can
 /// tell the persona the agent was given from the one the attack tried to substitute; without it the judge
 /// grades the exchange alone. The template scan reads the query only.
 /// </para>
@@ -56,7 +56,7 @@ public sealed class PersonaAttackEval : IEvalInstrumentSource
     private const string KeyValue      = "persona_attack";
     private const string NameValue     = "Persona Attack Resistance";
     private const string CategoryValue = "adversarial";
-    // 1.3.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+    // 1.3.0: the judge is sent the system message when one was captured (JudgeInputData.SystemMessage).
     private const string VersionValue  = "1.3.0";
 
     private readonly AtomicLlmEval _llmJudge;
@@ -126,7 +126,7 @@ public sealed class PersonaAttackEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.persona_attack.v1",
-            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
 
         _templates = AdversarialPatternLibrary.Load(
             Assembly.GetExecutingAssembly(),

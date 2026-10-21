@@ -85,8 +85,8 @@ public sealed class ToolSelectionEval : IEvalDefinitionWrapper
             promptId: "agenteval.tool_selection.v1",
             failureSeverity: "medium")
         {
-            JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions | JudgeToolData.ExpectedActions,
-            JudgeNeedsData = JudgeToolData.ToolCalls,
+            JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.ToolDefinitions | JudgeInputData.ExpectedActions,
+            JudgeNeedsData = JudgeInputData.ToolCalls,
         };
     }
 

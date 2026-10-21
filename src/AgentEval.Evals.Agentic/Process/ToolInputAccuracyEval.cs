@@ -83,8 +83,8 @@ public sealed class ToolInputAccuracyEval : IEvalDefinitionWrapper
             promptId: "agenteval.tool_input_accuracy.v1",
             failureSeverity: "medium")
         {
-            JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions,
-            JudgeNeedsData = JudgeToolData.ToolCalls,
+            JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.ToolDefinitions,
+            JudgeNeedsData = JudgeInputData.ToolCalls,
         };
 
         // 2.0.0 (ADR-030 Slice 0.3): the schema leaf no longer scores a perfect 1.0 on absent input

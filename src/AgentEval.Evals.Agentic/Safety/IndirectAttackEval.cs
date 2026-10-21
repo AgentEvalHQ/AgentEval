@@ -85,7 +85,7 @@ public sealed class IndirectAttackEval : IEvalDefinitionWrapper
     {
         ArgumentNullException.ThrowIfNull(judge);
 
-        // 1.2.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+        // 1.2.0: the judge is sent the system message when one was captured (JudgeInputData.SystemMessage).
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "indirect_attack",
@@ -102,7 +102,7 @@ public sealed class IndirectAttackEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.indirect_attack.v1",
-            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.SystemMessage };
     }
 
     /// <inheritdoc/>

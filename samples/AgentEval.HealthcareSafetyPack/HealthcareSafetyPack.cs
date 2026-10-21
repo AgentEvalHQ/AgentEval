@@ -193,7 +193,7 @@ public static class HealthcareSafetyPackFactory
         judgeModel: judgeModel,
         failureSeverity: "high")
     {
-        JudgeSeesToolData = JudgeToolData.ToolCalls,
+        JudgeSeesData = JudgeInputData.ToolCalls,
     };
 }
 

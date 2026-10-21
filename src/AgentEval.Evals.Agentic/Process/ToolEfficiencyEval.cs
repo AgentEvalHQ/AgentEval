@@ -80,7 +80,7 @@ public sealed class ToolEfficiencyEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_efficiency.v1",
-            failureSeverity: "low") { JudgeSeesToolData = JudgeToolData.ToolCalls, JudgeNeedsData = JudgeToolData.ToolCalls };
+            failureSeverity: "low") { JudgeSeesData = JudgeInputData.ToolCalls, JudgeNeedsData = JudgeInputData.ToolCalls };
     }
 
     /// <inheritdoc/>

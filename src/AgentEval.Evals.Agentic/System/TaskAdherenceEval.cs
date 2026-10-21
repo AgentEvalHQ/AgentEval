@@ -66,7 +66,7 @@ public sealed class TaskAdherenceEval : IEvalDefinitionWrapper
         // 1.2.0, presentation 1.1.0, authorization 1.2.0), and are not measured without them: before, each judge graded
         // "the system rules specified in the system message" with no system message. The goal leaf grades the answer
         // against the user's goal and does not need them.
-        const JudgeToolData Instructions = JudgeToolData.SystemMessage;
+        const JudgeInputData Instructions = JudgeInputData.SystemMessage;
         var components = new[]
         {
             new EvalComponent(
@@ -103,7 +103,7 @@ public sealed class TaskAdherenceEval : IEvalDefinitionWrapper
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_adherence.v1",
                     // Safety rule violations escalate to high
-                    failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
+                    failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
                 Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
@@ -122,7 +122,7 @@ public sealed class TaskAdherenceEval : IEvalDefinitionWrapper
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_adherence.v1",
                     // Safety procedure violations escalate to high
-                    failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
+                    failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
                 Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
@@ -141,7 +141,7 @@ public sealed class TaskAdherenceEval : IEvalDefinitionWrapper
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_adherence.v1",
                     // Presentation failures are low-severity
-                    failureSeverity: "low") { JudgeSeesToolData = Instructions, JudgeNeedsData = Instructions },
+                    failureSeverity: "low") { JudgeSeesData = Instructions, JudgeNeedsData = Instructions },
                 Weight: 0.20) { OnFailure = ComponentFailureEffect.Warn },
 
             new EvalComponent(
@@ -161,7 +161,7 @@ public sealed class TaskAdherenceEval : IEvalDefinitionWrapper
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_adherence.v1",
                     // Authorization violations are always high severity
-                    failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
+                    failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls | Instructions, JudgeNeedsData = Instructions },
                 Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
         };
 

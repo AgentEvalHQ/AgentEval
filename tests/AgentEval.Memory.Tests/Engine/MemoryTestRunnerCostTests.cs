@@ -47,6 +47,27 @@ public sealed class MemoryTestRunnerCostTests
     }
 
     [Fact]
+    public async Task UsageReported_ExplicitZeroPair_RemainsZeroTokensAndCost()
+    {
+        var result = await RunAsync(new UsageJudgeClient("gpt-4o-mini",
+            _ => new UsageDetails { InputTokenCount = 0, OutputTokenCount = 0 }));
+        Assert.Equal(0, result.TokensUsed);
+        Assert.Equal(0m, result.EstimatedCost);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    [InlineData(-1, 50)]
+    [InlineData(50, -1)]
+    public async Task UsageReported_NegativeCount_IsNotPriced(long input, long output)
+    {
+        var result = await RunAsync(new UsageJudgeClient("gpt-4o-mini",
+            _ => new UsageDetails { InputTokenCount = input, OutputTokenCount = output }));
+        Assert.Null(result.EstimatedCost);
+    }
+
+    [Fact]
     public async Task UsageReported_JudgeModelWithNoRate_IsNotPriced()
     {
         var result = await RunAsync(new UsageJudgeClient("llama3.1:8b", _ => new UsageDetails { InputTokenCount = 1000, OutputTokenCount = 200 }));

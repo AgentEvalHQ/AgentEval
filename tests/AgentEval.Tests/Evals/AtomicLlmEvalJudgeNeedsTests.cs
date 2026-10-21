@@ -31,8 +31,8 @@ public class AtomicLlmEvalJudgeNeedsTests
         }
     }
 
-    private static AtomicLlmEval Leaf(IEvaluator judge, JudgeToolData needs, JudgeToolData sees = JudgeToolData.None) =>
-        new(judge, "k", "Leaf Name", "c", "1.0.0", ["criterion"]) { JudgeSeesToolData = sees, JudgeNeedsData = needs };
+    private static AtomicLlmEval Leaf(IEvaluator judge, JudgeInputData needs, JudgeInputData sees = JudgeInputData.None) =>
+        new(judge, "k", "Leaf Name", "c", "1.0.0", ["criterion"]) { JudgeSeesData = sees, JudgeNeedsData = needs };
 
     [Theory]
     [InlineData(null)]
@@ -42,7 +42,7 @@ public class AtomicLlmEvalJudgeNeedsTests
     {
         var judge = new RecordingJudge();
 
-        var result = await Leaf(judge, JudgeToolData.SystemMessage).EvaluateAsync(new EvalInput("Q", "A", SystemMessage: systemMessage));
+        var result = await Leaf(judge, JudgeInputData.SystemMessage).EvaluateAsync(new EvalInput("Q", "A", SystemMessage: systemMessage));
 
         Assert.Equal("skipped", result.Score.Label);
         Assert.False(result.Score.Passed);
@@ -58,7 +58,7 @@ public class AtomicLlmEvalJudgeNeedsTests
         // A need implies the data is sent: a leaf graded against the instructions is never graded without them.
         var judge = new RecordingJudge();
 
-        var result = await Leaf(judge, JudgeToolData.SystemMessage).EvaluateAsync(new EvalInput("Q", "A", SystemMessage: "SYS-4417 be brief"));
+        var result = await Leaf(judge, JudgeInputData.SystemMessage).EvaluateAsync(new EvalInput("Q", "A", SystemMessage: "SYS-4417 be brief"));
 
         Assert.Equal("pass", result.Score.Label);
         Assert.Contains("<agent_instructions>\nSYS-4417 be brief\n</agent_instructions>", Assert.Single(judge.Inputs), StringComparison.Ordinal);
@@ -69,7 +69,7 @@ public class AtomicLlmEvalJudgeNeedsTests
     {
         var judge = new RecordingJudge();
 
-        var result = await Leaf(judge, JudgeToolData.ToolCalls).EvaluateAsync(new EvalInput("Q", "A"));
+        var result = await Leaf(judge, JudgeInputData.ToolCalls).EvaluateAsync(new EvalInput("Q", "A"));
 
         Assert.Equal("skipped", result.Score.Label);
         Assert.Contains("No tool-call data was captured", result.Details.Summary!, StringComparison.Ordinal);
@@ -82,7 +82,7 @@ public class AtomicLlmEvalJudgeNeedsTests
         // Guard: an empty list says the calls were recorded and none were made, which a judge can grade.
         var judge = new RecordingJudge();
 
-        var result = await Leaf(judge, JudgeToolData.ToolCalls).EvaluateAsync(new EvalInput("Q", "A", ToolCalls: []));
+        var result = await Leaf(judge, JudgeInputData.ToolCalls).EvaluateAsync(new EvalInput("Q", "A", ToolCalls: []));
 
         Assert.Equal("pass", result.Score.Label);
         Assert.Contains("Tool calls the agent made: none.", Assert.Single(judge.Inputs), StringComparison.Ordinal);
@@ -92,7 +92,7 @@ public class AtomicLlmEvalJudgeNeedsTests
     public async Task EveryMissingNeed_IsNamed()
     {
         var judge = new RecordingJudge();
-        var leaf = Leaf(judge, JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions | JudgeToolData.SystemMessage | JudgeToolData.ExpectedActions);
+        var leaf = Leaf(judge, JudgeInputData.ToolCalls | JudgeInputData.ToolDefinitions | JudgeInputData.SystemMessage | JudgeInputData.ExpectedActions);
 
         var result = await leaf.EvaluateAsync(new EvalInput("Q", "A", ExpectedActions: []));
 
@@ -107,7 +107,7 @@ public class AtomicLlmEvalJudgeNeedsTests
         // Guard: the default is unchanged.
         var judge = new RecordingJudge();
 
-        var result = await Leaf(judge, JudgeToolData.None, sees: JudgeToolData.ToolCalls | JudgeToolData.SystemMessage)
+        var result = await Leaf(judge, JudgeInputData.None, sees: JudgeInputData.ToolCalls | JudgeInputData.SystemMessage)
             .EvaluateAsync(new EvalInput("Q", "A"));
 
         Assert.Equal("pass", result.Score.Label);
@@ -120,13 +120,13 @@ public class AtomicLlmEvalJudgeNeedsTests
         // What the judge is sent decides the fingerprint; declaring that it cannot be graded without it does not change
         // what it is sent, so it is the same instrument when the data is there.
         var judge = new RecordingJudge();
-        var seesOnly = Leaf(judge, JudgeToolData.None, sees: JudgeToolData.SystemMessage).CaptureDefinition();
-        var needsToo = Leaf(judge, JudgeToolData.SystemMessage, sees: JudgeToolData.SystemMessage).CaptureDefinition();
-        var needsOnly = Leaf(judge, JudgeToolData.SystemMessage).CaptureDefinition();
+        var seesOnly = Leaf(judge, JudgeInputData.None, sees: JudgeInputData.SystemMessage).CaptureDefinition();
+        var needsToo = Leaf(judge, JudgeInputData.SystemMessage, sees: JudgeInputData.SystemMessage).CaptureDefinition();
+        var needsOnly = Leaf(judge, JudgeInputData.SystemMessage).CaptureDefinition();
 
         Assert.Equal(seesOnly.RubricDigest, needsToo.RubricDigest);
         Assert.Equal(seesOnly.RubricDigest, needsOnly.RubricDigest);
-        Assert.Equal(JudgeToolData.SystemMessage, needsOnly.ToolData);
+        Assert.Equal(JudgeInputData.SystemMessage, needsOnly.InputData);
     }
 
     // ── The shipped tool evaluators (T12 part C) ─────────────────────────────

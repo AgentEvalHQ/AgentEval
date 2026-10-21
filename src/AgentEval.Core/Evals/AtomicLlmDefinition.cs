@@ -20,8 +20,8 @@ public sealed record AtomicLlmDefinition
     public string? JudgeModel { get; init; }
     /// <summary>Configured judge provider, when known.</summary>
     public string? JudgeProvider { get; init; }
-    /// <summary>Tool data included in the judge input.</summary>
-    public required JudgeToolData ToolData { get; init; }
+    /// <summary>Additional run data included in the judge input.</summary>
+    public required JudgeInputData InputData { get; init; }
     /// <summary>Digest of the bound rubric's score scale, review boundary and severity policy.</summary>
     public required string ScorePolicyDigest { get; init; }
     /// <summary>Evaluator implementation type, for producer-side assembly identity binding.</summary>

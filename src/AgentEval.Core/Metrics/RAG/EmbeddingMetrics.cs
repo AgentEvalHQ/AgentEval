@@ -149,26 +149,10 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
     {
         if (a.Length != b.Length)
             return $"the embeddings have different dimensions ({a.Length} and {b.Length})";
-        if (a.Length == 0)
-            return "the embeddings are empty";
-        return UnusableVector(a) ?? UnusableVector(b);
+        return AgentEval.Embeddings.EmbeddingValidation.InvalidReason(a)
+            ?? AgentEval.Embeddings.EmbeddingValidation.InvalidReason(b);
     }
 
-    private static string? UnusableVector(ReadOnlySpan<float> vector)
-    {
-        foreach (var component in vector)
-        {
-            if (!float.IsFinite(component))
-                return "an embedding has a component that is not a finite number";
-        }
-
-        // Finite components can still give a length that overflows a float (3e19 in each slot): its norm is +∞, which is
-        // not below the zero-vector cut, and the cosine came out NaN — a measured 0 (T13).
-        var norm = System.Numerics.Tensors.TensorPrimitives.Norm(vector);
-        if (!float.IsFinite(norm))
-            return "an embedding's length is too large to compute";
-        return norm < 1e-12f ? "an embedding is a zero vector" : null;
-    }
 }
 
 /// <summary>

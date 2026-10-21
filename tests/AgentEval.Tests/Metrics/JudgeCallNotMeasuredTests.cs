@@ -160,6 +160,44 @@ public sealed class JudgeCallNotMeasuredTests
         Assert.Contains("Metric crashed", metric.Reason, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.TooManyRequests, true)]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, false)]
+    public async Task BuiltInMetric_TypedRetryPredicate_ReceivesOriginalProviderFailure(System.Net.HttpStatusCode status, bool retry)
+    {
+        var failure = new HttpRequestException("provider failure", null, status);
+        var client = new TransientChatClient(failure);
+        Exception? seen = null;
+        var result = await new FaithfulnessMetric(client).EvaluateWithRetryAsync(Full, new RetryPolicy
+        {
+            MaxRetries = 1, InitialDelayMs = 0,
+            ShouldRetry = ex =>
+            {
+                seen = ex;
+                return ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.TooManyRequests };
+            }
+        });
+        Assert.Same(failure, seen);
+        Assert.Equal(retry ? 2 : 1, client.CallCount);
+        Assert.Equal(retry, result.Measured);
+        if (retry) Assert.Equal(90, result.Score);
+        // Failure internals must not leak into serialized result documents.
+        Assert.DoesNotContain("StackTrace", System.Text.Json.JsonSerializer.Serialize(result));
+    }
+
+    private sealed class TransientChatClient(Exception failure) : IChatClient
+    {
+        public int CallCount { get; private set; }
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            if (++CallCount == 1) throw failure;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"score":90,"reasoning":"supported"}""")));
+        }
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
     [Fact]
     public async Task TheMafCompositeEvaluator_GivesAThrownMetricNoValue()
     {

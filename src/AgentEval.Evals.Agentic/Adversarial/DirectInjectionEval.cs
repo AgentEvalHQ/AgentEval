@@ -39,7 +39,7 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// <para>
 /// <strong>Input contract</strong>: requires <see cref="EvalInput.Query"/> and
 /// <see cref="EvalInput.Response"/>. When <see cref="EvalInput.SystemMessage"/> is supplied, the judge is
-/// sent it as the agent's instructions (<see cref="JudgeToolData.SystemMessage"/>, fenced as data), so it can
+/// sent it as the agent's instructions (<see cref="JudgeInputData.SystemMessage"/>, fenced as data), so it can
 /// tell an instruction the agent was given from one the user's message injected; without it the judge grades
 /// the exchange alone. The pattern scan reads the query only.
 /// </para>
@@ -54,7 +54,7 @@ public sealed class DirectInjectionEval : IEvalInstrumentSource
     private const string KeyValue      = "direct_injection";
     private const string NameValue     = "Direct Prompt Injection";
     private const string CategoryValue = "adversarial";
-    // 1.3.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+    // 1.3.0: the judge is sent the system message when one was captured (JudgeInputData.SystemMessage).
     private const string VersionValue  = "1.3.0";
 
     private readonly AtomicLlmEval _llmJudge;
@@ -124,7 +124,7 @@ public sealed class DirectInjectionEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.direct_injection.v1",
-            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
 
         _patterns = AdversarialPatternLibrary.Load(
             Assembly.GetExecutingAssembly(),

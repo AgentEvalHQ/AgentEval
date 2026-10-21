@@ -209,15 +209,41 @@ public class TraceFidelityTests
     }
 
     [Fact]
-    public void TokenUnderReporting_WithSomeChatSideUsage_IsStillMeasured()
+    public void TokenUnderReporting_WithSomeChatSideUsage_CannotCertifyCleanAccounting()
     {
-        // Guard: a response that reports usage is a measurement; the class is not measured only when none does.
+        // A partial lower bound cannot prove that the agent's account was complete.
         var report = Reconcile(
             agent: Agent(new TracePerformance { TotalPromptTokens = 10, TotalCompletionTokens = 5 }, AgentResp(0)),
             chat: Chat(ChatResp(0, prompt: 10, completion: 5), ChatRespNoUsage(1)));
 
-        Assert.True(Class(report, TraceFidelityRubric.TokenUnderReporting).Measured);
+        Assert.False(Class(report, TraceFidelityRubric.TokenUnderReporting).Measured);
         Assert.Equal(1.0, report.OverallScore, 6);
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(new TracePerformance { TotalPromptTokens = 10, TotalCompletionTokens = 5 }, AgentResp(0)),
+            Chat(ChatResp(0, prompt: 10, completion: 5), ChatRespNoUsage(1)));
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public void TokenUnderReporting_PartialUsageWithProvenShortfall_StillDetectsViolation()
+    {
+        var report = Reconcile(
+            agent: Agent(new TracePerformance { TotalPromptTokens = 1, TotalCompletionTokens = 0 }, AgentResp(0)),
+            chat: Chat(ChatResp(0, prompt: 100, completion: 50), ChatRespNoUsage(1)));
+        var tokens = Class(report, TraceFidelityRubric.TokenUnderReporting);
+        Assert.True(tokens.Measured);
+        Assert.Equal(1, tokens.Count);
+    }
+
+    [Fact]
+    public void TokenUnderReporting_PartialZeroUsage_DoesNotCertifyZeroSpend()
+    {
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(new TracePerformance { TotalPromptTokens = 0, TotalCompletionTokens = 0 }, AgentResp(0)),
+            Chat(ChatResp(0, prompt: 0, completion: 0), ChatRespNoUsage(1)));
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
     }
 
     [Fact]

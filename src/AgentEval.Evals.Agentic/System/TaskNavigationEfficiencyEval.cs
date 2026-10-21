@@ -104,8 +104,8 @@ public sealed class TaskNavigationEfficiencyEval : IEvalDefinitionWrapper
                     promptId: "agenteval.task_navigation_efficiency.v1",
                     failureSeverity: "medium")
                 {
-                    JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ExpectedActions,
-                    JudgeNeedsData = JudgeToolData.ToolCalls,
+                    JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.ExpectedActions,
+                    JudgeNeedsData = JudgeInputData.ToolCalls,
                 },
                 Weight: 0.50) { OnFailure = ComponentFailureEffect.Warn },
         };

@@ -972,7 +972,7 @@ abstract class AgentEval.Evals.AtomicEval : AgentEval.Evals.IEval
     protected ctor(System.String key, System.String name, System.String category, System.String version)
 sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.Evals.AtomicLlmDefinition>
     AgentEval.Evals.AtomicLlmDefinition <Clone>$()
-    AgentEval.Evals.JudgeToolData ToolData { get; init; }
+    AgentEval.Evals.JudgeInputData InputData { get; init; }
     System.Boolean Equals(AgentEval.Evals.AtomicLlmDefinition other)
     System.Boolean Equals(System.Object obj)
     System.Boolean PromptIdentified { get; init; }
@@ -988,7 +988,7 @@ sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.E
     ctor()
 sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
     AgentEval.Evals.AtomicLlmDefinition CaptureDefinition()
-    AgentEval.Evals.JudgeToolData JudgeSeesToolData { get; init; }
+    AgentEval.Evals.JudgeInputData JudgeSeesData { get; init; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     const System.Int32 SystemMessageCharacterLimit
     const System.Int32 ToolSectionCharacterLimit
@@ -1065,7 +1065,7 @@ interface AgentEval.Evals.IEvalRegistry
     AgentEval.Evals.IEval Resolve(System.String key, AgentEval.Core.IEvaluator judge, System.String judgeModel)
     System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalRegistration> All { get; }
     System.Void Register(AgentEval.Evals.EvalRegistration registration)
-enum AgentEval.Evals.JudgeToolData
+enum AgentEval.Evals.JudgeInputData
     None
     ToolCalls
     ToolDefinitions

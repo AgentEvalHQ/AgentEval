@@ -207,6 +207,10 @@ public class EvaluationContext
 /// </summary>
 public class MetricResult
 {
+    // Preserve the original provider failure for in-process retry classification, never result serialization.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Exception? CallFailure { get; init; }
+
     /// <summary>Whether this result used model grading; null when the producer did not report it.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? ModelGraded { get; init; }

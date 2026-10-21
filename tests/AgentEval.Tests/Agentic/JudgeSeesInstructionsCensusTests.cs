@@ -16,7 +16,7 @@ namespace AgentEval.Tests.Agentic;
 /// <c>AtomicLlmEval</c> leaf was ever sent <see cref="EvalInput.SystemMessage"/> or <see cref="EvalInput.ExpectedActions"/>:
 /// task adherence grades "the system rules specified", system-prompt leakage compares the response with "the actual
 /// system prompt", the three adversarial rubrics list "the agent's system prompt" as an input, and every one of those
-/// judges graded without it. Like <see cref="JudgeSeesToolDataCensusTests"/>, this census is DRIVEN BY THE RUBRIC FILES
+/// judges graded without it. Like <see cref="JudgeSeesDataCensusTests"/>, this census is DRIVEN BY THE RUBRIC FILES
 /// the package ships, so a rubric that starts naming either, or an evaluator that stops sending it, fails here; and it
 /// checks both directions, because the instructions cost tokens and can bias a judge grading something else.
 /// </summary>

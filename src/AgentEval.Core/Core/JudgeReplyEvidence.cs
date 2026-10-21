@@ -101,8 +101,13 @@ internal static class JudgeReplyEvidence
             ["errorType"] = ex.GetType().FullName ?? ex.GetType().Name,
             ["errorMessage"] = ex.Message,
         };
-        return MetricResult.NotMeasured(metricName, NotMeasuredCause.JudgeCallFailed,
-            $"{label} not measured: {call} failed ({ex.GetType().Name}: {ex.Message}).", details);
+        return new MetricResult
+        {
+            MetricName = metricName, Score = 0, Passed = false, Measured = false,
+            NotMeasuredCause = NotMeasuredCause.JudgeCallFailed, CallFailure = ex,
+            Explanation = $"{label} not measured: {call} failed ({ex.GetType().Name}: {ex.Message}).",
+            Details = details,
+        };
     }
 
     /// <summary>The <c>judgeReplyFailure</c> detail for <paramref name="failure"/>, in snake_case.</summary>

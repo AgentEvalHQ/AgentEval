@@ -145,6 +145,31 @@ public class MemoryJudgeTests
         Assert.Empty(result.MissingFacts);
     }
 
+    [Theory]
+    [InlineData("Score: 1000")]
+    [InlineData("Score: 1e3")]
+    [InlineData("-40/100")]
+    [InlineData("Score: 85.5.2")]
+    public async Task JudgeAsync_FallbackNumericToken_IsNeverTruncatedIntoAValidScore(string reply)
+    {
+        var judge = new MemoryJudge(new CustomResponseChatClient(reply), NullLogger<MemoryJudge>.Instance);
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+        Assert.False(result.Measured);
+    }
+
+    [Theory]
+    [InlineData("Score: 85.5", 85.5)]
+    [InlineData("85.5/100", 85.5)]
+    [InlineData("Score: 0", 0)]
+    [InlineData("Score: 100", 100)]
+    public async Task JudgeAsync_FallbackValidNumber_PreservesExactScore(string reply, double expected)
+    {
+        var judge = new MemoryJudge(new CustomResponseChatClient(reply), NullLogger<MemoryJudge>.Instance);
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+        Assert.True(result.Measured);
+        Assert.Equal(expected, result.Score);
+    }
+
     [Fact]
     public async Task JudgeAsync_EmptyFoundFactString_DoesNotSpuriouslyMatch()
     {

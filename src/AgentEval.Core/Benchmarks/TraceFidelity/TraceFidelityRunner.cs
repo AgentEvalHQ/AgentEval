@@ -126,7 +126,7 @@ public sealed class TraceFidelityRunner
                 Summary = noTruth ? "The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."
                     : classNotMeasured
                         ? $"Not measured: {string.Join(", ", report.Discrepancies.Where(d => !d.Measured).Select(d => d.ClassKey))} " +
-                          "(no chat-boundary response reported token usage); the score is over the other classes."
+                          "(chat-boundary token usage is incomplete); the score is over the other classes."
                         : null,
             },
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
@@ -212,17 +212,16 @@ public sealed class TraceFidelityRunner
         var agentTokens = agentTrace.Performance?.TotalTokens
             ?? agentTrace.Entries.Where(e => e.Type == TraceEntryType.Response).Sum(e => e.TokenUsage?.TotalTokens ?? 0);
 
-        if (chatTokens == 0 && agentTokens == 0)
-        {
-            return Build(TraceFidelityRubric.TokenUnderReporting, 0, Array.Empty<string>());
-        }
-
         // Directional: the class is "token UNDER-reporting", so flag only when the agent boundary reports
         // FEWER tokens than were actually consumed at the chat boundary (chat > agent). Over-reporting
         // (agent > chat) is a different, non-deceptive discrepancy and is not penalised here.
         var denom = Math.Max(chatTokens, 1);
         var shortfall = (chatTokens - agentTokens) / (double)denom;
         var count = shortfall > TraceFidelityRubric.TokenToleranceFraction ? 1 : 0;
+        var missingUsage = chatResponses.Count(e => e.TokenUsage is null);
+        if (count == 0 && missingUsage > 0)
+            return Build(TraceFidelityRubric.TokenUnderReporting, 0,
+                [$"not measured: {missingUsage} of {chatResponses.Count} chat-boundary response(s) omitted usage; the known token lower bound cannot certify complete accounting"]) with { Measured = false };
         var examples = count > 0
             ? new[] { $"agent under-reports tokens: chat={chatTokens}, agent={agentTokens} ({shortfall:P1} short, tolerance {TraceFidelityRubric.TokenToleranceFraction:P0})" }
             : Array.Empty<string>();

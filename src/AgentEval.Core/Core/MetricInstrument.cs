@@ -20,5 +20,6 @@ internal static class MetricInstrument
         MetricName = result.MetricName, Score = result.Score, Passed = result.Passed,
         Measured = result.Measured, NotMeasuredCause = result.NotMeasuredCause, Explanation = result.Explanation,
         Details = result.Details, ModelGraded = modelGraded, RubricDigest = digest,
+        CallFailure = result.CallFailure,
     };
 }

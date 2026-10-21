@@ -100,7 +100,7 @@ public record StochasticResult(
     /// <see cref="TestResult.Score"/> of 0 and <see cref="TestResult.Passed"/> of false: it is not measured.
     /// </summary>
     /// <param name="run">One run's result.</param>
-    public static bool IsMeasured(TestResult run)
+    internal static bool IsMeasured(TestResult run)
     {
         ArgumentNullException.ThrowIfNull(run);
         return run.Error is null && !run.JudgeFailed;
@@ -121,7 +121,7 @@ public record StochasticResult(
     /// The share is compared as the runner always compared it (passed / total ≥ threshold), so a result with every run
     /// measured gets the verdict it always had. Kept in one method so the rule can be changed in one place.
     /// </remarks>
-    public static StochasticVerdict DecideVerdict(int passedRuns, int notMeasuredRuns, int totalRuns, double successRateThreshold)
+    internal static StochasticVerdict DecideVerdict(int passedRuns, int notMeasuredRuns, int totalRuns, double successRateThreshold)
     {
         if (totalRuns <= 0 || notMeasuredRuns >= totalRuns)
             return StochasticVerdict.NotMeasured;

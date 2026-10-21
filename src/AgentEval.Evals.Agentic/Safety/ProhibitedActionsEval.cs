@@ -162,7 +162,7 @@ public sealed class ProhibitedActionsEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.prohibited_actions.v1",
-            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.SystemMessage };
     }
 
     /// <inheritdoc/>

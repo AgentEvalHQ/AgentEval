@@ -177,7 +177,7 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
         // the verdict in prose or markdown fences — the single biggest source of parse failures
         // with smaller judge models. Not all endpoints/models support it, so the call falls back
         // to an unconstrained request when the option is rejected.
-        long? inputTokens = null, outputTokens = null;
+        long? inputTokens = 0, outputTokens = 0;
 
         var (parsed, firstResponse) = await InvokeAndParseAsync(messages, cancellationToken);
         Accumulate(ref inputTokens, ref outputTokens, firstResponse?.Usage);
@@ -311,9 +311,9 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
     private static void Accumulate(ref long? input, ref long? output, UsageDetails? usage)
     {
-        if (usage is null) return;
-        if (usage.InputTokenCount is { } i) input = (input ?? 0) + i;
-        if (usage.OutputTokenCount is { } o) output = (output ?? 0) + o;
+        // Nullable addition keeps an incomplete component absent across every corrective attempt.
+        input += usage?.InputTokenCount;
+        output += usage?.OutputTokenCount;
     }
 
     internal static EvaluationResult ParseEvaluationResponse(string responseText, EvalRubric? rubric = null)

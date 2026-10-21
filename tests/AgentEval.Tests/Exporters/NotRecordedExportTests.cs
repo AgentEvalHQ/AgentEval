@@ -293,7 +293,7 @@ public sealed class NotRecordedExportTests : IDisposable
     public async Task Directory_StoreExport_AScorelessTest_IsStoredAsNotMeasured()
     {
         // A test with no score but no NotMeasured flag (a hand-built report) would otherwise be stored as a measured 0
-        // that `compare` averages in. Its untimed duration is stored as zero, the store's "not recorded".
+        // that `compare` averages in. Its untimed duration stays absent in the store.
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
         var manifest = await store.StartRunAsync(subject, new RunContext("TestProject", ".", "TestHarness", null, null, "eval"));
@@ -312,6 +312,6 @@ public sealed class NotRecordedExportTests : IDisposable
             scenarios.Add(scenario);
         var stored = Assert.Single(scenarios);
         Assert.Equal(ScenarioMeasurement.NotMeasured, stored.Measurement);
-        Assert.Equal(TimeSpan.Zero, stored.Duration);
+        Assert.Null(stored.Duration);
     }
 }

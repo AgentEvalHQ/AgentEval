@@ -67,7 +67,9 @@ public sealed class RetryPolicy
             }
             catch (Exception ex)
             {
-                if (ShouldRetry is not null && !ShouldRetry(ex))
+                var policyFailure = ex is RetryPolicyExtensions.FailedCallException { Result.CallFailure: { } original }
+                    ? original : ex;
+                if (ShouldRetry is not null && !ShouldRetry(policyFailure))
                 {
                     throw; // a permanent failure (e.g. auth) — don't waste the retry budget
                 }
@@ -162,6 +164,7 @@ public static class RetryPolicyExtensions
                 NotMeasuredCause = NotMeasuredCause.JudgeCallFailed,
                 Explanation = $"{last.Explanation} The evaluation failed after {attempts} attempts.",
                 Details = details, ModelGraded = last.ModelGraded, RubricDigest = last.RubricDigest,
+                CallFailure = last.CallFailure,
             };
         }
         catch (RetryExhaustedException ex)
@@ -188,7 +191,7 @@ public static class RetryPolicyExtensions
     }
 
     // Carries a metric's "the judge call failed" result through RetryPolicy, which retries on a throw.
-    private sealed class FailedCallException(MetricResult result) : Exception(result.Explanation)
+    internal sealed class FailedCallException(MetricResult result) : Exception(result.Explanation, result.CallFailure)
     {
         public MetricResult Result { get; } = result;
     }

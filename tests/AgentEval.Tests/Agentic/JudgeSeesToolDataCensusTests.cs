@@ -20,7 +20,7 @@ namespace AgentEval.Tests.Agentic;
 /// a list in this file — so a rubric that starts naming tool data, or an evaluator that stops sending it, fails here.
 /// It checks both directions: the evaluators that send tool data are exactly those whose rubric names it.
 /// </summary>
-public class JudgeSeesToolDataCensusTests
+public class JudgeSeesDataCensusTests
 {
     private const string CanaryTool = "canary_tool_7f3a";
     private const string CanaryArgument = "canary-argument-7f3a";

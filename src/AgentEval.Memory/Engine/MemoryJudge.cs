@@ -298,9 +298,10 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         // Only an EXPLICIT score: `score: 85`, `"score": 85` (a JSON reply that failed to parse as a whole), or
         // `85/100`. "2 out of 3 facts" or a "100%" inside the explanation is not the judge's score; reading the first
         // such number as one turned prose into a measurement.
+        const string number = @"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?";
         var scoreMatch = System.Text.RegularExpressions.Regex.Match(
             responseText,
-            @"(?:""?score""?\s*[:=]\s*(\d{1,3})|\b(\d{1,3})\s*/\s*100\b)",
+            $@"(?:\b""?score""?\s*[:=]\s*({number})(?![\w.+-])|(?<![\w.+-])({number})(?![\w.+-])\s*/\s*100(?!\w|\.\d))",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         // No score in the reply means no score: never a default (this used to be 50, a number no judge gave).
@@ -309,7 +310,9 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         {
             // Read as given: a score off 0-100 is not measured downstream (ConvertToJudgmentResult), never clamped.
             var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value : scoreMatch.Groups[2].Value;
-            score = int.Parse(matched, System.Globalization.CultureInfo.InvariantCulture);
+            if (double.TryParse(matched, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                score = parsed;
         }
 
         return new JudgmentResponseData
@@ -330,7 +333,7 @@ Be strict — any specific fabricated detail (a name, address, number, food item
     /// </summary>
     private static (int Input, int Output)? ExtractTokenUsage(ChatResponse response)
     {
-        if (response.Usage is { InputTokenCount: { } i, OutputTokenCount: { } o } && (i > 0 || o > 0))
+        if (response.Usage is { InputTokenCount: { } i, OutputTokenCount: { } o } && i >= 0 && o >= 0)
             return ((int)Math.Min(i, int.MaxValue), (int)Math.Min(o, int.MaxValue));
         return null;
     }

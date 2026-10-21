@@ -97,7 +97,7 @@ public sealed class ToolCallSuccessEval : IEvalDefinitionWrapper
             passThreshold: 0.70,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_call_success.v1",
-            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls, JudgeNeedsData = JudgeToolData.ToolCalls };
+            failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls, JudgeNeedsData = JudgeInputData.ToolCalls };
     }
 
     /// <inheritdoc/>
