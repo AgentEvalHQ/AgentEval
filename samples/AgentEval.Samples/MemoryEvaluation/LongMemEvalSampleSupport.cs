@@ -33,6 +33,28 @@ internal static class LongMemEvalSampleSupport
     /// </summary>
     public const int JudgeMaxOutputTokens = 1024;
 
+    /// <summary>
+    /// The LongMemEval S dataset G8 and G10 read: <c>src/AgentEval.Memory/Data/longmemeval/longmemeval_s_cleaned.json</c>
+    /// under the first folder above the samples' binary that holds it. G8 and G10 used a fixed five folders up, which is
+    /// right only for <c>samples/AgentEval.Samples/bin/Debug/net10.0</c>: built elsewhere (<c>--artifacts-path</c>, a
+    /// copied binary) they reported the dataset missing while it was there. When no folder holds it, the path is the
+    /// one under the repository root the old rule named, so the "not found" message still says where to put it.
+    /// </summary>
+    public static string DatasetPath { get; } = FindDataset();
+
+    private static string FindDataset()
+    {
+        var relative = Path.Combine("src", "AgentEval.Memory", "Data", "longmemeval", "longmemeval_s_cleaned.json");
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, relative);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", relative));
+    }
+
     /// <summary>Every selected question, accounted for: a selected count is not a scored count.</summary>
     public static void PrintAccounting(ExternalBenchmarkResult result)
     {

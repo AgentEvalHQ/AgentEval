@@ -112,8 +112,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default 256 and dropped preference questions); G9 runs Quick when non-interactive; G10 stops as not
   measured when the provider does not serve the paper's gpt-4o. H3 and H12 graded tool-call accuracy on an
   agent with no tools and now give the agent tools; H11 grades what MAF's evaluate path carries. A judge
-  reply that could not be parsed is not measured in B1, B2 and B4 (it read as a correct detection). C2
-  and C3 show 4 steps; on GLM-5.3-Flash C3 passes and C2 fails its own 3-minute limit (239 s).
+  reply that could not be parsed is not measured in B1, B2 and B4 (it read as a correct detection). F2
+  grades its dataset with the answer-correctness judge and the dataset's context (it matched the expected
+  sentence verbatim, passed a case with no expected answer and exported made-up metric scores), and F4
+  grades the tool calls its runs made (it graded tool-call accuracy with no tool data). G8 and G10 find
+  the LongMemEval dataset from any build folder. C2 and C3 show 4 steps; on GLM-5.3-Flash C3 passes and C2
+  fails its own 3-minute limit (195-239 s).
 
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared

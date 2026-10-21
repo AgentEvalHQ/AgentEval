@@ -98,14 +98,16 @@ internal static class SampleOutcome
             return;
 
         var leaves = Leaves(result).ToList();
-        var unmeasured = leaves
-            .Where(l => l.Score.Label.ToLowerInvariant() is "skipped" or "error")
-            .Select(l => l.Metric.Name)
-            .ToList();
+        var unmeasured = leaves.Where(l => l.Score.Label.ToLowerInvariant() is "skipped" or "error").ToList();
         if (unmeasured.Count > 0)
         {
-            var named = string.Join(", ", unmeasured.Take(5)) + (unmeasured.Count > 5 ? $" and {unmeasured.Count - 5} more" : "");
-            Skip($"{what}: {unmeasured.Count} of {leaves.Count} checks were not measured (skipped or errored): {named}");
+            // Say which: an errored check failed to run; a skipped one may simply be outside the preset (Smoke covers
+            // two OWASP categories of ten), which is still a check this run did not measure.
+            var errored = unmeasured.Count(l => l.Score.Label.Equals("error", StringComparison.OrdinalIgnoreCase));
+            var names = unmeasured.Select(l => l.Metric.Name).ToList();
+            var named = string.Join(", ", names.Take(5)) + (names.Count > 5 ? $" and {names.Count - 5} more" : "");
+            Skip($"{what}: {unmeasured.Count} of {leaves.Count} checks were not measured ({unmeasured.Count - errored} skipped, " +
+                 $"{errored} errored; a smaller preset skips the checks it does not cover): {named}");
         }
 
         static IEnumerable<EvalResult> Leaves(EvalResult node) =>

@@ -50,9 +50,7 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class LongMemEvalBaselineRepro
 {
-    private static readonly string DatasetPath = Path.GetFullPath(Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
-        "src", "AgentEval.Memory", "Data", "longmemeval", "longmemeval_s_cleaned.json"));
+    private static string DatasetPath => LongMemEvalSampleSupport.DatasetPath;
 
     public static async Task RunAsync()
     {
