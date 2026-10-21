@@ -493,7 +493,10 @@ public static class Extensibility
             await writer.WriteLineAsync("<!DOCTYPE html>");
             await writer.WriteLineAsync("<html><head><title>AgentEval Report</title></head><body>");
             await writer.WriteLineAsync($"<h1>{report.Name ?? "Evaluation Report"}</h1>");
-            await writer.WriteLineAsync($"<p>Score: {report.OverallScore:F1}% | Pass Rate: {report.PassRate:F1}%</p>");
+            // Not measured prints as n/a: a null score or pass rate (nothing measured, no tests) is not 0%.
+            var score = report.OverallScore is { } overall ? $"{overall:F1}%" : "n/a";
+            var passRate = report.PassRate is { } rate ? $"{rate:F1}%" : "n/a";
+            await writer.WriteLineAsync($"<p>Score: {score} | Pass Rate: {passRate}</p>");
             await writer.WriteLineAsync($"<p>Tests: {report.PassedTests}/{report.TotalTests} passed</p>");
 
             if (report.TestResults.Count > 0)
@@ -502,8 +505,9 @@ public static class Extensibility
                 foreach (var tr in report.TestResults)
                 {
                     var color = tr.Passed ? "green" : "red";
+                    var testScore = tr.Score is { } value ? $"{value:F1}" : "n/a";   // no score is n/a, not 0
                     await writer.WriteLineAsync(
-                        $"<tr><td>{tr.Name}</td><td>{tr.Score:F1}</td>" +
+                        $"<tr><td>{tr.Name}</td><td>{testScore}</td>" +
                         $"<td style='color:{color}'>{(tr.Passed ? "✅" : "❌")}</td></tr>");
                 }
                 await writer.WriteLineAsync("</table>");

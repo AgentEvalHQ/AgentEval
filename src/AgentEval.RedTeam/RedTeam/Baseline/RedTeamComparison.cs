@@ -14,21 +14,25 @@ public record RedTeamComparison
     /// <summary>The current result being compared.</summary>
     public required RedTeamResult Current { get; init; }
 
-    /// <summary>Change in overall score (positive = improvement).</summary>
-    public double ScoreDelta => Current.OverallScore - Baseline.OverallScore;
+    /// <summary>
+    /// Change in overall score (positive = improvement). <see langword="null"/> when either run has no overall score — it
+    /// measured nothing, so the comparison is refused (<see cref="IsComparable"/>, T81).
+    /// </summary>
+    public double? ScoreDelta => Current.OverallScore - Baseline.OverallScore;
 
     /// <summary>
     /// Change in the CONCLUSIVE-only score (resisted / conclusive × 100, RC-6) — the honest score dimension that an
     /// inconclusive-diluted <see cref="ScoreDelta"/> can mask (item 4). Positive = improvement. Falls back to
-    /// <see cref="ScoreDelta"/> when the baseline predates the persisted <see cref="RedTeamBaseline.ConclusiveScore"/>.
+    /// <see cref="ScoreDelta"/> when the baseline has no <see cref="RedTeamBaseline.ConclusiveScore"/> (it predates the
+    /// field). <see langword="null"/> when the current run has no conclusive score.
     /// </summary>
-    public double ConclusiveScoreDelta =>
+    public double? ConclusiveScoreDelta =>
         Baseline.ConclusiveScore is { } baselineConclusive
             ? Current.ConclusiveScore - baselineConclusive
             : ScoreDelta;
 
-    /// <summary>Change in attack success rate (negative = improvement).</summary>
-    public double AttackSuccessRateDelta =>
+    /// <summary>Change in attack success rate (negative = improvement); <see langword="null"/> when either run has none.</summary>
+    public double? AttackSuccessRateDelta =>
         Current.AttackSuccessRate - Baseline.AttackSuccessRate;
 
     /// <summary>New vulnerabilities not in baseline.</summary>
@@ -98,9 +102,9 @@ public record RedTeamComparison
         ?? Baseline.AttackResults.Sum(a => a.ResistedCount + a.FailedProbeIds.Count);
 
     /// <summary>
-    /// Whether both runs measured something: at least one probe each reached a verdict. When either side measured
-    /// nothing, its scores are placeholders, so <see cref="ScoreDelta"/>, <see cref="ConclusiveScoreDelta"/> and
-    /// <see cref="AttackSuccessRateDelta"/> are not measurements; <see cref="NotComparableReason"/> says why, and the
+    /// Whether both runs measured something: at least one probe each reached a verdict, and each has an overall score.
+    /// When either side measured nothing, it has no scores, so <see cref="ScoreDelta"/>, <see cref="ConclusiveScoreDelta"/>
+    /// and <see cref="AttackSuccessRateDelta"/> are <see langword="null"/>; <see cref="NotComparableReason"/> says why, and the
     /// comparison is refused: its <see cref="Status"/> is <see cref="RegressionStatus.Incomparable"/>, neither a
     /// regression nor a pass (<see cref="IsRegression"/>, <see cref="IsStable"/> and <see cref="IsImprovement"/> are all
     /// false), and the CLI exits 13 (incomparable). Reading it as a regression said the agent got worse when one run had
@@ -115,6 +119,9 @@ public record RedTeamComparison
             (0, 0) => "neither the baseline nor the current run has a probe that reached a verdict",
             (0, _) => $"the baseline ({Baseline.Version}) has no probe that reached a verdict",
             (_, 0) => "the current run has no probe that reached a verdict",
+            // A score left out of a baseline file (or a run with verdicts but no probe count) has no delta to read (T81).
+            _ when Baseline.OverallScore is null => $"the baseline ({Baseline.Version}) records no overall score",
+            _ when Current.OverallScore is null => "the current run has no overall score",
             _ => null,
         };
 
@@ -148,7 +155,7 @@ public record RedTeamComparison
     /// <summary>Is this stable (no significant change)?</summary>
     public bool IsStable =>
         IsComparable
-        && Math.Abs(ScoreDelta) < Thresholds.StableScoreBand && NewVulnerabilities.Count == 0
+        && ScoreDelta is { } delta && Math.Abs(delta) < Thresholds.StableScoreBand && NewVulnerabilities.Count == 0
         && CoverageDrop < Thresholds.RegressionCoverageDrop && FidelityEscalations.Count == 0;
 
     private RegressionStatus DetermineStatus()
@@ -162,8 +169,10 @@ public record RedTeamComparison
         // A persistent vuln whose evidence strengthened (e.g. Verbal→Behavioral) is a real worsening the deltas miss.
         if (FidelityEscalations.Count > 0) return RegressionStatus.Degraded;
         if (ResolvedVulnerabilities.Count > 0) return RegressionStatus.Improved;
-        if (Math.Abs(ScoreDelta) < Thresholds.StableScoreBand) return RegressionStatus.Stable;
-        return ScoreDelta > 0 ? RegressionStatus.Improved : RegressionStatus.Degraded;
+        // IsComparable means both runs have an overall score; the guard keeps a missing one from reading as a change.
+        if (ScoreDelta is not { } delta) return RegressionStatus.Incomparable;
+        if (Math.Abs(delta) < Thresholds.StableScoreBand) return RegressionStatus.Stable;
+        return delta > 0 ? RegressionStatus.Improved : RegressionStatus.Degraded;
     }
 
     /// <summary>

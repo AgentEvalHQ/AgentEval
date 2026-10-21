@@ -107,8 +107,12 @@ internal static class StochasticBenchRunner
                 EvalResultPersistence.ToScenarioResult(leaf, leaf.Metric.Key, leaf.Metric.Name,
                     input: input.Query, subjectModel: input.SubjectModel), ct);
         var stats = leaves.Select(l => l.Score).ToRunStats();
+        // The voted root's score only when it is a reading (T13): with no run counted it wrote overallScore 0.
+        var metrics = rollup.Score.MeasuredValue() is { } overallScore
+            ? new Dictionary<string, double> { ["overallScore"] = overallScore }
+            : new Dictionary<string, double>();
         await store.CompleteRunAsync(manifest, new RunSummary("1.0", manifest.Run.RunId,
-            rollup.Score.RunVerdict(stats), stats, new Dictionary<string, double> { ["overallScore"] = rollup.Score.Value }), ct);
+            rollup.Score.RunVerdict(stats), stats, metrics), ct);
         return manifest.Run.RunId;
     }
 

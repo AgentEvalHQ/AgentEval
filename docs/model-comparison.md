@@ -145,7 +145,7 @@ public record ModelResult(
     StochasticResult StochasticResult,         // every run, and their statistics
     TimeSpan? AverageLatency,                  // null when no run returned (none recorded a latency)
     decimal? AverageCost,                      // null when no run carried a cost estimate
-    decimal? TotalCost);                       // plus PassRate, MeanScore, StandardDeviation
+    decimal? TotalCost);                       // plus PassRate, MeanScore?, StandardDeviation? (null when no run was measured)
 
 public record ModelRanking(
     string ModelId,
@@ -167,8 +167,10 @@ foreach (var model in result.ModelResults)
 {
     var cost = model.AverageCost is { } c ? $"${c:F4}" : "not measured";
     var latency = model.AverageLatency is { } l ? $"{l.TotalSeconds:F2}s" : "not measured";
-    Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, mean score {model.MeanScore:F1} " +
-                      $"(SD {model.StandardDeviation:F1}), latency {latency}, cost/run {cost}");
+    // MeanScore and StandardDeviation are null when none of the model's runs was measured (every run errored, or
+    // the judge produced no verdict): no score, not 0.
+    var quality = model.MeanScore is { } mean ? $"mean score {mean:F1} (SD {model.StandardDeviation:F1})" : "not measured";
+    Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, {quality}, latency {latency}, cost/run {cost}");
 }
 
 foreach (var ranking in result.Ranking)
@@ -310,7 +312,7 @@ foreach (var r in results)
 
     foreach (var model in r.ModelResults)
     {
-        Console.WriteLine($"  {model.ModelName}: mean score {model.MeanScore:F1}, pass rate {model.PassRate:P0}");
+        Console.WriteLine($"  {model.ModelName}: mean score {model.MeanScore?.ToString("F1") ?? "n/a"}, pass rate {model.PassRate:P0}");
     }
 }
 ```
@@ -348,7 +350,7 @@ var priced = result.ModelResults
 
 foreach (var (model, costPerRun) in priced)
 {
-    Console.WriteLine($"{model.ModelName}: mean score {model.MeanScore:F1}, " +
+    Console.WriteLine($"{model.ModelName}: mean score {model.MeanScore?.ToString("F1") ?? "n/a"}, " +
                       $"cost/run {(costPerRun is { } cost ? $"${cost:F4}" : "not measured")}");
 }
 ```
@@ -509,12 +511,13 @@ foreach (var r in results)
     var after = r.ModelResults.Single(m => m.ModelId == "gpt-4o");
 
     Console.WriteLine($"{r.TestCase.Name}:");
-    Console.WriteLine($"  Mean score: {before.MeanScore:F1} -> {after.MeanScore:F1}");
+    Console.WriteLine($"  Mean score: {Score(before.MeanScore)} -> {Score(after.MeanScore)}");
     Console.WriteLine($"  Pass rate:  {before.PassRate:P0} -> {after.PassRate:P0}");
     Console.WriteLine($"  Latency:    {Seconds(before.AverageLatency)} -> {Seconds(after.AverageLatency)}");
 }
 
-// AverageLatency is null when no run recorded one: print n/a, not "s".
+// MeanScore is null when no run was measured, AverageLatency when no run recorded one: print n/a, not "" or "s".
+static string Score(double? mean) => mean is { } m ? $"{m:F1}" : "n/a";
 static string Seconds(TimeSpan? latency) => latency is { } t ? $"{t.TotalSeconds:F2}s" : "n/a";
 ```
 
@@ -530,7 +533,10 @@ var result = await comparer.CompareModelsAsync(
 var expensive = result.ModelResults.Single(m => m.ModelId == "gpt-4o");
 var cheap = result.ModelResults.Single(m => m.ModelId == "gpt-4o-mini");
 
-Console.WriteLine($"Mean score drop: {expensive.MeanScore - cheap.MeanScore:F1} points");
+// A model none of whose runs was measured has no MeanScore (null), so there is no drop to report.
+Console.WriteLine(expensive.MeanScore is { } high && cheap.MeanScore is { } low
+    ? $"Mean score drop: {high - low:F1} points"
+    : "Mean score drop: n/a (a model has no measured run)");
 Console.WriteLine($"Pass rate:       {expensive.PassRate:P0} -> {cheap.PassRate:P0}");
 // For the price side, price each model's tokens at its own rate (see Cost-Quality Tradeoffs)
 ```

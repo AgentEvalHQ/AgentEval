@@ -108,7 +108,7 @@ public sealed class AgenticSummaryBuilder
             // (sum / count). The previous pairwise `(existing + score) / 2` re-average
             // silently over-weighted the last evaluator added to each bucket (BUG-16).
             var catScoreSum = new Dictionary<string, double>(StringComparer.Ordinal);
-            var catCount = new Dictionary<string, int>(StringComparer.Ordinal);
+            var catMeasured = new Dictionary<string, int>(StringComparer.Ordinal);
             var catStatus = new Dictionary<string, string>(StringComparer.Ordinal);
             var catCriticals = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
@@ -125,8 +125,13 @@ public sealed class AgenticSummaryBuilder
                     Severity: evaluator.Score.Severity ?? "none",
                     Confidence: confidence);
 
-                catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
-                catCount[categoryKey] = catCount.GetValueOrDefault(categoryKey) + 1;
+                // Only an evaluator that measured something is averaged in (T13): an errored, skipped or inapplicable one
+                // carries a placeholder 0, so [pass 1.0, error] read 0.5. Its status still reaches the category below.
+                if (evaluator.Score.CountsTowardAggregate())
+                {
+                    catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
+                    catMeasured[categoryKey] = catMeasured.GetValueOrDefault(categoryKey) + 1;
+                }
                 catStatus[categoryKey] = catStatus.TryGetValue(categoryKey, out var prior)
                     ? EvalScoreExtensions.CombineReportStatus(prior, status)
                     : status;
@@ -139,11 +144,14 @@ public sealed class AgenticSummaryBuilder
                 }
             }
 
-            foreach (var (categoryKey, count) in catCount)
+            foreach (var (categoryKey, categoryStatus) in catStatus)
             {
+                // With nothing measured the score stays 0, because agentic-result.schema.json requires a number there; the
+                // category's status (ERROR or SKIPPED) is what says it is not a reading.
+                var measured = catMeasured.GetValueOrDefault(categoryKey);
                 perCategory[categoryKey] = new AgenticCategorySummary(
-                    Score: catScoreSum[categoryKey] / count,
-                    Status: catStatus[categoryKey],
+                    Score: measured > 0 ? catScoreSum[categoryKey] / measured : 0,
+                    Status: categoryStatus,
                     CriticalFails: catCriticals.TryGetValue(categoryKey, out var fails)
                         ? fails
                         : (IReadOnlyList<string>)Array.Empty<string>());

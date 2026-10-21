@@ -289,20 +289,13 @@ public sealed class AtomicLlmEval : AtomicEval
         // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage.
         // Not priced is null, never $0: an IEvaluator that reports no token counts (test fakes,
         // non-chat evaluators), or only one of the two, and a judge model with no rate leave the
-        // cost unknown. A missing count is not a zero count.
-        long? inputTokens = er.InputTokenCount;
-        long? outputTokens = er.OutputTokenCount;
+        // cost unknown. A missing count is not a zero count, so the token total is complete or
+        // absent too: with one count unreported it was the other count alone, read as the whole (T82).
         int? tokensUsed = null;
         double? estimatedCost = null;
-        if (inputTokens is not null || outputTokens is not null)
+        if (er.InputTokenCount is { } inT && er.OutputTokenCount is { } outT)
         {
-            var inT = inputTokens ?? 0;
-            var outT = outputTokens ?? 0;
-            if (inputTokens is null || outputTokens is null)
-            {
-                // One count unreported: no complete cost.
-            }
-            else if (_rateResolver is not null)
+            if (_rateResolver is not null)
             {
                 // LR7-F1: per-instance resolver wins over the static JudgeCostMap.
                 // Lets a tenant override list price with a negotiated rate without

@@ -63,7 +63,7 @@ public static class TableFormatter
             }
         }
 
-        // Pass Rate
+        // Pass Rate: over every run, so its sample is every run, not the measured ones the score row counts.
         if (options.ShowPassRate)
         {
             writer.WriteLine($"{indent}{{0,-25}} {{1,10}} {{2,10}} {{3,10}} {{4,10}} {{5,10}}",
@@ -72,7 +72,7 @@ public static class TableFormatter
                 "-",
                 PassRateOverEveryRun(result),
                 "-",
-                result.Statistics.SampleSize);
+                result.IndividualResults.Count);
         }
 
         if (result.NotMeasuredCount > 0)
@@ -83,21 +83,24 @@ public static class TableFormatter
         }
 
         // Duration
-        if (options.ShowDuration && result.DurationStats.SampleSize == 0)
+        if (options.ShowDuration)
         {
-            // No run recorded a duration: not a 0 ms run.
-            WriteNotMeasuredRow(writer, indent, "Duration (ms)");
-        }
-        else if (options.ShowDuration)
-        {
-            var durationVariance = CalculateVariancePercent(result.DurationStats.Min, result.DurationStats.Max, result.DurationStats.Mean);
-            writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F0}} {{4,10}} {{5,10}}",
-                "Duration (ms)",
-                result.DurationStats.Min,
-                result.DurationStats.Max,
-                result.DurationStats.Mean,
-                FormatVarianceWithColor(durationVariance, options.UseColors),
-                result.DurationStats.SampleSize);
+            if (result.DurationStats is { } durationStats)
+            {
+                var durationVariance = CalculateVariancePercent(durationStats.Min, durationStats.Max, durationStats.Mean);
+                writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F0}} {{4,10}} {{5,10}}",
+                    "Duration (ms)",
+                    durationStats.Min,
+                    durationStats.Max,
+                    durationStats.Mean,
+                    FormatVarianceWithColor(durationVariance, options.UseColors),
+                    durationStats.SampleSize);
+            }
+            else
+            {
+                // No run recorded a duration: not a 0 ms run.
+                WriteNotMeasuredRow(writer, indent, "Duration (ms)");
+            }
         }
         
         // TTFT
@@ -113,8 +116,9 @@ public static class TableFormatter
                 result.TimeToFirstTokenStats.SampleSize);
         }
         
-        // Tokens
-        if (options.ShowTokens && result.TotalTokenStats != null && result.TotalTokenStats.Max > 0)
+        // Tokens and cost: a row when any run reported them, a recorded 0 included (it is a value, not a gap); no row
+        // when none did. The comparison table follows the same rule.
+        if (options.ShowTokens && result.TotalTokenStats != null)
         {
             var tokenVariance = CalculateVariancePercent(result.TotalTokenStats.Min, result.TotalTokenStats.Max, result.TotalTokenStats.Mean);
             writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F0}} {{4,10}} {{5,10}}",
@@ -126,7 +130,7 @@ public static class TableFormatter
                 result.TotalTokenStats.SampleSize);
         }
         
-        if (options.ShowPromptTokens && result.PromptTokenStats != null && result.PromptTokenStats.Max > 0)
+        if (options.ShowPromptTokens && result.PromptTokenStats != null)
         {
             var promptVariance = CalculateVariancePercent(result.PromptTokenStats.Min, result.PromptTokenStats.Max, result.PromptTokenStats.Mean);
             writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F0}} {{4,10}} {{5,10}}",
@@ -138,7 +142,7 @@ public static class TableFormatter
                 result.PromptTokenStats.SampleSize);
         }
         
-        if (options.ShowCompletionTokens && result.CompletionTokenStats != null && result.CompletionTokenStats.Max > 0)
+        if (options.ShowCompletionTokens && result.CompletionTokenStats != null)
         {
             var completionVariance = CalculateVariancePercent(result.CompletionTokenStats.Min, result.CompletionTokenStats.Max, result.CompletionTokenStats.Mean);
             writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F0}} {{4,10}} {{5,10}}",
@@ -151,7 +155,7 @@ public static class TableFormatter
         }
         
         // Cost
-        if (options.ShowCost && result.CostStats != null && result.CostStats.Max > 0)
+        if (options.ShowCost && result.CostStats != null)
         {
             var costVariance = CalculateVariancePercent(result.CostStats.Min, result.CostStats.Max, result.CostStats.Mean);
             writer.WriteLine($"{indent}{{0,-25}} {{1,10:F6}} {{2,10:F6}} {{3,10:F6}} {{4,10}} {{5,10}}",
@@ -164,21 +168,24 @@ public static class TableFormatter
         }
         
         // Tool Calls
-        if (options.ShowToolCalls && result.ToolCallCountStats.SampleSize == 0)
+        if (options.ShowToolCalls)
         {
-            // No run tracked tool usage: not a run with zero calls.
-            WriteNotMeasuredRow(writer, indent, "Tool Calls/Run");
-        }
-        else if (options.ShowToolCalls)
-        {
-            var toolCallVariance = CalculateVariancePercent(result.ToolCallCountStats.Min, result.ToolCallCountStats.Max, result.ToolCallCountStats.Mean);
-            writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F1}} {{4,10}} {{5,10}}",
-                "Tool Calls/Run",
-                result.ToolCallCountStats.Min,
-                result.ToolCallCountStats.Max,
-                result.ToolCallCountStats.Mean,
-                FormatVarianceWithColor(toolCallVariance, options.UseColors),
-                result.ToolCallCountStats.SampleSize);
+            if (result.ToolCallCountStats is { } toolCallStats)
+            {
+                var toolCallVariance = CalculateVariancePercent(toolCallStats.Min, toolCallStats.Max, toolCallStats.Mean);
+                writer.WriteLine($"{indent}{{0,-25}} {{1,10:F0}} {{2,10:F0}} {{3,10:F1}} {{4,10}} {{5,10}}",
+                    "Tool Calls/Run",
+                    toolCallStats.Min,
+                    toolCallStats.Max,
+                    toolCallStats.Mean,
+                    FormatVarianceWithColor(toolCallVariance, options.UseColors),
+                    toolCallStats.SampleSize);
+            }
+            else
+            {
+                // No run tracked tool usage: not a run with zero calls.
+                WriteNotMeasuredRow(writer, indent, "Tool Calls/Run");
+            }
         }
         
         // Evaluation Metrics
@@ -213,8 +220,13 @@ public static class TableFormatter
         
         writer.WriteLine($"\n{indent}🔧 Tool: {summary.ToolName}");
         writer.WriteLine($"{indent}" + new string('─', 50));
-        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Call Rate:", $"{summary.CallRate * 100:F0}% ({summary.RunsWithTool}/{summary.CallCountStats.SampleSize} runs)");
-        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Error Rate:", $"{summary.ErrorRate * 100:F0}%");
+        // The rates are over the runs that tracked tool usage; with none there is no rate, not a 0% (0/N runs).
+        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Call Rate:",
+            summary.CallCountStats is { } calls && summary.CallRate is { } callRate
+                ? $"{callRate * 100:F0}% ({summary.RunsWithTool}/{calls.SampleSize} runs that tracked tools)"
+                : "N/A (no run tracked tool usage)");
+        writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Error Rate:",
+            summary.ErrorRate is { } errorRate ? $"{errorRate * 100:F0}%" : "N/A (no run tracked tool usage)");
         writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Total Calls:", summary.TotalCalls);
         
         var statusIcon = options.UseColors 
@@ -345,12 +357,13 @@ public static class TableFormatter
             if (options.ShowDuration)
             {
                 // No run recorded a duration: N/A, not a 0 ms mean.
-                var timed = result.DurationStats.SampleSize > 0;
+                var durationStats = result.DurationStats;
                 sb.Append(" | ");
-                sb.Append((timed ? $"{result.DurationStats.Mean:F0}" : "N/A").PadLeft(8));
+                sb.Append((durationStats is { } timed ? $"{timed.Mean:F0}" : "N/A").PadLeft(8));
                 sb.Append(" | ");
-                var durVariance = CalculateVariancePercent(result.DurationStats.Min, result.DurationStats.Max, result.DurationStats.Mean);
-                sb.Append((timed ? FormatVarianceWithColor(durVariance, options.UseColors) : "N/A").PadLeft(7));
+                sb.Append((durationStats is { } spread
+                    ? FormatVarianceWithColor(CalculateVariancePercent(spread.Min, spread.Max, spread.Mean), options.UseColors)
+                    : "N/A").PadLeft(7));
             }
             
             if (options.ShowTimeToFirstToken)
@@ -449,14 +462,19 @@ public static class TableFormatter
             writer.WriteLine($"{indent}{icon} Slowest: {result.SlowestRun.Value.Duration.TotalMilliseconds:F0}ms");
         }
         
-        var range = result.DurationStats.Max - result.DurationStats.Min;
-        var variance = result.DurationStats.Mean > 0
-            ? (range / result.DurationStats.Mean * 100)
-            : 0;
         var icon3 = options.UseColors ? "📏" : "[RANGE]";
-        writer.WriteLine(result.DurationStats.SampleSize > 0
-            ? $"{indent}{icon3} Range:   {range:F0}ms ({variance:F1}% variance)"
-            : $"{indent}{icon3} Range:   N/A (no run recorded a duration)");
+        if (result.DurationStats is { } durationStats)
+        {
+            var range = durationStats.Max - durationStats.Min;
+            var variance = durationStats.Mean > 0
+                ? (range / durationStats.Mean * 100)
+                : 0;
+            writer.WriteLine($"{indent}{icon3} Range:   {range:F0}ms ({variance:F1}% variance)");
+        }
+        else
+        {
+            writer.WriteLine($"{indent}{icon3} Range:   N/A (no run recorded a duration)");
+        }
         writer.WriteLine($"{indent}" + new string('─', 50));
     }
 

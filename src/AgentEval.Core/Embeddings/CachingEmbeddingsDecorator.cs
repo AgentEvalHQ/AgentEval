@@ -120,6 +120,11 @@ public class CachingEmbeddingsDecorator : IAgentEvalEmbeddings
 
     private void TryAddToCache(string text, ReadOnlyMemory<float> embedding)
     {
+        // A vector no similarity can be read from is passed on but not kept (T13): cached, one bad reply stayed
+        // "not measured" for that text for the life of the cache.
+        if (!IsUsable(embedding.Span))
+            return;
+
         // Best-effort approximate bound: Count check is not atomic with TryAdd, so under
         // high concurrency the cache may briefly exceed _maxCacheSize by a small margin.
         // This is acceptable for eval workloads (no eviction policy needed).
@@ -127,5 +132,20 @@ public class CachingEmbeddingsDecorator : IAgentEvalEmbeddings
         {
             _cache.TryAdd(text, embedding);
         }
+    }
+
+    // Empty, a component that is not a finite number, or a zero or overflowing length: the rules the embedding metrics
+    // apply before they read a cosine.
+    private static bool IsUsable(ReadOnlySpan<float> vector)
+    {
+        if (vector.Length == 0)
+            return false;
+        foreach (var component in vector)
+        {
+            if (!float.IsFinite(component))
+                return false;
+        }
+        var norm = System.Numerics.Tensors.TensorPrimitives.Norm(vector);
+        return float.IsFinite(norm) && norm >= 1e-12f;
     }
 }

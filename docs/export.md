@@ -70,6 +70,11 @@ Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test re
 `metricsNotMeasured` (a metric that ran but was not measured — an input it needs was not supplied, or, in a memory
 benchmark report, its category was skipped — with its reason; it has no score, so it is never in `metricScores`).
 
+A value that was not recorded is written as `null`, never as 0: `overallScore` when no test was measured,
+`durationMs` when the run was not timed, `stats.passRate` for a report with no tests, and a test's `score` and
+`durationMs` when it produced no score or carries no timing. Each test also has `notMeasured`: `true` when it produced
+no verdict (the judge produced none, or the run errored), which is not a failure.
+
 ### JUnit XML
 
 Standard JUnit XML format compatible with all major CI/CD systems:
@@ -87,6 +92,8 @@ await exporter.ExportAsync(report, stream);
 ```
 
 Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. A test that produced no verdict (`TestResultSummary.NotMeasured`: the judge produced none, or the run errored) is an `<error type="NotMeasured">` with the reason, counted in `errors`: not a failure, and not a `<skipped>`, which CI reads as not run and keeps green. Metric scores are written to `<system-out>`, and a metric that was not measured as `name: not measured — reason`.
+
+A `time` that was not recorded is left out rather than written as `0.000`: on `<testsuites>` when the report was not timed, on a `<testsuite>` (the sum of its timed tests) when none of its tests was timed, and on a `<testcase>` with no timing. The `overallScore` property reads `n/a` when no test was measured.
 
 ### Markdown
 
@@ -114,8 +121,10 @@ await mdExporter.ExportAsync(report, stream);
 
 The Markdown exporter renders:
 - Status header with ✅/❌ emoji: FAILED when a test failed, else ⚠️ INCOMPLETE when a test produced no verdict (with
-  the count), else PASSED; the score reads n/a when no test was measured
-- Results table with score, status, and duration (a test with no verdict reads `n/a` and `⚠️ not measured`)
+  the count), else PASSED; the score reads n/a when no test was measured, and the duration `not recorded` when the
+  report was not timed
+- Results table with score, status, and duration (a test with no verdict reads `n/a` and `⚠️ not measured`; a test
+  with no timing reads `n/a` for its time)
 - Optional failure details section
 - Optional metric breakdown table (dynamic columns from `MetricScores` and `MetricsNotMeasured`; a metric that was not
   measured reads `not measured`, one not requested for that test `-`)
@@ -131,7 +140,7 @@ await using var stream = File.Create("results.trx");
 await exporter.ExportAsync(report, stream);
 ```
 
-Uses deterministic GUIDs based on test names for reproducible output. Includes full TRX structure: `TestRun`, `Times`, `ResultSummary`, `TestDefinitions`, `TestEntries`, and `Results`. A test that produced no verdict has outcome `Error` (counted in `error`, not `notExecuted`), and the `ResultSummary` outcome is `Failed` when a test failed or produced no verdict.
+Uses deterministic GUIDs based on test names for reproducible output. Includes full TRX structure: `TestRun`, `Times`, `ResultSummary`, `TestDefinitions`, `TestEntries`, and `Results`. A test that produced no verdict has outcome `Error` (counted in `error`, not `notExecuted`), and the `ResultSummary` outcome is `Failed` when a test failed or produced no verdict. A `UnitTestResult` with no recorded timing has no `duration` and no `endTime` attribute, rather than `00:00:00`.
 
 ### CSV
 
@@ -147,7 +156,7 @@ var csvExporter = new CsvExporter();
 var csv = await csvExporter.ExportToStringAsync(report);
 ```
 
-Fixed columns: `RunId`, `TestName`, `Category`, `Score`, `Passed`, `Skipped`, `DurationMs`, `Error`, `AgentName`, `AgentModel`.
+Fixed columns: `RunId`, `TestName`, `Category`, `Score`, `Passed`, `Skipped`, `DurationMs`, `Error`, `AgentName`, `AgentModel`. A test that produced no score has `not measured` in `Score`, and a test with no timing an empty `DurationMs`: neither is written as 0.
 
 Dynamic columns are appended for each unique key in `MetricScores` and `MetricsNotMeasured` (e.g., `relevance`, `correctness`). A cell holds the score, `not measured` when the metric ran without an input it needs, or is empty when the metric was not requested for that test — so a metric column can mix numbers and text (read it as text, or treat `not measured` as missing, not 0). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
 
@@ -183,9 +192,9 @@ Each run produces a directory with:
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly); `metricsNotMeasured` names a metric that ran without an input it needs, with its reason |
-| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) over the tests that measured it; `metricsNotMeasured` counts, per metric, the tests where it was not measured |
-| `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration |
+| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly); `notMeasured` is `true` for a test with no verdict; `score` and `durationMs` are `null` when not recorded; `metricsNotMeasured` names a metric that ran without an input it needs, with its reason |
+| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) over the tests that measured it; `metricsNotMeasured` counts, per metric, the tests where it was not measured; `overallScore`, `duration` and `stats.passRate` are `null` when nothing was measured, the run was not timed, or there are no tests |
+| `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration (`null` when the run was not timed) |
 | *(original filename)* | *(original format)* | Copy of original config/dataset file with filename preserved (when provided, for reproducibility) |
 
 The stream-based `ExportAsync` method writes `summary.json` content for `IResultExporter` compatibility. For full directory output, use `ExportToDirectoryAsync`.
@@ -319,8 +328,14 @@ var report = new EvaluationReport
 ```
 
 Computed properties:
-- `Duration` — calculated from `EndTime - StartTime`
-- `PassRate` — calculated as percentage with zero-division protection
+- `Duration` — `EndTime - StartTime`, or `null` when `EndTime` is not after `StartTime` (the report was not timed)
+- `PassRate` — a percentage, or `null` for a report with no tests
+
+`OverallScore`, `TestResultSummary.Score` and `TestResultSummary.DurationMs` are nullable too: `null` means not
+measured or not recorded, never 0. `TestSummary.ToEvaluationReport()` leaves `OverallScore` null when no test was
+measured, a test's `Score` null when it produced no verdict, and its `DurationMs` null when it carries no performance
+data. `TestSummary.TotalDuration` sums the timed tests (null when none was); `TestSummary.TotalCost` is complete or
+absent — null when any test was not priced, with `UnpricedTests` and `TotalCostNotPricedReason` saying which and why.
 
 ## CI/CD Integration
 

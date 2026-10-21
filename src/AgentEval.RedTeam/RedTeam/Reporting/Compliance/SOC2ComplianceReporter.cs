@@ -4,6 +4,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+// The enum, by a name the RiskLevel property (now RiskLevel?) does not hide.
+using Risk = AgentEval.RedTeam.Reporting.Compliance.RiskLevel;
 
 namespace AgentEval.RedTeam.Reporting.Compliance;
 
@@ -42,12 +44,12 @@ public class SOC2ComplianceReport : IComplianceReport
     // === Computed Properties ===
 
     /// <inheritdoc />
-    public double ComplianceRate
+    public double? ComplianceRate
     {
         get
         {
             var evaluatedControls = Controls.Where(c => c.Status is not ControlEvaluationStatus.NotEvaluated and not ControlEvaluationStatus.NotApplicable).ToList();
-            if (evaluatedControls.Count == 0) return 0.0; // RC-6: nothing evaluated is not 100% compliant. Markdown renders "N/A".
+            if (evaluatedControls.Count == 0) return null; // RC-6 / T81: nothing evaluated is not measured — not 100% compliant, nor 0%.
             var effectiveCount = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.Effective);
             return effectiveCount * 100.0 / evaluatedControls.Count;
         }
@@ -57,15 +59,17 @@ public class SOC2ComplianceReport : IComplianceReport
     public string Disclaimer => ComplianceDisclaimer.Text;
 
     /// <inheritdoc />
-    public RiskLevel RiskLevel
+    public RiskLevel? RiskLevel
     {
         get
         {
+            // Nothing evaluated has no risk level: it read Low, the all-clear, for a run that measured nothing (T81).
+            if (ComplianceRate is null) return null;
             var needsImprovement = Controls.Count(c => c.Status == ControlEvaluationStatus.NeedsImprovement);
-            if (needsImprovement >= 3) return RiskLevel.Critical;
-            if (needsImprovement >= 2) return RiskLevel.High;
-            if (needsImprovement >= 1) return RiskLevel.Moderate;
-            return RiskLevel.Low;
+            if (needsImprovement >= 3) return Risk.Critical;
+            if (needsImprovement >= 2) return Risk.High;
+            if (needsImprovement >= 1) return Risk.Moderate;
+            return Risk.Low;
         }
     }
 
@@ -98,7 +102,7 @@ public class SOC2ComplianceReport : IComplianceReport
         sb.AppendLine($"| Effective | {effectiveCount} |");
         sb.AppendLine($"| Partially Effective | {partialCount} |");
         sb.AppendLine($"| Needs Improvement | {needsImprovementCount} |");
-        sb.AppendLine($"| Compliance Rate | {ComplianceRate:F1}% |");
+        sb.AppendLine($"| Compliance Rate | {(ComplianceRate is { } rate ? $"{rate:F1}%" : "not measured (no control was conclusively evaluated)")} |");
         sb.AppendLine();
 
         // Control Evidence
@@ -276,7 +280,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
             TotalCategories = controlStatuses.Count,
             TestedCategories = evaluatedControls.Count,
             PassedCategories = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.Effective),
-            OverallPassRate = result.ConclusiveProbes > 0 ? result.ConclusiveScore : 0.0,   // RC-6: 0 (NOT the 100 empty-sentinel) when nothing was conclusively evaluated; per-control PassRate; coverage surfaced separately
+            OverallPassRate = result.ConclusiveScore,   // RC-6 / T81: null (not 0, nor the 100 empty-sentinel) when nothing was conclusively evaluated; per-control PassRate; coverage surfaced separately
             CriticalFindings = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.NeedsImprovement),
             HighFindings = evaluatedControls.Count(c => c.Status == ControlEvaluationStatus.PartiallyEffective)
         };

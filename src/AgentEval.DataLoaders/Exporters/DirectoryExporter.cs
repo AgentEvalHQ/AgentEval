@@ -182,15 +182,18 @@ public sealed class DirectoryExporter : IResultExporter
                 Input: "",
                 Output: result.Output ?? "",
                 Passed: result.Passed,
-                Score: result.Score,
+                // ScenarioResult.Score is not nullable: a test with no score is stored with a placeholder 0 and marked
+                // not measured below. A duration of zero is the store's "not recorded" (read back as null).
+                Score: result.Score ?? 0,
                 Metrics: result.MetricScores,
                 Assertions: BuildAssertions(result),
-                Duration: TimeSpan.FromMilliseconds(result.DurationMs),
+                Duration: result.DurationMs is { } durationMs ? TimeSpan.FromMilliseconds(durationMs) : TimeSpan.Zero,
                 // The report carries no cost: not priced (null), never a $0 the test did not measure.
                 EstimatedCost: null)
             {
-                // A test with no verdict is stored with a placeholder 0; this keeps `compare` from averaging it.
-                Measurement = result.NotMeasured ? ScenarioMeasurement.NotMeasured : null,
+                // A test with no verdict, or with no score at all, is stored with a placeholder 0; this keeps `compare`
+                // from averaging it.
+                Measurement = result.NotMeasured || result.Score is null ? ScenarioMeasurement.NotMeasured : null,
             };
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
@@ -262,6 +265,7 @@ public sealed class DirectoryExporter : IResultExporter
                 Category = result.Category,
                 Passed = result.Passed,
                 Skipped = result.Skipped,
+                NotMeasured = result.NotMeasured,
                 Score = result.Score,
                 DurationMs = result.DurationMs,
                 Error = result.Error,
@@ -295,7 +299,7 @@ public sealed class DirectoryExporter : IResultExporter
             RunId = report.RunId,
             Name = report.Name,
             Timestamp = report.StartTime,
-            Duration = report.Duration.ToString(@"hh\:mm\:ss"),
+            Duration = FormatDuration(report.Duration),
             Agent = report.Agent is not null ? new DirectoryAgentInfo
             {
                 Name = report.Agent.Name,
@@ -322,7 +326,7 @@ public sealed class DirectoryExporter : IResultExporter
             RunId = report.RunId,
             Name = report.Name,
             Timestamp = report.StartTime,
-            Duration = report.Duration.ToString(@"hh\:mm\:ss"),
+            Duration = FormatDuration(report.Duration),
             OverallScore = report.OverallScore,
             Stats = new DirectorySummaryStats
             {
@@ -330,9 +334,10 @@ public sealed class DirectoryExporter : IResultExporter
                 Passed = report.PassedTests,
                 Failed = report.FailedTests,
                 Skipped = report.SkippedTests,
+                // No tests, no pass rate: null, not 0.
                 PassRate = report.TotalTests > 0
                     ? (double)report.PassedTests / report.TotalTests
-                    : 0
+                    : null
             }
         };
 
@@ -377,6 +382,9 @@ public sealed class DirectoryExporter : IResultExporter
 
         return summary;
     }
+
+    // A report that was not timed has no duration: null, written as null, never "00:00:00".
+    private static string? FormatDuration(TimeSpan? duration) => duration?.ToString(@"hh\:mm\:ss");
 
     /// <summary>
     /// Calculates sample standard deviation. Self-contained to avoid requiring DI

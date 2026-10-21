@@ -69,6 +69,21 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
     (`HasMeasuredScore`, counts); `agenteval compare` leaves unmeasured scenarios out of the mean delta
     (`ScenarioResult.Measurement`, `NotMeasuredScenarios`); a calibrate category with nothing scored is NOT MEASURED,
     not FAIL; golden traces record a case with no verdict (`TraceChange.NotMeasured`).
+  - **Absent aggregate values (breaking):** batch averages, report scores, untimed durations, empty workflow pass
+    rates and unrecorded tool-usage statistics are nullable. Exporters preserve the absence in JSON, CSV, Markdown,
+    JUnit and TRX; an empty report does not claim success. `EvalScore.MeasuredValue()` returns a score only when it
+    counts toward aggregation. Embedding caches no longer retain unusable vectors, and aggregation census tests
+    guard against silently averaging placeholder values.
+  - **Empty red-team scans (breaking):** security scores, attack success rates, compliance rates and risk levels are
+    nullable when no probe reached a verdict. Red-team JSON uses schema version `0.4.0` and explains absent scores;
+    Markdown and PDF reports show that nothing was measured. Consumers of `IRedTeamResult`, compliance reports,
+    baselines and risk summaries must handle null.
+  - **Complete cost and token totals:** `TestSummary.TotalCost` is nullable and names unpriced tests. Agentic cost
+    telemetry is nullable; cost evaluators skip untracked costs while still scoring a measured zero. Judge token
+    totals require both input and output usage. Mission Control counts each leaf cost once and labels an incomplete
+    sum as a priced part, with its unpriced count, instead of presenting it as the run's total cost.
+  - **Calibration instructions:** `CalibrationEntry.SystemMessage` carries the agent's instructions through the
+    evaluator and ASSERT export. It is an optional JSON `systemMessage` field; existing entries remain readable.
   - **Benchmarks:** LongMemEval and TypedMemEval with nothing scored, AutoAudit with no recorded responses or usage
     (`FidelityMeasured`, `TokensReported`), `bench performance` when calls fail, trace fidelity's token class without
     chat-side usage, memory reducer and reach-back metrics, conversation completeness's not-asked dimensions, and the

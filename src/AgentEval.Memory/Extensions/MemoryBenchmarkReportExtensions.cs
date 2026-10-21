@@ -34,6 +34,9 @@ public static class MemoryBenchmarkReportExtensions
         ArgumentNullException.ThrowIfNull(result);
 
         var now = DateTimeOffset.UtcNow;
+        // With no category measured (every one skipped, or crashed: a crashed category is marked skipped too), the
+        // benchmark's OverallScore is a placeholder 0, so the report has no score.
+        var anyMeasured = result.CategoryResults.Any(c => !c.Skipped);
         return new EvaluationReport
         {
             Name = result.BenchmarkName,
@@ -41,7 +44,7 @@ public static class MemoryBenchmarkReportExtensions
             PassedTests = result.CategoryResults.Count(c => !c.Skipped && c.Score >= 70),
             FailedTests = result.CategoryResults.Count(c => !c.Skipped && c.Score < 70),
             SkippedTests = result.CategoryResults.Count(c => c.Skipped),
-            OverallScore = result.OverallScore,
+            OverallScore = anyMeasured ? result.OverallScore : null,
             StartTime = now - result.Duration,
             EndTime = now,
             Agent = (agentName != null || modelName != null)
@@ -57,7 +60,7 @@ public static class MemoryBenchmarkReportExtensions
             {
                 Name = c.CategoryName,
                 Category = "MemoryBenchmark",
-                Score = c.Score,
+                Score = c.Skipped ? null : c.Score,   // a skipped category's 0 is a placeholder, not a score
                 Passed = !c.Skipped && c.Score >= 70,
                 Skipped = c.Skipped,
                 DurationMs = (long)c.Duration.TotalMilliseconds,

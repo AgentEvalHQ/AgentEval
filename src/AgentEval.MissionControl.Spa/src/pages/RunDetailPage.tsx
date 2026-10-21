@@ -68,6 +68,8 @@ interface RunDetailResponse {
     unknownKeyCost: number;
     legacyFlatCost: number;
     filteredOut: string[];
+    unpricedCount: number;
+    isComplete: boolean;
   } | null;
 }
 
@@ -111,6 +113,8 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
       unknownKeyCost
       legacyFlatCost
       filteredOut
+      unpricedCount
+      isComplete
     }
   }
 `;
@@ -219,7 +223,8 @@ export function RunDetailPage() {
               />
             </section>
 
-            {d.runCostBreakdown && d.runCostBreakdown.totalCost > 0 && (
+            {/* A run with unpriced costs keeps the section, so a partial total is never silently hidden (T83). */}
+            {d.runCostBreakdown && (d.runCostBreakdown.totalCost > 0 || !d.runCostBreakdown.isComplete) && (
               <section className="rounded-lg border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">
                   Cost by tier
@@ -239,9 +244,16 @@ export function RunDetailPage() {
                   )}
                   {" "}— derived from each leaf evaluator's{" "}
                   <code>provenance.estimatedCost</code> in the recursive{" "}
-                  <code>EvalResult</code> tree. Inclusive total{" "}
-                  {formatCost(d.runCostBreakdown.totalCost)} (chart segments above
-                  exclude the legacy-flat slice; see breakdown below).
+                  <code>EvalResult</code> tree.{" "}
+                  {d.runCostBreakdown.isComplete ? "Inclusive total" : "Priced part (partial)"}{" "}
+                  {formatCost(d.runCostBreakdown.totalCost)}
+                  {!d.runCostBreakdown.isComplete && (
+                    <>
+                      {" "}— {d.runCostBreakdown.unpricedCount} cost(s) not priced, so this is
+                      not the run's cost
+                    </>
+                  )}{" "}
+                  (chart segments above exclude the legacy-flat slice; see breakdown below).
                 </p>
                 {(d.runCostBreakdown.unknownKeyCost > 0 ||
                   d.runCostBreakdown.legacyFlatCost > 0) && (

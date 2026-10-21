@@ -211,15 +211,16 @@ public record ModelResult(
         : 0;
 
     /// <summary>
-    /// Mean score for this model over its measured runs; a placeholder 0 when none was measured
-    /// (<see cref="StochasticResult.MeasuredCount"/>).
+    /// Mean score for this model over its measured runs, or <see langword="null"/> when none was measured
+    /// (<see cref="StochasticResult.MeasuredCount"/> is 0).
     /// </summary>
-    public double MeanScore => StochasticResult.Statistics.MeanScore;
+    public double? MeanScore => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics.MeanScore : null;
 
     /// <summary>
-    /// Standard deviation of scores over the measured runs.
+    /// Standard deviation of scores over the measured runs, or <see langword="null"/> when none was measured: the
+    /// spread of nothing is not 0.
     /// </summary>
-    public double StandardDeviation => StochasticResult.Statistics.StandardDeviation;
+    public double? StandardDeviation => StochasticResult.MeasuredCount > 0 ? StochasticResult.Statistics.StandardDeviation : null;
 }
 
 /// <summary>

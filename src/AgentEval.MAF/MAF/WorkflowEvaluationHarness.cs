@@ -422,7 +422,9 @@ public class WorkflowEvaluationHarness
 
         _logger.LogInformation($"   Suite: {summary.SuiteName}");
         _logger.LogInformation($"   Workflow: {summary.WorkflowName}");
-        _logger.LogInformation($"   Tests: {summary.PassedTests}/{summary.TotalTests} passed ({summary.PassRate:F0}%)");
+        _logger.LogInformation(summary.PassRate is { } passRate
+            ? $"   Tests: {summary.PassedTests}/{summary.TotalTests} passed ({passRate:F0}%)"
+            : "   Tests: none ran (no pass rate)");
         _logger.LogInformation($"   Duration: {summary.TotalDuration.TotalMilliseconds:F0}ms");
 
         foreach (var result in summary.Results)
@@ -436,6 +438,11 @@ public class WorkflowEvaluationHarness
         if (summary.AllPassed)
         {
             _logger.LogInformation("\n   🎉 All workflow tests passed!\n");
+        }
+        else if (summary.TotalTests == 0)
+        {
+            // A suite with no test case passed nothing (T13); it logged "All workflow tests passed!".
+            _logger.LogWarning("\n   ⚠️ No workflow test ran: nothing was tested.\n");
         }
         else
         {

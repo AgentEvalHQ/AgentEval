@@ -226,8 +226,8 @@ public static class ModelComparisonExtensions
             // The pass rate over every run, as reliability is ranked: a run that was not measured did not pass. The mean
             // score is over the measured runs; with none it is not measured.
             var passRateFormatted = $"{PassShareOfAllRuns(modelResult):P1}";
-            var meanScoreFormatted = modelResult.StochasticResult.MeasuredCount > 0
-                ? $"{modelResult.MeanScore:F1}"
+            var meanScoreFormatted = modelResult.MeanScore is { } meanScore
+                ? $"{meanScore:F1}"
                 : "n/a";
             var latencyFormatted = modelResult.AverageLatency is { } latency ? FormatDuration(latency) : "N/A";
             var avgCostFormatted = modelResult.AverageCost.HasValue 

@@ -227,15 +227,15 @@ public static class BenchPerfCommand
 
             var runStats = new[] { result.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
             var verdict = result.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+            // The score only when it is a reading (T13): an agent whose every call failed wrote overallScore 0.
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
                 Stats: runStats,
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overallScore"] = result.Score.Value,
-                });
+                Metrics: result.Score.MeasuredValue() is { } overallScore
+                    ? new Dictionary<string, double> { ["overallScore"] = overallScore }
+                    : new Dictionary<string, double>());
             await store.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
             ct.ThrowIfCancellationRequested();
@@ -274,7 +274,7 @@ public static class BenchPerfCommand
         }
 
         Console.WriteLine($"Overall result: composite verdict {result.Score.Label.ToUpperInvariant()} " +
-            $"(score {result.Score.Value:F3})");
+            (result.Score.MeasuredValue() is { } shownScore ? $"(score {shownScore:F3})" : "(no measured score)"));
 
         // AEF: the perf result as sealed evidence (the mock run returned above, unstored).
         if (WriteEvidence())

@@ -20,11 +20,17 @@ public interface IComplianceReport
     /// <summary>When the report was generated.</summary>
     DateTimeOffset GeneratedAt { get; }
 
-    /// <summary>Overall compliance pass rate (0-100).</summary>
-    double ComplianceRate { get; }
+    /// <summary>
+    /// Overall compliance pass rate (0-100), or <see langword="null"/> when nothing was conclusively evaluated: not
+    /// measured — neither 100% compliant nor the 0% it read before (T81).
+    /// </summary>
+    double? ComplianceRate { get; }
 
-    /// <summary>Risk level based on compliance.</summary>
-    RiskLevel RiskLevel { get; }
+    /// <summary>
+    /// Risk level based on compliance, or <see langword="null"/> when nothing was conclusively evaluated: a run that
+    /// measured nothing read Low (or Moderate), the all-clear, on no evidence (T81).
+    /// </summary>
+    RiskLevel? RiskLevel { get; }
 
     /// <summary>Export to Markdown format.</summary>
     string ToMarkdown();

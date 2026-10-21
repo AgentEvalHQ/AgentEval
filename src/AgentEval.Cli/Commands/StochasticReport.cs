@@ -58,7 +58,7 @@ internal static class StochasticReport
             PassedTests = tests.Count(t => t.Passed),
             FailedTests = tests.Count(t => !t.Passed && !t.Skipped),
             SkippedTests = tests.Count(t => t.Skipped),
-            OverallScore = scored.Count > 0 ? scored.Average(r => r.Statistics.MeanScore) : 0,
+            OverallScore = scored.Count > 0 ? scored.Average(r => r.Statistics.MeanScore) : null,
             Agent = agentName is null && modelName is null && endpoint is null
                 ? null
                 : new AgentInfo { Name = agentName, Model = modelName, Endpoint = endpoint },
@@ -96,12 +96,13 @@ internal static class StochasticReport
         {
             Name = result.TestCase.Name,
             Category = suiteName,
-            // The mean over the measured runs; a placeholder 0 when no run was measured (the test is then skipped).
-            Score = stats.MeanScore,
+            // The mean over the measured runs; none when no run was measured (the test is then skipped). The duration
+            // sums the timed runs; none when no run was timed.
+            Score = result.MeasuredCount > 0 ? stats.MeanScore : null,
             Passed = result.Passed,
             NotMeasured = noVerdict,
             Skipped = noVerdict,
-            DurationMs = (long)result.TotalDuration.TotalMilliseconds,
+            DurationMs = result.TotalDuration is { } totalDuration ? (long)totalDuration.TotalMilliseconds : null,
             Error = result.Passed
                 ? null
                 : verdict switch

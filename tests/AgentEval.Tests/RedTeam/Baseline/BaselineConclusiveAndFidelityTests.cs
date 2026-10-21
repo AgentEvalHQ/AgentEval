@@ -79,7 +79,7 @@ public class BaselineConclusiveAndFidelityTests
 
         var c = new RedTeamBaselineComparer().Compare(current, baseline);
 
-        Assert.Equal(-10.0, c.ConclusiveScoreDelta, 1);
+        Assert.Equal(-10.0, c.ConclusiveScoreDelta!.Value, 1);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class BaselineConclusiveAndFidelityTests
 
         var c = new RedTeamBaselineComparer().Compare(current, baseline);
 
-        Assert.Equal(c.ScoreDelta, c.ConclusiveScoreDelta, 5);
+        Assert.Equal(c.ScoreDelta!.Value, c.ConclusiveScoreDelta!.Value, 5);
     }
 
     // ───────────────────────── Item 5: fidelity escalation ─────────────────────────

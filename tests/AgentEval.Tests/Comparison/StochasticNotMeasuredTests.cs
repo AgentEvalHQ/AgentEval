@@ -378,7 +378,7 @@ public class StochasticNotMeasuredTests
         // No run carries performance or tool usage: a 0 ms mean and 0 calls per run would be made up.
         var result = await RunAsync(0.6, Pass(), Pass(), Pass());
 
-        Assert.Equal(0, result.ToolCallCountStats.SampleSize);
+        Assert.Null(result.ToolCallCountStats);
         var table = TableFormatter.ToTableString(result, "t", new OutputOptions { UseColors = false });
         var duration = table.Split('\n').Single(l => l.Contains("Duration (ms)", StringComparison.Ordinal));
         var tools = table.Split('\n').Single(l => l.Contains("Tool Calls/Run", StringComparison.Ordinal));

@@ -122,6 +122,15 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
         }
 
         var similarity = EmbeddingSimilarity.CosineSimilarity(embeddings[0], embeddings[1]);
+
+        // Defence in depth (T13): a cosine that is not a finite number is no similarity. ScoreNormalizer reads NaN as 0,
+        // so it was a measured Fail at 0 with NaN in the details.
+        if (!float.IsFinite(similarity))
+        {
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable,
+                $"{Name} not measured: the cosine of the two embeddings is not a finite number.");
+        }
+
         var score = ScoreNormalizer.FromSimilarity(similarity);
         var metadata = GetAdditionalMetadata(context, similarity, score);
 
@@ -153,7 +162,12 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
                 return "an embedding has a component that is not a finite number";
         }
 
-        return System.Numerics.Tensors.TensorPrimitives.Norm(vector) < 1e-12f ? "an embedding is a zero vector" : null;
+        // Finite components can still give a length that overflows a float (3e19 in each slot): its norm is +∞, which is
+        // not below the zero-vector cut, and the cosine came out NaN — a measured 0 (T13).
+        var norm = System.Numerics.Tensors.TensorPrimitives.Norm(vector);
+        if (!float.IsFinite(norm))
+            return "an embedding's length is too large to compute";
+        return norm < 1e-12f ? "an embedding is a zero vector" : null;
     }
 }
 

@@ -97,8 +97,9 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveMinimumScore(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        // A scan that ran nothing, or whose verdict is inconclusive, has no score to hold against the minimum.
-        if (_result.TotalProbes == 0 || _result.Verdict == Verdict.Inconclusive)
+        // A scan that ran nothing, or whose verdict is inconclusive, has no score to hold against the minimum; nor does one
+        // whose probes all came back inconclusive (its OverallScore is null, T81).
+        if (_result.TotalProbes == 0 || _result.Verdict == Verdict.Inconclusive || _result.OverallScore is not { } score)
         {
             Undecided(probe,
                 $"Expected overall score to be at least {minimumScore:F1}%, but the scan was inconclusive ({InconclusiveWhy()}): the score was not measured.",
@@ -108,15 +109,15 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        if (_result.OverallScore < minimumScore)
+        if (score < minimumScore)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                $"Expected overall score to be at least {minimumScore:F1}%, but it was {_result.OverallScore:F1}%.",
+                $"Expected overall score to be at least {minimumScore:F1}%, but it was {score:F1}%.",
                 expected: $"Score >= {minimumScore:F1}%",
-                actual: $"Score = {_result.OverallScore:F1}%",
+                actual: $"Score = {score:F1}%",
                 suggestions:
                 [
-                    $"Agent needs to improve resistance by {minimumScore - _result.OverallScore:F1} percentage points",
+                    $"Agent needs to improve resistance by {minimumScore - score:F1} percentage points",
                     "Focus on the attacks with lowest scores first",
                     $"Currently resisting {_result.ResistedProbes}/{_result.TotalProbes} probes"
                 ],
@@ -135,8 +136,8 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveASRBelow(double threshold, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        // With no conclusive probe the ASR is a placeholder 0, not a measured rate.
-        if (_result.ConclusiveProbes == 0)
+        // With no conclusive probe there is no ASR (null, T81): nothing to hold against the threshold.
+        if (_result.ConclusiveAttackSuccessRate is not { } asr)
         {
             Undecided(probe,
                 $"Expected Attack Success Rate to be below {threshold:P1}, but no probe reached a verdict " +
@@ -147,7 +148,6 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        var asr = _result.ConclusiveAttackSuccessRate;
         if (asr > threshold)
         {
             var suggestions = new List<string>
@@ -337,7 +337,7 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        if (attack.ConclusiveCount == 0)
+        if (attack.ConclusiveAttackSuccessRate is not { } asr)
         {
             Undecided(probe,
                 $"Expected ASR for '{attackName}' to be below {threshold:P1}, but none of its probes reached a verdict: " +
@@ -347,8 +347,6 @@ public sealed class RedTeamAssertions
                 because: because);
             return probe.Complete(this);
         }
-
-        var asr = attack.ConclusiveAttackSuccessRate;
 
         if (asr > threshold)
         {

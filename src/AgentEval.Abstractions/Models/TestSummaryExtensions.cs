@@ -39,14 +39,16 @@ public static class TestSummaryExtensions
     {
         ArgumentNullException.ThrowIfNull(summary);
 
-        // Derive time boundaries from performance data when available
+        // Derive time boundaries from performance data when available. Without any, start and end are the same instant,
+        // so the report's Duration is null (not timed); two UtcNow reads made it a few ticks that read as a timed run.
         var resultsWithPerf = summary.Results.Where(r => r.Performance != null).ToList();
+        var now = DateTimeOffset.UtcNow;
         var startTime = resultsWithPerf.Count > 0
             ? resultsWithPerf.Min(r => r.Performance!.StartTime)
-            : DateTimeOffset.UtcNow;
+            : now;
         var endTime = resultsWithPerf.Count > 0
             ? resultsWithPerf.Max(r => r.Performance!.EndTime)
-            : DateTimeOffset.UtcNow;
+            : now;
 
         return new EvaluationReport
         {
@@ -75,19 +77,20 @@ public static class TestSummaryExtensions
 
     private static TestResultSummary MapTestResult(TestResult result, string suiteName)
     {
-        // No verdict: its Score of 0 and Passed of false are placeholders (TestSummary.NotMeasuredCount).
+        // No verdict: its Score of 0 and Passed of false are placeholders (TestSummary.NotMeasuredCount), so it has no
+        // score here. A test with no performance data was not timed: no duration, not 0 ms.
         var notMeasured = result.JudgeFailed || result.HasError;
         return new TestResultSummary
         {
             Name = result.TestName,
             Category = suiteName,
-            Score = result.Score,
+            Score = notMeasured ? null : result.Score,
             Passed = result.Passed,
             NotMeasured = notMeasured,
             Skipped = notMeasured,
-            DurationMs = result.Performance != null
-                ? (long)result.Performance.TotalDuration.TotalMilliseconds
-                : 0,
+            DurationMs = result.Performance is { } performance
+                ? (long)performance.TotalDuration.TotalMilliseconds
+                : null,
             Error = BuildErrorMessage(result),
             StackTrace = result.Error?.StackTrace,
             Output = result.ActualOutput,
@@ -132,11 +135,15 @@ public static class TestSummaryExtensions
     {
         var metadata = new Dictionary<string, string>();
 
-        if (summary.TotalDuration > TimeSpan.Zero)
-            metadata["TotalDuration"] = summary.TotalDuration.ToString();
+        // Written when recorded, a recorded zero included; absent when not. A partial cost total is not written as the
+        // cost: when some test carries performance data but the total is not complete, the reason is written instead.
+        if (summary.TotalDuration is { } totalDuration)
+            metadata["TotalDuration"] = totalDuration.ToString();
 
-        if (summary.TotalCost > 0)
-            metadata["TotalCost"] = summary.TotalCost.ToString("F6", CultureInfo.InvariantCulture);
+        if (summary.TotalCost is { } totalCost)
+            metadata["TotalCost"] = totalCost.ToString("F6", CultureInfo.InvariantCulture);
+        else if (summary.Results.Any(r => r.Performance != null) && summary.TotalCostNotPricedReason is { } why)
+            metadata["TotalCostNotPriced"] = why;
 
         return metadata;
     }

@@ -28,7 +28,7 @@ namespace AgentEval.Evals.Agentic.Efficiency;
 ///   <item><c>EvalInput.Metadata["agentic_telemetry"]</c> → <see cref="AgenticTelemetry"/> for cost data.</item>
 ///   <item><c>EvalInput.Metadata["scenario_score"]</c> → <c>double</c> in [0..1] — the quality score from the benchmark run.</item>
 /// </list>
-/// If either key is absent the evaluator returns <see cref="EvalResult.Skipped(IEval, string)"/>.
+/// If either key is absent, or the telemetry's <see cref="AgenticTelemetry.EstimatedCostUsd"/> is null (cost not tracked), the evaluator returns <see cref="EvalResult.Skipped(IEval, string)"/>.
 /// </para>
 /// <para>
 /// <b>Cost tier: TRIVIAL</b> — pure code; no LLM call.
@@ -120,8 +120,16 @@ public sealed class CostQualityEfficiencyEval : IEval
                 $"EvalInput.Metadata[\"{ScenarioScoreMetadataKey}\"] (double 0..1)."));
         }
 
+        // An untracked cost is not measured, never $0: floored to $0.001 it read as the most efficient run there is,
+        // and passed (T82).
+        if (telemetry.EstimatedCostUsd is not { } costUsd)
+        {
+            return Task.FromResult(EvalResult.Skipped(this,
+                "The run's cost was not tracked (AgenticTelemetry.EstimatedCostUsd is null), so Cost-Quality Efficiency " +
+                "was not measured: an untracked cost is not $0."));
+        }
+
         var score = scenarioScore.Value;
-        var costUsd = telemetry.EstimatedCostUsd;
         var effectiveCost = Math.Max(costUsd, 0.001);
         var scorePerDollar = score / effectiveCost;
         var finalScore = Math.Clamp(scorePerDollar / ReferenceEfficiency, 0.0, 1.0);

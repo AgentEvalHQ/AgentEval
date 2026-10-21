@@ -235,15 +235,15 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         var judgeModel = JudgeModel ?? meter.ObservedModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
 
         // Not priced is null, never $0: a judge call that reported no usage, or only one of the two counts, leaves the
-        // total incomplete, and a judge model with no rate has no price.
+        // total incomplete, and a judge model with no rate has no price. The token total is complete or absent the same
+        // way: summed over the counts that were reported, it read as the whole spend (T82).
         int? tokensUsed = null;
         double? estimatedCost = null;
-        if (meter.HasUsage)
+        if (meter.UsageComplete)
         {
             var total = meter.InputTokens + meter.OutputTokens;
             tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
-            if (meter.UsageComplete)
-                estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
+            estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
         }
 
         return new EvalProvenance(
@@ -300,7 +300,6 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
 
         public long InputTokens { get; private set; }
         public long OutputTokens { get; private set; }
-        public bool HasUsage { get; private set; }
         public string? ObservedModelId { get; private set; }
 
         /// <summary>True when every judge call reported both its input and its output token count.</summary>
@@ -350,8 +349,8 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             {
                 if (modelId is not null) ObservedModelId ??= modelId;
                 if (usage is null) return (false, false);
-                if (usage.InputTokenCount is { } i) { InputTokens += i; HasUsage = true; }
-                if (usage.OutputTokenCount is { } o) { OutputTokens += o; HasUsage = true; }
+                if (usage.InputTokenCount is { } i) InputTokens += i;
+                if (usage.OutputTokenCount is { } o) OutputTokens += o;
                 return (usage.InputTokenCount is not null, usage.OutputTokenCount is not null);
             }
         }

@@ -572,11 +572,11 @@ public class ExporterTests
     }
 
     [Fact]
-    public void EvaluationReport_PassRate_HandlesZeroTests()
+    public void EvaluationReport_PassRate_IsNull_ForZeroTests()
     {
         var report = new EvaluationReport { TotalTests = 0, PassedTests = 0 };
         
-        Assert.Equal(0.0, report.PassRate);
+        Assert.Null(report.PassRate);
     }
 
     [Fact]

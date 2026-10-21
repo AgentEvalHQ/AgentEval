@@ -66,12 +66,18 @@ SOURCE_PATHS = {
     "refusal_quality":                 "UX/RefusalQualityEval.cs",
 }
 
+# Card version per key, when it is not 1.0.0. It must equal the evaluator class's Version
+# (CardRuntimeMetadataParityTest checks the card against the class).
+CARD_VERSIONS = {
+    "cost": "1.1.0",   # CostEval 1.1.0: an untracked cost (EstimatedCostUsd null) is skipped, not scored as $0 (T82)
+}
+
 # (name, category, costTier, higherIsBetter, defaultThreshold, description,
 #  expected_inputs [(kind, key, required, desc), ...], visualization, foundry_uri_or_None)
 CARDS = {
-    "cost": ("Telemetry: Cost", "telemetry", "Trivial", False, 1.0,
-        "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget.",
-        [("metadata", "agentic_telemetry", True, "AgenticTelemetry record with EstimatedCost.")],
+    "cost": ("Telemetry: Cost", "operational", "Trivial", True, 0.8,
+        "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget. A cost that was not tracked (EstimatedCostUsd null) is not measured: the result is skipped, never scored as $0.",
+        [("metadata", "agentic_telemetry", True, "AgenticTelemetry record with EstimatedCostUsd (null when the cost was not tracked).")],
         "stackedBar", None),
     "latency": ("Telemetry: Latency", "telemetry", "Trivial", False, 1.0,
         "Pure-code telemetry evaluator surfacing the agent p50/p95/p99 latency from AgenticTelemetry. Lower is better.",
@@ -313,7 +319,7 @@ def main():
             "key": key,
             "name": name,
             "category": category,
-            "version": "1.0.0",
+            "version": CARD_VERSIONS.get(key, "1.0.0"),
             "description": description,
             "costTier": cost_tier,
             "higherIsBetter": higher_is_better,

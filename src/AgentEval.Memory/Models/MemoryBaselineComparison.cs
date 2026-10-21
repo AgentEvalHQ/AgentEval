@@ -22,8 +22,11 @@ public class MemoryBaselineComparison
     /// <summary>Per-dimension comparison across all baselines.</summary>
     public required IReadOnlyList<DimensionComparison> Dimensions { get; init; }
 
-    /// <summary>ID of the baseline with the highest overall score.</summary>
-    public required string BestBaselineId { get; init; }
+    /// <summary>
+    /// ID of the baseline with the highest overall score among those that measured at least one dimension, or
+    /// <see langword="null"/> when none did: a baseline that measured nothing is not a contender.
+    /// </summary>
+    public required string? BestBaselineId { get; init; }
 
     /// <summary>Radar chart data for pentagon visualization.</summary>
     public required RadarChartData RadarChart { get; init; }
@@ -46,8 +49,11 @@ public class DimensionComparison
     /// <summary>IDs of the compared baselines that did not measure this dimension.</summary>
     public IReadOnlyList<string> NotMeasuredBy { get; init; } = [];
 
-    /// <summary>Highest score across the baselines that measured this dimension.</summary>
-    public double BestScore => Scores.Count > 0 ? Scores.Values.Max() : 0;
+    /// <summary>
+    /// Highest score across the baselines that measured this dimension, or <see langword="null"/> when none did: no
+    /// baseline scored 0 there (T13).
+    /// </summary>
+    public double? BestScore => Scores.Count > 0 ? Scores.Values.Max() : null;
 
     /// <summary>ID of the baseline with the best score for this dimension, among those that measured it.</summary>
     /// <remarks>Returns <c>null</c> when there are no scores.</remarks>

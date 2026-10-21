@@ -123,7 +123,7 @@ public class ReportingModelTests
             Scores = new Dictionary<string, double>()
         };
 
-        Assert.Equal(0, dim.BestScore);
+        Assert.Null(dim.BestScore);
         Assert.Null(dim.BestBaselineId);
     }
 

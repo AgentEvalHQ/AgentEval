@@ -191,6 +191,14 @@ public static class BenchMemoryCommand
             // for) is neither a pass nor a fail. The stored verdict is WARN, the schema's indeterminate value (as for
             // bench typedmemeval); the console says INCOMPLETE and the exit code is GateIndeterminate (11).
             var verdict = Verdict(result);
+            // overall_score only when a category was measured (T13): with every category skipped it is a placeholder 0.
+            var metrics = new Dictionary<string, double>
+            {
+                ["unmeasured_queries"] = result.UnmeasuredQueries,
+                ["errored_categories"] = result.ErroredCategories.Count,
+            };
+            if (result.HasMeasuredCategory)
+                metrics["overall_score"] = result.OverallScore;
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
@@ -202,12 +210,7 @@ public static class BenchMemoryCommand
                     Failed: result.CategoryResults.Count(c => !c.Skipped && c.Score < 50),
                     Warnings: result.CategoryResults.Count(c => !c.Skipped && c.Score >= 50 && c.Score < 70),
                     Skipped: result.CategoryResults.Count(c => c.Skipped)),
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overall_score"] = result.OverallScore,
-                    ["unmeasured_queries"] = result.UnmeasuredQueries,
-                    ["errored_categories"] = result.ErroredCategories.Count,
-                });
+                Metrics: metrics);
             // One scenario result per MEASURED category, so `agenteval compare` can diff two memory runs per category
             // (before this, a memory run had no scenarios/ and compare could not read it). A skipped, crashed or wholly
             // unmeasured category measured nothing and is left out: written as a 0 it would read as a regression in
@@ -245,12 +248,11 @@ public static class BenchMemoryCommand
                 JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
 
             Console.WriteLine();
-            var anythingMeasured = result.CategoryResults.Any(c => !c.Skipped);
             if (result.IsComplete)
             {
                 Console.WriteLine($"   Overall score: {result.OverallScore:F1}%  Grade: {result.Grade}");
             }
-            else if (anythingMeasured)
+            else if (result.HasMeasuredCategory)
             {
                 // Incomplete: no grade. The overall counts each unmeasured category as 0; the measured-only figure
                 // leaves them out. Neither is the true score, which is why the verdict is INCOMPLETE.
@@ -260,6 +262,12 @@ public static class BenchMemoryCommand
             Console.WriteLine($"   Verdict:       {verdict}");
             if (!result.IsComplete)
             {
+                if (!result.HasMeasuredCategory && result.ErroredCategories.Count == 0)
+                {
+                    // Every category was skipped (the agent supports none of them), or the benchmark has none (T13): it
+                    // printed "Overall score 0.0% Grade F" and failed.
+                    Console.WriteLine("   Not measured:  no category ran (the agent supports none of this benchmark's categories)");
+                }
                 if (result.ErroredCategories.Count > 0)
                 {
                     Console.WriteLine($"   Not measured:  {string.Join(", ", result.ErroredCategories)} (the run failed, or no question produced a score)");

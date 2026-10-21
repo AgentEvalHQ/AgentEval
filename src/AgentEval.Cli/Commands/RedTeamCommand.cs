@@ -724,7 +724,10 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine($"  === Red Team Summary ===");
                 Console.Error.WriteLine($"  {result.Summary}");
                 // RC-6 honesty: lead with the conclusive-only score + coverage, not the inconclusive-diluted OverallScore.
-                Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
+                // T81: with no conclusive probe there is no score; say why instead of printing a blank or a 0.
+                Console.Error.WriteLine(result.ConclusiveScore is { } conclusiveScore
+                    ? $"  Verdict: {result.Verdict}  (score {conclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)"
+                    : $"  Verdict: {result.Verdict}  (score not measured: {result.ScoresNotMeasuredReason})");
                 if (result.InconclusiveProbes > 0)
                     Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
                 // The second headline number, always: an agent that refuses everything passes on attacks alone.

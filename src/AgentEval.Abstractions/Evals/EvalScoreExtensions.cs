@@ -45,6 +45,24 @@ public static class EvalScoreExtensions
     }
 
     /// <summary>
+    /// The score's <see cref="EvalScore.Value"/> when it is a reading (<see cref="CountsTowardAggregate"/>), otherwise
+    /// <see langword="null"/>.
+    /// </summary>
+    /// <param name="score">The score to read.</param>
+    /// <returns>The value, or <see langword="null"/> for a skipped, errored, inapplicable or withheld score.</returns>
+    /// <remarks>
+    /// A score that measured nothing still carries a <see cref="EvalScore.Value"/> (the schema requires a number), and
+    /// that value is a placeholder. A run summary wrote it as <c>overallScore: 0</c> beside a PENDING verdict (T13);
+    /// write this instead, and leave the number out when it is null.
+    /// </remarks>
+    public static double? MeasuredValue(this EvalScore score)
+    {
+        ArgumentNullException.ThrowIfNull(score);
+
+        return score.CountsTowardAggregate() ? score.Value : null;
+    }
+
+    /// <summary>
     /// Classifies a score into the three-way census bucket, reading <b>both</b> the state and the
     /// label for the reason given on <see cref="CountsTowardAggregate"/>.
     /// </summary>

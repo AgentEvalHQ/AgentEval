@@ -22,10 +22,9 @@ public class MaxTreeWalkDepthTests
     [Fact]
     public void WalkAndAccumulate_DepthExceedsCap_DoesNotStackOverflow_AndCapsAccumulation()
     {
-        // Build a 40-deep linear chain where each level adds 1.0 to the "unknown"
-        // bucket (metric.Key not registered in EvaluatorCostMap, EstimatedCost=1.0).
-        // With the cap at 32 the walker bails after 33 levels (depth 0..32 inclusive),
-        // so the accumulated unknown bucket must be ≤ 33 and strictly less than 40.
+        // Build a 40-deep linear chain where each level carries EstimatedCost 1.0 (key not
+        // registered in EvaluatorCostMap). With the cap at 32 the walker stops at depth 32
+        // and only that composite's 1.0 is counted.
         var deepTree = BuildLinearChain(depth: 40, costPerLevel: 1.0);
 
         double trivial = 0, low = 0, medium = 0, high = 0, unknown = 0;
@@ -35,10 +34,10 @@ public class MaxTreeWalkDepthTests
         // depth that asserts the EARLY return logic engages.
         Query.WalkAndAccumulate(deepTree, ref trivial, ref low, ref medium, ref high, ref unknown);
 
-        // The guard at `if (depth > MaxTreeWalkDepth) return;` visits depths 0..32
-        // inclusive before returning, so the unknown bucket accumulates exactly
-        // MaxTreeWalkDepth+1 = 33 levels' worth of cost (1.0 each).
-        Assert.Equal((double)(Query.MaxTreeWalkDepth + 1), unknown);
+        // The walk descends through depths 0..32 and stops at the composite on the cap (depth 32): its own cost stands
+        // for the subtree it does not walk, counted once (T83). Composites above it are walked, not added, so the
+        // unknown bucket holds that one level's cost (1.0), not 33 levels' worth.
+        Assert.Equal(1.0, unknown);
         Assert.True(unknown < 40,
             $"Sanity: expected the depth cap to engage and prevent walking all 40 levels; got {unknown}.");
     }

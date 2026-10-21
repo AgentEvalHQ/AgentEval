@@ -121,7 +121,7 @@ public class EndToEndReportingTests : IDisposable
         Assert.Equal("Quick", report.Name);
         // OverallScore is a weighted average, not the raw score
         Assert.Equal(result.OverallScore, report.OverallScore);
-        Assert.InRange(report.OverallScore, 0, 100);
+        Assert.InRange(report.OverallScore!.Value, 0, 100);
         Assert.NotNull(report.Agent);
         Assert.Equal("TestAgent", report.Agent!.Name);
         Assert.Equal("gpt-4o", report.Agent.Model);

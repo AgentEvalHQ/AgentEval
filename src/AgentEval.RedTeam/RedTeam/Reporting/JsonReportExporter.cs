@@ -61,7 +61,7 @@ public sealed class JsonReportExporter : IReportExporter
 
         var report = new JsonReport
         {
-            SchemaVersion = "0.3.0",   // 0.3.0: summary.over_refusal (always) + benign_controls (when run) + fold turn/node counts; 0.2.0: coverage/truncation/fidelity (5d)
+            SchemaVersion = "0.4.0",   // 0.4.0: the four summary scores and each attack's asr are null when no probe reached a verdict, + summary.scores_not_measured (T81); 0.3.0: summary.over_refusal (always) + benign_controls (when run) + fold turn/node counts; 0.2.0: coverage/truncation/fidelity (5d)
             ReportId = DeriveReportId(result),   // LOW: deterministic so re-exporting the same result is byte-identical (diffable)
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
@@ -80,6 +80,7 @@ public sealed class JsonReportExporter : IReportExporter
                 ConclusiveAttackSuccessRate = result.ConclusiveAttackSuccessRate,
                 OverallScore = result.OverallScore,
                 ConclusiveScore = result.ConclusiveScore,
+                ScoresNotMeasured = result.ScoresNotMeasuredReason,
                 Coverage = result.Coverage,
                 Verdict = result.Verdict.ToString(),
                 // 5d: a FailFast-truncated or low-coverage scan must be distinguishable from a clean full scan.
@@ -102,7 +103,7 @@ public sealed class JsonReportExporter : IReportExporter
                 Resisted = a.ResistedCount,
                 Succeeded = a.SucceededCount,
                 Inconclusive = a.InconclusiveCount,
-                ASR = a.TotalCount > 0 ? (double)a.SucceededCount / a.TotalCount : 0
+                ASR = a.AttackSuccessRate   // null when none of its probes reached a verdict (T81), not 0
             }).ToList(),
             Failures = result.AttackResults
                 .SelectMany(a => a.ProbeResults
@@ -280,17 +281,27 @@ public sealed class JsonReportExporter : IReportExporter
         public int Inconclusive { get; init; }
         public int Errored { get; init; }
 
+        // The four scores are written as null, never left out, when no probe reached a verdict (T81):
+        // scores_not_measured says why.
         [JsonPropertyName("attack_success_rate")]
-        public double AttackSuccessRate { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? AttackSuccessRate { get; init; }
 
         [JsonPropertyName("conclusive_attack_success_rate")]
-        public double ConclusiveAttackSuccessRate { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? ConclusiveAttackSuccessRate { get; init; }
 
         [JsonPropertyName("overall_score")]
-        public double OverallScore { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? OverallScore { get; init; }
 
         [JsonPropertyName("conclusive_score")]
-        public double ConclusiveScore { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? ConclusiveScore { get; init; }
+
+        /// <summary>Why the four scores are null; absent when they were measured.</summary>
+        [JsonPropertyName("scores_not_measured")]
+        public string? ScoresNotMeasured { get; init; }
 
         /// <summary>Conclusive coverage as a 0-100 percentage; pair with scores to judge trustworthiness (RC-6).</summary>
         public double Coverage { get; init; }
@@ -333,8 +344,10 @@ public sealed class JsonReportExporter : IReportExporter
         public int Succeeded { get; init; }
         public int Inconclusive { get; init; }
 
+        /// <summary>Null when none of the attack's probes reached a verdict (T81).</summary>
         [JsonPropertyName("asr")]
-        public double ASR { get; init; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? ASR { get; init; }
     }
 
     private sealed record JsonFailure

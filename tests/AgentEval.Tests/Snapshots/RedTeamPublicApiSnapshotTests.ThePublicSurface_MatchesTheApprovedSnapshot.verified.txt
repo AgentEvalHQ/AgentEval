@@ -139,8 +139,8 @@ class AgentEval.RedTeam.AttackResult
     AgentEval.RedTeam.Severity Severity { get; init; }
     Boolean MeasuredNothing { get; }
     Boolean Passed { get; }
-    Double AttackSuccessRate { get; }
-    Double ConclusiveAttackSuccessRate { get; }
+    Double? AttackSuccessRate { get; }
+    Double? ConclusiveAttackSuccessRate { get; }
     IReadOnlyList<AgentEval.RedTeam.ProbeResult> ProbeResults { get; init; }
     Int32 AmbiguousCount { get; }
     Int32 ConclusiveCount { get; }
@@ -529,9 +529,9 @@ class AgentEval.RedTeam.Baseline.RedTeamBaseline : IEquatable<AgentEval.RedTeam.
     Boolean Equals(AgentEval.RedTeam.Baseline.RedTeamBaseline other)
     Boolean Equals(Object obj)
     DateTimeOffset CapturedAt { get; init; }
-    Double AttackSuccessRate { get; init; }
-    Double OverallScore { get; init; }
+    Double? AttackSuccessRate { get; init; }
     Double? ConclusiveScore { get; init; }
+    Double? OverallScore { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.AttackBaselineResult> AttackResults { get; init; }
     IReadOnlyList<String> KnownVulnerabilities { get; init; }
     Int32 GetHashCode()
@@ -562,11 +562,11 @@ class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTea
     Boolean IsImprovement { get; }
     Boolean IsRegression { get; }
     Boolean IsStable { get; }
-    Double AttackSuccessRateDelta { get; }
     Double BaselineCoverage { get; }
-    Double ConclusiveScoreDelta { get; }
     Double CoverageDrop { get; }
-    Double ScoreDelta { get; }
+    Double? AttackSuccessRateDelta { get; }
+    Double? ConclusiveScoreDelta { get; }
+    Double? ScoreDelta { get; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.AttackComparison> AttackComparisons { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.FidelityEscalation> FidelityEscalations { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.NewVulnerability> NewVulnerabilities { get; init; }
@@ -1488,13 +1488,13 @@ class AgentEval.RedTeam.RedTeamResult : IRedTeamResult
     Boolean WasTruncated { get; init; }
     DateTimeOffset CompletedAt { get; init; }
     DateTimeOffset StartedAt { get; init; }
-    Double AttackSuccessRate { get; }
-    Double ConclusiveAttackSuccessRate { get; }
     Double ConclusiveRate { get; }
-    Double ConclusiveScore { get; }
     Double Coverage { get; }
     Double InconclusiveRate { get; }
-    Double OverallScore { get; }
+    Double? AttackSuccessRate { get; }
+    Double? ConclusiveAttackSuccessRate { get; }
+    Double? ConclusiveScore { get; }
+    Double? OverallScore { get; }
     IEnumerable<AgentEval.RedTeam.AttackResult> FailedAttacks { get; }
     IReadOnlyList<AgentEval.RedTeam.AttackResult> AttackResults { get; init; }
     IReadOnlyList<AgentEval.RedTeam.BenignClassBreakdown> OverRefusalByClass { get; }
@@ -1515,6 +1515,7 @@ class AgentEval.RedTeam.RedTeamResult : IRedTeamResult
     String AgentName { get; init; }
     String BenignControlsNotRunReason { get; init; }
     String OverRefusalSummary { get; }
+    String ScoresNotMeasuredReason { get; }
     String Summary { get; }
     TimeSpan Duration { get; init; }
     const Double PartialPassScoreThreshold
@@ -1573,7 +1574,7 @@ class AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions
     const String TruncatedIncompleteReason
     ctor()
 class AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary
-    Double OverallPassRate { get; init; }
+    Double? OverallPassRate { get; init; }
     Int32 CriticalFindings { get; init; }
     Int32 HighFindings { get; init; }
     Int32 LowFindings { get; init; }
@@ -1631,9 +1632,9 @@ static class AgentEval.RedTeam.Reporting.Compliance.FrameworkCrosswalk
     static IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlMapping> AllControls
     static IReadOnlyList<String> Frameworks { get; }
 interface AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     String AgentName { get; }
     String FrameworkName { get; }
     String FrameworkVersion { get; }
@@ -1646,10 +1647,10 @@ static class AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceExtensions
     static Task SaveISO27001ComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
 class AgentEval.RedTeam.Reporting.Compliance.ISO27001ComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
     AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; init; }
     DateTimeOffset? AssessmentDate { get; init; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.NonConformity> NonConformities { get; init; }
     IReadOnlyList<String> Recommendations { get; init; }
@@ -1679,9 +1680,9 @@ static class AgentEval.RedTeam.Reporting.Compliance.MITREATLASComplianceExtensio
     static Task SaveMITREATLASComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
 class AgentEval.RedTeam.Reporting.Compliance.MITREATLASReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
     AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; init; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.MITRETechniqueStatus> Techniques { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.TacticCoverage> Tactics { get; init; }
     IReadOnlyList<String> Recommendations { get; init; }
@@ -1740,9 +1741,9 @@ static class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceExtension
     static AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport ToNistAiRmfComplianceReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null)
 class AgentEval.RedTeam.Reporting.Compliance.NistAiRmfComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
     AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; init; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
     IReadOnlyList<String> Recommendations { get; init; }
     String AgentName { get; init; }
@@ -1790,9 +1791,9 @@ static class AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceExtensions
     static Task SaveOWASPComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
 class AgentEval.RedTeam.Reporting.Compliance.OWASPComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
     AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; init; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.OWASPCategoryStatus> Categories { get; init; }
     IReadOnlyList<String> Recommendations { get; init; }
     Int32 InconclusiveCount { get; }
@@ -1827,11 +1828,11 @@ static class AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceExtensions
     static Task SaveSOC2ComplianceReportAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions options = null, CancellationToken cancellationToken = default)
 class AgentEval.RedTeam.Reporting.Compliance.SOC2ComplianceReport : AgentEval.RedTeam.Reporting.Compliance.IComplianceReport
     AgentEval.RedTeam.Reporting.Compliance.ComplianceSummary Summary { get; init; }
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel RiskLevel { get; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? RiskLevel { get; }
     DateTimeOffset GeneratedAt { get; init; }
     DateTimeOffset? PeriodEnd { get; init; }
     DateTimeOffset? PeriodStart { get; init; }
-    Double ComplianceRate { get; }
+    Double? ComplianceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ControlStatus> Controls { get; init; }
     IReadOnlyList<String> Recommendations { get; init; }
     String AgentName { get; init; }
@@ -1957,10 +1958,10 @@ class AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions : IEquatable<AgentEval.Re
 class AgentEval.RedTeam.Reporting.Pdf.RiskScoreCalculator
     AgentEval.RedTeam.Reporting.Compliance.RiskLevel GetRiskLevel(Int32 score)
     AgentEval.RedTeam.Reporting.Pdf.RiskSummary GetSummary(AgentEval.RedTeam.RedTeamResult result)
-    Int32 CalculateScore(AgentEval.RedTeam.RedTeamResult result)
+    Int32? CalculateScore(AgentEval.RedTeam.RedTeamResult result)
     ctor()
 class AgentEval.RedTeam.Reporting.Pdf.RiskSummary : IEquatable<AgentEval.RedTeam.Reporting.Pdf.RiskSummary>
-    AgentEval.RedTeam.Reporting.Compliance.RiskLevel Level { get; init; }
+    AgentEval.RedTeam.Reporting.Compliance.RiskLevel? Level { get; init; }
     AgentEval.RedTeam.Reporting.Pdf.RiskSummary <Clone>$()
     Boolean Equals(AgentEval.RedTeam.Reporting.Pdf.RiskSummary other)
     Boolean Equals(Object obj)
@@ -1974,9 +1975,9 @@ class AgentEval.RedTeam.Reporting.Pdf.RiskSummary : IEquatable<AgentEval.RedTeam
     Int32 LowFindings { get; init; }
     Int32 MediumFindings { get; init; }
     Int32 PassedProbes { get; init; }
-    Int32 Score { get; init; }
     Int32 TotalFindings { get; }
     Int32 TotalProbes { get; init; }
+    Int32? Score { get; init; }
     String ToString()
     ctor()
 static class AgentEval.RedTeam.Reporting.ProbeExpectation

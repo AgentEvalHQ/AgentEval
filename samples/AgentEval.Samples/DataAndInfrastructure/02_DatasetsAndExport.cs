@@ -126,7 +126,7 @@ public static class DatasetsAndExport
             testResults.Add(new TestResultSummary
             {
                 Name = tc.Id,
-                Score = notMeasured is null ? graded!.Score : 0,
+                Score = notMeasured is null ? graded!.Score : null,   // not graded: no score, not a 0
                 Passed = passed,
                 Skipped = notMeasured is not null,
                 DurationMs = sw.ElapsedMilliseconds,
@@ -149,14 +149,15 @@ public static class DatasetsAndExport
             PassedTests = testResults.Count(r => r.Passed),
             FailedTests = testResults.Count(r => !r.Passed && !r.Skipped),
             SkippedTests = testResults.Count(r => r.Skipped),
-            // Over the graded cases only: an ungraded case has no score, not a 0.
-            OverallScore = testResults.Where(r => !r.Skipped).Select(r => r.Score).DefaultIfEmpty(0).Average(),
+            // Over the graded cases only: an ungraded case has no score, not a 0; with none graded there is no score (null).
+            OverallScore = testResults.Where(r => !r.Skipped).Average(r => r.Score),
             Agent = new AgentInfo { Name = "QA Agent", Model = AIConfig.ModelDeployment },
             TestResults = testResults
         };
 
         Console.WriteLine($"\n   Results: {report.PassedTests}/{report.TotalTests} passed, {report.FailedTests} failed, " +
-                          $"{report.SkippedTests} not measured ({report.OverallScore:F0}% avg correctness over the graded cases)");
+                          $"{report.SkippedTests} not measured (" +
+                          (report.OverallScore is { } avg ? $"{avg:F0}% avg correctness over the graded cases" : "no case was graded") + ")");
         return report;
     }
 
@@ -313,11 +314,14 @@ public static class DatasetsAndExport
         Console.WriteLine($"   │ Agent Model: {report.Agent?.Model}                    │");
         Console.WriteLine($"   │ Total Tests: {report.TotalTests}                             │");
         Console.WriteLine($"   │ Success Rate: {(double)report.PassedTests / report.TotalTests:P1}                       │");
-        Console.WriteLine($"   │ Average Score: {report.OverallScore:F1}%                     │");
+        Console.WriteLine($"   │ Average Score: {FormatPercent(report.OverallScore)}                     │");
         Console.WriteLine($"   │ Time Taken: {(report.EndTime - report.StartTime).TotalSeconds:F1}s                     │");
         Console.WriteLine("   └───────────────────────────────────────────────────────────────┘\n");
     }
-    
+
+    // A score nobody measured prints as n/a, never as "%" or 0%.
+    private static string FormatPercent(double? value) => value is { } v ? $"{v:F1}%" : "n/a";
+
     private static string GenerateInteractiveHtmlReport(EvaluationReport report)
     {
         var passedCount = report.PassedTests;
@@ -331,14 +335,15 @@ public static class DatasetsAndExport
             var statusText = t.Passed ? "&#x2705; PASS" : "&#x274C; FAIL";
             var outputPreview = t.Output?[..Math.Min(100, t.Output?.Length ?? 0)] ?? "";
             var ellipsis = (t.Output?.Length > 100) ? "..." : "";
+            var score = t.Score is { } graded ? $"{graded:F0}%" : "n/a";   // an ungraded case has no score
             return $"        <div class=\"test-row test-item\" data-status=\"{status}\">" +
                    $"<div>{t.Name}</div>" +
                    $"<div class=\"{statusClass}\">{statusText}</div>" +
-                   $"<div>{t.Score:F0}%</div>" +
+                   $"<div>{score}</div>" +
                    $"<div style=\"font-family: monospace; font-size: 0.9em;\">{outputPreview}{ellipsis}</div></div>";
         }));
         
-        var durationsJs = string.Join(", ", report.TestResults.Select(r => r.DurationMs.ToString()));
+        var durationsJs = string.Join(", ", report.TestResults.Select(r => r.DurationMs?.ToString() ?? "null"));
         
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
@@ -377,7 +382,7 @@ public static class DatasetsAndExport
         sb.AppendLine($"        <div class=\"metric-card\"><div class=\"metric-value\">{report.TotalTests}</div><div>Total Tests</div></div>");
         sb.AppendLine($"        <div class=\"metric-card\"><div class=\"metric-value\">{passedCount}</div><div>Passed</div></div>");
         sb.AppendLine($"        <div class=\"metric-card\"><div class=\"metric-value\">{failedCount}</div><div>Failed</div></div>");
-        sb.AppendLine($"        <div class=\"metric-card\"><div class=\"metric-value\">{avgScore:F1}%</div><div>Avg Score</div></div>");
+        sb.AppendLine($"        <div class=\"metric-card\"><div class=\"metric-value\">{FormatPercent(avgScore)}</div><div>Avg Score</div></div>");
         sb.AppendLine("    </div>");
         sb.AppendLine("    <div class=\"chart-container\"><h3>Test Results Overview</h3><canvas id=\"resultsChart\" width=\"400\" height=\"200\"></canvas></div>");
         sb.AppendLine("    <div class=\"chart-container\"><h3>Performance Distribution</h3><canvas id=\"performanceChart\" width=\"400\" height=\"200\"></canvas></div>");

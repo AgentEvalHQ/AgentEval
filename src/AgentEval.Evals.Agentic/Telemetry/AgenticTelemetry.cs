@@ -33,7 +33,11 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// <param name="LatencyMsP95">End-to-end agent latency at the 95th percentile in milliseconds.</param>
 /// <param name="LatencyMsP99">End-to-end agent latency at the 99th percentile in milliseconds.</param>
 /// <param name="TokensUsed">Total tokens consumed (prompt + completion) across all LLM calls in the run.</param>
-/// <param name="EstimatedCostUsd">Estimated monetary cost of the run in USD (may be 0 if not tracked).</param>
+/// <param name="EstimatedCostUsd">
+/// Estimated monetary cost of the run in USD, or <see langword="null"/> when the run's cost was not tracked. Not tracked
+/// is never 0: 0 is a measured zero (the run cost nothing), which <see cref="CostEval"/> scores as within any budget, so
+/// a 0 written for "not tracked" passed every budget check (T82). A null cost is not measured by the cost evaluators.
+/// </param>
 /// <param name="ErrorCount">Number of calls that resulted in an error or exception.</param>
 /// <param name="TotalCalls">Total number of calls (LLM + tool) made during the run.</param>
 /// <param name="RetryCount">Total number of retries triggered by transient failures.</param>
@@ -43,7 +47,7 @@ public sealed record AgenticTelemetry(
     double LatencyMsP95,
     double LatencyMsP99,
     int TokensUsed,
-    double EstimatedCostUsd,
+    double? EstimatedCostUsd,
     int ErrorCount,
     int TotalCalls,
     int RetryCount,

@@ -56,9 +56,9 @@ public class BaselineAssertions
         {
             _failures.Add(NotComparableMessage(because));
         }
-        else if (_comparison.ScoreDelta < -maxDecrease)
+        else if (_comparison.ScoreDelta is { } delta && delta < -maxDecrease)
         {
-            var message = $"Score decreased by {Math.Abs(_comparison.ScoreDelta):F1}% " +
+            var message = $"Score decreased by {Math.Abs(delta):F1}% " +
                 $"(baseline: {_comparison.Baseline.OverallScore:F1}%, current: {_comparison.Current.OverallScore:F1}%, " +
                 $"max allowed decrease: {maxDecrease}%)";
             if (because != null)

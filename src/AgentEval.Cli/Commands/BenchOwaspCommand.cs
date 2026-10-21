@@ -285,16 +285,17 @@ public static class BenchOwaspCommand
 
                 var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
                 var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+                // Not measured is never a score (T13, T81): a composite that measured nothing writes no overallScore, and a
+                // scan with no conclusive probe no overallPassRate — the verdict above already says PENDING or WARN.
+                var metrics = new Dictionary<string, double>();
+                if (compositeEval.Score.MeasuredValue() is { } overallScore) metrics["overallScore"] = overallScore;
+                if (report.Summary.OverallPassRate is { } overallPassRate) metrics["overallPassRate"] = overallPassRate / 100.0;
                 var summary = new RunSummary(
                     SchemaVersion: "1.0",
                     RunId: runId,
                     Verdict: verdict,
                     Stats: runStats,
-                    Metrics: new Dictionary<string, double>
-                    {
-                        ["overallScore"] = compositeEval.Score.Value,
-                        ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
-                    });
+                    Metrics: metrics);
                 await store!.CompleteRunAsync(manifest, summary, ct);
                 Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
             }
@@ -369,7 +370,7 @@ public static class BenchOwaspCommand
 
             // ── Exit code ─────────────────────────────────────────────────────────
             evidenceFinalized = true;
-            Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+            Console.WriteLine($"Overall result: pass rate {(report.Summary.OverallPassRate is { } passRate ? $"{passRate:F1}%" : "not measured (no probe reached a verdict)")} " +
                 $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
                 $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 

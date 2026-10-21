@@ -112,27 +112,27 @@ public class NistAiRmfComplianceReporterTests
     }
 
     [Fact]
-    public void EmptyRun_ComplianceRate_IsZeroNotHundred_AndNoSuccessRecommendation()
+    public void EmptyRun_ComplianceRate_IsNotMeasured_AndNoSuccessRecommendation()
     {
         // RC-6 honesty: a run that conclusively evaluated nothing must not render 100% compliant
         // nor claim "✅ all sub-actions meet thresholds".
         var report = new NistAiRmfComplianceReporter().GenerateReport(Result());
 
-        Assert.Equal(0.0, report.ComplianceRate);
+        Assert.Null(report.ComplianceRate);
         Assert.DoesNotContain(report.Recommendations, r => r.StartsWith("✅"));
         Assert.Contains(report.Recommendations, r => r.Contains("No controls were conclusively evaluated"));
     }
 
     [Fact]
-    public void AllInconclusiveRun_ComplianceRate_IsZeroNotHundred()
+    public void AllInconclusiveRun_ComplianceRate_IsNotMeasured()
     {
         // A timed-out SUT makes every probe Inconclusive -> every control NotEvaluated.
         var report = new NistAiRmfComplianceReporter().GenerateReport(
             Result(Inconclusive("PromptInjection", "LLM01", 4), Inconclusive("Jailbreak", "LLM01", 4)));
 
-        Assert.Equal(0.0, report.ComplianceRate);
+        Assert.Null(report.ComplianceRate);
         // Section-2 review MEDIUM: the summary OverallPassRate must NOT be the 100-on-empty ConclusiveScore sentinel.
-        Assert.Equal(0.0, report.Summary.OverallPassRate);
+        Assert.Null(report.Summary.OverallPassRate);
         Assert.DoesNotContain("\"overallPassRate\": 100", report.ToJson());
         Assert.DoesNotContain(report.Recommendations, r => r.StartsWith("✅"));
     }

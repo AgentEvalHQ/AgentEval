@@ -198,29 +198,74 @@ public class TestSummary
     /// <summary>Tests that produced a verdict: <see cref="TotalCount"/> minus <see cref="NotMeasuredCount"/>.</summary>
     public int MeasuredCount => TotalCount - NotMeasuredCount;
 
-    /// <summary>Whether at least one test was measured, so <see cref="AverageScore"/> is a score.</summary>
+    /// <summary>Whether at least one test was measured, so <see cref="AverageScore"/> has a value.</summary>
     public bool HasMeasuredScore => MeasuredCount > 0;
 
     /// <summary>
-    /// Average score over the measured tests (<see cref="MeasuredCount"/>). A placeholder 0 when nothing was measured:
-    /// read <see cref="HasMeasuredScore"/> first.
+    /// Average score over the measured tests (<see cref="MeasuredCount"/>), or <see langword="null"/> when nothing was
+    /// measured (<see cref="HasMeasuredScore"/> is false): no score, never a placeholder 0.
     /// </summary>
-    public double AverageScore => HasMeasuredScore ? Results.Where(r => !IsNotMeasured(r)).Average(r => r.Score) : 0;
+    public double? AverageScore => HasMeasuredScore ? Results.Where(r => !IsNotMeasured(r)).Average(r => r.Score) : null;
 
-    /// <summary>Whether all tests passed. A test that was not measured did not pass.</summary>
-    public bool AllPassed => Results.All(r => r.Passed);
+    /// <summary>
+    /// Whether all tests passed. A test that was not measured did not pass, and an empty suite did not pass either:
+    /// nothing ran.
+    /// </summary>
+    public bool AllPassed => Results.Count > 0 && Results.All(r => r.Passed);
 
     // A crashed run and a judge with no verdict are the same absence: no score was produced (T06, T13-4).
     private static bool IsNotMeasured(TestResult result) => result.JudgeFailed || result.HasError;
-    
-    /// <summary>Total duration across all tests.</summary>
-    public TimeSpan TotalDuration => TimeSpan.FromTicks(
-        Results.Where(r => r.Performance != null)
-               .Sum(r => r.Performance!.TotalDuration.Ticks));
-    
-    /// <summary>Total estimated cost.</summary>
-    public decimal TotalCost => Results.Where(r => r.Performance?.EstimatedCost != null)
-                                        .Sum(r => r.Performance!.EstimatedCost!.Value);
+
+    /// <summary>
+    /// Total duration over the timed tests (those with <see cref="TestResult.Performance"/>), or <see langword="null"/>
+    /// when no test was timed: an untimed test is not a 0 s test. A run that threw usually carries no timing, so the
+    /// total covers the timed tests only.
+    /// </summary>
+    public TimeSpan? TotalDuration
+    {
+        get
+        {
+            var timed = Results.Where(r => r.Performance != null).ToList();
+            return timed.Count > 0 ? TimeSpan.FromTicks(timed.Sum(r => r.Performance!.TotalDuration.Ticks)) : null;
+        }
+    }
+
+    /// <summary>
+    /// Total estimated cost, complete or absent: <see langword="null"/> when any test was not priced
+    /// (<see cref="UnpricedTests"/>) or there is no test, and <see cref="TotalCostNotPricedReason"/> says which. The sum
+    /// of the priced tests alone would read as the whole cost wherever it is printed, so it is not returned (the rule
+    /// <c>CostRollup</c> applies to an eval tree). A priced $0 stays 0.
+    /// </summary>
+    public decimal? TotalCost => Results.Count > 0 && Results.All(r => r.Performance?.EstimatedCost is not null)
+        ? Results.Sum(r => r.Performance!.EstimatedCost!.Value)
+        : null;
+
+    /// <summary>
+    /// Names of the tests that carry no cost: no <see cref="TestResult.Performance"/> (the run threw, or performance is
+    /// not tracked) or no <see cref="PerformanceMetrics.EstimatedCost"/> (no price for the model). Any of them leaves
+    /// <see cref="TotalCost"/> <see langword="null"/>.
+    /// </summary>
+    public IReadOnlyList<string> UnpricedTests => Results
+        .Where(r => r.Performance?.EstimatedCost is null)
+        .Select(r => r.TestName)
+        .ToList();
+
+    /// <summary>Why <see cref="TotalCost"/> is <see langword="null"/>, or <see langword="null"/> when it has a value.</summary>
+    public string? TotalCostNotPricedReason
+    {
+        get
+        {
+            if (Results.Count == 0)
+                return "no test ran, so nothing was priced.";
+            var unpriced = UnpricedTests;
+            if (unpriced.Count == 0)
+                return null;
+            return unpriced.Count == Results.Count
+                ? "no test was priced (no performance data, or no price for the model)."
+                : $"{unpriced.Count} of {Results.Count} tests were not priced ({string.Join(", ", unpriced)}): no " +
+                  "performance data, or no price for the model; the priced tests alone are not the total.";
+        }
+    }
 
     public TestSummary(string suiteName, IEnumerable<TestResult> results)
     {

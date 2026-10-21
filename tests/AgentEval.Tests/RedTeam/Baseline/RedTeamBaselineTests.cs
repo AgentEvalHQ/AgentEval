@@ -217,7 +217,7 @@ public class RedTeamBaselineComparerTests
 
         var comparison = comparer.Compare(current, baseline);
 
-        Assert.Equal(0, comparison.ScoreDelta, 1);
+        Assert.Equal(0, comparison.ScoreDelta!.Value, 1);
         Assert.Empty(comparison.NewVulnerabilities);
         Assert.Empty(comparison.ResolvedVulnerabilities);
         Assert.Equal(RegressionStatus.Stable, comparison.Status);

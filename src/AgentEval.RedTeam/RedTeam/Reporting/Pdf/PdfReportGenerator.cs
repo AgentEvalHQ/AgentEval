@@ -65,7 +65,8 @@ public class PdfReportGenerator : IReportExporter
         await File.WriteAllBytesAsync(filePath, bytes, cancellationToken);
     }
 
-    private Document CreateDocument(RedTeamResult result, PdfReportOptions options)
+    /// <summary>Builds the document model before rendering; internal so tests can read what a page says.</summary>
+    internal Document CreateDocument(RedTeamResult result, PdfReportOptions options)
     {
         var document = new Document();
         SetDocumentInfo(document, result, options);
@@ -210,28 +211,29 @@ public class PdfReportGenerator : IReportExporter
     {
         section.AddParagraph("RISK SCORE").Style = "Heading1";
 
-        // RC-6: a scan with no conclusive evidence (zero-probe or all-inconclusive) has no meaningful score.
+        // RC-6: a scan with no conclusive evidence (zero-probe or all-inconclusive) has no score (null, T81).
         // Render "NOT ASSESSABLE" rather than a fabricated 100/LOW headline for the least-technical audience.
-        if (!summary.IsAssessable)
+        if (!summary.IsAssessable || summary.Score is not { } score || summary.Level is not { } level)
         {
             var na = section.AddParagraph("NOT ASSESSABLE");
             na.Style = "ScoreLabel";
             na.Format.Font.Color = Colors.Gray;
-            var naDetail = section.AddParagraph(
-                $"No conclusive evidence — {summary.InconclusiveProbes} of {summary.TotalProbes} probes were inconclusive. " +
-                "No risk score can be computed for this run.");
+            var naDetail = section.AddParagraph(summary.TotalProbes == 0
+                ? "No probe ran. No risk score can be computed for this run."
+                : $"No conclusive evidence — {summary.InconclusiveProbes} of {summary.TotalProbes} probes were inconclusive. " +
+                  "No risk score can be computed for this run.");
             naDetail.Format.Font.Color = Colors.DarkGray;
             naDetail.Format.SpaceAfter = "0.5cm";
             return;
         }
 
-        var scorePara = section.AddParagraph($"{summary.Score}/100");
+        var scorePara = section.AddParagraph($"{score}/100");
         scorePara.Style = "Score";
-        scorePara.Format.Font.Color = GetRiskColor(summary.Level);
+        scorePara.Format.Font.Color = GetRiskColor(level);
 
-        var levelPara = section.AddParagraph(summary.Level.ToString().ToUpperInvariant());
+        var levelPara = section.AddParagraph(level.ToString().ToUpperInvariant());
         levelPara.Style = "ScoreLabel";
-        levelPara.Format.Font.Color = GetRiskColor(summary.Level);
+        levelPara.Format.Font.Color = GetRiskColor(level);
         levelPara.Format.SpaceAfter = "0.5cm";
     }
 
@@ -443,11 +445,10 @@ public class PdfReportGenerator : IReportExporter
         var baselineSummary = _riskCalculator.GetSummary(options.BaselineResults);
 
         var scoreDiff = currentSummary.Score - baselineSummary.Score;
-        var diffText = scoreDiff >= 0 ? $"▲ +{scoreDiff}" : $"▼ {scoreDiff}";
-        var diffColor = scoreDiff >= 0 ? Colors.DarkGreen : Colors.DarkRed;
+        var diffColor = scoreDiff is null ? Colors.Gray : scoreDiff >= 0 ? Colors.DarkGreen : Colors.DarkRed;
 
         section.AddParagraph("BASELINE COMPARISON").Style = "Heading2";
-        var diffPara = section.AddParagraph($"vs. Previous: {diffText} points");
+        var diffPara = section.AddParagraph($"vs. Previous: {ScoreTrend(baselineSummary.Score, currentSummary.Score)}");
         diffPara.Format.Font.Color = diffColor;
         diffPara.Format.Font.Size = 14;
 
@@ -469,25 +470,55 @@ public class PdfReportGenerator : IReportExporter
         AddComparisonRow(table, "Risk Score", baselineSummary.Score, currentSummary.Score);
         AddComparisonRow(table, "Critical Findings", baselineSummary.CriticalFindings, currentSummary.CriticalFindings, lowerIsBetter: true);
         AddComparisonRow(table, "High Findings", baselineSummary.HighFindings, currentSummary.HighFindings, lowerIsBetter: true);
+        // Over conclusive probes, as page 2 reads it: an inconclusive probe lowers coverage, not the pass rate (T81).
         AddComparisonRow(table, "Pass Rate %",
-            PassRatePercent(baselineSummary.PassedProbes, baselineSummary.TotalProbes),
-            PassRatePercent(currentSummary.PassedProbes, currentSummary.TotalProbes));
+            PassRatePercent(baselineSummary.PassedProbes, baselineSummary.PassedProbes + baselineSummary.FailedProbes),
+            PassRatePercent(currentSummary.PassedProbes, currentSummary.PassedProbes + currentSummary.FailedProbes));
     }
 
-    /// <summary>L26: pass-rate percent that ROUNDS (float division) instead of integer-truncating — 7/8 → 88, not 87.</summary>
-    internal static int PassRatePercent(int passed, int total)
-        => total > 0 ? (int)Math.Round(passed * 100.0 / total) : 100;
+    /// <summary>
+    /// L26: pass-rate percent that ROUNDS (float division) instead of integer-truncating — 7/8 → 88, not 87.
+    /// <see langword="null"/> when there is nothing to divide by: it read 100 for a run that measured nothing (T81).
+    /// </summary>
+    internal static int? PassRatePercent(int passed, int total)
+        => total > 0 ? (int)Math.Round(passed * 100.0 / total) : null;
 
-    private static void AddComparisonRow(Table table, string metric, int previous, int current, bool lowerIsBetter = false)
+    /// <summary>
+    /// The trends headline: "▲ +5 points" / "▼ -3 points", or why there is no change to show. A run with no conclusive
+    /// probe has no risk score, and a difference against one would be a placeholder (T81).
+    /// </summary>
+    internal static string ScoreTrend(int? previous, int? current) => (previous, current) switch
+    {
+        ({ } p, { } c) when c >= p => $"▲ +{c - p} points",
+        ({ } p, { } c) => $"▼ {c - p} points",
+        (null, null) => "not comparable: neither run has a conclusive probe, so neither has a risk score",
+        (null, _) => "not comparable: the previous run has no conclusive probe, so it has no risk score",
+        _ => "not comparable: this run has no conclusive probe, so it has no risk score",
+    };
+
+    /// <summary>
+    /// The previous, current and change cells of a trends row: "n/a" for a value that was not measured, and a change only
+    /// when both were (T81).
+    /// </summary>
+    internal static (string Previous, string Current, string Change) ComparisonCells(int? previous, int? current) =>
+        (previous?.ToString() ?? "n/a",
+         current?.ToString() ?? "n/a",
+         previous is { } p && current is { } c ? (c - p >= 0 ? $"+{c - p}" : (c - p).ToString()) : "n/a");
+
+    private static void AddComparisonRow(Table table, string metric, int? previous, int? current, bool lowerIsBetter = false)
     {
         var row = table.AddRow();
         row.Cells[0].AddParagraph(metric);
-        row.Cells[1].AddParagraph(previous.ToString());
-        row.Cells[2].AddParagraph(current.ToString());
+        var cells = ComparisonCells(previous, current);
+        row.Cells[1].AddParagraph(cells.Previous);
+        row.Cells[2].AddParagraph(cells.Current);
+        var diffPara = row.Cells[3].AddParagraph(cells.Change);
 
-        var diff = current - previous;
-        var diffText = diff >= 0 ? $"+{diff}" : diff.ToString();
-        var diffPara = row.Cells[3].AddParagraph(diffText);
+        if (current - previous is not { } diff)
+        {
+            diffPara.Format.Font.Color = Colors.Gray;
+            return;
+        }
 
         var improved = lowerIsBetter ? diff < 0 : diff > 0;
         var worsened = lowerIsBetter ? diff > 0 : diff < 0;

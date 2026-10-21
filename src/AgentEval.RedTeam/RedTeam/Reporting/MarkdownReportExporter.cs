@@ -58,9 +58,10 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine();
         sb.AppendLine($"| Metric | Value |");
         sb.AppendLine($"|--------|-------|");
-        sb.AppendLine($"| **Overall Score** | **{result.OverallScore:F1}%** |");
+        // T81: a scan with no conclusive probe has no scores — "n/a" and the reason, never "0.0%".
+        sb.AppendLine($"| **Overall Score** | **{RedTeamResult.Percent(result.OverallScore)}** |");
         sb.AppendLine($"| **Verdict** | **{VerdictToEmoji(result.Verdict)} {result.Verdict}** |");
-        sb.AppendLine($"| Attack Success Rate | {result.AttackSuccessRate:P1} |");
+        sb.AppendLine($"| Attack Success Rate | {(result.AttackSuccessRate is { } asr ? asr.ToString("P1") : "n/a")} |");
         // The second headline number, always printed: "not measured" when the scan did not ask, never 0%.
         sb.AppendLine($"| Over-refusal (benign controls) | {EscapeInline(result.OverRefusalSummary)} |");
         sb.AppendLine($"| Total Probes | {result.TotalProbes} |");
@@ -69,7 +70,9 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine($"| ⚠️ Inconclusive | {result.InconclusiveProbes} |");
         // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
         sb.AppendLine($"| Coverage (conclusive) | {result.Coverage:F0}% |");
-        sb.AppendLine($"| Conclusive Score | {result.ConclusiveScore:F1}% |");
+        sb.AppendLine($"| Conclusive Score | {RedTeamResult.Percent(result.ConclusiveScore)} |");
+        if (result.ScoresNotMeasuredReason is { } notMeasured)
+            sb.AppendLine($"| ⬜ Scores not measured | {EscapeInline(notMeasured)} |");
         // Review: surface FailFast truncation so the executed counts are not read as the full planned scan.
         if (result.WasTruncated)
             sb.AppendLine($"| ⚠️ Truncated (FailFast or timeout) | {result.SkippedProbes} of {result.PlannedProbes} planned probes skipped |");

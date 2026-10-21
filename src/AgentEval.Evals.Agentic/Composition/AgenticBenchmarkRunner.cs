@@ -144,11 +144,15 @@ public sealed class AgenticBenchmarkRunner
         // A root that errored or measured nothing is not a FAIL (B9b): PENDING when nothing was measured, else WARN.
         var verdict = root.Score.RunVerdict(stats);
 
+        // The root's score only when it is a reading (T13): a root that errored or measured nothing wrote overallScore 0
+        // beside its PENDING verdict.
         return new RunSummary(
             SchemaVersion: "1.0",
             RunId: runId,
             Verdict: verdict,
             Stats: stats,
-            Metrics: new Dictionary<string, double> { ["overallScore"] = root.Score.Value });
+            Metrics: root.Score.MeasuredValue() is { } overallScore
+                ? new Dictionary<string, double> { ["overallScore"] = overallScore }
+                : new Dictionary<string, double>());
     }
 }

@@ -76,7 +76,8 @@ public class RedTeamOutputFormatter
             : (result.Passed ? "[PASS]" : "[FAIL]");
 
         var scoreColor = result.Passed ? _theme.Success : _theme.Failure;
-        WriteLine(string.Create(CultureInfo.InvariantCulture, $"RedTeam: {scoreColor}{result.OverallScore:F1}%{_theme.Reset} {icon} {result.Verdict} ") +
+        // T81: "n/a" when no probe reached a verdict, never a placeholder "0.0%".
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"RedTeam: {scoreColor}{RedTeamResult.Percent(result.OverallScore)}{_theme.Reset} {icon} {result.Verdict} ") +
             $"({result.TotalProbes} probes, {result.ResistedProbes} resisted)");
     }
 
@@ -90,8 +91,9 @@ public class RedTeamOutputFormatter
         WriteLine($"║{new string(' ', padding)}{_theme.Bold}{title}{_theme.Reset}{new string(' ', Math.Max(0, _width - padding - title.Length - 2))}║");
         WriteLine($"╠{border}╣");
 
-        // Score with color based on threshold
-        var scoreColor = result.OverallScore >= 85 ? _theme.Success
+        // Score with color based on threshold; a score that was not measured is dimmed, not red (T81)
+        var scoreColor = result.OverallScore is null ? _theme.Dim
+            : result.OverallScore >= 85 ? _theme.Success
             : result.OverallScore >= 70 ? _theme.Warning
             : _theme.Failure;
 
@@ -99,12 +101,13 @@ public class RedTeamOutputFormatter
             ? (result.Passed ? "🛡️ " : "⚠️ ")
             : "";
 
-        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  {icon}Overall Score: {scoreColor}{result.OverallScore:F1}%{_theme.Reset}"));
+        var notMeasured = result.ScoresNotMeasuredReason is { } why ? $" (not measured: {why})" : "";
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  {icon}Overall Score: {scoreColor}{RedTeamResult.Percent(result.OverallScore)}{_theme.Reset}{notMeasured}"));
         WriteLine($"║  Verdict: {_theme.StatusIcon(result.Passed, _options.UseEmoji)} {result.Verdict}");
         WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Duration: {result.Duration.TotalSeconds:F1}s | Agent: {result.AgentName}"));
         WriteLine($"║  Probes: {result.TotalProbes} total, {result.ResistedProbes} resisted, {result.SucceededProbes} compromised, {result.InconclusiveProbes} inconclusive");
         // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
-        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {result.ConclusiveScore:F1}%"));
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {RedTeamResult.Percent(result.ConclusiveScore)}"));
         // Review: a FailFast-truncated scan executed only part of its plan — say so, so the counts above are not read as the whole scan.
         if (result.WasTruncated)
             WriteLine($"║  {_theme.Warning}[TRUNCATED] stopped after {result.TotalProbes}/{result.PlannedProbes} probes (FailFast or the overall timeout); {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
@@ -127,11 +130,15 @@ public class RedTeamOutputFormatter
 
         foreach (var attack in result.AttackResults)
         {
-            var rate = attack.TotalCount > 0
+            // T81: an attack none of whose probes reached a verdict has no rate: "n/a", where it read 100% ✅ for no probes
+            // and 0% ❌ for all inconclusive.
+            var rate = attack.ConclusiveCount > 0 && attack.TotalCount > 0
                 ? (double)attack.ResistedCount / attack.TotalCount
-                : 1.0;
-            var rateStr = rate.ToString("P0", CultureInfo.InvariantCulture).PadRight(rateCol);
-            var icon = _theme.RateIcon(rate, _options.UseEmoji);
+                : (double?)null;
+            var rateStr = (rate?.ToString("P0", CultureInfo.InvariantCulture) ?? "n/a").PadRight(rateCol);
+            var icon = rate is { } measured
+                ? _theme.RateIcon(measured, _options.UseEmoji)
+                : _options.UseEmoji ? "⬜" : $"{_theme.Dim}?{_theme.Reset}";
 
             var severityStr = _theme.Colorize(attack.Severity.ToString(), attack.Severity);
             var displayName = attack.AttackDisplayName.Length > attackCol - 2

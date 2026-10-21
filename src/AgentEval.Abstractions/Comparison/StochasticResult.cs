@@ -52,10 +52,17 @@ public record StochasticResult(
     bool Passed)
 {
     /// <summary>
-    /// Total duration of all runs combined.
+    /// Total duration of the timed runs (those with <see cref="TestResult.Performance"/>), or <see langword="null"/>
+    /// when no run was timed: an untimed run is not a 0 ms run.
     /// </summary>
-    public TimeSpan TotalDuration => TimeSpan.FromTicks(
-        IndividualResults.Sum(r => r.Performance?.TotalDuration.Ticks ?? 0));
+    public TimeSpan? TotalDuration
+    {
+        get
+        {
+            var durations = GetDurations();
+            return durations.Count > 0 ? TimeSpan.FromTicks(durations.Sum(d => d.Ticks)) : null;
+        }
+    }
     
     /// <summary>
     /// Number of individual runs that passed.
@@ -140,8 +147,11 @@ public record StochasticResult(
 
     private string NotMeasuredNote => NotMeasuredCount > 0 ? $"; {NotMeasuredCount} not measured" : "";
 
-    /// <summary>Aggregate duration statistics (ms).</summary>
-    public DistributionStatistics DurationStats => DistributionStatisticsFactory.Create(GetDurations());
+    /// <summary>
+    /// Aggregate duration statistics (ms) over the timed runs, or <see langword="null"/> when no run recorded a
+    /// duration: never a 0 ms mean.
+    /// </summary>
+    public DistributionStatistics? DurationStats => StatsOrNull(GetDurations());
 
     // PERF-06: each nullable stat below evaluates its source list ONCE (the source getters
     // re-materialize from IndividualResults), instead of calling GetX() twice — once for the count
@@ -163,18 +173,21 @@ public record StochasticResult(
     public DistributionStatistics? CostStats => StatsOrNull(GetCosts());
 
     /// <summary>
-    /// Aggregate tool call count statistics across the runs that tracked tool usage. A run without a tool usage report is
-    /// not a run with zero calls; with no run tracking it, <see cref="DistributionStatistics.SampleSize"/> is 0.
+    /// Aggregate tool call count statistics across the runs that tracked tool usage, or <see langword="null"/> when no
+    /// run tracked it. A run without a tool usage report is not a run with zero calls.
     /// </summary>
-    public DistributionStatistics ToolCallCountStats => DistributionStatisticsFactory.Create(GetToolCallCounts());
+    public DistributionStatistics? ToolCallCountStats => StatsOrNull(GetToolCallCounts());
 
-    /// <summary>Fastest run by total duration.</summary>
+    // FirstOrDefault() on an empty list of tuples is default((null, 0)), which converts to a non-null nullable: with no
+    // timed run the fastest and slowest read as a null run at 0 ms. An empty list gives null instead.
+
+    /// <summary>Fastest run by total duration, or <see langword="null"/> when no run recorded a duration.</summary>
     public (TestResult Result, TimeSpan Duration)? FastestRun =>
-        GetRunsByDuration().FirstOrDefault();
+        GetRunsByDuration() is { Count: > 0 } runs ? runs[0] : null;
 
-    /// <summary>Slowest run by total duration.</summary>
+    /// <summary>Slowest run by total duration, or <see langword="null"/> when no run recorded a duration.</summary>
     public (TestResult Result, TimeSpan Duration)? SlowestRun =>
-        GetRunsByDuration().LastOrDefault();
+        GetRunsByDuration() is { Count: > 0 } runs ? runs[^1] : null;
 
     /// <summary>Metric score distributions grouped by metric name (e.g., Faithfulness, Relevance).</summary>
     public IReadOnlyDictionary<string, DistributionStatistics> MetricDistributions => _metricDistributions ??= BuildMetricDistributions();
@@ -182,7 +195,9 @@ public record StochasticResult(
     private IReadOnlyDictionary<string, DistributionStatistics>? _metricDistributions;
 
     /// <summary>
-    /// Get a summary of tool usage across runs for a specific tool (e.g., "CalculatorTool").
+    /// Get a summary of tool usage across runs for a specific tool (e.g., "CalculatorTool"), over the runs that tracked
+    /// tool usage: a run without a tool usage report is not a run that made zero calls. With no such run, the call
+    /// statistics and both rates are <see langword="null"/>.
     /// </summary>
     public ToolUsageSummary GetToolUsageSummary(string toolName)
     {
@@ -190,15 +205,13 @@ public record StochasticResult(
         int runsWithTool = 0;
         int runsWithErrors = 0;
         int totalCalls = 0;
-        int sampleSize = IndividualResults.Count;
-        
-        foreach (var result in IndividualResults)
+
+        foreach (var result in IndividualResults.Where(r => r.ToolUsage != null))
         {
-            var toolCalls = result.ToolUsage?.GetCallsByName(toolName) ?? Enumerable.Empty<ToolCallRecord>();
-            var callCount = toolCalls.Count();
-            callCounts.Add(callCount);
-            totalCalls += callCount;
-            if (callCount > 0)
+            var toolCalls = result.ToolUsage!.GetCallsByName(toolName).ToList();
+            callCounts.Add(toolCalls.Count);
+            totalCalls += toolCalls.Count;
+            if (toolCalls.Count > 0)
             {
                 runsWithTool++;
                 if (toolCalls.Any(c => c.HasError))
@@ -207,11 +220,12 @@ public record StochasticResult(
                 }
             }
         }
-        
-        var callStats = DistributionStatisticsFactory.Create(callCounts);
-        double callRate = sampleSize == 0 ? 0 : (double)runsWithTool / sampleSize;
-        double errorRate = sampleSize == 0 ? 0 : (double)runsWithErrors / sampleSize;
-        
+
+        int sampleSize = callCounts.Count;
+        var callStats = StatsOrNull(callCounts);
+        double? callRate = sampleSize == 0 ? null : (double)runsWithTool / sampleSize;
+        double? errorRate = sampleSize == 0 ? null : (double)runsWithErrors / sampleSize;
+
         return new ToolUsageSummary(
             ToolName: toolName,
             RunsWithTool: runsWithTool,
@@ -228,6 +242,8 @@ public record StochasticResult(
     private static DistributionStatistics? StatsOrNull(IReadOnlyList<int> values)
         => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
     private static DistributionStatistics? StatsOrNull(IReadOnlyList<decimal> values)
+        => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
+    private static DistributionStatistics? StatsOrNull(IReadOnlyList<TimeSpan> values)
         => values.Count == 0 ? null : DistributionStatisticsFactory.Create(values);
 
     private List<TimeSpan> GetDurations() => IndividualResults

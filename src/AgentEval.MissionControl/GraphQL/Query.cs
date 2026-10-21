@@ -522,10 +522,10 @@ public sealed partial class Query
                 continue;
             }
 
-            // Walk the tree, accumulating per-tier cost from every leaf's provenance.
-            // Composites have EstimatedCost == 0; only LLM/code leaves carry real cost.
-            // The tree is authoritative — supersedes scenario.EstimatedCost (which is
-            // the root composite's provenance, often 0 for trees).
+            // Walk the tree, accumulating per-tier cost from every leaf's provenance, each leaf
+            // once. A composite carries its parts' rolled-up cost (CostRollup), so it is walked,
+            // not added. The tree is authoritative — supersedes scenario.EstimatedCost (which is
+            // the root composite's provenance: the same rolled-up figure, without the tiers).
             WalkAndAccumulate(tree, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced);
         }
 
@@ -566,6 +566,13 @@ public sealed partial class Query
     /// <summary>As above, also counting the leaves whose cost was not priced (<see cref="EvalProvenance.EstimatedCost"/>
     /// null) into <paramref name="unpriced"/>: they are counted, never summed as $0. A composite whose cost is null
     /// because a part was not priced is not counted itself; its unpriced leaves are.</summary>
+    /// <remarks>
+    /// Each leaf's cost is added once. A composite is walked, never added: its own cost is its parts' rolled up
+    /// (<see cref="CostRollup.Aggregate"/>), so adding it as well counted every leaf once more for each composite above
+    /// it (T83). At <see cref="MaxTreeWalkDepth"/> a composite's parts are not walked and its rolled-up cost stands for
+    /// them, counted once (or, when it is null, the composite counts once as unpriced): a subtree past the cap is neither
+    /// dropped nor counted twice.
+    /// </remarks>
     internal static void WalkAndAccumulate(
         EvalResult node,
         ref double trivial,
@@ -578,9 +585,22 @@ public sealed partial class Query
     {
         if (depth > MaxTreeWalkDepth) return;
 
-        if (node.Provenance.EstimatedCost is null && node.Details.SubResults is not { Count: > 0 })
+        if (node.Details.SubResults is { Count: > 0 } children && depth < MaxTreeWalkDepth)
+        {
+            foreach (var child in children)
+            {
+                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced, depth + 1);
+            }
+            return;
+        }
+
+        if (node.Provenance.EstimatedCost is not double cost)
+        {
             unpriced++;
-        if (node.Provenance.EstimatedCost is double cost && cost > 0)
+            return;
+        }
+
+        if (cost > 0)
         {
             // Lookup by metric key. Unknown keys default to Medium per
             // EvaluatorCostMap.GetTier — but we want to flag them as
@@ -599,14 +619,6 @@ public sealed partial class Query
             else
             {
                 unknown += cost;
-            }
-        }
-
-        if (node.Details.SubResults is { } children)
-        {
-            foreach (var child in children)
-            {
-                WalkAndAccumulate(child, ref trivial, ref low, ref medium, ref high, ref unknown, ref unpriced, depth + 1);
             }
         }
     }

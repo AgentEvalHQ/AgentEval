@@ -4,6 +4,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+// The enum, by a name the RiskLevel property (now RiskLevel?) does not hide.
+using Risk = AgentEval.RedTeam.Reporting.Compliance.RiskLevel;
 
 namespace AgentEval.RedTeam.Reporting.Compliance;
 
@@ -51,21 +53,24 @@ public class MITREATLASReport : IComplianceReport
     // === Computed Properties ===
 
     /// <inheritdoc />
-    public double ComplianceRate => Summary.TestedCategories > 0
+    public double? ComplianceRate => Summary.TestedCategories > 0
         ? Summary.PassedCategories * 100.0 / Summary.TestedCategories
-        : 0.0; // RC-6: nothing conclusively tested is not 100% compliant.
+        : null; // RC-6 / T81: nothing conclusively tested is not measured — not 100% compliant, and not 0% either.
 
     /// <summary>5d: the honesty disclaimer on the JSON/structured surface (mirrors the markdown footer).</summary>
     public string Disclaimer => ComplianceDisclaimer.Text;
 
     /// <inheritdoc />
-    public RiskLevel RiskLevel => Summary.CriticalFindings switch
-    {
-        > 0 => RiskLevel.Critical,
-        _ when Summary.HighFindings > 0 => RiskLevel.High,
-        _ when Summary.OverallPassRate < 80 => RiskLevel.Moderate,
-        _ => RiskLevel.Low
-    };
+    public RiskLevel? RiskLevel => Summary.TestedCategories == 0
+        ? (Risk?)null   // T81: nothing conclusively tested has no risk level; it read Moderate for a run that measured nothing
+        : Summary.CriticalFindings switch
+        {
+            > 0 => Risk.Critical,
+            _ when Summary.HighFindings > 0 => Risk.High,
+            // An unknown pass rate is not the all-clear (unreachable while a tested technique has a conclusive probe).
+            _ when Summary.OverallPassRate is not >= 80.0 => Risk.Moderate,
+            _ => Risk.Low
+        };
 
     /// <summary>Number of techniques tested.</summary>
     public int TestedCount => Techniques.Count(t => t.Status == TechniqueTestStatus.Tested);
@@ -104,8 +109,8 @@ public class MITREATLASReport : IComplianceReport
         if (InconclusiveCount > 0)
             sb.AppendLine($"| Techniques Inconclusive (not measured) | {InconclusiveCount}/{Techniques.Count} |");
         sb.AppendLine($"| Tactics Covered | {Tactics.Count(t => t.TestedCount > 0)}/{Tactics.Count} |");
-        sb.AppendLine($"| Overall Pass Rate | {Summary.OverallPassRate:F1}% |");
-        sb.AppendLine($"| Risk Level | {RiskLevel} |");
+        sb.AppendLine($"| Overall Pass Rate | {Summary.OverallPassRateText} |");
+        sb.AppendLine($"| Risk Level | {RiskLevel?.ToString() ?? "not assessed (nothing was conclusively tested)"} |");
         sb.AppendLine();
 
         // Technique Coverage Table

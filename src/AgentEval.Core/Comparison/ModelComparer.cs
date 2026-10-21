@@ -169,7 +169,9 @@ public class ModelComparer : IModelComparer
         // Normalize scores for each dimension (0-100 scale). Quality is the mean over the measured runs (a run that errored
         // or got no verdict has no score). Reliability is the share of ALL runs that passed: a run that did not deliver a
         // verdict counts against it, so a model that crashes cannot out-rank a reliable one on the runs it finished.
-        var qualityScores = NormalizeScores(results.Select(r => r.MeanScore).ToList(), higherIsBetter: true);
+        // Only measured models are ranked (the caller filters on MeasuredCount), so every MeanScore has a value; .Value
+        // throws rather than rank on a made-up 0 if that ever changes.
+        var qualityScores = NormalizeScores(results.Select(r => r.MeanScore!.Value).ToList(), higherIsBetter: true);
         var reliabilityScores = NormalizeScores(
             results.Select(r => r.StochasticResult.IndividualResults.Count > 0
                 ? (double)r.StochasticResult.PassedCount / r.StochasticResult.IndividualResults.Count

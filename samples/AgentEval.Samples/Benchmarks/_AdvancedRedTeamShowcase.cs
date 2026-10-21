@@ -116,11 +116,13 @@ internal static class AdvancedRedTeamShowcase
         // ── 4. Five compliance reporters from the one scan ──
         Console.WriteLine();
         Console.WriteLine("  [4] Compliance reporters from one scan (conclusive-only; governance never auto-PASS):");
-        Console.WriteLine($"      OWASP LLM Top 10 : {new OWASPComplianceReporter().GenerateReport(result).ComplianceRate:F0}% compliant");
-        Console.WriteLine($"      MITRE ATLAS      : {new MITREATLASReporter().GenerateReport(result).ComplianceRate:F0}% compliant");
-        Console.WriteLine($"      NIST AI RMF      : {new NistAiRmfComplianceReporter().GenerateReport(result).ComplianceRate:F0}% compliant");
-        Console.WriteLine($"      SOC 2            : {new SOC2ComplianceReporter().GenerateReport(result).ComplianceRate:F0}% compliant");
-        Console.WriteLine($"      ISO 27001        : {new ISO27001ComplianceReporter().GenerateReport(result).ComplianceRate:F0}% compliant");
+        // A report that conclusively evaluated nothing has no compliance rate (null), never a placeholder 0% (T81).
+        static string Compliant(double? rate) => rate is { } c ? $"{c:F0}% compliant" : "not measured (nothing conclusively evaluated)";
+        Console.WriteLine($"      OWASP LLM Top 10 : {Compliant(new OWASPComplianceReporter().GenerateReport(result).ComplianceRate)}");
+        Console.WriteLine($"      MITRE ATLAS      : {Compliant(new MITREATLASReporter().GenerateReport(result).ComplianceRate)}");
+        Console.WriteLine($"      NIST AI RMF      : {Compliant(new NistAiRmfComplianceReporter().GenerateReport(result).ComplianceRate)}");
+        Console.WriteLine($"      SOC 2            : {Compliant(new SOC2ComplianceReporter().GenerateReport(result).ComplianceRate)}");
+        Console.WriteLine($"      ISO 27001        : {Compliant(new ISO27001ComplianceReporter().GenerateReport(result).ComplianceRate)}");
 
         // ── 5. (Pro) Benchmark-pack catalog (API/installation example — no harmful data downloaded) ──
         if (isPro)

@@ -470,15 +470,18 @@ public class PerformanceBenchmark
     ///   <item><b>Latency</b> — P99 vs <c>LatencyOptions.P99ThresholdMs</c> (default 5000 ms).
     ///         score = 1 − (p99ms / threshold), clamped to [0, 1]. Lower latency → higher score.</item>
     ///   <item><b>Throughput</b> — RequestsPerSecond vs <c>ThroughputOptions.MinRps</c> (default 0.5 RPS).
-    ///         score = min(rps / minRps, 1.0). Higher throughput → higher score.</item>
+    ///         score = min(rps / minRps, 1.0). Higher throughput → higher score.
+    ///         When every request failed there is no throughput: the leaf is an error, not measured.</item>
     ///   <item><b>Cost</b> — EstimatedCostUSD vs <c>CostOptions.MaxCostUSD</c> (default 0.10 USD).
     ///         score = 1 − (cost / maxCost), clamped to [0, 1]. Lower cost → higher score.
-    ///         When cost is unknown (no pricing data), score defaults to 1.0 (pass with low severity).</item>
+    ///         When cost is unknown (no pricing data, no usage reported, or no prompt returned), the leaf is skipped:
+    ///         not measured, never a $0 pass.</item>
     /// </list>
     /// </para>
     /// <para>
     /// <b>Aggregation</b>: <c>CapByWorst</c> — a critical/high-severity failure in any single leaf
-    /// caps the composite. Use <see cref="PerformanceBenchmarkOptions.EvaluateOptions"/> to tune thresholds
+    /// caps the composite. With no leaf measured the composite has no verdict: <c>error</c> when a leaf errored, else
+    /// <c>skipped</c>. Use <see cref="PerformanceBenchmarkOptions.EvaluateOptions"/> to tune thresholds
     /// before calling this method.
     /// </para>
     /// </remarks>
@@ -538,7 +541,13 @@ public class PerformanceBenchmark
         // satisfy the EvalComponent constructor are gone.
         var (compositeScore, compositeSeverity) =
             CapByWorstAggregation.AggregateWeights(leaves, [1.0, 1.0, 1.0]);
-        bool passed = compositeScore >= opts.CompositePassThreshold
+        // No leaf measured anything (every call failed, say): no verdict, by CompositeEval's rule — error when a leaf
+        // errored, else skipped (T13). The empty roll-up's (0, "none") read as a measured WARN, or a PASS at a pass
+        // threshold of 0. (A latency leaf that withheld its pass cannot be the only one: it needs a call that returned,
+        // and then the throughput leaf is measured too.)
+        var nothingMeasured = !leaves.Any(l => l.Score.CountsTowardAggregate());
+        bool passed = !nothingMeasured
+            && compositeScore >= opts.CompositePassThreshold
             && leaves.All(l => l.Score.Label != "fail");
         // Latency not measured (no call returned, or some failed) withholds the composite's pass: the other leaves
         // cannot show the latency budget held.
@@ -547,7 +556,9 @@ public class PerformanceBenchmark
         {
             passed = false;
         }
-        string label = passed ? "pass"
+        string label = nothingMeasured
+            ? (leaves.Any(l => l.Score.Label == "error") ? "error" : "skipped")
+            : passed ? "pass"
             : latencyWithheld ? "warn"
             : leaves.Any(l => l.Score.Severity is "critical" or "high") ? "fail"
             : "warn";
@@ -558,7 +569,11 @@ public class PerformanceBenchmark
         {
             dimensions["p99_ms"] = latencyResult.P99Latency.TotalMilliseconds;
         }
-        dimensions["rps"] = throughputResult.RequestsPerSecond;
+        // Nor is the 0 RPS of requests that all failed a throughput.
+        if (!ThroughputNotMeasured(throughputResult))
+        {
+            dimensions["rps"] = throughputResult.RequestsPerSecond;
+        }
         if (costResult.EstimatedCostUSD is { } measuredCost && costResult.SuccessfulPrompts > 0)
         {
             dimensions["cost_usd"] = (double)measuredCost;
@@ -692,8 +707,35 @@ public class PerformanceBenchmark
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
+    // Every request in the window failed: there is no throughput to read. A window in which nothing completed and
+    // nothing failed (a call that outlasts it) is a measured 0.
+    private static bool ThroughputNotMeasured(ThroughputBenchmarkResult r) => r.CompletedRequests == 0 && r.ErrorCount > 0;
+
     private static EvalResult BuildThroughputLeaf(ThroughputBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
     {
+        if (ThroughputNotMeasured(r))
+        {
+            // No request completed because every one failed: 0 RPS of nothing scored a critical fail, a measured FAIL of
+            // the whole benchmark beside two leaves that measured nothing (T13). An error, not measured, with the failed
+            // requests counted.
+            var reason = $"Throughput not measured: none of {r.ErrorCount} requests completed (every one failed).";
+            return new EvalResult(
+                Metric: new("perf_throughput", "Throughput", "performance", "1.0.0"),
+                Score: new(0.0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
+                Details: new(
+                    Dimensions: new Dictionary<string, double>
+                    {
+                        ["completed"] = 0,
+                        ["errors"] = r.ErrorCount,
+                    },
+                    Evidence: [new EvalEvidence("throughput", r.AgentName, reason)],
+                    Recommendations: [reason],
+                    SubResults: null,
+                    AggregationStrategy: null),
+                Provenance: new("code", null, null, null, null, 0.0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+        }
+
         var rps = r.RequestsPerSecond;
         var minRps = opts.MinThroughputRps;
 

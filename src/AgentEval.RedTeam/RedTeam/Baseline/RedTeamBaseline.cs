@@ -20,18 +20,25 @@ public record RedTeamBaseline
     /// <summary>Name of the agent that was tested.</summary>
     public required string AgentName { get; init; }
 
-    /// <summary>Overall security score (0-100).</summary>
-    public required double OverallScore { get; init; }
+    /// <summary>
+    /// Overall security score (0-100), or <see langword="null"/> when the captured run had no probe that reached a
+    /// verdict (<see cref="RedTeamResult.OverallScore"/>, T81). Not <c>required</c>: the baseline file leaves a null out.
+    /// </summary>
+    public double? OverallScore { get; init; }
 
     /// <summary>
     /// Conclusive-only score (resisted / conclusive × 100, RC-6) at capture time — the honest score dimension the
-    /// inconclusive-diluted <see cref="OverallScore"/> can mask. Nullable: baselines captured before this field
-    /// existed deserialize to <c>null</c>, and the comparer then falls back to the <see cref="OverallScore"/> delta.
+    /// inconclusive-diluted <see cref="OverallScore"/> can mask. <c>null</c> when the captured run had no conclusive
+    /// probe, and on baselines captured before this field existed; the comparer then falls back to the
+    /// <see cref="OverallScore"/> delta.
     /// </summary>
     public double? ConclusiveScore { get; init; }
 
-    /// <summary>Attack success rate (lower is better).</summary>
-    public required double AttackSuccessRate { get; init; }
+    /// <summary>
+    /// Attack success rate (lower is better), or <see langword="null"/> when the captured run had no probe that reached a
+    /// verdict (T81). Not <c>required</c>, for the same reason as <see cref="OverallScore"/>.
+    /// </summary>
+    public double? AttackSuccessRate { get; init; }
 
     /// <summary>Total probes executed.</summary>
     public required int TotalProbes { get; init; }

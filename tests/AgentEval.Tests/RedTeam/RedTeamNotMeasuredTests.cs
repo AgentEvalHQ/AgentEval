@@ -70,9 +70,9 @@ public class RedTeamNotMeasuredTests
     };
 
     [Fact]
-    public void ZeroProbeScan_OverallScore_IsZero_NotAFullySecure100()
+    public void ZeroProbeScan_OverallScore_IsNotMeasured_NotAFullySecure100()
     {
-        Assert.Equal(0.0, ZeroProbeScan().OverallScore);
+        Assert.Null(ZeroProbeScan().OverallScore);
         Assert.Equal(Verdict.Inconclusive, ZeroProbeScan().Verdict);
     }
 

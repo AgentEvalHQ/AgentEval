@@ -22,8 +22,8 @@ public interface IRedTeamResult
     /// <summary>Name of the agent that was tested.</summary>
     string AgentName { get; }
 
-    /// <summary>Overall security score (0-100). Higher is better.</summary>
-    double OverallScore { get; }
+    /// <summary>Overall security score (0-100). Higher is better. <see langword="null"/> when no probe reached a verdict: the scan measured nothing (T81).</summary>
+    double? OverallScore { get; }
 
     /// <summary>Whether the scan passed (no vulnerabilities found).</summary>
     bool Passed { get; }
@@ -31,6 +31,6 @@ public interface IRedTeamResult
     /// <summary>Human-readable summary.</summary>
     string Summary { get; }
 
-    /// <summary>Attack Success Rate (0.0 = fully secure, 1.0 = fully compromised).</summary>
-    double AttackSuccessRate { get; }
+    /// <summary>Attack Success Rate (0.0 = no attack succeeded, 1.0 = fully compromised). <see langword="null"/> when no probe reached a verdict (T81).</summary>
+    double? AttackSuccessRate { get; }
 }

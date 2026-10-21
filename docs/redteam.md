@@ -93,7 +93,7 @@ using AgentEval.RedTeam;
 var result = await agent.QuickRedTeamScanAsync();
 
 // Check results
-Console.WriteLine($"Score: {result.OverallScore}%");
+Console.WriteLine($"Score: {(result.OverallScore is { } score ? $"{score:F1}%" : $"n/a ({result.ScoresNotMeasuredReason})")}");
 Console.WriteLine($"Verdict: {result.Verdict}");
 
 // Use in tests with fluent assertions
@@ -698,7 +698,7 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 
 ```json
 {
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "report_id": "5e0c7a91d4b2f386",
   "created_utc": "2026-01-30T14:22:33.4987654Z",
   "target": {
@@ -786,7 +786,8 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 }
 ```
 
-- `schema_version` is the version of this JSON layout, not of AgentEval; the exporter writes `0.3.0`. The JSON report does not record which AgentEval version wrote it.
+- `schema_version` is the version of this JSON layout, not of AgentEval; the exporter writes `0.4.0`. The JSON report does not record which AgentEval version wrote it.
+- `overall_score`, `conclusive_score`, `attack_success_rate`, `conclusive_attack_success_rate` and each attack's `asr` are `null` when no probe reached a verdict, and `summary.scores_not_measured` says why ("no probe ran" or "none of the N probes reached a verdict"). A compliance report with nothing conclusively evaluated has `complianceRate` and `riskLevel` null and its Markdown says "not measured".
 - `report_id` is derived from the agent name, the scan start time and the probe ids, so exporting the same result twice gives the same id.
 - `attack_success_rate` and each attack's `asr` divide by every executed probe, inconclusive ones included. `conclusive_attack_success_rate` and `conclusive_score` divide by conclusive probes only (resisted plus succeeded), and `coverage` is the conclusive share as a percentage. Read a score beside its coverage.
 - `errored` counts probes that failed to run (a timeout, a transport fault or an execution fault); they are also counted in `inconclusive`.
@@ -798,8 +799,9 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 
 | Property | Description |
 |----------|-------------|
-| `OverallScore` | Defense success rate (0-100%) |
-| `AttackSuccessRate` | Proportion of successful attacks (ASR) |
+| `OverallScore` | Defense success rate (0-100%); `null` when no probe reached a verdict |
+| `AttackSuccessRate` | Proportion of successful attacks (ASR); `null` when no probe reached a verdict |
+| `ScoresNotMeasuredReason` | Why the scores are `null` ("no probe ran" or "none of the N probes reached a verdict"); `null` when they were measured |
 | `Verdict` | Pass/Fail/PartialPass |
 | `Passed` | True if all attacks resisted |
 | `TotalProbes` | Total probes executed |
@@ -1573,8 +1575,8 @@ public async Task Agent_DoesNotRegress()
 
 | Property | Description |
 |----------|-------------|
-| `ScoreDelta` | Change in overall score (positive = improved) |
-| `AttackSuccessRateDelta` | Change in ASR (negative = improved) |
+| `ScoreDelta` | Change in overall score (positive = improved); `null` when either run has no score |
+| `AttackSuccessRateDelta` | Change in ASR (negative = improved); `null` when either run has no rate |
 | `NewVulnerabilities` | Probe IDs that now fail but passed before |
 | `ResolvedVulnerabilities` | Probe IDs that now pass but failed before |
 | `PersistentVulnerabilities` | Probe IDs that fail in both |

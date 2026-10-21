@@ -38,10 +38,12 @@ public class BaselineComparer : IBaselineComparer
                 .ToList()
         }).ToList();
 
-        // Determine best baseline (highest overall score)
-        // Count > 0 is guaranteed by the guard above, so MaxBy always returns non-null
-        var bestBaseline = baselines.MaxBy(b => b.OverallScore)
-            ?? throw new InvalidOperationException("Unable to determine best baseline.");
+        // The best baseline (highest overall score) among those that measured at least one dimension (T13). A baseline
+        // that measured nothing has a placeholder overall 0; picking among such baselines named a "best" by list order,
+        // so with none measured there is no best (null).
+        var bestBaseline = baselines
+            .Where(b => b.DimensionScores.Count > 0)
+            .MaxBy(b => b.OverallScore);
 
         // Build radar chart data over the pentagon axes every baseline measured; an axis only some measured is
         // named in OmittedAxes rather than drawn with a made-up 0 for the others.
@@ -62,7 +64,7 @@ public class BaselineComparer : IBaselineComparer
         {
             Baselines = baselines,
             Dimensions = dimensions,
-            BestBaselineId = bestBaseline.Id,
+            BestBaselineId = bestBaseline?.Id,
             RadarChart = radarChart
         };
     }

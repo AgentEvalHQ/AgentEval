@@ -450,8 +450,8 @@ public class PdfReportGeneratorTests
     [Theory] // L26: the trends pass-rate ROUNDS (float division) instead of integer-truncating.
     [InlineData(7, 8, 88)]   // 87.5 → 88 (was 87 under integer division)
     [InlineData(1, 3, 33)]
-    [InlineData(0, 0, 100)]  // no probes → 100 by convention
+    [InlineData(0, 0, null)]  // no conclusive probe → not measured (T81), never 100
     [InlineData(10, 10, 100)]
-    public void PassRatePercent_RoundsNotTruncates(int passed, int total, int expected)
+    public void PassRatePercent_RoundsNotTruncates(int passed, int total, int? expected)
         => Assert.Equal(expected, PdfReportGenerator.PassRatePercent(passed, total));
 }
