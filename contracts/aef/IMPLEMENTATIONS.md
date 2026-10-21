@@ -3,8 +3,8 @@
 A conformance claim names the implementation and its version, the AEF version, its classes (with the Run verifier
 level, and a Sealer's signing algorithms) and the corpus it passed in full ([CONF-4](1/spec/09-conformance.md#94-claiming-conformance)).
 Until the `aef-1.0` tag the corpus changes with the text, so the claims below are re-established on every change to
-this folder rather than pinned to one digest: by CI (`.github/workflows/aef.yml` in the AgentEval repository) once it
-runs on GitHub (its first run is pending: every step is run locally before each commit until then). At the tag, each
+this folder rather than pinned to one digest: by CI (`.github/workflows/aef.yml` in the AgentEval repository), which
+has run on GitHub on every such change since 2026-10-15 (first green run: the pull request for #297). At the tag, each
 claim names that tag's corpus digest (the SHA-256 of `1/conformance/index.json`).
 
 | Implementation | Language | Classes claimed | Run verifier level | Signs with | How it is checked |

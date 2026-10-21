@@ -116,9 +116,9 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 
 ## AEF → in-toto and SLSA
 
-The optional [artifact companion profile](artifact-companion.md) now specifies the
+The optional [artifact-evidence profile](../../profiles/artifact-evidence/README.md), outside AEF 1.0, specifies the
 explicit artifact-to-seal binding missing from the base format, with a Results API
-and CLI. The table below describes the base AEF 1.0 format without that companion.
+and CLI. The table below describes the base AEF 1.0 format without that profile.
 
 | AEF | in-toto / SLSA | Fidelity |
 |---|---|---|

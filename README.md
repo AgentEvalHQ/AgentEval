@@ -34,7 +34,7 @@ AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool u
 > Portions of the code, tests, and documentation were created with assistance from AI tools and reviewed by maintainers.
 > Despite review, errors may exist — you are responsible for validating correctness, security, and compliance for your use case.
 >
-> Licensed under the **MIT License** — provided **"AS IS"** without warranty. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
+> Licensed under the **MIT License** — provided **"AS IS"** without warranty. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md). The AEF evidence format in [`contracts/aef/`](contracts/aef/) is under the **Apache License 2.0**; see [License](#license).
 
 ---
 
@@ -623,17 +623,20 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 ## Feature Maturity
 
-AgentEval ships as a single lockstep-versioned package (see [Installation](#installation)) — there is no per-package version to signal maturity the way some multi-package frameworks do. Instead, maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning). Only Gatekeeper's public surface is frozen by a test; every other front can still change incompatibly, and breaking changes are listed in the [CHANGELOG](CHANGELOG.md).
+AgentEval ships as two packages released together on one version: the `AgentEval` library and the `AgentEval.Cli` tool (see [Installation](#installation)). Maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
 
-| Front | Maturity | Why |
-|---|---|---|
-| Core eval (assertions, RAG metrics, LLM-as-judge, benchmarks, exporters) | **GA-track, not frozen** | The longest-standing surface and the foundation every other front builds on. The public API of `AgentEval.Core` and `AgentEval.Abstractions` is snapshot-tested: any change to a public type or member fails the build until the new surface is reviewed, so it cannot move silently. It can still move on purpose, and the CHANGELOG records past breaking changes there (for example a type moved out of `AgentEval.Abstractions` and a member added to the `IOutputStoreReader` interface). |
-| RedTeam core (OWASP LLM Top 10, attacks/probes, Composite Judges) | **GA-track, not frozen** | Feature-complete for its stated scope. No test guards its public API, so it can still change incompatibly; breaking changes are listed in the CHANGELOG. |
-| Compliance benchmarks (GDPR, EU AI Act) | **Beta** | Scenario content, weights and aggregation are stable, but judge calibration is **not** reproducible yet: it was measured in May 2026 on the maintainer's own deployments, with the generic judge prompt rather than the regulation prompt the benchmarks send (`calibrate` sends the benchmark prompt from 0.42.0-beta), and the reports are not in the repository. Beta until re-calibration is published. See the CHANGELOG (`Corrected`). |
-| **Gatekeeper** (runtime enforcement) | **Stable (v1)** | The public surface is frozen and snapshot-tested: a change fails CI until it is reviewed. Eight newer types stay individually marked `[Experimental]` and are outside that promise, as are the A2A gates, which are implemented and calibrated but not promoted. It runs inside Microsoft Agent Framework's own AgentHooks host through an experimental adapter. Known limits are listed on the [implementation status](docs/gatekeeper/implementation-status.md) page. |
-| Agent Skills | **Beta** (evaluation) · **Stable (v1)** (governance gates) | The evaluation side (disclosure assertions, the efficiency metric, the `SKILL.md` scanner, the Skill Security Index and `SkillInjectionAttack`) is shipped and tested, but depends on a recently GA'd upstream (MAF Agent Skills) and is still growing. The Gatekeeper skill gates (`SkillScriptExecutionGate`, `SkillScriptApprovalGate` and `GatekeeperOptions.WithSkillGate`) are part of the frozen Gatekeeper v1 surface. |
-| Copilot Studio | **Experimental** | The connector has not yet been verified against a real tenant. |
-| Mission Control | **Experimental** | Real and functioning, but with acknowledged gaps and comparatively less investment than Core/RedTeam. |
+**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target). **1.0.0-rc.1 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
+
+| Front | Ships in | Maturity | Why |
+|---|---|---|---|
+| Core evaluation and red team (assertions, RAG metrics, LLM-as-judge, benchmarks, exporters; OWASP LLM Top 10, attacks and probes, Composite Judges) | library, CLI | **Stable at 1.0** (release candidate) | Established feature families with broad samples and assertions. The public API of `AgentEval.Core` and `AgentEval.Abstractions` is snapshot-tested: any change to a public type or member fails the build until it is reviewed. Past breaking changes are in the CHANGELOG; from 1.0.0 there are none before 2.0. |
+| **Gatekeeper** (runtime enforcement) | library, CLI | **Stable (v1)** | The public v1 surface is frozen and snapshot-tested: a change fails CI until it is reviewed. Eight newer types stay individually marked `[Experimental]` and are outside that promise, as are the A2A gates, which are implemented and calibrated but not promoted. Some interception routes and workflow seams are experimental or unsupported; it runs inside Microsoft Agent Framework's AgentHooks host through an experimental adapter. Known limits are on the [implementation status](docs/gatekeeper/implementation-status.md) page. |
+| Compliance evaluation (GDPR, EU AI Act) | library, CLI | **Beta** | The benchmark scenarios screen observed behaviour; they do not establish legal compliance. Scenario content, weights and aggregation are stable, but judge calibration is **not** reproducible yet: it was measured in May 2026 on the maintainer's own deployments, with the generic judge prompt rather than the regulation prompt the benchmarks send (`calibrate` sends the benchmark prompt from 0.42.0-beta), and the reports are not in the repository. Beta until re-calibration is published. |
+| Agent Skills | library, CLI | **Beta** (evaluation) · **Stable (v1)** (governance gates) | The evaluation side (disclosure assertions, the efficiency metric, the `SKILL.md` scanner, the Skill Security Index and `SkillInjectionAttack`) is shipped and tested, but depends on a recently GA'd upstream (MAF Agent Skills) and is still growing. The Gatekeeper skill gates (`SkillScriptExecutionGate`, `SkillScriptApprovalGate` and `GatekeeperOptions.WithSkillGate`) are part of the frozen Gatekeeper v1 surface. |
+| Memory evaluation (LongMemEval, TypedMemEval, memory benchmarks) | library, CLI | **Beta** | Shipped and tested, and still changing as the benchmarks are recalibrated; it stays outside the 1.0 promise until its API settles. |
+| AgentEval Evidence Format ([AEF](docs/aef.md)) | CLI | **Release candidate** | AEF 1.0 records evaluation evidence that anyone can check independently, with two implementations passing the conformance corpus. Integrity shows the evidence was not changed after the run; it does not prove that a judge's conclusion is correct. The format freezes at the `aef-1.0` tag, released with AgentEval 1.0.0. |
+| Mission Control | CLI | **Experimental** | The local read-only evidence viewer works. Multi-workspace aggregation and the full self-hosted control-plane modes are not implemented yet. |
+| Copilot Studio connector | CLI | **Experimental** | The connector and its credential-free tests are implemented, but the live path against a real tenant has not been independently verified. |
 
 ---
 
@@ -786,6 +789,12 @@ AgentEval is **MIT licensed** and will remain open source forever. We believe in
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+One folder has its own licence: [`contracts/aef/`](contracts/aef/), the AEF evidence format (specification, schemas,
+conformance corpus and reference tools), is under the Apache License 2.0. See [its LICENSE](contracts/aef/LICENSE),
+[NOTICE](contracts/aef/NOTICE) and [GOVERNANCE.md](contracts/aef/GOVERNANCE.md#licence-and-patents). The
+`AgentEval.Cli` tool embeds the AEF schemas, so its package is licensed `MIT AND Apache-2.0` and carries AEF's
+LICENSE and NOTICE.
 
 ---
 

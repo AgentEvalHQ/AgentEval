@@ -44,8 +44,10 @@ round 3), each round's findings reworked into the text, the schemas and the conf
    minor only adds ([VER-5]), errata are fixed in the next minor, and anything else is AEF 2.0. The tag requires:
    - a critic mean above 9.5 on the standing 12-dimension rubric;
    - for every conformance class, a second implementation passing its vectors, or the class released *at risk*;
-   - the patent commitment for implementers in force (the Community Specification License 1.0 is drafted and waits
-     on counsel; until then Apache-2.0 alone applies).
+   - the licence settled. *Amended 2026-10-20:* this said "the patent commitment for implementers in force", with
+     the Community Specification License 1.0 drafted for the specification text. The lead editor decided that AEF 1.0
+     is released under Apache-2.0 alone, with no separate patent commitment
+     ([GOVERNANCE.md](../../contracts/aef/GOVERNANCE.md#licence-and-patents)), so this condition is met.
 5. **Relation to ADR-034.** AEF is the export path for the result model that ADR-034 found missing. The store v1
    exporter (`agenteval aef export`) writes existing runs as imported AEF runs ([RUN-15]); native
    eval, redteam and benchmark pipelines write AEF directly, retaining typed absences, decisions, usage and partial

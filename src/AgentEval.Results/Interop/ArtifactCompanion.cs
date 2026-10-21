@@ -16,8 +16,11 @@ public sealed class ArtifactCompanion
 {
     /// <summary>The in-toto Statement v1 identifier.</summary>
     public const string StatementType = "https://in-toto.io/Statement/v1";
-    /// <summary>The artifact-evidence predicate identifier (no external registration implied).</summary>
-    public const string PredicateType = "https://agenteval.dev/aef/1/artifact-evidence";
+    /// <summary>
+    /// The artifact-evidence predicate identifier (no external registration implied). A profile outside AEF 1.0
+    /// (contracts/aef/profiles/artifact-evidence), so outside <c>/aef/1/</c>; its major version is in the URI.
+    /// </summary>
+    public const string PredicateType = "https://agenteval.dev/attestation/artifact-evidence/v1";
     /// <summary>Maximum document size, checked before parsing or copying.</summary>
     public const int MaxDocumentBytes = 64 * 1024;
     /// <summary>Maximum optional DSSE envelope size.</summary>

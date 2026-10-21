@@ -37,14 +37,12 @@ Every commit to `contracts/aef/` carries a **Developer Certificate of Origin** s
 
 ## Licence and patents
 
-- **Today:** everything in this folder is licensed under the Apache License 2.0 (`LICENSE`). Its patent grant covers
-  the contributions themselves, and so code that uses them.
-- **Planned for the 1.0 release, pending counsel:** the specification text (`1/spec/`, the primer, rationale, interop
-  pages and reference) under the **Community Specification License 1.0**, in its royalty-free patent mode, so that
-  anyone who implements AEF from the text alone has a patent commitment from every contributor. The commitment
-  covers only what is strictly needed to implement the normative specification, as `SCOPE.md` defines it, and
-  nothing else of any contributor's work. The schemas, the corpus and the tools stay under Apache-2.0, as code.
-- Until counsel confirms and this section says so, Apache-2.0 alone applies.
+- Everything in this folder (the specification text, the primer, rationale, interop and reference pages, the schemas,
+  the corpus and the tools) is licensed under the **Apache License 2.0** (`LICENSE`), with the attributions in
+  `NOTICE`. This is the licence of AEF 1.0, decided by the lead editor on 2026-10-20 and recorded in the changelog.
+- Its patent licence (section 3) comes from each contributor and covers their contributions and works based on them.
+  AEF makes no separate patent commitment to implementations written from the text alone.
+- A change to these terms is a governance change: it follows the proposal process above, and the changelog records it.
 
 ## Versions and releases
 
@@ -70,7 +68,8 @@ the project. If AEF moves to a neutral home, version 1 keeps its names and a lat
 
 A profile builds on AEF for a narrower use, with its own `$id` (outside `/aef/1/`) and its own versions. Profiles are
 not part of AEF 1.0 and no AEF conformance class requires one. The runtime-verdict profile (AEVP 0.1, in
-`profiles/runtime-verdict/`) is the first.
+`profiles/runtime-verdict/`) is the first. The artifact-evidence profile (in `profiles/artifact-evidence/`) binds an
+evaluated artifact, by digest, to a sealed run.
 
 ## Security flaws in the format
 

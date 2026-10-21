@@ -3,7 +3,7 @@
 # AgentEval CLI
 
 [![NuGet](https://img.shields.io/nuget/vpre/AgentEval.Cli.svg)](https://www.nuget.org/packages/AgentEval.Cli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+[![License: MIT AND Apache-2.0](https://img.shields.io/badge/License-MIT%20AND%20Apache--2.0-yellow.svg)](#license)
 [![Built on Microsoft Agent Framework](https://img.shields.io/badge/built%20on-Microsoft%20Agent%20Framework-blueviolet)](https://github.com/microsoft/agent-framework)
 ![.NET 8.0 | 10.0](https://img.shields.io/badge/.NET-8.0%20|%2010.0-512BD4)
 
@@ -211,4 +211,9 @@ Contributions are welcome! Please open an issue or pull request on the
 
 ## License
 
-MIT License. See [LICENSE](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE) for details.
+MIT AND Apache-2.0. The CLI's own code is under the MIT License; see
+[LICENSE](https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE). The tool also embeds the schemas of the AEF
+evidence format, which are under the Apache License 2.0; the package carries AEF's licence and notice in
+`licenses/aef/`, and the source is in
+[contracts/aef/](https://github.com/AgentEvalHQ/AgentEval/tree/main/contracts/aef). Third-party components are listed
+in `THIRD-PARTY-NOTICES.md` at the package root.

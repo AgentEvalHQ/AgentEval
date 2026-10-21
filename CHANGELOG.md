@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Everything below ships as **1.0.0-rc.1**, the release candidate for AgentEval 1.0: a prerelease for
+feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, with its date, on release.
+
+- **What 1.0 promises** (README, "Feature Maturity"): semantic versioning for the public API of the
+  `AgentEval` library and for the CLI's documented commands, options and exit codes, except types marked
+  `[Experimental]` and the fronts labelled Beta or Experimental. Core evaluation and red team are Stable at
+  1.0, Gatekeeper v1 is Stable; compliance, Agent Skills evaluation and memory evaluation are Beta; Mission
+  Control and the Copilot Studio connector are Experimental; the AgentEval Evidence Format is a release
+  candidate.
+- **AgentEval Evidence Format:** eval, redteam and bench write sealed AEF evidence (#291, #292, #293, #296); Mission
+  Control's web views and evidence governance read it (#297). AEF's licence is settled as Apache-2.0 alone,
+  and the artifact-evidence statement is a profile outside AEF 1.0, with its own predicate type
+  (`contracts/aef/1/CHANGELOG.md`).
+
 - **Reasoning is off by default:** every chat client the samples, the TravelDemo and PartnerDesk demos, the
   other sample projects and the CLI build from the provider variables is wrapped in the new
   `MinimalReasoningChatClient` (`chatClient.WithMinimalReasoning()`, `AgentEval.Core`). A request that sets
@@ -153,6 +167,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grades the tool calls its runs made (it graded tool-call accuracy with no tool data). G8 and G10 find
   the LongMemEval dataset from any build folder. C2 and C3 show 4 steps; on GLM-5.3-Flash C3 passes and C2
   fails its own 3-minute limit (195-239 s).
+
+- **`AgentEval.Cli` licence now says it carries AEF:** the tool embeds the AEF schemas (`contracts/aef/`,
+  Apache-2.0) but its package declared MIT alone and shipped neither AEF's `LICENSE` nor its `NOTICE`.
+  The package is now licensed `MIT AND Apache-2.0` and packs both files in `licenses/aef/`. No published
+  package was affected: AEF arrived after 0.43.0-beta. `AefLicencePackagingTests` fails any packable
+  project that carries AEF content without both, and the release workflow checks the packed tool. The
+  root README, the CLI README and `THIRD-PARTY-NOTICES.md` now name the AEF folder's licence.
+- **AEF's licence is Apache-2.0 alone:** `contracts/aef/GOVERNANCE.md` names it as the licence of AEF 1.0;
+  the plan for a separate specification licence is dropped and `contracts/aef/SCOPE.md` removed. AEF makes
+  no separate patent commitment to implementations written from the text alone.
+- **Artifact-evidence predicate type changed:** `ArtifactCompanion.PredicateType` is now
+  `https://agenteval.dev/attestation/artifact-evidence/v1` (was `https://agenteval.dev/aef/1/artifact-evidence`),
+  and the profile's page moved to `contracts/aef/profiles/artifact-evidence/`. No released version wrote the
+  old type.
 
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
