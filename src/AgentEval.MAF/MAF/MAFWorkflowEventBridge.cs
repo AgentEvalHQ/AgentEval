@@ -131,7 +131,8 @@ public static class MAFWorkflowEventBridge
         }
 
         await foreach (var evt in TranslateEventsAsync(
-            run.WatchStreamAsync(cancellationToken), chatProtocolExecutorIds, executorIdMap, cancellationToken,
+            run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken: cancellationToken),
+            chatProtocolExecutorIds, executorIdMap, cancellationToken,
             runStartedAt: runStartedAt)
             .ConfigureAwait(false))
         {
@@ -521,6 +522,15 @@ public static class MAFWorkflowEventBridge
                         errorData?.GetType().Name);
                     break;
 
+                case MAFWorkflows.RequestInfoEvent requestInfo:
+                    // This adapter has no responder. End the run at its pending-request halt and report
+                    // the control-flow requirement instead of waiting for cancellation or claiming success.
+                    var portId = NormalizeId(requestInfo.Request.PortInfo.PortId);
+                    yield return new ExecutorErrorEvent(portId,
+                        $"Expected: completed workflow. Actual: request '{requestInfo.Request.RequestId}' is waiting on port '{portId}'. " +
+                        "Suggestions: use a workflow host that can supply the required response.");
+                    break;
+
                 // ── SuperStep events (no direct mapping) ──
 
                 case MAFWorkflows.SuperStepStartedEvent:
@@ -531,7 +541,6 @@ public static class MAFWorkflowEventBridge
                 case MAFWorkflows.SuperStepCompletedEvent:
                 case MAFWorkflows.WorkflowStartedEvent:
                 case MAFWorkflows.WorkflowWarningEvent:
-                case MAFWorkflows.RequestInfoEvent:
                     // These MAF events don't have direct AgentEval equivalents.
                     // They could be used for detailed tracing in the future.
                     break;
@@ -592,7 +601,8 @@ public static class MAFWorkflowEventBridge
     /// </summary>
     private static string? ExtractTextFromResult(object? result)
     {
-        if (result is null)
+        // A request-port handler returns its request envelope, not an answer from the executor.
+        if (result is null or MAFWorkflows.ExternalRequest)
             return null;
 
         // Plain string result
