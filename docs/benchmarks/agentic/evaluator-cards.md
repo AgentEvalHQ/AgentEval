@@ -74,8 +74,8 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 
 | Key | Class | Score formula |
 |-----|-------|---------------|
-| `latency` | `LatencyEval` | Linear on P99 vs threshold; high severity above threshold |
-| `token_usage` | `TokenUsageEval` | Linear on tokens vs budget |
+| `latency` | `LatencyEval` | Linear on P99 vs threshold; high severity above threshold; skipped when P99 is not tracked, error when invalid |
+| `token_usage` | `TokenUsageEval` | Linear on tokens vs budget; skipped when not tracked, error for negative counts |
 | `cost` | `CostEval` | Linear on USD vs budget |
 | `error_rate` | `ErrorRateEval` | `1 - (errors / totalCalls)` |
 | `retry_rate` | `RetryRateEval` | `1 - (retries / totalCalls)` |

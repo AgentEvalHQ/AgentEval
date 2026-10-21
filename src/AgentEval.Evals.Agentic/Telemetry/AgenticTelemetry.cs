@@ -29,10 +29,10 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// </code>
 /// </para>
 /// </summary>
-/// <param name="LatencyMsP50">End-to-end agent latency at the 50th percentile in milliseconds.</param>
-/// <param name="LatencyMsP95">End-to-end agent latency at the 95th percentile in milliseconds.</param>
-/// <param name="LatencyMsP99">End-to-end agent latency at the 99th percentile in milliseconds.</param>
-/// <param name="TokensUsed">Total tokens consumed (prompt + completion) across all LLM calls in the run.</param>
+/// <param name="LatencyMsP50">End-to-end agent latency at the 50th percentile in milliseconds; null when not tracked, 0 for a measured zero.</param>
+/// <param name="LatencyMsP95">End-to-end agent latency at the 95th percentile in milliseconds; null when not tracked, 0 for a measured zero.</param>
+/// <param name="LatencyMsP99">End-to-end agent latency at the 99th percentile in milliseconds; null when not tracked, 0 for a measured zero. LatencyEval scores on this percentile alone.</param>
+/// <param name="TokensUsed">Total tokens consumed (prompt + completion) across all LLM calls in the run; null when not tracked. A reported 0 is a measured zero and is within budget.</param>
 /// <param name="EstimatedCostUsd">
 /// Estimated monetary cost of the run in USD, or <see langword="null"/> when the run's cost was not tracked. Not tracked
 /// is never 0: 0 is a measured zero (the run cost nothing), which <see cref="CostEval"/> scores as within any budget, so
@@ -43,10 +43,10 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// <param name="RetryCount">Total number of retries triggered by transient failures.</param>
 /// <param name="ToolLatencyMs">Per-tool mean latency in milliseconds, keyed by tool name.</param>
 public sealed record AgenticTelemetry(
-    double LatencyMsP50,
-    double LatencyMsP95,
-    double LatencyMsP99,
-    int TokensUsed,
+    double? LatencyMsP50,
+    double? LatencyMsP95,
+    double? LatencyMsP99,
+    int? TokensUsed,
     double? EstimatedCostUsd,
     int ErrorCount,
     int TotalCalls,

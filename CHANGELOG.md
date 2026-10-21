@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Breaking:** `AgenticTelemetry.TokensUsed` and `LatencyMsP50/P95/P99` are nullable. Untracked tokens or P99 skip their evaluators and make the Telemetry preset warn; measured zero remains valid. Negative counts and negative/non-finite P99 return an error. Missing or invalid supporting percentiles are omitted from latency dimensions; P99 remains the scoring input.
+
 - **Breaking:** Red-team baseline/attack rates, scan coverage and progress rates are nullable when unmeasured. Per-attack reports consistently use conclusive probes. Known vulnerabilities require an explicit resisted verdict to count as resolved; missing or inconclusive retests are unverified and make the comparison incomparable (CLI exit 13).
 
 

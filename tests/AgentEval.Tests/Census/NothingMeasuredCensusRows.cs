@@ -35,7 +35,7 @@ using TraceLog = AgentEval.Tracing.AgentTrace;
 namespace AgentEval.Tests.Census;
 
 /// <summary>One producer of a number or a verdict, fed an input in which nothing was measured.</summary>
-/// <param name="Id">The row's id in the T13 design (A = eval trees, B = batches and runs, C = red team, D = cost, O = open).</param>
+/// <param name="Id">The row's id in the T13 design (A = eval trees, B = batches and runs, C = red team, D = cost and usage telemetry, O = open).</param>
 /// <param name="Producer">The type that aggregates. The reflection guard matches it against the types it discovers.</param>
 /// <param name="NothingMeasuredInput">The input, in words.</param>
 /// <param name="Expected">What the producer must give for it, in words.</param>
@@ -64,7 +64,7 @@ internal sealed record CensusRow(
 /// <remarks>
 /// Rows whose fix belongs to another wave-1 task are written for the fixed behaviour and hold once that task lands:
 /// B-1 and B-6 (T71, nullable batch averages), C2 to C4 (T81, red-team numbers), D2 (T82, an untracked AgenticTelemetry
-/// cost is null).
+/// cost is null), D3/D4 (T88, untracked tokens and P99 latency).
 /// The scripted inputs below are shapes a producer reads; nothing here grades an agent.
 /// </remarks>
 internal static class NothingMeasuredCensusRows
@@ -169,6 +169,10 @@ internal static class NothingMeasuredCensusRows
         // ── Cost ─────────────────────────────────────────────────────────────
         rows.Add(new("D1", typeof(CostRollup), "results none of which was priced", "no total", D1Nothing, D1Twin));
         rows.Add(new("D2", typeof(CostEval), "telemetry whose cost was not tracked", "skipped", D2Nothing, D2Twin,
+            Discoverable: false));
+        rows.Add(new("D3", typeof(TokenUsageEval), "telemetry whose token count was not tracked", "skipped", D3Nothing, D3Twin,
+            Discoverable: false));
+        rows.Add(new("D4", typeof(LatencyEval), "telemetry whose P99 latency was not tracked", "skipped", D4Nothing, D4Twin,
             Discoverable: false));
 
         // ── Compliance summaries (T85) ────────────────────────────────────
@@ -1320,6 +1324,26 @@ internal static class NothingMeasuredCensusRows
     {
         var result = await new CostEval(Telemetry(0.08)).EvaluateAsync(new EvalInput("q"));
 
+        Assert.True(result.Score.CountsTowardAggregate());
+        Assert.True(result.Score.Passed);
+    }
+
+    private static async Task D3Nothing() => NoReading.Score(
+        (await new TokenUsageEval(Telemetry(0.08) with { TokensUsed = null }).EvaluateAsync(new EvalInput("q"))).Score, "D3");
+
+    private static async Task D3Twin()
+    {
+        var result = await new TokenUsageEval(Telemetry(0.08)).EvaluateAsync(new EvalInput("q"));
+        Assert.True(result.Score.CountsTowardAggregate());
+        Assert.True(result.Score.Passed);
+    }
+
+    private static async Task D4Nothing() => NoReading.Score(
+        (await new LatencyEval(Telemetry(0.08) with { LatencyMsP99 = null }).EvaluateAsync(new EvalInput("q"))).Score, "D4");
+
+    private static async Task D4Twin()
+    {
+        var result = await new LatencyEval(Telemetry(0.08)).EvaluateAsync(new EvalInput("q"));
         Assert.True(result.Score.CountsTowardAggregate());
         Assert.True(result.Score.Passed);
     }

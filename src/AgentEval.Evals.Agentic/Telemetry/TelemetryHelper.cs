@@ -9,6 +9,18 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// </summary>
 internal static class TelemetryHelper
 {
+    /// <summary>Returns a finite, non-negative reading, or null when absent or invalid.</summary>
+    internal static double? Reading(double? value) =>
+        value is { } number && double.IsFinite(number) && number >= 0 ? number : null;
+
+    /// <summary>Reports malformed telemetry as an error without a measurement.</summary>
+    internal static EvalResult InvalidReading(IEval eval, double passThreshold, string reason) => new(
+        Metric: new(eval.Key, eval.Name, eval.Category, eval.Version),
+        Score: new(0, null, "error", false, passThreshold, "none", null),
+        Details: new(null, null, [reason], null, null) { Summary = reason },
+        Provenance: new("atomic-code", null, null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
     /// <summary>
     /// Resolves <see cref="AgenticTelemetry"/> from input metadata (takes precedence) or from
     /// the constructor-supplied fallback. Returns <c>null</c> if neither is available.
