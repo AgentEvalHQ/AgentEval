@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Breaking:** `EvaluationResult.OverallScore` is nullable and always null on evaluator failure; removed `EvaluationDefaults.DefaultFailureScore`. Judge consumers reject missing scores rather than voting or passing on a fallback grade.
+
+
 Everything below ships as **1.0.0-rc.1**, the release candidate for AgentEval 1.0: a prerelease for
 feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, with its date, on release.
 

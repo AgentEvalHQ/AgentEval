@@ -115,7 +115,7 @@ public static class RunClassifier
         ArgumentNullException.ThrowIfNull(test);
         ArgumentNullException.ThrowIfNull(judge);
         var structural = StructuralFailures(test);
-        if (judge.EvaluationFailed)
+        if (judge.EvaluationFailed || judge.OverallScore is not { } score)
         {
             return structural.Count == 0
                 ? RunOutcome.NotMeasured(run, "the judge produced no verdict")
@@ -124,9 +124,9 @@ public static class RunClassifier
                     StructureFailed: true);
         }
 
-        bool qualityPassed = judge.OverallScore >= passingScore;
+        bool qualityPassed = score >= passingScore;
         bool passed = structural.Count == 0 && qualityPassed;
-        return new RunOutcome(run, judge.OverallScore, passed,
+        return new RunOutcome(run, score, passed,
             FailureReason: passed ? null
                 : Reasons(structural, qualityPassed ? null : $"score {judge.OverallScore} < {passingScore}"),
             StructureFailed: structural.Count > 0);

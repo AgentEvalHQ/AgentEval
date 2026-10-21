@@ -98,7 +98,7 @@ public class CalibratedEvaluator : IEvaluator
         CancellationToken cancellationToken = default)
     {
         var criteriaList = criteria.ToList();
-        var results = new List<(string Name, EvaluationResult Result)>();
+        var results = new List<(string Name, EvaluationResult Result, int Score)>();
         var errors = new List<(string Name, Exception Error)>();
 
         // Run all evaluators in parallel with concurrency limit
@@ -144,19 +144,11 @@ public class CalibratedEvaluator : IEvaluator
 
         foreach (var tr in taskResults)
         {
-            // Regression fix: a judge whose response couldn't be parsed doesn't throw — ChatClientEvaluator
-            // returns a fallback EvaluationResult (OverallScore = DefaultFailureScore, EvaluationFailed = true)
-            // that this loop previously routed into `results` indistinguishably from a real judge verdict. That
-            // fabricated score then got voted into CalculateFinalScore/AggregateCriteriaResults and counted
-            // toward MinimumJudgesRequired — exactly the gap ChatClientEvaluator's own comment already warns
-            // about ("a failed judge silently returns an EvaluationFailed fallback score that callers like
-            // CalibratedEvaluator cannot tell apart from a real low score"). Route it into `errors` instead,
-            // the same bucket a thrown exception uses — a judge that couldn't produce a verdict is a judge
-            // failure, not a low-confidence real vote.
-            if (tr.Result is { EvaluationFailed: true })
+            // Only usable verdicts count toward the quorum and vote.
+            if (tr.Result is { EvaluationFailed: true } or { OverallScore: null })
                 errors.Add((tr.Name, new InvalidOperationException($"Judge '{tr.Name}' did not return a parseable verdict.")));
-            else if (tr.Result != null)
-                results.Add((tr.Name, tr.Result));
+            else if (tr.Result is { OverallScore: { } score })
+                results.Add((tr.Name, tr.Result, score));
             else if (tr.Error != null)
                 errors.Add((tr.Name, tr.Error));
         }
@@ -175,11 +167,11 @@ public class CalibratedEvaluator : IEvaluator
     }
 
     private EvaluationResult AggregateResults(
-        List<(string Name, EvaluationResult Result)> results,
+        List<(string Name, EvaluationResult Result, int Score)> results,
         List<string> criteriaList)
     {
-        var scores = results.Select(r => (double)r.Result.OverallScore).ToList();
-        var judgeScoreMap = results.ToDictionary(r => r.Name, r => (double)r.Result.OverallScore);
+        var scores = results.Select(r => (double)r.Score).ToList();
+        var judgeScoreMap = results.ToDictionary(r => r.Name, r => (double)r.Score);
 
         // Aggregate overall score via voting strategy
         var finalScore = CalculateFinalScore(scores, judgeScoreMap);
@@ -213,7 +205,7 @@ public class CalibratedEvaluator : IEvaluator
     }
 
     private List<CriterionResult> AggregateCriteriaResults(
-        List<(string Name, EvaluationResult Result)> results,
+        List<(string Name, EvaluationResult Result, int Score)> results,
         List<string> criteriaList)
     {
         var aggregated = new List<CriterionResult>();

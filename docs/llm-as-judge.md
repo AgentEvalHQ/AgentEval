@@ -173,7 +173,7 @@ public interface IEvaluator
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `OverallScore` | `int` | Score 0-100 |
+| `OverallScore` | `int?` | Score 0-100; null when absent or evaluation failed |
 | `Summary` | `string` | Evaluator's summary |
 | `Improvements` | `IReadOnlyList<string>` | Suggested improvements |
 | `CriteriaResults` | `IReadOnlyList<CriterionResult>` | Per-criterion `Met` + `Explanation` |
@@ -184,7 +184,7 @@ public interface IEvaluator
 - Criteria formatting as a numbered list
 - JSON parsing that skips `<think>` blocks and tries every fenced block, then every JSON object in the reply (trailing commas and comments allowed); a score off 0-100 is out of contract and never clamped, and verdicts with different scores are refused, not guessed
 - One corrective retry that shows the judge the reply it could not parse
-- Graceful failure: when the retry fails too, `EvaluationFailed = true` with the placeholder `EvaluationDefaults.DefaultFailureScore` (currently 50), which is not a measurement
+- Graceful failure: when the retry fails too, `EvaluationFailed = true` with `OverallScore = null`; no fallback grade is assigned
 
 ```csharp
 // Create directly
@@ -225,7 +225,7 @@ The expected JSON response schema:
 In `MAFEvaluationHarness.RunEvaluationAsync()`:
 
 1. The harness calls `_evaluator.EvaluateAsync(input, output, criteria)`
-2. `result.Passed = evaluation.OverallScore >= testCase.PassingScore` (default: 70)
+2. A failed evaluation or missing score sets `JudgeFailed = true` and cannot pass. Otherwise the measured score is compared with `testCase.PassingScore` (default: 70)
 3. Each `CriterionResult.Met` is stored on the `TestResult` for inspection
 4. `EvaluateResponse = true` must be set in `EvaluationOptions`
 

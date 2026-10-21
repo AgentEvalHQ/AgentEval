@@ -101,7 +101,7 @@ public static class CalibratedEvaluatorDemo
     {
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("   ┌──────────────────────────────────────────────────┐");
-        Console.WriteLine($"   │  Calibrated Score: {result.OverallScore,3}/100                        │");
+        Console.WriteLine($"   │  Calibrated Score: {result.OverallScore?.ToString() ?? "n/a",3}/100                        │");
         Console.WriteLine("   └──────────────────────────────────────────────────┘");
         Console.ResetColor();
 

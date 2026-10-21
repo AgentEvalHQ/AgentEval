@@ -316,19 +316,6 @@ public sealed class AtomicLlmEval : AtomicEval
             tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
         }
 
-        var value = Math.Clamp(er.OverallScore / 100.0, 0.0, 1.0);
-        var passed = value >= _passThreshold;
-        // Compute severity from score; then take the maximum with failureSeverity (if set)
-        // so that critical/high article metadata severity is surfaced without downgrading
-        // score-derived severity for lower-severity articles.
-        var scoreSeverity = value < 0.40 ? "high" : "medium";
-        var severity = passed
-            ? "none"
-            : (_failureSeverity is null
-                ? scoreSeverity
-                : SeverityRollup.Max([scoreSeverity, _failureSeverity]));
-        var label = passed ? "pass" : "fail";
-
         var dimensions = er.CriteriaResults?
             .GroupBy(c => c.Criterion)
             .ToDictionary(g => g.Key, g => g.Last().Met ? 1.0 : 0.0)
@@ -340,42 +327,12 @@ public sealed class AtomicLlmEval : AtomicEval
             .ToList()
             ?? new List<EvalEvidence>();
 
-        // A rubric verdict (B9): the band of the exact score. The rubric's needs-review band is a warn — not passed, not
-        // a confirmed failure; its severity table, where it has one, sets the severity.
-        if (er.RubricScore is { } rubricScore && !er.EvaluationFailed)
-        {
-            value = rubricScore;
-            passed = value >= _passThreshold;
-            var review = !passed && _rubric?.ReviewAt is { } reviewAt && value >= reviewAt;
-            label = passed ? "pass" : review ? "warn" : "fail";
-            severity = passed
-                ? "none"
-                : er.RubricSeverity ?? (review ? (_failureSeverity == "low" ? "low" : "medium") : severity);
-
-            foreach (var e in er.Evidence)
-                evidence.Add(new EvalEvidence(Source: string.IsNullOrWhiteSpace(e.Source) ? "judge" : "judge:" + e.Source,
-                    Reference: e.Reference, Message: e.Message));
-
-            // The judge's own label is evidence, not the verdict: a label that disagrees with its own score is recorded.
-            var judgeBand = er.JudgeLabel?.Trim().ToLowerInvariant() switch
-            {
-                "pass" => "pass",
-                "fail" => "fail",
-                "warn" or "needs_review" or "needs review" or "review" => "warn",
-                _ => null,
-            };
-            if (er.JudgeLabel is not null && judgeBand != label)
-                evidence.Add(new EvalEvidence(Source: "judge-label", Reference: Key,
-                    Message: $"The judge labelled this '{er.JudgeLabel}', but its score {value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} " +
-                             $"is in the rubric's {label} band; the score decides."));
-        }
-
-        // An evaluation that failed to produce a usable judgement (no/malformed JSON from the
-        // judge) is an INFRASTRUCTURE error, not a low-scoring agent. Surface it as a distinct
-        // "error" label with severity "none" so it is visibly separable from a real low score and
-        // does not masquerade as a confirmed (e.g. critical) violation in roll-ups. It still counts
-        // as not-passed (value 0) — an un-evaluated control cannot be attested as compliant.
-        if (er.EvaluationFailed)
+        double value;
+        bool passed;
+        string severity;
+        string label;
+        // A missing verdict blocks attestation and carries diagnostic evidence, not a grade.
+        if (er.EvaluationFailed || er.OverallScore is not { } overall)
         {
             value = 0.0;
             passed = false;
@@ -391,6 +348,51 @@ public sealed class AtomicLlmEval : AtomicEval
                         : er.Summary),
             };
             dimensions = new Dictionary<string, double>();
+        }
+        else
+        {
+            value = Math.Clamp(overall / 100.0, 0.0, 1.0);
+            passed = value >= _passThreshold;
+            // Compute severity from score; then take the maximum with failureSeverity (if set)
+            // so that critical/high article metadata severity is surfaced without downgrading
+            // score-derived severity for lower-severity articles.
+            var scoreSeverity = value < 0.40 ? "high" : "medium";
+            severity = passed
+                ? "none"
+                : (_failureSeverity is null
+                    ? scoreSeverity
+                    : SeverityRollup.Max([scoreSeverity, _failureSeverity]));
+            label = passed ? "pass" : "fail";
+
+            // A rubric verdict (B9): the band of the exact score. The rubric's needs-review band is a warn — not passed, not
+            // a confirmed failure; its severity table, where it has one, sets the severity.
+            if (er.RubricScore is { } rubricScore)
+            {
+                value = rubricScore;
+                passed = value >= _passThreshold;
+                var review = !passed && _rubric?.ReviewAt is { } reviewAt && value >= reviewAt;
+                label = passed ? "pass" : review ? "warn" : "fail";
+                severity = passed
+                    ? "none"
+                    : er.RubricSeverity ?? (review ? (_failureSeverity == "low" ? "low" : "medium") : severity);
+
+                foreach (var e in er.Evidence)
+                    evidence.Add(new EvalEvidence(Source: string.IsNullOrWhiteSpace(e.Source) ? "judge" : "judge:" + e.Source,
+                        Reference: e.Reference, Message: e.Message));
+
+                // The judge's own label is evidence, not the verdict: a label that disagrees with its own score is recorded.
+                var judgeBand = er.JudgeLabel?.Trim().ToLowerInvariant() switch
+                {
+                    "pass" => "pass",
+                    "fail" => "fail",
+                    "warn" or "needs_review" or "needs review" or "review" => "warn",
+                    _ => null,
+                };
+                if (er.JudgeLabel is not null && judgeBand != label)
+                    evidence.Add(new EvalEvidence(Source: "judge-label", Reference: Key,
+                        Message: $"The judge labelled this '{er.JudgeLabel}', but its score {value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} " +
+                                 $"is in the rubric's {label} band; the score decides."));
+            }
         }
 
         return new EvalResult(

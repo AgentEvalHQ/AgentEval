@@ -530,7 +530,8 @@ public class GoldenReachabilityTests
 
             var er = await judge.EvaluateAsync(input.Query, handedToTheJudge, [], ct);
 
-            var value = Math.Clamp(er.OverallScore / 100.0, 0.0, 1.0);
+            Assert.NotNull(er.OverallScore);
+            var value = Math.Clamp(er.OverallScore.Value / 100.0, 0.0, 1.0);
             bool passed = value >= 0.70;
 
             return new EvalResult(

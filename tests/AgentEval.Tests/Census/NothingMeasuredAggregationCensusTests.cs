@@ -175,7 +175,7 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Comparison.ModelRanking"] = "DTO of ModelComparer (row B-3): only measured models are ranked",
         ["AgentEval.Comparison.StochasticStatistics"] = "non-empty statistics: positive SampleSize is enforced; no measured run means null statistics (row B-2, T86a)",
         ["AgentEval.Comparison.ToolUsageSummary"] = "DTO of StochasticResult.GetToolUsageSummary; T71 makes its rates null when no run tracked tools",
-        ["AgentEval.Core.EvaluationResult"] = "placeholder plus flag: an evaluator's OverallScore with EvaluationFailed set is no reading",
+        ["AgentEval.Core.EvaluationResult"] = "nullable judge score: absent or failed verdicts have no OverallScore (EvaluationResultNoScoreTests)",
         ["AgentEval.Evals.EvalDetails"] = "data: carries a result's sub-results and computes nothing",
         ["AgentEval.Evals.Meta.FloorComparison"] = "statistical test: with no measured trial its p-value and interval say 'no evidence'; Census counts the excluded",
         ["AgentEval.Evals.Meta.ObservationCensus"] = "count: a zero is a true zero",

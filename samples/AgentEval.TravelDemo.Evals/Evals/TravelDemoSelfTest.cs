@@ -411,6 +411,8 @@ public static class TravelDemoSelfTest
         var structureFails = RunClassifier.AfterJudging(1, Test(orderOk: false), Judge(100), 60);
         Check("structure failed + score 100 → FAILED, not ✅", structureFails.Measured && !structureFails.Passed && structureFails.StructureFailed,
               structureFails.ToString());
+        var absentScore = RunClassifier.AfterJudging(1, Test(orderOk: true), new EvaluationResult(), 0);
+        Check("unset judge score is not measured at a zero threshold", !absentScore.Measured && !absentScore.Passed);
         var bothPass = RunClassifier.AfterJudging(1, Test(orderOk: true), Judge(85), 60);
         Check("structure passed + score 85 → passed", bothPass.Measured && bothPass.Passed && bothPass.Score == 85);
         var lowScore = RunClassifier.AfterJudging(1, Test(orderOk: true), Judge(40), 60);
@@ -550,6 +552,13 @@ public static class TravelDemoSelfTest
     private static void SnapshotsRecordTheChecks()
     {
         var execution = new WorkflowExecutionResult { FinalOutput = "itinerary", Steps = [] };
+        bool refusedMissingScore = false;
+        try
+        {
+            Eval02_TripPlannerEvals.BuildSnapshot(execution, new EvaluationResult(), true, true, "offline", "m");
+        }
+        catch (ArgumentException) { refusedMissingScore = true; }
+        Check("snapshot refuses an unset judge score", refusedMissingScore);
         var judge95   = new EvaluationResult { OverallScore = 95, CriteriaResults = [] };
         var workflow  = Eval02_TripPlannerEvals.BuildSnapshot(execution, judge95, structurePassed: false, qualityPassed: true, "bitdeer", "m");
         var roundTrip = System.Text.Json.JsonSerializer.Deserialize<EvalSnapshot>(System.Text.Json.JsonSerializer.Serialize(workflow));

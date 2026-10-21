@@ -696,34 +696,27 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     /// <b>a judge that failed to produce a verdict never passes.</b>
     /// </summary>
     /// <remarks>
-    /// ADR-030 Slice 0.2 (defect D-b). <c>ChatClientEvaluator</c> returns
-    /// <c>OverallScore = EvaluationDefaults.DefaultFailureScore</c> (50) with
-    /// <see cref="EvaluationResult.EvaluationFailed"/> set when the judge returned no JSON, malformed JSON or
-    /// no recognisable score field. That 50 is a sentinel, documented as "should not be read as a real grade"
-    /// — but this harness compared it against <see cref="TestCase.PassingScore"/> and never read the flag, so
-    /// every test case with <c>PassingScore &lt;= 50</c> passed on a judge parse failure. Non-optional and
-    /// without opt-out: the sentinel is discarded (score 0, the same shape the harness already uses for an
-    /// agent exception), <c>Passed</c> is false, and the failure report names the judge as the cause so it is
-    /// distinguishable from a genuinely low-scoring agent.
+    /// Missing or failed verdicts cannot pass, including at a zero passing threshold.
+    /// The legacy TestResult score is unmeasured when JudgeFailed is set.
     /// </remarks>
     private static void ApplyJudgeVerdict(TestResult result, TestCase testCase, EvaluationResult evaluation)
     {
-        if (evaluation.EvaluationFailed)
+        if (evaluation.EvaluationFailed || evaluation.OverallScore is not { } score)
         {
             result.JudgeFailed = true;
             result.Score = 0;
             result.Passed = false;
             result.Details = "The judge produced no verdict (evaluation failed): " +
                              (string.IsNullOrWhiteSpace(evaluation.Summary) ? "no parseable judgement was returned" : evaluation.Summary) +
-                             ". This is an evaluation-infrastructure failure, not a grade — the fallback score was discarded.";
+                             ". This is an evaluation-infrastructure failure, not a grade — no score was measured.";
             result.Suggestions = evaluation.Improvements.ToList();
             result.CriteriaResults = evaluation.CriteriaResults.ToList();
             return;
         }
 
         result.JudgeRubricDigest = evaluation.RubricDigest;
-        result.Score = evaluation.OverallScore;
-        result.Passed = evaluation.OverallScore >= testCase.PassingScore;
+        result.Score = score;
+        result.Passed = score >= testCase.PassingScore;
         result.Details = evaluation.Summary;
         result.Suggestions = evaluation.Improvements.ToList();
         result.CriteriaResults = evaluation.CriteriaResults.ToList();
@@ -732,7 +725,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     private static FailureReport BuildFailureReport(TestResult result, TestCase testCase, ToolCallTimeline timeline, EvaluationResult? evaluation = null)
     {
         // Determine the primary failure reason for the headline
-        var judgeFailed = evaluation?.EvaluationFailed == true;
+        var judgeFailed = result.JudgeFailed;
         var headline = judgeFailed
             ? $"Test '{testCase.Name}' could not be graded: the judge produced no verdict"
             : result.Score < testCase.PassingScore
@@ -754,7 +747,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             report.AddReason("Judge",
                 "The evaluator failed to produce a usable judgement (no JSON, malformed JSON, or no score field): " +
                 (string.IsNullOrWhiteSpace(evaluation!.Summary) ? "no details" : evaluation.Summary) +
-                ". The fallback score was discarded; re-run the evaluation or inspect the judge model / prompt.",
+                ". No score was measured; re-run the evaluation or inspect the judge model / prompt.",
                 FailureSeverity.Critical);
             report.AddSuggestion("Check Judge", "Inspect the judge model's raw response and the evaluation prompt; the agent was not graded.", 0.9);
         }

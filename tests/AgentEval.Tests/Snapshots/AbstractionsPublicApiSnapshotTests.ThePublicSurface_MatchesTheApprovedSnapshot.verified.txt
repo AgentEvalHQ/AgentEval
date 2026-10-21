@@ -403,7 +403,6 @@ static class AgentEval.Core.EvaluationDefaults
     const Double ExtraToolPenaltyPercent
     const Double OrderPenaltyPercent
     const Double PassingScoreThreshold
-    const Int32 DefaultFailureScore
     const Int32 DefaultMaxExpectedToolCalls
     const Int32 DefaultPassingScore
     static TimeSpan DefaultMaxToolDuration
@@ -423,7 +422,7 @@ class AgentEval.Core.EvaluationResult
     IReadOnlyList<AgentEval.Core.CriterionResult> CriteriaResults { get; init; }
     IReadOnlyList<AgentEval.Core.JudgeEvidence> Evidence { get; init; }
     IReadOnlyList<String> Improvements { get; init; }
-    Int32 OverallScore { get; init; }
+    Int32? OverallScore { get; init; }
     Int64? InputTokenCount { get; init; }
     Int64? OutputTokenCount { get; init; }
     String JudgeLabel { get; init; }

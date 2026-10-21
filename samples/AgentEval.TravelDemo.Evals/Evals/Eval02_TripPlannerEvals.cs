@@ -250,9 +250,9 @@ public static class Eval02_TripPlannerEvals
                 output:   execResult.FinalOutput,
                 criteria: TravelEvalCriteria.Eval02);
 
-            if (evalResult.EvaluationFailed)
+            if (evalResult.EvaluationFailed || evalResult.OverallScore is not { } overallScore)
             {
-                // The judge answered nothing usable: its score is a sentinel, not a grade.
+                // The judge answered nothing usable: no score was measured.
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("  ⚠️  LLM Quality Gate NOT MEASURED — the judge produced no verdict (no snapshot).");
                 Console.ResetColor();
@@ -261,14 +261,14 @@ public static class Eval02_TripPlannerEvals
             }
 
             EvalPrinter.PrintLlmJudge(
-                evalResult.OverallScore,
+                overallScore,
                 evalResult.CriteriaResults,
                 evalResult.Improvements,
                 label: "Eval 02 — LLM Quality Gate (10 criteria)");
 
             // ── Quality gate verdict ─────────────────────────────────────────────
             const int passingScore = 75;
-            bool qualityPassed = evalResult.OverallScore >= passingScore;
+            bool qualityPassed = overallScore >= passingScore;
             qualityGatePassed = qualityPassed;
             Console.ForegroundColor = qualityPassed ? ConsoleColor.Green : ConsoleColor.Red;
             Console.WriteLine(qualityPassed
@@ -311,6 +311,8 @@ public static class Eval02_TripPlannerEvals
     internal static EvalSnapshot BuildSnapshot(WorkflowExecutionResult execResult, EvaluationResult evalResult, bool structurePassed,
                                                bool qualityPassed, string? providerTag, string? model)
     {
+        if (evalResult.EvaluationFailed || evalResult.OverallScore is not { } overallScore)
+            throw new ArgumentException("A snapshot requires a measured judge score.", nameof(evalResult));
         int criteriaTotal    = evalResult.CriteriaResults?.Count ?? 0;
         int criteriaMetCount = evalResult.CriteriaResults?.Count(c => c.Met) ?? 0;
         return new EvalSnapshot
@@ -319,7 +321,7 @@ public static class Eval02_TripPlannerEvals
             Label            = "Eval 02 — TripPlanner Workflow",
             ProviderTag      = providerTag,   // provenance: recorded even when the console hides it
             Model            = model,
-            LlmScore         = evalResult.OverallScore,
+            LlmScore         = overallScore,
             CriteriaScore    = criteriaTotal > 0 ? criteriaMetCount * 100 / criteriaTotal : 0,
             CriteriaMetCount = criteriaMetCount,
             CriteriaTotal    = criteriaTotal,

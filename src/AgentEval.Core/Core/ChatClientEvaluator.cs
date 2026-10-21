@@ -353,13 +353,13 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
                 }
                 else if (!candidateScore.Equals(score))
                 {
-                    return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - the reply holds verdicts with different scores", EvaluationFailed = true };
+                    return new EvaluationResult { Summary = "Failed to parse evaluation - the reply holds verdicts with different scores", EvaluationFailed = true };
                 }
             }
 
             if (props is null)
             {
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = sawObject ? "Failed to parse evaluation - no score field" : "Failed to parse evaluation - no JSON found", EvaluationFailed = true };
+                return new EvaluationResult { Summary = sawObject ? "Failed to parse evaluation - no score field" : "Failed to parse evaluation - no JSON found", EvaluationFailed = true };
             }
 
             // A rubric states its scale. A score off it is out of contract — an error, never a grade: before B9 every
@@ -369,13 +369,13 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
             if (rubric is not null)
             {
                 if (!TryReadOnScale(score, rubric.Scale, out var unit, out var why))
-                    return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = $"Out of contract: {why}", EvaluationFailed = true };
+                    return new EvaluationResult { Summary = $"Out of contract: {why}", EvaluationFailed = true };
                 rubricScore = unit;
                 score = unit * 100.0;
             }
             else if (!double.IsFinite(score) || score < 0 || score > 100)
             {
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = $"Out of contract: the score {score.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off 0-100", EvaluationFailed = true };
+                return new EvaluationResult { Summary = $"Out of contract: the score {score.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off 0-100", EvaluationFailed = true };
             }
 
             var criteria = new List<CriterionResult>();
@@ -439,7 +439,6 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
             // Return failure score when evaluation parsing fails to indicate evaluation system error
             return new EvaluationResult
             {
-                OverallScore = EvaluationDefaults.DefaultFailureScore,
                 Summary = "Failed to parse evaluation result",
                 EvaluationFailed = true
             };

@@ -10,16 +10,10 @@ namespace AgentEval.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is a judge contract, not a general scoring contract. Its result type has three members whose
-/// documented meaning only a judge can satisfy: <see cref="EvaluationResult.EvaluationFailed"/> ("the
-/// judge returned no JSON, malformed JSON, or no recognisable score field"),
-/// <see cref="EvaluationResult.InputTokenCount"/> / <see cref="EvaluationResult.OutputTokenCount"/>
-/// ("<c>null</c> when the evaluator did not invoke a chat model"), and an
-/// <see cref="EvaluationResult.OverallScore"/> that on failure "carries the conventional failure-score
-/// fallback but should not be read as a real grade". A deterministic implementation can never truthfully
-/// enter the first state, is indistinguishable from a judge whose provider dropped usage reporting in the
-/// second, and has no sentinel to emit for the third — so <b>deterministic scoring does not belong here</b>.
-/// It belongs on <c>AgentEval.Evals.IEval</c> (typically via <c>AtomicCodeEval</c>).
+/// This is a judge contract, not a general scoring contract. Failure to produce a usable verdict is
+/// recorded in <see cref="EvaluationResult.EvaluationFailed"/> with no <see cref="EvaluationResult.OverallScore"/>.
+/// Token counts describe the model call when the provider reports them. Deterministic scoring belongs on
+/// <c>AgentEval.Evals.IEval</c> (typically via <c>AtomicCodeEval</c>).
 /// </para>
 /// <para>
 /// The sanctioned bridge from this transport into the unified eval tree is <c>AgentEval.Evals.AtomicLlmEval</c>,
@@ -49,13 +43,21 @@ public interface IEvaluator
 
 /// <summary>
 /// Result of an LLM-judge evaluation (the <see cref="IEvaluator"/> transport). Read
-/// <see cref="EvaluationFailed"/> before <see cref="OverallScore"/>: when it is set the score is a
-/// sentinel, not a grade.
+/// <see cref="EvaluationFailed"/> before <see cref="OverallScore"/>: when it is set the score is
+/// absent. An unset score is also absent.
 /// </summary>
 public class EvaluationResult
 {
-    /// <summary>Overall score from 0 to 100.</summary>
-    public int OverallScore { get; init; }
+    private readonly int? _overallScore;
+
+    /// <summary>Overall score from 0 to 100, or null when absent or the evaluation failed.</summary>
+    /// <remarks>A failure flag suppresses any legacy placeholder supplied by a producer.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public int? OverallScore
+    {
+        get => EvaluationFailed ? null : _overallScore;
+        init => _overallScore = value;
+    }
 
     /// <summary>Summary of the evaluation.</summary>
     public string Summary { get; init; } = "";
@@ -71,8 +73,7 @@ public class EvaluationResult
     /// returned no JSON, malformed JSON, or no recognisable score field. This is an INFRASTRUCTURE
     /// failure, not a low-scoring agent: consumers must distinguish "the eval errored" from "the
     /// agent genuinely scored low" rather than treating the fallback score as a real verdict.
-    /// When set, <see cref="OverallScore"/> carries the conventional failure-score fallback but
-    /// should not be read as a real grade.
+    /// When set, <see cref="OverallScore"/> is null even if a producer supplied a numeric placeholder.
     /// </summary>
     public bool EvaluationFailed { get; init; }
 
