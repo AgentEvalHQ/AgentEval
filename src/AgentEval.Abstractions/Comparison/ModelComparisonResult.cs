@@ -191,8 +191,10 @@ public record ModelComparisonResult(
 /// tracked, or, with the non-streaming harness, no run returned). Not measured is not zero (see
 /// <see cref="ModelComparisonResult.SpeedNotMeasuredReason"/>).
 /// </param>
-/// <param name="AverageCost">Average cost per run (if available).</param>
-/// <param name="TotalCost">Total cost across all runs (if available).</param>
+/// <param name="AverageCost">Mean estimated cost over the priced runs (<see cref="PricedRunCount"/>), or null when
+/// none was priced or cost analysis is disabled. Runs without prices are excluded, never treated as free.</param>
+/// <param name="TotalCost">Complete estimated cost across every run, or null when any run is unpriced or cost analysis
+/// is disabled. See <see cref="TotalCostNotPricedReason"/>. A recorded zero remains zero.</param>
 public record ModelResult(
     string ModelId,
     string ModelName,
@@ -201,6 +203,36 @@ public record ModelResult(
     decimal? AverageCost,
     decimal? TotalCost)
 {
+    /// <summary>Number of runs carrying an estimated cost, including a recorded zero.</summary>
+    public int PricedRunCount => StochasticResult.IndividualResults.Count(r => r.Performance?.EstimatedCost is not null);
+
+    /// <summary>Why the complete total is absent, or null when <see cref="TotalCost"/> is available.</summary>
+    public string? TotalCostNotPricedReason
+    {
+        get
+        {
+            if (TotalCost.HasValue) return null;
+            var runs = StochasticResult.IndividualResults;
+            if (runs.Count == 0) return "No run, so nothing was priced.";
+            var priced = PricedRunCount;
+            if (priced == runs.Count || (priced > 0 && AverageCost is null))
+                return "No total was computed: cost analysis is off (ModelComparisonOptions.EnableCostAnalysis = false).";
+
+            var unpriced = runs.Where(r => r.Performance?.EstimatedCost is null).ToList();
+            var causes = new List<string>();
+            var threw = unpriced.Count(r => r.Error is not null);
+            var untracked = unpriced.Count(r => r.Error is null && r.Performance is null);
+            var noPrice = unpriced.Count - threw - untracked;
+            if (threw > 0) causes.Add($"{threw} threw");
+            if (untracked > 0) causes.Add($"{untracked} had no performance data");
+            if (noPrice > 0) causes.Add($"{noPrice} had no price");
+            var detail = string.Join("; ", causes);
+            return priced == 0
+                ? $"None of the {runs.Count} runs was priced ({detail})."
+                : $"{unpriced.Count} of {runs.Count} runs were not priced ({detail}); the priced runs alone are not the total.";
+        }
+    }
+
     /// <summary>
     /// Pass rate for this model over every run, measured or not: a run that errored or got no verdict from the judge did
     /// not pass, and the model is less reliable for it (decision D-15). <see cref="StochasticResult.Statistics"/>'s

@@ -144,8 +144,9 @@ public record ModelResult(
     string ModelName,
     StochasticResult StochasticResult,         // every run, and their statistics
     TimeSpan? AverageLatency,                  // null when no run returned (none recorded a latency)
-    decimal? AverageCost,                      // null when no run carried a cost estimate
-    decimal? TotalCost);                       // plus PassRate, MeanScore?, StandardDeviation? (null when no run was measured)
+    decimal? AverageCost,                      // mean over PricedRunCount; null when none was priced
+    decimal? TotalCost);                       // complete or absent; TotalCostNotPricedReason explains null
+// Also: PricedRunCount, PassRate, MeanScore?, StandardDeviation? (null when no run was measured)
 
 public record ModelRanking(
     string ModelId,
@@ -186,6 +187,8 @@ Console.WriteLine($"Winner: {result.Winner.ModelName}");
 ---
 
 ## How the Scores Are Computed
+
+A total cost is available only when every run carries a price. Missing prices or crashed runs leave `TotalCost` null, with `TotalCostNotPricedReason` explaining why. `AverageCost` remains the mean over `PricedRunCount` priced runs; the detailed table labels that sample size when it is partial. A recorded zero cost remains zero.
 
 1. Each model runs `RunsPerModel` times through the stochastic runner. `ModelResult.StochasticResult` keeps every run (`IndividualResults`) and their statistics.
 2. Each model gets four raw numbers: mean score over its measured runs (quality), average latency (speed), average estimated cost per run (cost) and pass rate over every run (reliability, `ModelResult.PassRate`). A run that errored or got no verdict from the judge is not measured: it is not a sample of quality, and it did not pass, so it counts against reliability. A model none of whose runs was measured is not ranked: it stays in `ModelResults`, `UnrankedReason` names it, and when no model was measured the comparison throws `InvalidOperationException`.

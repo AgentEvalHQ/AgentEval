@@ -230,14 +230,24 @@ public static class ModelComparisonExtensions
                 ? $"{meanScore:F1}"
                 : "n/a";
             var latencyFormatted = modelResult.AverageLatency is { } latency ? FormatDuration(latency) : "N/A";
-            var avgCostFormatted = modelResult.AverageCost.HasValue 
-                ? $"${modelResult.AverageCost:F4}" 
+            var avgCostFormatted = modelResult.AverageCost.HasValue
+                ? string.Format(CultureInfo.InvariantCulture, "${0:F4}", modelResult.AverageCost)
                 : "N/A";
-            var totalCostFormatted = modelResult.TotalCost.HasValue 
-                ? $"${modelResult.TotalCost:F4}" 
-                : "N/A";
+            var runs = modelResult.StochasticResult.IndividualResults.Count;
+            var priced = modelResult.PricedRunCount;
+            if (modelResult.AverageCost.HasValue && priced < runs)
+                avgCostFormatted += $" ({priced} of {runs} runs priced)";
+            var totalCostFormatted = modelResult.TotalCost.HasValue
+                ? string.Format(CultureInfo.InvariantCulture, "${0:F4}", modelResult.TotalCost)
+                : priced > 0 && priced < runs ? $"not priced ({runs - priced} of {runs} runs unpriced)" : "N/A";
 
             sb.AppendLine($"| {modelResult.ModelName} | {passRateFormatted} | {meanScoreFormatted} | {latencyFormatted} | {avgCostFormatted} | {totalCostFormatted} |");
+        }
+
+        foreach (var model in result.ModelResults)
+        {
+            if (model.TotalCostNotPricedReason is { } reason)
+                sb.AppendLine($"Total cost not priced for {model.ModelName}: {reason}");
         }
 
         return sb.ToString();

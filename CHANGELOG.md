@@ -14,6 +14,10 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   with distinct `cal-tad-*` IDs. Offline tests verify both verdict directions and delivery to every rule
   judge. Published calibration figures remain historical and have not been re-measured.
 
+- Model comparison totals are complete or absent: `ModelResult.TotalCost` is null if any run is unpriced.
+  `PricedRunCount` and `TotalCostNotPricedReason` explain coverage; the average remains over priced runs,
+  and reports identify a partial sample instead of presenting its subtotal as the full cost.
+
 - **What 1.0 promises** (README, "Feature Maturity"): semantic versioning for the public API of the
   `AgentEval` library and for the CLI's documented commands, options and exit codes, except types marked
   `[Experimental]` and the fronts labelled Beta or Experimental. Core evaluation and red team are Stable at

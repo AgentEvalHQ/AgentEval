@@ -159,7 +159,7 @@ public class ModelComparer : IModelComparer
         var total = costs.Sum();
         var avg = total / costs.Count;
         
-        return (avg, total);
+        return (avg, costs.Count == result.IndividualResults.Count ? total : null);
     }
     
     private static List<ModelRanking> CalculateRankings(

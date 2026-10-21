@@ -178,9 +178,11 @@ class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelRe
     Double? MeanScore { get; }
     Double? StandardDeviation { get; }
     Int32 GetHashCode()
+    Int32 PricedRunCount { get; }
     String ModelId { get; init; }
     String ModelName { get; init; }
     String ToString()
+    String TotalCostNotPricedReason { get; }
     TimeSpan? AverageLatency { get; init; }
     Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan? AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
     ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan? AverageLatency, Decimal? AverageCost, Decimal? TotalCost)

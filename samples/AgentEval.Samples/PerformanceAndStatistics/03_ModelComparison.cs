@@ -188,9 +188,16 @@ public static class ModelComparison
         foreach (var modelResult in result.ModelResults.OrderBy(m => m.AverageCost ?? decimal.MaxValue))
         {
             var avgCost = modelResult.AverageCost.HasValue ? $"${modelResult.AverageCost:F4}" : "N/A";
-            var totalCost = modelResult.TotalCost.HasValue ? $"${modelResult.TotalCost:F4}" : "N/A";
+            var totalCost = modelResult.TotalCost.HasValue ? $"${modelResult.TotalCost:F4}" : "not priced";
             var latency = modelResult.AverageLatency is { } l ? $"{l.TotalMilliseconds:F0}ms" : "N/A";
             Console.WriteLine($"   {modelResult.ModelName.PadRight(nameWidth)} │ {avgCost,13} │ {totalCost,10} │ {modelResult.PassRate,9:P0} │ {latency,10}");
+        }
+        foreach (var model in result.ModelResults)
+        {
+            if (model.TotalCostNotPricedReason is { } reason)
+                Console.WriteLine($"   {model.ModelName}: {reason}");
+            if (model.AverageCost.HasValue && model.PricedRunCount < model.StochasticResult.IndividualResults.Count)
+                Console.WriteLine($"   Average cost covers {model.PricedRunCount} of {model.StochasticResult.IndividualResults.Count} priced runs.");
         }
         Console.WriteLine();
 
