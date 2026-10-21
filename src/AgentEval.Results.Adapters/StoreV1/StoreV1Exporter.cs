@@ -460,8 +460,8 @@ public static class StoreV1Exporter
             Lane = lane,
             Severity = severity,
             DurationMs = scenario.Duration is { } duration && duration >= TimeSpan.Zero ? duration.TotalMilliseconds : null,
-            // A cost not priced (null) writes no usage: absent, never a $0 the run did not report.
-            Usage = scenario.EstimatedCost is double cost && cost > 0 && double.IsFinite(cost)
+            // Preserve recorded zero; only absent or invalid costs omit usage.
+            Usage = scenario.EstimatedCost is double cost && cost >= 0 && double.IsFinite(cost)
                 ? [new AefUsage { Role = AefUsageRole.Other, CostUsd = cost, CostSource = "AgentEval store v1 estimate (ScenarioResult.EstimatedCost)" }]
                 : null,
         };

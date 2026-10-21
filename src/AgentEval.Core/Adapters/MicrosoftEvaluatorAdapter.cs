@@ -310,10 +310,18 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
 
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            var response = await inner.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
-            var (sawInput, sawOutput) = Record(response.Usage, response.ModelId);
-            EndCall(sawInput, sawOutput);
-            return response;
+            bool sawInput = false, sawOutput = false;
+            try
+            {
+                var response = await inner.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
+                (sawInput, sawOutput) = Record(response.Usage, response.ModelId);
+                return response;
+            }
+            finally
+            {
+                // A failed request may have consumed tokens without reporting them.
+                EndCall(sawInput, sawOutput);
+            }
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)

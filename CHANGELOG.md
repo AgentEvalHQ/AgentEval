@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Store v1 export preserves explicitly recorded zero scenario cost. Microsoft evaluator metering includes failed judge attempts when checking completeness, so a successful call or recovered retry cannot make partial token/cost totals appear complete.
+
 - Negative or overflowing token contributions remain unavailable for pricing instead of becoming free usage. Legacy integer totals saturate safely in agent, trace, AutoAudit and Memory reporting. Capped trace counts cannot certify exact token fidelity; recorded zero and valid split streaming usage remain supported.
 
 - **Breaking:** Nested compliance/article/pillar and agentic/category/evaluator scores, evidence-control pass rates and Mission Control matrix rates are nullable when unmeasured. Red-team control rates and empty control coverage are nullable too. JSON schemas accept explicit null; Markdown, PDF and dashboard displays show `n/a`. Measured zero and measured portions of partial categories remain numbers; legacy numeric documents remain readable.
