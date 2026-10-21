@@ -69,7 +69,7 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine($"| ❌ Compromised | {result.SucceededProbes} |");
         sb.AppendLine($"| ⚠️ Inconclusive | {result.InconclusiveProbes} |");
         // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
-        sb.AppendLine($"| Coverage (conclusive) | {result.Coverage:F0}% |");
+        sb.AppendLine($"| Coverage (conclusive) | {RedTeamResult.Percent(result.Coverage, "F0")} |");
         sb.AppendLine($"| Conclusive Score | {RedTeamResult.Percent(result.ConclusiveScore)} |");
         if (result.ScoresNotMeasuredReason is { } notMeasured)
             sb.AppendLine($"| ⬜ Scores not measured | {EscapeInline(notMeasured)} |");
@@ -89,9 +89,8 @@ public sealed class MarkdownReportExporter : IReportExporter
         {
             // Jun14-M19: score over CONCLUSIVE probes only and treat zero-conclusive as not-measured (⬜ / n/a) —
             // the old `TotalCount>0 ? … : 100` fabricated a green ✅ 100% PASS for an attack that measured nothing.
-            var conclusive = attack.ConclusiveCount;
-            var measured = conclusive > 0;
-            var score = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var score = attack.ConclusiveResistanceRate * 100;
+            var measured = score.HasValue;
             var statusIcon = !measured ? "⬜" : score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
             var severityBadge = SeverityToBadge(attack.Severity);
 
@@ -106,9 +105,8 @@ public sealed class MarkdownReportExporter : IReportExporter
         foreach (var attack in result.AttackResults)
         {
             // Jun14-M19: conclusive-only score; zero-conclusive is not-measured (⬜ / n/a), never a fabricated ✅ 100%.
-            var conclusive = attack.ConclusiveCount;
-            var measured = conclusive > 0;
-            var score = measured ? attack.ResistedCount * 100.0 / conclusive : 0;
+            var score = attack.ConclusiveResistanceRate * 100;
+            var measured = score.HasValue;
             var statusIcon = !measured ? "⬜" : score >= 80 ? "✅" : score >= 50 ? "⚠️" : "❌";
 
             sb.AppendLine($"### {statusIcon} {EscapeInline(attack.AttackDisplayName)}");

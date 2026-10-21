@@ -71,12 +71,12 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        if (_result.InconclusiveRate > maxInconclusiveFraction)
+        if (_result.InconclusiveRate is { } rate && rate > maxInconclusiveFraction)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                $"Scan returned Pass, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({_result.InconclusiveRate:P1}) — too untrustworthy to accept as a Pass.",
+                $"Scan returned Pass, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({_result.InconclusiveRate?.ToString("P1") ?? "n/a"}) — too untrustworthy to accept as a Pass.",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0}",
-                actual: $"Inconclusive {_result.InconclusiveRate:P1}, coverage {_result.Coverage:F1}%",
+                actual: $"Inconclusive {_result.InconclusiveRate?.ToString("P1") ?? "n/a"}, coverage {RedTeamResult.Percent(_result.Coverage)}",
                 suggestions:
                 [
                     "Increase TimeoutPerProbe or fix transport errors, then re-run",
@@ -399,7 +399,7 @@ public sealed class RedTeamAssertions
     {
         using var probe = AgentEvalScope.BeginAssertion();
         var inconclusiveRate = _result.InconclusiveRate;
-        if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
+        if (_result.Verdict == Verdict.Inconclusive || (inconclusiveRate is { } fraction && fraction > maxInconclusiveFraction))
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
                 _result.Verdict == Verdict.Inconclusive   // every reason, at any inconclusive fraction (B10bc)
@@ -407,10 +407,10 @@ public sealed class RedTeamAssertions
                     // "no probe ran; 0.0% of probes inconclusive").
                     ? $"Expected a conclusive scan, but it was inconclusive ({InconclusiveWhy()}"
                       + (_result.InconclusiveProbes > 0 && _result.InconclusiveProbes <= _result.ResistedProbes
-                          ? $"; {inconclusiveRate:P1} of probes inconclusive" : "") + ")."
-                    : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
+                          ? $"; {inconclusiveRate?.ToString("P1") ?? "n/a"} of probes inconclusive" : "") + ")."
+                    : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate?.ToString("P1") ?? "n/a"}).",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0} and a definitive verdict",
-                actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate:P1}, coverage {_result.Coverage:F1}%",
+                actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate?.ToString("P1") ?? "n/a"}, coverage {RedTeamResult.Percent(_result.Coverage)}",
                 suggestions:
                 [
                     "Increase TimeoutPerProbe or check agent/transport health — timeouts produce inconclusive probes",

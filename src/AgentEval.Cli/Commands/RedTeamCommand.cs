@@ -759,12 +759,8 @@ internal static class RedTeamCommand
                 if (!opts.Quiet)
                 {
                     Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
-                    // Honesty: a baseline captured from a low-coverage run carries that coverage forward;
-                    // future comparisons measure drops relative to it, not relative to a perfect 100%.
-                    if (result.ConclusiveRate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop)
-                        Console.Error.WriteLine(
-                            $"  Note: this baseline's coverage is only {result.ConclusiveRate * 100:F0}% conclusive — " +
-                            "future runs are compared against that level, not 100%.");
+                    if (BaselineCaptureNote(result) is { } note)
+                        Console.Error.WriteLine("  " + note);
                 }
             }
 
@@ -956,14 +952,25 @@ internal static class RedTeamCommand
         $"  Not comparable: {c.NotComparableReason}. No delta against the baseline is a measurement, so the comparison " +
         "is refused (exit 13), neither a regression nor a pass.";
 
+    internal static string? BaselineCaptureNote(RedTeamResult result)
+    {
+        if (result.ConclusiveProbes == 0)
+            return $"Note: this baseline measured nothing ({result.ScoresNotMeasuredReason}): every comparison against it is refused (exit 13).";
+        return result.ConclusiveRate is { } rate && rate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop
+            ? $"Note: this baseline's coverage is only {rate * 100:F0}% conclusive; future runs are compared against that level, not 100%."
+            : null;
+    }
+
     /// <summary>Renders a baseline comparison (new / fixed / persistent findings + deltas) to stderr.</summary>
     private static void PrintComparison(RedTeamComparison c)
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  === Baseline Comparison ===");
+        if (c.UnverifiedVulnerabilities.Count > 0)
+            Console.Error.WriteLine($"  Unverified: {c.UnverifiedVulnerabilities.Count} known vulnerability probe(s) produced no verdict; excluded from Fixed.");
         if (!c.IsComparable)
         {
-            // One side measured nothing: its scores are placeholders, so no delta is printed.
+            // Missing measurements or unverified known vulnerabilities prevent a comparison verdict.
             Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}");
             Console.Error.WriteLine(NotComparableLine(c));
             return;
@@ -974,8 +981,8 @@ internal static class RedTeamCommand
         Console.Error.WriteLine($"  New: {c.NewVulnerabilities.Count}   Fixed: {c.ResolvedVulnerabilities.Count}   Persistent: {c.PersistentVulnerabilities.Count}");
         if (c.NotReTested.Count > 0)
             Console.Error.WriteLine($"  Not re-tested: {c.NotReTested.Count} baseline attack(s) with {c.NotReTested.Sum(n => n.KnownVulnerabilities)} known vuln(s) — excluded from Fixed.");
-        if (c.CoverageDrop > 0)
-            Console.Error.WriteLine($"  Coverage drop: {c.CoverageDrop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
+        if (c.CoverageDrop is { } drop && drop > 0)
+            Console.Error.WriteLine($"  Coverage drop: {drop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
         foreach (var v in c.NewVulnerabilities)
             Console.Error.WriteLine($"    + NEW [{v.Severity}] {v.AttackName} / {v.ProbeId}: {v.Reason}");
         foreach (var e in c.FidelityEscalations)

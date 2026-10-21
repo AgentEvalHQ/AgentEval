@@ -206,15 +206,15 @@ public class RedTeamResult : IRedTeamResult
         : $"none of the {TotalProbes} probes reached a verdict";
 
     /// <summary>A 0-100 score for a report line: "87.5%", or "n/a" when it was not measured — never a placeholder 0.</summary>
-    internal static string Percent(double? score) =>
-        score is { } s ? s.ToString("F1", CultureInfo.InvariantCulture) + "%" : "n/a";
+    internal static string Percent(double? score, string format = "F1") =>
+        score is { } s ? s.ToString(format, CultureInfo.InvariantCulture) + "%" : "n/a";
 
     /// <summary>Fraction (0-1) of executed probes that produced a conclusive outcome (RC-6). Zero probes means
-    /// nothing was covered, so this is 0 (not 1) for an empty scan — Coverage honestly reads 0.</summary>
-    public double ConclusiveRate => TotalProbes > 0 ? (double)ConclusiveProbes / TotalProbes : 0.0;
+    /// no coverage was measured, so an empty scan has no rate.</summary>
+    public double? ConclusiveRate => TotalProbes > 0 ? (double)ConclusiveProbes / TotalProbes : null;
 
     /// <summary>Coverage of the scan: <see cref="ConclusiveRate"/> as a 0-100 percentage (RC-6).</summary>
-    public double Coverage => ConclusiveRate * 100.0;
+    public double? Coverage => ConclusiveRate * 100.0;
 
     /// <summary>
     /// Security score over <b>conclusive</b> probes only: Resisted / (Resisted + Succeeded), 0-100.
@@ -228,7 +228,7 @@ public class RedTeamResult : IRedTeamResult
     public double? ConclusiveScore => ConclusiveProbes > 0 ? (ResistedProbes * 100.0 / ConclusiveProbes) : null;
 
     /// <summary>Fraction (0-1) of executed probes that were inconclusive (incl. errored).</summary>
-    public double InconclusiveRate => TotalProbes > 0 ? (double)InconclusiveProbes / TotalProbes : 0.0;
+    public double? InconclusiveRate => TotalProbes > 0 ? (double)InconclusiveProbes / TotalProbes : null;
 
     /// <summary>
     /// Attack Success Rate (ASR) - percentage of successful attacks.
@@ -335,7 +335,7 @@ public class RedTeamResult : IRedTeamResult
         {
             // Invariant-culture formatting so decimal scores render as "0.95" not "0,95" on comma-decimal locales (thanks @bmerkle).
             var summary = string.Create(CultureInfo.InvariantCulture,
-                $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised (Score: {Percent(OverallScore)}, ConclusiveScore: {Percent(ConclusiveScore)}, Coverage: {Coverage:F1}%, Inconclusive: {InconclusiveProbes}/{TotalProbes})");
+                $"{Verdict}: {SucceededProbes}/{TotalProbes} probes compromised (Score: {Percent(OverallScore)}, ConclusiveScore: {Percent(ConclusiveScore)}, Coverage: {Percent(Coverage)}, Inconclusive: {InconclusiveProbes}/{TotalProbes})");
 
             // Said beside the "n/a", so a missing score is never read as a lost one (T81).
             if (ScoresNotMeasuredReason is { } notMeasured)
@@ -441,6 +441,9 @@ public class AttackResult
 
     /// <summary>Probes for this attack that produced a conclusive outcome (Resisted or Succeeded).</summary>
     public int ConclusiveCount => ResistedCount + SucceededCount;
+
+    /// <summary>Resistance rate over conclusive probes (0-1); null when none reached a verdict.</summary>
+    public double? ConclusiveResistanceRate => ConclusiveCount > 0 ? (double)ResistedCount / ConclusiveCount : null;
 
     /// <summary>
     /// The attack ran but produced no conclusive verdict, and did not declare why it cannot measure in this setup

@@ -246,7 +246,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
             var status = ComplianceStatusPolicy.StatusFor(passRate, worstSeverity, control.Fidelity, conclusiveTests);
 
             var attackSummaries = relevantResults.Select(r =>
-                $"- {r.AttackName}: {r.ResistedCount}/{r.TotalCount} blocked ({r.ResistedCount * 100.0 / r.TotalCount:F1}%)");
+                $"- {r.AttackName}: {r.ResistedCount}/{r.ConclusiveCount} blocked ({RedTeamResult.Percent(r.ConclusiveResistanceRate * 100)}){(r.InconclusiveCount > 0 ? $", {r.InconclusiveCount} inconclusive" : "")}");
 
             var observations = relevantResults
                 .Where(r => r.SucceededCount > 0)

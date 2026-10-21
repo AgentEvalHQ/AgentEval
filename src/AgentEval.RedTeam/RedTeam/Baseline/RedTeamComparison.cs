@@ -44,6 +44,9 @@ public record RedTeamComparison
     /// <summary>Vulnerabilities present in both.</summary>
     public required IReadOnlyList<string> PersistentVulnerabilities { get; init; }
 
+    /// <summary>Known vulnerabilities in retested attacks whose probes produced no conclusive verdict this run.</summary>
+    public IReadOnlyList<string> UnverifiedVulnerabilities { get; init; } = [];
+
     /// <summary>Per-attack comparison.</summary>
     public required IReadOnlyList<AttackComparison> AttackComparisons { get; init; }
 
@@ -72,15 +75,17 @@ public record RedTeamComparison
 
     /// <summary>
     /// Coverage (conclusive fraction, 0-1) recorded in the baseline, derived from its persisted per-attack
-    /// counts: (resisted + failed) / total. Old/empty baselines with no probes degrade gracefully to 1.0.
+    /// counts: (resisted + failed) / total, or its top-level counts. Null when counts were not recorded.
     /// </summary>
-    public double BaselineCoverage
+    public double? BaselineCoverage
     {
         get
         {
             var total = Baseline.AttackResults.Sum(a => a.TotalCount);
-            if (total <= 0) return 1.0;
-            var conclusive = Baseline.AttackResults.Sum(a => a.ResistedCount + a.FailedProbeIds.Count);
+            if (total <= 0)
+                return Baseline.TotalProbes > 0 && Baseline.ConclusiveProbes is { } count
+                    ? count / (double)Baseline.TotalProbes : null;
+            var conclusive = Baseline.AttackResults.Sum(a => a.ConclusiveCount);
             return conclusive / (double)total;
         }
     }
@@ -91,7 +96,8 @@ public record RedTeamComparison
     /// inconclusive-laden run no longer makes every identical re-run a permanent false regression. A genuinely
     /// lower-coverage current run vs a conclusive baseline still registers as a drop (fail-closed preserved).
     /// </summary>
-    public double CoverageDrop => Math.Max(0.0, BaselineCoverage - Current.ConclusiveRate);
+    public double? CoverageDrop => BaselineCoverage is { } baseline && Current.ConclusiveRate is { } current
+        ? Math.Max(0.0, baseline - current) : null;
 
     /// <summary>
     /// Probes of the baseline that reached a verdict: <see cref="RedTeamBaseline.ConclusiveProbes"/>, or, for a
@@ -99,10 +105,10 @@ public record RedTeamComparison
     /// </summary>
     private int BaselineConclusiveProbes =>
         Baseline.ConclusiveProbes
-        ?? Baseline.AttackResults.Sum(a => a.ResistedCount + a.FailedProbeIds.Count);
+        ?? Baseline.AttackResults.Sum(a => a.ConclusiveCount);
 
     /// <summary>
-    /// Whether both runs measured something: at least one probe each reached a verdict, and each has an overall score.
+    /// Whether both runs have scores and coverage, and every known vulnerability in a retested attack has a new verdict.
     /// When either side measured nothing, it has no scores, so <see cref="ScoreDelta"/>, <see cref="ConclusiveScoreDelta"/>
     /// and <see cref="AttackSuccessRateDelta"/> are <see langword="null"/>; <see cref="NotComparableReason"/> says why, and the
     /// comparison is refused: its <see cref="Status"/> is <see cref="RegressionStatus.Incomparable"/>, neither a
@@ -120,6 +126,8 @@ public record RedTeamComparison
             (0, _) => $"the baseline ({Baseline.Version}) has no probe that reached a verdict",
             (_, 0) => "the current run has no probe that reached a verdict",
             // A score left out of a baseline file (or a run with verdicts but no probe count) has no delta to read (T81).
+            _ when UnverifiedVulnerabilities.Count > 0 => $"{UnverifiedVulnerabilities.Count} known vulnerability probe(s) are unverified in this run; re-run them to compare",
+            _ when BaselineCoverage is null => $"the baseline ({Baseline.Version}) records no probe counts, so its coverage was not measured",
             _ when Baseline.OverallScore is null => $"the baseline ({Baseline.Version}) records no overall score",
             _ when Current.OverallScore is null => "the current run has no overall score",
             _ => null,
@@ -252,13 +260,21 @@ public record AttackComparison
     public required string AttackDisplayName { get; init; }
 
     /// <summary>Baseline resistance rate.</summary>
-    public required double BaselineRate { get; init; }
+    public required double? BaselineRate { get; init; }
 
     /// <summary>Current resistance rate.</summary>
-    public required double CurrentRate { get; init; }
+    public required double? CurrentRate { get; init; }
 
     /// <summary>Change in rate (positive = improvement).</summary>
-    public double RateDelta => CurrentRate - BaselineRate;
+    public double? RateDelta => CurrentRate - BaselineRate;
+
+    /// <summary>True when the baseline never tested this attack.</summary>
+    public bool IsNewAttack { get; init; }
+
+    /// <summary>Why no rate delta can be measured, or null when both rates exist.</summary>
+    public string? RateNotComparableReason => IsNewAttack ? "the attack is not in the baseline"
+        : BaselineRate is null ? "none of its baseline probes reached a verdict"
+        : CurrentRate is null ? "none of its probes reached a verdict in this run" : null;
 
     /// <summary>New probe IDs that failed in current but not baseline.</summary>
     public required IReadOnlyList<string> NewFailures { get; init; }
@@ -276,8 +292,9 @@ public record AttackComparison
         {
             if (NewFailures.Count > 0) return "❌";
             if (Resolved.Count > 0) return "✅";
-            if (Math.Abs(RateDelta) < StableBand) return "➡️";
-            return RateDelta > 0 ? "📈" : "📉";
+            if (RateDelta is not { } delta) return "❓";
+            if (Math.Abs(delta) < StableBand) return "➡️";
+            return delta > 0 ? "📈" : "📉";
         }
     }
 }

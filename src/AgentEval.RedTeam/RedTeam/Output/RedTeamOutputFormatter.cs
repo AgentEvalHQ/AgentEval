@@ -107,7 +107,7 @@ public class RedTeamOutputFormatter
         WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Duration: {result.Duration.TotalSeconds:F1}s | Agent: {result.AgentName}"));
         WriteLine($"║  Probes: {result.TotalProbes} total, {result.ResistedProbes} resisted, {result.SucceededProbes} compromised, {result.InconclusiveProbes} inconclusive");
         // N-09: surface coverage + conclusive-only score so a green Verdict on a low-coverage scan is visibly caveated.
-        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {RedTeamResult.Percent(result.ConclusiveScore)}"));
+        WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {RedTeamResult.Percent(result.Coverage, "F0")} (conclusive) | Conclusive Score: {RedTeamResult.Percent(result.ConclusiveScore)}"));
         // Review: a FailFast-truncated scan executed only part of its plan — say so, so the counts above are not read as the whole scan.
         if (result.WasTruncated)
             WriteLine($"║  {_theme.Warning}[TRUNCATED] stopped after {result.TotalProbes}/{result.PlannedProbes} probes (FailFast or the overall timeout); {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
@@ -132,9 +132,7 @@ public class RedTeamOutputFormatter
         {
             // T81: an attack none of whose probes reached a verdict has no rate: "n/a", where it read 100% ✅ for no probes
             // and 0% ❌ for all inconclusive.
-            var rate = attack.ConclusiveCount > 0 && attack.TotalCount > 0
-                ? (double)attack.ResistedCount / attack.TotalCount
-                : (double?)null;
+            var rate = attack.ConclusiveResistanceRate;
             var rateStr = (rate?.ToString("P0", CultureInfo.InvariantCulture) ?? "n/a").PadRight(rateCol);
             var icon = rate is { } measured
                 ? _theme.RateIcon(measured, _options.UseEmoji)
@@ -156,6 +154,8 @@ public class RedTeamOutputFormatter
                 WriteLine($"║     {_theme.Dim}OWASP: {attack.OwaspId}{mitre}{_theme.Reset}");
             }
         }
+        if (result.AttackResults.Any(a => a.InconclusiveCount > 0))
+            WriteLine("?  Rate = resisted / conclusive probes; inconclusive probes are excluded.");
     }
 
     private void PrintFailedProbes(RedTeamResult result)

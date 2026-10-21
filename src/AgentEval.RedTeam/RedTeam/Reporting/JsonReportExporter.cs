@@ -61,7 +61,7 @@ public sealed class JsonReportExporter : IReportExporter
 
         var report = new JsonReport
         {
-            SchemaVersion = "0.4.0",   // 0.4.0: the four summary scores and each attack's asr are null when no probe reached a verdict, + summary.scores_not_measured (T81); 0.3.0: summary.over_refusal (always) + benign_controls (when run) + fold turn/node counts; 0.2.0: coverage/truncation/fidelity (5d)
+            SchemaVersion = "0.4.0",   // 0.4.0: empty-scan coverage is null (T87); the four summary scores and each attack's asr are null when no probe reached a verdict, + summary.scores_not_measured (T81); 0.3.0: summary.over_refusal (always) + benign_controls (when run) + fold turn/node counts; 0.2.0: coverage/truncation/fidelity (5d)
             ReportId = DeriveReportId(result),   // LOW: deterministic so re-exporting the same result is byte-identical (diffable)
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
@@ -303,8 +303,9 @@ public sealed class JsonReportExporter : IReportExporter
         [JsonPropertyName("scores_not_measured")]
         public string? ScoresNotMeasured { get; init; }
 
-        /// <summary>Conclusive coverage as a 0-100 percentage; pair with scores to judge trustworthiness (RC-6).</summary>
-        public double Coverage { get; init; }
+        /// <summary>Conclusive coverage as a 0-100 percentage, null when no probe ran; pair with scores to judge trustworthiness (RC-6).</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+        public double? Coverage { get; init; }
 
         public string Verdict { get; init; } = "";
 

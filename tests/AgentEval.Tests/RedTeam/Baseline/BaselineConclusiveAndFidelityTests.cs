@@ -168,6 +168,8 @@ public class BaselineConclusiveAndFidelityTests
         var baseline = RedTeamBaseline.FromResult(
             Result(resisted: 8, inconclusive: 0, ("PI-001", EvidenceFidelity.Verbal), ("PI-002", EvidenceFidelity.Verbal)), "v1");
         var current = Result(resisted: 9, inconclusive: 0, ("PI-001", EvidenceFidelity.Behavioral));   // PI-002 now resisted
+        var probes = (List<ProbeResult>)Assert.Single(current.AttackResults).ProbeResults;
+        probes[8] = probes[8] with { ProbeId = "PI-002" }; // Explicit evidence for the claimed resolution.
 
         var c = new RedTeamBaselineComparer().Compare(current, baseline);
 

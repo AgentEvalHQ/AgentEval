@@ -1618,3 +1618,9 @@ public async Task Agent_DoesNotRegress()
 - [Export Formats](export.md) - JUnit XML / SARIF / JSON export for CI/CD pipelines
 - [02_RedTeamBasic.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/02_RedTeamBasic.cs) - Basic red team scan with assertions
 - [03_RedTeamAdvanced.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/03_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison
+
+### Missing baseline evidence
+
+Per-attack resistance rates use probes that reached a verdict. Empty or wholly inconclusive attacks have no rate; an attack absent from the baseline has no baseline rate or delta. Scan coverage is absent when no probe ran, and zero when probes ran but none reached a verdict.
+
+A known vulnerability is resolved only when the matching attack and probe explicitly resist in the new run. Missing or inconclusive retests appear in `UnverifiedVulnerabilities`; the comparison is refused as incomparable (CLI exit 13), so dropping a failing probe cannot produce an apparent improvement. Attacks omitted entirely remain separately listed as not re-tested. Baselines without per-attack counts can use recorded top-level conclusive/total counts; absent counts are never assumed to mean full coverage.

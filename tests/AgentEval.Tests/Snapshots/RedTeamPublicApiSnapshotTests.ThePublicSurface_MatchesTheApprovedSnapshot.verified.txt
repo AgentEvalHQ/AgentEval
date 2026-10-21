@@ -141,6 +141,7 @@ class AgentEval.RedTeam.AttackResult
     Boolean Passed { get; }
     Double? AttackSuccessRate { get; }
     Double? ConclusiveAttackSuccessRate { get; }
+    Double? ConclusiveResistanceRate { get; }
     IReadOnlyList<AgentEval.RedTeam.ProbeResult> ProbeResults { get; init; }
     Int32 AmbiguousCount { get; }
     Int32 ConclusiveCount { get; }
@@ -436,9 +437,10 @@ class AgentEval.RedTeam.Baseline.AttackBaselineResult : IEquatable<AgentEval.Red
     AgentEval.RedTeam.Severity Severity { get; init; }
     Boolean Equals(AgentEval.RedTeam.Baseline.AttackBaselineResult other)
     Boolean Equals(Object obj)
-    Double Rate { get; }
+    Double? Rate { get; }
     IReadOnlyDictionary<String, AgentEval.RedTeam.EvidenceFidelity> FailedProbeFidelities { get; init; }
     IReadOnlyList<String> FailedProbeIds { get; init; }
+    Int32 ConclusiveCount { get; }
     Int32 GetHashCode()
     Int32 ResistedCount { get; init; }
     Int32 TotalCount { get; init; }
@@ -451,15 +453,17 @@ class AgentEval.RedTeam.Baseline.AttackComparison : IEquatable<AgentEval.RedTeam
     AgentEval.RedTeam.Baseline.AttackComparison <Clone>$()
     Boolean Equals(AgentEval.RedTeam.Baseline.AttackComparison other)
     Boolean Equals(Object obj)
-    Double BaselineRate { get; init; }
-    Double CurrentRate { get; init; }
-    Double RateDelta { get; }
+    Boolean IsNewAttack { get; init; }
     Double StableBand { get; init; }
+    Double? BaselineRate { get; init; }
+    Double? CurrentRate { get; init; }
+    Double? RateDelta { get; }
     IReadOnlyList<String> NewFailures { get; init; }
     IReadOnlyList<String> Resolved { get; init; }
     Int32 GetHashCode()
     String AttackDisplayName { get; init; }
     String AttackName { get; init; }
+    String RateNotComparableReason { get; }
     String StatusEmoji { get; }
     String ToString()
     ctor()
@@ -562,10 +566,10 @@ class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTea
     Boolean IsImprovement { get; }
     Boolean IsRegression { get; }
     Boolean IsStable { get; }
-    Double BaselineCoverage { get; }
-    Double CoverageDrop { get; }
     Double? AttackSuccessRateDelta { get; }
+    Double? BaselineCoverage { get; }
     Double? ConclusiveScoreDelta { get; }
+    Double? CoverageDrop { get; }
     Double? ScoreDelta { get; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.AttackComparison> AttackComparisons { get; init; }
     IReadOnlyList<AgentEval.RedTeam.Baseline.FidelityEscalation> FidelityEscalations { get; init; }
@@ -573,6 +577,7 @@ class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTea
     IReadOnlyList<AgentEval.RedTeam.Baseline.NotReTestedAttack> NotReTested { get; init; }
     IReadOnlyList<String> PersistentVulnerabilities { get; init; }
     IReadOnlyList<String> ResolvedVulnerabilities { get; init; }
+    IReadOnlyList<String> UnverifiedVulnerabilities { get; init; }
     Int32 GetHashCode()
     String NotComparableReason { get; }
     String StatusEmoji { get; }
@@ -1488,12 +1493,12 @@ class AgentEval.RedTeam.RedTeamResult : IRedTeamResult
     Boolean WasTruncated { get; init; }
     DateTimeOffset CompletedAt { get; init; }
     DateTimeOffset StartedAt { get; init; }
-    Double ConclusiveRate { get; }
-    Double Coverage { get; }
-    Double InconclusiveRate { get; }
     Double? AttackSuccessRate { get; }
     Double? ConclusiveAttackSuccessRate { get; }
+    Double? ConclusiveRate { get; }
     Double? ConclusiveScore { get; }
+    Double? Coverage { get; }
+    Double? InconclusiveRate { get; }
     Double? OverallScore { get; }
     IEnumerable<AgentEval.RedTeam.AttackResult> FailedAttacks { get; }
     IReadOnlyList<AgentEval.RedTeam.AttackResult> AttackResults { get; init; }
@@ -2064,8 +2069,8 @@ struct AgentEval.RedTeam.ScanProgress : IEquatable<AgentEval.RedTeam.ScanProgres
     AgentEval.RedTeam.EvaluationOutcome? LastOutcome { get; init; }
     Boolean Equals(AgentEval.RedTeam.ScanProgress other)
     Boolean Equals(Object obj)
-    Double CurrentSuccessRate { get; }
     Double PercentComplete { get; }
+    Double? CurrentSuccessRate { get; }
     Int32 CompletedProbes { get; init; }
     Int32 GetHashCode()
     Int32 ResistedCount { get; init; }

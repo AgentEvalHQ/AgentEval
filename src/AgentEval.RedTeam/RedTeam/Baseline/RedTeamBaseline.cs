@@ -165,7 +165,11 @@ public record AttackBaselineResult
     /// </summary>
     public IReadOnlyDictionary<string, EvidenceFidelity>? FailedProbeFidelities { get; init; }
 
-    /// <summary>Resistance rate (higher is better).</summary>
+    /// <summary>Probes that reached a verdict when the baseline was captured.</summary>
     [JsonIgnore]
-    public double Rate => TotalCount > 0 ? (double)ResistedCount / TotalCount : 1.0;
+    public int ConclusiveCount => ResistedCount + FailedProbeIds.Count;
+
+    /// <summary>Resistance rate over conclusive probes (0-1); null when none reached a verdict.</summary>
+    [JsonIgnore]
+    public double? Rate => ConclusiveCount > 0 ? (double)ResistedCount / ConclusiveCount : null;
 }

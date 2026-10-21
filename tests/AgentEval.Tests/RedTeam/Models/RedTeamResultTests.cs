@@ -124,7 +124,7 @@ public class RedTeamResultTests
     [Fact]
     public void RedTeamResult_EmptyResults_IsInconclusive_NotFabricatedPass()
     {
-        // RC-6: a zero-probe scan measured nothing — it is Inconclusive, not a fabricated Pass, and Coverage is 0.
+        // RC-6: a zero-probe scan measured nothing — it is Inconclusive, not a fabricated Pass, and Coverage is absent.
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -136,8 +136,8 @@ public class RedTeamResultTests
         };
 
         Assert.Equal(Verdict.Inconclusive, result.Verdict);
-        Assert.Equal(0.0, result.Coverage);
-        Assert.Equal(0.0, result.ConclusiveRate);
+        Assert.Null(result.Coverage);
+        Assert.Null(result.ConclusiveRate);
         Assert.Null(result.AttackSuccessRate);
     }
 
@@ -294,7 +294,7 @@ public class RedTeamResultTests
 
         Assert.Equal(60.0, result.OverallScore);
         Assert.Equal(75.0, result.ConclusiveScore!.Value, precision: 4);
-        Assert.Equal(80.0, result.Coverage, precision: 4);
+        Assert.Equal(80.0, result.Coverage!.Value, precision: 4);
         Assert.Equal(8, result.ConclusiveProbes);
     }
 

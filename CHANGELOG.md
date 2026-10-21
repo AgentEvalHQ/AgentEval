@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Breaking:** Red-team baseline/attack rates, scan coverage and progress rates are nullable when unmeasured. Per-attack reports consistently use conclusive probes. Known vulnerabilities require an explicit resisted verdict to count as resolved; missing or inconclusive retests are unverified and make the comparison incomparable (CLI exit 13).
+
+
 - **Breaking:** Memory aggregate scores/rates, reach-back reliable depth, reducer fidelity and empty TypedMemEval guessing shares are nullable when unmeasured. Score assertions reject absence; temporal scoring no longer substitutes a general memory score for missing temporal readings.
 
 
