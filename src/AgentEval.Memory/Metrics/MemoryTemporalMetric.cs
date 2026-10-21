@@ -53,32 +53,34 @@ public class MemoryTemporalMetric : IMemoryMetric
                 return Task.FromResult(MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable", notApplicableDetails));
             }
 
-            if (!memoryResult.IsMeasured)
+            if (!memoryResult.IsMeasured || memoryResult.OverallScore is not { } overallScore)
             {
                 return Task.FromResult(MetricResult.NotMeasured(Name,
                     "Not measured: the judge produced no score for any query."));
             }
 
-            // Extract temporal-specific metrics
-            // Use pattern-matching unboxing because values stored in Dictionary<string,object>
-            // are boxed primitives; `as double?` returns null for boxed doubles.
-            var temporalScore = memoryResult.Metadata?.GetValueOrDefault("TemporalScore") is double ts
-                ? ts : memoryResult.OverallScore;
-            var temporalAccuracy = memoryResult.Metadata?.GetValueOrDefault("TemporalAccuracy") is double ta
-                ? ta : 0;
+            // A general memory score cannot stand in for an unmeasured temporal query.
+            var measuredTemporal = memoryResult.QueryResults.Where(q => q.Measured && q.Query.QueryTime.HasValue).ToArray();
+            double? temporalReading = memoryResult.Metadata?.GetValueOrDefault("TemporalScore") is double ts
+                ? ts : measuredTemporal.Length > 0 ? measuredTemporal.Average(q => q.Score) : null;
+            if (temporalReading is not { } temporalScore)
+                return Task.FromResult(MetricResult.NotMeasured(Name, "Not measured: no temporal question produced a score."));
+            double? temporalAccuracy = memoryResult.Metadata?.GetValueOrDefault("TemporalAccuracy") is double ta
+                ? ta : measuredTemporal.Length > 0 ? measuredTemporal.Count(q => q.Passed) / (double)measuredTemporal.Length * 100 : null;
             var temporalQueryCount = memoryResult.Metadata?.GetValueOrDefault("TemporalQueryCount") is int tq
-                ? tq : 0;
+                ? tq : memoryResult.QueryResults.Count(q => q.Query.QueryTime.HasValue);
 
             var passed = temporalScore >= 75; // Slightly lower threshold for complex temporal reasoning
 
             var details = new Dictionary<string, object>
             {
                 ["temporal_score"] = temporalScore,
-                ["temporal_accuracy"] = temporalAccuracy,
                 ["temporal_query_count"] = temporalQueryCount,
-                ["overall_score"] = memoryResult.OverallScore,
+                ["overall_score"] = overallScore,
                 ["scenario_name"] = memoryResult.ScenarioName
             };
+
+            if (temporalAccuracy is { } accuracy) details["temporal_accuracy"] = accuracy;
 
             // Add time range information if available
             if (memoryResult.Metadata?.TryGetValue("TimeRange", out var timeRangeObj) == true)
@@ -117,13 +119,13 @@ public class MemoryTemporalMetric : IMemoryMetric
     private static string BuildTemporalExplanation(
         MemoryEvaluationResult memoryResult, 
         double temporalScore, 
-        double temporalAccuracy, 
+        double? temporalAccuracy,
         int temporalQueryCount)
     {
         var explanation = new List<string>
         {
             $"Temporal memory score: {temporalScore:F1}%",
-            $"Temporal reasoning accuracy: {temporalAccuracy:F1}%"
+            $"Temporal reasoning accuracy: {(temporalAccuracy is { } accuracy ? $"{accuracy:F1}%" : "n/a (not measured)")}"
         };
         
         if (temporalQueryCount > 0)

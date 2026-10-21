@@ -101,7 +101,7 @@ public class ReachBackEvaluator : IReachBackEvaluator
         };
 
         _logger.LogInformation("Reach-back evaluation complete: MaxReliableDepth={MaxDepth}, FailurePoint={FailurePoint}, OverallScore={Score:F1}%",
-            result.MaxReliableDepth, result.FailurePoint?.ToString() ?? "none", result.OverallScore);
+            result.MaxReliableDepth?.ToString() ?? "n/a", result.FailurePoint?.ToString() ?? "none", result.OverallScore?.ToString("F1") ?? "n/a (not measured)");
 
         return result;
     }

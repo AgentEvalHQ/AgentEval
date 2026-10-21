@@ -134,7 +134,7 @@ public static class MemoryCrossSession
 
         Console.Write("   Score: ");
         Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.Write($"{MemorySampleReading.Percent(result.OverallScore)}");
         Console.ResetColor();
         Console.WriteLine($"  Passed: {(result.Passed ? "✅" : "❌")}");
         Console.WriteLine($"   Retained: {result.RetainedCount}/{result.FactResults.Count} facts  |  Resets: {result.SessionResetCount}");
@@ -154,7 +154,7 @@ public static class MemoryCrossSession
 
     private static void PrintComparison(CrossSessionResult basic, CrossSessionResult persistent)
     {
-        var basicScore = basic.SessionResetSupported ? $"{basic.OverallScore:F1}%" : "N/A";
+        var basicScore = basic.SessionResetSupported ? MemorySampleReading.Percent(basic.OverallScore) : "N/A";
         var basicRetained = basic.SessionResetSupported
             ? $"{basic.RetainedCount}/{basic.FactResults.Count}"
             : "N/A";
@@ -163,7 +163,7 @@ public static class MemoryCrossSession
         Console.WriteLine("   │ Feature                  │ Basic Agent  │ Persistent   │");
         Console.WriteLine("   ├──────────────────────────┼──────────────┼──────────────┤");
         Console.WriteLine($"   │ Session Reset Support    │ {"Yes",-12} │ {"Yes",-12} │");
-        Console.WriteLine($"   │ Cross-Session Score      │ {basicScore,-12} │ {persistent.OverallScore:F1}%{"",-7} │");
+        Console.WriteLine($"   │ Cross-Session Score      │ {basicScore,-12} │ {MemorySampleReading.Percent(persistent.OverallScore),-12} │");
         Console.WriteLine($"   │ Facts Retained           │ {basicRetained,-12} │ {persistent.RetainedCount + "/" + persistent.FactResults.Count,-12} │");
         Console.WriteLine("   └──────────────────────────┴──────────────┴──────────────┘");
         Console.WriteLine();

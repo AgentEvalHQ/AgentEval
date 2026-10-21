@@ -161,10 +161,10 @@ public static class MemoryBasics
 
         // Overall score with visual indicator
         Console.Write("   Overall Score: ");
-        var scoreColor = result.OverallScore >= 80 ? ConsoleColor.Green :
-                        result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        var scoreColor = result.OverallScore is null ? ConsoleColor.Yellow : result.OverallScore is >= 80 ? ConsoleColor.Green :
+                        result.OverallScore is >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
         Console.ForegroundColor = scoreColor;
-        Console.WriteLine($"{result.OverallScore:F1}% {GetScoreEmoji(result.OverallScore)}");
+        Console.WriteLine($"{MemorySampleReading.Percent(result.OverallScore)} {GetScoreEmoji(result.OverallScore)}");
         Console.ResetColor();
 
         Console.WriteLine($"   Duration: {result.Duration.TotalMilliseconds:F0}ms");
@@ -201,10 +201,11 @@ public static class MemoryBasics
         }
     }
 
-    private static string GetScoreEmoji(double score)
+    private static string GetScoreEmoji(double? score)
     {
         return score switch
         {
+            null => "n/a",
             >= 90 => "🏆",
             >= 80 => "✅",
             >= 70 => "👍",

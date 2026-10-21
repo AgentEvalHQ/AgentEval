@@ -230,12 +230,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private static void Record(List<double> scores, ReducerEvaluationResult result) =>
         Record(scores, result.IsMeasured, result.FidelityScore, result.UnmeasuredFacts);
 
-    private static void Record(List<double> scores, bool measured, double score, int unmeasured)
+    private static void Record(List<double> scores, bool measured, double? score, int unmeasured)
     {
         var tally = s_tally.Value;
         if (tally is not null) tally.UnmeasuredQueries += unmeasured;
-        if (!measured) return;
-        scores.Add(score);
+        if (!measured || score is not { } value) return;
+        scores.Add(value);
         if (tally is not null) tally.MeasuredScenarios++;
     }
 

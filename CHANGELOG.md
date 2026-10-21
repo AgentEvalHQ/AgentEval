@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Breaking:** Memory aggregate scores/rates, reach-back reliable depth, reducer fidelity and empty TypedMemEval guessing shares are nullable when unmeasured. Score assertions reject absence; temporal scoring no longer substitutes a general memory score for missing temporal readings.
+
+
 - **Breaking:** `EvaluationResult.OverallScore` is nullable and always null on evaluator failure; removed `EvaluationDefaults.DefaultFailureScore`. Judge consumers reject missing scores rather than voting or passing on a fallback grade.
 
 

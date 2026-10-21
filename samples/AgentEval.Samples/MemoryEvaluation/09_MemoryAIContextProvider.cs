@@ -112,8 +112,8 @@ public static class MemoryAIContextProvider
         Console.WriteLine(new string('═', 70));
 
         Console.Write("   Score: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.ForegroundColor = result.OverallScore is >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
+        Console.Write($"{MemorySampleReading.Percent(result.OverallScore)}");
         Console.ResetColor();
         Console.WriteLine($"  Passed: {(result.Passed ? "✅" : "❌")}  Session resets: {result.SessionResetCount}");
         if (!result.SessionResetSupported)

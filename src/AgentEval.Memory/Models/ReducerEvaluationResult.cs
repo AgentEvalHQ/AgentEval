@@ -19,11 +19,11 @@ public class ReducerEvaluationResult
     public required IReadOnlyList<ReducerFactResult> FactResults { get; init; }
 
     /// <summary>
-    /// Fidelity score (0-100): percentage of key facts retained after reduction.
+    /// Fidelity score (0-100): percentage of key facts retained after reduction; null when none were measured.
     /// </summary>
-    public double FidelityScore => MeasuredFacts > 0
-        ? FactResults.Count(f => f.Retained) / (double)MeasuredFacts * 100
-        : 0;
+    public double? FidelityScore => MeasuredFacts > 0
+        ? FactResults.Count(f => f.Measured && f.Retained) / (double)MeasuredFacts * 100
+        : null;
 
     /// <summary>Facts the judge scored. The others are left out of every count here and reported.</summary>
     public int MeasuredFacts => FactResults.Count(f => f.Measured);
@@ -70,7 +70,7 @@ public class ReducerEvaluationResult
     /// <summary>
     /// Whether the evaluation passed (fidelity >= 80% and no critical losses).
     /// </summary>
-    public bool Passed => UnmeasuredFacts == 0 && FidelityScore >= 80 && !HasCriticalLoss;
+    public bool Passed => UnmeasuredFacts == 0 && FidelityScore is >= 80 && !HasCriticalLoss;
 
     /// <summary>
     /// Total execution time for the reducer evaluation.

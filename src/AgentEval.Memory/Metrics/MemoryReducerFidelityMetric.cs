@@ -125,8 +125,8 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
 
     private Task<MetricResult> EvaluateSpecificReducerFidelity(MemoryEvaluationResult memoryResult)
     {
-        // OverallScore is a placeholder 0 when the judge scored nothing.
-        if (!memoryResult.IsMeasured)
+        // A specific score needs a measured aggregate.
+        if (!memoryResult.IsMeasured || memoryResult.OverallScore is not { } score)
         {
             return Task.FromResult(MetricResult.NotMeasured(Name,
                 "Not measured: the judge produced no score for any query."));
@@ -158,7 +158,7 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
         var originalSize = memoryResult.Metadata?.GetValueOrDefault("OriginalSize") as int? ?? 0;
         
         var fidelityScore = CalculateSpecificFidelityScore(
-            memoryResult.OverallScore, 
+            score,
             compressionRatio, 
             informationLoss, 
             keyFactRetention

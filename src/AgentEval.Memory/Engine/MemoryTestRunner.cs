@@ -102,7 +102,7 @@ public class MemoryTestRunner : IMemoryTestRunner
             var result = AggregateResults(scenario, queryResults, stopwatch.Elapsed, totalTokens, totalCost);
             
             _logger.LogInformation("Memory evaluation completed: {ScenarioName} - Overall Score: {Score:F1}% ({Passed}/{Total} queries passed)",
-                scenario.Name, result.OverallScore, result.PassedQueries, result.TotalQueries);
+                scenario.Name, result.OverallScore?.ToString("F1") ?? "n/a (not measured)", result.PassedQueries, result.TotalQueries);
                 
             return result;
         }
@@ -322,7 +322,7 @@ public class MemoryTestRunner : IMemoryTestRunner
         // Over the measured queries only: a query the judge produced no score for is not a 0 (it is counted instead,
         // as MemoryEvaluationResult.UnmeasuredQueries).
         var measured = queryResults.Where(r => r.Measured).ToList();
-        var overallScore = measured.Count > 0 ? measured.Average(r => r.Score) : 0;
+        double? overallScore = measured.Count > 0 ? measured.Average(r => r.Score) : null;
 
         // estimatedCost is the judge calls' priced total, or null when any call was not priced (PriceJudgment).
         return new MemoryEvaluationResult

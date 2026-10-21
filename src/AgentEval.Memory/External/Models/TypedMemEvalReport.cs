@@ -202,9 +202,9 @@ public sealed class TypedMemEvalGuessingBaseline
     /// </summary>
     public required double MaximumCorrectFromGuessing { get; init; }
 
-    /// <summary>That maximum as a share of the whole vertical.</summary>
-    public double ShareOfVertical =>
-        QuestionsTotal == 0 ? 0 : MaximumCorrectFromGuessing / QuestionsTotal;
+    /// <summary>That maximum as a share of the whole vertical; null when it has no questions.</summary>
+    public double? ShareOfVertical =>
+        QuestionsTotal == 0 ? null : MaximumCorrectFromGuessing / QuestionsTotal;
 }
 
 /// <summary>

@@ -9,9 +9,16 @@ namespace AgentEval.Memory.Models;
 public class MemoryEvaluationResult
 {
     /// <summary>
-    /// Overall memory score (0-100) for the entire evaluation.
+    /// Overall memory score (0-100), or null when no query was measured.
     /// </summary>
-    public required double OverallScore { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public required double? OverallScore
+    {
+        get => IsMeasured ? _overallScore : null;
+        init => _overallScore = value;
+    }
+
+    private readonly double? _overallScore;
 
     /// <summary>
     /// Results for each individual query in the scenario.
@@ -68,7 +75,7 @@ public class MemoryEvaluationResult
     /// <summary>
     /// Memory retention rate as a percentage (0-100), over the measured queries.
     /// </summary>
-    public double RetentionRate => MeasuredQueries > 0 ? QueryResults.Where(r => r.Measured).Average(r => r.Score) : 0;
+    public double? RetentionRate => MeasuredQueries > 0 ? QueryResults.Where(r => r.Measured).Average(r => r.Score) : null;
 
     /// <summary>
     /// Number of queries that passed their minimum score threshold.
@@ -95,9 +102,9 @@ public class MemoryEvaluationResult
     /// <summary>
     /// Success rate as a percentage of the measured queries that passed.
     /// </summary>
-    public double SuccessRate => MeasuredQueries > 0 ? (double)PassedQueries / MeasuredQueries * 100 : 0;
+    public double? SuccessRate => MeasuredQueries > 0 ? (double)PassedQueries / MeasuredQueries * 100 : null;
 
-    public override string ToString() => $"{ScenarioName}: {OverallScore:F1}% ({PassedQueries}/{TotalQueries} queries passed)";
+    public override string ToString() => $"{ScenarioName}: {(OverallScore is { } score ? $"{score:F1}%" : "n/a (not measured)")} ({PassedQueries}/{TotalQueries} queries passed)";
 }
 
 /// <summary>

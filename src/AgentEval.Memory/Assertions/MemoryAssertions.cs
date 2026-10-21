@@ -47,7 +47,17 @@ public class MemoryEvaluationAssertions
     public MemoryEvaluationAssertions HaveOverallScoreAtLeast(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        if (_result.OverallScore < minimumScore)
+        if (_result.OverallScore is not { } score)
+        {
+            AgentEvalScope.FailWith(new MemoryAssertionException(
+                "Expected a measured memory score, but the score was not measured",
+                expected: $"Measured score >= {minimumScore}%",
+                actual: "not measured",
+                suggestions: ["Run a memory query with a judge that returns a usable score"],
+                because: because));
+            return probe.Complete(this);
+        }
+        if (score < minimumScore)
         {
             var suggestions = new List<string>();
             
@@ -128,7 +138,7 @@ public class MemoryEvaluationAssertions
                 $"Expected at least {minimumPassed} queries to pass, but only {_result.PassedQueries} passed",
                 expected: $"At least {minimumPassed} queries passed",
                 actual: $"{_result.PassedQueries} queries passed",
-                suggestions: new[] { $"Success rate: {_result.SuccessRate:F1}%" },
+                suggestions: new[] { $"Success rate: {(_result.SuccessRate is { } rate ? $"{rate:F1}%" : "n/a (not measured)")}" },
                 because: because
             ));
         }

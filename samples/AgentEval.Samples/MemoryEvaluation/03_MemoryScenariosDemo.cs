@@ -89,12 +89,12 @@ public static class MemoryScenariosDemo
 
         Console.WriteLine($"   Fact: \"{fact.Content}\"");
         Console.WriteLine($"   Depths tested: {result.DepthResults.Count}");
-        Console.WriteLine($"   Max Reliable Depth: {result.MaxReliableDepth} turns");
-        Console.WriteLine($"   Failure Point: {(result.FailurePoint.HasValue ? $"at depth {result.FailurePoint}" : "none (all passed!)")}");
-        Console.WriteLine($"   Overall Score: {result.OverallScore:F1}%");
+        Console.WriteLine($"   Max Reliable Depth: {result.MaxReliableDepth?.ToString() ?? "n/a"} turns");
+        Console.WriteLine($"   Failure Point: {(result.FailurePoint.HasValue ? $"at depth {result.FailurePoint}" : result.UnmeasuredDepths > 0 || !result.IsMeasured ? "unknown (unmeasured depths)" : "none (all measured depths passed)")}");
+        Console.WriteLine($"   Overall Score: {MemorySampleReading.Percent(result.OverallScore)}");
         Console.WriteLine($"   Passed: {(result.Passed ? "✅ Yes" : "❌ No")}\n");
         if (!result.Passed)
-            SampleOutcome.Fail($"reach-back: '{fact.Content}' was not recalled reliably (score {result.OverallScore:F1}%, failure point {result.FailurePoint?.ToString() ?? "none"})");
+            SampleOutcome.Fail($"reach-back: '{fact.Content}' was not recalled reliably (score {MemorySampleReading.Percent(result.OverallScore)}, failure point {result.FailurePoint?.ToString() ?? "none"})");
 
         Console.WriteLine("   Depth Breakdown:");
         foreach (var dr in result.DepthResults)
@@ -144,12 +144,12 @@ public static class MemoryScenariosDemo
 
         Console.WriteLine($"   Facts tested: {facts.Length}");
         Console.WriteLine($"   Noise turns: 15");
-        Console.WriteLine($"   Fidelity Score: {result.FidelityScore:F1}%");
+        Console.WriteLine($"   Fidelity Score: {MemorySampleReading.Percent(result.FidelityScore)}");
         Console.WriteLine($"   Retained: {result.RetainedCount} | Lost: {result.LostCount}");
         Console.WriteLine($"   Critical Loss: {(result.HasCriticalLoss ? "⚠️ YES" : "✅ No")}");
         Console.WriteLine($"   Passed: {(result.Passed ? "✅ Yes" : "❌ No")}\n");
         if (!result.Passed)
-            SampleOutcome.Fail($"reducer: fidelity {result.FidelityScore:F1}%, {result.LostCount} fact(s) lost{(result.HasCriticalLoss ? ", including a critical one" : "")}");
+            SampleOutcome.Fail($"reducer: fidelity {MemorySampleReading.Percent(result.FidelityScore)}, {result.LostCount} fact(s) lost{(result.HasCriticalLoss ? ", including a critical one" : "")}");
 
         Console.WriteLine("   Per-Fact Results:");
         foreach (var fr in result.FactResults)
@@ -189,7 +189,7 @@ public static class MemoryScenariosDemo
             includeHistory: true);
 
         var priorityResult = await runner.RunAsync(agentA, priorityScenario);
-        Console.WriteLine($"     Score: {priorityResult.OverallScore:F1}% | Found: {priorityResult.FoundFacts.Count} | Missing: {priorityResult.MissingFacts.Count}");
+        Console.WriteLine($"     Score: {MemorySampleReading.Percent(priorityResult.OverallScore)} | Found: {priorityResult.FoundFacts.Count} | Missing: {priorityResult.MissingFacts.Count}");
 
         // Scenario B: Buried facts in chatty conversation
         Console.WriteLine("   Scenario B: Buried Facts (Chatty Conversation)");
@@ -206,7 +206,7 @@ public static class MemoryScenariosDemo
             includeHistory: true);
 
         var buriedResult = await runner.RunAsync(agentB, buriedScenario);
-        Console.WriteLine($"     Score: {buriedResult.OverallScore:F1}% | Steps: {buriedScenario.Steps.Count} | Queries: {buriedScenario.Queries.Count}");
+        Console.WriteLine($"     Score: {MemorySampleReading.Percent(buriedResult.OverallScore)} | Steps: {buriedScenario.Steps.Count} | Queries: {buriedScenario.Queries.Count}");
 
         // Scenario C: Fact Updates
         Console.WriteLine("   Scenario C: Fact Updates (Correction Handling)");
@@ -220,7 +220,7 @@ public static class MemoryScenariosDemo
             includeHistory: true);
 
         var updateResult = await runner.RunAsync(agentC, updateScenario);
-        Console.WriteLine($"     Score: {updateResult.OverallScore:F1}% | Found: {updateResult.FoundFacts.Count} | Missing: {updateResult.MissingFacts.Count}");
+        Console.WriteLine($"     Score: {MemorySampleReading.Percent(updateResult.OverallScore)} | Found: {updateResult.FoundFacts.Count} | Missing: {updateResult.MissingFacts.Count}");
 
         Console.WriteLine();
     }

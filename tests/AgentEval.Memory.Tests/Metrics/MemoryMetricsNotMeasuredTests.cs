@@ -149,7 +149,7 @@ public sealed class MemoryMetricsNotMeasuredTests
 
     private static MemoryQueryResult Query(bool measured) => new()
     {
-        Query = MemoryQuery.Create("q?", MemoryFact.Create("fact")),
+        Query = new() { Question = "q?", ExpectedFacts = [MemoryFact.Create("fact")], QueryTime = DateTimeOffset.UnixEpoch },
         Response = "r",
         Score = measured ? 90 : 0,
         Measured = measured,

@@ -19,9 +19,9 @@ public class ReachBackResult
     public required IReadOnlyList<DepthResult> DepthResults { get; init; }
 
     /// <summary>
-    /// Maximum depth where the agent reliably recalled the fact (score >= 80).
+    /// Maximum reliable depth (score >= 80); zero when measured but none recalled, null when unmeasured.
     /// </summary>
-    public int MaxReliableDepth => DepthResults
+    public int? MaxReliableDepth => !IsMeasured ? null : DepthResults
         .Where(d => d.Recalled)
         .Select(d => d.Depth)
         .DefaultIfEmpty(0)
@@ -38,11 +38,11 @@ public class ReachBackResult
         .FirstOrDefault();
 
     /// <summary>
-    /// Overall score (0-100) as the average of per-depth raw scores.
+    /// Overall score (0-100) over measured depths; null when none were measured.
     /// </summary>
-    public double OverallScore => DepthResults.Any(d => d.Measured)
+    public double? OverallScore => DepthResults.Any(d => d.Measured)
         ? DepthResults.Where(d => d.Measured).Average(d => d.Score)
-        : 0;
+        : null;
 
     /// <summary>Depths whose question the judge produced no score for, or whose run failed; left out of the score.</summary>
     public int UnmeasuredDepths => DepthResults.Count(d => !d.Measured);
@@ -53,7 +53,7 @@ public class ReachBackResult
     /// <summary>
     /// Whether the evaluation passed (max reliable depth meets minimum threshold).
     /// </summary>
-    public bool Passed => MaxReliableDepth > 0;
+    public bool Passed => MaxReliableDepth is > 0;
 
     /// <summary>
     /// Total execution time for the complete reach-back evaluation.

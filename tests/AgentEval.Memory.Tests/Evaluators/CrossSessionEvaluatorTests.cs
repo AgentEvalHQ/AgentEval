@@ -29,7 +29,7 @@ public class CrossSessionEvaluatorTests
 
         Assert.False(result.SessionResetSupported);
         Assert.False(result.Passed);
-        Assert.Equal(0, result.OverallScore);
+        Assert.Null(result.OverallScore);
         Assert.Empty(result.FactResults);
         Assert.NotNull(result.ErrorMessage);
         Assert.Contains("ISessionResettableAgent", result.ErrorMessage);
