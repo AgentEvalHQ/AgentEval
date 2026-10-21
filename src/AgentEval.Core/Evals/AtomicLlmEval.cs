@@ -293,7 +293,7 @@ public sealed class AtomicLlmEval : AtomicEval
         // absent too: with one count unreported it was the other count alone, read as the whole (T82).
         int? tokensUsed = null;
         double? estimatedCost = null;
-        if (er.InputTokenCount is { } inT && er.OutputTokenCount is { } outT)
+        if (er.InputTokenCount is >= 0 and { } inT && er.OutputTokenCount is >= 0 and { } outT)
         {
             if (_rateResolver is not null)
             {
@@ -302,7 +302,7 @@ public sealed class AtomicLlmEval : AtomicEval
                 // forking or mutating the process-global rate table.
                 var rate = _rateResolver(_judgeModel);
                 estimatedCost = inT > 0 || outT > 0
-                    ? (Math.Max(0, inT) / 1000.0) * rate.InputRatePer1K + (Math.Max(0, outT) / 1000.0) * rate.OutputRatePer1K
+                    ? (inT / 1000.0) * rate.InputRatePer1K + (outT / 1000.0) * rate.OutputRatePer1K
                     : 0;
             }
             else
@@ -312,8 +312,7 @@ public sealed class AtomicLlmEval : AtomicEval
             // EvalProvenance.TokensUsed is the legacy single-int totals field; sum the two
             // for backwards-compatible reporting. We clamp to int.MaxValue defensively even
             // though realistic judge transcripts are nowhere near that volume.
-            var total = inT + outT;
-            tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
+            tokensUsed = Core.TokenUsageMapping.SaturatingTotal(inT, outT);
         }
 
         var dimensions = er.CriteriaResults?

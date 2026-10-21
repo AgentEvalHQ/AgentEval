@@ -133,15 +133,14 @@ public static class JudgeCostMap
     /// <param name="inputTokens">Input (prompt) token count.</param>
     /// <param name="outputTokens">Output (completion) token count.</param>
     /// <returns>
-    /// Estimated cost in USD; 0 when both token counts are non-positive (nothing was spent), and
-    /// <see langword="null"/> (not priced) when <paramref name="judgeModel"/> has no rate.
+    /// Estimated cost in USD; 0 when both token counts are zero (nothing was spent), and
+    /// <see langword="null"/> (not priced) when a count is negative or <paramref name="judgeModel"/> has no rate.
     /// </returns>
     public static double? EstimateCost(string? judgeModel, long inputTokens, long outputTokens)
     {
-        if (inputTokens <= 0 && outputTokens <= 0) return 0;
+        if (inputTokens < 0 || outputTokens < 0) return null;
+        if (inputTokens == 0 && outputTokens == 0) return 0;
         if (GetRate(judgeModel) is not { } rate) return null;
-        var inT = Math.Max(0, inputTokens);
-        var outT = Math.Max(0, outputTokens);
-        return (inT / 1000.0) * rate.InputRatePer1K + (outT / 1000.0) * rate.OutputRatePer1K;
+        return (inputTokens / 1000.0) * rate.InputRatePer1K + (outputTokens / 1000.0) * rate.OutputRatePer1K;
     }
 }

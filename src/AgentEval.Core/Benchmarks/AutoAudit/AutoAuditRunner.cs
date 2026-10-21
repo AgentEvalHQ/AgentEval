@@ -35,10 +35,11 @@ public static class AutoAuditRunner
         var responses = chatBoundary.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
             .ToList();
-        var promptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0);
-        var completionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0);
+        var promptTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.PromptTokens ?? 0));
+        var completionTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.CompletionTokens ?? 0));
         // A response without usage adds nothing to the counts above, so they are not the endpoint's token cost then.
-        var tokensReported = responses.Count > 0 && responses.All(r => r.TokenUsage is not null);
+        var tokensReported = responses.Count > 0 && responses.All(r => r.TokenUsage is not null)
+            && (long)promptTokens + completionTokens < int.MaxValue;
         var latency = responses.Sum(r => r.DurationMs ?? 0);
 
         var gateBlocks = CountGateBlocks(chatBoundary);

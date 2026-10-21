@@ -208,9 +208,22 @@ public sealed class TraceFidelityRunner
                 [$"not measured: none of the {chatResponses.Count} chat-boundary response(s) reported token usage"]) with { Measured = false };
         }
 
-        var chatTokens = chatResponses.Sum(e => e.TokenUsage?.TotalTokens ?? 0);
-        var agentTokens = agentTrace.Performance?.TotalTokens
-            ?? agentTrace.Entries.Where(e => e.Type == TraceEntryType.Response).Sum(e => e.TokenUsage?.TotalTokens ?? 0);
+        var agentResponses = agentTrace.Entries.Where(e => e.Type == TraceEntryType.Response).ToList();
+        // Legacy int components carry no saturation marker. A maximum value may have lost usage;
+        // neither boundary then supports an exact comparison, even against a smaller observed sum.
+        static bool PossiblyCapped(TraceTokenUsage? usage) =>
+            usage is { PromptTokens: int.MaxValue } or { CompletionTokens: int.MaxValue };
+        if (chatResponses.Any(e => PossiblyCapped(e.TokenUsage))
+            || (agentTrace.Performance is { } performance
+                ? performance.TotalPromptTokens == int.MaxValue || performance.TotalCompletionTokens == int.MaxValue
+                : agentResponses.Any(e => PossiblyCapped(e.TokenUsage))))
+            return Build(TraceFidelityRubric.TokenUnderReporting, 0,
+                ["not measured: token counts may be capped at the legacy integer limit"]) with { Measured = false };
+
+        var chatTokens = chatResponses.Sum(e => (long)(e.TokenUsage?.PromptTokens ?? 0) + (e.TokenUsage?.CompletionTokens ?? 0));
+        var agentTokens = agentTrace.Performance is { } measured
+            ? (long)measured.TotalPromptTokens + measured.TotalCompletionTokens
+            : agentResponses.Sum(e => (long)(e.TokenUsage?.PromptTokens ?? 0) + (e.TokenUsage?.CompletionTokens ?? 0));
 
         // Directional: the class is "token UNDER-reporting", so flag only when the agent boundary reports
         // FEWER tokens than were actually consumed at the chat boundary (chat > agent). Over-reporting

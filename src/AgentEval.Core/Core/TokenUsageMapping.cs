@@ -18,15 +18,28 @@ namespace AgentEval.Core;
 /// </remarks>
 internal static class TokenUsageMapping
 {
-    /// <summary>The input and output counts, or null when <paramref name="usage"/> is null or lacks either one.</summary>
+    /// <summary>The nonnegative input and output counts, or null when either is missing or invalid.</summary>
     public static (int Prompt, int Completion)? Counts(UsageDetails? usage) =>
-        usage is { InputTokenCount: { } input, OutputTokenCount: { } output }
+        usage is { InputTokenCount: >= 0 and { } input, OutputTokenCount: >= 0 and { } output }
             ? (Saturate(input), Saturate(output))
             : null;
 
-    /// <summary>A <see cref="TokenUsage"/> when both counts were reported, otherwise null.</summary>
+    /// <summary>A <see cref="TokenUsage"/> when both counts were reported and nonnegative, otherwise null.</summary>
     public static TokenUsage? FromUsage(UsageDetails? usage) =>
         Counts(usage) is { } c ? new TokenUsage { PromptTokens = c.Prompt, CompletionTokens = c.Completion } : null;
 
-    private static int Saturate(long count) => count > int.MaxValue ? int.MaxValue : count < 0 ? 0 : (int)count;
+    // Absence, invalid contributions and overflow remain unavailable on subsequent attempts.
+    internal static long? Add(long? total, long? contribution) =>
+        total is >= 0 and { } sum && contribution is >= 0 and { } count && count <= long.MaxValue - sum
+            ? sum + count
+            : null;
+
+    // Both components have already been validated. Bound before adding to avoid long overflow.
+    internal static int SaturatingTotal(long input, long output) =>
+        input >= int.MaxValue || output >= int.MaxValue ? int.MaxValue : Saturate(input + output);
+
+    internal static int SaturatingSum(IEnumerable<int> counts) =>
+        counts.Aggregate(0, (sum, count) => SaturatingTotal(sum, count));
+
+    private static int Saturate(long count) => count > int.MaxValue ? int.MaxValue : (int)count;
 }

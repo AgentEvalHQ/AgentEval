@@ -135,8 +135,8 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
         // Track token usage
         if (response.TokenUsage != null)
         {
-            _totalPromptTokens += response.TokenUsage.PromptTokens;
-            _totalCompletionTokens += response.TokenUsage.CompletionTokens;
+            _totalPromptTokens = TokenUsageMapping.SaturatingTotal(_totalPromptTokens, response.TokenUsage.PromptTokens);
+            _totalCompletionTokens = TokenUsageMapping.SaturatingTotal(_totalCompletionTokens, response.TokenUsage.CompletionTokens);
         }
 
         // Capture tool calls from the response (honoring TrackToolCalls) into both this turn and

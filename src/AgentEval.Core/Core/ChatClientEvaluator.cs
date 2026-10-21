@@ -311,9 +311,9 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
     private static void Accumulate(ref long? input, ref long? output, UsageDetails? usage)
     {
-        // Nullable addition keeps an incomplete component absent across every corrective attempt.
-        input += usage?.InputTokenCount;
-        output += usage?.OutputTokenCount;
+        // Missing, invalid or overflowed components stay unavailable across corrective attempts.
+        input = TokenUsageMapping.Add(input, usage?.InputTokenCount);
+        output = TokenUsageMapping.Add(output, usage?.OutputTokenCount);
     }
 
     internal static EvaluationResult ParseEvaluationResponse(string responseText, EvalRubric? rubric = null)

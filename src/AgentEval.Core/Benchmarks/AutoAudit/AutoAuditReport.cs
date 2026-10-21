@@ -31,7 +31,7 @@ public sealed record AutoAuditEndpointResult(
     bool LeakedPastGate = false)
 {
     /// <summary>Total tokens (prompt + completion).</summary>
-    public int TotalTokens => PromptTokens + CompletionTokens;
+    public int TotalTokens => (int)Math.Min((long)PromptTokens + CompletionTokens, int.MaxValue);
 
     /// <summary>
     /// Whether <see cref="FidelityScore"/> is a measurement. <see langword="false"/> when the chat-boundary trace holds no
@@ -42,7 +42,8 @@ public sealed record AutoAuditEndpointResult(
 
     /// <summary>
     /// Whether every chat-boundary response reported its token usage. <see langword="false"/> when one did not: the token
-    /// counts then leave its usage out, so they are not the endpoint's token cost.
+    /// counts then leave its usage out, so they are not the endpoint's token cost. Also false when the aggregate is
+    /// capped at the legacy integer limit and cannot represent the exact reported total.
     /// </summary>
     public bool TokensReported { get; init; } = true;
 }
@@ -89,14 +90,14 @@ public sealed record AutoAuditReport(IReadOnlyList<AutoAuditEndpointResult> Resu
             var top = !measured ? "—" : r.TopDiscrepancies.Count > 0 ? string.Join("; ", r.TopDiscrepancies) : "—";
             var fidelity = measured ? $"{r.FidelityScore * 100:F0}%" : "not measured";
             var blocks = r.LeakedPastGate ? $"{r.GateBlocks}, and a leak the gate missed" : r.GateBlocks.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var tokens = r.TokensReported ? r.TotalTokens.ToString(System.Globalization.CultureInfo.InvariantCulture) : $"{r.TotalTokens} (usage not reported)";
+            var tokens = r.TokensReported ? r.TotalTokens.ToString(System.Globalization.CultureInfo.InvariantCulture) : $"{r.TotalTokens} (usage not reported or capped)";
             sb.AppendLine($"| {rank++} | {r.Endpoint} | {fidelity} | {blocks} | {tokens} | {r.LatencyMs} | {(r.Completed ? "yes" : "no")} | {top} |");
         }
 
         sb.AppendLine();
         if (Winner is not null)
         {
-            sb.AppendLine($"**Winner: {Winner.Endpoint}** — fidelity {Winner.FidelityScore * 100:F0}%, {Winner.GateBlocks} gate block(s), {Winner.TotalTokens} tokens{(Winner.TokensReported ? "" : " (usage not reported)")}.");
+            sb.AppendLine($"**Winner: {Winner.Endpoint}** — fidelity {Winner.FidelityScore * 100:F0}%, {Winner.GateBlocks} gate block(s), {Winner.TotalTokens} tokens{(Winner.TokensReported ? "" : " (usage not reported or capped)")}.");
         }
 
         return sb.ToString();

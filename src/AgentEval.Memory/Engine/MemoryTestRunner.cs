@@ -89,7 +89,7 @@ public class MemoryTestRunner : IMemoryTestRunner
             {
                 var (queryResult, judgeCost) = await EvaluateQueryAsync(agent, query, contextBlob, cancellationToken);
                 queryResults.Add(queryResult);
-                totalTokens += queryResult.TokensUsed;
+                totalTokens = (int)Math.Min((long)totalTokens + queryResult.TokensUsed, int.MaxValue);
                 totalCost = totalCost is { } sum && judgeCost is { } cost ? sum + cost : null;
                 
                 _logger.LogDebug("Query '{Question}' scored {Score:F1}%", 

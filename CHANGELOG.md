@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Negative or overflowing token contributions remain unavailable for pricing instead of becoming free usage. Legacy integer totals saturate safely in agent, trace, AutoAudit and Memory reporting. Capped trace counts cannot certify exact token fidelity; recorded zero and valid split streaming usage remain supported.
+
 - **Breaking:** Nested compliance/article/pillar and agentic/category/evaluator scores, evidence-control pass rates and Mission Control matrix rates are nullable when unmeasured. Red-team control rates and empty control coverage are nullable too. JSON schemas accept explicit null; Markdown, PDF and dashboard displays show `n/a`. Measured zero and measured portions of partial categories remain numbers; legacy numeric documents remain readable.
 
 - **Breaking:** renamed `JudgeToolData` to `JudgeInputData`, `AtomicLlmEval.JudgeSeesToolData` to `JudgeSeesData`, and `AtomicLlmDefinition.ToolData` to `InputData`, reflecting their instruction/action inputs as well as tools. Enum values and existing instrument hash material stay stable. `StochasticResult.IsMeasured` and `DecideVerdict` are internal implementation helpers before 1.0.

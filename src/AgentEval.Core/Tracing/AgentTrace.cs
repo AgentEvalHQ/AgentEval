@@ -416,7 +416,7 @@ public class TraceTokenUsage
     /// Total tokens used.
     /// </summary>
     [JsonPropertyName("totalTokens")]
-    public int TotalTokens => PromptTokens + CompletionTokens;
+    public int TotalTokens => (int)Math.Min((long)PromptTokens + CompletionTokens, int.MaxValue);
 }
 
 /// <summary>
@@ -506,7 +506,7 @@ public class TracePerformance
     /// Total tokens used.
     /// </summary>
     [JsonPropertyName("totalTokens")]
-    public int TotalTokens => TotalPromptTokens + TotalCompletionTokens;
+    public int TotalTokens => (int)Math.Min((long)TotalPromptTokens + TotalCompletionTokens, int.MaxValue);
 
     /// <summary>
     /// Time to first token for the first streaming response (if any).

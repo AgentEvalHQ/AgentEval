@@ -55,7 +55,7 @@ public class PerformanceMetrics
     /// </remarks>
     public int? TotalTokens => PromptTokens is null && CompletionTokens is null
         ? null
-        : (PromptTokens ?? 0) + (CompletionTokens ?? 0);
+        : (int)Math.Min((long)(PromptTokens ?? 0) + (CompletionTokens ?? 0), int.MaxValue);
     
     /// <summary>Number of tool calls made.</summary>
     public int ToolCallCount { get; set; }

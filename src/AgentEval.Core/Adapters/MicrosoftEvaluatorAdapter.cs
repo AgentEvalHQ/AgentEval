@@ -241,8 +241,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         double? estimatedCost = null;
         if (meter.UsageComplete)
         {
-            var total = meter.InputTokens + meter.OutputTokens;
-            tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
+            tokensUsed = TokenUsageMapping.SaturatingTotal(meter.InputTokens, meter.OutputTokens);
             estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
         }
 
@@ -297,6 +296,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
 
         private int _calls;
         private int _callsWithBothCounts;
+        private bool _invalidUsage;
 
         public long InputTokens { get; private set; }
         public long OutputTokens { get; private set; }
@@ -305,7 +305,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         /// <summary>True when every judge call reported both its input and its output token count.</summary>
         public bool UsageComplete
         {
-            get { lock (_gate) return _calls > 0 && _callsWithBothCounts == _calls; }
+            get { lock (_gate) return !_invalidUsage && _calls > 0 && _callsWithBothCounts == _calls; }
         }
 
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
@@ -349,8 +349,18 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             {
                 if (modelId is not null) ObservedModelId ??= modelId;
                 if (usage is null) return (false, false);
-                if (usage.InputTokenCount is { } i) InputTokens += i;
-                if (usage.OutputTokenCount is { } o) OutputTokens += o;
+                // Streaming chunks may split the two components; only supplied contributions are added.
+                // An invalid contribution or overflow invalidates the whole account permanently.
+                if (usage.InputTokenCount is { } i)
+                {
+                    if (TokenUsageMapping.Add(InputTokens, i) is { } input) InputTokens = input;
+                    else _invalidUsage = true;
+                }
+                if (usage.OutputTokenCount is { } o)
+                {
+                    if (TokenUsageMapping.Add(OutputTokens, o) is { } output) OutputTokens = output;
+                    else _invalidUsage = true;
+                }
                 return (usage.InputTokenCount is not null, usage.OutputTokenCount is not null);
             }
         }
