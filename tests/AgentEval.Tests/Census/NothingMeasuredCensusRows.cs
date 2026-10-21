@@ -171,13 +171,11 @@ internal static class NothingMeasuredCensusRows
         rows.Add(new("D2", typeof(CostEval), "telemetry whose cost was not tracked", "skipped", D2Nothing, D2Twin,
             Discoverable: false));
 
-        // ── Open: found by this census, not fixed in wave 1 ─────────────────
+        // ── Compliance summaries (T85) ────────────────────────────────────
         rows.Add(new("O1", typeof(AgentEval.Compliance.Gdpr.Reporting.SummaryBuilder), "a GDPR run whose root was skipped",
-            "no overall score (the reports print it as 'score 0%')", O1Nothing, O1Twin,
-            OpenTask: "T13 follow-up: compliance summary scores"));
+            "no overall score; the reports print n/a", O1Nothing, O1Twin));
         rows.Add(new("O2", typeof(AgentEval.Compliance.EuAiAct.Reporting.SummaryBuilder), "an EU AI Act run whose root was skipped",
-            "no overall score (the reports print it as 'score 0%')", O2Nothing, O2Twin,
-            OpenTask: "T13 follow-up: compliance summary scores"));
+            "no overall score; the reports print n/a", O2Nothing, O2Twin));
 
         return rows;
     }
@@ -489,6 +487,7 @@ internal static class NothingMeasuredCensusRows
     {
         var summary = Agentic(Error(), ("task_completion", Error()), ("task_adherence", Error()));
 
+        Assert.Null(summary.OverallScore);
         Assert.Equal("ERROR", summary.OverallStatus);
         Assert.Equal("ERROR", summary.PerCategory["system-outcome"].Status);
         return Task.CompletedTask;
@@ -498,6 +497,7 @@ internal static class NothingMeasuredCensusRows
     {
         var summary = Agentic(Pass(0.75), ("task_completion", Pass(0.9)), ("task_adherence", Pass(0.6)));
 
+        Assert.Equal(0.75, summary.OverallScore);
         Assert.Equal("PASS", summary.OverallStatus);
         Assert.Equal(0.75, summary.PerCategory["system-outcome"].Score, 6);
         return Task.CompletedTask;
@@ -1332,7 +1332,7 @@ internal static class NothingMeasuredCensusRows
                 new AgentEval.Compliance.Gdpr.Articles.Building.ScenarioToAtomicEval(new NeverCalledJudge(), judgeModel: "census")));
         var summary = new AgentEval.Compliance.Gdpr.Reporting.SummaryBuilder(registry).Build(Root("gdpr.census", Skipped()));
 
-        // OverallStatus already says SKIPPED; the markdown, the PDF and the CLI still print "(score 0%)".
+        // OverallStatus and score now agree: skipped is not a measured zero.
         Assert.Null(summary.OverallScore);
         return Task.CompletedTask;
     }

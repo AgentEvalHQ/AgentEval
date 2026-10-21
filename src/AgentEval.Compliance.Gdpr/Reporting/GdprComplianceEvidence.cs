@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 using AgentEval.Evals;
 using AgentEval.Output;
 using AgentEval.Compliance.Core;
@@ -27,10 +29,17 @@ public sealed record GdprComplianceEvidence(
 /// Roll-up summary of a GDPR benchmark run, broken down by pillar and article.
 /// </summary>
 public sealed record GdprSummary(
-    double OverallScore,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? OverallScore,
     string OverallStatus,
     IReadOnlyDictionary<string, GdprPillarSummary> PerPillar,
-    IReadOnlyDictionary<string, GdprArticleSummary> PerArticle);
+    IReadOnlyDictionary<string, GdprArticleSummary> PerArticle)
+{
+    /// <summary>Formats the measured overall score, or explains its absence, including in legacy ERROR/SKIPPED documents.</summary>
+    public string OverallScoreText() =>
+        OverallScore is { } score && OverallStatus is not ("ERROR" or "SKIPPED")
+            ? $"{score:P0}"
+            : "n/a \u2014 not measured";
+}
 
 /// <summary>Summary for a single GDPR pillar.</summary>
 public sealed record GdprPillarSummary(double Score, string Status, IReadOnlyList<string> CriticalFails);

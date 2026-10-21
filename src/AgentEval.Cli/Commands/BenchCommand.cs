@@ -356,7 +356,7 @@ public static class BenchCommand
             if (aefFailed)
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
             evidenceFinalized = true;
-            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
+            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScoreText()})");
 
             // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
             // the shared helper exists specifically so a future policy change lands in one place.

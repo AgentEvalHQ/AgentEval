@@ -343,12 +343,10 @@ public static class BenchAgenticCommand
 
             // ── Exit code ─────────────────────────────────────────────────────────
             evidenceFinalized = true;
-            // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
+            // ERROR / SKIPPED are not verdicts on the agent (B9b): the overall score is absent, and the exit is
             // indeterminate (11), not "gate failed" (9).
             var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
-            var scoreText = overall is "ERROR" or "SKIPPED"
-                ? $"score {result.Summary.OverallScore:P0} of the measured part only"
-                : $"score {result.Summary.OverallScore:P0}";
+            var scoreText = $"score {result.Summary.OverallScoreText()}";
             Console.WriteLine($"Overall result: {overall} ({scoreText})");
             if (errored.Count > 0)
                 Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +

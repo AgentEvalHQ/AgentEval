@@ -131,7 +131,7 @@ public sealed class GDPRPdfRenderer
             col.Item().PaddingTop(30)
                 .Background(StatusColor(ev.Summary.OverallStatus))
                 .Padding(10)
-                .Text($"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScore:P0})")
+                .Text($"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScoreText()})")
                 .FontColor(Colors.White).FontSize(20).Bold();
 
             col.Item().PaddingTop(30).Text(ev.Disclaimer).FontSize(10).Italic();

@@ -272,7 +272,8 @@ gates' checks, `Fail`, `Warn`, or `Averaged` — the old behaviour, the default 
 
 A report shows five statuses. `PASS`, `WARN` and `FAIL` are verdicts on the agent. `ERROR` means a check produced no
 verdict because its judge or its input failed (for example a judge reply off its rubric's scale); `SKIPPED` means
-nothing was measured. Neither is a verdict on the agent: the overall score then covers only the measured part, an
+nothing was measured. Neither is a verdict on the agent: the overall score is absent (`null` in `agentic-result.json`,
+rendered as `n/a — not measured`). A withheld `WARN` also has no overall score; measured parts remain in the detailed tables. An
 errored check is listed as "produced no verdict", not as a failure to review, and `bench agentic` exits `11`
 (indeterminate), not `9` (gate failed). The run's `summary.json`, whose schema has no ERROR, records `WARN` when part
 of the run was measured and `PENDING` when none was.

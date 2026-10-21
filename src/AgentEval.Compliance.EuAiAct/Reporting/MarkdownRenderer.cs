@@ -36,7 +36,7 @@ public sealed class MarkdownRenderer
         sb.AppendLine($"**Subject**: `{evidence.Base.Subject.Name}` ({evidence.Base.Subject.Kind})");
         sb.AppendLine($"**Run**: `{evidence.Base.SourceRun.RunId}`");
         sb.AppendLine($"**Generated**: {evidence.Base.GeneratedAt:O}");
-        sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScore:P0})");
+        sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScoreText()})");
         sb.AppendLine();
 
         // Smoke and other flat presets produce an empty PerPillar dict; suppress the section entirely

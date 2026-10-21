@@ -124,7 +124,7 @@ public sealed class AgenticPdfRenderer
             col.Item().PaddingTop(30)
                 .Background(StatusColor(result.Summary.OverallStatus))
                 .Padding(10)
-                .Text($"OVERALL: {result.Summary.OverallStatus} (score {result.Summary.OverallScore:P0})")
+                .Text($"OVERALL: {result.Summary.OverallStatus} (score {result.Summary.OverallScoreText()})")
                 .FontColor(Colors.White).FontSize(20).Bold();
 
             col.Item().PaddingTop(30).Text(result.Disclaimer).FontSize(10).Italic();
@@ -181,7 +181,7 @@ public sealed class AgenticPdfRenderer
             col.Item().PaddingTop(20)
                 .Background(StatusColor(result.Summary.OverallStatus))
                 .Padding(8)
-                .Text($"Overall: {result.Summary.OverallStatus} — {result.Summary.OverallScore:P0}")
+                .Text($"Overall: {result.Summary.OverallStatus} — {result.Summary.OverallScoreText()}")
                 .FontColor(Colors.White).FontSize(14).Bold();
         });
     }

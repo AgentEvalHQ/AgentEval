@@ -197,11 +197,11 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Compliance.EuAiAct.Reporting.EuAiActArticleSummary"] = "DTO of the EU AI Act SummaryBuilder (row O2); status by ReportStatus",
         ["AgentEval.Compliance.EuAiAct.Reporting.EuAiActComplianceEvidence"] = "evidence document carrying EuAiActSummary (row O2)",
         ["AgentEval.Compliance.EuAiAct.Reporting.EuAiActPillarSummary"] = "DTO of the EU AI Act SummaryBuilder (row O2); status by ReportStatus",
-        ["AgentEval.Compliance.EuAiAct.Reporting.EuAiActSummary"] = "DTO of the EU AI Act SummaryBuilder (row O2: its OverallScore is the open gap)",
+        ["AgentEval.Compliance.EuAiAct.Reporting.EuAiActSummary"] = "DTO of the EU AI Act SummaryBuilder (row O2: OverallScore is absent when not measured)",
         ["AgentEval.Compliance.Gdpr.Reporting.GdprArticleSummary"] = "DTO of the GDPR SummaryBuilder (row O1); status by ReportStatus",
         ["AgentEval.Compliance.Gdpr.Reporting.GdprComplianceEvidence"] = "evidence document carrying GdprSummary (row O1)",
         ["AgentEval.Compliance.Gdpr.Reporting.GdprPillarSummary"] = "DTO of the GDPR SummaryBuilder (row O1); status by ReportStatus",
-        ["AgentEval.Compliance.Gdpr.Reporting.GdprSummary"] = "DTO of the GDPR SummaryBuilder (row O1: its OverallScore is the open gap)",
+        ["AgentEval.Compliance.Gdpr.Reporting.GdprSummary"] = "DTO of the GDPR SummaryBuilder (row O1: OverallScore is absent when not measured)",
 
         // DataLoaders
         ["AgentEval.Output.AssertionSummary"] = "data: one assertion's outcome in a trace; no number",
@@ -213,7 +213,7 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Evals.Agentic.Reporting.AgenticBenchmarkResult"] = "evaluation artifact carrying AgenticSummary (row A11)",
         ["AgentEval.Evals.Agentic.Reporting.AgenticCategorySummary"] = "DTO of AgenticSummaryBuilder (row A11): Score must be a number (agentic-result.schema.json); Status ERROR or SKIPPED says it is no reading",
         ["AgentEval.Evals.Agentic.Reporting.AgenticEvaluatorSummary"] = "DTO of AgenticSummaryBuilder (row A11): the evaluator's own score and status",
-        ["AgentEval.Evals.Agentic.Reporting.AgenticSummary"] = "DTO of AgenticSummaryBuilder (row A11): OverallScore must be a number (schema); OverallStatus carries the absence",
+        ["AgentEval.Evals.Agentic.Reporting.AgenticSummary"] = "DTO of AgenticSummaryBuilder (row A11): OverallScore is nullable; the schema preserves explicit null",
 
         // MAF
         ["AgentEval.MAF.Gatekeeper.GateBlockAggregation"] = "count: refusals by tool, policy, fingerprint, severity and day",

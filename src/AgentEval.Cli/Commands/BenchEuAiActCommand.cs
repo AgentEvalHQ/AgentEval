@@ -337,7 +337,7 @@ public static class BenchEuAiActCommand
             if (aefFailed)
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
             evidenceFinalized = true;
-            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
+            Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScoreText()})");
 
             // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping —
             // OverallStatus is always exactly "PASS"/"WARN"/"FAIL", see MapLabelToStatus, so this is behaviorally

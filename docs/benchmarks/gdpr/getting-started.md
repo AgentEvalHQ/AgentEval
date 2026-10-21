@@ -115,8 +115,10 @@ The standard `ComplianceEvidence` document written by `SaveComplianceEvidenceAsy
 
 The GDPR-specific wrapper. Contains:
 - `compositeTree` — the full recursive `EvalResult` tree, one node per article and per pillar.
-- `pillarSummary` — per-pillar score, pass/fail, and article count.
-- `overallVerdict` — `PASS`, `WARN`, or `FAIL`.
+- `summary.perPillar` and `summary.perArticle` — scores and statuses for the measured parts.
+- `summary.overallStatus` — `PASS`, `WARN`, `FAIL`, `ERROR`, or `SKIPPED`.
+- `summary.overallScore` — the measured overall score, or explicit `null` when the root is not measured
+  (including a withheld `WARN`). Markdown, PDF and CLI output display `n/a — not measured`; a measured zero remains zero.
 - `criticalFindings` — list of articles that scored below threshold at `high` or `critical` severity.
 - `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this structured shape and the legacy `string[]` shape written by v0.8.1-beta, via `anyOf` at the `items` level, so older files still validate. The schema also accepts an optional `metadata: { string: string }` object on each entry; the built-in recommendation extractor does not write it.
 - `disclaimer` — the verbatim disclaimer text from this document's Scope section.

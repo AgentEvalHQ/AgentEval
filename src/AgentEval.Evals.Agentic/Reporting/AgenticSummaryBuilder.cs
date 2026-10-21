@@ -52,7 +52,7 @@ public sealed class AgenticSummaryBuilder
         if (root.Details.SubResults is not { Count: > 0 } l1Children)
         {
             return new AgenticSummary(
-                OverallScore: root.Score.Value,
+                OverallScore: root.Score.MeasuredValue(),
                 OverallStatus: root.Score.ReportStatus(),
                 PerCategory: perCategory,
                 PerEvaluator: perEvaluator);
@@ -159,7 +159,7 @@ public sealed class AgenticSummaryBuilder
         }
 
         return new AgenticSummary(
-            OverallScore: root.Score.Value,
+            OverallScore: root.Score.MeasuredValue(),
             OverallStatus: root.Score.ReportStatus(),
             PerCategory: perCategory,
             PerEvaluator: perEvaluator);

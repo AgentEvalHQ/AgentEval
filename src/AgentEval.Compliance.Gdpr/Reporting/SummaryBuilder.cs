@@ -48,7 +48,7 @@ public sealed class SummaryBuilder
         if (root.Details.SubResults is not { Count: > 0 } l1Children)
         {
             return new GdprSummary(
-                OverallScore: root.Score.Value,
+                OverallScore: root.Score.MeasuredValue(),
                 OverallStatus: root.Score.ReportStatus(),
                 PerPillar: perPillar,
                 PerArticle: perArticle);
@@ -115,7 +115,7 @@ public sealed class SummaryBuilder
         }
 
         return new GdprSummary(
-            OverallScore: root.Score.Value,
+            OverallScore: root.Score.MeasuredValue(),
             OverallStatus: root.Score.ReportStatus(),
             PerPillar: perPillar,
             PerArticle: perArticle);
