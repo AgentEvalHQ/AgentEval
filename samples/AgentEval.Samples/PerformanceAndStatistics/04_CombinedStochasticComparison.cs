@@ -73,7 +73,8 @@ public static class CombinedStochasticComparison
         {
             TrackTools = true,
             TrackPerformance = true,
-            ModelName = AIConfig.ModelDeployment // not per factory: every model's runs are priced at this name's rate
+            // No ModelName: each agent names its own model (MAFIdentifiableAgentAdapter below), so each model's runs are
+            // priced at that model's own rate in ModelPricing.
         });
         Console.WriteLine("   ✓ Stochastic runner ready\n");
         
@@ -215,7 +216,7 @@ public static class CombinedStochasticComparison
             instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
             tools: [AIFunctionFactory.Create(CalculatorTool)]);
 
-        return new MAFAgentAdapter(agent);
+        return new MAFIdentifiableAgentAdapter(agent, deployment, deployment);
     }
 
     [Description("Performs basic arithmetic operations")]

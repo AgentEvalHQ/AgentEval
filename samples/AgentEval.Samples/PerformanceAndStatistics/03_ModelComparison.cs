@@ -89,7 +89,8 @@ public static class ModelComparison
         {
             TrackTools = true,
             TrackPerformance = true,
-            ModelName = AIConfig.ModelDeployment
+            // No ModelName: each agent names its own model (MAFIdentifiableAgentAdapter below), so each model's runs are
+            // priced at that model's own rate in ModelPricing. A ModelName here would price every model at one rate.
         });
         var comparer = new ModelComparer(stochasticRunner);
         
@@ -139,14 +140,14 @@ public static class ModelComparison
 
         var nameWidth = Math.Max(11, result.Ranking.Max(r => r.ModelName.Length));
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"   Rank │ {"Model".PadRight(nameWidth)} │ Composite │ Quality │ Speed │ Cost │ Reliability");
-        Console.WriteLine($"   ─────┼─{new string('─', nameWidth)}─┼───────────┼─────────┼───────┼──────┼────────────");
+        Console.WriteLine($"   Rank │ {"Model".PadRight(nameWidth)} │ Composite │ Quality │ Speed │  Cost │ Reliability");
+        Console.WriteLine($"   ─────┼─{new string('─', nameWidth)}─┼───────────┼─────────┼───────┼───────┼────────────");
         Console.ResetColor();
 
         foreach (var ranking in result.Ranking)
         {
             var medal = ranking.Rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{ranking.Rank}" };
-            Console.WriteLine($"   {medal,-4} │ {ranking.ModelName.PadRight(nameWidth)} │ {ranking.CompositeScore,9:F1} │ {ranking.QualityScore,7:F1} │ {FormatScore(ranking.SpeedScore),5} │ {FormatScore(ranking.CostScore),4} │ {ranking.ReliabilityScore,8:F1}");
+            Console.WriteLine($"   {medal,-4} │ {ranking.ModelName.PadRight(nameWidth)} │ {ranking.CompositeScore,9:F1} │ {ranking.QualityScore,7:F1} │ {FormatScore(ranking.SpeedScore),5} │ {FormatScore(ranking.CostScore),5} │ {ranking.ReliabilityScore,8:F1}");
         }
         Console.WriteLine();
 
@@ -165,17 +166,16 @@ public static class ModelComparison
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   ⚠️  Cost n/a — not measured: {costNotMeasured}");
             Console.ResetColor();
-            // What pricing exists: ModelPricing's table and ModelPricing.SetPricing. The harness prices every run at
-            // EvaluationOptions.ModelName, one name for all models (the primary, above), so there is no per-model price
-            // to feed the comparison; BITDEER_PRICE_*_PER_1M prices one model, in sample N1 only.
-            Console.WriteLine($"      To rank on cost, {AIConfig.ModelDeployment} needs a price: ModelPricing.SetPricing(model, inputPer1K, outputPer1K).");
-            Console.WriteLine("      This sample prices every model's runs at that one rate, so a priced cost here compares token use, not");
-            Console.WriteLine("      prices (docs/model-comparison.md, \"Cost is priced from one model name\").\n");
+            // Each model is priced from ModelPricing's table at its own id; a model the table does not know is unpriced.
+            var unpriced = models.Where(m => ModelPricing.GetPricing(m) is null).ToList();
+            Console.WriteLine(unpriced.Count > 0
+                ? $"      To rank on cost, give {string.Join(", ", unpriced)} a price: ModelPricing.SetPricing(model, inputPer1K, outputPer1K).\n"
+                : "      Every model has a price, so a model's runs returned no token usage to price.\n");
             SampleOutcome.Skip($"cost not measured: {costNotMeasured}");
         }
         else
         {
-            Console.WriteLine($"   (Cost: every model's runs are priced at {AIConfig.ModelDeployment}'s rate, so it compares token use, not prices.)\n");
+            Console.WriteLine($"   (Cost: each model's tokens at its own price in ModelPricing, table {ModelPricing.TableName}.)\n");
         }
 
         Console.WriteLine("📝 Step 7: Cost Analysis\n");
@@ -293,8 +293,8 @@ public static class ModelComparison
             instructions: "You are a math assistant. Always use the CalculatorTool for calculations.",
             tools: [AIFunctionFactory.Create(CalculatorTool)]);
 
-        // Wrap with MAFAgentAdapter for evaluation
-        return new MAFAgentAdapter(agent);
+        // The identifiable adapter names the model, so the harness prices this agent's runs at its own rate.
+        return new MAFIdentifiableAgentAdapter(agent, deployment, deployment);
     }
 
     [Description("Performs basic arithmetic operations")]

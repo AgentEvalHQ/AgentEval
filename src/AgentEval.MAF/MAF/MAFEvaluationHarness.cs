@@ -97,7 +97,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             if (metrics != null)
             {
                 metrics.EndTime = DateTimeOffset.UtcNow;
-                metrics.ModelUsed = options.ModelName;
+                metrics.ModelUsed = ModelForCost(options, agent);
             }
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
 
@@ -265,7 +265,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         
         options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
-        var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = options.ModelName };
+        var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = ModelForCost(options, agent) };
         WarnIfExpectedToolsUnenforced(testCase);
         var toolCalls = new Dictionary<string, ToolCallRecord>();
         var responseText = new System.Text.StringBuilder();
@@ -626,7 +626,16 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         if (text.Length <= maxLength) return text;
         return text[..(maxLength - 3)] + "...";
     }
-    
+
+    /// <summary>
+    /// The model a run's cost is priced at: <see cref="EvaluationOptions.ModelName"/> when set, else the model the agent
+    /// says it runs (<see cref="AgentEval.Comparison.IModelIdentifiable"/>). With options shared across agents, as
+    /// <c>StochasticRunner</c> and <c>ModelComparer</c> share them, the agent's own model is what prices each model's
+    /// runs at its own rate; before, every run was priced at the one options name, or not priced at all.
+    /// </summary>
+    private static string? ModelForCost(EvaluationOptions options, IEvaluableAgent agent) =>
+        options.ModelName ?? (agent as AgentEval.Comparison.IModelIdentifiable)?.ModelId;
+
     // ═══════════════════════════════════════════════════════════════════════════
     // TIMELINE & FAILURE REPORT HELPERS
     // ═══════════════════════════════════════════════════════════════════════════

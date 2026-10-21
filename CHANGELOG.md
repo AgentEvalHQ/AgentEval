@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Bitdeer models are priced; each model in a comparison at its own rate:** `ModelPricing` and
+  `JudgeCostMap` carry the prices bitdeer.ai/en/pricing/ai-models charged on 2026-10-21 for every model
+  Bitdeer serves (GLM-5.3-Flash, GLM-5.3, DeepSeek-V4-Flash, DeepSeek-V4.1-Flash, Qwen3.8-27B,
+  Nemotron-3.5-Super, bge-m3 and the bge reranker), keyed by Bitdeer's model id. Where the page shows a
+  sale, the row holds the sale price and its comment the struck-through list price. Before, a comparison
+  on Bitdeer reported cost as not measured, and a GLM judge was charged at `JudgeCostMap`'s
+  gpt-4o-mini-grade default rate. `ModelPricing.TableName` is now `agenteval-model-pricing-2026-10-21`.
+  `MAFEvaluationHarness` prices a run at `EvaluationOptions.ModelName` and, when that is not set, at the
+  model the agent names (`IModelIdentifiable`, `MAFIdentifiableAgentAdapter`). `StochasticRunner` shares
+  one options object across every model of a comparison, so a comparison used to price every model at
+  one model's rate (comparing token counts, not prices) or price nothing; samples D3 and D4 now price each
+  model at its own rate. On Bitdeer (2026-10-21) D3 ranks GLM-5.3-Flash, DeepSeek-V4-Flash and
+  Qwen3.8-27B on cost and completes (it was not measured). Sample N1 takes `BITDEER_PRICE_*_PER_1M` as an
+  override and the table otherwise. Sample H6 no longer prints "all 10 OWASP categories covered, no
+  skipped leaves" on a Smoke run, which covers two and skips eight: it names what the run covered.
+
 - **Workflow steps are one per agent turn again:** since #129, `MAFWorkflowAdapter.FromMAFWorkflow`
   recorded every message MAF delivers to an executor as a step. An agent bound with `BindAsExecutor`
   receives 2-3 messages per turn (the chat messages it only collects, then the `TurnToken` that runs it),

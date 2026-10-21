@@ -104,9 +104,22 @@ public static class OwaspBenchmarkSample
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - OWASP is a Shape B / runner-style benchmark — the pipeline drives the agent itself.");
-        Console.WriteLine("   - All 10 OWASP LLM Top 10 v2.0 categories are now covered: Wave D added LLM03 supply");
-        Console.WriteLine("     chain, LLM04 data + model poisoning, LLM08 vector + embedding weaknesses, and LLM09");
-        Console.WriteLine("     misinformation as agent-API-layer attacks — no skipped leaves.");
+        // Say what THIS run covered: Smoke runs 3 attacks over two categories and reports the other eight as skipped.
+        // Until 2026-10 this line said "all 10 covered, no skipped leaves" on a Smoke run that had skipped eight.
+        var covered = run.CoveredOwaspIds.Count();
+        if (covered < 10)
+        {
+            Console.WriteLine($"   - This {run.PresetName} run covered {covered} of the 10 OWASP LLM Top 10 v2.0 categories " +
+                              $"({string.Join(", ", run.CoveredOwaspIds)});");
+            Console.WriteLine($"     the other {10 - covered} are skipped, so not measured. Standard and AuditGrade cover all 10");
+            Console.WriteLine("     (--preset standard, or AGENTEVAL_SAMPLES_PRESET=standard).");
+        }
+        else
+        {
+            Console.WriteLine("   - All 10 OWASP LLM Top 10 v2.0 categories are covered: Wave D added LLM03 supply");
+            Console.WriteLine("     chain, LLM04 data + model poisoning, LLM08 vector + embedding weaknesses, and LLM09");
+            Console.WriteLine("     misinformation as agent-API-layer attacks.");
+        }
         Console.WriteLine("   - Graded judge first: Composite Judges decide the semantic attacks (several judge calls");
         Console.WriteLine("     per probe); the other attacks are decided by their oracle, which asks the judge only");
         Console.WriteLine("     when it is inconclusive. The judge may then only raise a probe to 'attack succeeded'.");

@@ -201,7 +201,7 @@ Console.WriteLine(results.ToMarkdown());
 | 🥉 3 | GPT-3.5 Turbo | **75.2** | 68.9 | 88.0 | 90.1 | 60.0 | 3.00 |
 ```
 
-The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The cost column needs care. The harness prices every model's runs at the rate of one model name, `EvaluationOptions.ModelName`; with none set, as in the snippet above, no run is priced, so cost is not measured: the Avg Cost column reads `n/a` and each composite weighs quality, speed and reliability. The cost scores in this illustration appear only when every model's runs are priced. See [how the scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
+The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The cost column needs care. The harness prices a run at the model `EvaluationOptions.ModelName` names (one name prices every model at one rate) or, with none set, at the model the agent names itself (`MAFIdentifiableAgentAdapter`); an agent that names no model, or a model without a price, leaves its runs unpriced, so cost is not measured: the Avg Cost column reads `n/a` and each composite weighs quality, speed and reliability. The cost scores in this illustration appear only when every model's runs are priced. See [how the scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
 
 ---
 

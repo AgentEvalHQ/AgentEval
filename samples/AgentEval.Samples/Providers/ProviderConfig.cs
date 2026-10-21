@@ -48,8 +48,28 @@ internal static class ProviderConfig
     /// <summary>The benchmark identity: model AND provider, because serving changes what a model does.</summary>
     public static string BitdeerAgentName => $"{BitdeerModel}@{BitdeerProviderTag}";
 
-    /// <summary>Per-1K rates from BITDEER_PRICE_*_PER_1M, or null when the run is not priced.</summary>
+    /// <summary>
+    /// Per-1K rates for <see cref="BitdeerModel"/>: BITDEER_PRICE_*_PER_1M when both are set, else the model's row in
+    /// <see cref="AgentEval.Models.ModelPricing"/> (Bitdeer's prices on 2026-10-21), else null: the run is not priced.
+    /// </summary>
     public static (double InputPer1K, double OutputPer1K)? BitdeerPricePer1K
+    {
+        get
+        {
+            if (BitdeerPriceFromEnvironment is { } set)
+                return set;
+            return AgentEval.Models.ModelPricing.GetPricing(BitdeerModel) is { } row
+                ? ((double)row.InputPer1K, (double)row.OutputPer1K)
+                : null;
+        }
+    }
+
+    /// <summary>Where <see cref="BitdeerPricePer1K"/> came from, for the line that prints it.</summary>
+    public static string BitdeerPriceSource => BitdeerPriceFromEnvironment is not null
+        ? "BITDEER_PRICE_*_PER_1M"
+        : $"ModelPricing table {AgentEval.Models.ModelPricing.TableName}";
+
+    private static (double InputPer1K, double OutputPer1K)? BitdeerPriceFromEnvironment
     {
         get
         {

@@ -356,8 +356,8 @@ $env:OPENROUTER_API_KEY = "..."                       # relay:  https://openrout
 $env:JEV_TRANSPORT = "typesafe"                       # or "openrouter" — when both keys are set
 $env:JEV_MODEL     = "jev-1.13.0"                     # pin a versioned id for anything reproducible (TypeSafe: jev-1.13.0; OpenRouter: typesafe/jev-1.13)
 $env:AGENTEVAL_SAMPLES_SHOW_RAW = "1"                 # N2: print every request and reply body (the key is never printed)
-$env:BITDEER_PRICE_INPUT_PER_1M  = "0.00"             # Bitdeer's list price was not verifiable from their public
-$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; unset → the run prints "not priced"
+$env:BITDEER_PRICE_INPUT_PER_1M  = "0.083"            # override ModelPricing's Bitdeer row (bitdeer.ai prices on
+$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.275"            # 2026-10-21); a model with no row and no override prints "not priced"
 ```
 
 ### O — Domain Packs  🔑 a model provider

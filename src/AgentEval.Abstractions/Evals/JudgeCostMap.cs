@@ -64,6 +64,15 @@ public static class JudgeCostMap
         // the provider does not report a cost itself — OpenRouter does (usage.cost), and that wins.
         // Substring-matched, so "typesafe/jev-1.13-20260917" and "jev-latest" both resolve here.
         ["jev"]                      = new(0.000042, 0.0),
+        // Bitdeer AI chat models (a GLM judge on Bitdeer): the prices bitdeer.ai/en/pricing/ai-models charged on
+        // 2026-10-21, sale prices where the page shows one. Until then these judges fell back to the gpt-4o-mini-grade
+        // default rate. ModelPricing has the list prices beside each row.
+        ["zai-org/GLM-5.3-Flash"]    = new(0.000083, 0.000275),
+        ["zai-org/GLM-5.3"]          = new(0.00063, 0.00198),
+        ["deepseek-ai/DeepSeek-V4.1-Flash"] = new(0.000144, 0.000576),
+        ["deepseek-ai/DeepSeek-V4-Flash"]   = new(0.00014, 0.00028),
+        ["Qwen/Qwen3.8-27B"]         = new(0.0004, 0.0024),
+        ["nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B"] = new(0.0001, 0.0004),
         ["o1-preview"]               = new(0.01500, 0.06000),
         ["o1-mini"]                  = new(0.00300, 0.01200),
         ["o3-mini"]                  = new(0.00110, 0.00440),

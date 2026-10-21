@@ -61,7 +61,7 @@ Cost: not measured — no cost was recorded for GPT-4o, GPT-4o Mini (no price fo
 Recommendation: Use GPT-4o
 ```
 
-Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And cost is `n/a` because no run was priced ([Cost is priced from one model name](#what-the-ranking-does-not-tell-you)): a model with no cost is not ranked as the cheapest, and the composite leaves cost out.
+Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And cost is `n/a` because no run was priced ([How a run is priced](#what-the-ranking-does-not-tell-you)): a model with no cost is not ranked as the cheapest, and the composite leaves cost out.
 
 ---
 
@@ -80,7 +80,7 @@ IEvaluableAgent CreateAgent(string deployment) =>
         systemPrompt: "You are a customer support assistant for an online store.");
 ```
 
-For a Microsoft Agent Framework `AIAgent`, return `new MAFAgentAdapter(aiAgent)` instead (see [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)). Implement `IAgentFactory` yourself when a factory needs its own state. `ModelComparer` does not read `IAgentFactory.Configuration`.
+For a Microsoft Agent Framework `AIAgent`, return `new MAFIdentifiableAgentAdapter(aiAgent, modelId, displayName)` instead: it names the model, so each model's runs are priced at its own rate (see [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)). Implement `IAgentFactory` yourself when a factory needs its own state. `ModelComparer` does not read `IAgentFactory.Configuration`.
 
 ### Step 2: Define Test Cases
 
@@ -198,7 +198,7 @@ What follows from this:
 
 ### What the Ranking Does Not Tell You
 
-- **Cost is priced from one model name.** The harness estimates a run's cost from its token counts and the price of `EvaluationOptions.ModelName` in `ModelPricing`. `StochasticRunner` passes the same `EvaluationOptions` for every model, so every model is priced at that one model's rate, and the cost dimension then compares token usage, not prices. With no `ModelName` (as in the examples above), or a name missing from the price table, no run is priced: `AverageCost` is `null` for every model and cost is not measured (step 5). To compare prices, price each model's tokens at its own rate ([Cost-Quality Tradeoffs](#cost-quality-tradeoffs)), or set the cost weight to 0.
+- **How a run is priced.** The harness estimates a run's cost from its token counts and a model's price in `ModelPricing`: the model `EvaluationOptions.ModelName` names, or, when that is not set, the model the agent names itself (`IModelIdentifiable.ModelId`; `MAFIdentifiableAgentAdapter` for a MAF `AIAgent`). `StochasticRunner` passes the same `EvaluationOptions` for every model, so a `ModelName` there prices every model at that one model's rate, and the cost dimension then compares token usage, not prices: leave it unset and let each agent name its model. An agent that names no model (`AsEvaluableAgent`, `MAFAgentAdapter`), or a model missing from the price table, leaves its runs unpriced: when any model has no cost, cost is not measured for the comparison (step 5). Add a missing price with `ModelPricing.SetPricing`, or set the cost weight to 0.
 - **Latency and cost cover only the runs that returned.** A model whose every run throws has neither, so speed and cost are not measured for the whole comparison (step 5) and it is ranked on quality and reliability alone, where its failed runs count. A model with only some failed runs is timed and priced on the runs that returned: check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before reading its speed.
 - **Weights are not checked.** `ModelComparer` does not call `ScoringWeights.Validate()`. Weights that do not sum to 1 change the scale of `CompositeScore`, which is then no longer 0–100. Call `Validate()` on your weights yourself.
 - **Tokens may be estimated.** When the provider returns no token usage, the harness estimates tokens from the text (`PerformanceMetrics.TokensAreEstimated`), and a cost built on them is an estimate of an estimate.
@@ -241,7 +241,7 @@ Presets: `ModelComparisonOptions.Quick` (3 runs per model), `ModelComparisonOpti
 Your own weights:
 
 ```csharp
-// Cost weight 0: the runs are not priced per model, so cost would not discriminate anyway
+// Cost weight 0: rank on quality, speed and reliability only
 var weights = new ScoringWeights(Quality: 0.5, Speed: 0.3, Cost: 0.0, Reliability: 0.2);
 weights.Validate();   // throws unless every weight is non-negative and they sum to 1.0
 
@@ -330,7 +330,7 @@ Console.WriteLine("Complex flows:\n" + complexComparison.ToMarkdown(MarkdownExpo
 
 ## Cost-Quality Tradeoffs
 
-The built-in cost dimension prices every model at one rate ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price, price each model's own token usage at its own rate with `ModelPricing.EstimateCost`:
+The built-in cost dimension prices each model at its own rate when each agent names its model ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price yourself, for agents that name no model, price each model's token usage at its own rate with `ModelPricing.EstimateCost`:
 
 ```csharp
 using AgentEval.Models;
