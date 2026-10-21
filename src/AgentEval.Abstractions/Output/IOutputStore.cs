@@ -173,6 +173,49 @@ public sealed record ScenarioResult(
     /// </para>
     /// </remarks>
     public ComparabilityFacts? Comparability { get; init; }
+
+    /// <summary>
+    /// Whether <see cref="Score"/> is a measurement: <see cref="ScenarioMeasurement.NotMeasured"/> when the scenario
+    /// errored, was skipped or its judge produced no verdict, <see cref="ScenarioMeasurement.NotApplicable"/> when the
+    /// case could not test the thing. Its <see cref="Score"/> and <see cref="Passed"/> are then placeholders, never a 0
+    /// that a comparison may average.
+    /// </summary>
+    /// <remarks>
+    /// <see langword="null"/> reads as measured. A measured scenario, and every one written before this member existed,
+    /// carries none: non-positional and null-defaulting for the same reason as <see cref="StimulusHash"/>, so their files
+    /// are byte-identical under the store's <c>DefaultIgnoreCondition = WhenWritingNull</c>.
+    /// </remarks>
+    public string? Measurement { get; init; }
+}
+
+/// <summary>The values <see cref="ScenarioResult.Measurement"/> takes.</summary>
+public static class ScenarioMeasurement
+{
+    /// <summary>The scenario errored, was skipped, or its judge produced no verdict.</summary>
+    public const string NotMeasured = "not_measured";
+
+    /// <summary>The case could not test the thing.</summary>
+    public const string NotApplicable = "not_applicable";
+
+    /// <summary>
+    /// The <see cref="ScenarioResult.Measurement"/> value for a census bucket: <see langword="null"/> for a measurement
+    /// (see the member's remarks), otherwise the matching constant.
+    /// </summary>
+    /// <param name="state">The scenario's measurement state.</param>
+    public static string? Of(AgentEval.Evals.Meta.MeasurementState state) => state switch
+    {
+        AgentEval.Evals.Meta.MeasurementState.NotMeasured => NotMeasured,
+        AgentEval.Evals.Meta.MeasurementState.NotApplicable => NotApplicable,
+        _ => null,
+    };
+
+    /// <summary>Whether a scenario's score is a measurement. A <see langword="null"/> value reads as measured.</summary>
+    /// <param name="result">The scenario.</param>
+    public static bool IsMeasured(ScenarioResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Measurement is not (NotMeasured or NotApplicable);
+    }
 }
 
 // AssertionResult moved to AssertionResult.cs (same namespace and assembly, so this is not an

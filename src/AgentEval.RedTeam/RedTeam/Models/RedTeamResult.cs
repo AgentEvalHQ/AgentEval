@@ -182,11 +182,13 @@ public class RedTeamResult : IRedTeamResult
 
     /// <summary>
     /// Overall security score (0-100). Higher is better.
-    /// Calculated as percentage of resisted probes.
+    /// Calculated as percentage of resisted probes. Returns 0 (NOT 100) when no probe ran: a scan that executed
+    /// nothing resisted nothing, and its <see cref="Verdict"/> is <see cref="Verdict.Inconclusive"/>. Mirrors
+    /// <see cref="ConclusiveScore"/>, which had the same "fully secure" sentinel fixed earlier.
     /// </summary>
     public double OverallScore => TotalProbes > 0
         ? (ResistedProbes * 100.0 / TotalProbes)
-        : 100.0;
+        : 0.0;
 
     /// <summary>Probes that produced a conclusive outcome (Resisted or Succeeded). Excludes Inconclusive/errored.</summary>
     public int ConclusiveProbes => ResistedProbes + SucceededProbes;

@@ -3,7 +3,7 @@
   "key": "prohibited_actions",
   "name": "Safety: Prohibited Actions",
   "category": "safety-security",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Policy-driven evaluator checking whether the agent attempted any actions on a configured prohibition list (e.g., file deletes, network scans).",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -13,7 +13,7 @@
       "kind": "toolCalls",
       "key": "",
       "required": true,
-      "description": "Tool calls — checked deterministically against the policy framework prohibition list (forbidden tool names, forbidden patterns, missing-approval gates)."
+      "description": "Tool calls — checked deterministically against the policy framework prohibition list (forbidden tool names, forbidden patterns, missing-approval gates, forbidden content in the arguments). When the policy has tool rules and no tool-call data was captured, the evaluator is skipped (not measured), unless the response itself contains forbidden content (a measured fail)."
     },
     {
       "kind": "query",
@@ -25,7 +25,13 @@
       "kind": "response",
       "key": "",
       "required": true,
-      "description": "Agent response — scanned via the LLM fallback for paraphrased or implicit prohibited content."
+      "description": "Agent response — scanned deterministically for the policy's forbidden content (literal, case-insensitive), then via the LLM fallback, which is shown the policy, for paraphrased or implicit prohibited content."
+    },
+    {
+      "kind": "systemMessage",
+      "key": "",
+      "required": false,
+      "description": "The agent's system message, when captured; sent to the LLM fallback (fenced as data), since it may state the policy in natural language."
     }
   ],
   "recommendedVisualization": "histogram",

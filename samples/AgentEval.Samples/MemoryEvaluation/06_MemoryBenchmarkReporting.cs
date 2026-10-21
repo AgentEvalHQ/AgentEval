@@ -204,8 +204,8 @@ public static class MemoryBenchmarkReporting
             Console.Write($"   | {dim.DimensionName,-14} ");
             foreach (var bl in comparison.Baselines)
             {
-                // Read the baseline's own scores: the comparer fills a dimension a baseline did not measure with 0,
-                // and a dimension that was not measured is not a 0.
+                // Read the baseline's own scores: a dimension a baseline did not measure has no score (not a 0), and
+                // prints n/a.
                 Console.Write(bl.DimensionScores.TryGetValue(dim.DimensionName, out var score)
                     ? $"| {score,10:F1}%  "
                     : $"| {MemoryComparisonLeaders.NotMeasured,11}  ");

@@ -55,6 +55,16 @@ public class MetricInstrumentTests
     }
 
     [Fact]
+    public void RecordingTheInstrument_KeepsWhyANotMeasuredResultWasNotMeasured()
+    {
+        var notMeasured = MetricResult.NotMeasured("m", NotMeasuredCause.CheckTimedOut, "m not measured: the scan timed out.");
+
+        Assert.Equal(NotMeasuredCause.CheckTimedOut, MetricInstrument.Code(notMeasured).NotMeasuredCause);
+        Assert.Equal(NotMeasuredCause.CheckTimedOut, MetricInstrument.Model(notMeasured, "template").NotMeasuredCause);
+        Assert.False(MetricInstrument.Code(notMeasured).Measured);
+    }
+
+    [Fact]
     public async Task Evaluate_DifferentInstruments_HaveDistinctDigests()
     {
         var digests = new HashSet<string>();

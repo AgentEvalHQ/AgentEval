@@ -323,7 +323,7 @@ public static class BenchEuAiActCommand
 
             ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;
-            var finalExit = BenchExitCodes.FromLabel(overall);
+            var finalExit = BenchExitCodes.FromVerdict(overall, compositeResult.Score.Measurement);
             // ── AEF ───────────────────────────────────────────────────────────────
             // As bench gdpr: a live agent is live, a stand-in mocked, a graded --response replayed.
             var aefFailed = !noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,

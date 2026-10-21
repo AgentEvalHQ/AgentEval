@@ -117,9 +117,10 @@ public class ToolInputAccuracySkipTests
     {
         // The case could test schema validity (it declares the tool) and the answer called nothing: the
         // required schema leaf did not run, so the judge's 100 alone is not the composite's pass (#203).
+        // "Called nothing" is a captured empty list: with no tool-call data at all the judge does not run either (2.7.0).
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
         var definitions = new[] { new ToolDefinition("search_flights", "Search", new Dictionary<string, object>()) };
-        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolDefinitions: definitions);
+        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolCalls: [], ToolDefinitions: definitions);
 
         var result = await eval.EvaluateAsync(input);
 
@@ -139,7 +140,7 @@ public class ToolInputAccuracySkipTests
         // it, so the preset passed on the judge alone. The preset must not pass either.
         var preset = AgentEval.Benchmarks.AgenticBenchmark.ToolCallAccuracy(new FixedScoreEvaluator(100));
         var definitions = new[] { new ToolDefinition("search_flights", "Search", new Dictionary<string, object>()) };
-        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolDefinitions: definitions);
+        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolCalls: [], ToolDefinitions: definitions);
 
         var result = await preset.EvaluateAsync(input);
 
@@ -216,6 +217,10 @@ public class ToolInputAccuracySkipTests
                     "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped",
         // 2.6.0 (B10j): a pass on a minority of the calls warns.
         ["2.6.0"] = "not-captured=skipped; none-declared-no-calls=inapplicable; none-declared-with-calls=fail; " +
+                    "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped; " +
+                    "minority-checked=warn; half-checked=pass; minority-checked-failing=fail",
+        // 2.7.0: the schema check is unchanged; the semantic judge is not measured without tool-call data.
+        ["2.7.0"] = "not-captured=skipped; none-declared-no-calls=inapplicable; none-declared-with-calls=fail; " +
                     "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped; " +
                     "minority-checked=warn; half-checked=pass; minority-checked-failing=fail",
     };

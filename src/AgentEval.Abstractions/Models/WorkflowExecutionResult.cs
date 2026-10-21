@@ -76,6 +76,9 @@ public record WorkflowExecutionResult
                     Arguments = call.Arguments,
                     Result = call.Result,
                     Exception = call.Exception,
+                    // Kept from the step's record: code_tool_success counts only executed calls (T58).
+                    WasExecuted = call.WasExecuted,
+                    ApprovalState = call.ApprovalState,
                     Order = globalOrder++,
                     ExecutorId = call.ExecutorId,
                     StartTime = call.StartTime,

@@ -37,6 +37,8 @@ public static class AutoAuditRunner
             .ToList();
         var promptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0);
         var completionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0);
+        // A response without usage adds nothing to the counts above, so they are not the endpoint's token cost then.
+        var tokensReported = responses.Count > 0 && responses.All(r => r.TokenUsage is not null);
         var latency = responses.Sum(r => r.DurationMs ?? 0);
 
         var gateBlocks = CountGateBlocks(chatBoundary);
@@ -49,7 +51,12 @@ public static class AutoAuditRunner
             .ToList();
 
         return new AutoAuditEndpointResult(
-            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate);
+            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate)
+        {
+            // The same test ReconcileToEvalResult applies: no model response at the chat boundary, nothing reconciled.
+            FidelityMeasured = TraceFidelityRunner.HasChatTruth(chatBoundary),
+            TokensReported = tokensReported,
+        };
     }
 
     /// <summary>Assembles a cross-endpoint <see cref="AutoAuditReport"/> from per-endpoint results.</summary>

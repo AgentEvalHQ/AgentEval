@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Memory.External.Models;
 
 namespace AgentEval.Memory.External.TypedMemEval;
@@ -129,7 +130,10 @@ public static class TypedMemEvalEvalResultAdapter
                 Passed: measured > 0 && share >= passThreshold,
                 Threshold: passThreshold,
                 Severity: "none",
-                Confidence: null),
+                Confidence: null)
+            {
+                Measurement = measured == 0 ? MeasurementState.NotMeasured : MeasurementState.Measured,
+            },
             Details: new EvalDetails(
                 Dimensions: dimensions,
                 Evidence: null,
@@ -522,17 +526,25 @@ public static class TypedMemEvalEvalResultAdapter
         // THE OUTCOME IS THE RESULT, NOT THE BOOLEAN. A question that abstained, was never run,
         // or came back inconclusive is not a question answered wrongly, and collapsing all three
         // into `false` is the exact loss this family's typed vector exists to prevent. `Value`
-        // is not nullable, so the distinction is carried by Label and Severity instead.
+        // is not nullable, so the distinction is carried by Label and Measurement instead: a
+        // question that did not run is skipped, one whose agent failed before the judge an error,
+        // and one the judge could not decide inconclusive, all three not measured (as
+        // BenchAef.TypedTree writes them). Unrun first: the runner marks a question it did not run
+        // as Unrun with an agent-error status.
         var (value, label, passed, severity) = outcome switch
         {
+            TypedMemEvalOutcome.Unrun => (0.0, "skipped", false, "none"),
+            _ when question.ExecutionStatus != QuestionExecutionStatus.Completed => (0.0, "error", false, "none"),
             TypedMemEvalOutcome.Correct => (1.0, "pass", true, "none"),
             TypedMemEvalOutcome.Wrong => (0.0, "fail", false, "medium"),
             TypedMemEvalOutcome.Abstained => (0.0, "abstained", false, "low"),
             TypedMemEvalOutcome.Missed => (0.0, "missed", false, "medium"),
             TypedMemEvalOutcome.Premature => (0.0, "premature", false, "medium"),
-            TypedMemEvalOutcome.Inconclusive => (0.0, "inconclusive", false, "low"),
-            _ => (0.0, "unrun", false, "low")
+            _ => (0.0, "inconclusive", false, "low")
         };
+        var measurement = label is "skipped" or "error" or "inconclusive"
+            ? MeasurementState.NotMeasured
+            : MeasurementState.Measured;
 
         var notes = new List<string> { $"Outcome: {outcome}." };
         if (!string.IsNullOrWhiteSpace(question.JudgeExplanation))
@@ -565,7 +577,10 @@ public static class TypedMemEvalEvalResultAdapter
                 Passed: passed,
                 Threshold: passThreshold,
                 Severity: severity,
-                Confidence: null),
+                Confidence: null)
+            {
+                Measurement = measurement,
+            },
             Details: new EvalDetails(
                 Dimensions: dimensions,
                 Evidence: null,
@@ -600,10 +615,10 @@ public static class TypedMemEvalEvalResultAdapter
         var measured = counts.N - counts.Inconclusive - counts.Unrun;
 
         // A run that measured nothing gets the report shape's own indeterminate vocabulary, not a
-        // zero. `Value` is not nullable here, so the only honest signal available is the label and
-        // the pass flag: emitting 0.0 as "fail" would make a judge outage indistinguishable from a
-        // system that got every question wrong, which is the exact confusion the Inconclusive and
-        // Unrun members exist to prevent.
+        // zero. `Value` is not nullable here, so the signal is the label, the pass flag and the
+        // score's Measurement (not measured): emitting 0.0 as "fail" would make a judge outage
+        // indistinguishable from a system that got every question wrong, which is the exact
+        // confusion the Inconclusive and Unrun members exist to prevent.
         var share = measured > 0 ? (double)counts.Correct / measured : 0;
         var (label, passed, severity) = measured == 0
             ? ("inconclusive", false, "low")
@@ -639,7 +654,11 @@ public static class TypedMemEvalEvalResultAdapter
                 Passed: passed,
                 Threshold: passThreshold,
                 Severity: severity,
-                Confidence: null),
+                Confidence: null)
+            {
+                // Nothing measured: the share is a placeholder 0, and the node is not measured.
+                Measurement = measured == 0 ? MeasurementState.NotMeasured : MeasurementState.Measured,
+            },
             Details: new EvalDetails(
                 Dimensions: extra ?? Vector(counts),
                 Evidence: null,

@@ -122,6 +122,12 @@ public static class RetryPolicyExtensions
     /// <summary>
     /// Execute a metric evaluation with retry.
     /// </summary>
+    /// <remarks>
+    /// A metric that throws is retried, and so is one that reports its own failed judge call as not measured
+    /// (<see cref="NotMeasuredCause.JudgeCallFailed"/>): the built-in LLM metrics catch the call and no longer throw.
+    /// When the attempts run out the result is not measured, with the last error; it was a Fail at score 0, a score
+    /// nothing measured. The caller's cancellation propagates.
+    /// </remarks>
     public static async Task<MetricResult> EvaluateWithRetryAsync(
         this IMetric metric,
         EvaluationContext context,
@@ -129,23 +135,61 @@ public static class RetryPolicyExtensions
         CancellationToken cancellationToken = default)
     {
         var policy = retryPolicy ?? RetryPolicy.Default;
-        
+        var attempts = policy.MaxRetries + 1;
+
         try
         {
             return await policy.ExecuteAsync(
-                ct => metric.EvaluateAsync(context, ct),
+                async ct =>
+                {
+                    var result = await metric.EvaluateAsync(context, ct).ConfigureAwait(false);
+                    return result.NotMeasuredCause == NotMeasuredCause.JudgeCallFailed
+                        ? throw new FailedCallException(result)
+                        : result;
+                },
                 cancellationToken);
+        }
+        catch (RetryExhaustedException ex) when (ex.InnerException is FailedCallException { Result: var last })
+        {
+            var details = new Dictionary<string, object>(last.Details ?? new Dictionary<string, object>())
+            {
+                ["attemptCount"] = attempts,
+                ["lastError"] = last.Explanation ?? "Unknown error"
+            };
+            return new MetricResult
+            {
+                MetricName = last.MetricName, Score = 0, Passed = false, Measured = false,
+                NotMeasuredCause = NotMeasuredCause.JudgeCallFailed,
+                Explanation = $"{last.Explanation} The evaluation failed after {attempts} attempts.",
+                Details = details, ModelGraded = last.ModelGraded, RubricDigest = last.RubricDigest,
+            };
         }
         catch (RetryExhaustedException ex)
         {
-            return MetricResult.Fail(
+            var error = ex.InnerException;
+            return MetricResult.NotMeasured(
                 metric.Name,
-                $"Evaluation failed after {policy.MaxRetries + 1} attempts: {ex.InnerException?.Message}",
-                details: new Dictionary<string, object>
+                NotMeasuredCause.JudgeCallFailed,
+                $"{metric.Name} not measured: the evaluation failed after {attempts} attempts " +
+                $"({error?.GetType().Name}: {error?.Message}).",
+                new Dictionary<string, object>
                 {
-                    ["attemptCount"] = policy.MaxRetries + 1,
-                    ["lastError"] = ex.InnerException?.Message ?? "Unknown error"
+                    ["attemptCount"] = attempts,
+                    ["lastError"] = error?.Message ?? "Unknown error",
+                    ["errorType"] = error?.GetType().FullName ?? "Unknown",
+                    ["errorMessage"] = error?.Message ?? "Unknown error"
                 });
         }
+        catch (FailedCallException ex)
+        {
+            // The policy's ShouldRetry declined it: the metric's own not-measured result stands.
+            return ex.Result;
+        }
+    }
+
+    // Carries a metric's "the judge call failed" result through RetryPolicy, which retries on a throw.
+    private sealed class FailedCallException(MetricResult result) : Exception(result.Explanation)
+    {
+        public MetricResult Result { get; } = result;
     }
 }

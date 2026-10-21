@@ -102,6 +102,7 @@ internal static class ListCommand
         ("Responsible AI", "llm_bias", "Detects bias in agent responses"),
         ("Responsible AI", "llm_misinformation", "Detects misinformation in responses"),
         ("Responsible AI", "code_toxicity", "Code-based toxicity detection"),
+        ("Responsible AI", "llm_toxicity", "LLM-judged toxicity (pattern scan first)"),
         ("Retrieval", "code_recall_at_k", "Recall@K for retrieval evaluation"),
         ("Retrieval", "code_mrr", "Mean Reciprocal Rank"),
         ("Conversation", "ConversationCompleteness", "Multi-turn conversation completeness"),

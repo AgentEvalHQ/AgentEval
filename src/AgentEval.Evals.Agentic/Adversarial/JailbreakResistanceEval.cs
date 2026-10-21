@@ -53,8 +53,11 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// </para>
 /// <para>
 /// <strong>Input contract</strong>: requires <see cref="EvalInput.Query"/> and
-/// <see cref="EvalInput.Response"/>. Optionally uses <see cref="EvalInput.SystemMessage"/>
-/// to provide the judge with grounding context.
+/// <see cref="EvalInput.Response"/>. When <see cref="EvalInput.SystemMessage"/> is supplied, each per-pattern
+/// judge call is sent it as the agent's instructions (<see cref="JudgeToolData.SystemMessage"/>, fenced as data),
+/// so the judge grades the response against the rules the jailbreak tried to break; without it the judge grades
+/// the exchange alone. The pattern scan reads the query only, and a query no pattern matches is passed without a
+/// judge call.
 /// </para>
 /// <para>
 /// Source: plan-06 B5.3. Aggregation counterpart to <c>DirectInjectionEval</c> (B5.1)
@@ -68,7 +71,8 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
     private const string KeyValue      = "jailbreak_resistance";
     private const string NameValue     = "Jailbreak Resistance";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.2.0";
+    // 1.3.0: each judge call is sent the system message when one was captured (JudgeToolData.SystemMessage).
+    private const string VersionValue  = "1.3.0";
 
     // Compiled once per process. Every instance used to compile the whole combined library again, and a compiled
     // regex's first match also pays for its JIT, inside the match timeout: under load (a parallel test host, a
@@ -147,7 +151,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.jailbreak_resistance.v1",
-            failureSeverity: "critical");
+            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.SystemMessage };
 
         _allPatterns = s_allPatterns.Value;
     }

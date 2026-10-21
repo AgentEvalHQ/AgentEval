@@ -91,7 +91,7 @@ public class ToolArgumentsMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoToolsCalled_Returns100()
+    public async Task EvaluateAsync_ARecordedRunWithNoCalls_IsNotMeasured_NotAVacuousPass()
     {
         // Arrange
         var requiredArgs = new Dictionary<string, IEnumerable<string>>
@@ -99,25 +99,26 @@ public class ToolArgumentsMetricTests
             ["SendEmail"] = new[] { "to" }
         };
         var metric = new ToolArgumentsMetric(requiredArgs);
-        
+
         var context = new EvaluationContext
         {
             Input = "Hello",
             Output = "Hi!",
-            ToolUsage = null
+            ToolUsage = new ToolUsageReport() // recorded, and no tool was called
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
-        // Assert
-        Assert.Equal(100, result.Score);
-        Assert.True(result.Passed);
-        Assert.Contains("No tools called", result.Explanation);
+
+        // Assert - no argument was checked, so there is nothing to pass: it read PASS 100 ("No tools called to validate.")
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Contains("not measured", result.Explanation);
+        Assert.Contains("no tool was called", result.Explanation);
     }
-    
+
     [Fact]
-    public async Task EvaluateAsync_ToolNotInRequirements_Ignored()
+    public async Task EvaluateAsync_NoCallToAToolWithRequirements_IsNotMeasured_NotAVacuousPass()
     {
         // Arrange
         var requiredArgs = new Dictionary<string, IEnumerable<string>>
@@ -140,13 +141,37 @@ public class ToolArgumentsMetricTests
             Output = "Done",
             ToolUsage = toolUsage
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
-        // Assert
-        Assert.Equal(100, result.Score);
+
+        // Assert - the only call is to a tool with no requirements, so no argument was checked: it read PASS 100
+        // ("No argument requirements to check.")
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Contains("not measured", result.Explanation);
+        Assert.Contains("argument requirements", result.Explanation);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ACallToAToolWithRequirements_IsStillMeasured()
+    {
+        // Guard: the not-applicable rule must not widen to a run that did call a tool with requirements.
+        var metric = new ToolArgumentsMetric(new Dictionary<string, IEnumerable<string>> { ["SendEmail"] = new[] { "to" } });
+        var toolUsage = new ToolUsageReport();
+        toolUsage.AddCall(new ToolCallRecord { Name = "OtherTool", CallId = "1" });
+        toolUsage.AddCall(new ToolCallRecord
+        {
+            Name = "SendEmail",
+            CallId = "2",
+            Arguments = new Dictionary<string, object?> { ["to"] = "a@b.c" },
+        });
+
+        var result = await metric.EvaluateAsync(new EvaluationContext { Input = "Send it", Output = "Sent", ToolUsage = toolUsage });
+
+        Assert.True(result.Measured);
         Assert.True(result.Passed);
+        Assert.Equal(100, result.Score);
     }
     
     [Fact]

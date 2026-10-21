@@ -113,13 +113,31 @@ public static class StochasticEvaluation
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"   ❌ Assertion failed: {ex.Message}\n");
-            SampleOutcome.Fail($"stochastic assertion failed: {ex.Message}");
+            // A run that errored or got no judge verdict is not measured, and an assertion over it says so: no check
+            // failed. Only a pass rate missed even counting those runs as passes is a failure.
+            if (result.Verdict != StochasticVerdict.Failed && result.NotMeasuredCount > 0)
+            {
+                Console.WriteLine($"   ⚠️ Assertion not measured: {ex.Message}\n");
+                SampleOutcome.Error($"stochastic assertion not measured: {ex.Message}");
+            }
+            else
+            {
+                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}\n");
+                SampleOutcome.Fail($"stochastic assertion failed: {ex.Message}");
+            }
         }
-        
+
         PrintFooter(result.Passed);
-        if (!result.Passed)
-            SampleOutcome.Fail($"pass rate below the {options.SuccessRateThreshold:P0} threshold: {result.Summary}");
+        switch (result.Verdict)
+        {
+            case StochasticVerdict.Failed:
+                SampleOutcome.Fail($"pass rate below the {options.SuccessRateThreshold:P0} threshold: {result.Summary}");
+                break;
+            case StochasticVerdict.Undecided or StochasticVerdict.NotMeasured:
+                // Runs that were not measured leave the verdict open: not a pass, and not a pass rate below the threshold.
+                SampleOutcome.Error($"not measured: {result.Summary}");
+                break;
+        }
     }
     
     private static IEvaluableAgent CreateAgentWithCalculator()

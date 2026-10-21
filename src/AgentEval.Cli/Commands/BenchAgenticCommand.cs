@@ -219,7 +219,9 @@ public static class BenchAgenticCommand
         var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference);
         if (glassBoxTrace is not null)
         {
-            evalInput = evalInput.WithTrace(glassBoxTrace);
+            // The agent's instructions as the trace recorded them: the judges whose rubric grades the response against
+            // them are shown them, and Task Adherence's rule leaves are not measured without them.
+            evalInput = evalInput.WithTrace(glassBoxTrace) with { SystemMessage = RecordedInstructions(glassBoxTrace) };
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
@@ -332,7 +334,7 @@ public static class BenchAgenticCommand
             // ── AEF ───────────────────────────────────────────────────────────────
             ct.ThrowIfCancellationRequested();
             var overall = result.Summary.OverallStatus;
-            var finalExit = BenchExitCodes.FromLabel(overall);
+            var finalExit = BenchExitCodes.FromVerdict(overall, compositeResult.Score.Measurement);
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
@@ -406,6 +408,17 @@ public static class BenchAgenticCommand
             .LastOrDefault(t => !string.IsNullOrWhiteSpace(t));
         return (query, answer);
     }
+
+    /// <summary>
+    /// The agent's instructions a trace recorded: the system prompt of its first model request (a chat-turn request) that
+    /// carries one, or <see langword="null"/> when none does. Nothing recorded is null, never an empty prompt.
+    /// </summary>
+    internal static string? RecordedInstructions(AgentEval.Tracing.AgentTrace trace) =>
+        trace.Entries
+            .Where(e => e.EffectiveScope == AgentEval.Tracing.TraceEntryScope.ChatTurn
+                        && e.Type == AgentEval.Tracing.TraceEntryType.Request)
+            .Select(e => e.SystemPrompt)
+            .FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
 
     /// <summary>
     /// Resolves a preset specification into a <see cref="CompositeEval"/>.

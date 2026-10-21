@@ -69,7 +69,8 @@ public record CalibratedResult
 
     /// <summary>
     /// False when fewer judges than <see cref="CalibratedJudgeOptions.MinimumJudgesRequired"/> measured anything
-    /// because the metric lacked an input it needs (see <c>MetricResult.Measured</c>). Such a result is neither
+    /// because the metric lacked an input it needs (see <c>MetricResult.Measured</c>); a judge that failed or whose reply
+    /// could not be read (<c>MetricResult.NotMeasuredCause</c>) is a judge failure, not this. Such a result is neither
     /// a pass nor a fail: <see cref="Score"/> is a placeholder 0 and <see cref="NotMeasuredReason"/> says why.
     /// A judge that returned not measured is never counted in <see cref="JudgeScores"/>.
     /// </summary>

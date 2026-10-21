@@ -64,12 +64,13 @@ public sealed class ToolInputAccuracyEval : IEvalDefinitionWrapper
         ArgumentNullException.ThrowIfNull(judge);
 
         var schemaValidation = new ToolInputSchemaEval();
+        // 1.2.0: not measured without tool-call data (it used to grade the arguments of calls it was never shown).
         var semanticGroundedness = new AtomicLlmEval(
             evaluator: judge,
             key: "tool_input_accuracy_semantic",
             name: "Tool Input Accuracy (Semantic)",
             category: "agentic-process",
-            version: "1.1.0",
+            version: "1.2.0",
             criteria: new[]
             {
                 "Argument values are traceable to the user query or prior tool outputs (no hallucinated values)",
@@ -80,7 +81,11 @@ public sealed class ToolInputAccuracyEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_input_accuracy.v1",
-            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
+            failureSeverity: "medium")
+        {
+            JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions,
+            JudgeNeedsData = JudgeToolData.ToolCalls,
+        };
 
         // 2.0.0 (ADR-030 Slice 0.3): the schema leaf no longer scores a perfect 1.0 on absent input
         // (no tool calls / no tool definitions); it skips. A composite that read 0.5 * 1.0 from a check
@@ -88,11 +93,12 @@ public sealed class ToolInputAccuracyEval : IEvalDefinitionWrapper
         // 2.1.0 (#203): no tool definitions is inapplicable (the judge alone, as before); tool definitions but no
         // tool calls stays skipped, and a required leaf that did not run means the composite cannot pass.
         // 2.6.0 (#203 review round 3, B10j): a schema pass on fewer than half the calls is a warn, as for a composite.
+        // 2.7.0: the semantic leaf is not measured without tool-call data, so with none captured nothing is measured.
         _inner = new CompositeEval(
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.6.0",
+            version: "2.7.0",
             components: new[]
             {
                 new EvalComponent(schemaValidation, Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },

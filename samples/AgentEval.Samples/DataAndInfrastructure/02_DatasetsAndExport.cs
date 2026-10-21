@@ -110,7 +110,7 @@ public static class DatasetsAndExport
                 });
             var notMeasured = graded is null
                 ? "the dataset gives no expected answer"
-                : MetricMeasurement.CouldNotMeasure(graded) ? $"the judge did not grade it ({graded.Explanation})" : null;
+                : !graded.Measured ? $"the judge did not grade it ({graded.Explanation})" : null;
             var passed = notMeasured is null && graded!.Passed;
 
             Console.ForegroundColor = notMeasured is not null ? ConsoleColor.Yellow : passed ? ConsoleColor.Green : ConsoleColor.Red;

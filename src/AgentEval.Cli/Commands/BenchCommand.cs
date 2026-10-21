@@ -336,7 +336,7 @@ public static class BenchCommand
 
             ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;
-            var finalExit = BenchExitCodes.FromLabel(overall);
+            var finalExit = BenchExitCodes.FromVerdict(overall, compositeResult.Score.Measurement);
             // ── AEF ───────────────────────────────────────────────────────────────
             // One run of the preset as sealed evidence. A live agent (--from-env, or --sut) is live; a stand-in is mocked; a
             // supplied --response is replayed: the subject was not driven, its recorded answer was graded.

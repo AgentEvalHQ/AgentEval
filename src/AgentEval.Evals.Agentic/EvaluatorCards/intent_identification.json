@@ -3,7 +3,7 @@
   "key": "intent_identification",
   "name": "Intent Identification",
   "category": "system-outcome",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Single-turn LLM judge assessing whether the agent correctly identified what the user actually wanted (the *intent*), independent of whether the agent then succeeded at fulfilling that intent. The 'did they understand the question?' check.",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -20,6 +20,12 @@
       "key": "",
       "required": true,
       "description": "The agent's response — judged against whether the intent was correctly inferred."
+    },
+    {
+      "kind": "systemMessage",
+      "key": "",
+      "required": false,
+      "description": "The agent's system message, when captured; sent to the judge (fenced as data) as the scope the agent was given."
     }
   ],
   "recommendedVisualization": "histogram",

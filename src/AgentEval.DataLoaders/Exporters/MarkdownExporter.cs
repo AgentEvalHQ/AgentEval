@@ -44,14 +44,18 @@ public class MarkdownExporter : IResultExporter
     {
         var sb = new StringBuilder();
         
-        // Header
-        var statusEmoji = report.FailedTests == 0 ? "✅" : "❌";
-        var statusText = report.FailedTests == 0 ? "PASSED" : "FAILED";
-        
+        // Header. A skipped test (from ToEvaluationReport, one that produced no verdict: the judge failed, the run
+        // errored) is not a failure, but a report with one is not a clean PASS either.
+        var (statusEmoji, statusText) = report.FailedTests > 0 ? ("❌", "FAILED")
+            : report.SkippedTests > 0 ? ("⚠️", $"INCOMPLETE ({report.SkippedTests} not measured)")
+            : ("✅", "PASSED");
+
         sb.AppendLine("## 🤖 AgentEval Results");
         sb.AppendLine();
         sb.AppendLine($"**Status:** {statusEmoji} {statusText}");
-        sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Score:** {report.OverallScore:F1}/100"));
+        sb.AppendLine(report.SkippedTests > 0 && report.SkippedTests >= report.TotalTests
+            ? "**Score:** n/a (nothing measured)"
+            : string.Create(CultureInfo.InvariantCulture, $"**Score:** {report.OverallScore:F1}/100"));
         sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Tests:** {report.PassedTests}/{report.TotalTests} passed ({report.PassRate:F0}%)"));
         sb.AppendLine($"**Duration:** {FormatDuration(report.Duration)}");
         
@@ -74,10 +78,11 @@ public class MarkdownExporter : IResultExporter
         
         foreach (var test in orderedResults)
         {
-            var status = test.Skipped ? "⏭️" : (test.Passed ? "✅" : "❌");
+            var status = test.NotMeasured ? "⚠️ not measured" : test.Skipped ? "⏭️" : (test.Passed ? "✅" : "❌");
             var time = FormatDuration(TimeSpan.FromMilliseconds(test.DurationMs));
-            
-            sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"| {EscapeMarkdown(test.Name)} | {test.Score:F1} | {status} | {time} |"));
+            var score = test.NotMeasured ? "n/a" : test.Score.ToString("F1", CultureInfo.InvariantCulture);
+
+            sb.AppendLine($"| {EscapeMarkdown(test.Name)} | {score} | {status} | {time} |");
         }
         
         // Failures section

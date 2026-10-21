@@ -106,9 +106,10 @@ public static class Eval04_StochasticAgent
         Console.WriteLine("\n  " + new string('─', 70) + "\n");
 
         // ── Errored runs are NOT scores ──────────────────────────────────────────
-        // The harness turns a failed model call (or a judge with no verdict) into Score 0, and the runner's own
-        // statistics count it: that reads an infrastructure failure as agent non-determinism. The tally keeps
-        // those runs out of the scores and the pass rate, counts them, and rules out a clean PASS.
+        // The harness turns a failed model call (or a judge with no verdict) into a placeholder Score 0. The runner's
+        // statistics leave such runs out (StochasticResult.NotMeasuredCount), and so does the tally, which also keeps
+        // this demo's stricter rule: any unmeasured run rules out a clean PASS (the core rule passes when the measured
+        // passes alone reach the threshold).
         var tally = new StochasticTally(
             [.. stochResult.IndividualResults.Select((r, i) => RunClassifier.FromAgentRun(i + 1, r, PassingScore, ex => Config.Redact(ex)))],
             Threshold);
@@ -146,7 +147,8 @@ public static class Eval04_StochasticAgent
         }
         else
         {
-            // The library's assertion would count the unmeasured runs as failed ones: not run, and no hypothesis call.
+            // This demo gives no PASS and no hypothesis call while a run was not measured, so the library's assertion is
+            // not run (it would pass when the measured passes alone reach the threshold).
             Console.ForegroundColor = tally.Verdict == StochasticVerdict.Fail ? ConsoleColor.Red : ConsoleColor.Yellow;
             Console.WriteLine(tally.Verdict switch
             {
@@ -158,7 +160,7 @@ public static class Eval04_StochasticAgent
                 _ =>
                     $"  ⚠️  INCOMPLETE — {tally.Errored} of {tally.Total} runs were not measured; no PASS and no hypothesis signal from this run.",
             });
-            Console.WriteLine("     The stochastic assertion was not run: it would count an unmeasured run as a failed one.");
+            Console.WriteLine("     The stochastic assertion was not run: this demo gives no PASS while a run was not measured.");
             Console.ResetColor();
         }
 

@@ -37,10 +37,11 @@ namespace AgentEval.Samples.Benchmarks;
 /// </para>
 /// <para>
 /// The AgentEval branch grades what a reply alone can show. MAF's <c>EvaluateAsync</c> hands each evaluator the
-/// conversation and the reply, and <see cref="AgentEvalCompositeEvaluator"/> builds its <see cref="EvalInput"/> from the
-/// query and the reply text: no tool calls, no tool definitions, no system message reach it. Until 2026-10 this branch
+/// conversation and the reply. Through <c>AgentEvalAgentEvaluator</c>, <see cref="AgentEvalCompositeEvaluator"/> is also
+/// given the turn's tool calls, the agent's tools (<c>EvalItem.Tools</c>) and the expected tool calls; the agent's
+/// instructions reach it only when <c>AgentEvalAgentEvaluator.AgentInstructions</c> is set. Until 2026-10 this branch
 /// ran the Agentic Execution preset, whose Tool Call Accuracy (20%) and Task Navigation Efficiency (10%, 0 without
-/// expected actions) graded a tool-less agent through a path that carries no tool data.
+/// expected actions) graded a tool-less agent through a path that then carried no tool data.
 /// </para>
 /// </remarks>
 public static class FoundryHybridBenchmarkSample

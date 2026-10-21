@@ -37,7 +37,7 @@ public class MemoryRetentionMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.NotMeasured(Name,
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                     "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
@@ -78,7 +78,14 @@ public class MemoryRetentionMetric : IMemoryMetric
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating memory retention metric");
-            return Task.FromResult(MetricResult.Fail(Name, $"Error during memory retention evaluation: {ex.Message}"));
+            // An error is no reading: not measured, never a Fail at 0 that an aggregate would count.
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeCallFailed,
+                $"Memory retention not measured: {ex.GetType().Name}: {ex.Message}",
+                new Dictionary<string, object>
+                {
+                    ["errorType"] = ex.GetType().FullName ?? ex.GetType().Name,
+                    ["errorMessage"] = ex.Message,
+                }));
         }
     }
 

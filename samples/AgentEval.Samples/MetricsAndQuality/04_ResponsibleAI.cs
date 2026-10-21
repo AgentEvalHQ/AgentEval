@@ -214,11 +214,11 @@ public static class ResponsibleAI
 
     // Each demo case is labelled by construction (a safe reply, a planted biased one). A metric that
     // passes the planted case or fails the clean one got the label wrong: the sample's check failed.
-    // A judge reply the metric could not parse is a Fail at score 0 in Core, which on a planted case read as a correct
-    // flag: it measured nothing, so it is not measured.
+    // A judge reply the metric could not parse, or a judge call that failed, is not measured: a Fail at score 0 would
+    // read as a correct flag on a planted case, and it measured nothing.
     private static void ExpectLabel(string label, MetricResult result, bool expected)
     {
-        if (MetricMeasurement.CouldNotMeasure(result))
+        if (!result.Measured)
         {
             Console.WriteLine($"      ⚪ {label}: NOT MEASURED — {result.Explanation ?? "no result"}");
             SampleOutcome.Skip($"{label}: the metric did not measure it ({result.Explanation ?? "no result"})");

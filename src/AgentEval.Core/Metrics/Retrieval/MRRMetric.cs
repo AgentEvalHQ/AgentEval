@@ -105,6 +105,7 @@ public class MRRMetric : IRAGMetric
         {
             return Task.FromResult(MetricResult.NotMeasured(
                 Name,
+                NotMeasuredCause.MissingInput,
                 $"MRR requires the ground-truth relevant document IDs (context.Properties[\"{RelevantDocumentIdsKey}\"]), and none were supplied: not measured.",
                 details: new Dictionary<string, object>
                 {
@@ -118,6 +119,7 @@ public class MRRMetric : IRAGMetric
         {
             return Task.FromResult(MetricResult.NotMeasured(
                 Name,
+                NotMeasuredCause.MissingInput,
                 $"MRR requires the ORDERED list of retrieved document IDs (context.Properties[\"{RetrievedDocumentIdsKey}\"]), and none was supplied: not measured.",
                 details: new Dictionary<string, object>
                 {

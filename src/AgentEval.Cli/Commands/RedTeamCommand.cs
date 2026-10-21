@@ -798,6 +798,9 @@ internal static class RedTeamCommand
                     regression = comparison.Status;
                     if (!opts.Quiet)
                         PrintComparison(comparison);
+                    else if (!comparison.IsComparable)
+                        // The refusal decides the exit code (13), so its reason is printed even with --quiet.
+                        Console.Error.WriteLine(NotComparableLine(comparison));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -810,15 +813,17 @@ internal static class RedTeamCommand
             ct.ThrowIfCancellationRequested();
 
             // 11. Honest exit-code gate (W-E3).
-            var exitCode = comparisonError is null ? ComputeExitCode(failOn, regression, result.Passed) : ExitCodes.RuntimeError;
+            var exitCode = comparisonError is null
+                ? ComputeExitCode(failOn, regression, result.Passed, scanInconclusive: result.Verdict == AgentEval.RedTeam.Verdict.Inconclusive)
+                : ExitCodes.RuntimeError;
             var gate = new AefCommandGate
             {
                 GateId = "gate:redteam",
                 Rule = "fail-on:" + failOn,
-                Outcome = comparisonError is not null ? AefGateOutcome.Inconclusive
+                Outcome = comparisonError is not null || exitCode == ExitCodes.Incomparable ? AefGateOutcome.Inconclusive
                     : exitCode == ExitCodes.Success ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
                 ExitCode = exitCode,
-                Comparability = comparisonError is not null ? AefComparability.Incomparable
+                Comparability = comparisonError is not null || regression == RegressionStatus.Incomparable ? AefComparability.Incomparable
                     : regression is not null && failOn != "never" ? AefComparability.Comparable : AefComparability.NotApplicable,
                 Ext = baselineDigest is null ? null : new System.Text.Json.Nodes.JsonObject
                 {
@@ -922,26 +927,44 @@ internal static class RedTeamCommand
     /// Pure exit-code gate (W-E3), separated from the scan for testability. A regression versus the baseline is the
     /// strongest signal (<see cref="ExitCodes.RegressionFailure"/> = 4) and takes precedence over the absolute
     /// vulnerability gate (<see cref="ExitCodes.TestFailure"/> = 1); <paramref name="failOn"/> selects which gate
-    /// applies. <c>never</c> always passes; <c>regression</c> ignores absolute vulnerabilities.
+    /// applies. <c>never</c> always passes; <c>regression</c> ignores absolute vulnerabilities. A comparison the baseline
+    /// gate had to refuse (<see cref="RegressionStatus.Incomparable"/>: one run has no probe that reached a verdict) is
+    /// <see cref="ExitCodes.Incomparable"/> (13), not a regression; under <c>vuln</c> a scan that found a vulnerability
+    /// still exits 1, a real failure winning over a gate that could not decide. <paramref name="scanInconclusive"/>: the
+    /// scan itself reached no verdict, so its not passing is no finding either.
     /// </summary>
-    internal static int ComputeExitCode(string failOn, RegressionStatus? regression, bool passed)
+    internal static int ComputeExitCode(string failOn, RegressionStatus? regression, bool passed, bool scanInconclusive = false)
     {
         var isRegression = regression == RegressionStatus.Regression;
+        var incomparable = regression == RegressionStatus.Incomparable;
         return failOn.ToLowerInvariant() switch
         {
             "never" => ExitCodes.Success,
-            "regression" => isRegression ? ExitCodes.RegressionFailure : ExitCodes.Success,
-            _ /* vuln */ => isRegression
-                ? ExitCodes.RegressionFailure
-                : (passed ? ExitCodes.Success : ExitCodes.TestFailure),
+            "regression" => incomparable ? ExitCodes.Incomparable
+                : isRegression ? ExitCodes.RegressionFailure : ExitCodes.Success,
+            _ /* vuln */ => isRegression ? ExitCodes.RegressionFailure
+                : incomparable && (passed || scanInconclusive) ? ExitCodes.Incomparable
+                : passed ? ExitCodes.Success : ExitCodes.TestFailure,
         };
     }
+
+    // The refusal, in the words of the comparison: why the runs cannot be compared and what that means for the gate.
+    private static string NotComparableLine(RedTeamComparison c) =>
+        $"  Not comparable: {c.NotComparableReason}. No delta against the baseline is a measurement, so the comparison " +
+        "is refused (exit 13), neither a regression nor a pass.";
 
     /// <summary>Renders a baseline comparison (new / fixed / persistent findings + deltas) to stderr.</summary>
     private static void PrintComparison(RedTeamComparison c)
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  === Baseline Comparison ===");
+        if (!c.IsComparable)
+        {
+            // One side measured nothing: its scores are placeholders, so no delta is printed.
+            Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}");
+            Console.Error.WriteLine(NotComparableLine(c));
+            return;
+        }
         Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}  (score {c.ScoreDelta:+0.0;-0.0;0.0} vs baseline {c.Baseline.OverallScore:F1})");
         // RC-6: the conclusive-only score is the honest dimension; show it so a green overall score can't hide a conclusive drop.
         Console.Error.WriteLine($"  Conclusive score delta: {c.ConclusiveScoreDelta:+0.0;-0.0;0.0} (current {c.Current.ConclusiveScore:F1} vs baseline {(c.Baseline.ConclusiveScore is { } b ? b.ToString("F1") : "n/a (pre-field baseline)")})");

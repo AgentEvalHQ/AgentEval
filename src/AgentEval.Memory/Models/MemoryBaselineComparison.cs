@@ -37,13 +37,19 @@ public class DimensionComparison
     /// <summary>Dimension name (e.g., "Recall", "Resilience").</summary>
     public required string DimensionName { get; init; }
 
-    /// <summary>Score per baseline ID.</summary>
+    /// <summary>
+    /// Score per baseline ID, for the baselines that measured this dimension only. A baseline that did not measure it
+    /// has no entry (read with <c>TryGetValue</c>) and is listed in <see cref="NotMeasuredBy"/>.
+    /// </summary>
     public required IReadOnlyDictionary<string, double> Scores { get; init; }
 
-    /// <summary>Highest score across all baselines for this dimension.</summary>
+    /// <summary>IDs of the compared baselines that did not measure this dimension.</summary>
+    public IReadOnlyList<string> NotMeasuredBy { get; init; } = [];
+
+    /// <summary>Highest score across the baselines that measured this dimension.</summary>
     public double BestScore => Scores.Count > 0 ? Scores.Values.Max() : 0;
 
-    /// <summary>ID of the baseline with the best score for this dimension.</summary>
+    /// <summary>ID of the baseline with the best score for this dimension, among those that measured it.</summary>
     /// <remarks>Returns <c>null</c> when there are no scores.</remarks>
     public string? BestBaselineId => Scores.Count > 0 ? Scores.MaxBy(kvp => kvp.Value).Key : null;
 }

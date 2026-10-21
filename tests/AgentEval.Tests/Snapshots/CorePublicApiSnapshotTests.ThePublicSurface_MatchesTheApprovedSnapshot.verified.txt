@@ -310,7 +310,9 @@ sealed class AgentEval.Benchmarks.AutoAuditEndpointResult : System.IEquatable<Ag
     System.Boolean Completed { get; init; }
     System.Boolean Equals(AgentEval.Benchmarks.AutoAuditEndpointResult other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean FidelityMeasured { get; init; }
     System.Boolean LeakedPastGate { get; init; }
+    System.Boolean TokensReported { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> TopDiscrepancies { get; init; }
     System.Double FidelityScore { get; init; }
     System.Int32 CompletionTokens { get; init; }
@@ -409,6 +411,7 @@ sealed class AgentEval.Benchmarks.TraceFidelityDiscrepancy : System.IEquatable<A
     AgentEval.Benchmarks.TraceFidelityDiscrepancy <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.TraceFidelityDiscrepancy other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean Measured { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> Examples { get; init; }
     System.Double Score { get; init; }
     System.Int32 Count { get; init; }
@@ -985,6 +988,7 @@ sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEv
     AgentEval.Evals.AtomicLlmDefinition CaptureDefinition()
     AgentEval.Evals.JudgeToolData JudgeSeesToolData { get; init; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
+    const System.Int32 SystemMessageCharacterLimit
     const System.Int32 ToolSectionCharacterLimit
     const System.Int32 ToolValueCharacterLimit
     const System.String JudgeInputFramingVersion
@@ -1063,6 +1067,8 @@ enum AgentEval.Evals.JudgeToolData
     None
     ToolCalls
     ToolDefinitions
+    SystemMessage
+    ExpectedActions
 sealed class AgentEval.Evals.MajorityVoteAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
@@ -1342,6 +1348,7 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ScenarioComparison> WithUnpinnedAxes { get; }
     System.Collections.Generic.IReadOnlyList<System.String> BaselineOnly { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> CandidateOnly { get; init; }
+    System.Collections.Generic.IReadOnlyList<System.String> NotMeasuredScenarios { get; }
     System.Collections.Generic.IReadOnlyList<System.String> RefusalReasons { get; }
     System.Double MeanScoreDelta { get; }
     System.Int32 GetHashCode()
@@ -1355,8 +1362,11 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
 sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.Output.ScenarioComparison>
     AgentEval.Output.ScenarioComparison <Clone>$()
     System.Boolean BaselineHasUsableFloor { get; init; }
+    System.Boolean BaselineMeasured { get; init; }
     System.Boolean BaselinePassed { get; init; }
+    System.Boolean BothMeasured { get; }
     System.Boolean CandidateHasUsableFloor { get; init; }
+    System.Boolean CandidateMeasured { get; init; }
     System.Boolean CandidatePassed { get; init; }
     System.Boolean DeltaHasAFloor { get; }
     System.Boolean Equals(AgentEval.Output.ScenarioComparison other)
@@ -1680,6 +1690,7 @@ sealed class AgentEval.Snapshots.GoldenTraceCase : System.IEquatable<AgentEval.S
     AgentEval.Snapshots.GoldenTraceCase <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceCase other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean NotMeasured { get; init; }
     System.Boolean Passed { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls { get; init; }
     System.Int32 GetHashCode()
@@ -1695,6 +1706,7 @@ sealed class AgentEval.Snapshots.GoldenTraceComparison : System.IEquatable<Agent
     AgentEval.Snapshots.GoldenTraceComparison <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceComparison other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean HasNotMeasured { get; }
     System.Boolean HasRegression { get; }
     System.Boolean HasToolChange { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases { get; init; }
@@ -1737,6 +1749,7 @@ enum AgentEval.Snapshots.TraceChange
     Unchanged
     Added
     Removed
+    NotMeasured
 class AgentEval.Testing.AssertionResult : System.IEquatable<AgentEval.Testing.AssertionResult>
     AgentEval.Output.AssertionResult ToAssertionResult()
     AgentEval.Testing.AssertionResult <Clone>$()
@@ -1759,7 +1772,9 @@ class AgentEval.Testing.ConversationAggregateStats : System.IEquatable<AgentEval
     System.Double SuccessRate { get; }
     System.Int32 ErrorCount { get; init; }
     System.Int32 GetHashCode()
+    System.Int32 ResponseRateMeasuredCount { get; init; }
     System.Int32 SuccessfulConversations { get; init; }
+    System.Int32 ToolUsageMeasuredCount { get; init; }
     System.Int32 TotalConversations { get; init; }
     System.String ToString()
     System.TimeSpan AverageDuration { get; init; }

@@ -34,6 +34,17 @@ public class ReportStatusTests
     }
 
     [Theory]
+    [InlineData("inconclusive", MeasurementState.NotMeasured, "SKIPPED")]   // LongMemEval / TypedMemEval: read FAIL
+    [InlineData("fail", MeasurementState.NotMeasured, "SKIPPED")]
+    [InlineData("unrun", MeasurementState.NotApplicable, "SKIPPED")]
+    [InlineData("error", MeasurementState.NotMeasured, "ERROR")]            // guard: an error stays an error
+    [InlineData("warn", MeasurementState.NotMeasured, "WARN")]              // guard: a withheld pass stays a warning
+    public void ReportStatus_AScoreThatMeasuredNothing_IsNeverAFail(string label, MeasurementState state, string status)
+    {
+        Assert.Equal(status, Score(label, passed: false, state).ReportStatus());
+    }
+
+    [Theory]
     [InlineData("pass", 1, 0, 0, "PASS")]
     [InlineData("warn", 1, 0, 1, "WARN")]
     [InlineData("fail", 0, 1, 0, "FAIL")]

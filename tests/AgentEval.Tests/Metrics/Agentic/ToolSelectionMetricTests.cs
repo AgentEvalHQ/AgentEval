@@ -47,7 +47,7 @@ public class ToolSelectionMetricTests
         {
             Input = "What's the weather?",
             Output = "I don't know.",
-            ToolUsage = null // No tools called
+            ToolUsage = new ToolUsageReport() // recorded, and no tool was called (null would be "not recorded", T58)
         };
         
         // Act
@@ -69,7 +69,7 @@ public class ToolSelectionMetricTests
         {
             Input = "Hello",
             Output = "Hi there!",
-            ToolUsage = null
+            ToolUsage = new ToolUsageReport()
         };
         
         // Act

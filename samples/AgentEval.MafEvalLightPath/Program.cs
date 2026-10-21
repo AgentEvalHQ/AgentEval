@@ -110,8 +110,10 @@ internal static class Program
         Console.WriteLine("KEY TAKEAWAYS:");
         Console.WriteLine("  • Both ran via MAF's NATIVE IAgentEvaluator overload: agent.EvaluateAsync(queries, evaluator).");
         Console.WriteLine("  • [1] flat metrics and [2] a full AgenticBenchmark COMPOSITE both plug in as one evaluator.");
-        Console.WriteLine("  • The native adapter forwards EvalItem.Conversation (full, with tool calls), so even");
-        Console.WriteLine("    code-based tool metrics now see the calls (MAF's MEAI-only adapter drops them).");
+        Console.WriteLine("  • The native adapter forwards EvalItem.Conversation (full, with tool calls) and the agent's");
+        Console.WriteLine("    tools, so the flat tool metrics and the composite's tool checks see the calls the agent");
+        Console.WriteLine("    made (MAF's MEAI-only adapter drops them). The agent's instructions reach the judges only");
+        Console.WriteLine("    when AgentEvalAgentEvaluator.AgentInstructions is set: MAF does not put them on the item.");
 
         if (autoOpen)
             foreach (var p in produced)

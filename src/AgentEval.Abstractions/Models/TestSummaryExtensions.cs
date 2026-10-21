@@ -54,6 +54,9 @@ public static class TestSummaryExtensions
             TotalTests = summary.TotalCount,
             PassedTests = summary.PassedCount,
             FailedTests = summary.FailedCount,
+            // A test with no verdict (judge failed, or the run errored) is not a failure: it is skipped, and it is not
+            // in the score, which averages the measured tests only.
+            SkippedTests = summary.NotMeasuredCount,
             OverallScore = summary.AverageScore,
             StartTime = startTime,
             EndTime = endTime,
@@ -72,12 +75,16 @@ public static class TestSummaryExtensions
 
     private static TestResultSummary MapTestResult(TestResult result, string suiteName)
     {
+        // No verdict: its Score of 0 and Passed of false are placeholders (TestSummary.NotMeasuredCount).
+        var notMeasured = result.JudgeFailed || result.HasError;
         return new TestResultSummary
         {
             Name = result.TestName,
             Category = suiteName,
             Score = result.Score,
             Passed = result.Passed,
+            NotMeasured = notMeasured,
+            Skipped = notMeasured,
             DurationMs = result.Performance != null
                 ? (long)result.Performance.TotalDuration.TotalMilliseconds
                 : 0,

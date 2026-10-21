@@ -25,6 +25,9 @@ namespace AgentEval.Evals.Agentic.Process;
 ///   <item>All calls have <c>status: "success"</c> (case-insensitive) → score 1.0, severity none.</item>
 ///   <item>Any call has <c>status: "error"</c> or non-null <c>error</c> → score 0.0, severity high.</item>
 /// </list>
+/// With no status records and no tool-call data captured (<see cref="EvalInput.ToolCalls"/> null) the result is skipped,
+/// not measured, and the LLM fallback is not called: it used to judge "all tool calls completed without errors" from the
+/// reply text. A captured empty list reaches the fallback.
 /// </para>
 /// <para>
 /// Lineage (LLM fallback): AgentEval's own criteria and reference prompt, modelled on the evaluator
@@ -42,7 +45,8 @@ public sealed class ToolCallSuccessEval : IEvalDefinitionWrapper
     private const string KeyValue      = "tool_call_success";
     private const string NameValue     = "Tool Call Success";
     private const string CategoryValue = "agentic-process";
-    private const string VersionValue  = "1.2.0";
+    // 1.3.0: the LLM fallback is not measured without tool-call data.
+    private const string VersionValue  = "1.3.0";
 
     /// <summary>
     /// Conventional key for supplying per-call status records via <see cref="EvalInput.Metadata"/>.
@@ -93,7 +97,7 @@ public sealed class ToolCallSuccessEval : IEvalDefinitionWrapper
             passThreshold: 0.70,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_call_success.v1",
-            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls, JudgeNeedsData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>
@@ -114,6 +118,7 @@ public sealed class ToolCallSuccessEval : IEvalDefinitionWrapper
             return tcResult!;
 
         // ── 4. LLM fallback — no structured status available ─────────────────────
+        //       Not measured when no tool-call data was captured: the fallback needs the calls (JudgeNeedsData).
         return await _llmFallback.EvaluateAsync(input, ct);
     }
 

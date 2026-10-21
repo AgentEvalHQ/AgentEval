@@ -130,7 +130,7 @@ public class ContextRecallMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_MalformedLlmResponse_ReturnsFail()
+    public async Task EvaluateAsync_MalformedLlmResponse_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient("Not JSON at all");
@@ -149,6 +149,7 @@ public class ContextRecallMetricTests
         
         // Assert
         Assert.False(result.Passed);
+        Assert.False(result.Measured);   // nothing was measured: not a Fail at 0 (T03)
         Assert.Contains("parse", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }
     
@@ -166,17 +167,15 @@ public class ContextRecallMetricTests
     }
 
     [Theory]
-    [InlineData(-20, 0)]
-    [InlineData(0, 0)]
-    [InlineData(100, 100)]
-    [InlineData(120, 100)]
-    public async Task EvaluateAsync_ScoreOutOfRange_ClampedTo0To100(int llmScore, int expectedScore)
+    [InlineData(0)]
+    [InlineData(100)]
+    public async Task EvaluateAsync_ScoreOnTheScale_IsReadAsIs(int llmScore)
     {
         // Arrange
         var fakeResponse = $$"""{"score": {{llmScore}}, "reasoning": "test"}""";
         var fakeChatClient = new FakeChatClient(fakeResponse);
         var metric = new ContextRecallMetric(fakeChatClient);
-        
+
         var context = new EvaluationContext
         {
             Input = "Question",
@@ -184,12 +183,31 @@ public class ContextRecallMetricTests
             Context = "Context",
             GroundTruth = "Ground truth"
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
+
         // Assert
-        Assert.InRange(result.Score, 0, 100);
-        Assert.Equal(expectedScore, result.Score);
+        Assert.True(result.Measured);
+        Assert.Equal(llmScore, result.Score);
+    }
+
+    [Theory]
+    [InlineData(-20)]
+    [InlineData(120)]
+    public async Task EvaluateAsync_ScoreOffTheScale_IsNotMeasured_NeverClamped(int llmScore)
+    {
+        // It was clamped: 120 read as a confident 100, -20 as a measured 0 (T04).
+        var fakeChatClient = new FakeChatClient($$"""{"score": {{llmScore}}, "reasoning": "test"}""");
+        var metric = new ContextRecallMetric(fakeChatClient);
+
+        var result = await metric.EvaluateAsync(new EvaluationContext
+        {
+            Input = "Question", Output = "Answer", Context = "Context", GroundTruth = "Ground truth",
+        });
+
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Equal(NotMeasuredCause.JudgeReplyUnreadable, result.NotMeasuredCause);
     }
 }

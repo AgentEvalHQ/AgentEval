@@ -23,4 +23,15 @@ internal static class BenchExitCodes
         "fail" => ExitCodes.GateFailed,
         _      => ExitCodes.GateIndeterminate,
     };
+
+    /// <summary>
+    /// <see cref="FromLabel"/> for a composite whose measurement state is known. A warn that only withholds the pass
+    /// because a required check could not be measured (a security check with no tool calls recorded, D-17) is no
+    /// conclusive verdict: <see cref="ExitCodes.GateIndeterminate"/> (11), not <see cref="ExitCodes.GateWarning"/>
+    /// (10), which CI may treat as non-blocking. Security fails closed.
+    /// </summary>
+    public static int FromVerdict(string label, AgentEval.Evals.Meta.MeasurementState measurement) =>
+        label.Equals("warn", StringComparison.OrdinalIgnoreCase) && measurement == AgentEval.Evals.Meta.MeasurementState.NotMeasured
+            ? ExitCodes.GateIndeterminate
+            : FromLabel(label);
 }

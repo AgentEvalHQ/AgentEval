@@ -34,7 +34,10 @@ public class ToolSelectionMetric : IAgenticMetric
     
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (context.ToolUsage == null || context.ToolUsage.Count == 0)
+        if (context.ToolUsage is null)
+            return ToolUsageNotRecorded.Result(Name);
+
+        if (context.ToolUsage.Count == 0)
         {
             if (_expectedTools.Count == 0)
             {
@@ -162,11 +165,18 @@ public class ToolArgumentsMetric : IAgenticMetric
     
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (context.ToolUsage == null || context.ToolUsage.Count == 0)
+        if (context.ToolUsage is null)
+            return ToolUsageNotRecorded.Result(Name);
+
+        // A vacuous check is not a pass (owner's decision, 2026-10-21): with no call, or no call to a tool that has
+        // argument requirements, nothing was checked. It read PASS 100. Not measured: no argument was checked.
+        if (context.ToolUsage.Count == 0)
         {
-            return Task.FromResult(MetricResult.Pass(Name, 100, "No tools called to validate."));
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.NotApplicable,
+                "The run's tool calls were recorded and no tool was called, so no argument was checked: tool arguments " +
+                "were not measured (not applicable to this run)."));
         }
-        
+
         var totalChecks = 0;
         var passedChecks = 0;
         var issues = new List<string>();
@@ -200,7 +210,9 @@ public class ToolArgumentsMetric : IAgenticMetric
         
         if (totalChecks == 0)
         {
-            return Task.FromResult(MetricResult.Pass(Name, 100, "No argument requirements to check."));
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.NotApplicable,
+                $"None of the {context.ToolUsage.Count} recorded call(s) is to a tool with argument requirements, so no " +
+                "argument was checked: tool arguments were not measured (not applicable to this run)."));
         }
         
         var score = (double)passedChecks / totalChecks * 100;
@@ -237,34 +249,48 @@ public class ToolSuccessMetric : IAgenticMetric
     
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (context.ToolUsage == null || context.ToolUsage.Count == 0)
+        if (context.ToolUsage is null)
+            return ToolUsageNotRecorded.Result(Name);
+
+        if (context.ToolUsage.Count == 0)
         {
             return Task.FromResult(MetricResult.Pass(Name, 100, "No tools called."));
         }
-        
+
+        // A success is a call that RAN without error. A call with no paired result was only emitted (a request the run
+        // never executed, an approval request, a rejected approval), so it is not a success either. Reading HasError
+        // alone counted every such call as one (T58).
         var totalCalls = context.ToolUsage.Count;
-        var successfulCalls = context.ToolUsage.Calls.Count(c => !c.HasError);
+        var successfulCalls = context.ToolUsage.Calls.Count(c => c.WasExecuted && !c.HasError);
         var failedCalls = context.ToolUsage.Calls.Where(c => c.HasError).ToList();
-        
+        var notExecutedCalls = context.ToolUsage.Calls.Where(c => !c.WasExecuted && !c.HasError).ToList();
+
         var score = (double)successfulCalls / totalCalls * 100;
-        
+
         var metadata = new Dictionary<string, object>
         {
             ["totalCalls"] = totalCalls,
             ["successfulCalls"] = successfulCalls,
-            ["failedCalls"] = failedCalls.Select(c => new { c.Name, Error = c.Exception?.Message }).ToList()
+            ["failedCalls"] = failedCalls.Select(c => new { c.Name, Error = c.Exception?.Message }).ToList(),
+            ["notExecutedCalls"] = notExecutedCalls.Select(c => c.Name).ToList()
         };
-        
+        var notRun = notExecutedCalls.Count == 0
+            ? ""
+            : $" {notExecutedCalls.Count} emitted but never ran (no execution was recorded): {string.Join(", ", notExecutedCalls.Select(c => c.Name))}.";
+
         if (score >= EvaluationDefaults.PassingScoreThreshold)
         {
             return Task.FromResult(MetricResult.Pass(Name, score,
-                $"{successfulCalls}/{totalCalls} tools executed successfully.", metadata));
+                $"{successfulCalls}/{totalCalls} tools executed successfully.{notRun}", metadata));
         }
         else
         {
             var errors = string.Join("; ", failedCalls.Take(3).Select(c => $"{c.Name}: {c.Exception?.Message}"));
+            var failures = failedCalls.Count == 0
+                ? $"{successfulCalls}/{totalCalls} tools executed successfully."
+                : $"Tool failures: {errors}.";
             return Task.FromResult(MetricResult.Fail(Name,
-                $"Tool failures: {errors}", score, metadata));
+                $"{failures}{notRun}", score, metadata));
         }
     }
 }
@@ -306,8 +332,9 @@ public class TaskCompletionMetric : IAgenticMetric
         
         var prompt = BuildTaskCompletionPrompt(context.Input, context.Output, toolsUsed, criteriaList);
         
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseCompletionResult(response.Text ?? ""), BuildTaskCompletionPrompt("", "", string.IsNullOrEmpty(toolsUsed) ? "" : "{tools}", criteriaList));
+        // A failed judge call or an unreadable reply is not measured, never a Fail at 0.
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Task completion", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseCompletionResult(response!), BuildTaskCompletionPrompt("", "", string.IsNullOrEmpty(toolsUsed) ? "" : "{tools}", criteriaList));
     }
     
     private static string BuildTaskCompletionPrompt(string input, string output, string toolsUsed, string criteriaList)
@@ -341,12 +368,11 @@ public class TaskCompletionMetric : IAgenticMetric
             """;
     }
     
-    private MetricResult ParseCompletionResult(string response)
+    private MetricResult ParseCompletionResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate task completion - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Task completion", response, failure);
         }
         
         var metadata = new Dictionary<string, object> { ["reasoning"] = parsed.Reasoning ?? "" };
@@ -387,24 +413,34 @@ public class ToolEfficiencyMetric : IAgenticMetric
     
     public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (context.ToolUsage == null || context.ToolUsage.Count == 0)
+        if (context.ToolUsage is null)
+            return ToolUsageNotRecorded.Result(Name);
+
+        if (context.ToolUsage.Count == 0)
         {
             return Task.FromResult(MetricResult.Pass(Name, 100, "No tools called - maximally efficient."));
         }
-        
+
         var callCount = context.ToolUsage.Count;
         var totalDuration = context.ToolUsage.TotalToolTime;
-        
+
         // Score based on call count (100 if within expected, decreasing after)
-        var callScore = callCount <= _maxExpectedCalls 
-            ? 100 
-            : Math.Max(0, 100 - (callCount - _maxExpectedCalls) * 10);
-        
-        // Score based on duration
-        var durationScore = totalDuration <= _maxExpectedDuration
+        var callScore = callCount <= _maxExpectedCalls
             ? 100
-            : Math.Max(0, 100 - (totalDuration.TotalSeconds - _maxExpectedDuration.TotalSeconds) * 5);
-        
+            : Math.Max(0, 100 - (callCount - _maxExpectedCalls) * 10);
+
+        // Score based on duration, only when every call was timed. The non-streaming path records no timing (unless a
+        // Glass Box trace back-fills it) and TotalToolTime sums the timed calls only, so an untimed run read a total of
+        // 0s and a perfect duration score: half of this metric credited for something nobody measured (T58).
+        var untimedCalls = context.ToolUsage.Calls.Count(c => !c.HasTiming);
+        double? durationScore = null;
+        if (untimedCalls == 0)
+        {
+            durationScore = totalDuration <= _maxExpectedDuration
+                ? 100
+                : Math.Max(0, 100 - (totalDuration.TotalSeconds - _maxExpectedDuration.TotalSeconds) * 5);
+        }
+
         // Check for repeated calls (potential retries)
         var duplicateCalls = context.ToolUsage.Calls
             .GroupBy(c => c.Name)
@@ -414,31 +450,59 @@ public class ToolEfficiencyMetric : IAgenticMetric
         
         var duplicatePenalty = duplicateCalls.Sum(d => (d.Count - 1) * EvaluationDefaults.DuplicateToolPenaltyPercent);
         
-        var finalScore = Math.Max(0, (callScore + durationScore) / 2 - duplicatePenalty);
-        
+        // Without a duration the score rests on the call count alone, and the explanation says so.
+        var finalScore = Math.Max(0, (durationScore is { } timed ? (callScore + timed) / 2 : callScore) - duplicatePenalty);
+        var durationNote = durationScore is null
+            ? $" (duration not measured: {untimedCalls} of {callCount} calls carry no timing)"
+            : "";
+
         var metadata = new Dictionary<string, object>
         {
             ["callCount"] = callCount,
             ["maxExpectedCalls"] = _maxExpectedCalls,
             ["totalDuration"] = totalDuration.ToString(),
             ["maxExpectedDuration"] = _maxExpectedDuration.ToString(),
+            ["durationMeasured"] = durationScore is not null,
             ["duplicateCalls"] = duplicateCalls
         };
-        
+
         if (finalScore >= EvaluationDefaults.PassingScoreThreshold)
         {
             return Task.FromResult(MetricResult.Pass(Name, finalScore,
-                $"Efficient: {callCount} calls in {totalDuration.TotalSeconds:F1}s", metadata));
+                durationScore is null
+                    ? $"Efficient: {callCount} calls{durationNote}"
+                    : $"Efficient: {callCount} calls in {totalDuration.TotalSeconds:F1}s", metadata));
         }
         else
         {
             var issues = new List<string>();
             if (callCount > _maxExpectedCalls) issues.Add($"{callCount} calls (expected ≤{_maxExpectedCalls})");
-            if (totalDuration > _maxExpectedDuration) issues.Add($"Duration {totalDuration.TotalSeconds:F1}s (expected ≤{_maxExpectedDuration.TotalSeconds}s)");
+            if (durationScore is not null && totalDuration > _maxExpectedDuration) issues.Add($"Duration {totalDuration.TotalSeconds:F1}s (expected ≤{_maxExpectedDuration.TotalSeconds}s)");
             if (duplicateCalls.Any()) issues.Add($"Repeated calls: {string.Join(", ", duplicateCalls.Select(d => $"{d.Tool}x{d.Count}"))}");
-            
+
             return Task.FromResult(MetricResult.Fail(Name,
-                $"Efficiency issues: {string.Join("; ", issues)}", finalScore, metadata));
+                $"Efficiency issues: {string.Join("; ", issues)}{durationNote}", finalScore, metadata));
         }
     }
+}
+
+/// <summary>
+/// The result a tool metric returns when no tool data was recorded for the run.
+/// </summary>
+/// <remarks>
+/// <see cref="EvaluationContext.ToolUsage"/> is <see langword="null"/> when nothing recorded the run's tool calls: tool
+/// tracking off, an adapter that returned no messages, a run that threw before its calls were read, a dataset row with
+/// no trace. That is not a run with no tool calls, which is an empty report and a real result. The tool metrics read the
+/// null as "no tools called" and scored it 100 (arguments, success, efficiency, skill disclosure) or a measured 0
+/// (selection) (T58).
+/// </remarks>
+internal static class ToolUsageNotRecorded
+{
+    internal const string Reason =
+        "No tool data was recorded for this run (tool tracking was off, the adapter returned no messages, or the run " +
+        "failed before its tool calls were read), so tool use was not measured. A recorded run with no tool calls is a " +
+        "real result; this is not one.";
+
+    internal static Task<MetricResult> Result(string metricName) =>
+        Task.FromResult(MetricResult.NotMeasured(metricName, NotMeasuredCause.MissingInput, Reason));
 }

@@ -601,10 +601,18 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
 
         _logger.LogInformation($"   Suite: {summary.SuiteName}");
         _logger.LogInformation($"   Tests Passed: {summary.PassedCount}/{summary.TotalCount}");
-        _logger.LogInformation($"   Average Score: {summary.AverageScore:F1}/100");
+        // The average is over the measured tests: a test with no verdict carries a placeholder 0 that is not a score.
+        _logger.LogInformation(summary.HasMeasuredScore
+            ? $"   Average Score: {summary.AverageScore:F1}/100 (over {summary.MeasuredCount} measured)"
+            : "   Average Score: n/a (nothing measured)");
 
         foreach (var result in summary.Results)
         {
+            if (result.JudgeFailed || result.HasError)
+            {
+                _logger.LogWarning($"   ⚠️ {result.TestName}: not measured");
+                continue;
+            }
             var status = result.Passed ? "✅" : "❌";
             var level = result.Passed ? LogLevel.Information : LogLevel.Error;
             _logger.Log(level, $"   {status} {result.TestName}: {result.Score}/100");
@@ -616,7 +624,11 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         }
         else
         {
-            _logger.LogWarning($"\n   ⚠️ {summary.FailedCount} test(s) need attention.\n");
+            // Failures and tests with no verdict apart: a run that only went unmeasured printed "0 test(s) need attention".
+            if (summary.FailedCount > 0)
+                _logger.LogWarning($"\n   ⚠️ {summary.FailedCount} test(s) failed.\n");
+            if (summary.NotMeasuredCount > 0)
+                _logger.LogWarning($"\n   ⚠️ {summary.NotMeasuredCount} test(s) not measured (the judge produced no verdict, or the run errored).\n");
         }
     }
     

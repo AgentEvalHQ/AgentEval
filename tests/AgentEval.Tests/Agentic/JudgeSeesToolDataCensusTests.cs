@@ -75,14 +75,16 @@ public class JudgeSeesToolDataCensusTests
     }
 
     // A tool call with no recorded outcome and a plain-text result, so the code-first evaluators (tool_call_success,
-    // prohibited_actions, sensitive_data_leakage) reach their judge; no PII, no policy match.
+    // prohibited_actions, sensitive_data_leakage) reach their judge; no PII, no policy match. A system message, so the
+    // task-adherence leaves that grade the agent's rules reach their judge too (they are not measured without one).
     private static EvalInput CanaryInput() => new(
         Query: "Look up the order status for order 1234.",
         Response: "Your order 1234 has shipped.",
         Context: "Order 1234 shipped on Monday.",
         ToolCalls: [new ToolCall(CanaryTool, new Dictionary<string, object> { ["order"] = CanaryArgument }, CanaryResult)],
         ToolDefinitions: [new ToolDefinition(CanaryTool, CanaryDefinition, new Dictionary<string, object> { ["required"] = new object[] { "order" } })],
-        ExpectedActions: [new ExpectedAction("look up the order", [CanaryTool])]);
+        ExpectedActions: [new ExpectedAction("look up the order", [CanaryTool])],
+        SystemMessage: "You answer questions about orders. Be brief.");
 
     // Evaluators that ship with a rubric but are not in the key registry, built the way their callers build them:
     //   prohibited_actions — needs an IPolicyResolver and a subject id, so the registry cannot dispatch it (see

@@ -11,7 +11,8 @@ namespace AgentEval.Memory.Tests.Samples;
 /// <summary>
 /// G7 (Benchmark Reporting)'s winner column and "best overall" line, as shipped. Until 2026-10 the first model listed took
 /// every tie, and a dimension a model did not measure printed as the comparer's 0. The comparisons here are built by the
-/// real <see cref="BaselineComparer"/>, which fills that 0.
+/// real <see cref="BaselineComparer"/>, which no longer fills that 0: it names the models that did not measure a
+/// dimension instead.
 /// </summary>
 public class MemoryComparisonLeadersTests
 {
@@ -48,14 +49,14 @@ public class MemoryComparisonLeadersTests
     }
 
     [Fact]
-    public void AModelThatDidNotMeasureADimension_IsNotInTheRunning_ThoughTheComparerFillsIt()
+    public void AModelThatDidNotMeasureADimension_IsNotInTheRunning()
     {
-        // glm measured 0 on Abstention; deepseek did not measure it, and the comparer gives deepseek a 0 there too. A
+        // glm measured 0 on Abstention; deepseek did not measure it, and the comparer gives deepseek no score there. A
         // measured 0 is a score, an unmeasured dimension is not, so this is glm's dimension and not a tie at 0.
         var glm = Baseline("glm", 50, ("Abstention", 0));
         var deepseek = Baseline("deepseek", 50);
         var comparison = new BaselineComparer().Compare([glm, deepseek]);
-        Assert.Equal(0, comparison.Dimensions.Single(d => d.DimensionName == "Abstention").Scores[deepseek.Id]);
+        Assert.False(comparison.Dimensions.Single(d => d.DimensionName == "Abstention").Scores.ContainsKey(deepseek.Id));
 
         Assert.Equal("glm", WinnerOn(comparison, "Abstention"));
     }

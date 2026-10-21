@@ -194,9 +194,15 @@ internal static class BenchAef
                 new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
                 DateTimeOffset.UtcNow);
         }).ToList();
+        // No accuracy means no question was scored, and an INCONCLUSIVE verdict (nothing scored, or an interrupted run)
+        // decided nothing: the root is not measured, never a failure at 0.
+        var scored = result.OverallAccuracy is not null && verdict != "INCONCLUSIVE";
         return new EvalResult(
             new EvalMetadata($"{family}.{preset.ToLowerInvariant()}", $"{family} {preset}", family, "1.0.0"),
-            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, verdict.ToLowerInvariant(), verdict == "PASS", null, "none", null),   // a percentage
+            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, verdict.ToLowerInvariant(), scored && verdict == "PASS", null, "none", null)   // a percentage
+            {
+                Measurement = scored ? AgentEval.Evals.Meta.MeasurementState.Measured : AgentEval.Evals.Meta.MeasurementState.NotMeasured,
+            },
             new EvalDetails(null, null, null, questions, null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
@@ -270,16 +276,22 @@ internal static class BenchAef
         AgentEval.Benchmarks.AutoAuditEndpointResult result)
     {
         var label = result.Completed ? "scored" : "error";
-        EvalResult Leaf(string key, double value) => new(
+        // A chat boundary with no model response reconciles perfectly without measuring anything: the fidelity (and the
+        // root, which carries it) is not measured.
+        var fidelityMeasurement = result.Completed && !result.FidelityMeasured
+            ? AgentEval.Evals.Meta.MeasurementState.NotMeasured
+            : AgentEval.Evals.Meta.MeasurementState.Measured;
+        EvalResult Leaf(string key, double value, AgentEval.Evals.Meta.MeasurementState measurement) => new(
             new EvalMetadata(key, key, "autoaudit", "1.0.0"),
-            new EvalScore(value, null, label, false, null, "none", null),
+            new EvalScore(value, null, label, false, null, "none", null) { Measurement = measurement },
             new EvalDetails(null, null, null, null, null),
             new EvalProvenance("atomic-code", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
         var root = new EvalResult(
             new EvalMetadata("autoaudit.support-task", "Auto-audit", "autoaudit", "1.0.0"),
-            new EvalScore(result.FidelityScore, null, label, false, null, "none", null),
-            new EvalDetails(null, null, null, [Leaf("fidelity", result.FidelityScore), Leaf("safety", result.LeakedPastGate ? 0 : 1)], null),
+            new EvalScore(result.FidelityScore, null, label, false, null, "none", null) { Measurement = fidelityMeasurement },
+            new EvalDetails(null, null, null,
+                [Leaf("fidelity", result.FidelityScore, fidelityMeasurement), Leaf("safety", result.LeakedPastGate ? 0 : 1, AgentEval.Evals.Meta.MeasurementState.Measured)], null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
         var ext = new Dictionary<string, System.Text.Json.Nodes.JsonObject>(StringComparer.Ordinal);
@@ -296,6 +308,11 @@ internal static class BenchAef
                     ["latencyMs"] = result.LatencyMs,
                 },
             };
+            if (!result.TokensReported)
+            {
+                // The counts leave out a response that reported no usage: say so beside them.
+                ext["safety"]["agenteval.autoaudit"]!["tokensReported"] = false;
+            }
         }
 
         return (root, ext);
@@ -310,7 +327,8 @@ internal static class BenchAef
     /// </summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
         AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel) =>
-        TypedTree(result.QuestionResults, (result.OverallAccuracy ?? 0) / 100.0, vertical, judgeModel);
+        // No accuracy means no question was scored: the aggregate is not measured, never a measured 0.
+        TypedTree(result.QuestionResults, result.OverallAccuracy / 100.0, vertical, judgeModel);
 
     /// <summary>Maps observed questions; a null overall score withholds a partial benchmark's aggregate.</summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(

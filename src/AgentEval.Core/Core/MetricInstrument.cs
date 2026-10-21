@@ -18,7 +18,7 @@ internal static class MetricInstrument
     private static MetricResult Copy(MetricResult result, bool modelGraded, string? digest) => new()
     {
         MetricName = result.MetricName, Score = result.Score, Passed = result.Passed,
-        Measured = result.Measured, Explanation = result.Explanation, Details = result.Details,
-        ModelGraded = modelGraded, RubricDigest = digest,
+        Measured = result.Measured, NotMeasuredCause = result.NotMeasuredCause, Explanation = result.Explanation,
+        Details = result.Details, ModelGraded = modelGraded, RubricDigest = digest,
     };
 }

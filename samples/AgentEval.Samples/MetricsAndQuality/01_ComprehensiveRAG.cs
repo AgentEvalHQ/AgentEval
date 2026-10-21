@@ -490,11 +490,12 @@ public static class ComprehensiveRAG
     }
 
     /// <summary>
-    /// True when a metric could not produce a measurement: an input was not supplied (<see cref="MetricResult.Measured"/>),
-    /// the judge's reply did not parse, or the embedding call failed. Core reports the last two as a Fail at 0, so the
-    /// sample tells them apart by Core's own wording; a judge that could not grade is not an answer that failed.
+    /// True when a metric could not produce a measurement: an input was not supplied, the judge's reply did not parse,
+    /// or the judge or embedding call failed. Core reports each as not measured (<see cref="MetricResult.Measured"/>,
+    /// with the cause in <see cref="MetricResult.NotMeasuredCause"/>); a judge that could not grade is not an answer that
+    /// failed.
     /// </summary>
-    private static bool CouldNotMeasure(MetricResult result) => MetricMeasurement.CouldNotMeasure(result);
+    private static bool CouldNotMeasure(MetricResult result) => !result.Measured;
 
     #endregion
 

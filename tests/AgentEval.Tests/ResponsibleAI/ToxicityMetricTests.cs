@@ -11,12 +11,46 @@ using AgentEval.Testing;
 public class ToxicityMetricTests
 {
     [Fact]
-    public void Name_ReturnsExpectedPrefix()
+    public void Name_SaysWhichInstrumentDecides()
     {
+        // T67: with an LLM judge it was named code_toxicity too, so AEF recorded the judge's verdict as a code check.
         var fakeClient = new FakeChatClient("""{"score": 100}""");
-        var metric = new ToxicityMetric(fakeClient);
 
-        Assert.Equal("code_toxicity", metric.Name);
+        Assert.Equal("llm_toxicity", new ToxicityMetric(fakeClient).Name);
+        Assert.Equal("code_toxicity", new ToxicityMetric(fakeClient, useLlmFallback: false).Name);
+        Assert.Equal("code_toxicity", new ToxicityMetric().Name);
+    }
+
+    [Fact]
+    public async Task TheJudgesVerdict_IsRecordedAsAModelGrade()
+    {
+        // T67: the LLM path was not wrapped as a model instrument (ModelGraded null under a code_ name).
+        var fakeClient = new FakeChatClient("""{"score": 95, "categories": [], "severity": "none", "reasoning": "safe"}""");
+        var context = new EvaluationContext { Input = "Weather?", Output = "The weather is sunny and pleasant today." };
+
+        var first = await new ToxicityMetric(fakeClient).EvaluateAsync(context);
+        var second = await new ToxicityMetric(new FakeChatClient("""{"score": 95}"""))
+            .EvaluateAsync(new EvaluationContext { Input = "Other", Output = "A different, harmless answer." });
+
+        Assert.Equal("llm_toxicity", first.MetricName);
+        Assert.True(first.ModelGraded);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", first.RubricDigest!);
+        Assert.Equal(first.RubricDigest, second.RubricDigest);   // the instrument, not the case
+    }
+
+    [Fact]
+    public async Task APatternMatch_IsACodeVerdict_EvenWithAJudge()
+    {
+        // With the judge configured, a pattern match still decides without it: that result is not a model's.
+        var fakeClient = new FakeChatClient("""{"score": 100}""");
+        var context = new EvaluationContext { Input = "q", Output = "Kill yourself you loser" };
+
+        var result = await new ToxicityMetric(fakeClient).EvaluateAsync(context);
+
+        Assert.Equal(0, fakeClient.CallCount);
+        Assert.False(result.Passed);
+        Assert.False(result.ModelGraded);
+        Assert.Null(result.RubricDigest);
     }
 
     [Fact]
@@ -91,7 +125,7 @@ public class ToxicityMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_TreatedAsInconclusive_NotAPass()
+    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_IsNotMeasured_NotAPass()
     {
         // Regression test for a real bug found in review: a judge reply with valid JSON but a missing/
         // non-numeric "score" field previously defaulted to score=80 (above PassingScoreThreshold) — an
@@ -119,6 +153,7 @@ public class ToxicityMetricTests
 
         Assert.False(result.Passed);
         Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);   // no verdict: not measured, never a Fail at 0 (T03); a gate still blocks it
     }
 
     [Fact]
@@ -255,9 +290,13 @@ public class ToxicityMetricTests
 
         var result = await metric.EvaluateAsync(context);
 
+        // T59: then it was a Fail at score 0, a score nothing measured. Not measured, and still not a pass, so a safety
+        // gate blocks it (fail-closed).
         Assert.False(result.Passed);
+        Assert.False(result.Measured);
+        Assert.Equal(NotMeasuredCause.CheckTimedOut, result.NotMeasuredCause);
         Assert.NotNull(result.Details);
-        Assert.Equal("inconclusive_treated_as_failure", result.Details["evaluationStatus"] as string);
+        Assert.Equal("inconclusive", result.Details["evaluationStatus"] as string);
         Assert.NotEmpty(Assert.IsType<List<string>>(result.Details["timedOutPatterns"]));
     }
 

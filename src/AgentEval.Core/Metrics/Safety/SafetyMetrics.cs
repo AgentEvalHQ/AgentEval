@@ -54,7 +54,7 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
     {
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.NotMeasured(Name,
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                 "Groundedness requires a retrieved context, and none was supplied: not measured. " +
                 "If no context is available, consider using a different safety metric.");
         }
@@ -66,10 +66,10 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         var toolResults = ToolResultEvidence.Render(context.ToolUsage);
         var prompt = BuildGroundednessPrompt(context.Context, context.Input, context.Output, toolResults);
 
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        var responseText = response.Text ?? "";
+        // A failed judge call or an unreadable reply is not measured, never a Fail at 0.
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Groundedness", cancellationToken);
 
-        return MetricInstrument.Model(ParseGroundednessResult(responseText),
+        return JudgeReplyEvidence.Model(failed ?? ParseGroundednessResult(response!),
             BuildGroundednessPrompt("", "", "", toolResults.Length == 0 ? "" : ToolResultEvidence.Template));
     }
 
@@ -130,13 +130,11 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
             """;
     }
     
-    private MetricResult ParseGroundednessResult(string response)
+    private MetricResult ParseGroundednessResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, 
-                "Unable to evaluate groundedness - failed to parse evaluator response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Groundedness", response, failure);
         }
         
         var ungroundedClaims = LlmJsonParser.ExtractStringArray(parsed.Root, "ungroundedClaims");
@@ -208,9 +206,9 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
         CancellationToken cancellationToken = default)
     {
         var prompt = BuildCoherencePrompt(context.Input, context.Output);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseCoherenceResult(response.Text ?? ""), BuildCoherencePrompt("", ""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Coherence", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseCoherenceResult(response!), BuildCoherencePrompt("", ""));
     }
     
     private static string BuildCoherencePrompt(string input, string output)
@@ -254,12 +252,11 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
             """;
     }
     
-    private MetricResult ParseCoherenceResult(string response)
+    private MetricResult ParseCoherenceResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate coherence - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Coherence", response, failure);
         }
         
         var hasContradictions = LlmJsonParser.GetBoolean(parsed.Root, "hasContradictions");
@@ -320,9 +317,9 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
         CancellationToken cancellationToken = default)
     {
         var prompt = BuildFluencyPrompt(context.Output);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseFluencyResult(response.Text ?? ""), BuildFluencyPrompt(""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Fluency", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseFluencyResult(response!), BuildFluencyPrompt(""));
     }
     
     private static string BuildFluencyPrompt(string output)
@@ -364,12 +361,11 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
             """;
     }
     
-    private MetricResult ParseFluencyResult(string response)
+    private MetricResult ParseFluencyResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate fluency - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Fluency", response, failure);
         }
         
         var grammarErrors = LlmJsonParser.ExtractStringArray(parsed.Root, "grammarErrors");

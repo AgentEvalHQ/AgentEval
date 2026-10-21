@@ -86,14 +86,15 @@ public class LightPathIntegrationTests
         var evaluator = AgentEvalEvaluators.ToolSuccess();
         var result = await evaluator.EvaluateAsync(messages, response, additionalContext: additionalContext);
 
-        // Assert — should still return a result (ToolSuccessMetric passes when no tools called)
+        // Assert — should still return a result (ToolSuccessMetric is not measured when no tool data was recorded)
         Assert.True(result.Metrics.ContainsKey("code_tool_success"));
     }
 
     [Fact]
-    public async Task LightPath_NoToolCalls_ToolSuccessReturnsPass()
+    public async Task LightPath_NoToolCallInTheTranscript_ToolSuccessIsNotMeasured()
     {
-        // ToolSuccessMetric returns Pass(100) when no tools are called
+        // The flat path cannot vouch for the whole turn, so a transcript with no tool call is "not recorded" (ToolUsage
+        // null, T10), and ToolSuccessMetric is not measured (T58). It read PASS 100 ("No tools called").
         var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
         var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi!")]);
 
@@ -101,7 +102,26 @@ public class LightPathIntegrationTests
         var result = await evaluator.EvaluateAsync(messages, response);
 
         var metric = Assert.IsType<NumericMetric>(result.Metrics["code_tool_success"]);
-        Assert.Equal(5.0, metric.Value!.Value, precision: 1); // 100 → 5.0
-        Assert.False(metric.Interpretation!.Failed);
+        Assert.Null(metric.Value);
+        Assert.True(metric.Interpretation!.Failed);
+        Assert.Contains("not measured", metric.Interpretation.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LightPath_GivenTheWholeConversation_NoToolCallIsARecordedNone()
+    {
+        // AgentEvalAgentEvaluator hands the flat evaluators the item's whole conversation and says so; a turn with no
+        // tool call is then a measured "none", so an expected tool that was never called is a real failure. Without the
+        // marker it was "not recorded" and the selection check measured nothing.
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Find me a flight") };
+        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Here is a flight.")]);
+        var additionalContext = new EvaluationContext[] { new AgentEvalWholeConversationContext() };
+
+        var result = await AgentEvalEvaluators.Agentic(["search_flights"]).EvaluateAsync(messages, response, additionalContext: additionalContext);
+
+        var metric = Assert.IsType<NumericMetric>(result.Metrics["code_tool_selection"]);
+        Assert.NotNull(metric.Value);
+        Assert.True(metric.Interpretation!.Failed);
+        Assert.DoesNotContain("not measured", metric.Interpretation.Reason, StringComparison.Ordinal);
     }
 }

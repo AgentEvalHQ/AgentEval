@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Memory.External.Models;
 
 namespace AgentEval.Memory.External.LongMemEval;
@@ -67,7 +68,10 @@ public static class LongMemEvalEvalResultAdapter
                     Passed: typePassed,
                     Threshold: passThreshold,
                     Severity: typeSeverity,
-                    Confidence: null),
+                    Confidence: null)
+                {
+                    Measurement = MeasurementOf(typeAccuracy),
+                },
                 Details: new EvalDetails(
                     Dimensions: new Dictionary<string, double>
                     {
@@ -176,7 +180,10 @@ public static class LongMemEvalEvalResultAdapter
                 Passed: overallPassed,
                 Threshold: passThreshold,
                 Severity: overallSeverity,
-                Confidence: null),
+                Confidence: null)
+            {
+                Measurement = MeasurementOf(overallAccuracy),
+            },
             Details: new EvalDetails(
                 Dimensions: rootDimensions,
                 Evidence: null,
@@ -204,11 +211,13 @@ public static class LongMemEvalEvalResultAdapter
         string? judgeModel,
         DateTimeOffset evaluatedAt)
     {
+        // A question with no binary judgment is a typed absence, never a failure: an agent that failed before the judge
+        // is an error, a judge with no verdict inconclusive. Both are not measured.
         var label = question.Correct switch
         {
             true => "pass",
             false => "fail",
-            null => "inconclusive",
+            null => question.ExecutionStatus == QuestionExecutionStatus.Completed ? "inconclusive" : "error",
         };
         var dimensions = new Dictionary<string, double>
         {
@@ -269,7 +278,10 @@ public static class LongMemEvalEvalResultAdapter
                     false => "medium",
                     null => "low",
                 },
-                Confidence: null),
+                Confidence: null)
+            {
+                Measurement = question.Correct.HasValue ? MeasurementState.Measured : MeasurementState.NotMeasured,
+            },
             Details: new EvalDetails(
                 Dimensions: dimensions,
                 Evidence: statusEvidence,
@@ -302,6 +314,10 @@ public static class LongMemEvalEvalResultAdapter
             ? ("pass", true, "none")
             : ("warn", true, "low");
     }
+
+    // An accuracy over no scored question is not a 0: the node is not measured.
+    private static MeasurementState MeasurementOf(double? accuracyPercent) =>
+        accuracyPercent.HasValue ? MeasurementState.Measured : MeasurementState.NotMeasured;
 
     private static bool IsSafeFailureCode(string? value) =>
         !string.IsNullOrWhiteSpace(value) &&

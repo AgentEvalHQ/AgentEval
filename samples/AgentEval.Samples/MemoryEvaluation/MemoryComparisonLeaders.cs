@@ -11,7 +11,8 @@ namespace AgentEval.Samples;
 /// </summary>
 /// <remarks>
 /// Until 2026-10 the first model listed took every tie, so two models scoring the same read as a win for whichever ran
-/// first, and a dimension a model did not measure printed as 0.0%, the comparer's fill value.
+/// first, and a dimension a model did not measure printed as 0.0%, the comparer's fill value then (the comparer now
+/// leaves it out and names the model in <c>DimensionComparison.NotMeasuredBy</c>).
 /// </remarks>
 internal static class MemoryComparisonLeaders
 {
@@ -32,8 +33,8 @@ internal static class MemoryComparisonLeaders
 
     /// <summary>
     /// The baselines sharing the top score on <paramref name="dimension"/>, in run order. A baseline's own scores are
-    /// read, not the comparer's: <c>BaselineComparer</c> fills a dimension a baseline did not measure with 0, and a
-    /// dimension that was not measured is not a 0, so that baseline is not in the running. Empty when none measured it.
+    /// read: a dimension a baseline did not measure is not a 0, so that baseline is not in the running (the comparer
+    /// gives it no score there either). Empty when none measured it.
     /// </summary>
     public static IReadOnlyList<MemoryBaseline> OnDimension(IReadOnlyList<MemoryBaseline> baselines, string dimension)
     {

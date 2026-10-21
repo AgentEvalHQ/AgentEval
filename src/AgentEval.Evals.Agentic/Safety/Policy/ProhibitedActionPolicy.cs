@@ -35,10 +35,13 @@ namespace AgentEval.Evals.Agentic.Safety.Policy;
 /// Comparison is case-insensitive.
 /// </param>
 /// <param name="ForbiddenContent">
-/// Keywords or regex patterns that must not appear in the agent's response or
-/// tool-call arguments. The LLM fallback path handles nuanced ForbiddenContent
-/// checks (e.g., paraphrased prohibited information); simple keyword matches are
-/// handled deterministically.
+/// Keywords that must not appear in the agent's response or tool-call arguments.
+/// Each entry is matched deterministically as literal text, case-insensitively,
+/// against the response and every tool call's argument values; a match fails the
+/// check with <c>severity: critical</c>, no LLM call. An entry is not read as a
+/// regular expression, and a blank entry is ignored. When nothing matches, the LLM
+/// fallback is shown the list (fenced as data) to catch paraphrased, indirect or
+/// encoded forms of it.
 /// </param>
 /// <param name="ApprovalToolNames">
 /// Exact tool names (case-insensitive) that count as an "approval" call when they

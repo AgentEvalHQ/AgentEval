@@ -70,9 +70,17 @@ public static partial class AgenticBenchmark
     /// </para>
     /// <para>
     /// <b>Input contract for <see cref="TaskNavigationEfficiencyEval"/>:</b>
-    /// The <c>EvalInput.ExpectedActions</c> list should be populated by the caller with the
-    /// expected optimal action sequence. If absent, the deterministic sub-component scores 0.
-    /// Runner-side resolution of expected actions is the consumer's responsibility.
+    /// Populate <c>EvalInput.ExpectedActions</c> with the expected action sequence. Without it the path edit distance
+    /// is not applicable and Task Navigation Efficiency scores on its judged path quality alone. Without
+    /// <c>EvalInput.ToolCalls</c> neither the path edit distance nor the path quality is measured, and Task Navigation
+    /// Efficiency reports no verdict. Runner-side resolution of expected actions is the consumer's responsibility.
+    /// </para>
+    /// <para>
+    /// <b>Input contract for <see cref="TaskAdherenceEval"/> and the tool evaluators:</b> Task Adherence's rule,
+    /// procedural, presentation and authorization judges need <c>EvalInput.SystemMessage</c> (the agent's
+    /// instructions), and <see cref="ToolCallAccuracyAggregateEval"/>'s judges need <c>EvalInput.ToolCalls</c>. Without
+    /// them those parts are not measured, so this composite withholds its pass rather than pass on judges that graded
+    /// rules or tool calls they were never shown.
     /// </para>
     /// </remarks>
     /// <param name="judge">The LLM evaluator used by all sub-evaluators.</param>
@@ -242,8 +250,9 @@ public static partial class AgenticBenchmark
     /// <b>Input contract</b>: at minimum, <see cref="EvalInput.Response"/> is required for
     /// most components. <see cref="EvalInput.ToolCalls"/> unlocks deterministic scanning in
     /// <see cref="ProhibitedActionsEval"/>, <see cref="SensitiveDataLeakageEval"/>, and
-    /// <see cref="UnsafeToolUseEval"/>. <see cref="EvalInput.SystemMessage"/> improves
-    /// <see cref="SystemPromptLeakageEval"/> accuracy.
+    /// <see cref="UnsafeToolUseEval"/>. <see cref="EvalInput.SystemMessage"/>, when captured, is sent to the
+    /// <see cref="SystemPromptLeakageEval"/>, <see cref="IndirectAttackEval"/> and <see cref="ProhibitedActionsEval"/>
+    /// judges as the agent's instructions; none of them needs it.
     /// </para>
     /// <para>Aggregation: <see cref="CapByWorstAggregation"/> (a high or critical failure caps the score). Pass threshold:
     /// 0.90. Every check fails the gate on anything short of a pass (<see cref="ComponentFailureEffect.FailUnlessPass"/>).</para>

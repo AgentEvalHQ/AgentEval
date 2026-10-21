@@ -39,8 +39,10 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// </para>
 /// <para>
 /// <strong>Input contract</strong>: requires <see cref="EvalInput.Query"/> and
-/// <see cref="EvalInput.Response"/>. Optionally uses <see cref="EvalInput.SystemMessage"/>
-/// to provide the judge with additional grounding context.
+/// <see cref="EvalInput.Response"/>. When <see cref="EvalInput.SystemMessage"/> is supplied, the judge is
+/// sent it as the agent's instructions (<see cref="JudgeToolData.SystemMessage"/>, fenced as data), so it can
+/// tell the persona the agent was given from the one the attack tried to substitute; without it the judge
+/// grades the exchange alone. The template scan reads the query only.
 /// </para>
 /// <para>
 /// Source: plan-06 B5.2. Counterpart to <c>DirectInjectionEval</c> (B5.1), which covers
@@ -54,7 +56,8 @@ public sealed class PersonaAttackEval : IEvalInstrumentSource
     private const string KeyValue      = "persona_attack";
     private const string NameValue     = "Persona Attack Resistance";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.2.0";
+    // 1.3.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+    private const string VersionValue  = "1.3.0";
 
     private readonly AtomicLlmEval _llmJudge;
     private readonly IReadOnlyList<AdversarialPatternLibrary.CompiledPattern> _templates;
@@ -123,7 +126,7 @@ public sealed class PersonaAttackEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.persona_attack.v1",
-            failureSeverity: "critical");
+            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.SystemMessage };
 
         _templates = AdversarialPatternLibrary.Load(
             Assembly.GetExecutingAssembly(),

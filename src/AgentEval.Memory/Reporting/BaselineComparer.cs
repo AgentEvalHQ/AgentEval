@@ -23,14 +23,19 @@ public class BaselineComparer : IBaselineComparer
             .Distinct()
             .ToList();
 
-        // Build per-dimension comparisons — include every baseline for every dimension,
-        // using 0 as the default for baselines that do not define a score for that dimension.
-        // This keeps per-dimension tables and radar charts consistent (no silent omissions).
+        // Build per-dimension comparisons. A baseline that did not measure a dimension (a skipped category, an agent
+        // without session reset, a benchmark with other dimension names) has no score for it: it is left out of
+        // Scores and named in NotMeasuredBy, never filled with a 0 that could lose, or win, the dimension.
         var dimensions = allDimensions.Select(dim => new DimensionComparison
         {
             DimensionName = dim,
             Scores = baselines
-                .ToDictionary(b => b.Id, b => b.DimensionScores.GetValueOrDefault(dim, 0))
+                .Where(b => b.DimensionScores.ContainsKey(dim))
+                .ToDictionary(b => b.Id, b => b.DimensionScores[dim]),
+            NotMeasuredBy = baselines
+                .Where(b => !b.DimensionScores.ContainsKey(dim))
+                .Select(b => b.Id)
+                .ToList()
         }).ToList();
 
         // Determine best baseline (highest overall score)
@@ -38,15 +43,18 @@ public class BaselineComparer : IBaselineComparer
         var bestBaseline = baselines.MaxBy(b => b.OverallScore)
             ?? throw new InvalidOperationException("Unable to determine best baseline.");
 
-        // Build radar chart data
-        var axes = PentagonConsolidator.Axes.Where(a => allDimensions.Contains(a)).ToList();
+        // Build radar chart data over the pentagon axes every baseline measured; an axis only some measured is
+        // named in OmittedAxes rather than drawn with a made-up 0 for the others.
+        var presentAxes = PentagonConsolidator.Axes.Where(a => allDimensions.Contains(a)).ToList();
+        var axes = presentAxes.Where(a => baselines.All(b => b.DimensionScores.ContainsKey(a))).ToList();
         var radarChart = new RadarChartData
         {
             Axes = axes,
+            OmittedAxes = presentAxes.Except(axes).ToList(),
             Series = baselines.Select(b => new RadarChartSeries
             {
                 Name = b.Name,
-                Values = axes.Select(a => b.DimensionScores.GetValueOrDefault(a, 0)).ToList()
+                Values = axes.Select(a => b.DimensionScores[a]).ToList()
             }).ToList()
         };
 

@@ -36,7 +36,7 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.NotMeasured(Name,
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                     "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
@@ -52,25 +52,50 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating reducer fidelity metric");
-            return Task.FromResult(MetricResult.Fail(Name, $"Error during reducer fidelity evaluation: {ex.Message}"));
+            // An error is no reading: not measured, never a Fail at 0 that an aggregate would count.
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeCallFailed,
+                $"Reducer fidelity not measured: {ex.GetType().Name}: {ex.Message}",
+                new Dictionary<string, object>
+                {
+                    ["errorType"] = ex.GetType().FullName ?? ex.GetType().Name,
+                    ["errorMessage"] = ex.Message,
+                }));
         }
     }
 
     private Task<MetricResult> EvaluateGeneralFidelity(MemoryEvaluationResult memoryResult)
     {
-        // For general scenarios, evaluate fidelity based on preservation of important facts
-        var totalExpectedFacts = memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count;
+        if (!memoryResult.IsMeasured)
+        {
+            return Task.FromResult(MetricResult.NotMeasured(Name,
+                "Not measured: the judge produced no score for any query."));
+        }
+
+        // For general scenarios, evaluate fidelity based on preservation of important facts.
+        // Over the measured queries only: a query the judge produced no score for lists every expected fact as
+        // missing, and that is a placeholder, not a lost fact. With every query measured the result-level lists
+        // are those same facts.
+        IReadOnlyList<MemoryFact> foundFacts = memoryResult.FoundFacts;
+        IReadOnlyList<MemoryFact> missingFacts = memoryResult.MissingFacts;
+        if (memoryResult.UnmeasuredQueries > 0)
+        {
+            var measured = memoryResult.QueryResults.Where(q => q.Measured).ToList();
+            foundFacts = measured.SelectMany(q => q.FoundFacts).Distinct().ToList();
+            missingFacts = measured.SelectMany(q => q.MissingFacts).Distinct().ToList();
+        }
+
+        var totalExpectedFacts = foundFacts.Count + missingFacts.Count;
 
         if (totalExpectedFacts == 0)
         {
-            return Task.FromResult(MetricResult.NotMeasured(Name,
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                 "The scenario expected no facts, so reduction fidelity was not tested: not measured."));
         }
 
-        var preservationRate = (double)memoryResult.FoundFacts.Count / totalExpectedFacts * 100;
+        var preservationRate = (double)foundFacts.Count / totalExpectedFacts * 100;
 
         // Analyze fact criticality (if metadata available)
-        var criticalFactsPreserved = AnalyzeCriticalFactPreservation(memoryResult);
+        var criticalFactsPreserved = AnalyzeCriticalFactPreservation(foundFacts, missingFacts);
 
         var fidelityScore = CalculateGeneralFidelityScore(preservationRate, criticalFactsPreserved);
         var passed = fidelityScore >= 75;
@@ -79,15 +104,19 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
         {
             ["preservation_rate"] = preservationRate,
             ["fidelity_score"] = fidelityScore,
-            ["facts_preserved"] = memoryResult.FoundFacts.Count,
-            ["facts_lost"] = memoryResult.MissingFacts.Count,
+            ["facts_preserved"] = foundFacts.Count,
+            ["facts_lost"] = missingFacts.Count,
             ["critical_facts_preserved"] = criticalFactsPreserved,
+            ["queries_not_measured"] = memoryResult.UnmeasuredQueries,
             ["evaluation_type"] = "general"
         };
 
         var explanation = $"General memory fidelity: {fidelityScore:F1}% " +
-                         $"({memoryResult.FoundFacts.Count}/{totalExpectedFacts} facts preserved, " +
-                         $"{criticalFactsPreserved}% critical facts retained)";
+                         $"({foundFacts.Count}/{totalExpectedFacts} facts preserved, " +
+                         $"{criticalFactsPreserved}% critical facts retained)" +
+                         (memoryResult.UnmeasuredQueries > 0
+                             ? $"; {memoryResult.UnmeasuredQueries} not measured (the judge produced no score)"
+                             : "");
 
         return Task.FromResult(passed
             ? MetricResult.Pass(Name, fidelityScore, explanation, details)
@@ -96,10 +125,35 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
 
     private Task<MetricResult> EvaluateSpecificReducerFidelity(MemoryEvaluationResult memoryResult)
     {
-        // Extract reducer-specific metrics from metadata
-        var compressionRatio = memoryResult.Metadata?.GetValueOrDefault("CompressionRatio") as double? ?? 0;
-        var informationLoss = memoryResult.Metadata?.GetValueOrDefault("InformationLoss") as double? ?? 0;
-        var keyFactRetention = memoryResult.Metadata?.GetValueOrDefault("KeyFactRetention") as double? ?? 0;
+        // OverallScore is a placeholder 0 when the judge scored nothing.
+        if (!memoryResult.IsMeasured)
+        {
+            return Task.FromResult(MetricResult.NotMeasured(Name,
+                "Not measured: the judge produced no score for any query."));
+        }
+
+        // Extract reducer-specific metrics from metadata. A missing one is not a 0: no information loss would read
+        // as no penalty, which flatters the reducer.
+        var compressionRatioValue = ReadNumber(memoryResult.Metadata, "CompressionRatio");
+        var informationLossValue = ReadNumber(memoryResult.Metadata, "InformationLoss");
+        var keyFactRetentionValue = ReadNumber(memoryResult.Metadata, "KeyFactRetention");
+        if (compressionRatioValue is not { } compressionRatio
+            || informationLossValue is not { } informationLoss
+            || keyFactRetentionValue is not { } keyFactRetention)
+        {
+            var missingKeys = new[]
+                {
+                    ("CompressionRatio", compressionRatioValue),
+                    ("InformationLoss", informationLossValue),
+                    ("KeyFactRetention", keyFactRetentionValue),
+                }
+                .Where(k => k.Item2 is null)
+                .Select(k => k.Item1);
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                $"Not measured: a reducer fidelity test needs the metadata {string.Join(", ", missingKeys)}, " +
+                "and it is missing or not a number."));
+        }
+
         var reducedSize = memoryResult.Metadata?.GetValueOrDefault("ReducedSize") as int? ?? 0;
         var originalSize = memoryResult.Metadata?.GetValueOrDefault("OriginalSize") as int? ?? 0;
         
@@ -141,20 +195,33 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
             : MetricResult.Fail(Name, explanation, fidelityScore, details));
     }
 
-    private static double AnalyzeCriticalFactPreservation(MemoryEvaluationResult memoryResult)
+    private static double AnalyzeCriticalFactPreservation(
+        IReadOnlyList<MemoryFact> foundFacts,
+        IReadOnlyList<MemoryFact> missingFacts)
     {
         // Analyze preservation of high-importance facts
-        var totalFacts = memoryResult.FoundFacts.Concat(memoryResult.MissingFacts);
+        var totalFacts = foundFacts.Concat(missingFacts);
         var criticalFacts = totalFacts.Where(f => f.Importance >= 80).ToArray();
-        
+
         if (criticalFacts.Length == 0)
         {
             return 100; // No critical facts to preserve
         }
-        
-        var criticalFactsFound = memoryResult.FoundFacts.Count(f => f.Importance >= 80);
+
+        var criticalFactsFound = foundFacts.Count(f => f.Importance >= 80);
         return (double)criticalFactsFound / criticalFacts.Length * 100;
     }
+
+    private static double? ReadNumber(Dictionary<string, object>? metadata, string key) =>
+        metadata?.GetValueOrDefault(key) switch
+        {
+            double d => d,
+            float f => f,
+            int i => i,
+            long l => l,
+            decimal m => (double)m,
+            _ => null,
+        };
 
     private static double CalculateGeneralFidelityScore(double preservationRate, double criticalFactsPreserved)
     {

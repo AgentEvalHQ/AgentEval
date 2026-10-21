@@ -85,10 +85,20 @@ public class ModelComparer : IModelComparer
         
         // Calculate rankings. When the runs leave nothing weighted to rank on (weights only on speed/cost and a model
         // without them), the exception still carries what the runs measured: they may have been paid for.
+        // A model none of whose runs was measured (every run errored, or its judge produced no verdict) has no quality
+        // to rank: it is left out of the ranking rather than ranked on a placeholder 0, and stays in ModelResults.
         List<ModelRanking> rankings;
         try
         {
-            rankings = CalculateRankings(modelResults, weights);
+            var rankable = modelResults.Where(m => m.StochasticResult.MeasuredCount > 0).ToList();
+            if (rankable.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"No model can be ranked: none of the runs of {string.Join(", ", modelResults.Select(m => m.ModelName))} " +
+                    "was measured (every run errored, or the judge produced no verdict). The models' results are in this " +
+                    "exception's Data[\"ModelResults\"].");
+            }
+            rankings = CalculateRankings(rankable, weights);
         }
         catch (InvalidOperationException ex)
         {
@@ -156,14 +166,18 @@ public class ModelComparer : IModelComparer
         List<ModelResult> results, 
         ScoringWeights weights)
     {
-        // Normalize scores for each dimension (0-100 scale)
+        // Normalize scores for each dimension (0-100 scale). Quality is the mean over the measured runs (a run that errored
+        // or got no verdict has no score). Reliability is the share of ALL runs that passed: a run that did not deliver a
+        // verdict counts against it, so a model that crashes cannot out-rank a reliable one on the runs it finished.
         var qualityScores = NormalizeScores(results.Select(r => r.MeanScore).ToList(), higherIsBetter: true);
         var reliabilityScores = NormalizeScores(
-            results.Select(r => r.PassRate).ToList(),
+            results.Select(r => r.StochasticResult.IndividualResults.Count > 0
+                ? (double)r.StochasticResult.PassedCount / r.StochasticResult.IndividualResults.Count
+                : 0).ToList(),
             higherIsBetter: true);
 
         // A dimension is scored only when it was measured for every model; scoring only the models that have it would
-        // rank the models on different dimension sets. Quality and reliability count every run, failed ones included.
+        // rank the models on different dimension sets.
         // Speed and cost come from the runs that returned: an unpriced model used to be read as $0 (cost score 100,
         // "cheapest" beside a priced one), and a model none of whose runs returned as latency 0 (speed score 100,
         // "fastest" — with speed-focused weights it could win). When any model lacks one, no model is scored on it and

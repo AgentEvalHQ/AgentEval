@@ -97,6 +97,17 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveMinimumScore(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
+        // A scan that ran nothing, or whose verdict is inconclusive, has no score to hold against the minimum.
+        if (_result.TotalProbes == 0 || _result.Verdict == Verdict.Inconclusive)
+        {
+            Undecided(probe,
+                $"Expected overall score to be at least {minimumScore:F1}%, but the scan was inconclusive ({InconclusiveWhy()}): the score was not measured.",
+                expected: $"Score >= {minimumScore:F1}% from a conclusive scan",
+                actual: $"Verdict.{_result.Verdict}, {_result.ConclusiveProbes}/{_result.TotalProbes} probes conclusive",
+                because: because);
+            return probe.Complete(this);
+        }
+
         if (_result.OverallScore < minimumScore)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
@@ -124,6 +135,18 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveASRBelow(double threshold, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
+        // With no conclusive probe the ASR is a placeholder 0, not a measured rate.
+        if (_result.ConclusiveProbes == 0)
+        {
+            Undecided(probe,
+                $"Expected Attack Success Rate to be below {threshold:P1}, but no probe reached a verdict " +
+                $"({_result.InconclusiveProbes}/{_result.TotalProbes} inconclusive): the ASR was not measured.",
+                expected: $"ASR < {threshold:P1} over at least one conclusive probe",
+                actual: $"0 conclusive probes of {_result.TotalProbes}",
+                because: because);
+            return probe.Complete(this);
+        }
+
         var asr = _result.ConclusiveAttackSuccessRate;
         if (asr > threshold)
         {
@@ -314,6 +337,17 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
+        if (attack.ConclusiveCount == 0)
+        {
+            Undecided(probe,
+                $"Expected ASR for '{attackName}' to be below {threshold:P1}, but none of its probes reached a verdict: " +
+                "the ASR was not measured.",
+                expected: $"ASR < {threshold:P1} for {attackName} over at least one conclusive probe",
+                actual: $"0 conclusive probes of {attack.TotalCount}",
+                because: because);
+            return probe.Complete(this);
+        }
+
         var asr = attack.ConclusiveAttackSuccessRate;
 
         if (asr > threshold)
@@ -326,6 +360,20 @@ public sealed class RedTeamAssertions
         }
 
         return probe.Complete(this);
+    }
+
+    // A check with nothing measured to decide on (T13-10): undecided inside a scope that records outcomes. Outside one
+    // nothing can record an undecided result, so the check fails: a security gate fails closed, never a silent pass.
+    [StackTraceHidden]
+    private static void Undecided(AssertionProbe probe, string message, string expected, string actual, string? because)
+    {
+        if (probe.IsActive)
+        {
+            probe.MarkInconclusive(message);
+            return;
+        }
+
+        AgentEvalScope.FailWith(RedTeamAssertionException.Create(message, expected: expected, actual: actual, because: because));
     }
 
     // Every reason the scan is inconclusive (B10ax, B10ba): an attack that measured nothing, a scan that stopped early, most

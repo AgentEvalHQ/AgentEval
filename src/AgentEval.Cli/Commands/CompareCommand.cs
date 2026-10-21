@@ -143,13 +143,15 @@ public static class CompareCommand
                 recovered = comparable ? comparison.Recovered : (int?)null,
                 regressed = comparable ? comparison.Regressed : (int?)null,
                 regressedScenarios = comparable ? RegressedIds(comparison) : null,
+                // A scenario either run did not measure has no delta: its 0 is a placeholder.
+                notMeasuredScenarios = comparable ? comparison.NotMeasuredScenarios : null,
                 deltas = comparable
                     ? comparison.Scenarios.Select(s => new
                     {
                         scenario = s.ScenarioId,
                         baseline = s.BaselineScore,
                         candidate = s.CandidateScore,
-                        delta = s.ScoreDelta,
+                        delta = s.BothMeasured ? s.ScoreDelta : (double?)null,
                     }).ToList()
                     : null,
             }, s_json));
@@ -212,11 +214,15 @@ public static class CompareCommand
         Console.WriteLine("  ------------------------------------------------------------------------");
         foreach (var s in comparison.Scenarios)
         {
+            // A side that did not measure the scenario has a placeholder score: no number, no delta.
+            string baselineCell = s.BaselineMeasured ? s.BaselineScore.ToString("F4", CultureInfo.InvariantCulture) : "n/m";
+            string candidateCell = s.CandidateMeasured ? s.CandidateScore.ToString("F4", CultureInfo.InvariantCulture) : "n/m";
+            string deltaCell = s.BothMeasured ? FormatDelta(s.ScoreDelta) : "n/a";
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  {Fit(s.ScenarioId, 40),-40}  {s.BaselineScore,8:F4}  {s.CandidateScore,9:F4}  {FormatDelta(s.ScoreDelta),9}"));
+                $"  {Fit(s.ScenarioId, 40),-40}  {baselineCell,8}  {candidateCell,9}  {deltaCell,9}"));
         }
 
-        int subPrecision = comparison.Scenarios.Count(s => IsBelowDisplayPrecision(s.ScoreDelta));
+        int subPrecision = comparison.Scenarios.Count(s => s.BothMeasured && IsBelowDisplayPrecision(s.ScoreDelta));
         bool meanIsSubPrecision = IsBelowDisplayPrecision(comparison.MeanScoreDelta);
         if (subPrecision > 0 || meanIsSubPrecision)
         {
@@ -244,6 +250,16 @@ public static class CompareCommand
         Console.WriteLine();
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  mean score delta: {FormatDelta(comparison.MeanScoreDelta)}  ·  recovered {comparison.Recovered}  ·  regressed {comparison.Regressed}"));
+        if (comparison.NotMeasuredScenarios.Count > 0)
+        {
+            // n/m: not measured (errored, skipped, or no judge verdict) on that side.
+            Console.WriteLine($"  ⚠ {comparison.NotMeasuredScenarios.Count} scenario(s) were not measured in one run or both " +
+                              "(errored, skipped, or no judge verdict; n/m above) and are not in the mean:");
+            foreach (string id in comparison.NotMeasuredScenarios.Take(40))
+                Console.WriteLine($"   • {id}");
+            if (comparison.NotMeasuredScenarios.Count > 40)
+                Console.WriteLine($"   • … and {comparison.NotMeasuredScenarios.Count - 40} more");
+        }
         Console.WriteLine();
 
         if (failOnRegression && comparison.Regressed > 0)
@@ -394,7 +410,8 @@ public static class CompareCommand
     /// </para>
     /// <list type="bullet">
     ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.
-    ///   ⚠ <b>DEFENSIVE ONLY — this branch has no live subject in the report.</b> See the remark below.</item>
+    ///   Live in the report since T13-5: a comparable run whose every shared scenario was not measured on one side
+    ///   has no measured pair to average. See the remark below.</item>
     ///   <item><b>exactly zero</b> — the runs scored identically → <c>0.0000</c>, unchanged.</item>
     ///   <item><b>non-zero, below four decimal places</b> → scientific, e.g. <c>1.17e-05</c>, keeping
     ///   both the sign and the magnitude. "Smaller than the display can show" is not "zero".</item>
@@ -410,6 +427,12 @@ public static class CompareCommand
     /// it dead is asserted by
     /// <c>TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst</c>,
     /// so if it is ever broken the branch goes live and that test says so.
+    /// </para>
+    /// <para>
+    /// T13-5 made the branch live by a second route: the mean now averages only the scenarios BOTH runs measured, so a
+    /// comparable pair of runs whose every shared scenario errored, was skipped or had no judge verdict on one side has
+    /// a <c>NaN</c> mean, and the report prints <c>n/a</c> for it. That is the honest rendering: there was no measured
+    /// pair to average. The empty-comparison coupling above still holds.
     /// </para>
     /// <para>
     /// The sub-precision case is decided by FORMATTING FIRST and asking whether the result reads as a

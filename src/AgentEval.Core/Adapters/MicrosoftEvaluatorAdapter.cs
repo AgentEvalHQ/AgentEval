@@ -345,14 +345,16 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     /// <inheritdoc />
     /// <remarks>
     /// Compatibility path. Prefer <see cref="EvaluateAsync(EvalInput, CancellationToken)"/>, which
-    /// carries provenance, cost and an honest <c>"error"</c> label for an indeterminate verdict.
+    /// carries provenance and cost. An evaluator that gives no reading (no metric, no value, a metric type this
+    /// adapter cannot read) or fails is not measured, as the <see cref="IEval"/> path reports it as an error: it
+    /// was a Fail at score 0. The caller's cancellation propagates.
     /// </remarks>
     public async Task<MetricResult> EvaluateAsync(
         Core.EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
         if (NotSupplied(context.Context, context.GroundTruth) is { } notMeasured)
-            return MetricResult.NotMeasured(Name, notMeasured);
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput, notMeasured);
 
         try
         {
@@ -376,7 +378,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             var metrics = result.Metrics;
             if (metrics.Count == 0)
             {
-                return MetricResult.Fail(Name, "Evaluator returned no metrics.");
+                return NoReading("Evaluator returned no metrics.", metricKey: null);
             }
 
             // Get the first (usually only) metric
@@ -393,16 +395,10 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                     // The evaluator produced NO numeric score (unparseable judge output, content
                     // filter, or evaluator error). Coercing null → 1.0 (lowest 1/5) reported a
                     // genuinely indeterminate result as a confident low-quality Fail, corrupting
-                    // pass/fail aggregation (BUG-26). Surface it explicitly instead.
-                    return MetricResult.Fail(
-                        Name,
+                    // pass/fail aggregation (BUG-26); then it was a Fail at 0. Not measured.
+                    return NoReading(
                         "Evaluator produced no numeric score (indeterminate: unparseable output, content filter, or evaluator error).",
-                        score: 0,
-                        new Dictionary<string, object>
-                        {
-                            ["microsoftMetricName"] = firstMetric.Key,
-                            ["indeterminate"] = true,
-                        });
+                        firstMetric.Key);
                 }
 
                 // Microsoft uses a 1-5 scale; convert to 0-100.
@@ -411,12 +407,18 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             }
             else if (metricValue is BooleanMetric boolMetric)
             {
-                score = boolMetric.Value == true ? 100 : 0;
+                // A null verdict read as false: a Fail at 0 for a judge that gave none.
+                if (boolMetric.Value is not { } verdict)
+                {
+                    return NoReading("Evaluator produced no boolean verdict (indeterminate).", firstMetric.Key);
+                }
+
+                score = verdict ? 100 : 0;
                 reasoning = boolMetric.Interpretation?.ToString();
             }
             else
             {
-                return MetricResult.Fail(Name, $"Unsupported metric type: {metricValue?.GetType().Name}");
+                return NoReading($"Unsupported metric type: {metricValue?.GetType().Name}.", firstMetric.Key);
             }
 
             var metadata = new Dictionary<string, object>
@@ -440,13 +442,20 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                 return MetricResult.Fail(Name, reasoning ?? $"Score below threshold: {score:F0}/100", score, metadata);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (JudgeReplyEvidence.IsCallFailure(ex, cancellationToken))
         {
-            return MetricResult.Fail(
-                Name,
-                $"Microsoft evaluator failed: {ex.Message}",
-                details: new Dictionary<string, object> { ["error"] = ex.Message });
+            return JudgeReplyEvidence.CallFailed(Name, Name, ex, "the Microsoft evaluator",
+                new Dictionary<string, object> { ["error"] = ex.Message });
         }
+    }
+
+    // The evaluator answered with nothing this adapter can read as a score: not measured, still flagged indeterminate.
+    private MetricResult NoReading(string why, string? metricKey)
+    {
+        var details = new Dictionary<string, object> { ["indeterminate"] = true };
+        if (metricKey is not null)
+            details["microsoftMetricName"] = metricKey;
+        return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable, $"{Name} not measured: {why}", details);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

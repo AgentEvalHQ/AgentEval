@@ -150,13 +150,19 @@ public static class EvalScoreExtensions
     /// One rule for every report (#203 review, B9b). The agentic, GDPR and EU AI Act reports each mapped every label but
     /// pass and warn to FAIL, so a judge that answered off its rubric's scale — or did not answer — read as an agent that
     /// failed: "FAIL 0%", "Review failures in …", and a run with nothing measured read "FAIL (score 100%)". An unknown
-    /// label is read by the score's own pass flag.
+    /// label is read by the score's own pass flag. A score whose <see cref="EvalScore.Measurement"/> says nothing was
+    /// measured is <c>SKIPPED</c> whatever its label, unless the label is <c>error</c> or <c>warn</c> (a withheld pass):
+    /// a benchmark's inconclusive judgment read FAIL by its pass flag.
     /// </remarks>
     public static string ReportStatus(this EvalScore score)
     {
         ArgumentNullException.ThrowIfNull(score);
 
-        return score.Label.ToLowerInvariant() switch
+        var label = score.Label.ToLowerInvariant();
+        if (score.Measurement != MeasurementState.Measured && label is not ("error" or "warn"))
+            return "SKIPPED";
+
+        return label switch
         {
             "pass" => "PASS",
             "warn" => "WARN",

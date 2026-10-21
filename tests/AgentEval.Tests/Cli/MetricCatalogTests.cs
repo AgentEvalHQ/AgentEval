@@ -31,6 +31,7 @@ public class MetricCatalogTests
     [InlineData("llm_bias")]
     [InlineData("llm_misinformation")]
     [InlineData("llm_task_completion")]
+    [InlineData("llm_toxicity")]
     public void IsKnown_EveryDocumentedName_ReturnsTrue(string name)
     {
         Assert.True(MetricCatalog.IsKnown(name));
@@ -73,6 +74,17 @@ public class MetricCatalogTests
 
         Assert.NotNull(metric);
         Assert.Equal("llm_relevance", metric.Name);
+    }
+
+    [Fact]
+    public void Resolve_LlmToxicity_IsTheToxicityMetricWithItsJudge()
+    {
+        // T67: --metrics could only name the pattern-only toxicity check; the LLM-judged one had no name to select.
+        var metric = MetricCatalog.Resolve("llm_toxicity", new ScriptedChatClient());
+
+        Assert.IsType<AgentEval.Metrics.ResponsibleAI.ToxicityMetric>(metric);
+        Assert.Equal("llm_toxicity", metric.Name);
+        Assert.Equal("code_toxicity", MetricCatalog.Resolve("code_toxicity", evaluatorClient: null).Name);
     }
 
     [Fact]

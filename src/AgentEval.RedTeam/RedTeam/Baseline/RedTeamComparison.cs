@@ -89,6 +89,35 @@ public record RedTeamComparison
     /// </summary>
     public double CoverageDrop => Math.Max(0.0, BaselineCoverage - Current.ConclusiveRate);
 
+    /// <summary>
+    /// Probes of the baseline that reached a verdict: <see cref="RedTeamBaseline.ConclusiveProbes"/>, or, for a
+    /// baseline saved before that field existed, its persisted per-attack resisted and failed counts.
+    /// </summary>
+    private int BaselineConclusiveProbes =>
+        Baseline.ConclusiveProbes
+        ?? Baseline.AttackResults.Sum(a => a.ResistedCount + a.FailedProbeIds.Count);
+
+    /// <summary>
+    /// Whether both runs measured something: at least one probe each reached a verdict. When either side measured
+    /// nothing, its scores are placeholders, so <see cref="ScoreDelta"/>, <see cref="ConclusiveScoreDelta"/> and
+    /// <see cref="AttackSuccessRateDelta"/> are not measurements; <see cref="NotComparableReason"/> says why, and the
+    /// comparison is refused: its <see cref="Status"/> is <see cref="RegressionStatus.Incomparable"/>, neither a
+    /// regression nor a pass (<see cref="IsRegression"/>, <see cref="IsStable"/> and <see cref="IsImprovement"/> are all
+    /// false), and the CLI exits 13 (incomparable). Reading it as a regression said the agent got worse when one run had
+    /// measured nothing.
+    /// </summary>
+    public bool IsComparable => NotComparableReason is null;
+
+    /// <summary>Why the two runs cannot be compared, or <c>null</c> when <see cref="IsComparable"/>.</summary>
+    public string? NotComparableReason =>
+        (BaselineConclusiveProbes, Current.ConclusiveProbes) switch
+        {
+            (0, 0) => "neither the baseline nor the current run has a probe that reached a verdict",
+            (0, _) => $"the baseline ({Baseline.Version}) has no probe that reached a verdict",
+            (_, 0) => "the current run has no probe that reached a verdict",
+            _ => null,
+        };
+
     /// <summary>Overall regression status.</summary>
     public RegressionStatus Status => DetermineStatus();
 
@@ -100,24 +129,33 @@ public record RedTeamComparison
     private bool ScoreRegressed =>
         ScoreDelta < -Thresholds.RegressionScoreDrop || ConclusiveScoreDelta < -Thresholds.RegressionScoreDrop;
 
-    /// <summary>Is this a regression (worse than baseline)?</summary>
+    /// <summary>
+    /// Is this a regression (worse than baseline)? False when the runs are not comparable: that comparison is refused
+    /// (<see cref="RegressionStatus.Incomparable"/>), not decided either way.
+    /// </summary>
     public bool IsRegression =>
-        NewVulnerabilities.Count > 0
-        || ScoreRegressed
-        || CoverageDrop >= Thresholds.RegressionCoverageDrop;
+        IsComparable
+        && (NewVulnerabilities.Count > 0
+            || ScoreRegressed
+            || CoverageDrop >= Thresholds.RegressionCoverageDrop);
 
     /// <summary>Is this an improvement over baseline?</summary>
     public bool IsImprovement =>
-        ResolvedVulnerabilities.Count > 0 && NewVulnerabilities.Count == 0
+        IsComparable
+        && ResolvedVulnerabilities.Count > 0 && NewVulnerabilities.Count == 0
         && CoverageDrop < Thresholds.RegressionCoverageDrop && FidelityEscalations.Count == 0;
 
     /// <summary>Is this stable (no significant change)?</summary>
     public bool IsStable =>
-        Math.Abs(ScoreDelta) < Thresholds.StableScoreBand && NewVulnerabilities.Count == 0
+        IsComparable
+        && Math.Abs(ScoreDelta) < Thresholds.StableScoreBand && NewVulnerabilities.Count == 0
         && CoverageDrop < Thresholds.RegressionCoverageDrop && FidelityEscalations.Count == 0;
 
     private RegressionStatus DetermineStatus()
     {
+        // A side that measured nothing cannot show the other regressed or did not (T13-10): the comparison is refused.
+        // First, because against a baseline that measured nothing every current failure would read as new.
+        if (!IsComparable) return RegressionStatus.Incomparable;
         if (NewVulnerabilities.Count > 0) return RegressionStatus.Regression;
         if (CoverageDrop >= Thresholds.RegressionCoverageDrop) return RegressionStatus.Regression;
         if (ScoreRegressed) return RegressionStatus.Regression;
@@ -137,7 +175,7 @@ public record RedTeamComparison
         RegressionStatus.Degraded => "⚠️",
         RegressionStatus.Stable => "➡️",
         RegressionStatus.Improved => "✅",
-        _ => "❓"
+        _ => "❓"   // Incomparable: refused, neither better nor worse
     };
 }
 
@@ -250,5 +288,11 @@ public enum RegressionStatus
     Degraded,
 
     /// <summary>New vulnerabilities found.</summary>
-    Regression
+    Regression,
+
+    /// <summary>
+    /// The runs cannot be compared: one of them has no probe that reached a verdict
+    /// (<see cref="RedTeamComparison.NotComparableReason"/>). The comparison is refused: neither a regression nor a pass.
+    /// </summary>
+    Incomparable
 }

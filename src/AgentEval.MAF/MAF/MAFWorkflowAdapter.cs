@@ -303,6 +303,9 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             CallId = toolEvent.CallId ?? Guid.NewGuid().ToString(),
                             Arguments = toolEvent.Arguments,
                             Result = toolEvent.Result,
+                            // The event is a completed call: the bridge emits it when the call's result arrives. Not
+                            // recording that read every workflow call as one that never ran (code_tool_success, T58).
+                            WasExecuted = true,
                             StartTime = DateTimeOffset.UtcNow - toolEvent.Duration,
                             EndTime = DateTimeOffset.UtcNow,
                             Order = currentToolCalls.Count + 1,
@@ -744,7 +747,9 @@ public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowE
 }
 
 /// <summary>
-/// Event indicating a tool call within an executor.
+/// Event indicating a completed tool call within an executor: <c>MAFWorkflowEventBridge</c> emits it when the call's
+/// result arrives, and the adapter records it as a call that ran (<see cref="ToolCallRecord.WasExecuted"/>). A source
+/// that emits one for a call that did not run misreports it.
 /// </summary>
 public record ExecutorToolCallEvent(
     string ExecutorId, 

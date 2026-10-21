@@ -125,6 +125,48 @@ public class WorkflowToolTrackingTests
     }
 
     [Fact]
+    public void ToolUsage_KeepsWhetherEachCallRan_AndItsApprovalState()
+    {
+        // T58 made code_tool_success count only executed calls; the aggregation copied every field but these two, so a
+        // step's call that ran read as one that never ran, and a rejected approval lost its state.
+        var result = new WorkflowExecutionResult
+        {
+            FinalOutput = "output",
+            Steps =
+            [
+                new ExecutorStep
+                {
+                    ExecutorId = "agent1",
+                    Output = "out",
+                    ToolCalls =
+                    [
+                        new ToolCallRecord { Name = "SearchFlights", CallId = "c1", WasExecuted = true, Result = "found" },
+                        new ToolCallRecord { Name = "BookFlight", CallId = "c2", ApprovalState = ToolCallRecord.ApprovalRejected },
+                    ],
+                },
+            ],
+        };
+
+        var calls = result.ToolUsage!.Calls;
+
+        Assert.True(calls[0].WasExecuted);
+        Assert.False(calls[1].WasExecuted);
+        Assert.Equal(ToolCallRecord.ApprovalRejected, calls[1].ApprovalState);
+    }
+
+    [Fact]
+    public async Task TheAdapter_RecordsAToolCallEvent_AsACallThatRan()
+    {
+        // The bridge emits ExecutorToolCallEvent only when the call's result arrives; the adapter did not say so, so every
+        // workflow tool call read as never run (code_tool_success 0, T58).
+        var adapter = CreateMockAdapter(("Agent1", "out1", [("ToolA", "c1")]));
+
+        var result = await adapter.ExecuteWorkflowAsync("test");
+
+        Assert.True(Assert.Single(result.ToolUsage!.Calls).WasExecuted);
+    }
+
+    [Fact]
     public void ToolUsage_HasGlobalOrderAcrossExecutors()
     {
         var result = CreateResultWithTools(

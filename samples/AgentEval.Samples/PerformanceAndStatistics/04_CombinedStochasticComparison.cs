@@ -182,21 +182,39 @@ public static class CombinedStochasticComparison
             return;
         }
 
+        // A run that errored or got no judge verdict is not measured: with none measured there is nothing to rank, and
+        // that is not a model that answered wrongly.
+        if (modelResults.All(m => m.Result.MeasuredCount == 0))
+        {
+            Console.WriteLine("   No winner: no model's run was measured.\n");
+            SampleOutcome.Error("no model's run was measured (every run errored or got no judge verdict): there is nothing to rank");
+            return;
+        }
+
         var winners = DetermineWinners(modelResults);
 
         // Each model's pass rate is the comparison's data; what must not read as a clean result is a winner that missed
         // the 80% threshold, or a comparison in which no model answered correctly at all.
         if (modelResults.All(m => m.Result.PassedCount == 0))
         {
-            SampleOutcome.Fail("no model passed a single run of the test case (123 + 456 = 579 via CalculatorTool): " +
-                               "there is no correct answer to rank");
+            if (modelResults.All(m => m.Result.Verdict == StochasticVerdict.Failed))
+                SampleOutcome.Fail("no model passed a single run of the test case (123 + 456 = 579 via CalculatorTool): " +
+                                   "there is no correct answer to rank");
+            else
+                SampleOutcome.Error("no model passed a measured run, and runs that were not measured leave the comparison open");
         }
         else
         {
             foreach (var (name, result) in modelResults.Where(m => winners.Contains(m.ModelName) && !m.Result.Passed))
             {
-                SampleOutcome.Warn($"the winner {name} passed {result.PassedCount}/{result.IndividualResults.Count} " +
-                                   $"runs, below the {stochasticOptions.SuccessRateThreshold:P0} threshold");
+                if (result.Verdict == StochasticVerdict.Failed)
+                    SampleOutcome.Warn($"the winner {name} passed {result.PassedCount}/{result.IndividualResults.Count} " +
+                                       $"runs, below the {stochasticOptions.SuccessRateThreshold:P0} threshold");
+                else
+                    // Undecided: its unmeasured runs could still put it either side of the threshold.
+                    SampleOutcome.Error($"the winner {name} passed {result.PassedCount}/{result.IndividualResults.Count} runs and " +
+                                        $"{result.NotMeasuredCount} were not measured: whether it meets the " +
+                                        $"{stochasticOptions.SuccessRateThreshold:P0} threshold is undecided");
             }
         }
 
@@ -241,14 +259,19 @@ public static class CombinedStochasticComparison
     {
         // Simple scoring: pass rate * mean score; on a tie, the cheaper model — but only when every model has a cost.
         // An unpriced model read as $0 used to win every tie as the "cheapest". A tie cost cannot break stays a tie:
-        // the first model listed is not the winner.
-        var costKnown = modelResults.All(m => m.Result.CostStats is not null);
-        var scored = modelResults
+        // the first model listed is not the winner. The pass rate is over every run (a run that crashed delivered
+        // nothing), the mean over the measured runs (Statistics); a model none of whose runs was measured is not ranked
+        // rather than ranked last at a placeholder 0.
+        var measured = modelResults.Where(m => m.Result.MeasuredCount > 0).ToList();
+        foreach (var (name, _) in modelResults.Where(m => m.Result.MeasuredCount == 0))
+            Console.WriteLine($"   {name}: not ranked, none of its runs was measured\n");
+        var costKnown = measured.All(m => m.Result.CostStats is not null);
+        var scored = measured
             .Select(m => new
             {
                 Model = m.ModelName,
-                Score = m.Result.Statistics.PassRate * m.Result.Statistics.MeanScore,
-                PassRate = m.Result.Statistics.PassRate,
+                Score = (double)m.Result.PassedCount / m.Result.IndividualResults.Count * m.Result.Statistics.MeanScore,
+                PassRate = (double)m.Result.PassedCount / m.Result.IndividualResults.Count,
                 Cost = costKnown ? m.Result.CostStats!.Mean : 0
             })
             .OrderByDescending(x => x.Score)

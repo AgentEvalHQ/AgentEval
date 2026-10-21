@@ -57,6 +57,12 @@ public record ModelComparisonResult(
                 lines.Add($"Cost: not measured — {why}");
             }
 
+            if (UnrankedReason is { } unranked)
+            {
+                lines.Add("");
+                lines.Add($"Not ranked — {unranked}");
+            }
+
             lines.Add("");
             lines.Add($"Recommendation: Use {Winner.ModelName}");
             
@@ -112,7 +118,8 @@ public record ModelComparisonResult(
     /// the fastest, speed score 100: with speed-focused weights a model that never answered could win. Speed follows the
     /// cost rule: when any model has no latency, every <see cref="ModelRanking.SpeedScore"/> is <see langword="null"/>
     /// and the composite weighs the dimensions that were measured, their weights scaled up to the full weight. Such a
-    /// model is still ranked on quality and reliability, which count every run, failed ones included.
+    /// model is still ranked on quality, over its measured runs, and reliability, over every run (a run that errored
+    /// counts against it); a model none of whose runs was measured is not ranked (<see cref="UnrankedReason"/>).
     /// </remarks>
     public string? SpeedNotMeasuredReason
     {
@@ -125,6 +132,29 @@ public record ModelComparisonResult(
             var who = untimed.Count > 0 ? $"no run of {string.Join(", ", untimed)}" : "no run of a model";
             return $"{who} recorded a latency (its runs failed, or performance is not tracked), so no model is " +
                    $"ranked on speed; {CompositeNote}.";
+        }
+    }
+
+    /// <summary>
+    /// Why some models are not in <see cref="Ranking"/>, or <see langword="null"/> when every model is ranked.
+    /// </summary>
+    /// <remarks>
+    /// A model none of whose runs was measured (every run errored, or the judge produced no verdict) has no quality to
+    /// rank: ranking it last on the runs' placeholder 0 would read as a model that answered wrongly. It stays in
+    /// <see cref="ModelResults"/> with its runs.
+    /// </remarks>
+    public string? UnrankedReason
+    {
+        get
+        {
+            var unranked = ModelResults
+                .Where(m => Ranking.All(r => r.ModelId != m.ModelId))
+                .Select(m => m.ModelName)
+                .ToList();
+            if (unranked.Count == 0)
+                return null;
+            return $"no run of {string.Join(", ", unranked)} was measured (every run errored, or the judge produced no " +
+                   $"verdict), so {(unranked.Count == 1 ? "it is" : "they are")} not ranked.";
         }
     }
 
@@ -172,17 +202,22 @@ public record ModelResult(
     decimal? TotalCost)
 {
     /// <summary>
-    /// Pass rate for this model.
+    /// Pass rate for this model over every run, measured or not: a run that errored or got no verdict from the judge did
+    /// not pass, and the model is less reliable for it (decision D-15). <see cref="StochasticResult.Statistics"/>'s
+    /// pass rate is over the measured runs only.
     /// </summary>
-    public double PassRate => StochasticResult.Statistics.PassRate;
-    
+    public double PassRate => StochasticResult.IndividualResults.Count > 0
+        ? (double)StochasticResult.PassedCount / StochasticResult.IndividualResults.Count
+        : 0;
+
     /// <summary>
-    /// Mean score for this model.
+    /// Mean score for this model over its measured runs; a placeholder 0 when none was measured
+    /// (<see cref="StochasticResult.MeasuredCount"/>).
     /// </summary>
     public double MeanScore => StochasticResult.Statistics.MeanScore;
-    
+
     /// <summary>
-    /// Standard deviation of scores.
+    /// Standard deviation of scores over the measured runs.
     /// </summary>
     public double StandardDeviation => StochasticResult.Statistics.StandardDeviation;
 }

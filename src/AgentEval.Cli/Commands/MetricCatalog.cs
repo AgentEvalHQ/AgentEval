@@ -56,6 +56,7 @@ internal static class MetricCatalog
             ["llm_fluency"] = c => new FluencyMetric(c),
             ["llm_bias"] = c => new BiasMetric(c),
             ["llm_misinformation"] = c => new MisinformationMetric(c),
+            ["llm_toxicity"] = c => new ToxicityMetric(c),   // pattern scan, then an LLM judge for what it does not match
             ["llm_task_completion"] = c => new TaskCompletionMetric(c),
         };
 

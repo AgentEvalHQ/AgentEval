@@ -88,7 +88,7 @@ public class MisinformationMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_TreatedAsInconclusive_NotAPass()
+    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_IsNotMeasured_NotAPass()
     {
         // Regression test for a real bug found in review: GetDouble's default of 70 sat EXACTLY AT
         // PassingScoreThreshold, so a judge reply with valid JSON but a missing/non-numeric "score" field
@@ -118,6 +118,7 @@ public class MisinformationMetricTests
 
         Assert.False(result.Passed);
         Assert.Equal(0.0, result.Score);
+        Assert.False(result.Measured);   // no verdict: not measured, never a Fail at 0 (T03)
     }
 
     [Fact]

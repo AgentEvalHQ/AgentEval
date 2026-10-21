@@ -21,6 +21,11 @@ namespace AgentEval.Evals.Agentic.Process;
 /// process evaluators: efficiency failures are optimization concerns, not correctness failures.
 /// </para>
 /// <para>
+/// <b>Input contract</b>: requires <see cref="EvalInput.ToolCalls"/>. With no tool-call data captured (a null list) the
+/// result is skipped, not measured, and the judge is not called: it used to grade efficiency from the reply text. A
+/// captured empty list is judged.
+/// </para>
+/// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_call_accuracy/tool_call_accuracy.prompty</c>.
@@ -59,12 +64,13 @@ public sealed class ToolEfficiencyEval : IEvalDefinitionWrapper
     public ToolEfficiencyEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.80)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        // 1.2.0: not measured without tool-call data.
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "tool_efficiency",
             name: "Tool Efficiency",
             category: "agentic-process",
-            version: "1.1.0",
+            version: "1.2.0",
             criteria: new[]
             {
                 "No tool is called twice with functionally identical arguments (no redundant calls)",
@@ -74,7 +80,7 @@ public sealed class ToolEfficiencyEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_efficiency.v1",
-            failureSeverity: "low") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+            failureSeverity: "low") { JudgeSeesToolData = JudgeToolData.ToolCalls, JudgeNeedsData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

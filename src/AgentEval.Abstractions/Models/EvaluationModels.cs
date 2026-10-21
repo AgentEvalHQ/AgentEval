@@ -181,15 +181,37 @@ public class TestSummary
     
     /// <summary>Number of passed tests.</summary>
     public int PassedCount => Results.Count(r => r.Passed);
-    
-    /// <summary>Number of failed tests.</summary>
-    public int FailedCount => Results.Count(r => !r.Passed);
-    
-    /// <summary>Average score across all tests.</summary>
-    public double AverageScore => Results.Count > 0 ? Results.Average(r => r.Score) : 0;
-    
-    /// <summary>Whether all tests passed.</summary>
+
+    /// <summary>
+    /// Number of measured tests that failed. A test that was not measured (<see cref="NotMeasuredCount"/>) is not a
+    /// failure: it is counted there.
+    /// </summary>
+    public int FailedCount => Results.Count(r => !r.Passed && !IsNotMeasured(r));
+
+    /// <summary>
+    /// Tests that produced no verdict: the judge produced none (<see cref="TestResult.JudgeFailed"/>) or the run errored
+    /// (<see cref="TestResult.Error"/>). Their <see cref="TestResult.Score"/> of 0 is a placeholder, so they are left out
+    /// of <see cref="AverageScore"/>; they are never passed.
+    /// </summary>
+    public int NotMeasuredCount => Results.Count(IsNotMeasured);
+
+    /// <summary>Tests that produced a verdict: <see cref="TotalCount"/> minus <see cref="NotMeasuredCount"/>.</summary>
+    public int MeasuredCount => TotalCount - NotMeasuredCount;
+
+    /// <summary>Whether at least one test was measured, so <see cref="AverageScore"/> is a score.</summary>
+    public bool HasMeasuredScore => MeasuredCount > 0;
+
+    /// <summary>
+    /// Average score over the measured tests (<see cref="MeasuredCount"/>). A placeholder 0 when nothing was measured:
+    /// read <see cref="HasMeasuredScore"/> first.
+    /// </summary>
+    public double AverageScore => HasMeasuredScore ? Results.Where(r => !IsNotMeasured(r)).Average(r => r.Score) : 0;
+
+    /// <summary>Whether all tests passed. A test that was not measured did not pass.</summary>
     public bool AllPassed => Results.All(r => r.Passed);
+
+    // A crashed run and a judge with no verdict are the same absence: no score was produced (T06, T13-4).
+    private static bool IsNotMeasured(TestResult result) => result.JudgeFailed || result.HasError;
     
     /// <summary>Total duration across all tests.</summary>
     public TimeSpan TotalDuration => TimeSpan.FromTicks(

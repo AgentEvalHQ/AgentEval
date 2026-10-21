@@ -30,13 +30,19 @@ public class EvaluationReport
     /// <summary>Number of tests that passed.</summary>
     public int PassedTests { get; set; }
     
-    /// <summary>Number of tests that failed.</summary>
+    /// <summary>Number of measured tests that failed.</summary>
     public int FailedTests { get; set; }
-    
-    /// <summary>Number of tests that were skipped.</summary>
+
+    /// <summary>
+    /// Number of tests that were skipped. From <see cref="TestSummaryExtensions.ToEvaluationReport"/>, the tests that
+    /// produced no verdict (the judge failed, or the run errored): not failures, and not in <see cref="OverallScore"/>.
+    /// </summary>
     public int SkippedTests { get; set; }
-    
-    /// <summary>Overall score (0-100).</summary>
+
+    /// <summary>
+    /// Overall score (0-100). From <see cref="TestSummaryExtensions.ToEvaluationReport"/>, the average over the measured
+    /// tests only (<see cref="TotalTests"/> minus <see cref="SkippedTests"/>); a placeholder 0 when none was measured.
+    /// </summary>
     public double OverallScore { get; set; }
     
     /// <summary>Pass rate as a percentage.</summary>
@@ -71,6 +77,14 @@ public class TestResultSummary
     
     /// <summary>Whether the test was skipped.</summary>
     public bool Skipped { get; set; }
+
+    /// <summary>
+    /// The test produced no verdict: the judge produced none, or the run errored. <see cref="Score"/> and
+    /// <see cref="Passed"/> are then placeholders, and <see cref="Skipped"/> is set too, so it is never counted as a
+    /// failure; <see cref="Error"/> says why. The JUnit and TRX exporters write it as an error (JUnit <c>&lt;error&gt;</c>,
+    /// TRX outcome <c>Error</c>), not a skip, so a CI run stays red; the Markdown report reads INCOMPLETE.
+    /// </summary>
+    public bool NotMeasured { get; set; }
     
     /// <summary>Duration in milliseconds.</summary>
     public long DurationMs { get; set; }

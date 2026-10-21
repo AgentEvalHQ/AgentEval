@@ -118,7 +118,14 @@ var compositeEvaluator = localComposite.AsMeaiEvaluator(
     + "asked about. The DETERMINISTIC leaf carries its own derivable-or-declared floor; the root "
     + "does not, and saying so is the point."));   // -> AgentEvalCompositeEvaluator (captures tree)
 
-IAgentEvaluator local = compositeEvaluator.AsAgentEvaluator(chatConfig);    // conversation-preserving
+// Forwards each item's whole conversation and the agent's tools, so the composite's checks get the run's tool calls
+// and tool definitions. MAF does not put the agent's instructions on the item, so they are passed here (the same text
+// the agent was built with above): Task Adherence's rule, procedural, presentation and authorization judges grade the
+// reply against them, and are not measured without them.
+IAgentEvaluator local = new AgentEvalAgentEvaluator(compositeEvaluator, chatConfig)
+{
+    AgentInstructions = "You are a helpful travel advisor.",
+};
 
 // Foundry cloud evaluator — BOUNDED timeout (it's a polling cloud job; the default is 300s).
 IAgentEvaluator? foundry = projectClient is not null

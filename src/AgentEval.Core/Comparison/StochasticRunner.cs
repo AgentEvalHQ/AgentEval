@@ -177,16 +177,27 @@ public class StochasticRunner : IStochasticRunner
             }
         }
         
-        // Calculate statistics
-        var scores = results.Select(r => r.Score).ToList();
-        var passResults = results.Select(r => r.Passed).ToList();
-        
+        // Calculate statistics over the measured runs only. A run that threw, or whose judge produced no verdict, carries a
+        // Score of 0 and Passed of false as placeholders (the harness sets them): not a sample. IndividualResults keep every
+        // run, and StochasticResult.NotMeasuredCount counts the rest.
+        var measured = results.Where(StochasticResult.IsMeasured).ToList();
+        var scores = measured.Select(r => r.Score).ToList();
+        var passResults = measured.Select(r => r.Passed).ToList();
+
         var statistics = options.EnableStatisticalAnalysis
             ? _statisticsCalculator.CreateStatistics(scores, passResults, options.ConfidenceLevel)
             : CreateMinimalStatistics(scores, passResults);
-        
-        bool passed = statistics.PassRate >= options.SuccessRateThreshold;
-        
+        if (measured.Count == 0)
+        {
+            // An interval around a mean of nothing is not (0, 0).
+            statistics = statistics with { ConfidenceInterval = null };
+        }
+
+        // Over every planned run, not the measured ones: 1 pass and 4 errored runs is not a 100% pass rate.
+        var verdict = StochasticResult.DecideVerdict(
+            results.Count(r => r.Passed), results.Count - measured.Count, results.Count, options.SuccessRateThreshold);
+        bool passed = verdict == StochasticVerdict.Passed;
+
         return new StochasticResult(
             TestCase: testCase,
             IndividualResults: results.AsReadOnly(),

@@ -1941,7 +1941,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var exit = await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", failure == "mock" ? null : "answer", judge,
             mock: failure == "mock", budgetTier: "HIGH",
             aef: aef, noAef: noAef, ct: cancellation.Token);
-        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 10 : failure == "mock" ? 11 : 1, exit);
+        // "success" withholds its pass (no trace, so the required tool checks were not measured): no conclusive verdict,
+        // 11 (D-17, D-21). It was 10, a warning CI may treat as non-blocking.
+        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 11 : failure == "mock" ? 11 : 1, exit);
         if (noAef || invalidDestination)
         {
             Assert.False(Directory.Exists(aef.FullName));

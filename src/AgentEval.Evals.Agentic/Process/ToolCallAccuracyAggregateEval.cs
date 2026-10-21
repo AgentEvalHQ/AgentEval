@@ -84,11 +84,12 @@ public sealed class ToolCallAccuracyAggregateEval : IEvalDefinitionWrapper
         ArgumentNullException.ThrowIfNull(toolCallSuccess);
         ArgumentNullException.ThrowIfNull(toolEfficiency);
 
+        // 1.2.0: its judged components are not measured without tool-call data, so with none captured it cannot pass.
         _inner = new CompositeEval(
             key: "tool_call_accuracy",
             name: "Tool Call Accuracy",
             category: "agentic-process",
-            version: "1.1.0",
+            version: "1.2.0",
             components: new[]
             {
                 new EvalComponent(toolSelection,         Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },

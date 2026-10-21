@@ -21,6 +21,68 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   and the artifact-evidence statement is a profile outside AEF 1.0, with its own predicate type
   (`contracts/aef/1/CHANGELOG.md`).
 
+- **Not measured is never a score (wave 1 of the 1.0 work).** Everywhere AgentEval could not measure something, it
+  now says so and why, instead of scoring 0, passing, or failing the agent for the instrument's fault.
+  - **Why a result was not measured:** new `MetricResult.NotMeasuredCause` (`MissingInput`, `JudgeReplyUnreadable`,
+    `JudgeCallFailed`, `CheckTimedOut`, `NotApplicable`) and an overload `MetricResult.NotMeasured(name, cause, reason,
+    details)`; existing calls compile unchanged. A check with nothing to check is `NotApplicable`: neither a pass
+    nor a failure.
+  - **Judge replies:** an unreadable reply is not measured, with its proof in `Details` (failure kind, length, SHA-256,
+    a 2,000-character excerpt, the judge's model; the explanation never quotes the reply). It was a Fail at 0 in
+    faithfulness, relevance, context precision and recall, answer correctness, groundedness, coherence, fluency, task
+    completion, toxicity, bias, misinformation and `MicrosoftEvaluatorAdapter`, and a bare `85` or `} x {` threw.
+    Replies are read more often: `<think>` blocks are skipped, every fenced block and JSON object is tried, trailing
+    commas and comments are allowed, and a quoted score is read in the invariant culture (on es-ES or de-DE `"85.5"`
+    read as 855). A score off 0-100 is not measured, never clamped (150 was a pass at 100); objects that disagree are
+    refused; the corrective retry shows the judge the reply it could not read. `MemoryJudge` no longer clamps either.
+  - **Failed calls:** a failed judge or embedding call (including a bad vector) is not measured with the error's type
+    and message, in the LLM and embedding metrics, `MicrosoftEvaluatorAdapter`, `EvaluateWithRetryAsync`, the MAF
+    `AgentEvalEvaluator` and `AgentEvalMetricAdapter`, the memory metrics and toxicity's timed-out pattern scan; the
+    MAF bridge labels it an error. The caller's cancellation now propagates (it became a Fail). A calibrated judge
+    whose call failed or whose reply was unreadable is a judge failure, not a 0 vote.
+  - **Toxicity with an LLM judge is `llm_toxicity`:** its verdict is recorded as a model grade; `code_toxicity` is the
+    pattern scan only. It was named `code_toxicity` and recorded an LLM verdict as a code check.
+  - **What the judge sees:** a judge is sent the agent's instructions (the system message) and the expected actions
+    where its rubric uses them, fenced as data; Task Adherence's rule, procedural, presentation and authorization
+    leaves are not measured without the instructions (they were graded against rules the judge never saw). MAF's
+    `EvaluateAsync` path (`AgentEvalCompositeEvaluator`, `AgentEvalAgentEvaluator`) now passes tool calls, tool
+    definitions, expected tool calls and the instructions (`AgentEvalAgentEvaluator.AgentInstructions`); `bench agentic
+    --trace` reads the instructions from the trace. Every LLM judge's prompt fingerprint moves once.
+  - **Tool data:** with no tool data recorded, tool selection, arguments, success, efficiency, skill disclosure, Task
+    Navigation's path edit distance and the tool evaluators are not measured; they passed at 100 (or scored 0). A
+    recorded run with no calls is a real result. Tool success counts only calls that ran; `ConversationExtractor`
+    delegates to `ToolUsageExtractor` (executed calls, reused CallIds, approval-gated calls, one turn only) and a turn
+    with no call is a recorded "none" only when the whole conversation is known. Traces no longer mark a call that
+    never ran as succeeded.
+  - **Security fails closed:** Prohibited Actions is not measured when its tool rules cannot be checked, and a gate
+    whose pass is withheld by an unmeasured required check exits 11 (it read PASS, then would have been warning 10).
+    Its forbidden-content list is now scanned deterministically (the docs promised a scan that did not exist) and sent
+    to the judge.
+  - **Repeated runs:** a run that threw or whose judge gave no verdict is no longer averaged in as 0.
+    `StochasticResult` gains `Verdict` (`StochasticVerdict`: Passed, Failed, Undecided, NotMeasured), `MeasuredCount`
+    and `NotMeasuredCount`; statistics describe measured runs. One rule everywhere, the one AEF evidence already uses:
+    PASS only when the unmeasured runs could not have changed the result, FAIL only when they could not have rescued
+    it, otherwise undecided. Score assertions on a result with unmeasured runs say "not measured". Model comparison
+    ranks quality over measured runs and still counts a crash against reliability; a model with no measured run is
+    not ranked (`UnrankedReason`).
+  - **Batches, compare and calibrate:** `TestSummary`/`EvaluationReport` averages cover measured cases
+    (`HasMeasuredScore`, counts); `agenteval compare` leaves unmeasured scenarios out of the mean delta
+    (`ScenarioResult.Measurement`, `NotMeasuredScenarios`); a calibrate category with nothing scored is NOT MEASURED,
+    not FAIL; golden traces record a case with no verdict (`TraceChange.NotMeasured`).
+  - **Benchmarks:** LongMemEval and TypedMemEval with nothing scored, AutoAudit with no recorded responses or usage
+    (`FidelityMeasured`, `TokensReported`), `bench performance` when calls fail, trace fidelity's token class without
+    chat-side usage, memory reducer and reach-back metrics, conversation completeness's not-asked dimensions, and the
+    memory baseline comparer and its report (`NotMeasuredBy`, `OmittedAxes`) no longer score what they could not check.
+    A red-team scan with no conclusive probe no longer scores 100 (`ConclusiveProbes`), and a comparison against a run
+    that measured nothing is refused (`IsComparable`, `RegressionStatus.Incomparable`).
+  - **Exit codes and exports (behaviour change):** `eval` (single run, `--runs`, `--metrics`, `--golden`), the calibrate
+    commands and the composite `bench` commands exit **11** when nothing failed but something was not measured; they
+    exited 0, 1 or 10. A refused red-team comparison exits 13. JUnit and TRX export a case with no verdict as an error
+    (it was a pass or a skip, so CI could read it as green); Markdown says INCOMPLETE.
+  - **Upgrade notes:** suites where some runs or cases errored can now turn red or exit 11; `DimensionComparison.Scores`
+    has no entry for a baseline that did not measure the dimension (use `TryGetValue`); judge prompt fingerprints and
+    evaluator versions changed, so cached judge results do not carry over.
+
 - **Reasoning is off by default:** every chat client the samples, the TravelDemo and PartnerDesk demos, the
   other sample projects and the CLI build from the provider variables is wrapped in the new
   `MinimalReasoningChatClient` (`chatClient.WithMinimalReasoning()`, `AgentEval.Core`). A request that sets

@@ -16,7 +16,9 @@ namespace AgentEval.Evals.Agentic.System;
 /// then resolved successfully. They can fail independently.
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> with three intent-identification criteria.
+/// Wraps an <see cref="AtomicLlmEval"/> with three intent-identification criteria. When
+/// <see cref="EvalInput.SystemMessage"/> was captured, the judge is sent it (fenced as data): the agent's instructions
+/// can say what scope a query is meant to have. Without it the judge grades the exchange alone, as the rubric allows.
 /// </para>
 /// <para>
 /// Source: split from the Foundry _intent_resolution evaluator per plan-05 §8 and
@@ -52,12 +54,13 @@ public sealed class IntentIdentificationEval : IEvalDefinitionWrapper
     public IntentIdentificationEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.70)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        // 1.2.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "intent_identification",
             name: "Intent Identification",
             category: "system-outcome",
-            version: "1.1.0",
+            version: "1.2.0",
             criteria: new[]
             {
                 "The agent correctly identified the primary intent of the user's query",
@@ -67,7 +70,7 @@ public sealed class IntentIdentificationEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.intent_identification.v1",
-            failureSeverity: "medium");
+            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.SystemMessage };
     }
 
     /// <inheritdoc/>

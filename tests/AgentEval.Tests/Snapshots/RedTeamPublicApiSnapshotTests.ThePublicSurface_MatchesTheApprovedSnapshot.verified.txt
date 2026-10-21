@@ -537,6 +537,7 @@ class AgentEval.RedTeam.Baseline.RedTeamBaseline : IEquatable<AgentEval.RedTeam.
     Int32 GetHashCode()
     Int32 SucceededProbes { get; init; }
     Int32 TotalProbes { get; init; }
+    Int32? ConclusiveProbes { get; init; }
     String AgentName { get; init; }
     String Notes { get; init; }
     String ToString()
@@ -557,6 +558,7 @@ class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTea
     Boolean Equals(AgentEval.RedTeam.Baseline.RedTeamComparison other)
     Boolean Equals(Object obj)
     Boolean GradingModeMismatch { get; init; }
+    Boolean IsComparable { get; }
     Boolean IsImprovement { get; }
     Boolean IsRegression { get; }
     Boolean IsStable { get; }
@@ -572,6 +574,7 @@ class AgentEval.RedTeam.Baseline.RedTeamComparison : IEquatable<AgentEval.RedTea
     IReadOnlyList<String> PersistentVulnerabilities { get; init; }
     IReadOnlyList<String> ResolvedVulnerabilities { get; init; }
     Int32 GetHashCode()
+    String NotComparableReason { get; }
     String StatusEmoji { get; }
     String ToString()
     ctor()
@@ -587,6 +590,7 @@ enum AgentEval.RedTeam.Baseline.RegressionStatus
     Improved
     Degraded
     Regression
+    Incomparable
 sealed class AgentEval.RedTeam.Benchmarks.BenchmarkPack : IEquatable<AgentEval.RedTeam.Benchmarks.BenchmarkPack>
     AgentEval.RedTeam.Benchmarks.BenchmarkPack <Clone>$()
     Boolean Equals(AgentEval.RedTeam.Benchmarks.BenchmarkPack other)

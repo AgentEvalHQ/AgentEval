@@ -725,6 +725,63 @@ public class CalibratedJudgeTests
         Assert.Contains("J3: Model overloaded", ex.Message);
     }
 
+    [Theory]
+    [InlineData(NotMeasuredCause.JudgeCallFailed)]
+    [InlineData(NotMeasuredCause.JudgeReplyUnreadable)]
+    public async Task EvaluateAsync_AJudgeThatGaveNoReading_IsAJudgeFailure_NotAMissingInput(NotMeasuredCause cause)
+    {
+        // The metrics catch a failed call and an unreadable reply since T03/T59; the shortfall is still an outage.
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", cause, "m not measured: the judge gave no reading.")),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 2 });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]));
+
+        Assert.Contains("J2: m not measured: the judge gave no reading.", ex.Message);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AJudgeThatGaveNoReading_WithContinueOnJudgeFailureFalse_Throws()
+    {
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", NotMeasuredCause.JudgeCallFailed, "m not measured: 503.")),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { ContinueOnJudgeFailure = false });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]));
+
+        Assert.Equal("m not measured: 503.", ex.Message);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NotEnoughMeasured_BecauseOfATypedMissingInput_StillReturnsNotMeasured()
+    {
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", NotMeasuredCause.MissingInput, "m: no context: not measured.")),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 2 });
+
+        var result = await judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]);
+
+        Assert.False(result.Measured);
+        Assert.Equal("m: no context: not measured.", result.NotMeasuredReason);
+    }
+
     #endregion
     
     #region Helper Methods

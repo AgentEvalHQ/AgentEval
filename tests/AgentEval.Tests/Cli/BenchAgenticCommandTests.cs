@@ -261,6 +261,71 @@ public class BenchAgenticCommandTests : IDisposable
         Assert.Contains("QUESTION-FROM-THE-TRACE", capturing.LastInput ?? "");
     }
 
+    /// <summary>Records every judge input, so a test can find the one a given check sent.</summary>
+    private sealed class AllInputsEvaluator : IEvaluator
+    {
+        private readonly List<string> _inputs = [];
+
+        public IReadOnlyList<string> Inputs { get { lock (_inputs) return _inputs.ToList(); } }
+
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            lock (_inputs) _inputs.Add(input);
+            return new PassingStubEvaluator().EvaluateAsync(input, output, criteria, ct);
+        }
+    }
+
+    [Fact]
+    public async Task BenchAgentic_Trace_TheAgentsRecordedInstructions_ReachTheJudgesThatGradeAgainstThem()
+    {
+        // Task Adherence's rule judges are not measured without the agent's instructions; a traced run recorded them on
+        // its model requests (TraceRecordingChatClient), and bench agentic used to drop them: SystemMessage was never set.
+        InitWorkspace();
+        var trace = new AgentEval.Tracing.AgentTrace { TraceName = "captured-run-with-instructions" };
+        trace.AddEntry(new AgentEval.Tracing.TraceEntry
+        {
+            Type = AgentEval.Tracing.TraceEntryType.Request,
+            Scope = AgentEval.Tracing.TraceEntryScope.AgentInvocation,
+            Prompt = "What is the refund window?",
+        });
+        trace.AddEntry(AgentEval.Tracing.TraceEntry.ForChatRequest(1, "c", "SYS-9152: answer in one sentence.", "What is the refund window?", null, null));
+        trace.AddEntry(new AgentEval.Tracing.TraceEntry
+        {
+            Type = AgentEval.Tracing.TraceEntryType.Response,
+            Scope = AgentEval.Tracing.TraceEntryScope.AgentInvocation,
+            Text = "Refunds are accepted within 30 days.",
+        });
+        var traceFile = Path.Combine(_root, "run-instructions.trace.json");
+        await AgentEval.Tracing.TraceSerializer.SaveToFileAsync(trace, traceFile);
+        var judge = new AllInputsEvaluator();
+
+        await BenchAgenticCommand.RunAsync(
+            preset: "agentic-execution",
+            subject: "AgenticInstructionsAgent",
+            rootOverride: _root,
+            inputText: null,
+            responseText: null,
+            evaluatorOverride: judge,
+            budgetTier: null,
+            traceFile: traceFile);
+
+        Assert.Contains(judge.Inputs, i => i.Contains("<agent_instructions>\nSYS-9152: answer in one sentence.\n</agent_instructions>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RecordedInstructions_IsTheFirstModelRequestsSystemPrompt_OrNull()
+    {
+        var trace = new AgentEval.Tracing.AgentTrace { TraceName = "t" };
+        Assert.Null(BenchAgenticCommand.RecordedInstructions(trace));
+
+        trace.AddEntry(AgentEval.Tracing.TraceEntry.ForChatRequest(0, "c", "   ", "p", null, null));
+        Assert.Null(BenchAgenticCommand.RecordedInstructions(trace));   // a blank prompt is no instructions, never ""
+
+        trace.AddEntry(AgentEval.Tracing.TraceEntry.ForChatRequest(1, "c", "first", "p", null, null));
+        trace.AddEntry(AgentEval.Tracing.TraceEntry.ForChatRequest(2, "c", "second", "p", null, null));
+        Assert.Equal("first", BenchAgenticCommand.RecordedInstructions(trace));
+    }
+
     [Fact]
     public async Task BenchAgentic_MockWithARealTarget_IsRefusedByTheCommandItself()
     {

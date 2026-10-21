@@ -487,10 +487,13 @@ public class GoldenReachabilityTests
         Assert.Equal(Reach.DecidedFromResponse, decided.Class);
         Assert.Equal("fail", decided.Result.Score.Label);
 
-        // 5. ToolInputAccuracyEval on a text-only case with a PASSING judge: its required schema check has no tool
-        //    definitions to read, so the composite withholds its pass (B3) — the judge ran, the evaluator reached no verdict.
+        // 5. ToolInputAccuracyEval on a case with its tool calls but no tool definitions, with a PASSING judge: its required
+        //    schema check has no definitions to read, so the composite withholds its pass (B3) — the judge ran, the
+        //    evaluator reached no verdict. (Without the tool calls the judge does not run at all: 2.7.0.)
         var withheld = await ClassifyAsync(registry, "tool_input_accuracy",
-            new EvalInput(Query: "Find flights", Response: "Called search_flights with the right arguments."), judgeScore: 100);
+            new EvalInput(Query: "Find flights", Response: "Called search_flights with the right arguments.",
+                ToolCalls: [new ToolCall("search_flights", new Dictionary<string, object> { ["origin"] = "NYC" }, "3 flights")]),
+            judgeScore: 100);
         Assert.Equal(Reach.Withheld, withheld.Class);
 
         // And the separation is real, not four names for one behaviour.

@@ -136,6 +136,7 @@ class AgentEval.Comparison.ModelComparisonResult : IEquatable<AgentEval.Comparis
     String SpeedNotMeasuredReason { get; }
     String Summary { get; }
     String ToString()
+    String UnrankedReason { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, out IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, out AgentEval.Comparison.ModelRanking Winner, out AgentEval.Comparison.ModelComparisonOptions Options)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, AgentEval.Comparison.ModelRanking Winner, AgentEval.Comparison.ModelComparisonOptions Options)
 class AgentEval.Comparison.ModelConfiguration : IEquatable<AgentEval.Comparison.ModelConfiguration>
@@ -246,6 +247,7 @@ class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.St
     AgentEval.Comparison.StochasticOptions Options { get; init; }
     AgentEval.Comparison.StochasticResult <Clone>$()
     AgentEval.Comparison.StochasticStatistics Statistics { get; init; }
+    AgentEval.Comparison.StochasticVerdict Verdict { get; }
     AgentEval.Comparison.ToolUsageSummary GetToolUsageSummary(String toolName)
     AgentEval.Models.TestCase TestCase { get; init; }
     Boolean Equals(AgentEval.Comparison.StochasticResult other)
@@ -255,6 +257,8 @@ class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.St
     IReadOnlyList<AgentEval.Models.TestResult> IndividualResults { get; init; }
     Int32 FailedCount { get; }
     Int32 GetHashCode()
+    Int32 MeasuredCount { get; }
+    Int32 NotMeasuredCount { get; }
     Int32 PassedCount { get; }
     String Summary { get; }
     String ToString()
@@ -263,6 +267,8 @@ class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.St
     ValueTuple<AgentEval.Models.TestResult, TimeSpan>? SlowestRun { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, out AgentEval.Comparison.StochasticStatistics Statistics, out AgentEval.Comparison.StochasticOptions Options, out Boolean Passed)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, AgentEval.Comparison.StochasticStatistics Statistics, AgentEval.Comparison.StochasticOptions Options, Boolean Passed)
+    static AgentEval.Comparison.StochasticVerdict DecideVerdict(Int32 passedRuns, Int32 notMeasuredRuns, Int32 totalRuns, Double successRateThreshold)
+    static Boolean IsMeasured(AgentEval.Models.TestResult run)
 class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Comparison.StochasticStatistics>
     AgentEval.Comparison.ConfidenceInterval ConfidenceInterval { get; init; }
     AgentEval.Comparison.StochasticStatistics <Clone>$()
@@ -282,6 +288,11 @@ class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Compariso
     String ToString()
     Void Deconstruct(out Double PassRate, out Double MeanScore, out Double MedianScore, out Double StandardDeviation, out Int32 MinScore, out Int32 MaxScore, out Double Percentile25, out Double Percentile75, out Double Percentile95, out AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, out Int32 SampleSize)
     ctor(Double PassRate, Double MeanScore, Double MedianScore, Double StandardDeviation, Int32 MinScore, Int32 MaxScore, Double Percentile25, Double Percentile75, Double Percentile95, AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, Int32 SampleSize)
+enum AgentEval.Comparison.StochasticVerdict
+    Passed
+    Failed
+    Undecided
+    NotMeasured
 class AgentEval.Comparison.ToolUsageSummary : IEquatable<AgentEval.Comparison.ToolUsageSummary>
     AgentEval.Comparison.DistributionStatistics CallCountStats { get; init; }
     AgentEval.Comparison.ToolUsageSummary <Clone>$()
@@ -562,6 +573,7 @@ enum AgentEval.Core.MetricCategory
     CodeBased
     Memory
 class AgentEval.Core.MetricResult
+    AgentEval.Core.NotMeasuredCause? NotMeasuredCause { get; init; }
     Boolean Measured { get; init; }
     Boolean Passed { get; init; }
     Boolean? ModelGraded { get; init; }
@@ -572,8 +584,15 @@ class AgentEval.Core.MetricResult
     String RubricDigest { get; init; }
     ctor()
     static AgentEval.Core.MetricResult Fail(String metricName, String explanation, Double score = 0, IDictionary<String, Object> details = null)
+    static AgentEval.Core.MetricResult NotMeasured(String metricName, AgentEval.Core.NotMeasuredCause cause, String reason, IDictionary<String, Object> details = null)
     static AgentEval.Core.MetricResult NotMeasured(String metricName, String reason, IDictionary<String, Object> details = null)
     static AgentEval.Core.MetricResult Pass(String metricName, Double score, String explanation = null, IDictionary<String, Object> details = null)
+enum AgentEval.Core.NotMeasuredCause
+    MissingInput
+    JudgeReplyUnreadable
+    JudgeCallFailed
+    CheckTimedOut
+    NotApplicable
 enum AgentEval.Core.PluginLifecycleStage
     Initializing
     Ready
@@ -1251,6 +1270,7 @@ static class AgentEval.Evals.TestRunEvalProjection
     const String ToolNotExecutedResultPrefix
     const String UnconvertibleResultPrefix
     static AgentEval.Evals.EvalInput ToEvalInput(AgentEval.Models.TestCase testCase, AgentEval.Models.TestResult result)
+    static AgentEval.Evals.EvalInput ToEvalInput(AgentEval.Models.TestCase testCase, AgentEval.Models.TestResult result, String agentInstructions)
     static AgentEval.Evals.ToolCall ToToolCall(AgentEval.Models.ToolCallRecord record)
 sealed class AgentEval.Evals.ToolCall : IEquatable<AgentEval.Evals.ToolCall>
     AgentEval.Evals.ToolCall <Clone>$()
@@ -1520,6 +1540,7 @@ class AgentEval.Models.TestResult
     String TestName { get; init; }
     ctor()
 class AgentEval.Models.TestResultSummary
+    Boolean NotMeasured { get; set; }
     Boolean Passed { get; set; }
     Boolean Skipped { get; set; }
     Dictionary<String, Double> MetricScores { get; set; }
@@ -1535,10 +1556,13 @@ class AgentEval.Models.TestResultSummary
     ctor()
 class AgentEval.Models.TestSummary
     Boolean AllPassed { get; }
+    Boolean HasMeasuredScore { get; }
     Decimal TotalCost { get; }
     Double AverageScore { get; }
     IReadOnlyList<AgentEval.Models.TestResult> Results { get; }
     Int32 FailedCount { get; }
+    Int32 MeasuredCount { get; }
+    Int32 NotMeasuredCount { get; }
     Int32 PassedCount { get; }
     Int32 TotalCount { get; }
     String SuiteName { get; }
@@ -2206,6 +2230,11 @@ sealed class AgentEval.Output.RunSummary : IEquatable<AgentEval.Output.RunSummar
     String Verdict { get; init; }
     Void Deconstruct(out String SchemaVersion, out String RunId, out String Verdict, out AgentEval.Output.RunStats Stats, out IReadOnlyDictionary<String, Double> Metrics, out AgentEval.Output.RunCostInfo Cost)
     ctor(String SchemaVersion, String RunId, String Verdict, AgentEval.Output.RunStats Stats, IReadOnlyDictionary<String, Double> Metrics, AgentEval.Output.RunCostInfo Cost = null)
+static class AgentEval.Output.ScenarioMeasurement
+    const String NotApplicable
+    const String NotMeasured
+    static Boolean IsMeasured(AgentEval.Output.ScenarioResult result)
+    static String Of(AgentEval.Evals.Meta.MeasurementState state)
 sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.ScenarioResult>
     AgentEval.Output.ComparabilityFacts Comparability { get; init; }
     AgentEval.Output.ScenarioResult <Clone>$()
@@ -2219,6 +2248,7 @@ sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.Scena
     Int32 GetHashCode()
     String Id { get; init; }
     String Input { get; init; }
+    String Measurement { get; init; }
     String Name { get; init; }
     String Output { get; init; }
     String StimulusHash { get; init; }

@@ -188,13 +188,14 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
         // as EvaluationFailed if the retry also fails).
         if (parsed.EvaluationFailed)
         {
-            var retryMessages = new List<ChatMessage>(messages)
-            {
-                new(ChatRole.User,
-                    "Your previous response could not be parsed. Respond with ONLY a single valid "
-                    + "JSON object matching the required schema — no prose, no markdown code fences, "
-                    + "nothing before or after the JSON."),
-            };
+            // The judge is shown the reply it gave: told only that "your previous response" failed, it never saw it.
+            var retryMessages = new List<ChatMessage>(messages);
+            if (!string.IsNullOrEmpty(firstResponse?.Text))
+                retryMessages.Add(new(ChatRole.Assistant, firstResponse.Text));
+            retryMessages.Add(new(ChatRole.User,
+                "Your previous response could not be parsed. Respond with ONLY a single valid "
+                + "JSON object matching the required schema — no prose, no markdown code fences, "
+                + "nothing before or after the JSON."));
             var (retryParsed, retryResponse) = await InvokeAndParseAsync(retryMessages, cancellationToken);
             Accumulate(ref inputTokens, ref outputTokens, retryResponse?.Usage);
             if (!retryParsed.EvaluationFailed)
@@ -319,17 +320,6 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
     {
         try
         {
-            var json = LlmJsonParser.ExtractJson(responseText);
-            if (json == null)
-            {
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no JSON found", EvaluationFailed = true };
-            }
-
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.ValueKind != System.Text.Json.JsonValueKind.Object)
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation", EvaluationFailed = true };
-
             // Judge prompts are not consistent about casing: the generic evaluator prompt emits
             // camelCase (overallScore / criteriaResults / explanation / improvements) while the
             // compliance judge prompts (gdpr-judge-system.v1, eu-ai-act) emit snake_case
@@ -339,15 +329,42 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
             // dropped every compliance verdict to the int default (0) with empty criteria — making
             // a real, token-spending judgement look identical to a non-response. Match on keys
             // normalised (lower-cased, underscores stripped) so both shapes round-trip.
-            var props = NormalisedProps(root);
+            //
+            // The verdict is the JSON object with a recognised score field, wherever the reply puts it: after a
+            // <think> block, in a ```JSON fence, before a trailing note. Objects that disagree on the score are refused
+            // rather than one of them guessed. A missing score field means the model did not produce a verdict in the
+            // expected shape → preserve the failure-score signal.
+            string[] scoreKeys = rubric is null ? ["overallscore", "score"] : ["score", "overallscore"];
+            Dictionary<string, System.Text.Json.JsonElement>? props = null;
+            double score = 0;
+            var sawObject = false;
+            foreach (var candidate in LlmJsonParser.JsonCandidates(responseText ?? ""))
+            {
+                if (!LlmJsonParser.TryParseObject(candidate, out var root, out _))
+                    continue;
+                sawObject = true;
+                var candidateProps = NormalisedProps(root);
+                if (!TryGetNumber(candidateProps, out var candidateScore, scoreKeys))
+                    continue;
+                if (props is null)
+                {
+                    props = candidateProps;
+                    score = candidateScore;
+                }
+                else if (!candidateScore.Equals(score))
+                {
+                    return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - the reply holds verdicts with different scores", EvaluationFailed = true };
+                }
+            }
 
-            // A recognisable score field must be present; its absence means the model did not
-            // produce a verdict in the expected shape → preserve the failure-score signal.
-            if (!TryGetNumber(props, out var score, rubric is null ? ["overallscore", "score"] : ["score", "overallscore"]))
-                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no score field", EvaluationFailed = true };
+            if (props is null)
+            {
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = sawObject ? "Failed to parse evaluation - no score field" : "Failed to parse evaluation - no JSON found", EvaluationFailed = true };
+            }
 
             // A rubric states its scale. A score off it is out of contract — an error, never a grade: before B9 every
-            // reply was read as 0–100, so a 0–1 rubric's 0.85 read as 0.85 out of 100.
+            // reply was read as 0–100, so a 0–1 rubric's 0.85 read as 0.85 out of 100. Without a rubric the scale is
+            // 0–100, and a score off it is out of contract too: it was clamped, so 150 read as a confident 100.
             double? rubricScore = null;
             if (rubric is not null)
             {
@@ -355,6 +372,10 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
                     return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = $"Out of contract: {why}", EvaluationFailed = true };
                 rubricScore = unit;
                 score = unit * 100.0;
+            }
+            else if (!double.IsFinite(score) || score < 0 || score > 100)
+            {
+                return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = $"Out of contract: the score {score.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off 0-100", EvaluationFailed = true };
             }
 
             var criteria = new List<CriterionResult>();
@@ -402,7 +423,7 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
             return new EvaluationResult
             {
-                OverallScore = (int)Math.Round(Math.Clamp(score, 0, 100)),
+                OverallScore = (int)Math.Round(score),
                 // A rubric reply calls its narrative "reasoning"; the default prompt calls it "summary".
                 Summary = (rubric is null ? GetString(props, "summary") : GetString(props, "reasoning", "summary")) ?? "",
                 Improvements = improvements,

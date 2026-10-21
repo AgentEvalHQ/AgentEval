@@ -7,6 +7,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 
+using MEAIQuality = Microsoft.Extensions.AI.Evaluation.Quality;
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
@@ -34,7 +35,15 @@ namespace AgentEval.MAF.Evaluators;
 /// forwards <see cref="EvalItem.Conversation"/> — the <b>full</b> conversation, including the assistant
 /// tool-call and tool-result turns — to the wrapped evaluator. AgentEval's
 /// <see cref="ConversationExtractor"/> can then recover the tool calls, so code-based tool metrics
-/// score correctly. LLM-judged metrics behave the same either way.
+/// score correctly, and a wrapped <see cref="AgentEvalCompositeEvaluator"/> hands them to its checks.
+/// </para>
+/// <para>
+/// The rest of the item travels as MEAI additional context: the reference and the retrieved context;
+/// <see cref="EvalItem.Tools"/> as M.E.AI's tool contexts (<c>ToolCallAccuracyEvaluatorContext</c>,
+/// <c>TaskAdherenceEvaluatorContext</c>, <c>IntentResolutionEvaluatorContext</c>), which M.E.AI's own tool
+/// evaluators and the composite read; and the names of <see cref="EvalItem.ExpectedToolCalls"/> as
+/// <see cref="AgentEvalExpectedToolsContext"/>. MAF does not put the agent's instructions on the item; set
+/// <see cref="AgentInstructions"/> to send them.
 /// </para>
 /// <para>
 /// Construct directly, or fluently via <see cref="AgentEvaluatorExtensions.AsAgentEvaluator"/>.
@@ -58,6 +67,20 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
 
     /// <inheritdoc/>
     public string Name { get; }
+
+    /// <summary>
+    /// The instructions the evaluated agent was given, when the caller knows them; <see langword="null"/> (the default)
+    /// sends none. MAF keeps them on the agent, not on the <see cref="EvalItem"/>: read them with
+    /// <c>agent.GetService&lt;ChatOptions&gt;()?.Instructions</c>, which returns the agent-level instructions only (a
+    /// run's own options and an <c>AIContextProvider</c>'s instructions are merged at run time and not seen there).
+    /// </summary>
+    /// <remarks>
+    /// They are forwarded as the conversation's first, system, message, as the agent was given them, unless the
+    /// conversation already carries a system message of its own: M.E.AI's task-adherence evaluator reads them from the
+    /// conversation, and <see cref="AgentEvalCompositeEvaluator"/> passes them on as <c>EvalInput.SystemMessage</c>. A
+    /// system prompt can be proprietary; setting this sends it to the judges' provider.
+    /// </remarks>
+    public string? AgentInstructions { get; init; }
 
     /// <inheritdoc/>
     public async Task<AgentEvaluationResults> EvaluateAsync(
@@ -91,12 +114,36 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
                 additionalContext.Add(new AgentEvalRAGContext(item.Context!));
             additionalContext.AddRange(MicrosoftEvaluatorAdapter.BuildAdditionalContext(item.Context, item.ExpectedOutput));
 
-            var result = await _evaluator.EvaluateAsync(
-                item.Conversation,
-                response,
-                _chatConfiguration,
-                additionalContext.Count > 0 ? additionalContext : null,
-                cancellationToken).ConfigureAwait(false);
+            // The tools the agent was offered and the tools the case expected were on the item and never forwarded, so
+            // M.E.AI's tool-call-accuracy evaluator had no definitions to check against and AgentEval's checks graded tool
+            // use from the reply text. MAF sets Tools only when the agent has at least one. M.E.AI marks these three
+            // contexts experimental (AIEVAL001); they are the carriers its own tool evaluators read, and
+            // AgentEvalCompositeEvaluator reads the tools back from them.
+            if (item.Tools is { Count: > 0 } tools)
+            {
+#pragma warning disable AIEVAL001
+                additionalContext.Add(new MEAIQuality.ToolCallAccuracyEvaluatorContext(tools));
+                additionalContext.Add(new MEAIQuality.TaskAdherenceEvaluatorContext(tools));
+                additionalContext.Add(new MEAIQuality.IntentResolutionEvaluatorContext(tools));
+#pragma warning restore AIEVAL001
+            }
+            if (item.ExpectedToolCalls is { } expectedCalls)   // the names only: an expected call's arguments have no carrier
+                additionalContext.Add(new AgentEvalExpectedToolsContext(expectedCalls.Select(c => c.Name).ToList()));
+
+            IReadOnlyList<ChatMessage> conversation = item.Conversation;
+            if (!string.IsNullOrWhiteSpace(AgentInstructions) && !conversation.Any(m => m.Role == ChatRole.System))
+                conversation = [new ChatMessage(ChatRole.System, AgentInstructions), .. conversation];
+
+            // AgentEval's flat evaluators read this to treat a turn with no tool call as a recorded none, as the composite
+            // does. Only they get it: any other evaluator sees the context it always saw.
+            if (_evaluator is AgentEvalEvaluator or AgentEvalMetricAdapter)
+                additionalContext.Add(new AgentEvalWholeConversationContext());
+            var context = additionalContext.Count > 0 ? additionalContext : null;
+            var result = _evaluator is AgentEvalCompositeEvaluator composite
+                // The composite is told the messages are the whole conversation, so a turn with no tool call is a
+                // measured none rather than "nothing recorded".
+                ? await composite.EvaluateItemAsync(conversation, response, context, wholeConversation: true, cancellationToken).ConfigureAwait(false)
+                : await _evaluator.EvaluateAsync(conversation, response, _chatConfiguration, context, cancellationToken).ConfigureAwait(false);
 
             FailWhatWasNotScored(result);
             results.Add(result);

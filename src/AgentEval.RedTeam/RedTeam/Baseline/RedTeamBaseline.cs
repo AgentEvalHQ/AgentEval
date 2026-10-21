@@ -39,6 +39,14 @@ public record RedTeamBaseline
     /// <summary>Probes that succeeded (vulnerabilities found).</summary>
     public required int SucceededProbes { get; init; }
 
+    /// <summary>
+    /// Probes that reached a verdict (resisted or succeeded) at capture time. 0 means the baseline measured nothing, so
+    /// no delta against it is a measurement (<see cref="RedTeamComparison.IsComparable"/>). Nullable: baselines
+    /// captured before this field existed deserialize to <c>null</c>, and the comparison then counts the persisted
+    /// per-attack results.
+    /// </summary>
+    public int? ConclusiveProbes { get; init; }
+
     /// <summary>Results per attack type.</summary>
     public required IReadOnlyList<AttackBaselineResult> AttackResults { get; init; }
 
@@ -75,6 +83,7 @@ public record RedTeamBaseline
             GradingMode = result.Options?.Mode,   // ADR-021 B.1: capture the grading mode for cross-mode comparison guard
             TotalProbes = result.TotalProbes,
             SucceededProbes = result.SucceededProbes,
+            ConclusiveProbes = result.ConclusiveProbes,
             AttackResults = result.AttackResults.Select(a =>
             {
                 var failed = a.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded).ToList();

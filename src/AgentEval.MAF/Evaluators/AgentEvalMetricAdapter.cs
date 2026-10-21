@@ -58,7 +58,8 @@ public class AgentEvalMetricAdapter : MEAIIEvaluator
             Output = output,
             Context = AdditionalContextHelper.ExtractRAGContext(additionalContext),
             GroundTruth = AdditionalContextHelper.ExtractGroundTruth(additionalContext),
-            ToolUsage = ConversationExtractor.ExtractToolUsage(messages, response),
+            ToolUsage = ConversationExtractor.ExtractToolUsage(messages, response,
+                conversationComplete: AgentEvalWholeConversationContext.In(additionalContext)),
             ExpectedTools = AdditionalContextHelper.ExtractExpectedTools(additionalContext),
         };
 
@@ -67,9 +68,11 @@ public class AgentEvalMetricAdapter : MEAIIEvaluator
         {
             metricResult = await _metric.EvaluateAsync(context, cancellationToken);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (JudgeReplyEvidence.IsCallFailure(ex, cancellationToken))
         {
-            metricResult = MetricResult.Fail(_metric.Name, $"Metric execution failed: {ex.Message}");
+            // A metric that threw measured nothing: not measured (no value, inconclusive, failed), never a measured 0
+            // rated Poor. A provider-side timeout is a failure too; the caller's cancellation propagates.
+            metricResult = JudgeReplyEvidence.CallFailed(_metric.Name, _metric.Name, ex, "the metric's execution");
         }
 
         return ResultConverter.ToMEAI(metricResult);

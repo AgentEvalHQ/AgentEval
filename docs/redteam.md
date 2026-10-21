@@ -1086,11 +1086,11 @@ agenteval redteam --endpoint $URL --model $MODEL \
 
 | Value | Exit 0 (pass) | Non-zero |
 |-------|---------------|----------|
-| `vuln` *(default)* | no vulnerabilities found | `1` any vulnerability · `4` regression vs `--baseline` |
-| `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop |
+| `vuln` *(default)* | no vulnerabilities found | `1` any vulnerability · `4` regression vs `--baseline` · `13` the baseline comparison was refused |
+| `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop · `13` the baseline comparison was refused |
 | `never` | always | — |
 
-**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, or more probes came back inconclusive than were resisted) · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
+**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, or more probes came back inconclusive than were resisted) · `3` runtime error · `4` regression vs baseline · `13` not comparable with the baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another. When the baseline or the current scan has no probe that reached a verdict, it measured nothing to compare: the comparison prints why, its status is `Incomparable` (neither a regression nor a pass) and the command exits `13`, unless under `vuln` the scan found a vulnerability (`1`).
 
 ```yaml
 # GitHub Actions: scan → upload SARIF to code-scanning + JUnit test report → baseline gate

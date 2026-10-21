@@ -88,7 +88,21 @@ public sealed record ScenarioComparison(
     public IReadOnlyList<ComparabilityAxis> Unpinned =>
         [.. Axes.Where(a => a.State is ComparabilityAxisState.Unpinned)];
 
-    /// <summary>Candidate minus baseline. Meaningful only when the comparison is COMPARABLE.</summary>
+    /// <summary>
+    /// Whether the baseline's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>). An errored,
+    /// skipped or unjudged scenario's score is a placeholder.
+    /// </summary>
+    public bool BaselineMeasured { get; init; } = true;
+
+    /// <summary>Whether the candidate's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>).</summary>
+    public bool CandidateMeasured { get; init; } = true;
+
+    /// <summary>True when both runs measured this scenario, so <see cref="ScoreDelta"/> is a difference of two scores.</summary>
+    public bool BothMeasured => BaselineMeasured && CandidateMeasured;
+
+    /// <summary>
+    /// Candidate minus baseline. Meaningful only when the comparison is COMPARABLE and <see cref="BothMeasured"/>.
+    /// </summary>
     public double ScoreDelta => CandidateScore - BaselineScore;
 
     /// <summary>True when both runs recorded a floor a delta can be read against.</summary>
@@ -233,12 +247,27 @@ public sealed record RunComparison(
     }
 
     /// <summary>
-    /// The mean of every matched scenario's score delta. ⚠ Read it only when
-    /// <see cref="Verdict"/> is <see cref="ComparisonVerdict.Comparable"/>; the renderer prints
-    /// nothing derived from it otherwise.
+    /// The mean score delta over the matched scenarios both runs measured; <c>NaN</c> when there is none. ⚠ Read it
+    /// only when <see cref="Verdict"/> is <see cref="ComparisonVerdict.Comparable"/>; the renderer prints nothing
+    /// derived from it otherwise. A scenario either run did not measure is left out and listed in
+    /// <see cref="NotMeasuredScenarios"/>: its placeholder 0 would report a score change nobody measured.
     /// </summary>
-    public double MeanScoreDelta =>
-        Scenarios.Count == 0 ? double.NaN : Scenarios.Average(s => s.ScoreDelta);
+    public double MeanScoreDelta
+    {
+        get
+        {
+            var measured = Scenarios.Where(s => s.BothMeasured).ToList();
+            return measured.Count == 0 ? double.NaN : measured.Average(s => s.ScoreDelta);
+        }
+    }
+
+    /// <summary>
+    /// Matched scenario ids that either run did not measure (errored, skipped, or no judge verdict). They are not in
+    /// <see cref="MeanScoreDelta"/>. <see cref="Regressed"/> still counts one that passed in the baseline and not in the
+    /// candidate, as "failed, errored or not run".
+    /// </summary>
+    public IReadOnlyList<string> NotMeasuredScenarios =>
+        [.. Scenarios.Where(s => !s.BothMeasured).Select(s => s.ScenarioId)];
 
     /// <summary>Matched scenarios the candidate passed and the baseline did not.</summary>
     public int Recovered => Scenarios.Count(s => s is { BaselinePassed: false, CandidatePassed: true });
@@ -354,7 +383,11 @@ public sealed record RunComparison(
             b.Passed,
             fa?.ChanceFloor?.IsUsableAsABar == true,
             fb?.ChanceFloor?.IsUsableAsABar == true,
-            selfGraded);
+            selfGraded)
+        {
+            BaselineMeasured = ScenarioMeasurement.IsMeasured(a),
+            CandidateMeasured = ScenarioMeasurement.IsMeasured(b),
+        };
     }
 
     // ── Axis constructors. Each encodes the same three-state rule, once. ─────────────────────

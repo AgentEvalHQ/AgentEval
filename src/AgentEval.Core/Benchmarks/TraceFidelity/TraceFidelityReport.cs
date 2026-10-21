@@ -15,11 +15,23 @@ public sealed record TraceFidelityDiscrepancy(
     string Severity,
     int Count,
     double Score,
-    IReadOnlyList<string> Examples);
+    IReadOnlyList<string> Examples)
+{
+    /// <summary>
+    /// False when the class could not be checked: <c>token_under_reporting</c> when no chat-boundary response reports
+    /// its token usage, so the tokens actually consumed are unknown. <see cref="Count"/> and <see cref="Score"/> are then
+    /// placeholders (0 and 1.0) that <see cref="TraceFidelityReport.OverallScore"/> leaves out; the class used to read
+    /// as clean.
+    /// </summary>
+    public bool Measured { get; init; } = true;
+}
 
 /// <summary>The structured result of reconciling an agent-boundary trace against a chat-boundary trace.</summary>
 /// <param name="Discrepancies">One entry per discrepancy class (always all six, in canonical order).</param>
-/// <param name="OverallScore">Severity-weighted root fidelity score, 0–1 (1 = perfectly faithful).</param>
+/// <param name="OverallScore">
+/// Severity-weighted root fidelity score, 0–1 (1 = perfectly faithful), over the classes that were measured
+/// (<see cref="TraceFidelityDiscrepancy.Measured"/>), their weights scaled up to the full weight.
+/// </param>
 public sealed record TraceFidelityReport(
     IReadOnlyList<TraceFidelityDiscrepancy> Discrepancies,
     double OverallScore);

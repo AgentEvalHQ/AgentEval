@@ -50,12 +50,22 @@ public class ToolCallAccuracyAggregateEvalTests
     [Fact]
     public async Task EvaluateAsync_LowScore_ReportsFail()
     {
-        var eval = AgenticEvaluatorFixture.BuildEvaluator("tool_call_accuracy", new FixedScoreEvaluator(10));
-        var input = new EvalInput(Query: "Use tools correctly", Response: "Everything failed.");
+        // The run's tool call, not a reply describing it (T68): this input used to carry no tool calls at all.
+        var judge = new RecordingScoreEvaluator(10);
+        var eval = AgenticEvaluatorFixture.BuildEvaluator("tool_call_accuracy", judge);
+        var input = new EvalInput(
+            Query: "Find flights from NYC to London",
+            Response: "Everything failed.",
+            ToolCalls: new[]
+            {
+                new ToolCall("search_flights", new Dictionary<string, object> { ["origin"] = "NYC" },
+                    "{\"status\":\"error\",\"error\":\"upstream timeout\"}"),
+            });
 
         var result = await eval.EvaluateAsync(input);
 
         Assert.False(result.Score.Passed,
             $"tool_call_accuracy: expected Passed==false with stub score=10, got score={result.Score.Value}");
+        Assert.Contains(judge.Inputs, i => i.Contains("search_flights", StringComparison.Ordinal));
     }
 }

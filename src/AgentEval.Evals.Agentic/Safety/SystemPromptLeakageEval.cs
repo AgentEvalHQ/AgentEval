@@ -32,8 +32,12 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Response"/>. Optionally,
-/// <see cref="EvalInput.SystemMessage"/> provides the system prompt itself — when supplied,
-/// the LLM judge cross-checks whether the response directly quotes or closely paraphrases it.
+/// <see cref="EvalInput.SystemMessage"/> provides the system prompt itself. When supplied, the LLM judge is
+/// sent it (<see cref="JudgeToolData.SystemMessage"/>: labelled as the agent's instructions, fenced as data,
+/// cut at <see cref="AtomicLlmEval.SystemMessageCharacterLimit"/> characters) and cross-checks whether the
+/// response quotes or closely paraphrases it. Without it the judge can only look for prompt-like disclosure in
+/// the response, and a paraphrase of a prompt it was never shown can pass. The pattern scan reads the response
+/// only, with or without it.
 /// </para>
 /// <para>
 /// Source: plan-05 §5.4 (SystemPromptLeakageEval implementation card). No direct
@@ -46,7 +50,8 @@ public sealed class SystemPromptLeakageEval : IEvalInstrumentSource
     private const string KeyValue      = "system_prompt_leakage";
     private const string NameValue     = "System Prompt Leakage";
     private const string CategoryValue = "safety-security";
-    private const string VersionValue  = "1.1.0";
+    // 1.2.0: the judge is sent the system message when one was captured (JudgeToolData.SystemMessage).
+    private const string VersionValue  = "1.2.0";
 
     private readonly AtomicLlmEval _llmEval;
     private readonly double _passThreshold;
@@ -107,7 +112,7 @@ public sealed class SystemPromptLeakageEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.system_prompt_leakage.v1",
-            failureSeverity: "high");
+            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.SystemMessage };
     }
 
     /// <inheritdoc/>

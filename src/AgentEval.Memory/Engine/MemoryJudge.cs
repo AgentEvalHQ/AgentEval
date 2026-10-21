@@ -306,8 +306,9 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         double? score = null;
         if (scoreMatch.Success)
         {
+            // Read as given: a score off 0-100 is not measured downstream (ConvertToJudgmentResult), never clamped.
             var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value : scoreMatch.Groups[2].Value;
-            score = Math.Min(100, Math.Max(0, int.Parse(matched)));
+            score = int.Parse(matched, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         return new JudgmentResponseData
@@ -352,19 +353,22 @@ Be strict — any specific fabricated detail (a name, address, number, food item
             ? actualTokens
             : EstimateTokenUsage(query, data.Explanation ?? "");
 
+        // A reply with no score, a non-finite one, or one off the documented 0-100 scale measured nothing: its reply could
+        // not be read as a measurement. An off-scale score used to be clamped (BUG-09 stopped it propagating unbounded),
+        // so a judge's 150 read as a perfect 100 and its -40 as a measured 0; the metrics' judges refuse it the same way.
+        var measured = data.Score is { } m && double.IsFinite(m) && m is >= 0 and <= 100;
+        var offScale = data.Score is { } o && double.IsFinite(o) && !measured;
+
         return new MemoryJudgmentResult
         {
-            // Clamp to the documented [0, 100] range. The structured-JSON path previously
-            // trusted the judge's number verbatim (the regex fallback already clamped), so a
-            // judge emitting e.g. 150 or -40 propagated unbounded into MemoryQueryResult.Score
-            // and silently skewed category weighting and the final OverallScore/Grade (BUG-09).
-            Score = data.Score is { } s && double.IsFinite(s) ? Math.Clamp(s, 0, 100) : 0,
-            // A reply with no score (or a non-finite one) measured nothing.
-            Measured = data.Score is { } m && double.IsFinite(m),
+            Score = measured ? data.Score!.Value : 0,
+            Measured = measured,
             FoundFacts = foundFacts,
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,
-            Explanation = data.Explanation,
+            Explanation = offScale
+                ? $"Not measured: the judge's score {data.Score!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off the 0-100 scale."
+                : data.Explanation,
             TokensUsed = tokensUsed
         };
     }

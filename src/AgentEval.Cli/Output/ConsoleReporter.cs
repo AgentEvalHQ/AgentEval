@@ -39,8 +39,12 @@ internal static class ConsoleReporter
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  ─────────────────────────────────");
+        // The score averages the measured tests only; a test with no verdict is counted apart, never as a 0.
+        var score = !summary.HasMeasuredScore ? "n/a (nothing measured)"
+            : summary.NotMeasuredCount > 0 ? $"{summary.AverageScore:F1} (over {summary.MeasuredCount} measured)"
+            : $"{summary.AverageScore:F1}";
         Console.Error.WriteLine($"  Results: {summary.PassedCount}/{summary.TotalCount} passed" +
-            $"  Score: {summary.AverageScore:F1}");
+            $"  Score: {score}");
 
         if (summary.TotalDuration > TimeSpan.Zero)
             Console.Error.WriteLine($"  Duration: {summary.TotalDuration.TotalSeconds:F1}s" +
@@ -49,7 +53,12 @@ internal static class ConsoleReporter
         if (summary.AllPassed)
             Console.Error.WriteLine("  All tests passed.");
         else
-            Console.Error.WriteLine($"  {summary.FailedCount} test(s) failed.");
+        {
+            if (summary.FailedCount > 0)
+                Console.Error.WriteLine($"  {summary.FailedCount} test(s) failed.");
+            if (summary.NotMeasuredCount > 0)
+                Console.Error.WriteLine($"  {summary.NotMeasuredCount} test(s) not measured (the judge produced no verdict, or the run errored).");
+        }
 
         Console.Error.WriteLine();
     }

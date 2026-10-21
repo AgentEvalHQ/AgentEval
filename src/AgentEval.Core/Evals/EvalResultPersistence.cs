@@ -119,6 +119,10 @@ public static class EvalResultPersistence
             // already holds — nothing here asks a caller for anything it does not have, which is
             // V1's whole claim: comparability data belongs on the RUN, not in a manifest.
             Comparability = ComparabilityOf(result, subjectModel),
+
+            // An errored, skipped or unjudged leaf is stored as Score 0 / Passed false; this says the 0 is a
+            // placeholder, so `compare` never averages it. Null (a measurement) keeps the file as it was.
+            Measurement = ScenarioMeasurement.Of(result.Score.CensusBucket()),
         };
     }
 

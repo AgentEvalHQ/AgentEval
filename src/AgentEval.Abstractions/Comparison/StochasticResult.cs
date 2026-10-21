@@ -11,13 +11,39 @@ using AgentEval.Models;
 namespace AgentEval.Comparison;
 
 /// <summary>
+/// The verdict of a stochastic test over all of its planned runs (<see cref="StochasticResult.DecideVerdict"/>).
+/// </summary>
+public enum StochasticVerdict
+{
+    /// <summary>The runs that passed reach the success-rate threshold on their own.</summary>
+    Passed,
+
+    /// <summary>The threshold is missed even if every run that was not measured had passed.</summary>
+    Failed,
+
+    /// <summary>
+    /// Runs that were not measured (errored, or the judge produced no verdict) could still decide it either way.
+    /// </summary>
+    Undecided,
+
+    /// <summary>No run was measured.</summary>
+    NotMeasured,
+}
+
+/// <summary>
 /// Result of a stochastic test run containing all individual results and statistics.
 /// </summary>
 /// <param name="TestCase">The test case that was run.</param>
-/// <param name="IndividualResults">Results from each individual run.</param>
-/// <param name="Statistics">Statistical analysis of the results.</param>
+/// <param name="IndividualResults">Results from each individual run, measured or not.</param>
+/// <param name="Statistics">
+/// Statistical analysis of the measured runs only: a run that errored or whose judge produced no verdict carries a
+/// placeholder score of 0, and is not a sample (see <see cref="NotMeasuredCount"/>).
+/// </param>
 /// <param name="Options">Options used for this stochastic run.</param>
-/// <param name="Passed">Whether the stochastic test passed based on SuccessRateThreshold.</param>
+/// <param name="Passed">
+/// Whether the stochastic test passed: <see langword="true"/> only when <see cref="Verdict"/> is
+/// <see cref="StochasticVerdict.Passed"/>.
+/// </param>
 public record StochasticResult(
     TestCase TestCase,
     IReadOnlyList<TestResult> IndividualResults,
@@ -35,18 +61,84 @@ public record StochasticResult(
     /// Number of individual runs that passed.
     /// </summary>
     public int PassedCount => IndividualResults.Count(r => r.Passed);
-    
+
     /// <summary>
-    /// Number of individual runs that failed.
+    /// Number of measured runs that failed. A run that was not measured is not a failure (<see cref="NotMeasuredCount"/>).
     /// </summary>
-    public int FailedCount => IndividualResults.Count(r => !r.Passed);
-    
+    public int FailedCount => IndividualResults.Count(r => !r.Passed && IsMeasured(r));
+
+    /// <summary>
+    /// Runs that produced no verdict: the run threw (<see cref="TestResult.Error"/>) or the judge produced none
+    /// (<see cref="TestResult.JudgeFailed"/>). They are left out of <see cref="Statistics"/>, never counted as passed.
+    /// </summary>
+    public int NotMeasuredCount => IndividualResults.Count(r => !IsMeasured(r));
+
+    /// <summary>Runs that produced a verdict: the sample <see cref="Statistics"/> describes.</summary>
+    public int MeasuredCount => IndividualResults.Count - NotMeasuredCount;
+
+    /// <summary>
+    /// The verdict over all runs, by <see cref="DecideVerdict"/>: it names a result the runs that were not measured could
+    /// still change, rather than reading them as failures or leaving them out of the denominator.
+    /// </summary>
+    public StochasticVerdict Verdict =>
+        DecideVerdict(PassedCount, NotMeasuredCount, IndividualResults.Count, Options.SuccessRateThreshold);
+
+    /// <summary>
+    /// Whether a run produced a verdict. A run that threw, or whose judge produced none, carries a placeholder
+    /// <see cref="TestResult.Score"/> of 0 and <see cref="TestResult.Passed"/> of false: it is not measured.
+    /// </summary>
+    /// <param name="run">One run's result.</param>
+    public static bool IsMeasured(TestResult run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return run.Error is null && !run.JudgeFailed;
+    }
+
+    /// <summary>
+    /// The one rule that decides a stochastic verdict over all <paramref name="totalRuns"/> planned runs, the same rule
+    /// the AEF writer applies to trials (AtLeast): <see cref="StochasticVerdict.Passed"/> when the passing runs reach the
+    /// threshold on their own, so no run that was not measured could undo it; <see cref="StochasticVerdict.Failed"/> when
+    /// they miss it even if every run that was not measured had passed; <see cref="StochasticVerdict.Undecided"/>
+    /// otherwise; <see cref="StochasticVerdict.NotMeasured"/> when no run was measured.
+    /// </summary>
+    /// <param name="passedRuns">Runs that passed.</param>
+    /// <param name="notMeasuredRuns">Runs that produced no verdict.</param>
+    /// <param name="totalRuns">All runs, measured or not.</param>
+    /// <param name="successRateThreshold">The pass share required (0.0-1.0).</param>
+    /// <remarks>
+    /// The share is compared as the runner always compared it (passed / total ≥ threshold), so a result with every run
+    /// measured gets the verdict it always had. Kept in one method so the rule can be changed in one place.
+    /// </remarks>
+    public static StochasticVerdict DecideVerdict(int passedRuns, int notMeasuredRuns, int totalRuns, double successRateThreshold)
+    {
+        if (totalRuns <= 0 || notMeasuredRuns >= totalRuns)
+            return StochasticVerdict.NotMeasured;
+        if ((double)passedRuns / totalRuns >= successRateThreshold)
+            return StochasticVerdict.Passed;
+        if ((double)(passedRuns + notMeasuredRuns) / totalRuns < successRateThreshold)
+            return StochasticVerdict.Failed;
+        return StochasticVerdict.Undecided;
+    }
+
     /// <summary>
     /// Gets a summary message for display.
     /// </summary>
-    public string Summary => Passed
-        ? $"✅ PASSED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate * 100:F1}% >= {Options.SuccessRateThreshold * 100:F0}% threshold)"
-        : $"❌ FAILED: {PassedCount}/{IndividualResults.Count} runs passed ({Statistics.PassRate * 100:F1}% < {Options.SuccessRateThreshold * 100:F0}% threshold)";
+    public string Summary => Verdict switch
+    {
+        StochasticVerdict.Passed when Passed =>
+            $"✅ PASSED: {PassedCount}/{IndividualResults.Count} runs passed ({(double)PassedCount / IndividualResults.Count * 100:F1}% >= {Options.SuccessRateThreshold * 100:F0}% threshold)" +
+            NotMeasuredNote,
+        StochasticVerdict.Undecided =>
+            $"⚠️ UNDECIDED: {PassedCount}/{IndividualResults.Count} runs passed and {NotMeasuredCount} were not measured " +
+            $"(errored, or the judge produced no verdict); whether the {Options.SuccessRateThreshold * 100:F0}% threshold is met is undecided",
+        StochasticVerdict.NotMeasured =>
+            $"⚠️ NOT MEASURED: none of {IndividualResults.Count} runs was measured (errored, or the judge produced no verdict)",
+        _ =>
+            $"❌ FAILED: {PassedCount}/{IndividualResults.Count} runs passed ({(IndividualResults.Count > 0 ? (double)PassedCount / IndividualResults.Count * 100 : 0):F1}% < {Options.SuccessRateThreshold * 100:F0}% threshold)" +
+            NotMeasuredNote,
+    };
+
+    private string NotMeasuredNote => NotMeasuredCount > 0 ? $"; {NotMeasuredCount} not measured" : "";
 
     /// <summary>Aggregate duration statistics (ms).</summary>
     public DistributionStatistics DurationStats => DistributionStatisticsFactory.Create(GetDurations());
@@ -70,7 +162,10 @@ public record StochasticResult(
     /// <summary>Aggregate cost statistics (USD).</summary>
     public DistributionStatistics? CostStats => StatsOrNull(GetCosts());
 
-    /// <summary>Aggregate tool call count statistics across runs.</summary>
+    /// <summary>
+    /// Aggregate tool call count statistics across the runs that tracked tool usage. A run without a tool usage report is
+    /// not a run with zero calls; with no run tracking it, <see cref="DistributionStatistics.SampleSize"/> is 0.
+    /// </summary>
     public DistributionStatistics ToolCallCountStats => DistributionStatisticsFactory.Create(GetToolCallCounts());
 
     /// <summary>Fastest run by total duration.</summary>
@@ -166,7 +261,8 @@ public record StochasticResult(
         .ToList();
     
     private List<int> GetToolCallCounts() => IndividualResults
-        .Select(r => r.ToolUsage?.Count ?? 0)
+        .Where(r => r.ToolUsage != null)
+        .Select(r => r.ToolUsage!.Count)
         .ToList();
     
     private List<(TestResult Result, TimeSpan Duration)> GetRunsByDuration()
@@ -194,19 +290,21 @@ public record StochasticResult(
 }
 
 /// <summary>
-/// Statistical analysis of stochastic test results.
+/// Statistical analysis of stochastic test results, over the measured runs only: from the stochastic runner, a run
+/// that errored or whose judge produced no verdict is not a sample.
+/// With no run measured, <paramref name="SampleSize"/> is 0 and every other value is a placeholder.
 /// </summary>
-/// <param name="PassRate">Percentage of tests that passed (0.0-1.0).</param>
-/// <param name="MeanScore">Average score across all runs.</param>
-/// <param name="MedianScore">Median score across all runs.</param>
+/// <param name="PassRate">Share of the measured runs that passed (0.0-1.0). Not the verdict: see <see cref="StochasticResult.Verdict"/>.</param>
+/// <param name="MeanScore">Average score across the measured runs.</param>
+/// <param name="MedianScore">Median score across the measured runs.</param>
 /// <param name="StandardDeviation">Standard deviation of scores.</param>
 /// <param name="MinScore">Minimum score observed.</param>
 /// <param name="MaxScore">Maximum score observed.</param>
 /// <param name="Percentile25">25th percentile score.</param>
 /// <param name="Percentile75">75th percentile score.</param>
 /// <param name="Percentile95">95th percentile score.</param>
-/// <param name="ConfidenceInterval">Confidence interval for the mean.</param>
-/// <param name="SampleSize">Number of samples used.</param>
+/// <param name="ConfidenceInterval">Confidence interval for the mean; <see langword="null"/> when no run was measured.</param>
+/// <param name="SampleSize">Number of samples used: the measured runs.</param>
 public record StochasticStatistics(
     double PassRate,
     double MeanScore,

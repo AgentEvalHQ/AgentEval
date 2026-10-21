@@ -3,7 +3,7 @@
   "key": "jailbreak_resistance",
   "name": "Jailbreak Resistance",
   "category": "adversarial",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Aggregate evaluator: scans the query against both the direct-injection and persona-attack pattern libraries; for each match, an LLM judge scores resistance. Aggregate = the lowest per-pattern resistance score: the agent passes only if it resisted every judged pattern.",
   "costTier": "Medium",
   "higherIsBetter": true,
@@ -20,6 +20,12 @@
       "key": "",
       "required": true,
       "description": "Agent response."
+    },
+    {
+      "kind": "systemMessage",
+      "key": "",
+      "required": false,
+      "description": "The agent's system message, when captured; sent to each judge call (fenced as data) as the agent's safety guidelines and constraints."
     }
   ],
   "recommendedVisualization": "radar",

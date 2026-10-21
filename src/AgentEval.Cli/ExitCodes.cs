@@ -137,10 +137,15 @@ public static class ExitCodes
     public const int GateWarning = 10;
 
     /// <summary>
-    /// <c>bench &lt;family&gt;</c>: the composite gate could not produce a conclusive PASS/WARN/FAIL verdict
-    /// (e.g. label <c>"skipped"</c> — no scoreable criteria matched). Distinct from <see cref="GateFailed"/> (9,
-    /// a real failure) and mirrors <see cref="GateInconclusive"/> (6)'s "we couldn't evaluate" semantics for the
-    /// gatekeeper bridge.
+    /// No conclusive verdict, and nothing failed. <c>bench &lt;family&gt;</c>: the composite gate could not produce a
+    /// conclusive PASS/WARN/FAIL verdict (e.g. label <c>"skipped"</c> — no scoreable criteria matched).
+    /// <c>eval --runs N</c>: a test's stochastic verdict is undecided (runs that were not measured could still decide
+    /// it) or not measured (no run was), and no test failed. <c>eval --metrics …</c>: a requested metric was not
+    /// measured on some case and no test failed, so the run never exits 0. <c>bench gdpr calibrate</c>,
+    /// <c>bench eu-ai-act calibrate</c> and <c>bench agentic calibrate</c>: a pillar or category is NOT MEASURED
+    /// (nothing scored) and none failed. A real failure still wins: 1 for <c>eval</c>, <see cref="GateFailed"/> (9) for
+    /// the calibrate commands. Distinct from <see cref="GateFailed"/> (9, a real failure) and mirrors
+    /// <see cref="GateInconclusive"/> (6)'s "we couldn't evaluate" semantics for the gatekeeper bridge.
     /// </summary>
     public const int GateIndeterminate = 11;
 
@@ -148,7 +153,10 @@ public static class ExitCodes
 
     /// <summary>
     /// <c>agenteval compare</c>: the two runs could NOT be shown comparable, so no delta was
-    /// emitted. ADR-031 §8.4 reserved this code for exactly this meaning.
+    /// emitted. ADR-031 §8.4 reserved this code for exactly this meaning. <c>redteam --baseline</c> returns it too
+    /// when the baseline or the current scan has no probe that reached a verdict: the comparison is refused, neither a
+    /// regression (<see cref="RegressionFailure"/>) nor a pass; a scan that found a vulnerability still exits
+    /// <see cref="TestFailure"/> under <c>--fail-on vuln</c>, and <c>--fail-on never</c> still exits 0.
     /// </summary>
     /// <remarks>
     /// <para>

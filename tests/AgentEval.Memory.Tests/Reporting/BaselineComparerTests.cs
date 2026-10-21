@@ -122,7 +122,7 @@ public class BaselineComparerTests
     }
 
     [Fact]
-    public void Compare_RadarChart_MissingDimensionsDefaultToZero()
+    public void Compare_RadarChart_LeavesOutAnAxisNotEveryBaselineMeasured()
     {
         var b1 = CreateBaseline("bl-1", "Full", 80);
         var b2 = CreateBaseline("bl-2", "Partial", 75);
@@ -130,11 +130,9 @@ public class BaselineComparerTests
 
         var comparison = _comparer.Compare([b1, b2]);
 
-        // b2's Persistence should default to 0 in radar values
-        var b2Series = comparison.RadarChart.Series.First(s => s.Name == "Partial");
-        var persIdx = comparison.RadarChart.Axes.ToList().IndexOf("Persistence");
-        Assert.True(persIdx >= 0, "Persistence axis should exist");
-        Assert.Equal(0, b2Series.Values[persIdx]);
+        // b2 did not measure Persistence: the radar leaves the axis out and names it, rather than drawing a 0.
+        Assert.DoesNotContain("Persistence", comparison.RadarChart.Axes);
+        Assert.Contains("Persistence", comparison.RadarChart.OmittedAxes);
     }
 
     [Fact]
@@ -151,13 +149,13 @@ public class BaselineComparerTests
         // Should still have all 5 dimensions (bl-1 has them all)
         Assert.Equal(5, comparison.Dimensions.Count);
 
-        // Every dimension should include ALL baselines — baselines missing a dimension get score 0.
-        // This keeps per-dimension tables and radar charts consistent (no silent omissions).
+        // A baseline that did not measure a dimension has no score for it (not a 0) and is named in NotMeasuredBy,
+        // so no omission is silent.
         var persistence = comparison.Dimensions.First(d => d.DimensionName == "Persistence");
-        Assert.Equal(2, persistence.Scores.Count);
+        Assert.Single(persistence.Scores);
         Assert.True(persistence.Scores.ContainsKey("bl-1"));
-        Assert.True(persistence.Scores.ContainsKey("bl-2"));
-        Assert.Equal(0, persistence.Scores["bl-2"]); // bl-2 removed this dimension → defaults to 0
+        Assert.False(persistence.Scores.ContainsKey("bl-2"));
+        Assert.Equal(new[] { "bl-2" }, persistence.NotMeasuredBy);
     }
 
     // --- Helpers ---

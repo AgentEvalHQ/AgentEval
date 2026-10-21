@@ -221,10 +221,14 @@ public static class ModelComparisonExtensions
         sb.AppendLine("| Model | Pass Rate | Mean Score | Avg Latency | Avg Cost | Total Cost |");
         sb.AppendLine("|-------|-----------|------------|-------------|----------|------------|");
 
-        foreach (var modelResult in result.ModelResults.OrderByDescending(m => m.PassRate))
+        foreach (var modelResult in result.ModelResults.OrderByDescending(PassShareOfAllRuns))
         {
-            var passRateFormatted = $"{modelResult.PassRate:P1}";
-            var meanScoreFormatted = $"{modelResult.MeanScore:F1}";
+            // The pass rate over every run, as reliability is ranked: a run that was not measured did not pass. The mean
+            // score is over the measured runs; with none it is not measured.
+            var passRateFormatted = $"{PassShareOfAllRuns(modelResult):P1}";
+            var meanScoreFormatted = modelResult.StochasticResult.MeasuredCount > 0
+                ? $"{modelResult.MeanScore:F1}"
+                : "n/a";
             var latencyFormatted = modelResult.AverageLatency is { } latency ? FormatDuration(latency) : "N/A";
             var avgCostFormatted = modelResult.AverageCost.HasValue 
                 ? $"${modelResult.AverageCost:F4}" 
@@ -256,6 +260,12 @@ public static class ModelComparisonExtensions
         foreach (var modelResult in result.ModelResults.OrderByDescending(m => m.MeanScore))
         {
             var stats = modelResult.StochasticResult.Statistics;
+            if (stats.SampleSize == 0)
+            {
+                // No measured run: every statistic would be the 0 of an empty sample.
+                sb.AppendLine($"| {modelResult.ModelName} | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |");
+                continue;
+            }
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "| {0} | {1:F1} | {2:F1} | {3:F2} | {4} | {5} | {6:F1} | {7:F1} | {8:F1} |",
                 modelResult.ModelName,
@@ -502,7 +512,8 @@ public static class ModelComparisonExtensions
         };
     }
 
-    // Beside a winner: what its composite did not weigh, so a win is never read as a win on every dimension.
+    // Beside a winner: what its composite did not weigh, so a win is never read as a win on every dimension, and which
+    // models it was not weighed against (none of their runs was measured, so they are not ranked).
     private static string NotMeasuredCaveat(ModelComparisonResult result)
     {
         var missing = new[]
@@ -510,10 +521,23 @@ public static class ModelComparisonExtensions
             result.SpeedNotMeasuredReason is null ? null : "speed",
             result.CostNotMeasuredReason is null ? null : "cost",
         }.Where(d => d is not null).ToList();
-        return missing.Count == 0
+        var unranked = result.ModelResults
+            .Where(m => result.Ranking.All(r => r.ModelId != m.ModelId))
+            .Select(m => m.ModelName)
+            .ToList();
+        var caveat = missing.Count == 0
             ? ""
             : $" ({string.Join(" and ", missing)} not measured: the composite weighs {MeasuredDimensions(result)})";
+        return unranked.Count == 0
+            ? caveat
+            : caveat + $" (not ranked: {string.Join(", ", unranked)}, none of whose runs was measured)";
     }
+
+    // Reliability as the ranking reads it: the share of every run that passed, a run that was not measured included.
+    private static double PassShareOfAllRuns(ModelResult model) =>
+        model.StochasticResult.IndividualResults.Count > 0
+            ? (double)model.StochasticResult.PassedCount / model.StochasticResult.IndividualResults.Count
+            : 0;
 
     private static string FormatScore(double? score) =>
         score is { } value ? value.ToString("F1", CultureInfo.InvariantCulture) : "n/a";

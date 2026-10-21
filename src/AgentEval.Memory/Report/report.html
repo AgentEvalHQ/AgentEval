@@ -180,6 +180,9 @@ function getBenchmarkSource(){return baselines[0]?.benchmark?.benchmark_source||
 function getCatInfo(name){return (isExternal()?EXT_CAT_INFO:CAT_INFO)[name]||{s:name,d:name,v:'—'}}
 function getDimInfo(){return isExternal()?EXT_DIM_INFO:DIM_INFO}
 function getActiveDims(){const di=getDimInfo();const latest=baselines[baselines.length-1];const ds=latest.dimension_scores;if(!ds||Object.keys(ds).length===0)return Object.keys(di);return Object.keys(di).filter(d=>ds[d]!=null)}
+// A category's score, or null when the baseline did not run it or skipped it: never a 0 that reads as a measured fail.
+function catScore(b,k){const c=b.category_results?.[k];return c&&!c.skipped&&c.score!=null?c.score:null}
+function pct(v,d){return v!==null?v.toFixed(d)+'%':'n/a'}
 
 // NAV
 const TABS=[{id:'overview',l:'Overview'},{id:'pentagon',l:'Pentagon'},{id:'timeline',l:'Timeline'},{id:'compare',l:'Comparer'}];
@@ -292,27 +295,27 @@ function buildDimKpiHtml(){
   const di=getDimInfo();
   return dims.map(dim=>{
     const info=di[dim]||{s:dim,color:'#64748b',cats:[]};
-    const s=latest.dimension_scores?.[dim]??0;
+    const s=latest.dimension_scores?.[dim]??null;
     const ps=prev?.dimension_scores?.[dim]??null;
-    const delta=ps!==null?s-ps:null;
+    const delta=s!==null&&ps!==null?s-ps:null;
     const catRows=info.cats.map(catName=>{
       const catInfo=getCatInfo(catName);
-      const catScore=latest.category_results?.[catName]?.score??null;
-      const scoreColor=catScore!==null?gc(catScore):'var(--td)';
+      const cs=catScore(latest,catName);
+      const scoreColor=cs!==null?gc(cs):'var(--td)';
       return `<div class="de-cat">
         <div><div class="de-cat-name">${catName}</div><div class="de-cat-desc">${catInfo.s}</div></div>
-        <div class="de-cat-score" style="color:${scoreColor}">${catScore!==null?catScore.toFixed(0)+'%':'—'}</div>
+        <div class="de-cat-score" style="color:${scoreColor}">${cs!==null?cs.toFixed(0)+'%':'—'}</div>
       </div>`;
     }).join('');
     return `<div class="kpi" style="border-left:3px solid ${info.color}">
       <div class="kl" style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${info.color};display:inline-block"></span>${dim}</div>
-      <div class="kv" style="color:${gc(s)}">${s.toFixed(0)}%${delta!==null?`<span style="font-size:12px;margin-left:8px;color:${delta>=0?'var(--good)':'var(--bad)'}">${delta>0?'+':''}${delta.toFixed(1)}</span>`:''}</div>
+      <div class="kv" style="color:${s!==null?gc(s):'var(--td)'}">${pct(s,0)}${delta!==null?`<span style="font-size:12px;margin-left:8px;color:${delta>=0?'var(--good)':'var(--bad)'}">${delta>0?'+':''}${delta.toFixed(1)}</span>`:''}</div>
       <div class="ks">${info.s}</div>
       <div class="dim-expand">
         <div class="de-desc">This dimension aggregates ${info.cats.length} categories into a single score. A drop here signals regression in one of the contributing categories below.</div>
         <div class="de-cats">${catRows}</div>
       </div>
-      <div class="kb" style="width:${s}%;background:${info.color}"></div>
+      <div class="kb" style="width:${s??0}%;background:${info.color}"></div>
     </div>`;
   }).join('');
 }
@@ -326,13 +329,13 @@ function renderPentChart(){
   document.querySelector('#sec-pentagon .sh').textContent=`${shapeLabel} — ${axes.length} Consolidated Dimensions`;
   const datasets=[...selectedConfigs].map(i=>{
     const b=baselines[i];
-    const vals=axes.map(a=>b.dimension_scores?.[a]??0);
+    const vals=axes.map(a=>b.dimension_scores?.[a]??null);
     return{label:b.name,data:vals,borderColor:b._color,backgroundColor:b._color+'18',borderWidth:2.5,pointBackgroundColor:b._color,pointRadius:4};
   });
   pentChart=new Chart(ctx,{type:'radar',data:{labels:axes,datasets},options:{responsive:true,
     scales:{r:{beginAtZero:true,max:100,grid:{color:'#1a2538'},angleLines:{color:'#1a2538'},
       pointLabels:{font:{size:12,family:'Anybody',weight:'600'},color:'#94a3b8'},ticks:{display:false}}},
-    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw.toFixed(1)}%`}}}}});
+    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw!==null?c.raw.toFixed(1)+'%':'not measured'}`}}}}});
   renderDimCallout();
 }
 
@@ -358,12 +361,12 @@ function renderCatBars(){
   const catNames=Object.keys(baselines[0].category_results);
   const datasets=[...selectedConfigs].map(i=>{
     const b=baselines[i];
-    const vals=catNames.map(k=>b.category_results[k]?.score??0);
+    const vals=catNames.map(k=>catScore(b,k));
     return{label:b.name,data:vals,backgroundColor:b._color+'99',borderColor:b._color,borderWidth:1,borderRadius:3};
   });
   catBarChart=new Chart(ctx,{type:'bar',data:{labels:catNames.map(n=>n.length>14?n.substring(0,12)+'…':n),datasets},
     options:{responsive:true,scales:{x:{grid:{color:'#1a253800'}},y:{beginAtZero:true,max:105,grid:{color:'#1a2538'},ticks:{callback:v=>v+'%'}}},
-    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}%`}}}}});
+    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw!==null?c.raw+'%':'not measured'}`}}}}});
 }
 
 const DIM_INFO={
@@ -434,9 +437,10 @@ function renderComparer(){
   const a=baselines[document.getElementById('cmpA').value];
   const b=baselines[document.getElementById('cmpB').value];
   if(!a||!b)return;
-  const keys=Object.keys(a.category_results);
-  const deltas=keys.map(k=>(b.category_results[k]?.score??0)-(a.category_results[k]?.score??0));
-  const colors=deltas.map(d=>d>=0?'#34d399':'#f87171');
+  const keys=[...new Set([...Object.keys(a.category_results),...Object.keys(b.category_results)])];
+  // A category either side did not run, or skipped, has no delta: it reads n/a and stays out of the waterfall.
+  const deltas=keys.map(k=>{const av=catScore(a,k),bv=catScore(b,k);return av!==null&&bv!==null?bv-av:null});
+  const colors=deltas.map(d=>d!==null&&d>=0?'#34d399':'#f87171');
 
   const ctx=document.getElementById('waterfall').getContext('2d');
   if(waterfallChart)waterfallChart.destroy();
@@ -449,11 +453,11 @@ function renderComparer(){
   document.getElementById('cmpTable').innerHTML=`<table class="cmp-tbl">
     <thead><tr><th>Category</th><th class="r">A</th><th class="r">B</th><th class="r">Delta</th></tr></thead>
     <tbody>${keys.map(k=>{
-      const av=a.category_results[k]?.score??0;
-      const bv=b.category_results[k]?.score??0;
-      const d=bv-av;
-      return `<tr><td>${k}</td><td class="r">${av.toFixed(0)}%</td><td class="r">${bv.toFixed(0)}%</td>
-        <td class="r ${d>0?'pos':d<0?'neg':''}">${d>0?'+':''}${d.toFixed(0)}%</td></tr>`;
+      const av=catScore(a,k);
+      const bv=catScore(b,k);
+      const d=av!==null&&bv!==null?bv-av:null;
+      return `<tr><td>${k}</td><td class="r">${pct(av,0)}</td><td class="r">${pct(bv,0)}</td>
+        <td class="r ${d>0?'pos':d<0?'neg':''}">${d===null?'n/a':(d>0?'+':'')+d.toFixed(0)+'%'}</td></tr>`;
     }).join('')}</tbody></table>`;
 }
 

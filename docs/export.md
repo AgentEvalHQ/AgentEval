@@ -86,7 +86,7 @@ await using var stream = File.Create("results.xml");
 await exporter.ExportAsync(report, stream);
 ```
 
-Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. Metric scores are written to `<system-out>`, and a metric that was not measured as `name: not measured — reason`.
+Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. A test that produced no verdict (`TestResultSummary.NotMeasured`: the judge produced none, or the run errored) is an `<error type="NotMeasured">` with the reason, counted in `errors`: not a failure, and not a `<skipped>`, which CI reads as not run and keeps green. Metric scores are written to `<system-out>`, and a metric that was not measured as `name: not measured — reason`.
 
 ### Markdown
 
@@ -113,8 +113,9 @@ await mdExporter.ExportAsync(report, stream);
 ```
 
 The Markdown exporter renders:
-- Status header with ✅/❌ emoji
-- Results table with score, status, and duration
+- Status header with ✅/❌ emoji: FAILED when a test failed, else ⚠️ INCOMPLETE when a test produced no verdict (with
+  the count), else PASSED; the score reads n/a when no test was measured
+- Results table with score, status, and duration (a test with no verdict reads `n/a` and `⚠️ not measured`)
 - Optional failure details section
 - Optional metric breakdown table (dynamic columns from `MetricScores` and `MetricsNotMeasured`; a metric that was not
   measured reads `not measured`, one not requested for that test `-`)
@@ -130,7 +131,7 @@ await using var stream = File.Create("results.trx");
 await exporter.ExportAsync(report, stream);
 ```
 
-Uses deterministic GUIDs based on test names for reproducible output. Includes full TRX structure: `TestRun`, `Times`, `ResultSummary`, `TestDefinitions`, `TestEntries`, and `Results`.
+Uses deterministic GUIDs based on test names for reproducible output. Includes full TRX structure: `TestRun`, `Times`, `ResultSummary`, `TestDefinitions`, `TestEntries`, and `Results`. A test that produced no verdict has outcome `Error` (counted in `error`, not `notExecuted`), and the `ResultSummary` outcome is `Failed` when a test failed or produced no verdict.
 
 ### CSV
 

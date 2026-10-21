@@ -3,7 +3,7 @@
   "key": "task_navigation_efficiency",
   "name": "Task Navigation Efficiency",
   "category": "system-outcome",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Hybrid algorithmic + LLM evaluator. The deterministic part (AtomicCodeEval, free) measures the agent's tool-call path length vs. the optimal path. The LLM judge then assesses whether deviations were justified (e.g., good error recovery) or wasteful (redundant calls). Gives credit for navigating efficiently while not penalising legitimate exploration.",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -25,13 +25,13 @@
       "kind": "toolCalls",
       "key": "",
       "required": true,
-      "description": "The full sequence of tool invocations; the algorithmic component computes path length from this."
+      "description": "The recorded sequence of tool invocations (EvalInput.ToolCalls), compared with the expected actions and sent to the path-quality judge. A recorded empty list is compared and judged like any other; when absent, neither the path edit distance nor the path quality is measured and the composite reports no verdict."
     },
     {
-      "kind": "metadata",
-      "key": "expected_actions",
+      "kind": "expectedActions",
+      "key": "",
       "required": false,
-      "description": "Optional ground-truth optimal path; when absent, the LLM judge estimates."
+      "description": "The expected action sequence (EvalInput.ExpectedActions), one entry per step, also sent to the path-quality judge as the reference for its ordering criterion. When absent, the path edit distance is not applicable and the composite scores on the judged path quality alone."
     }
   ],
   "recommendedVisualization": "histogram",

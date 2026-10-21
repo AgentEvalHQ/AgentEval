@@ -37,15 +37,16 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
     {
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.NotMeasured(Name, "Faithfulness requires a retrieved context, and none was supplied: not measured.");
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Faithfulness requires a retrieved context, and none was supplied: not measured.");
         }
-        
+
         var prompt = BuildFaithfulnessPrompt(context.Context, context.Input, context.Output);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        var responseText = response.Text ?? "";
-        
-        return MetricInstrument.Model(ParseFaithfulnessResult(responseText), BuildFaithfulnessPrompt("", "", ""));
+
+        // A failed judge call or an unreadable reply is not measured, never a Fail at 0.
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Faithfulness", cancellationToken);
+
+        return JudgeReplyEvidence.Model(failed ?? ParseFaithfulnessResult(response!), BuildFaithfulnessPrompt("", "", ""));
     }
     
     private static string BuildFaithfulnessPrompt(string contextText, string input, string output)
@@ -84,12 +85,11 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
             """;
     }
     
-    private MetricResult ParseFaithfulnessResult(string response)
+    private MetricResult ParseFaithfulnessResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate faithfulness - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Faithfulness", response, failure);
         }
         
         var hallucinatedClaims = LlmJsonParser.ExtractStringArray(parsed.Root, "hallucinatedClaims");
@@ -137,9 +137,9 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
         var prompt = BuildRelevancePrompt(context.Input, context.Output);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseRelevanceResult(response.Text ?? ""), BuildRelevancePrompt("", ""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Relevance", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseRelevanceResult(response!), BuildRelevancePrompt("", ""));
     }
     
     private static string BuildRelevancePrompt(string input, string output)
@@ -174,12 +174,11 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
             """;
     }
     
-    private MetricResult ParseRelevanceResult(string response)
+    private MetricResult ParseRelevanceResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate relevance - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Relevance", response, failure);
         }
         
         var addressesQuestion = LlmJsonParser.GetBoolean(parsed.Root, "addressesQuestion");
@@ -228,13 +227,14 @@ public class ContextPrecisionMetric : IRAGMetric
     {
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.NotMeasured(Name, "Context precision requires a retrieved context, and none was supplied: not measured.");
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Context precision requires a retrieved context, and none was supplied: not measured.");
         }
-        
+
         var prompt = BuildPrecisionPrompt(context.Input, context.Context);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParsePrecisionResult(response.Text ?? ""), BuildPrecisionPrompt("", ""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Context precision", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParsePrecisionResult(response!), BuildPrecisionPrompt("", ""));
     }
     
     private static string BuildPrecisionPrompt(string input, string contextText)
@@ -272,12 +272,11 @@ public class ContextPrecisionMetric : IRAGMetric
             """;
     }
     
-    private MetricResult ParsePrecisionResult(string response)
+    private MetricResult ParsePrecisionResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate context precision - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Context precision", response, failure);
         }
         
         var metadata = new Dictionary<string, object> { ["reasoning"] = parsed.Reasoning ?? "" };
@@ -321,18 +320,20 @@ public class ContextRecallMetric : IRAGMetric
     {
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.NotMeasured(Name, "Context recall requires a retrieved context, and none was supplied: not measured.");
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Context recall requires a retrieved context, and none was supplied: not measured.");
         }
-        
+
         if (!ReferenceText.HasWords(context.GroundTruth))   // a wordless reference ("?") is none (round 17)
         {
-            return MetricResult.NotMeasured(Name, "Context recall requires a reference answer, and none was supplied: not measured.");
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Context recall requires a reference answer, and none was supplied: not measured.");
         }
-        
+
         var prompt = BuildRecallPrompt(context.Input, context.GroundTruth, context.Context);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseRecallResult(response.Text ?? ""), BuildRecallPrompt("", "", ""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Context recall", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseRecallResult(response!), BuildRecallPrompt("", "", ""));
     }
     
     private static string BuildRecallPrompt(string input, string groundTruth, string contextText)
@@ -370,12 +371,11 @@ public class ContextRecallMetric : IRAGMetric
             """;
     }
     
-    private MetricResult ParseRecallResult(string response)
+    private MetricResult ParseRecallResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate context recall - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Context recall", response, failure);
         }
         
         var missingInfo = LlmJsonParser.ExtractStringArray(parsed.Root, "informationMissing");
@@ -424,13 +424,14 @@ public class AnswerCorrectnessMetric : IRAGMetric
     {
         if (!ReferenceText.HasWords(context.GroundTruth))   // not measured, never a fail (B12i); "?" is none (round 17)
         {
-            return MetricResult.NotMeasured(Name, "Answer correctness requires a reference answer, and none was supplied: not measured.");
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Answer correctness requires a reference answer, and none was supplied: not measured.");
         }
-        
+
         var prompt = BuildCorrectnessPrompt(context.Input, context.GroundTruth, context.Output);
-        
-        var response = await _chatClient.GetResponseAsync(prompt, cancellationToken: cancellationToken);
-        return MetricInstrument.Model(ParseCorrectnessResult(response.Text ?? ""), BuildCorrectnessPrompt("", "", ""));
+
+        var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Answer correctness", cancellationToken);
+        return JudgeReplyEvidence.Model(failed ?? ParseCorrectnessResult(response!), BuildCorrectnessPrompt("", "", ""));
     }
     
     private static string BuildCorrectnessPrompt(string input, string groundTruth, string output)
@@ -469,12 +470,11 @@ public class AnswerCorrectnessMetric : IRAGMetric
             """;
     }
     
-    private MetricResult ParseCorrectnessResult(string response)
+    private MetricResult ParseCorrectnessResult(ChatResponse response)
     {
-        var parsed = LlmJsonParser.ParseMetricResponse(response);
-        if (parsed == null)
+        if (!LlmJsonParser.TryParseMetricResponse(response.Text, out var parsed, out var failure))
         {
-            return MetricResult.Fail(Name, "Unable to evaluate answer correctness - failed to parse response.");
+            return JudgeReplyEvidence.NotMeasured(Name, "Answer correctness", response, failure);
         }
         
         var metadata = new Dictionary<string, object> { ["reasoning"] = parsed.Reasoning ?? "" };

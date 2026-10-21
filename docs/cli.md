@@ -250,7 +250,7 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. A `--system-prompt-file` that does not exist is ignored. |
 | `--temperature <value>` | Sampling temperature sent with every agent call. Omitted: nothing is sent and the provider's default applies. Given: the value is sent as given, `0` included. `0` narrows sampling; it does not guarantee identical outputs. |
 | `--max-tokens <n>` | Maximum output tokens per agent call. Omitted: nothing is sent. |
-| `--metrics <list>` | Comma-separated named metrics to score in addition to the normal pass/fail check (e.g. `llm_relevance,code_tool_success`). Each is scored against the same captured response; the agent is not called again. Omitted: no named metric is scored. An unknown name fails before any network call. Accepted names: `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. `agenteval list --type metrics` prints these and also names `--metrics` does not accept, each marked `[library only: not available via --metrics]`: `embed_answer_similarity`, `embed_response_context`, `embed_query_context`, `code_tool_selection`, `code_tool_arguments`, `code_recall_at_k`, `code_mrr` and `ConversationCompleteness`. They need input `--metrics` has no source for (expected tools, an embedding generator, a K; `ConversationCompleteness` scores a multi-turn conversation, not a single response), so construct them in code. LLM-based (`llm_*`) names need `--judge`, or on the `--endpoint`/`--azure` path fall back to the agent's own model; code-based (`code_*`) names need neither. Ignored, with a warning, when `--runs` is greater than 1. |
+| `--metrics <list>` | Comma-separated named metrics to score in addition to the normal pass/fail check (e.g. `llm_relevance,code_tool_success`). Each is scored against the same captured response; the agent is not called again. Omitted: no named metric is scored. An unknown name fails before any network call. Accepted names: `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_toxicity`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. `agenteval list --type metrics` prints these and also names `--metrics` does not accept, each marked `[library only: not available via --metrics]`: `embed_answer_similarity`, `embed_response_context`, `embed_query_context`, `code_tool_selection`, `code_tool_arguments`, `code_recall_at_k`, `code_mrr` and `ConversationCompleteness`. They need input `--metrics` has no source for (expected tools, an embedding generator, a K; `ConversationCompleteness` scores a multi-turn conversation, not a single response), so construct them in code. LLM-based (`llm_*`) names need `--judge`, or on the `--endpoint`/`--azure` path fall back to the agent's own model; code-based (`code_*`) names need neither. A requested metric that is not measured on some case (its judge call failed, its reply could not be read, the case lacked an input it needs) makes a run in which nothing failed exit `11`, never `0`. Ignored, with a warning, when `--runs` is greater than 1. |
 | `--runs <N>` | Runs per test case. Default `1`. Must be at least `1`; greater than `1` is stochastic mode (below), which needs at least 3 runs. |
 | `--success-threshold <0..1>` | Stochastic mode only: the share of a test case's runs that must pass for the test case to pass. Default `0.8`. Not used, and not checked, when `--runs` is `1`. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
@@ -267,7 +267,9 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 **Stochastic mode (`--runs` greater than 1)**
 
 Each test case is run N times. A test case passes when the share of its runs that passed is at least
-`--success-threshold`, and the command exits `1` when any test case does not. The stochastic runner needs at
+`--success-threshold`, and the command exits `1` when any test case fails. A run that errored or got no verdict
+from the judge is not measured: when such runs could still decide whether the threshold is met (undecided), or no
+run was measured, the test case has no conclusive verdict, and the command exits `11` if no test case failed. The stochastic runner needs at
 least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative values; in this mode a
 `--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
 
@@ -297,14 +299,16 @@ agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --golden gol
 ```
 
 Each test case is reported on stderr as **regressed** (passed in the golden trace, fails now), **improved**, **tools
-changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**
-or **removed**. Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
+changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**,
+**removed** or **NOT MEASURED** (the golden run or this one produced no verdict for it: the judge produced none, or the
+run errored; its placeholder fail is neither a regression nor an improvement). Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
 output varies from run to run, so an output change is reported and does not fail the run. When either run recorded no
 tool data, tool calls are not compared.
 
 With `--golden` the exit code follows the comparison, not the raw verdicts: `1` when a test case regressed (or, with
-`--fail-on-tool-change`, called different tools), `0` otherwise. A test that already failed in the golden trace does
-not fail the build. Regressions are printed even with `--quiet`. Give both options to compare and then update the
+`--fail-on-tool-change`, called different tools), `11` when none did but a test case is not measured, `0` otherwise. A
+test that already failed in the golden trace does not fail the build. Regressions and test cases not measured are
+printed even with `--quiet`. Give both options to compare and then update the
 file. A golden trace records one run per test case, so neither option combines with `--runs` above 1. A
 `--golden` file that is missing or unreadable is a usage error, raised before any agent call. In code, the same is
 `GoldenTrace.FromResults(results)` and `GoldenTraceComparer.Compare(golden, current)` in `AgentEval.Snapshots`.
@@ -319,9 +323,10 @@ The target configures its own model, so `--temperature`, `--max-tokens`, `--syst
 | Code | Meaning |
 |------|---------|
 | `0` | Every test case passed. With `--golden`: no test case regressed (and, with `--fail-on-tool-change`, none changed its tool calls). |
-| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
+| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold` even counting every run that was not measured as a pass. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
 | `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, a `--runs` or `--success-threshold` value stochastic mode does not accept, a `--golden` file that is missing or not a golden trace, `--fail-on-tool-change` without `--golden`, or a golden-trace option with `--runs` above 1. |
 | `3` | Runtime or configuration error — including a missing `--endpoint`/`--azure`/`--model`, a dataset that does not exist or is empty, an unknown `--metrics` name, and an unknown `--format`, which is reported only after the evaluation has run. |
+| `11` | No conclusive verdict, and no test case failed. In stochastic mode: a test case's verdict is undecided (runs that errored or got no judge verdict could still decide it) or not measured (no run was). With `--metrics`: a requested metric was not measured on some case (a judge call that failed, a reply that could not be read, an input the case lacked), so such a run never exits `0`. With `--golden`: no test case regressed, but one has no verdict in the golden trace or in this run (`NOT MEASURED`), so the comparison cannot say whether it regressed. |
 
 ---
 
@@ -1102,11 +1107,11 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
 | `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](copilot-studio.md#what---max-credits-does-today). |
-| `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL**. |
+| `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL** (for calibration: a pillar or category FAIL, INFRA-FAIL or INCOMPLETE). |
 | `10` | `bench <family>` — the composite gate is a **WARN** (soft finding, below ideal but not a hard failure). Calibration commands never return this — their thresholds are pass/fail binary. |
-| `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). Every `--sut mock` run exits `11` whatever it scores: it measured no agent. |
+| `11` | No conclusive verdict, and nothing failed. `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). Every `--sut mock` run exits `11` whatever it scores: it measured no agent. `eval --runs N` — a test case's verdict is undecided or not measured. `eval --metrics …` — a requested metric was not measured on some case. `bench <reg> calibrate` / `bench agentic calibrate` — a pillar or category is NOT MEASURED (nothing scored). A failure still exits `1` (`eval`) or `9` (calibrate). |
 | `12` | Reserved by [ADR-031](adr/031-eval-packs-ship-reduced.md). No command returns it. |
-| `13` | `compare` — **incomparable**: the two runs could not be shown to have measured the same thing, so no delta was emitted (`Incomparable`). Distinct from `11`, which means a run produced nothing scoreable: here both runs produced verdicts, and comparing them would be meaningless. See [`agenteval compare`](#agenteval-compare). |
+| `13` | `compare` — **incomparable**: the two runs could not be shown to have measured the same thing, so no delta was emitted (`Incomparable`). Distinct from `11`, which means a run produced nothing scoreable: here both runs produced verdicts, and comparing them would be meaningless. See [`agenteval compare`](#agenteval-compare). `redteam --baseline` — the baseline or the current scan has no probe that reached a verdict, so the comparison is refused, neither a regression (`4`) nor a pass; see [Red Team Security](redteam.md). |
 
 **Parse errors exit `2`.** An unknown command or option, a value that does not parse (`--runs abc`), a missing
 required option, or no command at all exits `2`. System.CommandLine prints the errors to stderr and the command's

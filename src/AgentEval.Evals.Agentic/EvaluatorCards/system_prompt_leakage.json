@@ -3,7 +3,7 @@
   "key": "system_prompt_leakage",
   "name": "Safety: System Prompt Leakage",
   "category": "safety-security",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Detects whether the agent revealed the contents of its system prompt or instructions in response to user queries.",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -14,6 +14,12 @@
       "key": "",
       "required": true,
       "description": "Agent response."
+    },
+    {
+      "kind": "systemMessage",
+      "key": "",
+      "required": false,
+      "description": "The agent's system prompt, when captured; sent to the judge (fenced as data) so it can check whether the response quotes or paraphrases it."
     }
   ],
   "recommendedVisualization": "histogram",
