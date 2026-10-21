@@ -28,7 +28,7 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// <see cref="AgenticTelemetry.EstimatedCostUsd"/> <see langword="null"/>, and the evaluator returns
 /// <see cref="EvalResult.Skipped(IEval, string)"/> (not measured) for it. It used to be 0 for "not tracked", which this
 /// evaluator scored 1.0 unconditionally: an untracked cost passed every budget (T82). A reported 0 is a measured zero
-/// and is scored.
+/// and is scored. Negative or non-finite costs return an error without a measurement.
 /// </para>
 /// </summary>
 public sealed class CostEval : IEvalConfigurationSource
@@ -106,6 +106,10 @@ public sealed class CostEval : IEvalConfigurationSource
                 "The run's cost was not tracked (AgenticTelemetry.EstimatedCostUsd is null), so Cost was not measured: " +
                 "an untracked cost is not $0 and is never read as within budget."));
         }
+
+        if (TelemetryHelper.Reading(costUsd) is null)
+            return Task.FromResult(TelemetryHelper.InvalidReading(this, _passThreshold,
+                "EstimatedCostUsd must be finite and non-negative; the cost was not measured."));
 
         var score = TelemetryHelper.LinearScore(costUsd, _budgetUsd);
         var passed = score >= _passThreshold;

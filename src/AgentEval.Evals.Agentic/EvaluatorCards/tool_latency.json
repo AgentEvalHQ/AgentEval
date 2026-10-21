@@ -4,7 +4,7 @@
   "name": "Telemetry: Tool Latency",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator surfacing per-tool latency percentiles from AgenticTelemetry.ToolLatencyMs. The rate is better lower; the score is its inverse, so a higher score is better.",
+  "description": "Scores the worst per-tool mean latency against the per-tool budget. A null map skips; an empty map records no tool calls and is not applicable. Any negative or non-finite latency returns an error. Measured zero latency is valid.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.8,
@@ -13,7 +13,7 @@
       "kind": "metadata",
       "key": "agentic_telemetry",
       "required": true,
-      "description": "AgenticTelemetry record with ToolLatencyMs."
+      "description": "AgenticTelemetry.ToolLatencyMs: null when not tracked, empty when no tool calls were recorded, otherwise finite non-negative means keyed by tool name."
     }
   ],
   "recommendedVisualization": "histogram",

@@ -29,6 +29,7 @@ namespace AgentEval.Evals.Agentic.Efficiency;
 ///   <item><c>EvalInput.Metadata["scenario_score"]</c> → <c>double</c> in [0..1] — the quality score from the benchmark run.</item>
 /// </list>
 /// If either key is absent, or the telemetry's <see cref="AgenticTelemetry.EstimatedCostUsd"/> is null (cost not tracked), the evaluator returns <see cref="EvalResult.Skipped(IEval, string)"/>.
+/// Negative or non-finite costs return an error without a measurement; a recorded zero cost remains valid.
 /// </para>
 /// <para>
 /// <b>Cost tier: TRIVIAL</b> — pure code; no LLM call.
@@ -128,6 +129,10 @@ public sealed class CostQualityEfficiencyEval : IEval
                 "The run's cost was not tracked (AgenticTelemetry.EstimatedCostUsd is null), so Cost-Quality Efficiency " +
                 "was not measured: an untracked cost is not $0."));
         }
+
+        if (TelemetryHelper.Reading(costUsd) is null)
+            return Task.FromResult(TelemetryHelper.InvalidReading(this, _passThreshold,
+                "EstimatedCostUsd must be finite and non-negative; cost-quality efficiency was not measured."));
 
         var score = scenarioScore.Value;
         var effectiveCost = Math.Max(costUsd, 0.001);

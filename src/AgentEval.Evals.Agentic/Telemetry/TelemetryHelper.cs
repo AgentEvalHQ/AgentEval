@@ -9,6 +9,31 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// </summary>
 internal static class TelemetryHelper
 {
+    /// <summary>Reports a recorded absence of applicable calls, without a score or verdict.</summary>
+    internal static EvalResult NotApplicable(IEval eval, string reason) => new(
+        Metric: new(eval.Key, eval.Name, eval.Category, eval.Version),
+        Score: EvalScore.NotApplicable(),
+        Details: new(null, null, [reason], null, null) { Summary = reason },
+        Provenance: new("atomic-code", null, null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
+    /// <summary>Returns an absent result unless the counts describe a valid, applicable call rate.</summary>
+    internal static EvalResult? ValidateCallCounts(IEval eval, double passThreshold,
+        int? count, int? total, string countName)
+    {
+        if (count < 0 || total < 0 || count > total)
+            return InvalidReading(eval, passThreshold,
+                $"{countName} and TotalCalls must be non-negative, with {countName} no greater than TotalCalls (including retry attempts).");
+
+        if (count is null || total is null)
+            return EvalResult.Skipped(eval,
+                $"{countName} or TotalCalls was not tracked; both readings are required to compute a call rate.");
+
+        return total == 0
+            ? NotApplicable(eval, "The run recorded zero calls and a zero numerator; a call rate is not applicable.")
+            : null;
+    }
+
     /// <summary>Returns a finite, non-negative reading, or null when absent or invalid.</summary>
     internal static double? Reading(double? value) =>
         value is { } number && double.IsFinite(number) && number >= 0 ? number : null;

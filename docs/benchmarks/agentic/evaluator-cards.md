@@ -76,10 +76,10 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 |-----|-------|---------------|
 | `latency` | `LatencyEval` | Linear on P99 vs threshold; high severity above threshold; skipped when P99 is not tracked, error when invalid |
 | `token_usage` | `TokenUsageEval` | Linear on tokens vs budget; skipped when not tracked, error for negative counts |
-| `cost` | `CostEval` | Linear on USD vs budget |
-| `error_rate` | `ErrorRateEval` | `1 - (errors / totalCalls)` |
-| `retry_rate` | `RetryRateEval` | `1 - (retries / totalCalls)` |
-| `tool_latency` | `ToolLatencyEval` | Linear on worst-tool mean latency vs per-tool budget |
+| `cost` | `CostEval` | Linear on USD vs budget; null skips, negative/non-finite cost errors |
+| `error_rate` | `ErrorRateEval` | `1 - (errors / totalCalls)`; missing counts skip, recorded zero calls is not applicable, invalid counts error |
+| `retry_rate` | `RetryRateEval` | `1 - (retries / totalCalls)` including retry attempts in the total; same absence/validation rules as error rate |
+| `tool_latency` | `ToolLatencyEval` | Linear on worst-tool mean latency vs per-tool budget; null skips, empty map is not applicable, any invalid latency errors |
 
 ---
 

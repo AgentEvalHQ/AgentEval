@@ -4,13 +4,23 @@
   "name": "Cost-Quality Efficiency",
   "category": "efficiency",
   "version": "1.0.0",
-  "description": "Pure-code Pareto-style metric: combines an external quality score with the agent's measured cost (from telemetry) into a score-per-dollar efficiency rating. No LLM judge involved.",
+  "description": "Pure-code Pareto-style metric: combines an external quality score with the agent's measured cost (from telemetry) into a score-per-dollar efficiency rating. No LLM judge involved. Negative or non-finite costs return an error without a measurement; measured zero remains valid.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.5,
   "expectedInputs": [
-    { "kind": "metadata", "key": "agentic_telemetry", "required": true, "description": "AgenticTelemetry record with TokensUsed, EstimatedCost, latency percentiles, and tool-call counts." },
-    { "kind": "metadata", "key": "external_quality_score", "required": true, "description": "Quality score in [0,1] from another evaluator (e.g. task_completion) — combined with cost to compute efficiency." }
+    {
+      "kind": "metadata",
+      "key": "agentic_telemetry",
+      "required": true,
+      "description": "AgenticTelemetry with EstimatedCostUsd: null when not tracked (skipped), otherwise finite and non-negative."
+    },
+    {
+      "kind": "metadata",
+      "key": "scenario_score",
+      "required": true,
+      "description": "Quality score in [0,1] from another evaluator (e.g. task_completion) — combined with cost to compute efficiency."
+    }
   ],
   "recommendedVisualization": "stackedBar",
   "compatibleWith": [],

@@ -64,7 +64,7 @@ internal sealed record CensusRow(
 /// <remarks>
 /// Rows whose fix belongs to another wave-1 task are written for the fixed behaviour and hold once that task lands:
 /// B-1 and B-6 (T71, nullable batch averages), C2 to C4 (T81, red-team numbers), D2 (T82, an untracked AgenticTelemetry
-/// cost is null), D3/D4 (T88, untracked tokens and P99 latency).
+/// cost is null), D3/D4 (T88, untracked tokens and P99 latency), D5-D7 (T90, untracked counts and tool latency).
 /// The scripted inputs below are shapes a producer reads; nothing here grades an agent.
 /// </remarks>
 internal static class NothingMeasuredCensusRows
@@ -174,6 +174,23 @@ internal static class NothingMeasuredCensusRows
             Discoverable: false));
         rows.Add(new("D4", typeof(LatencyEval), "telemetry whose P99 latency was not tracked", "skipped", D4Nothing, D4Twin,
             Discoverable: false));
+        foreach (var (id, build, absent, measured) in new (string, Func<AgenticTelemetry, IEval>, AgenticTelemetry, AgenticTelemetry)[]
+        {
+            ("D5", t => new ErrorRateEval(t), Telemetry(.08) with { ErrorCount = null }, Telemetry(.08)),
+            ("D6", t => new RetryRateEval(t), Telemetry(.08) with { RetryCount = null }, Telemetry(.08)),
+            ("D7", t => new ToolLatencyEval(t), Telemetry(.08) with { ToolLatencyMs = null },
+                Telemetry(.08) with { ToolLatencyMs = new Dictionary<string, double> { ["search"] = 0 } })
+        })
+        {
+            rows.Add(new(id, build(absent).GetType(), "required telemetry reading not tracked", "skipped",
+                async () => NoReading.Score((await build(absent).EvaluateAsync(new EvalInput("q"))).Score, id),
+                async () =>
+                {
+                    var result = await build(measured).EvaluateAsync(new EvalInput("q"));
+                    Assert.True(result.Score.CountsTowardAggregate());
+                    Assert.True(result.Score.Passed);
+                }, Discoverable: false));
+        }
 
         // ── Compliance summaries (T85) ────────────────────────────────────
         rows.Add(new("O1", typeof(AgentEval.Compliance.Gdpr.Reporting.SummaryBuilder), "a GDPR run whose root was skipped",

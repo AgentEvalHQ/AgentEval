@@ -4,7 +4,7 @@
   "name": "Telemetry: Retry Rate",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator computing the fraction of agent calls that required at least one retry. The rate is better lower; the score is its inverse, so a higher score is better.",
+  "description": "Computes 1 - RetryCount/TotalCalls. Totals include retry attempts. Missing counts skip; recorded zero calls and zero retries are not applicable. Negative counts or retries above TotalCalls return an error.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.9,
@@ -13,7 +13,7 @@
       "kind": "metadata",
       "key": "agentic_telemetry",
       "required": true,
-      "description": "AgenticTelemetry record with RetryCount + TotalCalls."
+      "description": "AgenticTelemetry with nullable RetryCount and TotalCalls; both readings are required."
     }
   ],
   "recommendedVisualization": "histogram",
