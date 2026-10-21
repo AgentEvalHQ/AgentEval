@@ -494,6 +494,8 @@ internal static class NothingMeasuredCensusRows
         Assert.Null(summary.OverallScore);
         Assert.Equal("ERROR", summary.OverallStatus);
         Assert.Equal("ERROR", summary.PerCategory["system-outcome"].Status);
+        Assert.Null(summary.PerCategory["system-outcome"].Score);
+        Assert.All(summary.PerEvaluator.Values, evaluator => Assert.Null(evaluator.Score));
         return Task.CompletedTask;
     }
 
@@ -503,7 +505,7 @@ internal static class NothingMeasuredCensusRows
 
         Assert.Equal(0.75, summary.OverallScore);
         Assert.Equal("PASS", summary.OverallStatus);
-        Assert.Equal(0.75, summary.PerCategory["system-outcome"].Score, 6);
+        Assert.Equal(0.75, summary.PerCategory["system-outcome"].Score!.Value, 6);
         return Task.CompletedTask;
     }
 
@@ -1356,7 +1358,9 @@ internal static class NothingMeasuredCensusRows
             new AgentEval.Compliance.Gdpr.Articles.Loading.ArticleScenarioYamlLoader(),
             new AgentEval.Compliance.Gdpr.Articles.Building.ArticleCompositeBuilder(
                 new AgentEval.Compliance.Gdpr.Articles.Building.ScenarioToAtomicEval(new NeverCalledJudge(), judgeModel: "census")));
-        var summary = new AgentEval.Compliance.Gdpr.Reporting.SummaryBuilder(registry).Build(Root("gdpr.census", Skipped()));
+        var summary = new AgentEval.Compliance.Gdpr.Reporting.SummaryBuilder(registry).Build(Root("gdpr.census", Skipped(), Root("Pillar", Skipped(), Leaf("article", Skipped()))));
+        Assert.Null(Assert.Single(summary.PerPillar.Values).Score);
+        Assert.Null(Assert.Single(summary.PerArticle.Values).Score);
 
         // OverallStatus and score now agree: skipped is not a measured zero.
         Assert.Null(summary.OverallScore);
@@ -1381,7 +1385,9 @@ internal static class NothingMeasuredCensusRows
             new AgentEval.Compliance.EuAiAct.Articles.Loading.ArticleScenarioYamlLoader(),
             new AgentEval.Compliance.EuAiAct.Articles.Building.ArticleCompositeBuilder(
                 new AgentEval.Compliance.EuAiAct.Articles.Building.ScenarioToAtomicEval(new NeverCalledJudge(), judgeModel: "census")));
-        var summary = new AgentEval.Compliance.EuAiAct.Reporting.SummaryBuilder(registry).Build(Root("euaiact.census", Skipped()));
+        var summary = new AgentEval.Compliance.EuAiAct.Reporting.SummaryBuilder(registry).Build(Root("euaiact.census", Skipped(), Root("Pillar", Skipped(), Leaf("article", Skipped()))));
+        Assert.Null(Assert.Single(summary.PerPillar.Values).Score);
+        Assert.Null(Assert.Single(summary.PerArticle.Values).Score);
 
         Assert.Null(summary.OverallScore);
         return Task.CompletedTask;

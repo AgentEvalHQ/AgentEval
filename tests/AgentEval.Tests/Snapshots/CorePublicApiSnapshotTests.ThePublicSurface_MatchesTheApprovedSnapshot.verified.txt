@@ -809,6 +809,8 @@ static class AgentEval.Core.Reporting.MarkdownText
     static System.String Escape(System.String text)
     static System.String EscapeInline(System.String text, System.Int32 maxLength = 200)
     static System.String Truncate(System.String text, System.Int32 maxLength = 200)
+static class AgentEval.Core.Reporting.ScoreFormatting
+    static System.String Percentage(System.Double? score)
 class AgentEval.Core.RetryExhaustedException : System.Exception, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.Exception> Attempts { get; }
     ctor(System.String message, System.Collections.Generic.IEnumerable<System.Exception> attempts)

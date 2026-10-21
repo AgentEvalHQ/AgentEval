@@ -120,7 +120,7 @@ public class NistAiRmfComplianceReport : IComplianceReport
             if (control.Status is not ControlEvaluationStatus.NotApplicable and not ControlEvaluationStatus.NotEvaluated)
             {
                 sb.AppendLine($"**Tests Performed:** {control.TotalTests}  ");
-                sb.AppendLine($"**Pass Rate:** {control.PassRate:F1}%");
+                sb.AppendLine($"**Pass Rate:** {RedTeamResult.Percent(control.PassRate, "F1")}");
             }
             sb.AppendLine();
             if (!string.IsNullOrEmpty(control.EvidenceSummary))
@@ -316,7 +316,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
         foreach (var c in controls.Where(c => c.Status == ControlEvaluationStatus.NeedsImprovement))
             recs.Add($"🔴 **{c.Control.ControlId}**: address {string.Join(", ", c.TestedAttacks)} weaknesses.");
         foreach (var c in controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective))
-            recs.Add($"🟡 **{c.Control.ControlId}**: strengthen — current pass rate {c.PassRate:F0}%.");
+            recs.Add($"🟡 **{c.Control.ControlId}**: strengthen — current pass rate {RedTeamResult.Percent(c.PassRate, "F0")}.");
         // A control that ran inconclusive is not a success to report (B10am L5): it sat beside "All evaluated ... meet".
         foreach (var c in controls.Where(c => c.RanInconclusive))
             recs.Add($"❓ **{c.Control.ControlId}**: probes ran but none was conclusive — re-run, or check the judge and the target.");

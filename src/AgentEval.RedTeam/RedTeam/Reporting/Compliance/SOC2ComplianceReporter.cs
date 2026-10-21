@@ -126,7 +126,7 @@ public class SOC2ComplianceReport : IComplianceReport
             sb.AppendLine();
             sb.AppendLine($"**Status:** {statusIcon} {control.Status}  ");
             sb.AppendLine($"**Tests Performed:** {control.TotalTests}  ");
-            sb.AppendLine($"**Pass Rate:** {control.PassRate:F1}%");
+            sb.AppendLine($"**Pass Rate:** {RedTeamResult.Percent(control.PassRate, "F1")}");
             sb.AppendLine();
             sb.AppendLine("**Evidence:**");
             sb.AppendLine(control.EvidenceSummary);
@@ -391,7 +391,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         var partial = controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective).ToList();
         foreach (var control in partial)
         {
-            recommendations.Add($"🟡 **{control.Control.ControlId}**: Strengthen existing controls - current pass rate {control.PassRate:F0}%");
+            recommendations.Add($"🟡 **{control.Control.ControlId}**: Strengthen existing controls - current pass rate {RedTeamResult.Percent(control.PassRate, "F0")}");
         }
 
         if (recommendations.Count == 0)

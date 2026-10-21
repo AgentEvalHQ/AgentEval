@@ -1,3 +1,5 @@
+import { formatPercentage } from "@/lib/format";
+
 // Plan-08 Wave 4 (MC1.6.7): the killer-feature compliance matrix.
 //
 // CSS Grid implementation with Tailwind classes; no chart library. A Visx
@@ -43,7 +45,7 @@ export interface MatrixCell {
   controlId: string;
   // As stored in the evidence, e.g. "PASS"; see cellStatus().
   status: string;
-  passRate: number;
+  passRate: number | null;
   lastEvidenceAt: string;
   lastEvidenceRunId: string;
   // Raw on-disk timestamp directory name ("yyyy-MM-dd_HH-mm-ss"). Use this
@@ -193,12 +195,12 @@ function Row({
             // just the glyph (✓ / ! / ✗ / ·) which is meaningless out loud.
             aria-label={
               cell
-                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${(cell.passRate * 100).toFixed(0)}%${chainBroken ? `, audit chain broken: ${cell.chainBreakReason}` : ""}`
+                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${formatPercentage(cell.passRate)}${chainBroken ? `, audit chain broken: ${cell.chainBreakReason}` : ""}`
                 : `${subject.name}, ${c.id}, no evidence`
             }
             title={
               cell
-                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${(cell.passRate * 100).toFixed(0)}%\nLast evidence: ${cell.lastEvidenceAt}${chainBroken ? `\n\n⚠ AUDIT CHAIN BROKEN: ${cell.chainBreakReason}\nThis cell's source-run hash does not match the stored evidence hash. The displayed status reflects what the evidence claims, NOT verified data.` : ""}`
+                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${formatPercentage(cell.passRate)}\nLast evidence: ${cell.lastEvidenceAt}${chainBroken ? `\n\n⚠ AUDIT CHAIN BROKEN: ${cell.chainBreakReason}\nThis cell's source-run hash does not match the stored evidence hash. The displayed status reflects what the evidence claims, NOT verified data.` : ""}`
                 : `${subject.name} · ${c.id}\nNo evidence`
             }
           >

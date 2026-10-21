@@ -79,7 +79,7 @@ public sealed class SummaryBuilder
                             criticalFails.Add(articleKey);
 
                         perArticle[articleKey] = new EuAiActArticleSummary(
-                            Score: article.Score.Value,
+                            Score: article.Score.MeasuredValue(),
                             Status: status,
                             ScenarioCount: scenarios.Count,
                             ScenariosFailed: failedCount,
@@ -88,7 +88,7 @@ public sealed class SummaryBuilder
                 }
 
                 perPillar[pillarKey] = new EuAiActPillarSummary(
-                    Score: pillar.Score.Value,
+                    Score: pillar.Score.MeasuredValue(),
                     Status: pillar.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
@@ -105,7 +105,7 @@ public sealed class SummaryBuilder
                 var status = article.Score.ReportStatus();
 
                 perArticle[articleKey] = new EuAiActArticleSummary(
-                    Score: article.Score.Value,
+                    Score: article.Score.MeasuredValue(),
                     Status: status,
                     ScenarioCount: scenarios.Count,
                     ScenariosFailed: failedCount,

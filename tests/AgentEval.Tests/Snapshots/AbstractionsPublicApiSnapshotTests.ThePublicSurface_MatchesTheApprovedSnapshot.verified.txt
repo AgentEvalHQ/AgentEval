@@ -1959,7 +1959,7 @@ sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.Evid
     Boolean Equals(AgentEval.Output.EvidenceControl other)
     Boolean Equals(Object obj)
     Boolean? RegressedFromBaseline { get; init; }
-    Double PassRate { get; init; }
+    Double? PassRate { get; init; }
     IReadOnlyList<String> ScenarioRefs { get; init; }
     Int32 GetHashCode()
     String Id { get; init; }
@@ -1967,8 +1967,8 @@ sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.Evid
     String Status { get; init; }
     String Title { get; init; }
     String ToString()
-    Void Deconstruct(out String Id, out String Title, out String Status, out Double PassRate, out IReadOnlyList<String> ScenarioRefs, out String Notes, out Boolean? RegressedFromBaseline)
-    ctor(String Id, String Title, String Status, Double PassRate, IReadOnlyList<String> ScenarioRefs, String Notes, Boolean? RegressedFromBaseline = null)
+    Void Deconstruct(out String Id, out String Title, out String Status, out Double? PassRate, out IReadOnlyList<String> ScenarioRefs, out String Notes, out Boolean? RegressedFromBaseline)
+    ctor(String Id, String Title, String Status, Double? PassRate, IReadOnlyList<String> ScenarioRefs, String Notes, Boolean? RegressedFromBaseline = null)
 sealed class AgentEval.Output.EvidenceSummary : IEquatable<AgentEval.Output.EvidenceSummary>
     AgentEval.Output.EvidenceSummary <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceSummary other)

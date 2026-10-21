@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Core.Reporting;
+
 using AgentEval.Evals;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -170,7 +172,7 @@ public sealed class AgenticPdfRenderer
                 foreach (var (key, cat) in OrderedCategories(result.Summary.PerCategory))
                 {
                     table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{cat.Score:P0}");
+                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(cat.Score)}");
                     table.Cell().Padding(5).Text(cat.Status);
                     table.Cell().Padding(5).Text(
                         cat.CriticalFails.Count == 0 ? "—" : string.Join(", ", cat.CriticalFails));
@@ -203,7 +205,7 @@ public sealed class AgenticPdfRenderer
             if (cat is not null)
             {
                 col.Item().Text(
-                    $"Score: {cat.Score:P0} — Status: {cat.Status.ToUpperInvariant()}")
+                    $"Score: {ScoreFormatting.Percentage(cat.Score)} — Status: {cat.Status.ToUpperInvariant()}")
                     .FontSize(12);
             }
             col.Item().PaddingTop(15);
@@ -238,7 +240,7 @@ public sealed class AgenticPdfRenderer
                 {
                     var conf = ev.Confidence.HasValue ? $"{ev.Confidence.Value:P0}" : "—";
                     table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{ev.Score:P0}");
+                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(ev.Score)}");
                     table.Cell().Padding(5).Text(ev.Status.ToUpperInvariant());
                     table.Cell().Padding(5).Text(ev.Severity);
                     table.Cell().Padding(5).Text(conf);
@@ -260,7 +262,7 @@ public sealed class AgenticPdfRenderer
         {
             col.Item().Text($"Evaluator: {evaluatorKey}").FontSize(18).Bold();
             col.Item().Text(
-                $"Score: {evalSummary.Score:P0} — Status: {evalSummary.Status.ToUpperInvariant()} — " +
+                $"Score: {ScoreFormatting.Percentage(evalSummary.Score)} — Status: {evalSummary.Status.ToUpperInvariant()} — " +
                 $"Severity: {evalSummary.Severity}")
                 .FontSize(11);
 

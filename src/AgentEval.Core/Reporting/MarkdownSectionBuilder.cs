@@ -59,9 +59,9 @@ public static class MarkdownSectionBuilder
             foreach (var pillar in pillars)
             {
                 var key = pillar.Metric.Key;
-                var score = pillar.Score.Value;
-                var status = pillar.Score.Passed ? "PASS" : (pillar.Score.Label ?? "—").ToUpperInvariant();
-                sb.AppendLine($"| `{key}` | {score:P0} | **{status}** |");
+                var score = ScoreFormatting.Percentage(pillar.Score.MeasuredValue());
+                var status = pillar.Score.ReportStatus();
+                sb.AppendLine($"| `{key}` | {score} | **{status}** |");
             }
             sb.AppendLine();
         }

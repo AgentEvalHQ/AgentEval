@@ -2,6 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals;
+using AgentEval.Core.Reporting;
+
 using System.Text;
 
 namespace AgentEval.Evals.Agentic.Reporting;
@@ -62,7 +65,7 @@ public sealed class AgenticMarkdownRenderer
                 var criticals = cat.CriticalFails.Count == 0
                     ? "—"
                     : string.Join(", ", cat.CriticalFails.Select(k => $"`{k}`"));
-                sb.AppendLine($"| {key} | {cat.Score:P0} | **{cat.Status}** | {criticals} |");
+                sb.AppendLine($"| {key} | {ScoreFormatting.Percentage(cat.Score)} | **{cat.Status}** | {criticals} |");
             }
             sb.AppendLine();
         }
@@ -77,7 +80,7 @@ public sealed class AgenticMarkdownRenderer
             foreach (var (key, ev) in result.Summary.PerEvaluator.OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
                 var conf = ev.Confidence.HasValue ? $"{ev.Confidence.Value:P0}" : "—";
-                sb.AppendLine($"| `{key}` | {ev.Score:P0} | **{ev.Status}** | {ev.Severity} | {conf} |");
+                sb.AppendLine($"| `{key}` | {ScoreFormatting.Percentage(ev.Score)} | **{ev.Status}** | {ev.Severity} | {conf} |");
             }
             sb.AppendLine();
         }
@@ -88,7 +91,7 @@ public sealed class AgenticMarkdownRenderer
             sb.AppendLine("## Critical findings");
             sb.AppendLine();
             foreach (var f in result.CriticalFindings)
-                sb.AppendLine($"- **{f.Metric.Key}** — score {f.Score.Value:P0}, severity `{f.Score.Severity}`");
+                sb.AppendLine($"- **{f.Metric.Key}** — score {ScoreFormatting.Percentage(f.Score.MeasuredValue())}, severity `{f.Score.Severity}`");
             sb.AppendLine();
         }
 

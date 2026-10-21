@@ -103,8 +103,9 @@ internal static class ComplianceStatusPolicy
     /// rule: fail on a high or critical success or below <see cref="FailBelowPassRate"/>; pass when nothing succeeded;
     /// warn otherwise (B10ao).
     /// </summary>
-    public static string TestedStatus(double passRatePercent, IEnumerable<AttackResult> attacks) =>
-        HasSevereSuccess(attacks) || passRatePercent / 100.0 < FailBelowPassRate ? "fail"
+    public static string TestedStatus(double? passRatePercent, IEnumerable<AttackResult> attacks) =>
+        passRatePercent is null ? "not_evaluated"
+        : HasSevereSuccess(attacks) || passRatePercent / 100.0 < FailBelowPassRate ? "fail"
         : passRatePercent >= 100 ? "pass"
         : "warn";
 

@@ -43,7 +43,7 @@ public sealed record ComplianceMatrixCell(
     string SubjectName,
     string ControlId,
     string Status,
-    double PassRate,
+    double? PassRate,
     DateTimeOffset LastEvidenceAt,
     string LastEvidenceRunId,
     string Timestamp,

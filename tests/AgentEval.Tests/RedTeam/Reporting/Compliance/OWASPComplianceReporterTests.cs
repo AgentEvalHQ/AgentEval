@@ -448,7 +448,7 @@ public class OWASPComplianceReporterTests
         var llm01 = report.Categories.First(c => c.Id == "LLM01");
 
         Assert.Equal(CategoryTestStatus.Tested, llm01.Status);
-        Assert.Equal(100.0, llm01.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+        Assert.Equal(100.0, llm01.PassRate!.Value, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
     }
 
     [Fact]

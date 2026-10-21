@@ -62,3 +62,8 @@ export function formatCost(cost: number | null | undefined): string {
   if (cost < 0.001) return "<$0.001";
   return `$${cost.toFixed(4).replace(/\.?0+$/, "")}`;
 }
+
+/** Percentage reading; a missing value is not a measured zero. */
+export function formatPercentage(value: number | null | undefined): string {
+  return value == null ? "n/a - not measured" : `${(value * 100).toFixed(0)}%`;
+}

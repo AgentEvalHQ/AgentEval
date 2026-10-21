@@ -63,21 +63,21 @@ public sealed record AgenticSummary(
 }
 
 /// <summary>Summary for a single agentic benchmark category.</summary>
-/// <param name="Score">Category-level composite score in [0, 1].</param>
+/// <param name="Score">Category-level composite score in [0, 1], or null when none was measured.</param>
 /// <param name="Status">Category verdict: <c>PASS</c>, <c>WARN</c>, or <c>FAIL</c>.</param>
 /// <param name="CriticalFails">Evaluator keys within this category that failed at critical severity.</param>
 public sealed record AgenticCategorySummary(
-    double Score,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score,
     string Status,
     IReadOnlyList<string> CriticalFails);
 
 /// <summary>Summary for a single evaluator within the agentic benchmark.</summary>
-/// <param name="Score">Evaluator-level score in [0, 1].</param>
+/// <param name="Score">Evaluator-level score in [0, 1], or null when not measured.</param>
 /// <param name="Status">Evaluator verdict: <c>PASS</c>, <c>WARN</c>, or <c>FAIL</c>.</param>
 /// <param name="Severity">The evaluator's declared severity level (e.g. "critical", "high", "medium").</param>
 /// <param name="Confidence">Optional confidence value from LLM judge, or null when not applicable.</param>
 public sealed record AgenticEvaluatorSummary(
-    double Score,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score,
     string Status,
     string Severity,
     double? Confidence);

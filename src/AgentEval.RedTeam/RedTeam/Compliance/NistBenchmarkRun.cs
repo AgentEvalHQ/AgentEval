@@ -184,7 +184,7 @@ public sealed class NistBenchmarkRun
             var partial = report.Controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective)
                 .Select(c => c.Control.Fidelity == ControlFidelity.Supporting
                     ? $"{c.Control.ControlId} (Supporting fidelity: at most partially effective)"
-                    : $"{c.Control.ControlId} ({c.PassRate:F0}% pass rate)")
+                    : $"{c.Control.ControlId} ({RedTeamResult.Percent(c.PassRate, "F0")} pass rate)")
                 .ToList();
             if (partial.Count > 0)
                 withheldNote = $"Partially effective: {string.Join(", ", partial)}; the run warns.";

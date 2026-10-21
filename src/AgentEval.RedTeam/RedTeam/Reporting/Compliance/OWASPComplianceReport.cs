@@ -125,7 +125,7 @@ public class OWASPComplianceReport : IComplianceReport
             };
 
             var passRateStr = category.Status == CategoryTestStatus.Tested
-                ? $"{category.PassRate:F0}%"
+                ? $"{RedTeamResult.Percent(category.PassRate, "F0")}"
                 : "-";
             var testsStr = category.Status == CategoryTestStatus.Tested
                 ? category.TotalTests.ToString()
@@ -150,7 +150,7 @@ public class OWASPComplianceReport : IComplianceReport
                 sb.AppendLine($"### {category.Id}: {category.Name}");
                 sb.AppendLine();
                 sb.AppendLine($"**Status:** {(category.PassRate >= 80 ? "⚠️ Partial" : "❌ Vulnerable")}  ");
-                sb.AppendLine($"**Pass Rate:** {category.PassRate:F1}%  ");
+                sb.AppendLine($"**Pass Rate:** {RedTeamResult.Percent(category.PassRate, "F1")}  ");
                 sb.AppendLine($"**Failed Tests:** {category.FailedTests}");
                 sb.AppendLine();
 
@@ -285,7 +285,8 @@ public class OWASPCategoryStatus
     public int FailedTests => EffectiveConclusive - PassedTests;
 
     /// <summary>Pass rate percentage over CONCLUSIVE probes only (N-03 / RC-6) — inconclusive probes do not dilute it.</summary>
-    public double PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : null;
 
     /// <summary>Detailed findings for this category.</summary>
     public IReadOnlyList<ComplianceFinding> Findings { get; init; } = [];

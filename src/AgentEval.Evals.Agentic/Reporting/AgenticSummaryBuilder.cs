@@ -88,7 +88,7 @@ public sealed class AgenticSummaryBuilder
                         var confidence = ExtractConfidence(evaluator);
 
                         perEvaluator[evalKey] = new AgenticEvaluatorSummary(
-                            Score: evaluator.Score.Value,
+                            Score: evaluator.Score.MeasuredValue(),
                             Status: status,
                             Severity: evaluator.Score.Severity ?? "none",
                             Confidence: confidence);
@@ -96,7 +96,7 @@ public sealed class AgenticSummaryBuilder
                 }
 
                 perCategory[categoryKey] = new AgenticCategorySummary(
-                    Score: categoryNode.Score.Value,
+                    Score: categoryNode.Score.MeasuredValue(),
                     Status: categoryNode.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
@@ -120,7 +120,7 @@ public sealed class AgenticSummaryBuilder
                 var confidence = ExtractConfidence(evaluator);
 
                 perEvaluator[evalKey] = new AgenticEvaluatorSummary(
-                    Score: evaluator.Score.Value,
+                    Score: evaluator.Score.MeasuredValue(),
                     Status: status,
                     Severity: evaluator.Score.Severity ?? "none",
                     Confidence: confidence);
@@ -146,11 +146,10 @@ public sealed class AgenticSummaryBuilder
 
             foreach (var (categoryKey, categoryStatus) in catStatus)
             {
-                // With nothing measured the score stays 0, because agentic-result.schema.json requires a number there; the
-                // category's status (ERROR or SKIPPED) is what says it is not a reading.
+                // The category has no score when no evaluator measured anything.
                 var measured = catMeasured.GetValueOrDefault(categoryKey);
                 perCategory[categoryKey] = new AgenticCategorySummary(
-                    Score: measured > 0 ? catScoreSum[categoryKey] / measured : 0,
+                    Score: measured > 0 ? catScoreSum[categoryKey] / measured : null,
                     Status: categoryStatus,
                     CriticalFails: catCriticals.TryGetValue(categoryKey, out var fails)
                         ? fails

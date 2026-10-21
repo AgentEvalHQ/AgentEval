@@ -42,10 +42,10 @@ public sealed record GdprSummary(
 }
 
 /// <summary>Summary for a single GDPR pillar.</summary>
-public sealed record GdprPillarSummary(double Score, string Status, IReadOnlyList<string> CriticalFails);
+public sealed record GdprPillarSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, IReadOnlyList<string> CriticalFails);
 
 /// <summary>Summary for a single GDPR article composite.</summary>
-public sealed record GdprArticleSummary(double Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
+public sealed record GdprArticleSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
 
 /// <summary>Attestation block for the GDPR evidence wrapper.</summary>
 public sealed record GdprAttestation(string JudgeMode, IReadOnlyDictionary<string, string> PromptVersions);

@@ -5,7 +5,7 @@ import { gqlRequest } from "@/lib/graphql-client";
 import { restUrls } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatPercentage } from "@/lib/format";
 
 // Plan-08 Wave 7 (MC1.6.8): per-evidence detail page reachable from the
 // compliance matrix. Renders the full evidence (controls + summary +
@@ -46,7 +46,7 @@ interface EvidenceDetailResponse {
         id: string;
         title: string;
         status: CellStatus;
-        passRate: number;
+        passRate: number | null;
         notes: string | null;
         regressedFromBaseline: boolean | null;
       }[];
@@ -246,7 +246,7 @@ export function EvidenceDetailPage() {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right font-mono">
-                        {(c.passRate * 100).toFixed(0)}%
+                        {formatPercentage(c.passRate)}
                       </td>
                       <td className="px-4 py-2 text-xs text-slate-700">
                         {c.notes ?? "—"}

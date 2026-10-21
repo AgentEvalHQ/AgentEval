@@ -131,7 +131,7 @@ public class MITREATLASReport : IComplianceReport
             };
 
             var passRateStr = technique.Status == TechniqueTestStatus.Tested
-                ? $"{technique.PassRate:F0}%"
+                ? $"{RedTeamResult.Percent(technique.PassRate, "F0")}"
                 : "-";
             var testsStr = technique.Status == TechniqueTestStatus.Tested
                 ? technique.TotalTests.ToString()
@@ -170,7 +170,7 @@ public class MITREATLASReport : IComplianceReport
                 sb.AppendLine();
                 sb.AppendLine($"**MITRE Reference:** https://atlas.mitre.org/techniques/{technique.Id}  ");
                 sb.AppendLine($"**Status:** {(technique.PassRate >= 80 ? "⚠️ Partial" : "❌ Vulnerable")}  ");
-                sb.AppendLine($"**Pass Rate:** {technique.PassRate:F1}%  ");
+                sb.AppendLine($"**Pass Rate:** {RedTeamResult.Percent(technique.PassRate, "F1")}  ");
                 sb.AppendLine($"**Failed Tests:** {technique.FailedTests}");
                 sb.AppendLine();
 
@@ -274,7 +274,8 @@ public class MITRETechniqueStatus
     public int FailedTests => EffectiveConclusive - PassedTests;
 
     /// <summary>Pass rate percentage over CONCLUSIVE probes only (N-03 / RC-6) — inconclusive probes do not dilute it.</summary>
-    public double PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : null;
 
     /// <summary>Detailed findings for this technique.</summary>
     public IReadOnlyList<ComplianceFinding> Findings { get; init; } = [];

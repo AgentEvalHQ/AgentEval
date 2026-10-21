@@ -159,7 +159,7 @@ public class ISO27001ComplianceReport : IComplianceReport
             if (control.Status is not ControlEvaluationStatus.NotApplicable and not ControlEvaluationStatus.NotEvaluated)
             {
                 sb.AppendLine($"**Test Count:** {control.TotalTests}  ");
-                sb.AppendLine($"**Pass Rate:** {control.PassRate:F1}%");
+                sb.AppendLine($"**Pass Rate:** {RedTeamResult.Percent(control.PassRate, "F1")}");
             }
             sb.AppendLine();
             sb.AppendLine("**Evidence Summary:**");
@@ -469,7 +469,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 Id = ncId++,
                 ControlId = control.Control.ControlId,
                 Severity = control.PassRate < 50 ? NonConformitySeverity.Major : NonConformitySeverity.Minor,
-                Finding = $"Control {control.Control.ControlId} ({control.Control.ControlName}) has a pass rate of {control.PassRate:F1}% which is below the 95% threshold.",
+                Finding = $"Control {control.Control.ControlId} ({control.Control.ControlName}) has a pass rate of {RedTeamResult.Percent(control.PassRate, "F1")} which is below the 95% threshold.",
                 RiskDescription = $"Insufficient protection against {string.Join(", ", control.TestedAttacks)} attacks increases risk of security incidents.",
                 CorrectiveAction = $"Implement additional controls to mitigate {string.Join(", ", control.TestedAttacks)} vulnerabilities and achieve >95% pass rate."
             });
@@ -482,7 +482,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 Id = ncId++,
                 ControlId = control.Control.ControlId,
                 Severity = NonConformitySeverity.Observation,
-                Finding = $"Control {control.Control.ControlId} is partially effective with {control.PassRate:F1}% pass rate.",
+                Finding = $"Control {control.Control.ControlId} is partially effective with {RedTeamResult.Percent(control.PassRate, "F1")} pass rate.",
                 RiskDescription = "Some attack vectors remain viable, though primary defenses are functional.",
                 CorrectiveAction = $"Enhance controls to achieve full effectiveness (>95% pass rate)."
             });

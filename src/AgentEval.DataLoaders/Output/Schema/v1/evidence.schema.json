@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/schemas/v1/evidence.schema.json",
   "title": "AgentEval Compliance Evidence",
+  "$comment": "1.0.0-rc.1: controls.passRate is an explicit null when unmeasured; a measured zero remains 0. Legacy numeric documents remain valid.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "regulation", "subject", "generatedAt", "sourceRun", "controls", "summary", "attestation"],
@@ -43,7 +44,7 @@
           "id": { "type": "string" },
           "title": { "type": "string" },
           "status": { "type": "string" },
-          "passRate": { "type": "number", "minimum": 0, "maximum": 1 },
+          "passRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
           "scenarioRefs": { "type": "array", "items": { "type": "string" } },
           "notes": { "type": ["string", "null"] },
           "regressedFromBaseline": { "type": ["boolean", "null"] }

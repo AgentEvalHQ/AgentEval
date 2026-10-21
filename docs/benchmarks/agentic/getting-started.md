@@ -475,3 +475,7 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.
+
+### Missing scores in reports
+
+Nested summary scores and compliance evidence `controls[].passRate` are explicit `null` when no score was measured. A measured zero remains numeric `0`. Markdown, PDF and Mission Control show missing values as `n/a`; partial agentic categories retain the average of their measured evaluators. Consumers must handle nullable scores and rates, including the GraphQL matrix field. Legacy numeric documents still deserialize and validate; this change does not reinterpret historical numeric placeholders without their original measurement evidence.

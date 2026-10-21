@@ -1620,8 +1620,8 @@ class AgentEval.RedTeam.Reporting.Compliance.ControlStatus
     AgentEval.RedTeam.Reporting.Compliance.ControlMapping Control { get; init; }
     Boolean NotMeasurable { get; init; }
     Boolean RanInconclusive { get; }
-    Double Coverage { get; }
-    Double PassRate { get; }
+    Double? Coverage { get; }
+    Double? PassRate { get; }
     IReadOnlyList<String> Observations { get; init; }
     IReadOnlyList<String> TestedAttacks { get; init; }
     Int32 ConclusiveTests { get; init; }
@@ -1729,7 +1729,7 @@ sealed class AgentEval.RedTeam.Reporting.Compliance.MITREAtlasTechnique : IEquat
     ctor(String Id, String Name, String TacticId, String TacticName, String Description, Boolean IsApplicable)
 class AgentEval.RedTeam.Reporting.Compliance.MITRETechniqueStatus
     AgentEval.RedTeam.Reporting.Compliance.TechniqueTestStatus Status { get; init; }
-    Double PassRate { get; }
+    Double? PassRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ComplianceFinding> Findings { get; init; }
     Int32 ConclusiveTests { get; init; }
     Int32 FailedTests { get; }
@@ -1781,7 +1781,7 @@ enum AgentEval.RedTeam.Reporting.Compliance.NonConformitySeverity
     Major
 class AgentEval.RedTeam.Reporting.Compliance.OWASPCategoryStatus
     AgentEval.RedTeam.Reporting.Compliance.CategoryTestStatus Status { get; init; }
-    Double PassRate { get; }
+    Double? PassRate { get; }
     IReadOnlyList<AgentEval.RedTeam.Reporting.Compliance.ComplianceFinding> Findings { get; init; }
     Int32 ConclusiveTests { get; init; }
     Int32 FailedTests { get; }

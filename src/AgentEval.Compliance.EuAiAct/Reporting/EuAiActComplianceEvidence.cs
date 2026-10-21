@@ -42,10 +42,10 @@ public sealed record EuAiActSummary(
 }
 
 /// <summary>Summary for a single EU AI Act pillar.</summary>
-public sealed record EuAiActPillarSummary(double Score, string Status, IReadOnlyList<string> CriticalFails);
+public sealed record EuAiActPillarSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, IReadOnlyList<string> CriticalFails);
 
 /// <summary>Summary for a single EU AI Act article composite.</summary>
-public sealed record EuAiActArticleSummary(double Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
+public sealed record EuAiActArticleSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
 
 /// <summary>Attestation block for the EU AI Act evidence wrapper.</summary>
 public sealed record EuAiActAttestation(string JudgeMode, IReadOnlyDictionary<string, string> PromptVersions);

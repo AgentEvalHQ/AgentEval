@@ -302,3 +302,7 @@ The following are not validated by this benchmark:
 - [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for a formal GDPR audit, DPIA, or legal opinion. Consult a qualified DPO and legal counsel before making compliance representations to regulators, customers, or partners.
+
+### Missing scores in reports
+
+Nested summary scores and compliance evidence `controls[].passRate` are explicit `null` when no score was measured. A measured zero remains numeric `0`. Markdown, PDF and Mission Control show missing values as `n/a`; partial agentic categories retain the average of their measured evaluators. Consumers must handle nullable scores and rates, including the GraphQL matrix field. Legacy numeric documents still deserialize and validate; this change does not reinterpret historical numeric placeholders without their original measurement evidence.
