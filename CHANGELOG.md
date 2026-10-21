@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Workflow recording preserves overlapping executor names and sub-workflow error IDs, and recognizes delayed chat-forwarding tokens as one turn. Tool calls are recorded when requested; only a paired result certifies execution, including a null-valued result.
+
 - Real MAF workflows that end their event stream on cancellation now propagate cancellation instead of completing with partial results. The evaluation harness reports its own timeout as a failed test and propagates caller cancellation.
 
 - Store v1 export preserves explicitly recorded zero scenario cost. Microsoft evaluator metering includes failed judge attempts when checking completeness, so a successful call or recovered retry cannot make partial token/cost totals appear complete.

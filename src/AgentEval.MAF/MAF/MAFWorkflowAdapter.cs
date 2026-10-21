@@ -93,6 +93,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         var stepStartOffset = TimeSpan.Zero;
         var stepIndex = 0;
         var currentToolCalls = new List<ToolCallRecord>();
+        var pendingToolRecords = new Dictionary<(string ExecutorId, string CallId), ToolCallRecord>();
         EdgeExecution? stepIncomingEdge = null; // Incoming edge for current step
         EdgeExecution? pendingIncomingEdge = null; // Edge waiting for next step
         var currentOutgoingEdges = new List<EdgeExecution>();
@@ -297,23 +298,41 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         break;
 
                     case ExecutorToolCallEvent toolEvent:
-                        currentToolCalls.Add(new ToolCallRecord
+                        var toolExecutorId = toolEvent.ExecutorId ?? currentExecutorId ?? "unknown";
+                        var toolCallId = toolEvent.CallId ?? Guid.NewGuid().ToString();
+                        var toolKey = (toolExecutorId, toolCallId);
+                        var observedAt = DateTimeOffset.UtcNow;
+                        if (toolEvent.HasResult && pendingToolRecords.Remove(toolKey, out var pendingCall))
+                        {
+                            pendingCall.Result = toolEvent.Result;
+                            pendingCall.WasExecuted = true;
+                            pendingCall.StartTime = observedAt - toolEvent.Duration;
+                            pendingCall.EndTime = observedAt;
+                            break;
+                        }
+
+                        // An agent can fail after requesting a tool but before producing any text.
+                        // Keep that attempted call and its executor visible even without a result.
+                        if (currentExecutorId is null)
+                            HandleExecutorOutput(new ExecutorOutputEvent(toolExecutorId, string.Empty));
+                        var toolRecord = new ToolCallRecord
                         {
                             Name = toolEvent.ToolName,
-                            CallId = toolEvent.CallId ?? Guid.NewGuid().ToString(),
+                            CallId = toolCallId,
                             Arguments = toolEvent.Arguments,
                             Result = toolEvent.Result,
-                            // The event is a completed call: the bridge emits it when the call's result arrives. Not
-                            // recording that read every workflow call as one that never ran (code_tool_success, T58).
-                            WasExecuted = true,
-                            StartTime = DateTimeOffset.UtcNow - toolEvent.Duration,
-                            EndTime = DateTimeOffset.UtcNow,
+                            WasExecuted = toolEvent.HasResult,
+                            StartTime = toolEvent.HasResult ? observedAt - toolEvent.Duration : observedAt,
+                            EndTime = toolEvent.HasResult ? observedAt : null,
                             Order = currentToolCalls.Count + 1,
                             // Use the executor ID embedded in the event (set by the bridge from the
                             // MAF streaming update that contained the tool call), falling back to
                             // currentExecutorId only when the event carries no ID itself.
-                            ExecutorId = toolEvent.ExecutorId ?? currentExecutorId
-                        });
+                            ExecutorId = toolExecutorId
+                        };
+                        currentToolCalls.Add(toolRecord);
+                        if (!toolEvent.HasResult)
+                            pendingToolRecords[toolKey] = toolRecord;
                         break;
 
                     case ExecutorErrorEvent errorEvent:
@@ -630,11 +649,12 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         if (!string.IsNullOrEmpty(workflow.StartExecutorId))
             allMafIds.Add(workflow.StartExecutorId);
 
-        // Build fullId → cleanName mapping by matching prefix
+        // Prefer the most specific name, so Fetch cannot consume Fetch_Retry's ID.
+        var namesBySpecificity = cleanNames.OrderByDescending(n => n.Length).ToList();
         var idMap = new Dictionary<string, string>();
         foreach (var fullId in allMafIds)
         {
-            foreach (var cleanName in cleanNames)
+            foreach (var cleanName in namesBySpecificity)
             {
                 // MAF format: "{Name}_{Guid32hex}" — match by prefix
                 if (string.Equals(fullId, cleanName, StringComparison.Ordinal)
@@ -747,9 +767,8 @@ public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowE
 }
 
 /// <summary>
-/// Event indicating a completed tool call within an executor: <c>MAFWorkflowEventBridge</c> emits it when the call's
-/// result arrives, and the adapter records it as a call that ran (<see cref="ToolCallRecord.WasExecuted"/>). A source
-/// that emits one for a call that did not run misreports it.
+/// Event indicating a tool call within an executor. A call with <see cref="HasResult"/> false records intent;
+/// a later event with the same executor and call ID updates it when a paired result arrives.
 /// </summary>
 public record ExecutorToolCallEvent(
     string ExecutorId, 
@@ -757,7 +776,14 @@ public record ExecutorToolCallEvent(
     string? CallId = null,
     IDictionary<string, object?>? Arguments = null,
     object? Result = null,
-    TimeSpan Duration = default) : WorkflowEvent;
+    TimeSpan Duration = default) : WorkflowEvent
+{
+    /// <summary>
+    /// Whether a paired result was observed, including a result whose value is null. Defaults to true for
+    /// compatibility with event sources that emit only completed calls. False never certifies execution or timing.
+    /// </summary>
+    public bool HasResult { get; init; } = true;
+}
 
 /// <summary>
 /// Event indicating an error in an executor.

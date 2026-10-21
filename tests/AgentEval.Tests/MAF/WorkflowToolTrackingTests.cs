@@ -157,7 +157,7 @@ public class WorkflowToolTrackingTests
     [Fact]
     public async Task TheAdapter_RecordsAToolCallEvent_AsACallThatRan()
     {
-        // The bridge emits ExecutorToolCallEvent only when the call's result arrives; the adapter did not say so, so every
+        // A completed ExecutorToolCallEvent certifies a paired result; the adapter previously did not say so, so every
         // workflow tool call read as never run (code_tool_success 0, T58).
         var adapter = CreateMockAdapter(("Agent1", "out1", [("ToolA", "c1")]));
 

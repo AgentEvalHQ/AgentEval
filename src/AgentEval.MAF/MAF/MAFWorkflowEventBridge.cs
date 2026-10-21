@@ -227,7 +227,7 @@ public static class MAFWorkflowEventBridge
         var openStepAwaitingTurn = false;
 
         // Track pending tool calls: FunctionCallContent arrives first, FunctionResultContent later.
-        // We buffer the call and yield a complete ExecutorToolCallEvent only when the result arrives.
+        // Record intent immediately, then update the same call when its paired result arrives.
         var pendingToolCalls = new Dictionary<string, (string ExecutorId, string ToolName, string? CallId, IDictionary<string, object?>? Arguments, TimeSpan StartTime)>();
 
         // Watch the MAF event stream and translate each event
@@ -342,6 +342,10 @@ public static class MAFWorkflowEventBridge
                             Arguments: call.Arguments,
                             StartTime: Now()
                         );
+                        yield return new ExecutorToolCallEvent(updateExecutorId, call.Name, callId, call.Arguments)
+                        {
+                            HasResult = false
+                        };
                     }
 
                     // Check for tool results (FunctionResultContent)
@@ -507,10 +511,11 @@ public static class MAFWorkflowEventBridge
                     break;
 
                 case MAFWorkflows.WorkflowErrorEvent workflowError:
-                    // Global workflow error
+                    // A nested workflow error carries its host ID even though it is a workflow-level event.
                     var errorData = workflowError.Data as Exception;
                     yield return new ExecutorErrorEvent(
-                        "workflow",
+                        workflowError is MAFWorkflows.SubworkflowErrorEvent nestedError
+                            ? NormalizeId(nestedError.SubworkflowId) : "workflow",
                         errorData?.Message ?? "Workflow error",
                         errorData?.StackTrace,
                         errorData?.GetType().Name);
@@ -552,7 +557,7 @@ public static class MAFWorkflowEventBridge
 
     /// <summary>
     /// The raw MAF IDs of the workflow's executors that implement the chat protocol — every
-    /// <see cref="MAFWorkflows.ChatProtocolExecutor"/>, which includes each agent bound with <c>BindAsExecutor</c>
+    /// <see cref="MAFWorkflows.ChatProtocolExecutor"/> and <see cref="MAFWorkflows.ChatForwardingExecutor"/>, including each agent bound with <c>BindAsExecutor</c>
     /// (an <c>AIAgentBinding</c> declares <c>AIAgentHostExecutor</c> as its executor type before it is instantiated).
     /// </summary>
     internal static HashSet<string> GetChatProtocolExecutorIds(MAFWorkflows.Workflow workflow)
@@ -561,7 +566,8 @@ public static class MAFWorkflowEventBridge
         foreach (var (id, binding) in workflow.ReflectExecutors())
         {
             if (binding.ExecutorType is { } executorType
-                && typeof(MAFWorkflows.ChatProtocolExecutor).IsAssignableFrom(executorType))
+                && (typeof(MAFWorkflows.ChatProtocolExecutor).IsAssignableFrom(executorType)
+                    || executorType == typeof(MAFWorkflows.ChatForwardingExecutor)))
             {
                 ids.Add(id);
             }
