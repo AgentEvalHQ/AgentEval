@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Buffered fan-in releases preserve every identifiable source activation, including multiple activations of one branch. Evaluation projection and Microsoft logging retain explicit unknown tool outcomes and timing instead of fabricating failures or zero-duration measurements.
+
 - Workflow trace replay preserves tool execution evidence, call identities and missing completion timing, plus observed traversals and activation indices. Timelines identify unmeasured tool outcomes and durations instead of reporting successful zero-duration calls. **Breaking:** `ToolStatistics.SuccessRate` is now nullable when every recorded outcome is unmeasured; observed outcomes form its denominator. See the upgrade notes in `docs/workflows.md`.
 
 - Unequal-depth fan-in barriers retain buffered source provenance across supersteps. Repeated turns and trailing accumulation on a selected fan-out target keep one branch identity per source activation. Shared step finalization consistently consumes timing and response-usage evidence.

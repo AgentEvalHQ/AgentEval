@@ -123,7 +123,7 @@ public static class TestRunEvalProjection
 
     /// <summary>
     /// Prefix marking a call the run records as NOT KNOWN TO HAVE EXECUTED — rejected at the
-    /// approval gate, or gated with no paired result observed.
+    /// approval gate, gated with no paired result observed, or explicitly unmeasured on a timeline.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -285,9 +285,9 @@ public static class TestRunEvalProjection
     /// <para>
     /// <see cref="TestResult.ToolUsage"/> wins over <see cref="TestResult.Timeline"/> because it
     /// carries structured arguments and the raw result object; the timeline carries pre-stringified
-    /// approximations of both — and only the record path can say whether a call actually EXECUTED
-    /// (see <see cref="ToolNotExecutedResultPrefix"/>); <see cref="ToolInvocation"/> has no such
-    /// field, so a timeline invocation is taken at face value.
+    /// approximations of both. An explicit <see cref="ToolInvocation.OutcomeNotMeasuredReason"/>
+    /// preserves execution uncertainty through <see cref="ToolNotExecutedResultPrefix"/>;
+    /// unmarked legacy timeline invocations retain their recorded success/failure interpretation.
     /// </para>
     /// <para>
     /// ⚠ <b>A dropping report is blind, timeline or no timeline.</b> When
@@ -388,10 +388,12 @@ public static class TestRunEvalProjection
         // recorded ABOUT a call that may never have run.
         return notExecuted is null
             ? rendered
-            : string.IsNullOrEmpty(rendered)
-                ? string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted}")
-                : string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted} | {rendered}");
+            : NotExecuted(notExecuted, rendered);
     }
+
+    private static string NotExecuted(string reason, string? rendered) => string.IsNullOrEmpty(rendered)
+        ? string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {reason}")
+        : string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {reason} | {rendered}");
 
     /// <summary>
     /// Why this call is not known to have executed, or <see langword="null"/> when the run does not
@@ -425,7 +427,9 @@ public static class TestRunEvalProjection
         new(
             invocation.ToolName,
             ArgumentsOf(invocation.Arguments),
-            invocation.Succeeded
+            invocation.OutcomeNotMeasuredReason is { } reason
+                ? NotExecuted(reason, invocation.ErrorMessage is { } error ? Failure(error, invocation.Result) : invocation.Result)
+                : invocation.Succeeded
                 ? invocation.Result
                 // ⚠ The result does NOT win over the failure. A failed invocation that also recorded a
                 // payload used to project as that payload alone, so `Succeeded = false` and the error

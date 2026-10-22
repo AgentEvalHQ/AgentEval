@@ -5,6 +5,7 @@
 using System.Text.Json;
 using AgentEval.Assertions;
 using AgentEval.Core;
+using AgentEval.Evals;
 using AgentEval.Output;
 using AgentEval.Metrics.Agentic;
 using AgentEval.MAF;
@@ -21,6 +22,47 @@ namespace AgentEval.Tests.MAF;
 
 public sealed partial class MAFWorkflowShapesTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ExecuteWorkflowAsync_MultipleBufferedActivations_PreservesEveryDeliveredSource(int cycles)
+    {
+        var rounds = 0;
+        var leftCalls = 0;
+        var rightCalls = 0;
+        var received = new List<string>();
+        var start = Function("Start", () => "seed-" + ++rounds);
+        var left = ((Func<string, string>)(_ => "L" + ++leftCalls)).BindAsExecutor<string, string>("Left");
+        var mid = ((Func<string, string>)(input => input)).BindAsExecutor<string, string>("Mid");
+        var delay = ((Func<string, string>)(input => input)).BindAsExecutor<string, string>("Delay");
+        var right = ((Func<string, string>)(_ => "R" + ++rightCalls)).BindAsExecutor<string, string>("Right");
+        var join = ((Func<string, string>)(input => { received.Add(input); return input; }))
+            .BindAsExecutor<string, string>("Join");
+        var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, mid])
+            .AddEdge<string>(left, left, _ => leftCalls % 2 == 1)
+            .AddEdge(mid, delay).AddEdge(delay, right).AddFanInBarrierEdge([left, right], join)
+            .AddEdge<string>(join, start, input => input?.StartsWith("R", StringComparison.Ordinal) == true && rounds < cycles)
+            .WithOutputFrom(join).Build();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "queued activations", ["Start", "Left", "Mid", "Delay", "Right", "Join"])
+            .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.True(result.IsSuccess, string.Join("; ", result.Errors?.Select(error => error.Message) ?? []));
+        Assert.Equal(cycles, rounds);
+        Assert.Equal(cycles * 2, leftCalls);
+        Assert.Equal(cycles, rightCalls);
+        var joins = result.Steps.Where(step => step.ExecutorId == "Join").ToArray();
+        Assert.Equal(cycles, joins.Length);
+        for (var cycle = 0; cycle < cycles; cycle++)
+        {
+            var expected = new[] { "L" + (cycle * 2 + 1), "L" + (cycle * 2 + 2), "R" + (cycle + 1) };
+            Assert.Equal(expected.Order(), received.Skip(cycle * 3).Take(3).Order());
+            var edges = result.Graph!.TraversedEdges!.Where(edge => edge.TargetStepIndex == joins[cycle].StepIndex).ToArray();
+            Assert.Equal(expected.Order(), edges.Select(edge => result.Steps[edge.SourceStepIndex].Output).Order());
+            Assert.All(edges, edge => Assert.Contains(edge, result.Steps[edge.SourceStepIndex].OutgoingEdges!));
+        }
+    }
+
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -132,6 +174,30 @@ public sealed partial class MAFWorkflowShapesTests
 public partial class MAFWorkflowEventBridgeTests
 {
     [Fact]
+    public async Task TranslateEvents_MultipleBufferedActivations_RetainsAllSourceIndices()
+    {
+        var ids = new[] { "Left", "Right", "Join" };
+        var graph = new WorkflowGraphSnapshot
+        {
+            EntryNodeId = "Left", ExitNodeIds = ["Join"], Nodes = ids.Select(id => new WorkflowNode { NodeId = id }).ToArray(),
+            Edges = ids.Take(2).Select(id => new WorkflowEdge
+            { EdgeId = id + ">Join", SourceExecutorId = id, TargetExecutorId = "Join", EdgeType = EdgeType.ParallelFanIn }).ToArray()
+        };
+        var events = SuperStep(0, FunctionDelivery("Left", "seed", "L1"))
+            .Concat(SuperStep(1, FunctionDelivery("Left", "L1", "L2")))
+            .Concat(SuperStep(2, FunctionDelivery("Right", "seed", "R")))
+            .Concat(SuperStep(3, FunctionDelivery("Join", "L1", "L1"), FunctionDelivery("Join", "L2", "L2"), FunctionDelivery("Join", "R", "R")));
+        var adapter = new MAFWorkflowAdapter("queued activations", (_, ct) =>
+            MAFWorkflowEventBridge.TranslateEventsAsync(RecordingEvents(events), new HashSet<string>(),
+                cancellationToken: ct, executorOrder: ids, graph: graph), ids, graphDefinition: graph);
+        var result = await adapter.ExecuteWorkflowAsync("input");
+        Assert.Equal(["Left", "Left", "Right", "Join"], result.Steps.Select(step => step.ExecutorId));
+        Assert.Equal(new[] { (0, 3), (1, 3), (2, 3) }, result.Graph!.TraversedEdges!
+            .Select(edge => (edge.SourceStepIndex, edge.TargetStepIndex)).Order());
+    }
+
+
+    [Fact]
     public void RestoreNestedAgentEvent_DuplicateAgentIdentity_RefusesArbitraryAttribution()
     {
         var left = new SharedIdentityAgent("Left").BindAsExecutor(emitEvents: true);
@@ -151,6 +217,8 @@ public partial class MAFWorkflowEventBridgeTests
     }
 
     [Theory]
+    [InlineData("eval-projection", false)]
+    [InlineData("eval-projection", true)]
     [InlineData("execution", true)]
     [InlineData("timing", false)]
     [InlineData("identity", true)]
@@ -168,6 +236,16 @@ public partial class MAFWorkflowEventBridgeTests
         Assert.Equal(hasResult, liveCall.WasExecuted);
         var trace = JsonSerializer.Deserialize<WorkflowTrace>(JsonSerializer.Serialize(recorder.Trace))!;
         var replay = await new WorkflowTraceReplayingAgent(trace).ExecuteWorkflowAsync("input");
+        if (check == "eval-projection")
+        {
+            var projected = new TestCase { Name = "tool", Input = "input" }
+                .ToEvalInput(new TestResult { TestName = "tool", Timeline = live.Timeline });
+            var call = Assert.Single(projected.ToolCalls!);
+            if (hasResult) Assert.Null(call.Result);
+            else Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, call.Result);
+            return;
+        }
+
         var replayCall = Assert.Single(Assert.Single(replay.Steps).ToolCalls!);
         switch (check)
         {

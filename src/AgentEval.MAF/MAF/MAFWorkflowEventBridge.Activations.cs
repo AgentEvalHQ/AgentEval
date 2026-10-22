@@ -318,20 +318,34 @@ public static partial class MAFWorkflowEventBridge
                 yield break;
             }
 
+            var inputs = target.Inputs.SelectMany(InputItems).ToArray();
             var candidates = graph.Edges.Where(edge => edge.TargetExecutorId == target.Id)
-                .Select(edge => (Edge: edge, Source: _emitted.LastOrDefault(source => source.Id == edge.SourceExecutorId &&
-                    source.Ordinal < target.Ordinal && source.FirstSuperstep < target.FirstSuperstep &&
-                    (source.LastSuperstep >= target.FirstSuperstep - 1 ||
-                        edge.EdgeType == EdgeType.ParallelFanIn && target.Inputs.SelectMany(InputItems).Any(input => Matches(source, input))) &&
-                    (edge.EdgeType != EdgeType.ParallelFanIn ||
-                        !_barrierDeliveries.TryGetValue((edge.EdgeId, source.StepIndex), out var deliveredAt) || deliveredAt == target.FirstSuperstep))))
-                .Where(candidate => candidate.Source is not null).ToArray();
+                .SelectMany(edge => Sources(edge).Select(source => (Edge: edge, Source: source))).ToArray();
+
+            IEnumerable<Activation> Sources(WorkflowEdge edge)
+            {
+                var eligible = _emitted.Where(source => source.Id == edge.SourceExecutorId &&
+                    source.Ordinal < target.Ordinal && source.FirstSuperstep < target.FirstSuperstep);
+                if (edge.EdgeType == EdgeType.ParallelFanIn)
+                {
+                    eligible = eligible.Where(source =>
+                        !_barrierDeliveries.TryGetValue((edge.EdgeId, source.StepIndex), out var deliveredAt) ||
+                        deliveredAt == target.FirstSuperstep);
+                    // A release drains all buffered messages, including several activations of one source.
+                    // Preserve every identifiable contributor, not only the last activation of each edge.
+                    var matched = eligible.Where(source => inputs.Any(input => Matches(source, input))).ToArray();
+                    if (matched.Length > 0) return matched;
+                }
+                // Without matching payload evidence retain the existing immediate-predecessor rule.
+                var latest = eligible.LastOrDefault(source => source.LastSuperstep >= target.FirstSuperstep - 1);
+                return latest is null ? [] : [latest];
+            }
             foreach (var candidate in candidates)
             {
                 // A barrier's invocation proves all its inputs arrived. A unique incoming candidate is also
                 // unambiguous. For other joins require matching payload evidence rather than inventing a source.
                 if (candidates.Length > 1 && candidate.Edge.EdgeType != EdgeType.ParallelFanIn &&
-                    !target.Inputs.SelectMany(InputItems).Any(input => Matches(candidate.Source!, input) &&
+                    !inputs.Any(input => Matches(candidate.Source, input) &&
                         candidates.Count(other => Matches(other.Source!, input)) == 1))
                     continue;
                 // A barrier can hold an earlier source across several supersteps. Payload evidence identifies
