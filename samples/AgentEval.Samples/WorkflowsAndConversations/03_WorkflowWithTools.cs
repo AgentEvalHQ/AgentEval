@@ -128,10 +128,7 @@ public static class WorkflowWithTools
             Console.WriteLine("   📈 EXECUTION TIMELINE:");
             foreach (var step in result.Steps)
             {
-                var startMs = step.StartOffset.TotalMilliseconds;
-                var durMs = step.Duration.TotalMilliseconds;
-
-                Console.WriteLine($"      {step.StepIndex + 1}. [{startMs:F0}ms] {step.ExecutorId} ({durMs:F0}ms)");
+                WorkflowWithToolsReport.WriteStep(Console.Out, step);
 
                 if (!string.IsNullOrEmpty(step.Output))
                 {
@@ -150,10 +147,7 @@ public static class WorkflowWithTools
 
             if (result.ToolUsage != null)
             {
-                Console.WriteLine($"   📊 ToolUsage report: {result.ToolUsage.Count} total tool calls");
-                Console.WriteLine($"   🔧 Unique tools: {string.Join(", ", result.ToolUsage.UniqueToolNames)}");
-                Console.WriteLine($"   ⏱️ Total tool time: {result.ToolUsage.TotalToolTime.TotalMilliseconds:F0}ms");
-                Console.WriteLine($"   ❌ Has errors: {result.ToolUsage.HasErrors}\n");
+                WorkflowWithToolsReport.WriteToolSummary(Console.Out, result.ToolUsage);
 
                 // Per-executor breakdown
                 foreach (var step in result.Steps.Where(s => s.HasToolCalls))
@@ -161,9 +155,8 @@ public static class WorkflowWithTools
                     Console.WriteLine($"   📌 {step.ExecutorId}: {step.ToolCalls!.Count} tool call(s)");
                     foreach (var tc in step.ToolCalls!)
                     {
-                        var duration = tc.Duration?.TotalMilliseconds ?? 0;
                         var resultSnippet = tc.Result?.ToString() is { } text ? WorkflowEvaluationReal.Snippet(text, 80) : "(no result)";
-                        Console.WriteLine($"      🔧 {tc.Name} ({duration:F0}ms) → {resultSnippet}");
+                        WorkflowWithToolsReport.WriteToolCall(Console.Out, tc, resultSnippet);
                     }
                 }
 
@@ -181,10 +174,7 @@ public static class WorkflowWithTools
             // Timeline display
             if (result.Timeline != null)
             {
-                Console.WriteLine($"\n   📈 TOOL TIMELINE:");
-                Console.WriteLine($"      Total: {result.Timeline.TotalToolCalls} calls, {result.Timeline.TotalDuration.TotalMilliseconds:F0}ms total");
-                Console.WriteLine($"      Tool time: {result.Timeline.TotalToolTime.TotalMilliseconds:F0}ms ({result.Timeline.ToolTimePercentage:F1}%)");
-                Console.WriteLine(result.Timeline.ToAsciiDiagram(80));
+                WorkflowWithToolsReport.WriteTimeline(Console.Out, result.Timeline);
             }
         }
 
