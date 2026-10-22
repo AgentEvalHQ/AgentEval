@@ -149,11 +149,13 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 traceStep.ToolCalls = step.ToolCalls.Select(tc => new TraceToolCall
                 {
                     Name = tc.Name,
+                    CallId = tc.CallId,
+                    WasExecuted = tc.WasExecuted,
                     Arguments = tc.Arguments != null
                         ? JsonSerializer.Serialize(tc.Arguments)
                         : null,
                     Result = SanitizeText(tc.Result?.ToString()),
-                    Succeeded = tc.Exception == null,
+                    Succeeded = tc.WasExecuted && tc.Exception == null,
                     Error = tc.Exception?.Message,
                     StartedAt = tc.StartTime, // persist per-tool start so replay can reconstruct timing (BUG-45)
                     DurationMs = (long?)tc.Duration?.TotalMilliseconds
@@ -173,24 +175,12 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
             // Record edge information
             if (step.IncomingEdge != null)
             {
-                traceStep.IncomingEdge = new WorkflowTraceEdge
-                {
-                    From = step.IncomingEdge.SourceExecutorId,
-                    To = step.IncomingEdge.TargetExecutorId,
-                    EdgeType = step.IncomingEdge.EdgeType.ToString(),
-                    Condition = step.IncomingEdge.RoutingReason
-                };
+                traceStep.IncomingEdge = RecordEdge(step.IncomingEdge);
             }
 
             if (step.OutgoingEdges != null && step.OutgoingEdges.Count > 0)
             {
-                traceStep.OutgoingEdges = step.OutgoingEdges.Select(e => new WorkflowTraceEdge
-                {
-                    From = e.SourceExecutorId,
-                    To = e.TargetExecutorId,
-                    EdgeType = e.EdgeType.ToString(),
-                    Condition = e.RoutingReason
-                }).ToList();
+                traceStep.OutgoingEdges = step.OutgoingEdges.Select(RecordEdge).ToList();
             }
 
             // Map any workflow-level error recorded for this executor into the step trace so
@@ -235,8 +225,12 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 ExitPoints = result.Graph.ExitNodeIds?.ToList(),
                 HasConditionalRouting = result.Graph.HasConditionalRouting,
                 HasParallelExecution = result.HasParallelExecution,
+                TraversedEdges = result.Graph.TraversedEdges?.Select(RecordEdge).ToList(),
+                ParallelBranches = result.Graph.ParallelBranches?.Select(branch => branch with
+                    { Output = SanitizeText(branch.Output) }).ToList(),
                 Edges = result.Graph.Edges.Select(e => new WorkflowTraceEdge
                 {
+                    EdgeId = e.EdgeId,
                     From = e.SourceExecutorId,
                     To = e.TargetExecutorId,
                     EdgeType = e.EdgeType.ToString(),
@@ -364,6 +358,21 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
 
         return agentTrace;
     }
+
+    private WorkflowTraceEdge RecordEdge(EdgeExecution edge) => new()
+    {
+        EdgeId = edge.EdgeId,
+        From = edge.SourceExecutorId,
+        To = edge.TargetExecutorId,
+        EdgeType = edge.EdgeType.ToString(),
+        Condition = edge.RoutingReason,
+        SourceStepIndex = edge.SourceStepIndex,
+        TargetStepIndex = edge.TargetStepIndex,
+        TraversedAt = edge.TraversedAt,
+        ConditionResult = edge.ConditionResult,
+        MatchedSwitchLabel = edge.MatchedSwitchLabel,
+        TransferredData = SanitizeText(edge.TransferredData)
+    };
 
     private void FinalizeTrace()
     {

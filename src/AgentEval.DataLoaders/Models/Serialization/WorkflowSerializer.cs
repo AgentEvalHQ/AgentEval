@@ -276,6 +276,7 @@ public static class WorkflowSerializer
                 ToolCalls = s.ToolCalls?.Select(t => new ToolCallExport
                 {
                     Name = t.Name,
+                    WasExecuted = t.WasExecuted,
                     Duration = t.Duration,
                     HasError = t.HasError
                 }).ToList()
@@ -482,6 +483,8 @@ public record ErrorExport
 
 public record ToolCallExport
 {
+    /// <summary>Whether a result was observed for this tool call.</summary>
+    public bool WasExecuted { get; init; }
     public required string Name { get; init; }
     public TimeSpan? Duration { get; init; }
     public bool HasError { get; init; }

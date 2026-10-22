@@ -240,6 +240,34 @@ public class WorkflowTraceRoutingDecision
 /// </summary>
 public class WorkflowTraceEdge
 {
+    /// <summary>Original edge identity. Null denotes a legacy trace.</summary>
+    [JsonPropertyName("edgeId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EdgeId { get; set; }
+    /// <summary>Source activation index, when observed.</summary>
+    [JsonPropertyName("sourceStepIndex")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SourceStepIndex { get; set; }
+    /// <summary>Target activation index, when observed.</summary>
+    [JsonPropertyName("targetStepIndex")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? TargetStepIndex { get; set; }
+    /// <summary>Observed traversal time, preserved at tick precision.</summary>
+    [JsonPropertyName("traversedAt")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeSpan? TraversedAt { get; set; }
+    /// <summary>Observed conditional result.</summary>
+    [JsonPropertyName("conditionResult")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ConditionResult { get; set; }
+    /// <summary>Matched switch case.</summary>
+    [JsonPropertyName("matchedSwitchLabel")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MatchedSwitchLabel { get; set; }
+    /// <summary>Data observed crossing this edge.</summary>
+    [JsonPropertyName("transferredData")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TransferredData { get; set; }
     /// <summary>
     /// Source executor ID.
     /// </summary>
@@ -270,6 +298,14 @@ public class WorkflowTraceEdge
 /// </summary>
 public class WorkflowTraceGraph
 {
+    /// <summary>Observed traversals, distinct from declared edges. Null means none were captured.</summary>
+    [JsonPropertyName("traversedEdges")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<WorkflowTraceEdge>? TraversedEdges { get; set; }
+    /// <summary>Observed branch membership and timing, when captured.</summary>
+    [JsonPropertyName("parallelBranches")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ParallelBranch>? ParallelBranches { get; set; }
     /// <summary>
     /// All nodes (executors) in the graph.
     /// </summary>

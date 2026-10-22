@@ -31,6 +31,12 @@ public sealed record ToolInvocation
     /// </summary>
     public required bool Succeeded { get; init; }
 
+    /// <summary>Why no tool outcome was observed; null preserves legacy measured outcomes.</summary>
+    public string? OutcomeNotMeasuredReason { get; init; }
+
+    /// <summary>Why duration is unavailable; null preserves legacy measured timing, including zero.</summary>
+    public string? TimingNotMeasuredReason { get; init; }
+
     /// <summary>
     /// Error message if the tool call failed.
     /// </summary>
@@ -98,17 +104,25 @@ public sealed class ToolCallTimeline
     /// <summary>
     /// Number of successful tool calls.
     /// </summary>
-    public int SuccessfulToolCalls => _invocations.Count(i => i.Succeeded);
+    public int SuccessfulToolCalls => _invocations.Count(i => i.OutcomeNotMeasuredReason is null && i.Succeeded);
 
     /// <summary>
     /// Number of failed tool calls.
     /// </summary>
-    public int FailedToolCalls => _invocations.Count(i => !i.Succeeded);
+    public int FailedToolCalls => _invocations.Count(i => i.OutcomeNotMeasuredReason is null && !i.Succeeded);
+
+    /// <summary>Calls without an observed outcome; excluded from success and failure counts.</summary>
+    public int UnmeasuredOutcomeCount => _invocations.Count(i => i.OutcomeNotMeasuredReason is not null);
+
+    /// <summary>Calls without measured timing; excluded from duration statistics.</summary>
+    public int UnmeasuredDurationCount => _invocations.Count(i => i.TimingNotMeasuredReason is not null);
+
+    private IEnumerable<ToolInvocation> TimedInvocations => _invocations.Where(i => i.TimingNotMeasuredReason is null);
 
     /// <summary>
-    /// Total time spent in tool execution.
+    /// Sum of measured tool durations. See <see cref="UnmeasuredDurationCount"/> for omitted calls.
     /// </summary>
-    public TimeSpan TotalToolTime => TimeSpan.FromTicks(_invocations.Sum(i => i.Duration.Ticks));
+    public TimeSpan TotalToolTime => TimeSpan.FromTicks(TimedInvocations.Sum(i => i.Duration.Ticks));
 
     /// <summary>
     /// Percentage of time spent in tool execution vs total duration.
@@ -118,16 +132,16 @@ public sealed class ToolCallTimeline
         : 0;
 
     /// <summary>
-    /// Average tool call duration.
+    /// Average measured tool duration; zero if none were measured. See <see cref="UnmeasuredDurationCount"/>.
     /// </summary>
-    public TimeSpan AverageToolDuration => _invocations.Count > 0
-        ? TimeSpan.FromTicks(_invocations.Sum(i => i.Duration.Ticks) / _invocations.Count)
+    public TimeSpan AverageToolDuration => TimedInvocations.Any()
+        ? TimeSpan.FromTicks(TimedInvocations.Sum(i => i.Duration.Ticks) / TimedInvocations.Count())
         : TimeSpan.Zero;
 
     /// <summary>
     /// The slowest tool call.
     /// </summary>
-    public ToolInvocation? SlowestTool => _invocations.MaxBy(i => i.Duration);
+    public ToolInvocation? SlowestTool => TimedInvocations.MaxBy(i => i.Duration);
 
     /// <summary>
     /// Adds a tool invocation to the timeline.
@@ -150,12 +164,14 @@ public sealed class ToolCallTimeline
                 {
                     ToolName = g.Key,
                     CallCount = g.Count(),
-                    SuccessCount = g.Count(i => i.Succeeded),
-                    FailureCount = g.Count(i => !i.Succeeded),
-                    TotalDuration = TimeSpan.FromTicks(g.Sum(i => i.Duration.Ticks)),
-                    AverageDuration = TimeSpan.FromTicks((long)g.Average(i => i.Duration.Ticks)),
-                    MinDuration = g.Min(i => i.Duration),
-                    MaxDuration = g.Max(i => i.Duration)
+                    SuccessCount = g.Count(i => i.OutcomeNotMeasuredReason is null && i.Succeeded),
+                    FailureCount = g.Count(i => i.OutcomeNotMeasuredReason is null && !i.Succeeded),
+                    UnmeasuredOutcomeCount = g.Count(i => i.OutcomeNotMeasuredReason is not null),
+                    UnmeasuredDurationCount = g.Count(i => i.TimingNotMeasuredReason is not null),
+                    TotalDuration = TimeSpan.FromTicks(g.Where(i => i.TimingNotMeasuredReason is null).Sum(i => i.Duration.Ticks)),
+                    AverageDuration = TimeSpan.FromTicks((long)g.Where(i => i.TimingNotMeasuredReason is null).Select(i => i.Duration.Ticks).DefaultIfEmpty().Average()),
+                    MinDuration = g.Where(i => i.TimingNotMeasuredReason is null).Select(i => i.Duration).DefaultIfEmpty().Min(),
+                    MaxDuration = g.Where(i => i.TimingNotMeasuredReason is null).Select(i => i.Duration).DefaultIfEmpty().Max()
                 });
     }
 
@@ -176,7 +192,9 @@ public sealed class ToolCallTimeline
         if (totalMs <= 0) totalMs = 1;
 
         sb.AppendLine($"┌─ Tool Call Timeline ({TotalToolCalls} calls, {TotalDuration.TotalMilliseconds:F0}ms total) ─┐");
-        sb.AppendLine($"│ TTFT: {TimeToFirstToken.TotalMilliseconds:F0}ms | Tool Time: {TotalToolTime.TotalMilliseconds:F0}ms ({ToolTimePercentage:F1}%)");
+        sb.AppendLine(UnmeasuredDurationCount > 0
+            ? $"│ TTFT: {TimeToFirstToken.TotalMilliseconds:F0}ms | Tool Time: not measured for {UnmeasuredDurationCount} call(s); measured subtotal {TotalToolTime.TotalMilliseconds:F0}ms"
+            : $"│ TTFT: {TimeToFirstToken.TotalMilliseconds:F0}ms | Tool Time: {TotalToolTime.TotalMilliseconds:F0}ms ({ToolTimePercentage:F1}%)");
         sb.AppendLine("├" + new string('─', width - 2) + "┤");
 
         foreach (var inv in _invocations)
@@ -191,11 +209,13 @@ public sealed class ToolCallTimeline
             var bar = new string(inv.Succeeded ? '█' : '░', length);
             var padding = new string(' ', startPos);
 
-            var status = inv.Succeeded ? "✓" : "✗";
+            var status = inv.OutcomeNotMeasuredReason is not null ? "?" : inv.Succeeded ? "✓" : "✗";
             var toolLabel = TruncateWithEllipsis(inv.ToolName, 20);
-            var duration = $"{inv.Duration.TotalMilliseconds:F0}ms";
+            var duration = inv.TimingNotMeasuredReason is not null ? "not measured" : $"{inv.Duration.TotalMilliseconds:F0}ms";
 
             sb.AppendLine($"│ {status} {toolLabel,-20} │{padding}{bar}│ {duration,6}");
+            if (inv.OutcomeNotMeasuredReason is not null)
+                sb.AppendLine($"│   └─ Outcome not measured: {inv.OutcomeNotMeasuredReason}");
 
             if (!inv.Succeeded && !string.IsNullOrEmpty(inv.ErrorMessage))
             {
@@ -228,6 +248,8 @@ public sealed class ToolCallTimeline
     public string ToCompactSummary()
     {
         var failures = FailedToolCalls > 0 ? $", {FailedToolCalls} failed" : "";
+        if (UnmeasuredOutcomeCount > 0) failures += $", {UnmeasuredOutcomeCount} outcome(s) not measured";
+        if (UnmeasuredDurationCount > 0) failures += $", {UnmeasuredDurationCount} duration(s) not measured";
         return $"Timeline: {TotalToolCalls} tools, {TotalDuration.TotalMilliseconds:F0}ms total, TTFT {TimeToFirstToken.TotalMilliseconds:F0}ms{failures}";
     }
 
@@ -257,6 +279,10 @@ public sealed class ToolCallTimeline
 /// </summary>
 public sealed record ToolStatistics
 {
+    /// <summary>Calls omitted from outcome counts.</summary>
+    public int UnmeasuredOutcomeCount { get; init; }
+    /// <summary>Calls omitted from duration statistics; numeric durations summarize measured calls only.</summary>
+    public int UnmeasuredDurationCount { get; init; }
     public required string ToolName { get; init; }
     public required int CallCount { get; init; }
     public required int SuccessCount { get; init; }
@@ -266,5 +292,7 @@ public sealed record ToolStatistics
     public required TimeSpan MinDuration { get; init; }
     public required TimeSpan MaxDuration { get; init; }
 
-    public double SuccessRate => CallCount > 0 ? (double)SuccessCount / CallCount * 100 : 0;
+    /// <summary>Success percentage among observed outcomes; null when every recorded outcome is unmeasured.</summary>
+    public double? SuccessRate => SuccessCount + FailureCount > 0
+        ? (double)SuccessCount / (SuccessCount + FailureCount) * 100 : UnmeasuredOutcomeCount > 0 ? null : 0;
 }

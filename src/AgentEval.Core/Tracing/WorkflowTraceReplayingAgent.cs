@@ -147,13 +147,15 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
             ToolCalls = s.ToolCalls?.Select(tc => new ToolCallRecord
             {
                 Name = tc.Name,
-                CallId = $"replay-{tc.Name}-{s.StepIndex}",
+                CallId = tc.CallId ?? $"replay-{tc.Name}-{s.StepIndex}-{globalToolOrder + 1}",
+                ExecutorId = s.ExecutorId,
+                WasExecuted = tc.WasExecuted ?? false,
                 Arguments = ParseRecordedArgumentsOrNull(tc.Arguments),
                 Result = tc.Result,
                 Exception = tc.Failed ? new Exception(tc.Error ?? "Unknown error") : null,   // B10f
                 Order = ++globalToolOrder,
                 StartTime = tc.StartedAt,
-                EndTime = tc.StartedAt?.AddMilliseconds(tc.DurationMs ?? 0)
+                EndTime = tc.DurationMs is { } duration ? tc.StartedAt?.AddMilliseconds(duration) : null
             }).ToList(),
             TokenUsage = s.TokenUsage != null
                 ? new TokenUsage
@@ -162,24 +164,8 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                     CompletionTokens = s.TokenUsage.CompletionTokens
                 }
                 : null,
-            IncomingEdge = s.IncomingEdge != null
-                ? new EdgeExecution
-                {
-                    EdgeId = $"{s.IncomingEdge.From}->{s.IncomingEdge.To}",
-                    SourceExecutorId = s.IncomingEdge.From,
-                    TargetExecutorId = s.IncomingEdge.To,
-                    EdgeType = ParseEdgeType(s.IncomingEdge.EdgeType),
-                    RoutingReason = s.IncomingEdge.Condition
-                }
-                : null,
-            OutgoingEdges = s.OutgoingEdges?.Select(e => new EdgeExecution
-            {
-                EdgeId = $"{e.From}->{e.To}",
-                SourceExecutorId = e.From,
-                TargetExecutorId = e.To,
-                EdgeType = ParseEdgeType(e.EdgeType),
-                RoutingReason = e.Condition
-            }).ToList()
+            IncomingEdge = s.IncomingEdge is not null ? ReplayEdge(s.IncomingEdge) : null,
+            OutgoingEdges = s.OutgoingEdges?.Select(ReplayEdge).ToList()
         }).ToList();
 
         var routingDecisions = _trace.RoutingDecisions?.Select(rd => new RoutingDecision
@@ -203,9 +189,11 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 }).ToList(),
                 EntryNodeId = _trace.Graph.EntryPoint ?? _trace.Graph.Nodes.FirstOrDefault() ?? string.Empty,
                 ExitNodeIds = _trace.Graph.ExitPoints ?? new List<string>(),
+                TraversedEdges = _trace.Graph.TraversedEdges?.Select(ReplayEdge).ToList(),
+                ParallelBranches = _trace.Graph.ParallelBranches?.ToList(),
                 Edges = _trace.Graph.Edges.Select(e => new WorkflowEdge
                 {
-                    EdgeId = $"{e.From}->{e.To}",
+                    EdgeId = e.EdgeId ?? $"{e.From}->{e.To}",
                     SourceExecutorId = e.From,
                     TargetExecutorId = e.To,
                     EdgeType = ParseEdgeType(e.EdgeType),
@@ -234,6 +222,21 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
             Errors = errors
         };
     }
+
+    private static EdgeExecution ReplayEdge(WorkflowTraceEdge edge) => new()
+    {
+        EdgeId = edge.EdgeId ?? $"{edge.From}->{edge.To}",
+        SourceExecutorId = edge.From,
+        TargetExecutorId = edge.To,
+        EdgeType = ParseEdgeType(edge.EdgeType),
+        RoutingReason = edge.Condition,
+        SourceStepIndex = edge.SourceStepIndex ?? -1,
+        TargetStepIndex = edge.TargetStepIndex ?? -1,
+        TraversedAt = edge.TraversedAt ?? TimeSpan.Zero,
+        ConditionResult = edge.ConditionResult,
+        MatchedSwitchLabel = edge.MatchedSwitchLabel,
+        TransferredData = edge.TransferredData
+    };
 
     private void ValidatePrompt(string actualPrompt)
     {

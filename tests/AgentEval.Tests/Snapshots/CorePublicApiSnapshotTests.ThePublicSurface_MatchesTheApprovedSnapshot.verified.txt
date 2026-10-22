@@ -2162,9 +2162,11 @@ class AgentEval.Tracing.TraceTokenUsage
 class AgentEval.Tracing.TraceToolCall
     System.Boolean Failed { get; }
     System.Boolean Succeeded { get; set; }
+    System.Boolean? WasExecuted { get; set; }
     System.DateTimeOffset? StartedAt { get; set; }
     System.Int64? DurationMs { get; set; }
     System.String Arguments { get; set; }
+    System.String CallId { get; set; }
     System.String Error { get; set; }
     System.String Name { get; set; }
     System.String Result { get; set; }
@@ -2191,10 +2193,17 @@ sealed class AgentEval.Tracing.WorkflowTrace
     System.String WorkflowType { get; set; }
     ctor()
 class AgentEval.Tracing.WorkflowTraceEdge
+    System.Boolean? ConditionResult { get; set; }
+    System.Int32? SourceStepIndex { get; set; }
+    System.Int32? TargetStepIndex { get; set; }
     System.String Condition { get; set; }
+    System.String EdgeId { get; set; }
     System.String EdgeType { get; set; }
     System.String From { get; set; }
+    System.String MatchedSwitchLabel { get; set; }
     System.String To { get; set; }
+    System.String TransferredData { get; set; }
+    System.TimeSpan? TraversedAt { get; set; }
     ctor()
 class AgentEval.Tracing.WorkflowTraceError
     System.Int64 OccurredAtMs { get; set; }
@@ -2206,7 +2215,9 @@ class AgentEval.Tracing.WorkflowTraceError
 class AgentEval.Tracing.WorkflowTraceGraph
     System.Boolean HasConditionalRouting { get; set; }
     System.Boolean HasParallelExecution { get; set; }
+    System.Collections.Generic.List<AgentEval.Models.ParallelBranch> ParallelBranches { get; set; }
     System.Collections.Generic.List<AgentEval.Tracing.WorkflowTraceEdge> Edges { get; set; }
+    System.Collections.Generic.List<AgentEval.Tracing.WorkflowTraceEdge> TraversedEdges { get; set; }
     System.Collections.Generic.List<System.String> ExitPoints { get; set; }
     System.Collections.Generic.List<System.String> Nodes { get; set; }
     System.String EntryPoint { get; set; }

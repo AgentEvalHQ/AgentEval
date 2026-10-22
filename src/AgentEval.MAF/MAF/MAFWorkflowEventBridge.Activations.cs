@@ -24,6 +24,8 @@ public static partial class MAFWorkflowEventBridge
         private readonly Dictionary<(string Executor, string Call), PendingCall> _pendingCalls = [];
         private readonly Dictionary<string, BranchSummary> _branches = new(StringComparer.Ordinal);
         private readonly HashSet<string> _reportedPendingRequests = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Edge, int Source), int> _barrierDeliveries = [];
+        private readonly Dictionary<(int Source, string Target), string> _forkBranches = [];
         private int _superstep;
         private int _ordinal;
         private Activation? _lastOutput;
@@ -267,13 +269,22 @@ public static partial class MAFWorkflowEventBridge
 
             var forks = batch.SelectMany(target => target.Incoming.Where(edge => edge.EdgeType == EdgeType.ParallelFanOut)
                     .Select(edge => (edge.SourceStepIndex, Target: target)))
-                .GroupBy(item => item.SourceStepIndex).Where(group => group.Select(item => item.Target.StepIndex).Distinct().Count() > 1);
+                .GroupBy(item => item.SourceStepIndex).Where(group => group.Select(item => item.Target.Id).Distinct().Count() > 1);
             foreach (var fork in forks)
-                foreach (var item in fork)
-                    item.Target.BranchId = $"fork-{fork.Key}-step-{item.Target.StepIndex}";
+                foreach (var target in fork.GroupBy(item => item.Target.Id))
+                {
+                    var key = (fork.Key!.Value, target.Key);
+                    if (!_forkBranches.TryGetValue(key, out var branchId))
+                        _forkBranches.Add(key, branchId = $"fork-{fork.Key}-step-{target.First().Target.StepIndex}");
+                    foreach (var item in target)
+                        item.Target.BranchId = branchId;
+                }
 
             foreach (var activation in batch)
             {
+                if (activation.BranchId is null && activation.Incoming.Count == 1 &&
+                    activation.Incoming[0] is { EdgeType: EdgeType.ParallelFanOut, SourceStepIndex: { } source })
+                    activation.BranchId = _forkBranches.GetValueOrDefault((source, activation.Id));
                 if (activation.BranchId is null && activation.Incoming.Count == 1 &&
                     activation.Incoming[0].EdgeType != EdgeType.ParallelFanIn)
                     activation.BranchId = _emitted[activation.Incoming[0].SourceStepIndex!.Value].BranchId;
@@ -310,7 +321,10 @@ public static partial class MAFWorkflowEventBridge
             var candidates = graph.Edges.Where(edge => edge.TargetExecutorId == target.Id)
                 .Select(edge => (Edge: edge, Source: _emitted.LastOrDefault(source => source.Id == edge.SourceExecutorId &&
                     source.Ordinal < target.Ordinal && source.FirstSuperstep < target.FirstSuperstep &&
-                    source.LastSuperstep >= target.FirstSuperstep - 1)))
+                    (source.LastSuperstep >= target.FirstSuperstep - 1 ||
+                        edge.EdgeType == EdgeType.ParallelFanIn && target.Inputs.SelectMany(InputItems).Any(input => Matches(source, input))) &&
+                    (edge.EdgeType != EdgeType.ParallelFanIn ||
+                        !_barrierDeliveries.TryGetValue((edge.EdgeId, source.StepIndex), out var deliveredAt) || deliveredAt == target.FirstSuperstep))))
                 .Where(candidate => candidate.Source is not null).ToArray();
             foreach (var candidate in candidates)
             {
@@ -320,6 +334,11 @@ public static partial class MAFWorkflowEventBridge
                     !target.Inputs.SelectMany(InputItems).Any(input => Matches(candidate.Source!, input) &&
                         candidates.Count(other => Matches(other.Source!, input)) == 1))
                     continue;
+                // A barrier can hold an earlier source across several supersteps. Payload evidence identifies
+                // that queued source; a consumed release cannot be reused by a later barrier cycle. Multiple
+                // agent turns released in the same superstep still share that release's source activations.
+                if (candidate.Edge.EdgeType == EdgeType.ParallelFanIn)
+                    _barrierDeliveries[(candidate.Edge.EdgeId, candidate.Source!.StepIndex)] = target.FirstSuperstep;
                 yield return Edge(candidate.Source!, target, candidate.Edge.EdgeType, candidate.Edge.EdgeId,
                     candidate.Edge.SwitchLabel);
             }

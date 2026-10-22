@@ -1603,6 +1603,8 @@ sealed class AgentEval.Models.ToolCallTimeline
     Int32 FailedToolCalls { get; }
     Int32 SuccessfulToolCalls { get; }
     Int32 TotalToolCalls { get; }
+    Int32 UnmeasuredDurationCount { get; }
+    Int32 UnmeasuredOutcomeCount { get; }
     String ConversationId { get; set; }
     String ToAsciiDiagram(Int32 width = 80)
     String ToCompactSummary()
@@ -1622,7 +1624,9 @@ sealed class AgentEval.Models.ToolInvocation : IEquatable<AgentEval.Models.ToolI
     Int32 SequenceIndex { get; init; }
     String Arguments { get; init; }
     String ErrorMessage { get; init; }
+    String OutcomeNotMeasuredReason { get; init; }
     String Result { get; init; }
+    String TimingNotMeasuredReason { get; init; }
     String ToString()
     String ToolName { get; init; }
     TimeSpan Duration { get; init; }
@@ -1633,11 +1637,13 @@ sealed class AgentEval.Models.ToolStatistics : IEquatable<AgentEval.Models.ToolS
     AgentEval.Models.ToolStatistics <Clone>$()
     Boolean Equals(AgentEval.Models.ToolStatistics other)
     Boolean Equals(Object obj)
-    Double SuccessRate { get; }
+    Double? SuccessRate { get; }
     Int32 CallCount { get; init; }
     Int32 FailureCount { get; init; }
     Int32 GetHashCode()
     Int32 SuccessCount { get; init; }
+    Int32 UnmeasuredDurationCount { get; init; }
+    Int32 UnmeasuredOutcomeCount { get; init; }
     String ToString()
     String ToolName { get; init; }
     TimeSpan AverageDuration { get; init; }

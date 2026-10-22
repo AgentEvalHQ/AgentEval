@@ -343,6 +343,15 @@ public class TraceToolDefinition
 /// </summary>
 public class TraceToolCall
 {
+    /// <summary>Original tool-call identity, when captured.</summary>
+    [JsonPropertyName("callId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CallId { get; set; }
+
+    /// <summary>Whether execution was observed. Null denotes legacy traces without execution evidence.</summary>
+    [JsonPropertyName("wasExecuted")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? WasExecuted { get; set; }
     /// <summary>
     /// Name of the tool that was called.
     /// </summary>
@@ -386,13 +395,14 @@ public class TraceToolCall
     public string? Error { get; set; }
 
     /// <summary>
-    /// Whether the call failed: a recorded <see cref="Error"/> is a failure whatever <see cref="Succeeded"/> says. The
+    /// Whether the call failed: explicit unexecuted intent without an error has no failure outcome. A recorded
+    /// <see cref="Error"/> is a failure whatever <see cref="Succeeded"/> or <see cref="WasExecuted"/> says. The
     /// flag defaults to <see langword="true"/>, so a trace written without it read an errored call as a success — in the
     /// tool-call projection (fixed in B6c-5), and in the Glass Box tool checks and the workflow replayer until #203 review
     /// round 3 (B10f). Every reader of a call's outcome uses this. Not serialized.
     /// </summary>
     [JsonIgnore]
-    public bool Failed => !Succeeded || Error is not null;
+    public bool Failed => Error is not null || WasExecuted != false && !Succeeded;
 }
 
 /// <summary>

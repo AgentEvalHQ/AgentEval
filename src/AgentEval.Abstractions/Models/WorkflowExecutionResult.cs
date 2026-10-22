@@ -115,7 +115,9 @@ public record WorkflowExecutionResult
                         // to the right whenever per-tool timing was present (BUG-42).
                         StartTime = step.StartOffset,
                         Duration = tc.Duration ?? TimeSpan.Zero,
-                        Succeeded = !tc.HasError,
+                        Succeeded = tc.WasExecuted && !tc.HasError,
+                        OutcomeNotMeasuredReason = !tc.WasExecuted && !tc.HasError ? "Tool execution was not observed." : null,
+                        TimingNotMeasuredReason = !tc.HasTiming ? "Tool completion timing was not observed." : null,
                         ErrorMessage = tc.Exception?.Message,
                         Arguments = tc.GetArgumentsAsJson(),
                         Result = tc.Result?.ToString()

@@ -131,6 +131,16 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             return (null, null);
         }
 
+        void AppendCurrentStep()
+        {
+            if (currentExecutorId is null) return;
+            var (usage, finishReason) = TakeLedger(currentExecutorId);
+            var (startOffset, duration) = StepTiming();
+            steps.Add(CreateStep(currentExecutorId, currentOutput.ToString(), startOffset, duration,
+                stepIndex, currentToolCalls, stepIncomingEdge, currentOutgoingEdges, stepBranchId,
+                usage, finishReason, timingNotMeasuredReason));
+        }
+
         // The output-accumulation + executor-switch bookkeeping shared by ExecutorOutputEvent and its
         // ExecutorAgentResponseEvent subclass. Flushes the previous executor's step (with its ledger
         // values) when the executor changes, then begins tracking the new one.
@@ -138,21 +148,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         {
             if ((e.StartsNewStep || currentExecutorId != e.ExecutorId) && currentExecutorId != null)
             {
-                var (usage, finishReason) = TakeLedger(currentExecutorId);
-                var (startOffset, duration) = StepTiming();
-                steps.Add(CreateStep(
-                    currentExecutorId,
-                    currentOutput.ToString(),
-                    startOffset,
-                    duration,
-                    stepIndex++,
-                    currentToolCalls,
-                    stepIncomingEdge,
-                    currentOutgoingEdges,
-                    stepBranchId,
-                    usage,
-                    finishReason,
-                    timingNotMeasuredReason));
+                AppendCurrentStep();
+                stepIndex++;
 
                 currentToolCalls = [];
                 currentOutgoingEdges = [];
@@ -252,21 +249,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         // the source executor's step (the original off-by-one attribution bug).
                         if (currentExecutorId != null)
                         {
-                            var (edgeUsage, edgeFinishReason) = TakeLedger(currentExecutorId);
-                            var (edgeStartOffset, edgeDuration) = StepTiming();
-                            steps.Add(CreateStep(
-                                currentExecutorId,
-                                currentOutput.ToString(),
-                                edgeStartOffset,
-                                edgeDuration,
-                                stepIndex++,
-                                currentToolCalls,
-                                stepIncomingEdge,
-                                currentOutgoingEdges,
-                                stepBranchId,
-                                edgeUsage,
-                                edgeFinishReason,
-                                timingNotMeasuredReason));
+                            AppendCurrentStep();
+                            stepIndex++;
 
                             currentToolCalls = [];
                             currentOutgoingEdges = [];
@@ -373,21 +357,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         // or the final executor of every workflow loses its tokens/finish reason.
                         if (currentExecutorId != null)
                         {
-                            var (completeUsage, completeFinishReason) = TakeLedger(currentExecutorId);
-                            var (completeStartOffset, completeDuration) = StepTiming();
-                            steps.Add(CreateStep(
-                                currentExecutorId,
-                                currentOutput.ToString(),
-                                completeStartOffset,
-                                completeDuration,
-                                stepIndex,
-                                currentToolCalls,
-                                stepIncomingEdge,
-                                currentOutgoingEdges,
-                                stepBranchId,
-                                completeUsage,
-                                completeFinishReason,
-                                timingNotMeasuredReason));
+                            AppendCurrentStep();
                         }
                         workflowComplete = true;
                         break;
@@ -400,21 +370,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             // If no WorkflowCompleteEvent was received, save final step
             if (currentExecutorId != null && !steps.Any(s => s.ExecutorId == currentExecutorId && s.StepIndex == stepIndex))
             {
-                var (finalUsage, finalFinishReason) = TakeLedger(currentExecutorId);
-                var (finalStartOffset, finalDuration) = StepTiming();
-                steps.Add(CreateStep(
-                    currentExecutorId,
-                    currentOutput.ToString(),
-                    finalStartOffset,
-                    finalDuration,
-                    stepIndex,
-                    currentToolCalls,
-                    stepIncomingEdge,
-                    currentOutgoingEdges,
-                    stepBranchId,
-                    finalUsage,
-                    finalFinishReason,
-                    timingNotMeasuredReason));
+                AppendCurrentStep();
             }
 
             overallStopwatch.Stop();

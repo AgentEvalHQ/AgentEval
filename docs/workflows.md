@@ -180,7 +180,15 @@ Parallel steps are timed to each executor's own completion. Recorded fan-out bra
 
 MAF's fan-in barrier releases individual messages; it does not aggregate them into an array. With agent chat protocols, it can leave message accumulation waiting for another token. The recorder preserves each observed turn and any remaining accumulation separately; the latter does not erase the last produced output. Use ordinary incoming edges when each upstream agent should trigger its own turn. The barrier's message-routing behavior is controlled by MAF.
 
+An unequal-depth barrier can retain a source message across supersteps. Matching payload evidence keeps that source activation attached to the eventual join; consumed evidence is not reused for a later barrier cycle. Repeated turns or trailing accumulation on one selected fan-out target retain that target's branch identity for the same source activation.
+
 A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with "time not measured" and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Custom sources without an explicit missing-timing reason keep arrival timing.
+
+**Tool evidence and replay.** A requested tool is retained even when no result arrives. Only an observed result sets `WasExecuted`, including a legitimate null result. Workflow trace JSON retains that execution marker and the call ID; replay preserves unknown completion timing. Legacy traces without the marker keep execution unconfirmed. Workflow JSON exports also include `WasExecuted`.
+
+Timeline invocations carry `OutcomeNotMeasuredReason` and `TimingNotMeasuredReason`. Unknown outcomes are excluded from success/failure counts; unknown durations are excluded from timing statistics. Numeric duration aggregates summarize only the measured subset, so check `UnmeasuredDurationCount` before treating them as complete. The text timeline names unavailable values instead of displaying a successful zero-duration call. **Upgrade:** `ToolStatistics.SuccessRate` is now `double?`, calculated over observed outcomes; it is null when every recorded outcome is unmeasured. Check for null when formatting or comparing it. Existing directly constructed timeline entries without missing-measurement markers retain their prior interpretation.
+
+Workflow trace JSON stores observed traversals separately from declared topology, including edge IDs, source/target activation indices, routing evidence and exact traversal time. Recording and replay preserve traversal assertions through loops. Old traces without observed traversals leave that collection absent; legacy step edges without activation indices replay with index `-1`, rather than inventing an association with step zero.
 
 ### Agent-builder recording contracts
 

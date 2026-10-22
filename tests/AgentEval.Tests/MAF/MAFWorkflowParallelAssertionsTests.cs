@@ -49,6 +49,7 @@ public sealed class MAFWorkflowParallelAssertionsTests
         var trace = JsonSerializer.Deserialize<WorkflowTrace>(JsonSerializer.Serialize(recorder.Trace))!;
         var replay = await new WorkflowTraceReplayingAgent(trace).ExecuteWorkflowAsync("input");
         AssertObservedParallelism(replay, selected);
+        Assert.Equal(JsonSerializer.Serialize(result.Graph.ParallelBranches), JsonSerializer.Serialize(replay.Graph!.ParallelBranches));
     }
 
     [Theory]
