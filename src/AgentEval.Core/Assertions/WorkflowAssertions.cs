@@ -56,6 +56,8 @@ public enum WorkflowFailureHint
     Timing,
     /// <summary>An execution-path / routing expectation was not met.</summary>
     ExecutionPath,
+    /// <summary>A duration could not be measured, so a timing budget cannot be evaluated.</summary>
+    TimingNotMeasured,
 }
 
 /// <summary>
@@ -790,6 +792,9 @@ public class WorkflowAssertionBuilder
                 case WorkflowFailureHint.Timing:
                     suggestions.Add("Consider increasing timeout or optimizing executor performance");
                     break;
+                case WorkflowFailureHint.TimingNotMeasured:
+                    suggestions.Add("Record executor invocation and completion before checking its duration");
+                    break;
                 case WorkflowFailureHint.ExecutionPath:
                     suggestions.Add("Check workflow routing logic and edge conditions");
                     break;
@@ -921,6 +926,12 @@ public class ExecutorStepAssertionBuilder
         if (_step == null)
         {
             AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
+        }
+        else if (_step.TimingNotMeasuredReason is { } reason)
+        {
+            AddFailure($"Expected: executor '{_executorId}' to complete within {maxDuration.TotalMilliseconds:F0}ms. " +
+                $"Actual: time not measured ({reason}). " +
+                "Suggestions: record executor invocation and completion before checking its duration.", WorkflowFailureHint.TimingNotMeasured);
         }
         else if (_step.Duration > maxDuration)
         {

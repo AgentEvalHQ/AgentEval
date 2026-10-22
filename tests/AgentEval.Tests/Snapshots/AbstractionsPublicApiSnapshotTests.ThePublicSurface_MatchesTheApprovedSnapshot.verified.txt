@@ -1381,6 +1381,7 @@ class AgentEval.Models.ExecutorStep : IEquatable<AgentEval.Models.ExecutorStep>
     String Input { get; init; }
     String Output { get; init; }
     String ParallelBranchId { get; init; }
+    String TimingNotMeasuredReason { get; init; }
     String ToString()
     TimeSpan Duration { get; init; }
     TimeSpan StartOffset { get; init; }

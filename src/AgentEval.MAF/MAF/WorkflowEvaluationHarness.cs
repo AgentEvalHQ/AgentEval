@@ -401,7 +401,8 @@ public class WorkflowEvaluationHarness
         foreach (var step in result.Steps)
         {
             var toolInfo = step.HasToolCalls ? $" [🔧 {step.ToolCalls!.Count} tools: {string.Join(", ", step.ToolCalls.Select(t => t.Name))}]" : "";
-            _logger.LogDebug($"     [{step.StepIndex}] {step.ExecutorId}: {step.Duration.TotalMilliseconds:F0}ms{toolInfo}");
+            var timing = step.TimingNotMeasuredReason is { } reason ? $"time not measured ({reason})" : $"{step.Duration.TotalMilliseconds:F0}ms";
+            _logger.LogDebug($"     [{step.StepIndex}] {step.ExecutorId}: {timing}{toolInfo}");
             
             if (!string.IsNullOrEmpty(step.Output) && step.Output.Length <= 100)
             {

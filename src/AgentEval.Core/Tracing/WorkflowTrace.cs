@@ -149,6 +149,11 @@ public class WorkflowTraceStep
     [JsonPropertyName("durationMs")]
     public long DurationMs { get; set; }
 
+    /// <summary>Why duration was unavailable; null preserves measured timing, including zero, in older traces.</summary>
+    [JsonPropertyName("timingNotMeasuredReason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TimingNotMeasuredReason { get; set; }
+
     /// <summary>
     /// Tool calls made by this executor.
     /// </summary>
@@ -380,7 +385,7 @@ public class WorkflowTracePerformance
     public int TotalTokens => TotalPromptTokens + TotalCompletionTokens;
 
     /// <summary>
-    /// Per-executor duration breakdown.
+    /// Per-executor duration breakdown. Executors with any unmeasured activation are omitted.
     /// </summary>
     [JsonPropertyName("durationByExecutor")]
     public Dictionary<string, long>? DurationByExecutor { get; set; }

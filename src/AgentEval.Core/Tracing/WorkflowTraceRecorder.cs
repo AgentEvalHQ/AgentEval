@@ -138,6 +138,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 Output = SanitizeText(step.Output),
                 StartOffsetMs = (long)step.StartOffset.TotalMilliseconds,
                 DurationMs = (long)step.Duration.TotalMilliseconds,
+                TimingNotMeasuredReason = step.TimingNotMeasuredReason,
                 ParallelBranchId = step.ParallelBranchId,
                 FinishReason = step.FinishReason
             };
@@ -267,6 +268,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
             TotalCompletionTokens = result.Steps.Sum(s => s.TokenUsage?.CompletionTokens ?? 0),
             DurationByExecutor = result.Steps
                 .GroupBy(s => s.ExecutorId)
+                .Where(group => group.All(step => step.TimingNotMeasuredReason is null))
                 .ToDictionary(
                     g => g.Key,
                     g => (long)g.Sum(s => s.Duration.TotalMilliseconds))

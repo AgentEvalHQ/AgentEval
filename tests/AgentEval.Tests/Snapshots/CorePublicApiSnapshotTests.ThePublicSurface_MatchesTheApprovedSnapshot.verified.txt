@@ -279,6 +279,7 @@ enum AgentEval.Assertions.WorkflowFailureHint
     IdNotFound
     Timing
     ExecutionPath
+    TimingNotMeasured
 class AgentEval.Assertions.WorkflowToolCallAssertionBuilder
     AgentEval.Assertions.WorkflowAssertionBuilder And()
     AgentEval.Assertions.WorkflowToolCallAssertionBuilder AfterTool(System.String otherToolName, System.String because = null)
@@ -2288,6 +2289,7 @@ class AgentEval.Tracing.WorkflowTraceStep
     System.String Input { get; set; }
     System.String Output { get; set; }
     System.String ParallelBranchId { get; set; }
+    System.String TimingNotMeasuredReason { get; set; }
     ctor()
 enum AgentEval.Trust.TrustBand
     Unknown

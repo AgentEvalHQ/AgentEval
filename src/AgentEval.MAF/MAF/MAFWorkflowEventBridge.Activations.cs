@@ -15,7 +15,7 @@ public static partial class MAFWorkflowEventBridge
     private sealed class ActivationRecorder(
         IReadOnlySet<string> chatIds, IReadOnlyDictionary<string, string>? idMap,
         IReadOnlyList<string>? executorOrder, WorkflowGraphSnapshot? graph,
-        ChatMessage? inputMessage, Func<TimeSpan> now)
+        ChatMessage? inputMessage, Func<TimeSpan> now, IReadOnlySet<string>? subworkflowIds)
     {
         private readonly Dictionary<string, Activation> _open = new(StringComparer.Ordinal);
         private readonly List<Activation> _ready = [];
@@ -41,7 +41,7 @@ public static partial class MAFWorkflowEventBridge
         {
             if (!_open.TryGetValue(rawId, out var activation))
             {
-                activation = new(rawId, Normalize(rawId), chatIds.Contains(rawId), _superstep, _ordinal++);
+                activation = new(rawId, Normalize(rawId), chatIds.Contains(rawId), subworkflowIds?.Contains(rawId) == true, _superstep, _ordinal++);
                 _open.Add(rawId, activation);
             }
             return activation;
@@ -293,16 +293,26 @@ public static partial class MAFWorkflowEventBridge
                 type == EdgeType.Conditional ? true : null, switchLabel)
             { SourceStepIndex = source.StepIndex, TargetStepIndex = target.StepIndex, ObservedAt = target.Start };
 
-        private static ExecutorOutputEvent Stamp(Activation activation, ExecutorOutputEvent output) =>
-            activation.Start is { } start && activation.End is { } end && activation.Running == 0
-                ? output with { StartOffset = start, Duration = end - start }
-                : output;
+        private static ExecutorOutputEvent Stamp(Activation activation, ExecutorOutputEvent output)
+        {
+            var reason = TimingNotMeasuredReason(activation);
+            return reason is null
+                ? output with { StartOffset = activation.Start, Duration = activation.End - activation.Start, TimingNotMeasuredReason = null }
+                : output with { StartOffset = activation.Start, Duration = null, TimingNotMeasuredReason = reason };
+        }
 
-        private sealed class Activation(string rawId, string id, bool isChat, int superstep, int ordinal)
+        private static string? TimingNotMeasuredReason(Activation activation) =>
+            activation.IsSubworkflow ? "Sub-workflow host duration does not cover its nested execution." :
+            activation.Start is null ? "Executor invocation was not observed." :
+            activation.End is null || activation.Running != 0 ? "Executor completion was not observed before the event stream ended." :
+            activation.IsChat && !activation.HasTurn ? "Agent turn was not observed; only chat accumulation was delivered." : null;
+
+        private sealed class Activation(string rawId, string id, bool isChat, bool isSubworkflow, int superstep, int ordinal)
         {
             public string RawId { get; } = rawId;
             public string Id { get; } = id;
             public bool IsChat { get; } = isChat;
+            public bool IsSubworkflow { get; } = isSubworkflow;
             public int FirstSuperstep { get; } = superstep;
             public int LastSuperstep { get; set; } = superstep;
             public int Ordinal { get; } = ordinal;
@@ -346,7 +356,7 @@ public static partial class MAFWorkflowEventBridge
             public void Add(Activation activation)
             {
                 if (!Executors.Contains(activation.Id)) Executors.Add(activation.Id);
-                Measured &= activation.Start.HasValue && activation.End.HasValue && activation.Running == 0;
+                Measured &= TimingNotMeasuredReason(activation) is null;
                 if (activation.Start is { } start && start < Start) Start = start;
                 if (activation.End is { } end && end > End) End = end;
                 Success &= !activation.Failed;

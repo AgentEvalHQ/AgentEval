@@ -180,9 +180,16 @@ public record ExecutorStep
     public TimeSpan StartOffset { get; init; }
 
     /// <summary>
-    /// How long this step took.
+    /// How long this step took. Do not interpret this value as a measurement when
+    /// <see cref="TimingNotMeasuredReason"/> is set.
     /// </summary>
     public TimeSpan Duration { get; init; }
+
+    /// <summary>
+    /// Why this activation's duration could not be measured. Null means timing is available,
+    /// including a measured zero duration. A non-null reason prevents time-limit assertions from passing.
+    /// </summary>
+    public string? TimingNotMeasuredReason { get; init; }
 
     /// <summary>
     /// Tool calls made by this executor during the step.

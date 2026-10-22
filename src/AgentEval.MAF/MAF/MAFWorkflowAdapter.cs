@@ -108,6 +108,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         // The bridge yields a step's output only once the step has finished, so a step its own output opens (the
         // first one) measured ~0 that way, starting at its own end.
         (TimeSpan StartOffset, TimeSpan Duration)? measuredStepTiming = null;
+        string? timingNotMeasuredReason = null;
 
         (TimeSpan StartOffset, TimeSpan Duration) StepTiming() =>
             measuredStepTiming ?? (stepStartOffset, executorStopwatch.Elapsed);
@@ -150,7 +151,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                     currentOutgoingEdges,
                     stepBranchId,
                     usage,
-                    finishReason));
+                    finishReason,
+                    timingNotMeasuredReason));
 
                 currentToolCalls = [];
                 currentOutgoingEdges = [];
@@ -163,6 +165,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                 stepStartOffset = overallStopwatch.Elapsed;
                 executorStopwatch.Restart();
                 measuredStepTiming = null;
+                timingNotMeasuredReason = null;
                 stepBranchId = e.StartsNewStep ? e.ParallelBranchId : currentBranchId;
                 stepIncomingEdge = pendingIncomingEdge;
                 pendingIncomingEdge = null;
@@ -174,8 +177,14 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             }
 
             currentOutput.Append(e.Output ?? string.Empty);
-            if (e.StartOffset is { } measuredStart && e.Duration is { } measuredDuration)
+            if (e.TimingNotMeasuredReason is { } reason)
             {
+                timingNotMeasuredReason = reason;
+                measuredStepTiming = (e.StartOffset ?? TimeSpan.Zero, TimeSpan.Zero);
+            }
+            else if (e.StartOffset is { } measuredStart && e.Duration is { } measuredDuration)
+            {
+                timingNotMeasuredReason = null;
                 measuredStepTiming = (measuredStart, measuredDuration);
             }
         }
@@ -256,7 +265,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentOutgoingEdges,
                                 stepBranchId,
                                 edgeUsage,
-                                edgeFinishReason));
+                                edgeFinishReason,
+                                timingNotMeasuredReason));
 
                             currentToolCalls = [];
                             currentOutgoingEdges = [];
@@ -269,6 +279,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         stepStartOffset = overallStopwatch.Elapsed;
                         executorStopwatch.Restart();
                         measuredStepTiming = null;
+                        timingNotMeasuredReason = null;
                         stepBranchId = currentBranchId;
                         stepIncomingEdge = edgeExecution;
                         pendingIncomingEdge = null;
@@ -375,7 +386,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                                 currentOutgoingEdges,
                                 stepBranchId,
                                 completeUsage,
-                                completeFinishReason));
+                                completeFinishReason,
+                                timingNotMeasuredReason));
                         }
                         workflowComplete = true;
                         break;
@@ -401,7 +413,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                     currentOutgoingEdges,
                     stepBranchId,
                     finalUsage,
-                    finalFinishReason));
+                    finalFinishReason,
+                    timingNotMeasuredReason));
             }
 
             overallStopwatch.Stop();
@@ -530,7 +543,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         List<EdgeExecution>? outgoingEdges = null,
         string? branchId = null,
         TokenUsage? tokenUsage = null,
-        string? finishReason = null)
+        string? finishReason = null,
+        string? timingNotMeasuredReason = null)
     {
         return new ExecutorStep
         {
@@ -538,6 +552,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             Output = output,
             StartOffset = startOffset,
             Duration = duration,
+            TimingNotMeasuredReason = timingNotMeasuredReason,
             StepIndex = stepIndex,
             ToolCalls = toolCalls.Count > 0 ? toolCalls.ToList() : null,
             IncomingEdge = incomingEdge,
@@ -793,6 +808,12 @@ public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowE
     /// source did not measure it. When a step has several output events, the latest one that carries timing wins.
     /// </summary>
     public TimeSpan? Duration { get; init; }
+
+    /// <summary>
+    /// Why this activation could not be timed. When set, this takes precedence over numeric timing on the event.
+    /// A later event carrying complete measured timing clears the reason.
+    /// </summary>
+    public string? TimingNotMeasuredReason { get; init; }
 }
 
 /// <summary>

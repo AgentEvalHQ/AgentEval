@@ -171,7 +171,8 @@ public static class WorkflowSerializer
                 Details = new Dictionary<string, object?>
                 {
                     ["output"] = step.Output,
-                    ["duration"] = step.Duration.TotalMilliseconds
+                    ["duration"] = step.TimingNotMeasuredReason is null ? step.Duration.TotalMilliseconds : null,
+                    ["timingNotMeasuredReason"] = step.TimingNotMeasuredReason
                 }
             });
         }
@@ -261,6 +262,7 @@ public static class WorkflowSerializer
                 Input = s.Input,
                 StartOffset = s.StartOffset,
                 Duration = s.Duration,
+                TimingNotMeasuredReason = s.TimingNotMeasuredReason,
                 ParallelBranchId = s.ParallelBranchId,
                 IncomingEdge = s.IncomingEdge != null ? new EdgeExecutionExport
                 {
@@ -434,6 +436,8 @@ public record StepExport
     public string? Input { get; init; }
     public TimeSpan StartOffset { get; init; }
     public TimeSpan Duration { get; init; }
+    /// <summary>Why duration is unavailable; consumers must not treat it as measured when this is set.</summary>
+    public string? TimingNotMeasuredReason { get; init; }
     public string? ParallelBranchId { get; init; }
     public EdgeExecutionExport? IncomingEdge { get; init; }
     public List<ToolCallExport>? ToolCalls { get; init; }

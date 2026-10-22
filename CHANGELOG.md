@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Executor time-limit assertions now fail as not measured when invocation, completion, agent-turn or nested-host timing is unavailable. `TimingNotMeasuredReason` survives workflow trace recording/replay and JSON export; incomplete executor duration totals are omitted. A measured zero duration remains valid.
+
 - Workflow recording isolates concurrent executor activations, including text, tools, usage and measured timing. Separate agent turns in one superstep remain separate steps; display order follows configured executor order. Traversed edges and branch timing use observed activation evidence, ambiguous join sources are not guessed, and interrupted streams retain partial output and tool intent with an error.
 
 - Workflow output events no longer end recording early: later steps, loop iterations, errors, requests and cancellation remain visible. Repeated yields are preserved, paired return/output events are counted once, and agent-builder chat-list outputs render their messages without echoing the original input.

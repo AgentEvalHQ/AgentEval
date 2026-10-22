@@ -180,7 +180,7 @@ Parallel steps are timed to each executor's own completion. Recorded fan-out bra
 
 MAF's fan-in barrier releases individual messages; it does not aggregate them into an array. With agent chat protocols, it can leave message accumulation waiting for another token. The recorder preserves each observed turn and any remaining accumulation separately; the latter does not erase the last produced output. Use ordinary incoming edges when each upstream agent should trigger its own turn. The barrier's message-routing behavior is controlled by MAF.
 
-A run interrupted before an executor's completion has no measured duration for that activation. The explicit not-measured timing marker and time-limit assertion guard are still pending; custom sources without measured timing still use arrival timing. Nested executor qualification and request-response hosting also remain pending.
+A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with ?time not measured? and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Sub-workflow hosts are explicitly untimed until their nested execution can be correlated. Custom sources without an explicit missing-timing reason keep arrival timing. Nested executor qualification and request-response hosting remain pending.
 
 ### Timeout Handling
 

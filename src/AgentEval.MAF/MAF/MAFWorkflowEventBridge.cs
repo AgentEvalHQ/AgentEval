@@ -105,6 +105,8 @@ public static partial class MAFWorkflowEventBridge
         // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
         // run starts so a reflection failure cannot leak a started run.
         var chatProtocolExecutorIds = GetChatProtocolExecutorIds(workflow);
+        var subworkflowExecutorIds = workflow.ReflectExecutors().Where(pair => pair.Value is MAFWorkflows.SubworkflowBinding)
+            .Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
         graph ??= MAFGraphExtractor.ExtractGraph(workflow, workflow.ReflectExecutors().Keys.ToList(), executorIdMap);
 
         MAFWorkflows.StreamingRun run;
@@ -144,7 +146,8 @@ public static partial class MAFWorkflowEventBridge
         await foreach (var evt in TranslateEventsAsync(
             run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken: cancellationToken),
             chatProtocolExecutorIds, executorIdMap, cancellationToken,
-            runStartedAt: runStartedAt, inputMessage: inputMessage, executorOrder: executorOrder, graph: graph)
+            runStartedAt: runStartedAt, inputMessage: inputMessage, executorOrder: executorOrder, graph: graph,
+            subworkflowExecutorIds: subworkflowExecutorIds)
             .ConfigureAwait(false))
         {
             yield return evt;
@@ -171,6 +174,7 @@ public static partial class MAFWorkflowEventBridge
     /// <param name="inputMessage">The original chat input, excluded by identity from chat-list output.</param>
     /// <param name="executorOrder">Preferred display-name order within a superstep; remaining names sort ordinally.</param>
     /// <param name="graph">Reflected topology for attributing observed transitions; null for custom event streams.</param>
+    /// <param name="subworkflowExecutorIds">Hosts whose delivery timing does not cover nested execution.</param>
     internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
         IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
         IReadOnlySet<string> chatProtocolExecutorIds,
@@ -180,7 +184,8 @@ public static partial class MAFWorkflowEventBridge
         long? runStartedAt = null,
         ChatMessage? inputMessage = null,
         IReadOnlyList<string>? executorOrder = null,
-        WorkflowGraphSnapshot? graph = null)
+        WorkflowGraphSnapshot? graph = null,
+        IReadOnlySet<string>? subworkflowExecutorIds = null)
     {
         ArgumentNullException.ThrowIfNull(mafEvents);
         ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
@@ -188,7 +193,7 @@ public static partial class MAFWorkflowEventBridge
         var clock = timeProvider ?? TimeProvider.System;
         var origin = runStartedAt ?? clock.GetTimestamp();
         var recorder = new ActivationRecorder(chatProtocolExecutorIds, executorIdMap, executorOrder, graph,
-            inputMessage, () => clock.GetElapsedTime(origin));
+            inputMessage, () => clock.GetElapsedTime(origin), subworkflowExecutorIds);
 
         Exception? streamError = null;
         await using var enumerator = mafEvents.GetAsyncEnumerator(cancellationToken);
