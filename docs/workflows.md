@@ -182,6 +182,21 @@ MAF's fan-in barrier releases individual messages; it does not aggregate them in
 
 A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with "time not measured" and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Custom sources without an explicit missing-timing reason keep arrival timing.
 
+### Agent-builder recording contracts
+
+The offline test suite executes the real MAF builders using scripted chat clients. Orchestration executors remain visible as steps:
+
+| Builder | Recorded infrastructure | Agent-turn contract |
+|---|---|---|
+| Sequential | `OutputMessages` | One turn per agent in chain order; terminal output contains the produced messages. |
+| Concurrent | `Start`, `Batcher/<agent>`, `ConcurrentEnd` | Each selected agent owns its turn and branch; batchers feed the fan-in. Display order follows configured names, while terminal message order may follow arrival order. |
+| Handoff | `HandoffStart`, `HandoffEnd` | The actual handoff tool request selects the next agent. MAF exposes selector edges as fan-outs in reflected topology; one selected successor does not count as parallel execution. Tool-only messages can contribute empty lines to rendered terminal output. |
+| Group chat | `GroupChatHost` between participant turns | The manager chooses the speaker and termination. Actual agent turns stay separate, including a participant speaking again. |
+
+MAF registers `GroupChatHost` through a factory typed as the base `Executor`, hiding its chat-protocol type from static binding reflection. Its message and turn-token deliveries may therefore appear as adjacent orchestration activations when scheduling puts them in separate supersteps. Its recorded duration describes those deliveries, not the whole group conversation; use participant step budgets for agent work and the workflow timeout for the conversation. The tests allow this infrastructure scheduling variation while checking exact participant turns, outputs, observed edges, edge-to-step indexes and measured agent timing.
+
+The shape suite also covers direct function/agent chains and loops, fan-out, ordinary and barrier fan-in, nested workflows and request/response ports. The explicit routing and nested-host limits described here are tested; unsupported or unmeasured behavior is not certified as a successful measurement.
+
 ### Nested workflows and external answers
 
 Nested executor steps use paths such as `Sub/A` and `Sub/B`. Supply those paths in `executorIds` to choose display names and ordering. The host starts with its input and runs through its observed children; its queueing call alone is not its duration. Nested results are buffered until the stream finishes so a host can precede its children while retaining the full interval. Incomplete children or an interrupted stream leave the host's timing not measured. Nested agent inputs receive the chat protocol's turn token, and forwarded agent events are attributed using their agent ID so child text, tool calls and usage stay with the child.
