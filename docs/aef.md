@@ -104,7 +104,7 @@ differently.
 | `agenteval aef seal <run-dir>` | Seals a closed run. `--key` also signs it (PKCS#8 PEM, ECDSA P-256). `--sealed-by producer\|ingest`. | the run cannot be sealed |
 | `agenteval aef view <run-dir>` | Shows the run as its overlays leave it: overrides, reviews, waivers in force at `--at`, withheld blobs. | (never) |
 | `agenteval aef checkpoint <file> --runs <dir>` | Checks a checkpoint: its manifest, its runs, each lane's recomputed result, its decision and its signature. | any problem |
-| `agenteval aef export <store-dir> <out-dir>` | Converts a run of AgentEval's `.agenteval/` store into an AEF run (an *imported* run, sealed by the exporter). | the converted run does not verify |
+| `agenteval aef import store-v1 <store-dir> <out-dir>` | Converts a legacy `.agenteval/` run into imported AEF. `aef export` remains a compatibility spelling for the same converter. | the converted run does not verify |
 | `agenteval aef import assert-ai <dir> <out-dir>` | Converts an [ASSERT](assert-interop.md) run into an AEF run, with ASSERT's harm and over-refusal rates. | the converted run does not verify |
 
 Every command takes `--json` and then prints one JSON value instead of a report. Exit code 2 is a usage or input
@@ -259,7 +259,22 @@ it using the CLI and independent Python run, checkpoint, lane and signature veri
 changing the checkpoint invalidates its signature. Prompts, responses and private keys stay outside the
 retained evidence. This verifies the local evidence flow; it makes no claim about a deployed model's quality.
 
-### Export a run, check it, sign it
+### Import a legacy run, check it, sign it
+
+Legacy conversion uses one implementation: `StoreV1Exporter` in `AgentEval.Results.Adapters`.
+Both `aef import store-v1` and the existing `aef export` command use it. Library callers can use
+`StoreV1Exporter.ExportAsync(IOutputStoreReader, runId, outputDirectory, options)` to convert a stored run,
+or `Export(StoreV1Run, outputDirectory, options)` for an already-read run. Conversion writes a new AEF folder;
+it does not alter the original store. `AefLocalRunImporter` stages existing AEF files and is not a legacy converter.
+
+The output is **imported: not sealed when it ran**. `run.json` names the original store in `imported.from`
+and lists converter-supplied fields in `imported.asserted`. A new seal uses `sealedBy: ingest`: it protects
+the converted evidence from import onward, not the original execution's earlier history. Interrupted
+legacy runs retain their observed results and are marked aborted. Legacy store compatibility remains for 1.x.
+
+Pass a run folder inside its original `.agenteval/subjects/<kind>/<name>/runs/<run-id>/` workspace,
+or pass the `.agenteval` workspace with `--run`. Keep the workspace structure when moving legacy evidence.
+The destination must be absent or empty; subsequent readers can use the resulting AEF folder.
 
 Export warns on stderr when a native header in the workspace’s `.agenteval/aef/runs/` links
 the same store run or trial. Prefer that native evidence: conversion is a separate imported projection.
@@ -268,7 +283,7 @@ The notice does not certify integrity—use `aef verify` for that.
 
 ```bash
 # Convert one run of the .agenteval store (store v1 records no target mode: say so if it ran live)
-agenteval aef export .agenteval --run 2026-10-08T120000Z-a1b2 ./aef-run --target-mode live --no-seal
+agenteval aef import store-v1 .agenteval --run 2026-10-08T120000Z-a1b2 ./aef-run --target-mode live --no-seal
 
 # Seal and sign it (the key is yours; keep it out of the run)
 agenteval aef seal ./aef-run --key ./signing-key.pem --sealed-by ingest

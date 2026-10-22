@@ -149,6 +149,7 @@ public static class StoreV1Exporter
         }
 
         var notes = new List<string>();
+        notes.Add("Imported: not sealed when it ran. The original legacy run was not AEF-sealed during execution; any ingest seal protects the converted evidence from import onward, not its earlier history.");
         var asserted = new List<string> { "execution.targetMode", "contentCapture" };
         notes.Add($"How the target was driven is not recorded in store v1: execution.targetMode is the exporter's claim ({AefNames.Of(options.TargetMode)}).");
         notes.Add($"Store v1 records no content capture policy: contentCapture is the exporter's ({AefNames.Of(capture)}).");

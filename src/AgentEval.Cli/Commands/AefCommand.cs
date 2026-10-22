@@ -33,7 +33,7 @@ namespace AgentEval.Cli.Commands;
 /// <item><c>companion create|verify</c>: bind explicit artifact digests to sealed evidence and report separate signature trust;</item>
 /// <item><c>view</c>: a run's effective view with its overlays (§4.3);</item>
 /// <item><c>checkpoint</c>: a checkpoint's problems ([CKP-7], [CKP-8]) and each lane's result (§5.3);</item>
-/// <item><c>export</c>: a run of AgentEval's older output store (store v1, §7.5) as an AEF run;</item>
+/// <item><c>import store-v1</c>: a run of AgentEval's older output store (store v1, §7.5) as an imported AEF run; <c>export</c> remains a compatibility spelling;</item>
 /// <item><c>import assert-ai</c>: an ASSERT run as an AEF run (interop/assert.md);</item>
 /// <item><c>import otel</c>: OpenTelemetry <c>gen_ai.evaluation.result</c> events as an AEF run (interop/opentelemetry.md);</item>
 /// <item><c>export-otel</c>: an AEF run as OpenTelemetry <c>gen_ai.evaluation.result</c> events, OTLP/JSON <c>LogsData</c> lines (interop/opentelemetry.md);</item>
@@ -57,7 +57,7 @@ internal static partial class AefCommand
         cmd.Add(CreateCompanion());
         cmd.Add(CreateView());
         cmd.Add(CreateCheckpoint());
-        cmd.Add(CreateExport());
+        cmd.Add(CreateStoreV1Conversion("export"));
         cmd.Add(CreateImport());
         cmd.Add(CreateExportOtel());
         cmd.Add(CreateExportEvalPort());
@@ -411,7 +411,8 @@ internal static partial class AefCommand
 
     // ---- export (store v1) ---------------------------------------------------------------------------------------
 
-    private static Command CreateExport()
+    // Both CLI spellings share the same options, action and StoreV1Exporter conversion.
+    private static Command CreateStoreV1Conversion(string name)
     {
         var storeDir = new Argument<string>("store-dir") { Description = "A run folder of AgentEval's older store (.agenteval/subjects/<kind>/<name>/runs/<run-id>/), or the .agenteval workspace with --run." };
         var outDir = new Argument<string>("out-dir") { Description = "The AEF run folder to write (must not exist, or be empty)." };
@@ -419,7 +420,7 @@ internal static partial class AefCommand
         var targetMode = new Option<string>("--target-mode") { Description = "How the run drove its target, which store v1 does not record: live, replayed, scripted or mocked (the default: never passed off as evidence about the live subject).", DefaultValueFactory = _ => "mocked" };
         var json = JsonOption();
         var (capture, noSeal, key) = ConversionOptions();
-        var cmd = new Command("export", "Export a run of AgentEval's older output store (store v1, spec 07 §7.5) as an AEF run: a root line per scenario, a child per assertion, sealed by the exporter (ingest).");
+        var cmd = new Command(name, "Convert a legacy AgentEval output-store run (store v1, spec 07 §7.5) to imported AEF: not AEF-sealed when it ran; any new seal is created at import (ingest).");
         cmd.Add(storeDir);
         cmd.Add(outDir);
         foreach (var o in new Option[] { run, targetMode, capture, noSeal, key, json }) cmd.Add(o);
@@ -579,7 +580,8 @@ internal static partial class AefCommand
 
     private static Command CreateImport()
     {
-        var cmd = new Command("import", "Import another tool's run as an AEF run.");
+        var cmd = new Command("import", "Import a legacy AgentEval store run or another tool's run as an AEF run.");
+        cmd.Add(CreateStoreV1Conversion("store-v1"));
         var runDir = new Argument<string>("assert-run-dir") { Description = "The ASSERT run directory (<results>/<suite>/<run>/, holding scores.jsonl)." };
         var outDir = new Argument<string>("out-dir") { Description = "The AEF run folder to write (must not exist, or be empty)." };
         var taxonomy = new Option<string?>("--taxonomy") { Description = "The taxonomy (default: taxonomy.json in the suite directory)." };

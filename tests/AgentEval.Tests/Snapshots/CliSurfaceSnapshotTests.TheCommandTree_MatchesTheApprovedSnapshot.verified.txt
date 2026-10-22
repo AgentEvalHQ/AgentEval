@@ -106,6 +106,15 @@
                 option --subject String [1..1] required
                 option --subject-kind String [1..1] default="agent"
                 option --target-mode String [1..1] required
+            command store-v1
+                argument <store-dir> String [1..1]
+                argument <out-dir> String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --run String [1..1]
+                option --target-mode String [1..1] default="mocked"
         command seal
             argument <run-dir> String [1..1]
             option --json Boolean [0..1] default=false

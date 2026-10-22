@@ -1027,12 +1027,18 @@ agenteval aef seal <run-dir> [--key <pkcs8.pem>] [--sealed-by producer|ingest] [
 agenteval aef view <run-dir> [--at <time>] [--policy <trust-policy.json>] [--json]
 agenteval aef checkpoint <manifest.json> --runs <dir> [--policy <trust-policy.json>] [--at <time>] [--envelope <file>] [--json]
 agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import store-v1 <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import otel <logs-file> <out-dir> --run-id <id> --from <tool> --subject <kind:name> [--subject-kind agent] --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef export-otel <run-dir> <out-file> [--policy <trust-policy.json>] [--json]
 agenteval aef import inspect <log-file> <out-dir> --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef export-inspect <run-dir> <out-file> [--ignore-overlays] [--policy <trust-policy.json>] [--json]
 ```
+
+**`import store-v1`** converts an existing legacy run folder, or a `.agenteval` workspace selected with `--run`,
+through the same converter as the retained `export` spelling. Its report says **imported: not sealed when it ran**;
+an ingest seal protects the conversion from import onward, not the original execution's history. Source files
+are preserved. See [legacy import](aef.md#import-a-legacy-run-check-it-sign-it) for the source-folder contract.
 
 **`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
 which trusted identities signed it, and lets authorized redactions withhold blobs; with `--anchors`, whether one of
