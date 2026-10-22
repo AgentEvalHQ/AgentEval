@@ -82,6 +82,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         var steps = new List<ExecutorStep>();
         var errors = new List<WorkflowError>();
         var traversedEdges = new List<EdgeExecution>();
+        var indexedEdges = new List<EdgeExecution>();
+        string? workflowOutput = null;
         var routingDecisions = new List<RoutingDecision>();
         var parallelBranches = new List<ParallelBranch>();
         var overallStopwatch = Stopwatch.StartNew();
@@ -133,7 +135,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         // values) when the executor changes, then begins tracking the new one.
         void HandleExecutorOutput(ExecutorOutputEvent e)
         {
-            if (currentExecutorId != e.ExecutorId && currentExecutorId != null)
+            if ((e.StartsNewStep || currentExecutorId != e.ExecutorId) && currentExecutorId != null)
             {
                 var (usage, finishReason) = TakeLedger(currentExecutorId);
                 var (startOffset, duration) = StepTiming();
@@ -154,14 +156,14 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                 currentOutgoingEdges = [];
             }
 
-            if (currentExecutorId != e.ExecutorId)
+            if (e.StartsNewStep || currentExecutorId != e.ExecutorId)
             {
                 currentExecutorId = e.ExecutorId;
                 currentOutput.Clear();
                 stepStartOffset = overallStopwatch.Elapsed;
                 executorStopwatch.Restart();
                 measuredStepTiming = null;
-                stepBranchId = currentBranchId;
+                stepBranchId = e.StartsNewStep ? e.ParallelBranchId : currentBranchId;
                 stepIncomingEdge = pendingIncomingEdge;
                 pendingIncomingEdge = null;
 
@@ -216,15 +218,22 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             SourceExecutorId = edgeEvent.SourceExecutorId,
                             TargetExecutorId = edgeEvent.TargetExecutorId,
                             EdgeType = edgeEvent.EdgeType,
-                            TraversedAt = overallStopwatch.Elapsed,
+                            TraversedAt = edgeEvent.ObservedAt ?? overallStopwatch.Elapsed,
                             ConditionResult = edgeEvent.ConditionResult,
                             MatchedSwitchLabel = edgeEvent.MatchedSwitchLabel,
                             TransferredData = edgeEvent.TransferredData,
-                            SourceStepIndex = stepIndex,
-                            TargetStepIndex = stepIndex + 1,
+                            SourceStepIndex = edgeEvent.SourceStepIndex ?? stepIndex,
+                            TargetStepIndex = edgeEvent.TargetStepIndex ?? stepIndex + 1,
                             RoutingReason = edgeEvent.RoutingReason
                         };
                         traversedEdges.Add(edgeExecution);
+                        if (edgeEvent.SourceStepIndex.HasValue && edgeEvent.TargetStepIndex.HasValue)
+                        {
+                            // The bridge resolves activation indices independently of display order.
+                            // Attach these edges after every step exists; an edge is not a step boundary.
+                            indexedEdges.Add(edgeExecution);
+                            break;
+                        }
                         currentOutgoingEdges.Add(edgeExecution);
 
                         // Flush the source executor's step immediately.
@@ -346,7 +355,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         });
                         break;
 
-                    case WorkflowCompleteEvent:
+                    case WorkflowCompleteEvent completeEvent:
+                        workflowOutput = completeEvent.FinalOutput;
                         // Workflow complete - save final step. This is the MOST COMMON terminal flush
                         // (the bridge always yields WorkflowCompleteEvent), so it MUST take the ledger too,
                         // or the final executor of every workflow loses its tokens/finish reason.
@@ -417,9 +427,22 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             });
         }
 
+        for (var index = 0; index < steps.Count; index++)
+        {
+            var step = steps[index];
+            var outgoing = indexedEdges.Where(edge => edge.SourceStepIndex == step.StepIndex).ToArray();
+            var incoming = indexedEdges.FirstOrDefault(edge => edge.TargetStepIndex == step.StepIndex);
+            if (outgoing.Length > 0 || incoming is not null)
+                steps[index] = step with
+                {
+                    IncomingEdge = step.IncomingEdge ?? incoming,
+                    OutgoingEdges = (step.OutgoingEdges ?? []).Concat(outgoing).ToArray()
+                };
+        }
+
         return new WorkflowExecutionResult
         {
-            FinalOutput = steps.LastOrDefault()?.Output ?? string.Empty,
+            FinalOutput = workflowOutput ?? steps.LastOrDefault()?.Output ?? string.Empty,
             Steps = steps,
             TotalDuration = overallStopwatch.Elapsed,
             OriginalPrompt = prompt,
@@ -677,7 +700,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
         return new MAFWorkflowAdapter(
             name,
-            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEvents(workflow, prompt, ct, idMap),
+            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEventsCore(workflow, prompt, ct, idMap, cleanNames, graph),
             cleanNames,
             workflowType,
             graph);
@@ -753,6 +776,12 @@ public abstract record WorkflowEvent;
 /// </remarks>
 public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowEvent
 {
+    /// <summary>Starts a distinct activation, including another turn of the same executor.</summary>
+    public bool StartsNewStep { get; init; }
+
+    /// <summary>The observed parallel branch owning this activation, when <see cref="StartsNewStep"/> is true.</summary>
+    public string? ParallelBranchId { get; init; }
+
     /// <summary>
     /// When the step this output belongs to started, relative to the start of the event stream, as the event source
     /// measured it; <c>null</c> when the source did not measure it.
@@ -812,7 +841,14 @@ public record ExecutorAgentResponseEvent(
 /// <summary>
 /// Event indicating workflow completion.
 /// </summary>
-public record WorkflowCompleteEvent : WorkflowEvent;
+public record WorkflowCompleteEvent : WorkflowEvent
+{
+    /// <summary>
+    /// Output of the last output-producing activation. Null preserves the legacy last-step fallback.
+    /// A later empty activation does not erase an earlier explicit workflow output.
+    /// </summary>
+    public string? FinalOutput { get; init; }
+}
 
 /// <summary>
 /// Event indicating an edge was traversed between executors.
@@ -825,7 +861,17 @@ public record EdgeTraversedEvent(
     bool? ConditionResult = null,
     string? MatchedSwitchLabel = null,
     string? TransferredData = null,
-    string? RoutingReason = null) : WorkflowEvent;
+    string? RoutingReason = null) : WorkflowEvent
+{
+    /// <summary>Explicit source activation index. Set together with <see cref="TargetStepIndex"/>.</summary>
+    public int? SourceStepIndex { get; init; }
+
+    /// <summary>Explicit target activation index; indexed edges do not open or close steps.</summary>
+    public int? TargetStepIndex { get; init; }
+
+    /// <summary>Observed transition time relative to run start, when measured by the event source.</summary>
+    public TimeSpan? ObservedAt { get; init; }
+}
 
 /// <summary>
 /// Event indicating a routing decision was made at a conditional/switch point.

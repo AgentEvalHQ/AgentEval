@@ -104,12 +104,9 @@ public partial class MAFWorkflowEventBridgeTests
     }
 
     [Fact]
-    public async Task TranslateEvents_FanOutSiblingInvokedWhileRunning_GoesOutUntimed_AndDoesNotStretchTheOpenStep()
+    public async Task TranslateEvents_FanOutSiblingInvokedWhileRunning_KeepsEachExecutorsOwnTiming()
     {
-        // Known limit (docs/workflows.md): fan-out siblings run concurrently in one superstep and the bridge
-        // attributes their output by stream position. Their timing must not be made up: Left is still running when
-        // Right is invoked, so the bridge cannot know when Left's step ends and sends it untimed rather than as
-        // ~0 ms. Right's step ends when RIGHT completes, not when its slower sibling does.
+        // Each sibling's own completion closes its timing, regardless of which sibling was invoked last.
         var clock = new FakeTimeProvider();
         var events = await TranslateAsync(clock,
             chatProtocolExecutorIds: [],
@@ -126,11 +123,10 @@ public partial class MAFWorkflowEventBridgeTests
 
         var outputs = events.OfType<ExecutorOutputEvent>().ToList();
         Assert.Contains(outputs, o => o.ExecutorId == "Left");
-        Assert.All(outputs.Where(o => o.ExecutorId == "Left"), o =>
-        {
-            Assert.Null(o.StartOffset);
-            Assert.Null(o.Duration);
-        });
+        var left = Assert.Single(outputs.Where(o => o.ExecutorId == "Left" && o.Duration is not null)
+            .Select(o => (o.StartOffset, o.Duration)).Distinct());
+        Assert.Equal(TimeSpan.FromMilliseconds(10), left.StartOffset);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), left.Duration);
         var right = Assert.Single(outputs.Where(o => o.ExecutorId == "Right" && o.Duration is not null)
             .Select(o => (o.StartOffset, o.Duration)).Distinct());
         Assert.Equal(TimeSpan.FromMilliseconds(10), right.StartOffset);

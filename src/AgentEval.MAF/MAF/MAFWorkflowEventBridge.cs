@@ -3,8 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Runtime.CompilerServices;
-using System.Text;
-using AgentEval.Core;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
@@ -42,9 +40,10 @@ namespace AgentEval.MAF;
 /// <b>Step boundaries:</b> MAF raises an <c>ExecutorInvokedEvent</c> for every message it delivers, so one agent
 /// turn shows up as 2-3 invocations of the same executor (the incoming chat messages, which only accumulate, and
 /// the <c>TurnToken</c> that runs the turn). The bridge reports one step per executor activation: deliveries to
-/// the open executor within one superstep, plus a chat-protocol executor's deliveries up to the turn they lead
-/// to, are one step. Only a re-invocation in a LATER superstep, once the open step has run, is a re-entry
-/// (a self-loop or a route back) and starts a new step.
+/// same function executor within one superstep are one step. A chat-protocol executor's deliveries up to each
+/// turn are one activation; a second turn starts another even in the same superstep. Concurrent executors own
+/// separate output, tool, usage and timing state. Completed activations are emitted at superstep boundaries in
+/// configured executor order, with ordinal name order for executors not in that list.
 /// </para>
 /// <para>
 /// <b>Step timing:</b> a step's output only goes out once the step has finished, so a consumer cannot time the step
@@ -55,11 +54,11 @@ namespace AgentEval.MAF;
 /// default OffThread mode streams events out as they are raised). An agent's first delivery is the chat messages it
 /// accumulates, which MAF hands over in the same superstep as the <c>TurnToken</c> that runs the turn, so the step
 /// starts when its turn starts; the start agent's input can land one superstep before its <c>TurnToken</c>, and its
-/// step then also counts the moment it waited for it. An output whose end cannot be known yet (a fan-out sibling was
-/// invoked while this executor was still running) goes out untimed, never with a made-up duration.
+/// step then also counts the moment it waited for it. Each parallel sibling is timed to its own completion,
+/// independently of display order. A step whose completion was never observed is emitted without measured timing.
 /// </para>
 /// </remarks>
-public static class MAFWorkflowEventBridge
+public static partial class MAFWorkflowEventBridge
 {
     /// <summary>
     /// Executes a MAF <see cref="MAFWorkflows.Workflow"/> and yields AgentEval-compatible
@@ -73,11 +72,20 @@ public static class MAFWorkflowEventBridge
     /// (e.g., "Planner"). When provided, all emitted event IDs are normalized to clean names.
     /// </param>
     /// <returns>An async enumerable of AgentEval <see cref="WorkflowEvent"/> records.</returns>
-    public static async IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEvents(
+    public static IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEvents(
+        MAFWorkflows.Workflow workflow,
+        string input,
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? executorIdMap = null) =>
+        StreamAsAgentEvalEventsCore(workflow, input, cancellationToken, executorIdMap);
+
+    internal static async IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEventsCore(
         MAFWorkflows.Workflow workflow,
         string input,
         [EnumeratorCancellation] CancellationToken cancellationToken = default,
-        IReadOnlyDictionary<string, string>? executorIdMap = null)
+        IReadOnlyDictionary<string, string>? executorIdMap = null,
+        IReadOnlyList<string>? executorOrder = null,
+        WorkflowGraphSnapshot? graph = null)
     {
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(input);
@@ -97,6 +105,7 @@ public static class MAFWorkflowEventBridge
         // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
         // run starts so a reflection failure cannot leak a started run.
         var chatProtocolExecutorIds = GetChatProtocolExecutorIds(workflow);
+        graph ??= MAFGraphExtractor.ExtractGraph(workflow, workflow.ReflectExecutors().Keys.ToList(), executorIdMap);
 
         MAFWorkflows.StreamingRun run;
         ChatMessage? inputMessage = null;
@@ -135,7 +144,7 @@ public static class MAFWorkflowEventBridge
         await foreach (var evt in TranslateEventsAsync(
             run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken: cancellationToken),
             chatProtocolExecutorIds, executorIdMap, cancellationToken,
-            runStartedAt: runStartedAt, inputMessage: inputMessage)
+            runStartedAt: runStartedAt, inputMessage: inputMessage, executorOrder: executorOrder, graph: graph)
             .ConfigureAwait(false))
         {
             yield return evt;
@@ -160,6 +169,8 @@ public static class MAFWorkflowEventBridge
     /// defaults to when translation starts.
     /// </param>
     /// <param name="inputMessage">The original chat input, excluded by identity from chat-list output.</param>
+    /// <param name="executorOrder">Preferred display-name order within a superstep; remaining names sort ordinally.</param>
+    /// <param name="graph">Reflected topology for attributing observed transitions; null for custom event streams.</param>
     internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
         IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
         IReadOnlySet<string> chatProtocolExecutorIds,
@@ -167,409 +178,42 @@ public static class MAFWorkflowEventBridge
         [EnumeratorCancellation] CancellationToken cancellationToken = default,
         TimeProvider? timeProvider = null,
         long? runStartedAt = null,
-        ChatMessage? inputMessage = null)
+        ChatMessage? inputMessage = null,
+        IReadOnlyList<string>? executorOrder = null,
+        WorkflowGraphSnapshot? graph = null)
     {
         ArgumentNullException.ThrowIfNull(mafEvents);
         ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
 
-        // Helper to translate full MAF IDs to clean names
-        string NormalizeId(string id) =>
-            executorIdMap is not null && executorIdMap.TryGetValue(id, out var clean) ? clean : id;
-
-        // Track state for event translation
-        string? previousExecutorId = null;
-        string? currentExecutorId = null;
-        var outputAccumulator = new StringBuilder();
-        // A function return is reported both as ExecutorCompleted and as WorkflowOutput when designated
-        // as an output. Consume that paired return once, without collapsing repeated explicit yields.
-        var recordedCompletionResults = new Dictionary<string, object>(StringComparer.Ordinal);
-
-        // One clock for every time the bridge reports, read when a MAF event arrives
-        // (see "Step timing" in the class remarks).
         var clock = timeProvider ?? TimeProvider.System;
         var origin = runStartedAt ?? clock.GetTimestamp();
-        TimeSpan Now() => clock.GetElapsedTime(origin);
+        var recorder = new ActivationRecorder(chatProtocolExecutorIds, executorIdMap, executorOrder, graph,
+            inputMessage, () => clock.GetElapsedTime(origin));
 
-        // Timing of the OPEN step: it runs from the delivery that opened it until its latest delivery completed or
-        // failed. openStepStartedAt is null when the bridge did not see the open step start; openStepRunningDeliveries
-        // counts its deliveries that were invoked and have not completed yet. openStepVisible is true once the
-        // consumer has the step open (an output of it or the edge into it went out), so a closing output for it,
-        // even an empty one, only re-times that step and never adds one.
-        TimeSpan? openStepStartedAt = null;
-        TimeSpan? openStepCompletedAt = null;
-        var openStepRunningDeliveries = 0;
-        var openStepVisible = false;
-
-        // Stamps an output of the open step with when MAF ran that step. Its end is the step's latest completed
-        // delivery, or outputCompletedAt for an output that is complete while its delivery still runs (an agent's
-        // complete response, a workflow output). While a delivery still runs and the output is not known complete —
-        // a fan-out sibling was invoked before this executor finished — the end is unknown and the output goes out
-        // untimed, so the adapter does not record a duration nobody measured.
-        ExecutorOutputEvent Timed(ExecutorOutputEvent output, TimeSpan? outputCompletedAt = null)
+        Exception? streamError = null;
+        await using var enumerator = mafEvents.GetAsyncEnumerator(cancellationToken);
+        while (true)
         {
-            openStepVisible = true;
-            var end = openStepRunningDeliveries == 0 ? openStepCompletedAt : outputCompletedAt;
-            return openStepStartedAt is { } start && end is { } stop
-                ? output with { StartOffset = start, Duration = stop - start }
-                : output;
-        }
-
-        // A delivery finished (ExecutorCompletedEvent / ExecutorFailedEvent). If it belongs to the open step, that
-        // step has run at least until now; a sibling's delivery finishing says nothing about the open step.
-        void DeliveryFinished(string? executorId)
-        {
-            if (executorId is not null && NormalizeId(executorId) == currentExecutorId)
+            try
             {
-                openStepCompletedAt = Now();
-                openStepRunningDeliveries = Math.Max(0, openStepRunningDeliveries - 1);
+                if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
             }
-        }
-
-        // Step-boundary state for the OPEN step (the current executor's activation).
-        // superStep counts MAF SuperStepStartedEvents; openStepSuperStep is the superstep of the open step's most
-        // recent delivery; openStepAwaitingTurn is true while the open step belongs to a chat-protocol executor
-        // that has so far only been handed messages to accumulate (its turn has not run yet).
-        var superStep = 0;
-        var openStepSuperStep = 0;
-        var openStepAwaitingTurn = false;
-
-        // Track pending tool calls: FunctionCallContent arrives first, FunctionResultContent later.
-        // Record intent immediately, then update the same call when its paired result arrives.
-        var pendingToolCalls = new Dictionary<string, (string ExecutorId, string ToolName, string? CallId, IDictionary<string, object?>? Arguments, TimeSpan StartTime)>();
-
-        // Watch the MAF event stream and translate each event
-        await foreach (var mafEvent in mafEvents.WithCancellation(cancellationToken).ConfigureAwait(false))
-        {
-            switch (mafEvent)
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error)
             {
-                // ── Executor lifecycle events ──────────────────────────────
-
-                case MAFWorkflows.ExecutorInvokedEvent invoked:
-                    // MAF raises one ExecutorInvokedEvent per DELIVERED MESSAGE, not per executor run, so an
-                    // invocation of the executor that is already open is not by itself a new step. An agent
-                    // executor (BindAsExecutor → a ChatProtocolExecutor) is handed 2-3 messages per turn — the
-                    // input / forwarded chat messages, which it only accumulates, then the TurnToken that runs
-                    // the turn — and all of them are that ONE turn. A step is one ACTIVATION: what MAF delivers
-                    // to the executor within one superstep (MAF's BSP unit; messages sent in superstep N are
-                    // only delivered in N+1, so nothing can route back into an executor within its superstep).
-                    var invokedAt = Now();
-                    var normalizedInvokedId = NormalizeId(invoked.ExecutorId);
-                    recordedCompletionResults.Remove(normalizedInvokedId);
-                    var invokedIsChatProtocol = chatProtocolExecutorIds.Contains(invoked.ExecutorId);
-                    var opensStep = currentExecutorId != normalizedInvokedId;
-                    if (currentExecutorId != null && currentExecutorId != normalizedInvokedId)
-                    {
-                        // Flush accumulated output for the previous executor
-                        yield return Timed(new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString()));
-
-                        // Emit edge between previous and current executor
-                        yield return new EdgeTraversedEvent(
-                            currentExecutorId,
-                            normalizedInvokedId,
-                            EdgeType.Sequential);
-
-                        outputAccumulator.Clear();
-                    }
-                    else if (currentExecutorId == normalizedInvokedId
-                        && superStep > openStepSuperStep
-                        && !openStepAwaitingTurn)
-                    {
-                        // 15: a DIRECT SELF-LOOP — an executor's own edge routes back to itself (e.g. a
-                        // retry/refine step), so this ExecutorInvokedEvent re-invokes the SAME executor ID in a
-                        // LATER superstep, after its open step has run. Neither branch above fires for this case,
-                        // which used to silently merge this invocation's streaming output into the SAME
-                        // accumulator as the PRIOR invocation's output (folding two steps into one
-                        // ExecutorOutputEvent) and never emit an EdgeTraversedEvent(A, A) — the self-loop
-                        // transition was invisible. Flush the prior invocation's output as its own step (with the
-                        // self-edge) before starting a clean accumulator for this invocation, mirroring the
-                        // flush-then-edge order above.
-                        // The superstep + turn guard keeps this branch to GENUINE re-entries: without it every
-                        // extra message delivery of one agent turn was flushed as a self-loop step, so a 4-agent
-                        // BindAsExecutor chain reported 11 steps, 7 of them empty.
-                        yield return Timed(new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString()));
-
-                        yield return new EdgeTraversedEvent(
-                            currentExecutorId,
-                            normalizedInvokedId,
-                            EdgeType.Sequential);
-
-                        outputAccumulator.Clear();
-                        opensStep = true;
-                    }
-                    else if (currentExecutorId == null && previousExecutorId == null)
-                    {
-                        // Very first executor — no edge to emit
-                        outputAccumulator.Clear();
-                    }
-                    // Otherwise: another delivery within the open step's activation — the same superstep, or a
-                    // chat-protocol executor whose turn has not run yet. That second case is how the bridge's
-                    // own input arrives: InProcessExecution runs the workflow off-thread, so the input
-                    // ChatMessage and the TurnToken sent after it can land in different supersteps. It stays
-                    // one step; nothing to flush.
-
-                    // A chat-protocol step keeps awaiting its turn only while every delivery so far was a
-                    // message the protocol merely accumulates; the TurnToken (or any other message) runs it.
-                    openStepAwaitingTurn = (opensStep || openStepAwaitingTurn)
-                        && invokedIsChatProtocol
-                        && IsChatProtocolAccumulation(invoked.Data);
-                    openStepSuperStep = superStep;
-
-                    // A new step starts its clock at the delivery that opens it; any delivery runs until its
-                    // ExecutorCompletedEvent or ExecutorFailedEvent. A step after the first one is visible at once:
-                    // the edge into it just went out.
-                    if (opensStep)
-                    {
-                        openStepStartedAt = invokedAt;
-                        openStepCompletedAt = null;
-                        openStepRunningDeliveries = 0;
-                        openStepVisible = currentExecutorId != null;
-                    }
-                    openStepRunningDeliveries++;
-
-                    previousExecutorId = currentExecutorId;
-                    currentExecutorId = normalizedInvokedId;
-                    break;
-
-                // ── Agent streaming update (RC: now inherits WorkflowOutputEvent, not ExecutorEvent) ──
-                case MAFWorkflows.AgentResponseUpdateEvent agentUpdate:
-                    // Agent streaming update — inspect for tool calls AND text
-                    var updateExecutorId = NormalizeId(agentUpdate.ExecutorId ?? currentExecutorId ?? "unknown");
-
-                    // Check for tool call invocations (FunctionCallContent)
-                    foreach (var call in agentUpdate.Update.Contents.OfType<FunctionCallContent>())
-                    {
-                        var callId = call.CallId ?? Guid.NewGuid().ToString();
-                        pendingToolCalls[callId] = (
-                            ExecutorId: updateExecutorId,
-                            ToolName: call.Name,
-                            CallId: callId,
-                            Arguments: call.Arguments,
-                            StartTime: Now()
-                        );
-                        yield return new ExecutorToolCallEvent(updateExecutorId, call.Name, callId, call.Arguments)
-                        {
-                            HasResult = false
-                        };
-                    }
-
-                    // Check for tool results (FunctionResultContent)
-                    foreach (var result in agentUpdate.Update.Contents.OfType<FunctionResultContent>())
-                    {
-                        var resultCallId = result.CallId ?? string.Empty;
-                        
-                        // Try exact CallId match first
-                        if (!pendingToolCalls.TryGetValue(resultCallId, out var pending))
-                        {
-                            // Fallback: when CallId is null/empty, match the most recent pending call.
-                            // This handles the case where FunctionCallContent.CallId was null (stored
-                            // under a generated GUID) and FunctionResultContent.CallId is also null.
-                            if (string.IsNullOrEmpty(resultCallId) && pendingToolCalls.Count > 0)
-                            {
-                                var fallbackEntry = pendingToolCalls
-                                    .OrderByDescending(kvp => kvp.Value.StartTime)
-                                    .First();
-                                resultCallId = fallbackEntry.Key;
-                                pending = fallbackEntry.Value;
-                            }
-                        }
-                        
-                        if (pending != default)
-                        {
-                            var duration = Now() - pending.StartTime;
-                            yield return new ExecutorToolCallEvent(
-                                ExecutorId: pending.ExecutorId,
-                                ToolName: pending.ToolName,
-                                CallId: pending.CallId,
-                                Arguments: pending.Arguments,
-                                Result: result.Result,
-                                Duration: duration);
-                            pendingToolCalls.Remove(resultCallId);
-                        }
-                    }
-
-                    // Also extract text from the update (existing behavior)
-                    var updateText = agentUpdate.Update.Text;
-                    if (!string.IsNullOrEmpty(updateText))
-                    {
-                        outputAccumulator.Append(updateText);
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorEvent genericExecutorEvent
-                    when genericExecutorEvent is not MAFWorkflows.ExecutorInvokedEvent
-                    && genericExecutorEvent is not MAFWorkflows.ExecutorCompletedEvent
-                    && genericExecutorEvent is not MAFWorkflows.ExecutorFailedEvent:
-                    // Catch remaining ExecutorEvent subtypes
-                    // by extracting text from their Data property
-                    var evtText = ExtractTextFromResult(genericExecutorEvent.Data, inputMessage);
-                    if (!string.IsNullOrEmpty(evtText))
-                    {
-                        outputAccumulator.Append(evtText);
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorCompletedEvent completed:
-                    DeliveryFinished(completed.ExecutorId);
-
-                    // Executor finished — extract text from result if no streaming output was accumulated
-                    if (currentExecutorId != null)
-                    {
-                        // If no streaming text was accumulated, try to extract from the result
-                        if (outputAccumulator.Length == 0 && completed.Data is not null)
-                        {
-                            var resultText = ExtractTextFromResult(completed.Data, inputMessage);
-                            if (!string.IsNullOrEmpty(resultText))
-                            {
-                                outputAccumulator.Append(resultText);
-                                if (NormalizeId(completed.ExecutorId) == currentExecutorId)
-                                    recordedCompletionResults[currentExecutorId] = completed.Data;
-                            }
-                        }
-
-                        var output = outputAccumulator.ToString();
-                        if (!string.IsNullOrEmpty(output))
-                        {
-                            yield return Timed(new ExecutorOutputEvent(currentExecutorId, output));
-                            outputAccumulator.Clear();
-                        }
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorFailedEvent failed:
-                    // Executor encountered an error; the failed delivery ran until now.
-                    DeliveryFinished(failed.ExecutorId);
-                    var exception = failed.Data as Exception;
-                    yield return new ExecutorErrorEvent(
-                        NormalizeId(failed.ExecutorId),
-                        exception?.Message ?? "Executor failed",
-                        exception?.StackTrace,
-                        exception?.GetType().Name);
-                    break;
-
-                // ── Agent complete (non-streaming) response ──────────────
-                // AgentResponseEvent inherits WorkflowOutputEvent, so this case
-                // MUST come before the generic WorkflowOutputEvent handler.
-
-                case MAFWorkflows.AgentResponseEvent agentResponse:
-                    // Non-streaming complete response from an executor.
-                    // Extract per-executor text, token usage, and finish reason.
-                    var responseExecutorId = NormalizeId(agentResponse.ExecutorId);
-
-                    // Flush any previously accumulated streaming output for a different executor
-                    if (currentExecutorId != null && currentExecutorId != responseExecutorId && outputAccumulator.Length > 0)
-                    {
-                        yield return Timed(new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString()));
-                        outputAccumulator.Clear();
-                    }
-                    if (currentExecutorId != responseExecutorId)
-                    {
-                        // A response from an executor the open step does not belong to (e.g. a concurrent sibling):
-                        // the bridge did not see when that executor's step started, so its outputs go out untimed.
-                        openStepStartedAt = null;
-                    }
-                    currentExecutorId = responseExecutorId;
-
-                    // Build response text: prefer accumulated streaming text, fall back to Response.Text
-                    var agentResponseText = outputAccumulator.Length > 0
-                        ? outputAccumulator.ToString()
-                        : agentResponse.Response.Text;
-                    outputAccumulator.Clear();
-
-                    // Extract token usage from AgentResponse.Usage: null unless both counts were reported (a missing
-                    // count is not 0).
-                    var responseUsage = TokenUsageMapping.FromUsage(agentResponse.Response.Usage);
-
-                    // Extract finish reason (ChatFinishReason.ToString())
-                    var finishReason = agentResponse.Response.FinishReason?.ToString();
-
-                    // MAF raises the response inside the turn's handler, before its ExecutorCompletedEvent: the
-                    // response is complete now.
-                    yield return Timed(
-                        new ExecutorAgentResponseEvent(
-                            ExecutorId: responseExecutorId,
-                            Output: agentResponseText,
-                            Usage: responseUsage,
-                            FinishReason: finishReason),
-                        outputCompletedAt: Now());
-                    break;
-
-                // ── Workflow-level events ────────────────────────────────
-
-                case MAFWorkflows.WorkflowOutputEvent workflowOutput:
-                    // An executor can yield repeatedly, then continue or route to another executor. Only
-                    // the end of the stream completes the workflow; this event records its owner's output.
-                    var outputExecutorId = NormalizeId(workflowOutput.ExecutorId);
-                    if (currentExecutorId != null && outputAccumulator.Length > 0)
-                    {
-                        yield return Timed(new ExecutorOutputEvent(currentExecutorId, outputAccumulator.ToString()));
-                        outputAccumulator.Clear();
-                    }
-
-                    var pairedReturn = recordedCompletionResults.Remove(outputExecutorId, out var recordedResult)
-                        && Equals(recordedResult, workflowOutput.Data);
-                    var workflowText = pairedReturn ? string.Empty : ExtractTextFromResult(workflowOutput.Data, inputMessage);
-                    if (outputExecutorId == currentExecutorId)
-                    {
-                        yield return Timed(new ExecutorOutputEvent(outputExecutorId, workflowText), outputCompletedAt: Now());
-                    }
-                    else if (!string.IsNullOrEmpty(workflowText))
-                    {
-                        yield return new ExecutorOutputEvent(outputExecutorId, workflowText);
-                    }
-                    break;
-
-                case MAFWorkflows.WorkflowErrorEvent workflowError:
-                    // A nested workflow error carries its host ID even though it is a workflow-level event.
-                    var errorData = workflowError.Data as Exception;
-                    yield return new ExecutorErrorEvent(
-                        workflowError is MAFWorkflows.SubworkflowErrorEvent nestedError
-                            ? NormalizeId(nestedError.SubworkflowId) : "workflow",
-                        errorData?.Message ?? "Workflow error",
-                        errorData?.StackTrace,
-                        errorData?.GetType().Name);
-                    break;
-
-                case MAFWorkflows.RequestInfoEvent requestInfo:
-                    // This adapter has no responder. End the run at its pending-request halt and report
-                    // the control-flow requirement instead of waiting for cancellation or claiming success.
-                    var portId = NormalizeId(requestInfo.Request.PortInfo.PortId);
-                    yield return new ExecutorErrorEvent(portId,
-                        $"Expected: completed workflow. Actual: request '{requestInfo.Request.RequestId}' is waiting on port '{portId}'. " +
-                        "Suggestions: use a workflow host that can supply the required response.");
-                    break;
-
-                // ── SuperStep events (no direct mapping) ──
-
-                case MAFWorkflows.SuperStepStartedEvent:
-                    // Superstep boundaries delimit executor activations — see the ExecutorInvokedEvent case.
-                    superStep++;
-                    break;
-
-                case MAFWorkflows.SuperStepCompletedEvent:
-                case MAFWorkflows.WorkflowStartedEvent:
-                case MAFWorkflows.WorkflowWarningEvent:
-                    // These MAF events don't have direct AgentEval equivalents.
-                    // They could be used for detailed tracing in the future.
-                    break;
+                streamError = error;
+                break;
             }
+            foreach (var translated in recorder.Add(enumerator.Current))
+                yield return translated;
         }
 
-        // MAF can end its event stream normally when cancelled. Preserve cancellation so the
-        // harness can distinguish a timeout from a completed workflow with partial evidence.
         cancellationToken.ThrowIfCancellationRequested();
-
-        // Flush after the last delivery, including work performed after an executor yielded output.
-        if (currentExecutorId != null && (outputAccumulator.Length > 0 || openStepVisible))
-        {
-            yield return Timed(new ExecutorOutputEvent(currentExecutorId, outputAccumulator.ToString()));
-        }
-        yield return new WorkflowCompleteEvent();
+        if (streamError is not null)
+            yield return new ExecutorErrorEvent("workflow", streamError.Message, streamError.StackTrace, streamError.GetType().Name);
+        foreach (var translated in recorder.Finish())
+            yield return translated;
+        yield return new WorkflowCompleteEvent { FinalOutput = recorder.FinalOutput };
     }
 
     /// <summary>
