@@ -132,9 +132,13 @@ public record WorkflowExecutionResult
     public bool HasConditionalRouting => Graph?.HasConditionalRouting ?? false;
 
     /// <summary>
-    /// Whether this workflow had parallel execution.
+    /// Whether execution recorded more than one distinct parallel branch on its activations.
+    /// Declared fan-out topology alone is not evidence that its branches ran.
     /// </summary>
-    public bool HasParallelExecution => Graph?.HasParallelExecution ?? false;
+    public bool HasParallelExecution => RecordedParallelBranchCount > 1;
+
+    internal int RecordedParallelBranchCount => Steps.Where(step => step.IsParallelBranch)
+        .Select(step => step.ParallelBranchId!).Distinct(StringComparer.Ordinal).Count();
 
     /// <summary>
     /// Gets the actual execution path through the graph.

@@ -119,13 +119,11 @@ public class EdgeAssertionsTests
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void HaveParallelExecution_Should_PassWhenParallelEdgesExist()
+    public void HaveParallelExecution_DeclaredFanOutWithoutActivations_Fails()
     {
         var result = CreateResultWithParallelExecution();
 
-        result.Should()
-            .HaveParallelExecution()
-            .Validate();
+        Assert.Throws<WorkflowAssertionException>(() => result.Should().HaveParallelExecution().Validate());
     }
 
     [Fact]
@@ -555,7 +553,12 @@ public class EdgeAssertionsTests
         return new WorkflowExecutionResult
         {
             FinalOutput = "output",
-            Steps = [],
+            Steps = [
+                new ExecutorStep { ExecutorId = "a", Output = "a", ParallelBranchId = "branch-1" },
+                new ExecutorStep { ExecutorId = "b", Output = "b", ParallelBranchId = "branch-1" },
+                new ExecutorStep { ExecutorId = "c", Output = "c", ParallelBranchId = "branch-2" },
+                new ExecutorStep { ExecutorId = "d", Output = "d", ParallelBranchId = "branch-2" }
+            ],
             Graph = new WorkflowGraphSnapshot
             {
                 Nodes = [new WorkflowNode { NodeId = "a" }],

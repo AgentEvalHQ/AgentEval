@@ -234,7 +234,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
                 EntryPoint = result.Graph.EntryNodeId,
                 ExitPoints = result.Graph.ExitNodeIds?.ToList(),
                 HasConditionalRouting = result.Graph.HasConditionalRouting,
-                HasParallelExecution = result.Graph.HasParallelExecution,
+                HasParallelExecution = result.HasParallelExecution,
                 Edges = result.Graph.Edges.Select(e => new WorkflowTraceEdge
                 {
                     From = e.SourceExecutorId,

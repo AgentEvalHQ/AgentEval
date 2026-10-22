@@ -569,13 +569,15 @@ public class WorkflowAssertionBuilder
         _currentBecause = because;
         if (!_result.HasParallelExecution)
         {
-            AddFailure("Expected workflow to have parallel execution but it did not");
+            AddFailure("Expected: parallel execution with at least two recorded branches. " +
+                $"Actual: {_result.RecordedParallelBranchCount} recorded branches. " +
+                "Suggestions: record branch ownership for executed steps and check the selected route.");
         }
         return this;
     }
 
     /// <summary>
-    /// Assert the workflow has a specific number of parallel branches.
+    /// Assert the activations record a specific number of distinct parallel branches.
     /// </summary>
     /// <param name="expectedCount">Expected number of parallel branches.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -583,7 +585,7 @@ public class WorkflowAssertionBuilder
     public WorkflowAssertionBuilder HaveParallelBranchCount(int expectedCount, string? because = null)
     {
         _currentBecause = because;
-        var actualCount = _result.Graph?.ParallelBranches?.Count ?? 0;
+        var actualCount = _result.RecordedParallelBranchCount;
         if (actualCount != expectedCount)
         {
             AddFailure($"Expected {expectedCount} parallel branches but found {actualCount}");

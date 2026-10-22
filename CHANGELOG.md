@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Parallel-execution assertions now require recorded branch activations, rather than declared fan-out edges. Branch counts use distinct recorded IDs and survive trace replay; a selector that executes zero or one fan-out target cannot pass a parallel-execution check.
+
 - Executor time-limit assertions now fail as not measured when invocation, completion, agent-turn or nested-host timing is unavailable. `TimingNotMeasuredReason` survives workflow trace recording/replay and JSON export; incomplete executor duration totals are omitted. A measured zero duration remains valid.
 
 - Workflow recording isolates concurrent executor activations, including text, tools, usage and measured timing. Separate agent turns in one superstep remain separate steps; display order follows configured executor order. Traversed edges and branch timing use observed activation evidence, ambiguous join sources are not guessed, and interrupted streams retain partial output and tool intent with an error.
