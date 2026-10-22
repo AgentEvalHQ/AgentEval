@@ -221,6 +221,7 @@ public partial class MAFWorkflowEventBridgeTests
     [InlineData("eval-projection", true)]
     [InlineData("execution", true)]
     [InlineData("timing", false)]
+    [InlineData("timing", true)]
     [InlineData("identity", true)]
     [InlineData("trace-outcome", false)]
     [InlineData("timeline-outcome", false)]
@@ -268,11 +269,11 @@ public partial class MAFWorkflowEventBridgeTests
             using var scope = AgentEvalScope.Collecting();
             result.ToolUsage!.Should().HaveCalledTool("lookup").WithDurationUnder(TimeSpan.FromMinutes(1));
             scope.Dispose();
-            Assert.Equal(hasResult ? AssertionOutcome.Passed : AssertionOutcome.Inconclusive, scope.Results[^1].Outcome);
+            Assert.Equal(AssertionOutcome.Inconclusive, scope.Results[^1].Outcome);
             using var export = JsonDocument.Parse(WorkflowSerializer.ToJson(result));
             var tool = export.RootElement.GetProperty("executionTrace").GetProperty("steps")[0].GetProperty("toolCalls")[0];
             Assert.Equal(hasResult, tool.GetProperty("wasExecuted").GetBoolean());
-            Assert.Equal(hasResult, tool.TryGetProperty("duration", out _));
+            Assert.False(tool.TryGetProperty("duration", out _));
         }
     }
 

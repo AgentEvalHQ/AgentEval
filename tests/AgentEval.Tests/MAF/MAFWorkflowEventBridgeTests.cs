@@ -10,6 +10,7 @@ using AgentEval.Models;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using static Microsoft.Agents.AI.Workflows.ExecutorBindingExtensions;
+using static Microsoft.Agents.AI.Workflows.OpenTelemetryWorkflowBuilderExtensions;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.Tests.MAF;
@@ -80,7 +81,7 @@ public partial class MAFWorkflowEventBridgeTests
         var workflow = new MAFWorkflows.WorkflowBuilder(a)
             .AddEdge(a, b)
             .WithOutputFrom(b)
-            .Build();
+            .WithOpenTelemetry().Build();
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -117,7 +118,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(a, b)
             .AddEdge(b, c)
             .WithOutputFrom(c)
-            .Build();
+            .WithOpenTelemetry().Build();
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -162,7 +163,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<string>(a, a, (string? _) => count < 2)    // loop back to itself once
             .AddEdge<string>(a, b, (string? _) => count >= 2)   // then proceed to B
             .WithOutputFrom(b)
-            .Build();
+            .WithOpenTelemetry().Build();
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -459,7 +460,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<string>(a, a, (string? _) => count < 2)
             .AddEdge<string>(a, b, (string? _) => count >= 2)
             .WithOutputFrom(b)
-            .Build();
+            .WithOpenTelemetry().Build();
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "self-loop", ["A", "B"]);
 
         var result = await adapter.ExecuteWorkflowAsync("start");
@@ -490,7 +491,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<object>(refiner, refiner, (object? _) => refinerClient.Turns < 2)  // loop back once
             .AddEdge<object>(refiner, publisher, (object? _) => refinerClient.Turns >= 2)
             .WithOutputFrom(publisher)
-            .Build();
+            .WithOpenTelemetry().Build();
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "refine-loop", ["Refiner", "Publisher"]);
 
         var result = await adapter.ExecuteWorkflowAsync("Draft a tagline");
@@ -541,7 +542,7 @@ public partial class MAFWorkflowEventBridgeTests
 
         var a = CreateFuncBinding("A", "output-A");
         var b = CreateFuncBinding("B", "output-B");
-        var functionChain = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).Build();
+        var functionChain = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).WithOpenTelemetry().Build();
         Assert.Empty(MAFWorkflowEventBridge.GetChatProtocolExecutorIds(functionChain));
     }
 
@@ -562,7 +563,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(a, b)
             .AddEdge(b, c)
             .WithOutputFrom(c)
-            .Build();
+            .WithOpenTelemetry().Build();
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "slow-chain", ["A", "B", "C"]);
 
         var result = await adapter.ExecuteWorkflowAsync("start");
@@ -599,7 +600,7 @@ public partial class MAFWorkflowEventBridgeTests
 
     /// <summary>
     /// Asserts the steps are timed as MAF ran them: each step lasts at least half its executor's known work (half,
-    /// because the bridge reads events as they arrive and a loaded test host can delay a read), the steps run in
+    /// allowing timer resolution differences while checking the producer span), the steps run in
     /// order without overlapping inside the run, and together they cover most of the run's total — the rest is MAF
     /// and bridge overhead before the first step and between supersteps.
     /// </summary>
@@ -776,7 +777,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(flightReservation, hotelReservation)
             .AddEdge(hotelReservation, presenter)
             .WithOutputFrom(presenter)
-            .Build();
+            .WithOpenTelemetry().Build();
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

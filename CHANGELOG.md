@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Workflow executor timing now uses producer-side MAF spans, preventing queued events from understating duration. Enable `WithOpenTelemetry()` with the default source; unavailable spans explicitly prevent executor timing certification. Tool completion remains separate from tool timing (`ExecutorToolCallEvent.HasTiming`); collection-valued barrier messages retain whole-payload source identity.
+
 - Buffered fan-in releases preserve every identifiable source activation, including multiple activations of one branch. Evaluation projection and Microsoft logging retain explicit unknown tool outcomes and timing instead of fabricating failures or zero-duration measurements.
 
 - Workflow trace replay preserves tool execution evidence, call identities and missing completion timing, plus observed traversals and activation indices. Timelines identify unmeasured tool outcomes and durations instead of reporting successful zero-duration calls. **Breaking:** `ToolStatistics.SuccessRate` is now nullable when every recorded outcome is unmeasured; observed outcomes form its denominator. See the upgrade notes in `docs/workflows.md`.

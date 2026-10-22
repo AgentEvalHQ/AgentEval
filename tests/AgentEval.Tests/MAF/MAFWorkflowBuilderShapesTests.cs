@@ -65,8 +65,8 @@ public sealed class MAFWorkflowBuilderShapesTests(Xunit.Abstractions.ITestOutput
             Assert.Equal(Enumerable.Range(1, count).Select(turn => $"{name}: reply {turn}"), replies.Select(step => step.Output));
             Assert.All(replies, step =>
             {
-                Assert.Null(step.TimingNotMeasuredReason);
-                Assert.True(step.Duration >= TimeSpan.FromMilliseconds(10));
+                // These convenience builders return workflows without executor telemetry enabled.
+                Assert.NotNull(step.TimingNotMeasuredReason);
             });
         }
         Assert.DoesNotContain("builder input marker", result.FinalOutput);

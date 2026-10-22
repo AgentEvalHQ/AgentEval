@@ -8,6 +8,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Time.Testing;
 using static Microsoft.Agents.AI.Workflows.ExecutorBindingExtensions;
+using static Microsoft.Agents.AI.Workflows.OpenTelemetryWorkflowBuilderExtensions;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.Tests.MAF;
@@ -21,11 +22,11 @@ public sealed class MAFWorkflowNestedRequestTests
         MAFWorkflows.SubworkflowBinding Host(string id)
         {
             var child = Function(id + "Work", value => id + " reply");
-            return new MAFWorkflows.SubworkflowBinding(new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build(), id, null);
+            return new MAFWorkflows.SubworkflowBinding(new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build(), id, null);
         }
         var left = Host("Left");
         var right = Host("Right");
-        var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right]).WithOutputFrom(left, right).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right]).WithOutputFrom(left, right).WithOpenTelemetry().Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "nested branches", [])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -47,7 +48,7 @@ public sealed class MAFWorkflowNestedRequestTests
         var port = MAFWorkflows.RequestPort.Create<string, string>("Approval");
         var processor = Function("Processor", value => "processed " + value);
         var workflow = new MAFWorkflows.WorkflowBuilder(port).AddEdge(port, processor)
-            .AddEdge<string>(processor, port, _ => requests < 2).WithOutputFrom(processor).Build();
+            .AddEdge<string>(processor, port, _ => requests < 2).WithOutputFrom(processor).WithOpenTelemetry().Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "two approvals", [], null, (request, _) =>
             ValueTask.FromResult<MAFWorkflows.ExternalResponse?>(request.CreateResponse("yes " + ++requests)));
@@ -163,7 +164,7 @@ public sealed class MAFWorkflowNestedRequestTests
     {
         var first = Function("Worker_a", value => value);
         var second = Function("Worker_b", value => value);
-        var workflow = new MAFWorkflows.WorkflowBuilder(first).AddEdge(first, second).WithOutputFrom(second).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(first).AddEdge(first, second).WithOutputFrom(second).WithOpenTelemetry().Build();
         var error = Assert.Throws<ArgumentException>(() => MAFWorkflowAdapter.FromMAFWorkflow(workflow, "ambiguous names", ["Worker"]));
         Assert.Contains("distinct", error.Message);
         Assert.Contains("Worker", error.Message);
@@ -175,7 +176,7 @@ public sealed class MAFWorkflowNestedRequestTests
         // MAF's concurrent builder uses root executor IDs such as Batcher/Left_<guid>.
         // A slash in a raw ID is not itself evidence of subworkflow containment.
         var worker = Function("Batcher/Left_raw", value => value);
-        var workflow = new MAFWorkflows.WorkflowBuilder(worker).WithOutputFrom(worker).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(worker).WithOutputFrom(worker).WithOpenTelemetry().Build();
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "slash name", ["Batcher/Left"]);
         Assert.Equal("Batcher/Left", adapter.GraphDefinition!.EntryNodeId);
     }
@@ -243,9 +244,9 @@ public sealed class MAFWorkflowNestedRequestTests
     public async Task FromMAFWorkflow_UnexposedNestedRequest_FailsPromptlyInsteadOfHanging(bool responder)
     {
         var port = MAFWorkflows.RequestPort.Create<string, string>("Approval");
-        var inner = new MAFWorkflows.WorkflowBuilder(port).WithOutputFrom(port).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(port).WithOutputFrom(port).WithOpenTelemetry().Build();
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        var workflow = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).WithOpenTelemetry().Build();
         var calls = 0;
         var adapter = responder
             ? MAFWorkflowAdapter.FromMAFWorkflow(workflow, "missing relay", [], null, (request, _) =>
@@ -266,12 +267,12 @@ public sealed class MAFWorkflowNestedRequestTests
     public async Task FromMAFWorkflow_TwoNestedLevels_QualifiesPathsAndTimesBothHosts()
     {
         var child = Function("Child", value => value + " done");
-        var leaf = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build();
+        var leaf = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
         var innerHost = new MAFWorkflows.SubworkflowBinding(leaf, "Inner", null);
         var prepare = Function("Prepare", value => value);
-        var middle = new MAFWorkflows.WorkflowBuilder(prepare).AddEdge(prepare, innerHost).WithOutputFrom(innerHost).Build();
+        var middle = new MAFWorkflows.WorkflowBuilder(prepare).AddEdge(prepare, innerHost).WithOutputFrom(innerHost).WithOpenTelemetry().Build();
         var outerHost = new MAFWorkflows.SubworkflowBinding(middle, "Outer", null);
-        var workflow = new MAFWorkflows.WorkflowBuilder(outerHost).WithOutputFrom(outerHost).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(outerHost).WithOutputFrom(outerHost).WithOpenTelemetry().Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "deep", ["Outer", "Outer/Prepare", "Outer/Inner", "Outer/Inner/Child"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -287,11 +288,11 @@ public sealed class MAFWorkflowNestedRequestTests
     public void FromMAFWorkflow_StackedCatchAllHosts_RefusesMAFSilentInputDrop()
     {
         var child = Function("Child", value => value);
-        var leaf = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build();
+        var leaf = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
         var innerHost = new MAFWorkflows.SubworkflowBinding(leaf, "Inner", null);
-        var middle = new MAFWorkflows.WorkflowBuilder(innerHost).WithOutputFrom(innerHost).Build();
+        var middle = new MAFWorkflows.WorkflowBuilder(innerHost).WithOutputFrom(innerHost).WithOpenTelemetry().Build();
         var outerHost = new MAFWorkflows.SubworkflowBinding(middle, "Outer", null);
-        var workflow = new MAFWorkflows.WorkflowBuilder(outerHost).WithOutputFrom(outerHost).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(outerHost).WithOutputFrom(outerHost).WithOpenTelemetry().Build();
         var error = Assert.Throws<NotSupportedException>(() => MAFWorkflowAdapter.FromMAFWorkflow(workflow, "unsupported entry", []));
         Assert.Contains("entry executor", error.Message);
         Assert.Contains("Outer", error.Message);
@@ -302,9 +303,9 @@ public sealed class MAFWorkflowNestedRequestTests
     {
         var outer = Function("A", value => value);
         var child = Function("A", value => value);
-        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        var workflow = new MAFWorkflows.WorkflowBuilder(outer).AddEdge(outer, host).WithOutputFrom(host).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(outer).AddEdge(outer, host).WithOutputFrom(host).WithOpenTelemetry().Build();
         var error = Assert.Throws<NotSupportedException>(() => MAFWorkflowAdapter.FromMAFWorkflow(workflow, "ambiguous", []));
         Assert.Contains("unique", error.Message);
         Assert.Contains("'A'", error.Message);
@@ -316,9 +317,9 @@ public sealed class MAFWorkflowNestedRequestTests
         var calls = 0;
         var tool = AIFunctionFactory.Create((int step) => { calls++; return "found"; }, "Lookup");
         var child = new ChatClientAgent(new BridgeScriptedChatClient("Child", ["Lookup"]), name: "Child", tools: [tool]).BindAsExecutor(emitEvents: true);
-        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        var workflow = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).WithOpenTelemetry().Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "nested agent", ["Sub", "Sub/Child"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -361,7 +362,7 @@ public sealed class MAFWorkflowNestedRequestTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var port = MAFWorkflows.RequestPort.Create<string, string>("Approval");
         var processor = Function("Processor", value => "processed " + value);
-        var workflow = new MAFWorkflows.WorkflowBuilder(port).AddEdge(port, processor).WithOutputFrom(processor).Build();
+        var workflow = new MAFWorkflows.WorkflowBuilder(port).AddEdge(port, processor).WithOutputFrom(processor).WithOpenTelemetry().Build();
         var graph = MAFGraphExtractor.ExtractGraph(workflow, ["Approval", "Processor"]);
         var adapter = new MAFWorkflowAdapter("external responder", (_, ct) =>
             MAFWorkflowEventBridge.TranslateEventsAsync(AnsweredEvents(ct), new HashSet<string>(), cancellationToken: ct, graph: graph));
@@ -394,23 +395,23 @@ public sealed class MAFWorkflowNestedRequestTests
     {
         var a = Function("A", value => value + " A");
         var b = Function("B", value => value + " B");
-        var inner = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).WithOpenTelemetry().Build();
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        return new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).Build();
+        return new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).WithOpenTelemetry().Build();
     }
 
     private static MAFWorkflows.Workflow RequestWorkflow(bool nested)
     {
         var port = MAFWorkflows.RequestPort.Create<string, string>("Approval");
         var processor = Function("Processor", value => "processed " + value);
-        var inner = new MAFWorkflows.WorkflowBuilder(port).AddEdge(port, processor).WithOutputFrom(processor).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(port).AddEdge(port, processor).WithOutputFrom(processor).WithOpenTelemetry().Build();
         if (!nested) return inner;
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
         // MAF forwards a child's request as an ExternalRequest message from its host. An outer port
         // accepts the wrapped request, exposes it to the caller, and routes the wrapped response back.
         var bridge = MAFWorkflows.RequestPort.Create<string, string>("ApprovalBridge");
         return new MAFWorkflows.WorkflowBuilder(host).AddEdge<MAFWorkflows.ExternalRequest>(host, bridge, request => request is not null)
-            .AddEdge<MAFWorkflows.ExternalResponse>(bridge, host, response => response is not null).WithOutputFrom(host).Build();
+            .AddEdge<MAFWorkflows.ExternalResponse>(bridge, host, response => response is not null).WithOutputFrom(host).WithOpenTelemetry().Build();
     }
 
     private static MAFWorkflows.ExecutorBinding Function(string id, Func<string, string> transform) =>

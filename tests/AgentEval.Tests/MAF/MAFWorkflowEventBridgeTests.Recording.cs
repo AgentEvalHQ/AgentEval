@@ -86,8 +86,8 @@ public partial class MAFWorkflowEventBridgeTests
         Assert.Equal("Caller", call.ExecutorId);
         Assert.Equal(hasResult, call.WasExecuted);
         Assert.Null(call.Result);
-        Assert.Equal(hasResult, call.EndTime.HasValue);
-        Assert.Equal(hasResult, call.HasTiming);
+        Assert.Null(call.EndTime);
+        Assert.False(call.HasTiming);
         if (hasResult) Assert.Null(Assert.Single(result.Steps, s => s.ExecutorId == "End").ToolCalls);
         else Assert.Contains(result.Errors!, e => e.Message.Contains("agent failed before tool result"));
     }

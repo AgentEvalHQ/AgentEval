@@ -394,6 +394,7 @@ public static class WorkflowEvaluationReal
             .WithOutputFrom(editorBinding)
             .WithName("ContentPipeline")
             .WithDescription("Sequential content creation pipeline: plan → research → write → edit")
+            .WithOpenTelemetry() // Producer spans establish executor timing.
             .Build();
 
         return (workflow, ["Planner", "Researcher", "Writer", "Editor"]);

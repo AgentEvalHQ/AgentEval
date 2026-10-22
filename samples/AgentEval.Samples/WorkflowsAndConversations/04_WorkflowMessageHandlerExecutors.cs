@@ -226,6 +226,7 @@ public static partial class WorkflowMessageHandlerExecutors
             .WithOutputFrom(formatter)
             .WithName("TextPipeline")
             .WithDescription("Deterministic text pipeline: sanitize → classify → format")
+            .WithOpenTelemetry() // Producer spans establish executor timing.
             .Build();
 
         return (workflow, ["Sanitizer", "Classifier", "Formatter"]);

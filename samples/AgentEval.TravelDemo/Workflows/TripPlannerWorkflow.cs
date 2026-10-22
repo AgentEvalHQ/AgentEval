@@ -42,6 +42,7 @@ public static class TripPlannerWorkflow
             .WithOutputFrom(presenterExecutor)
             .WithName("TripPlanner")
             .WithDescription("Trip planning pipeline: plan → flights → hotels → present")
+            .WithOpenTelemetry() // Producer spans establish executor timing.
             .Build();
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);

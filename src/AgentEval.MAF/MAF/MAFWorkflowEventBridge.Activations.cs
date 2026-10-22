@@ -16,7 +16,7 @@ public static partial class MAFWorkflowEventBridge
         IReadOnlySet<string> chatIds, IReadOnlyDictionary<string, string>? idMap,
         IReadOnlyList<string>? executorOrder, WorkflowGraphSnapshot? graph,
         ChatMessage? inputMessage, Func<TimeSpan> now, IReadOnlySet<string>? subworkflowIds,
-        IReadOnlyDictionary<string, string>? parents)
+        IReadOnlyDictionary<string, string>? parents, MAFWorkflowTimingCapture? timingCapture)
     {
         private readonly Dictionary<string, Activation> _open = new(StringComparer.Ordinal);
         private readonly List<Activation> _ready = [];
@@ -45,7 +45,7 @@ public static partial class MAFWorkflowEventBridge
         {
             if (!_open.TryGetValue(rawId, out var activation))
             {
-                activation = new(rawId, Normalize(rawId), chatIds.Contains(rawId), subworkflowIds?.Contains(rawId) == true, _superstep, _ordinal++);
+                activation = new(rawId, Normalize(rawId), chatIds.Contains(rawId), subworkflowIds?.Contains(rawId) == true, _superstep, _ordinal++, timingCapture is not null);
                 _open.Add(rawId, activation);
                 if (parents?.TryGetValue(rawId, out var parent) == true) activation.Parent = Get(parent);
             }
@@ -71,6 +71,15 @@ public static partial class MAFWorkflowEventBridge
                         activation = Get(invoked.ExecutorId);
                     }
                     activation.Start ??= now();
+                    if (timingCapture is not null)
+                    {
+                        var delivery = timingCapture.Take(invoked.ExecutorId);
+                        for (var owner = activation; owner is not null; owner = owner.Parent)
+                        {
+                            if (delivery is null) owner.MissingProducerTiming = true;
+                            else owner.Deliveries.Add(delivery);
+                        }
+                    }
                     activation.LastSuperstep = _superstep;
                     activation.Running++;
                     for (var parent = activation.Parent; parent is not null; parent = parent.Parent)
@@ -150,7 +159,7 @@ public static partial class MAFWorkflowEventBridge
                     responseOwner.Text.Clear();
                     var responseEvent = new ExecutorAgentResponseEvent(responseOwner.Id, responseText,
                         TokenUsageMapping.FromUsage(response.Response.Usage), response.Response.FinishReason?.ToString());
-                    if (responseOwner.Start is { } responseStart)
+                    if (timingCapture is null && responseOwner.Start is { } responseStart)
                         responseEvent = responseEvent with { StartOffset = responseStart, Duration = now() - responseStart };
                     responseOwner.Outputs.Add(responseEvent);
                     if (!string.IsNullOrEmpty(responseText)) _lastOutput = responseOwner;
@@ -206,6 +215,7 @@ public static partial class MAFWorkflowEventBridge
 
         public IEnumerable<WorkflowEvent> Finish(bool streamCompleted)
         {
+            foreach (var activation in _open.Values) RefreshProducerTiming(activation);
             if (!streamCompleted)
                 foreach (var host in _open.Values.Concat(_ready).Where(item => item.IsSubworkflow))
                     host.NestedIncomplete = true;
@@ -246,6 +256,7 @@ public static partial class MAFWorkflowEventBridge
 
         private void Close(Activation activation)
         {
+            RefreshProducerTiming(activation);
             if (TimingNotMeasuredReason(activation) is not null)
                 for (var parent = activation.Parent; parent is not null; parent = parent.Parent)
                     parent.NestedIncomplete = true;
@@ -358,8 +369,13 @@ public static partial class MAFWorkflowEventBridge
             }
         }
 
-        private static IEnumerable<object?> InputItems(object? input) =>
-            input is System.Collections.IEnumerable items && input is not string ? items.Cast<object?>() : [input];
+        private static IEnumerable<object?> InputItems(object? input)
+        {
+            // A collection can itself be the message. Preserve its identity as well as chat-list members.
+            yield return input;
+            if (input is System.Collections.IEnumerable items && input is not string)
+                foreach (var item in items) yield return item;
+        }
 
         private static bool Matches(Activation source, object? input) =>
             input is ChatMessage { MessageId: { } id } && source.MessageIds.Contains(id) ||
@@ -378,7 +394,22 @@ public static partial class MAFWorkflowEventBridge
                 : output with { StartOffset = activation.Start, Duration = null, TimingNotMeasuredReason = reason };
         }
 
+        private static void RefreshProducerTiming(Activation activation)
+        {
+            if (activation.RequiresProducerTiming && HasCompleteProducerTiming(activation))
+            {
+                activation.Start = activation.Deliveries.Min(delivery => delivery.Start);
+                activation.End = activation.Deliveries.Max(delivery => delivery.End!.Value);
+            }
+        }
+
+        private static bool HasCompleteProducerTiming(Activation activation) =>
+            !activation.MissingProducerTiming && activation.Deliveries.Count > 0 &&
+            activation.Deliveries.All(delivery => delivery.End is not null);
+
         private static string? TimingNotMeasuredReason(Activation activation) =>
+            activation.RequiresProducerTiming && !HasCompleteProducerTiming(activation)
+                ? "Producer execution timing was not observed. Enable MAF WithOpenTelemetry() with its default activity source and executor process spans." :
             activation.IsSubworkflow && (!activation.HasNestedActivity || activation.NestedRunning != 0 || activation.NestedIncomplete)
                 ? "Sub-workflow completion was not fully observed." :
             activation.PendingRequests.Count > 0 ? "The request port is waiting for a response." :
@@ -386,8 +417,11 @@ public static partial class MAFWorkflowEventBridge
             activation.End is null || activation.Running != 0 ? "Executor completion was not observed before the event stream ended." :
             activation.IsChat && !activation.HasTurn ? "Agent turn was not observed; only chat accumulation was delivered." : null;
 
-        private sealed class Activation(string rawId, string id, bool isChat, bool isSubworkflow, int superstep, int ordinal)
+        private sealed class Activation(string rawId, string id, bool isChat, bool isSubworkflow, int superstep, int ordinal, bool requiresProducerTiming)
         {
+            public bool RequiresProducerTiming { get; } = requiresProducerTiming;
+            public bool MissingProducerTiming { get; set; }
+            public List<MAFWorkflowTimingCapture.Delivery> Deliveries { get; } = [];
             public string RawId { get; } = rawId;
             public string Id { get; } = id;
             public bool IsChat { get; } = isChat;
@@ -425,7 +459,7 @@ public static partial class MAFWorkflowEventBridge
             public TimeSpan? End { get; set; }
             public object? Result { get; set; }
             public ExecutorToolCallEvent Event() => new(Owner.Id, name, Id, arguments, Result, End is { } end ? end - Start : default)
-                { HasResult = End.HasValue };
+                { HasResult = End.HasValue, HasTiming = End.HasValue && !Owner.RequiresProducerTiming };
         }
 
         private sealed class BranchSummary(string id)

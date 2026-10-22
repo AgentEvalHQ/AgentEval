@@ -310,8 +310,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         {
                             pendingCall.Result = toolEvent.Result;
                             pendingCall.WasExecuted = true;
-                            pendingCall.StartTime = observedAt - toolEvent.Duration;
-                            pendingCall.EndTime = observedAt;
+                            pendingCall.StartTime = toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt;
+                            pendingCall.EndTime = toolEvent.HasTiming ? observedAt : null;
                             break;
                         }
 
@@ -326,8 +326,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             Arguments = toolEvent.Arguments,
                             Result = toolEvent.Result,
                             WasExecuted = toolEvent.HasResult,
-                            StartTime = toolEvent.HasResult ? observedAt - toolEvent.Duration : observedAt,
-                            EndTime = toolEvent.HasResult ? observedAt : null,
+                            StartTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt,
+                            EndTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt : null,
                             Order = currentToolCalls.Count + 1,
                             // Use the executor ID embedded in the event (set by the bridge from the
                             // MAF streaming update that contained the tool call), falling back to
@@ -766,6 +766,13 @@ public record ExecutorToolCallEvent(
     /// compatibility with event sources that emit only completed calls. False never certifies execution or timing.
     /// </summary>
     public bool HasResult { get; init; } = true;
+
+    /// <summary>
+    /// Whether <see cref="Duration"/> was measured at the tool's execution boundaries. A paired result alone
+    /// does not prove timing. Defaults to true for existing custom sources; the queued MAF bridge sets false.
+    /// Timing is accepted only when <see cref="HasResult"/> is also true.
+    /// </summary>
+    public bool HasTiming { get; init; } = true;
 }
 
 /// <summary>

@@ -13,6 +13,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Time.Testing;
 using ChatRole = Microsoft.Extensions.AI.ChatRole;
 using static Microsoft.Agents.AI.Workflows.ExecutorBindingExtensions;
+using static Microsoft.Agents.AI.Workflows.OpenTelemetryWorkflowBuilderExtensions;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.Tests.MAF;
@@ -113,9 +114,9 @@ public sealed class MAFWorkflowTimingMeasurementTests
             await Task.Delay(30, ct);
             return "child reply";
         })).BindAsExecutor<string, string>("Child");
-        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        var outer = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).Build();
+        var outer = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).WithOpenTelemetry().Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(outer, "nested timing", ["Sub", "Child"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
