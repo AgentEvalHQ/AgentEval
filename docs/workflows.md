@@ -180,6 +180,10 @@ Known limits (tracked, not yet fixed): when one agent receives two turns in the 
 
 ### Timeout Handling
 
+An executor yielding a workflow output does not complete the run. AgentEval continues recording until the MAF event stream ends, preserving later steps, repeated yields and errors. For MAF's sequential and concurrent agent builders, chat-list output is rendered as message text separated by newlines; the original input message is excluded by identity, so a new reply with identical text is retained. The parallel step-attribution limits above still apply.
+
+If the event stream ends on cancellation, the adapter propagates cancellation. The harness reports its own timeout as a failed test and propagates caller cancellation. An unanswered request port returns a workflow error naming its port and request ID; the request envelope is not an executor answer.
+
 MAF workflows may not honor cancellation tokens during active LLM calls. AgentEval implements a **hard timeout pattern** in critical samples:
 
 ```csharp

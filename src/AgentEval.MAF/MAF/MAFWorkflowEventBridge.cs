@@ -99,12 +99,14 @@ public static class MAFWorkflowEventBridge
         var chatProtocolExecutorIds = GetChatProtocolExecutorIds(workflow);
 
         MAFWorkflows.StreamingRun run;
+        ChatMessage? inputMessage = null;
         if (isChatProtocol)
         {
             // Send a ChatMessage: every ChatProtocolExecutor accumulates one, while a plain string is accepted
             // only when the executor sets a string message role (AIAgentHostExecutor does in MAF 1.24).
+            inputMessage = new ChatMessage(ChatRole.User, input);
             run = await MAFWorkflows.InProcessExecution
-                .RunStreamingAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
+                .RunStreamingAsync(workflow, inputMessage, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         else
@@ -133,7 +135,7 @@ public static class MAFWorkflowEventBridge
         await foreach (var evt in TranslateEventsAsync(
             run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken: cancellationToken),
             chatProtocolExecutorIds, executorIdMap, cancellationToken,
-            runStartedAt: runStartedAt)
+            runStartedAt: runStartedAt, inputMessage: inputMessage)
             .ConfigureAwait(false))
         {
             yield return evt;
@@ -157,13 +159,15 @@ public static class MAFWorkflowEventBridge
     /// The <paramref name="timeProvider"/> timestamp the run started at, which step start offsets count from;
     /// defaults to when translation starts.
     /// </param>
+    /// <param name="inputMessage">The original chat input, excluded by identity from chat-list output.</param>
     internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
         IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
         IReadOnlySet<string> chatProtocolExecutorIds,
         IReadOnlyDictionary<string, string>? executorIdMap = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default,
         TimeProvider? timeProvider = null,
-        long? runStartedAt = null)
+        long? runStartedAt = null,
+        ChatMessage? inputMessage = null)
     {
         ArgumentNullException.ThrowIfNull(mafEvents);
         ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
@@ -176,7 +180,9 @@ public static class MAFWorkflowEventBridge
         string? previousExecutorId = null;
         string? currentExecutorId = null;
         var outputAccumulator = new StringBuilder();
-        bool workflowOutputReceived = false;
+        // A function return is reported both as ExecutorCompleted and as WorkflowOutput when designated
+        // as an output. Consume that paired return once, without collapsing repeated explicit yields.
+        var recordedCompletionResults = new Dictionary<string, object>(StringComparer.Ordinal);
 
         // One clock for every time the bridge reports, read when a MAF event arrives
         // (see "Step timing" in the class remarks).
@@ -248,6 +254,7 @@ public static class MAFWorkflowEventBridge
                     // only delivered in N+1, so nothing can route back into an executor within its superstep).
                     var invokedAt = Now();
                     var normalizedInvokedId = NormalizeId(invoked.ExecutorId);
+                    recordedCompletionResults.Remove(normalizedInvokedId);
                     var invokedIsChatProtocol = chatProtocolExecutorIds.Contains(invoked.ExecutorId);
                     var opensStep = currentExecutorId != normalizedInvokedId;
                     if (currentExecutorId != null && currentExecutorId != normalizedInvokedId)
@@ -398,7 +405,7 @@ public static class MAFWorkflowEventBridge
                     && genericExecutorEvent is not MAFWorkflows.ExecutorFailedEvent:
                     // Catch remaining ExecutorEvent subtypes
                     // by extracting text from their Data property
-                    var evtText = ExtractTextFromResult(genericExecutorEvent.Data);
+                    var evtText = ExtractTextFromResult(genericExecutorEvent.Data, inputMessage);
                     if (!string.IsNullOrEmpty(evtText))
                     {
                         outputAccumulator.Append(evtText);
@@ -414,10 +421,12 @@ public static class MAFWorkflowEventBridge
                         // If no streaming text was accumulated, try to extract from the result
                         if (outputAccumulator.Length == 0 && completed.Data is not null)
                         {
-                            var resultText = ExtractTextFromResult(completed.Data);
+                            var resultText = ExtractTextFromResult(completed.Data, inputMessage);
                             if (!string.IsNullOrEmpty(resultText))
                             {
                                 outputAccumulator.Append(resultText);
+                                if (NormalizeId(completed.ExecutorId) == currentExecutorId)
+                                    recordedCompletionResults[currentExecutorId] = completed.Data;
                             }
                         }
 
@@ -493,22 +502,26 @@ public static class MAFWorkflowEventBridge
                 // ── Workflow-level events ────────────────────────────────
 
                 case MAFWorkflows.WorkflowOutputEvent workflowOutput:
-                    // Workflow produced final output — flush any remaining output, or close a step the consumer
-                    // already has open so it carries the step's final timing. A workflow output the open step's
-                    // executor yields completes that step's output, even if its handler has not returned.
-                    if (currentExecutorId != null && (outputAccumulator.Length > 0 || openStepVisible))
+                    // An executor can yield repeatedly, then continue or route to another executor. Only
+                    // the end of the stream completes the workflow; this event records its owner's output.
+                    var outputExecutorId = NormalizeId(workflowOutput.ExecutorId);
+                    if (currentExecutorId != null && outputAccumulator.Length > 0)
                     {
-                        var outputCompletedAt = workflowOutput.ExecutorId is { } outputExecutorId
-                            && NormalizeId(outputExecutorId) == currentExecutorId
-                                ? Now()
-                                : (TimeSpan?)null;
-                        yield return Timed(
-                            new ExecutorOutputEvent(currentExecutorId, outputAccumulator.ToString()),
-                            outputCompletedAt);
+                        yield return Timed(new ExecutorOutputEvent(currentExecutorId, outputAccumulator.ToString()));
                         outputAccumulator.Clear();
                     }
-                    workflowOutputReceived = true;
-                    yield return new WorkflowCompleteEvent();
+
+                    var pairedReturn = recordedCompletionResults.Remove(outputExecutorId, out var recordedResult)
+                        && Equals(recordedResult, workflowOutput.Data);
+                    var workflowText = pairedReturn ? string.Empty : ExtractTextFromResult(workflowOutput.Data, inputMessage);
+                    if (outputExecutorId == currentExecutorId)
+                    {
+                        yield return Timed(new ExecutorOutputEvent(outputExecutorId, workflowText), outputCompletedAt: Now());
+                    }
+                    else if (!string.IsNullOrEmpty(workflowText))
+                    {
+                        yield return new ExecutorOutputEvent(outputExecutorId, workflowText);
+                    }
                     break;
 
                 case MAFWorkflows.WorkflowErrorEvent workflowError:
@@ -551,17 +564,12 @@ public static class MAFWorkflowEventBridge
         // harness can distinguish a timeout from a completed workflow with partial evidence.
         cancellationToken.ThrowIfCancellationRequested();
 
-        // If the stream ended without a WorkflowOutputEvent, still flush (or close the open step, as above) and complete
-        if (!workflowOutputReceived)
+        // Flush after the last delivery, including work performed after an executor yielded output.
+        if (currentExecutorId != null && (outputAccumulator.Length > 0 || openStepVisible))
         {
-            if (currentExecutorId != null && (outputAccumulator.Length > 0 || openStepVisible))
-            {
-                yield return Timed(new ExecutorOutputEvent(
-                    currentExecutorId,
-                    outputAccumulator.ToString()));
-            }
-            yield return new WorkflowCompleteEvent();
+            yield return Timed(new ExecutorOutputEvent(currentExecutorId, outputAccumulator.ToString()));
         }
+        yield return new WorkflowCompleteEvent();
     }
 
     /// <summary>
@@ -599,7 +607,7 @@ public static class MAFWorkflowEventBridge
     /// Uses reflection-free duck typing: checks for .Text property common to
     /// AgentResponse, AgentResponseUpdate, and string results.
     /// </summary>
-    private static string? ExtractTextFromResult(object? result)
+    private static string? ExtractTextFromResult(object? result, ChatMessage? inputMessage = null)
     {
         // A request-port handler returns its request envelope, not an answer from the executor.
         if (result is null or MAFWorkflows.ExternalRequest)
@@ -608,6 +616,13 @@ public static class MAFWorkflowEventBridge
         // Plain string result
         if (result is string str)
             return str;
+
+        if (result is IEnumerable<ChatMessage> messages)
+            return string.Join(Environment.NewLine, messages.Where(message => !ReferenceEquals(message, inputMessage))
+                .Select(message => message.Text));
+
+        if (result is ChatMessage message)
+            return ReferenceEquals(message, inputMessage) ? string.Empty : message.Text;
 
         // Duck-type: check for a Text property (covers AgentResponse, AgentResponseUpdate, etc.)
         var textProp = result.GetType().GetProperty("Text");

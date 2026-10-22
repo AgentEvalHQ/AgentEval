@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Workflow output events no longer end recording early: later steps, loop iterations, errors, requests and cancellation remain visible. Repeated yields are preserved, paired return/output events are counted once, and agent-builder chat-list outputs render their messages without echoing the original input.
+
 - Workflows waiting on an unanswered request port now return an error identifying the port and request instead of waiting for timeout. Request envelopes are excluded from step output.
 
 - Workflow recording preserves overlapping executor names and sub-workflow error IDs, and recognizes delayed chat-forwarding tokens as one turn. Tool calls are recorded when requested; only a paired result certifies execution, including a null-valued result.
