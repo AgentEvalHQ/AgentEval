@@ -657,7 +657,28 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         MAFWorkflows.Workflow workflow,
         string name,
         IEnumerable<string> executorIds,
-        string? workflowType = null)
+        string? workflowType = null) =>
+        CreateFromMAFWorkflow(workflow, name, executorIds, workflowType, null);
+
+    /// <summary>Wraps a MAF workflow and answers its external request ports during execution.</summary>
+    /// <param name="workflow">The built workflow.</param>
+    /// <param name="name">Human-readable workflow name.</param>
+    /// <param name="executorIds">Preferred executor display names, including nested paths such as Sub/A.</param>
+    /// <param name="workflowType">Optional workflow pattern name; pass null when unspecified.</param>
+    /// <param name="requestResponder">Creates a response with request.CreateResponse(...). Return null to decline;
+    /// a declined or failed response makes the run fail. Honor the supplied cancellation token.</param>
+    /// <returns>An adapter that hosts requests as well as recording execution.</returns>
+    public static MAFWorkflowAdapter FromMAFWorkflow(
+        MAFWorkflows.Workflow workflow, string name, IEnumerable<string> executorIds, string? workflowType,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>> requestResponder)
+    {
+        ArgumentNullException.ThrowIfNull(requestResponder);
+        return CreateFromMAFWorkflow(workflow, name, executorIds, workflowType, requestResponder);
+    }
+
+    private static MAFWorkflowAdapter CreateFromMAFWorkflow(
+        MAFWorkflows.Workflow workflow, string name, IEnumerable<string> executorIds, string? workflowType,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? requestResponder)
     {
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(name);
@@ -665,57 +686,13 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
         var cleanNames = executorIds.ToList();
 
-        // Discover real MAF executor IDs from ReflectEdges + StartExecutorId.
-        // MAF generates IDs in the form "Name_<32hexGuid>" (via GetDescriptiveId).
-        // We build a mapping from full MAF ID → user-provided clean name.
-        var reflectedEdges = workflow.ReflectEdges();
-        var allMafIds = new HashSet<string>(reflectedEdges.Keys);
-
-        // Also add sink IDs from edges (targets may not appear as source keys)
-        foreach (var edgeInfos in reflectedEdges.Values)
-        {
-            foreach (var edgeInfo in edgeInfos)
-            {
-                foreach (var sinkId in edgeInfo.Connection.SinkIds)
-                    allMafIds.Add(sinkId);
-                foreach (var sourceId in edgeInfo.Connection.SourceIds)
-                    allMafIds.Add(sourceId);
-            }
-        }
-
-        // Include the start executor ID
-        if (!string.IsNullOrEmpty(workflow.StartExecutorId))
-            allMafIds.Add(workflow.StartExecutorId);
-
-        // Prefer the most specific name, so Fetch cannot consume Fetch_Retry's ID.
-        var namesBySpecificity = cleanNames.OrderByDescending(n => n.Length).ToList();
-        var idMap = new Dictionary<string, string>();
-        foreach (var fullId in allMafIds)
-        {
-            foreach (var cleanName in namesBySpecificity)
-            {
-                // MAF format: "{Name}_{Guid32hex}" — match by prefix
-                if (string.Equals(fullId, cleanName, StringComparison.Ordinal)
-                    || fullId.StartsWith(cleanName + "_", StringComparison.Ordinal))
-                {
-                    idMap[fullId] = cleanName;
-                    break;
-                }
-            }
-
-            // If no clean name matched, map to itself (passthrough)
-            if (!idMap.ContainsKey(fullId))
-                idMap[fullId] = fullId;
-        }
-
-        // Use real MAF IDs for graph extraction (they match ReflectEdges keys),
-        // but pass the mapping so node/edge IDs are translated to clean names.
-        var realMafIds = allMafIds.ToList();
-        var graph = MAFGraphExtractor.ExtractGraph(workflow, realMafIds, idMap);
+        var topology = MAFWorkflowTopology.Create(workflow, cleanNames);
+        var idMap = topology.IdMap;
+        var graph = topology.Graph;
 
         return new MAFWorkflowAdapter(
             name,
-            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEventsCore(workflow, prompt, ct, idMap, cleanNames, graph),
+            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEventsCore(workflow, prompt, ct, idMap, cleanNames, graph, requestResponder, topology),
             cleanNames,
             workflowType,
             graph);

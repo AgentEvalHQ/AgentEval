@@ -85,7 +85,9 @@ public static partial class MAFWorkflowEventBridge
         [EnumeratorCancellation] CancellationToken cancellationToken = default,
         IReadOnlyDictionary<string, string>? executorIdMap = null,
         IReadOnlyList<string>? executorOrder = null,
-        WorkflowGraphSnapshot? graph = null)
+        WorkflowGraphSnapshot? graph = null,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? requestResponder = null,
+        MAFWorkflowTopology? topology = null)
     {
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(input);
@@ -104,10 +106,14 @@ public static partial class MAFWorkflowEventBridge
         // Which executors take TURNS (accumulate chat messages, run on a TurnToken) — needed to tell one turn's
         // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
         // run starts so a reflection failure cannot leak a started run.
-        var chatProtocolExecutorIds = GetChatProtocolExecutorIds(workflow);
-        var subworkflowExecutorIds = workflow.ReflectExecutors().Where(pair => pair.Value is MAFWorkflows.SubworkflowBinding)
-            .Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
-        graph ??= MAFGraphExtractor.ExtractGraph(workflow, workflow.ReflectExecutors().Keys.ToList(), executorIdMap);
+        topology ??= MAFWorkflowTopology.Create(workflow, executorOrder, executorIdMap);
+        // A subworkflow host advertises a catch-all route, hiding its entry agent's chat protocol.
+        // Resolve that protocol through containment so the child receives both input and TurnToken.
+        isChatProtocol |= topology.ChatIds.Contains(workflow.StartExecutorId);
+        var chatProtocolExecutorIds = topology.ChatIds;
+        var subworkflowExecutorIds = topology.HostIds;
+        executorIdMap = topology.IdMap;
+        graph ??= topology.Graph;
 
         MAFWorkflows.StreamingRun run;
         ChatMessage? inputMessage = null;
@@ -144,14 +150,66 @@ public static partial class MAFWorkflowEventBridge
         }
 
         await foreach (var evt in TranslateEventsAsync(
-            run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken: cancellationToken),
+            WatchWithResponsesAsync(run, topology, requestResponder, cancellationToken),
             chatProtocolExecutorIds, executorIdMap, cancellationToken,
             runStartedAt: runStartedAt, inputMessage: inputMessage, executorOrder: executorOrder, graph: graph,
-            subworkflowExecutorIds: subworkflowExecutorIds)
+            subworkflowExecutorIds: subworkflowExecutorIds, parentExecutorIds: topology.Parents)
             .ConfigureAwait(false))
         {
             yield return evt;
         }
+    }
+
+    private static async IAsyncEnumerable<MAFWorkflows.WorkflowEvent> WatchWithResponsesAsync(
+        MAFWorkflows.StreamingRun run, MAFWorkflowTopology topology,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? responder,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var outstandingAnswers = new HashSet<string>(StringComparer.Ordinal);
+        do
+        {
+            await foreach (var evt in run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken).ConfigureAwait(false))
+            {
+                if (evt is MAFWorkflows.ExecutorCompletedEvent { Data: MAFWorkflows.ExternalResponse completed })
+                    outstandingAnswers.Remove(completed.RequestId);
+                if (evt is MAFWorkflows.WorkflowErrorEvent or MAFWorkflows.ExecutorFailedEvent)
+                    outstandingAnswers.Clear();
+                if (responder is null || evt is not MAFWorkflows.RequestInfoEvent request)
+                {
+                    yield return topology.RestoreNestedAgentEvent(evt);
+                    continue;
+                }
+                MAFWorkflows.ExternalResponse? response;
+                try
+                {
+                    response = await responder(request.Request, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (response is not null)
+                    {
+                        if (response.RequestId != request.Request.RequestId || response.PortInfo != request.Request.PortInfo)
+                            throw new InvalidOperationException("The response does not match the request and port identity.");
+                        await run.SendResponseAsync(response).ConfigureAwait(false);
+                        outstandingAnswers.Add(response.RequestId);
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error)
+                {
+                    throw new InvalidOperationException($"Expected: response to request '{request.Request.RequestId}' on port '{request.Request.PortInfo.PortId}'. Actual: responder failed. Suggestions: return request.CreateResponse(...) with the required payload. {error.Message}", error);
+                }
+                if (response is null)
+                {
+                    // The existing pending-request diagnostic names the declined request. Stop this enumeration
+                    // instead of blocking on an answer the caller has explicitly declined to provide.
+                    yield return evt;
+                    yield break;
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            // A queued response can start a new MAF streaming epoch after the pending-request halt.
+            // Drain that epoch until the response delivery is observed. Unexposed nested requests
+            // instead end promptly and are diagnosed by the recorder's outstanding-request check.
+        } while (outstandingAnswers.Count > 0);
     }
 
     /// <summary>
@@ -175,6 +233,7 @@ public static partial class MAFWorkflowEventBridge
     /// <param name="executorOrder">Preferred display-name order within a superstep; remaining names sort ordinally.</param>
     /// <param name="graph">Reflected topology for attributing observed transitions; null for custom event streams.</param>
     /// <param name="subworkflowExecutorIds">Hosts whose delivery timing does not cover nested execution.</param>
+    /// <param name="parentExecutorIds">Raw child-to-host containment, resolved before execution.</param>
     internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
         IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
         IReadOnlySet<string> chatProtocolExecutorIds,
@@ -185,7 +244,8 @@ public static partial class MAFWorkflowEventBridge
         ChatMessage? inputMessage = null,
         IReadOnlyList<string>? executorOrder = null,
         WorkflowGraphSnapshot? graph = null,
-        IReadOnlySet<string>? subworkflowExecutorIds = null)
+        IReadOnlySet<string>? subworkflowExecutorIds = null,
+        IReadOnlyDictionary<string, string>? parentExecutorIds = null)
     {
         ArgumentNullException.ThrowIfNull(mafEvents);
         ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
@@ -193,7 +253,7 @@ public static partial class MAFWorkflowEventBridge
         var clock = timeProvider ?? TimeProvider.System;
         var origin = runStartedAt ?? clock.GetTimestamp();
         var recorder = new ActivationRecorder(chatProtocolExecutorIds, executorIdMap, executorOrder, graph,
-            inputMessage, () => clock.GetElapsedTime(origin), subworkflowExecutorIds);
+            inputMessage, () => clock.GetElapsedTime(origin), subworkflowExecutorIds, parentExecutorIds);
 
         Exception? streamError = null;
         await using var enumerator = mafEvents.GetAsyncEnumerator(cancellationToken);
@@ -216,7 +276,7 @@ public static partial class MAFWorkflowEventBridge
         cancellationToken.ThrowIfCancellationRequested();
         if (streamError is not null)
             yield return new ExecutorErrorEvent("workflow", streamError.Message, streamError.StackTrace, streamError.GetType().Name);
-        foreach (var translated in recorder.Finish())
+        foreach (var translated in recorder.Finish(streamError is null))
             yield return translated;
         yield return new WorkflowCompleteEvent { FinalOutput = recorder.FinalOutput };
     }
@@ -261,6 +321,9 @@ public static partial class MAFWorkflowEventBridge
         // A request-port handler returns its request envelope, not an answer from the executor.
         if (result is null or MAFWorkflows.ExternalRequest)
             return null;
+
+        if (result is MAFWorkflows.ExternalResponse response)
+            return response.TryGetDataAs<object>(out var value) ? ExtractTextFromResult(value, inputMessage) : null;
 
         // Plain string result
         if (result is string str)

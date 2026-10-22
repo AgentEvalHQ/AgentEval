@@ -180,7 +180,26 @@ Parallel steps are timed to each executor's own completion. Recorded fan-out bra
 
 MAF's fan-in barrier releases individual messages; it does not aggregate them into an array. With agent chat protocols, it can leave message accumulation waiting for another token. The recorder preserves each observed turn and any remaining accumulation separately; the latter does not erase the last produced output. Use ordinary incoming edges when each upstream agent should trigger its own turn. The barrier's message-routing behavior is controlled by MAF.
 
-A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with ?time not measured? and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Sub-workflow hosts are explicitly untimed until their nested execution can be correlated. Custom sources without an explicit missing-timing reason keep arrival timing. Nested executor qualification and request-response hosting remain pending.
+A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with "time not measured" and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Custom sources without an explicit missing-timing reason keep arrival timing.
+
+### Nested workflows and external answers
+
+Nested executor steps use paths such as `Sub/A` and `Sub/B`. Supply those paths in `executorIds` to choose display names and ordering. The host starts with its input and runs through its observed children; its queueing call alone is not its duration. Nested results are buffered until the stream finishes so a host can precede its children while retaining the full interval. Incomplete children or an interrupted stream leave the host's timing not measured. Nested agent inputs receive the chat protocol's turn token, and forwarded agent events are attributed using their agent ID so child text, tool calls and usage stay with the child.
+
+MAF flattens child events without their parent scope. Raw executor IDs must therefore be unique across the workflow tree; duplicate IDs are rejected before execution. Nested agent output must identify one bound agent within its host. MAF also cannot forward input through a host whose entry is directly another catch-all host; add an entry executor with an explicit input type inside that workflow. Multi-level nesting with concrete entry executors is supported.
+
+Use the responder overload to answer a request during execution:
+
+```csharp
+var adapter = MAFWorkflowAdapter.FromMAFWorkflow(
+    workflow, "approval workflow", ["Approval", "Processor"], workflowType: null,
+    requestResponder: (request, cancellationToken) =>
+        ValueTask.FromResult<ExternalResponse?>(request.CreateResponse("approved")));
+```
+
+The callback receives the original request and run cancellation token. Return `null` to decline; a declined, failed or mismatched response fails the run with the request and port identity. The original four-argument overload remains available. The answer completes the existing port activation, including time spent waiting, and its payload becomes the port's output; it does not create a self-loop. Subsequent genuine requests are separate activations.
+
+For a request inside a subworkflow, MAF forwards an `ExternalRequest` message from its host. Configure an outer request port to receive that wrapped message and route its `ExternalResponse` back to the host. Use type-filtering predicates (`request => request is not null`, `response => response is not null`) so normal host output is not routed as another request. The callback sees the outer port's request. A nested request with no relay fails promptly with the child port name and setup guidance.
 
 ### Timeout Handling
 

@@ -106,7 +106,7 @@ public sealed class MAFWorkflowTimingMeasurementTests
     }
 
     [Fact]
-    public async Task ExecuteWorkflowAsync_RealSubworkflowHostWithoutInvocationTiming_CannotPassTimeLimit()
+    public async Task ExecuteWorkflowAsync_RealSubworkflowHost_MeasuresItsChildLifetime()
     {
         var child = ((Func<string, CancellationToken, ValueTask<string>>)(async (_, ct) =>
         {
@@ -122,7 +122,12 @@ public sealed class MAFWorkflowTimingMeasurementTests
 
         Assert.True(result.IsSuccess, string.Join("; ", result.Errors?.Select(error => error.Message) ?? []));
         Assert.Contains(result.Steps, step => step.Output.Contains("child reply"));
-        AssertTimingUnavailable(result, "Sub");
+        var hostStep = Assert.Single(result.Steps, step => step.ExecutorId == "Sub");
+        var childStep = Assert.Single(result.Steps, step => step.ExecutorId == "Sub/Child");
+        Assert.Null(hostStep.TimingNotMeasuredReason);
+        Assert.True(hostStep.Duration >= childStep.Duration);
+        Assert.True(hostStep.Duration >= TimeSpan.FromMilliseconds(25));
+        Assert.False(result.Should().ForExecutor("Sub").HaveCompletedWithin(TimeSpan.FromMilliseconds(1)).And().IsValid);
     }
 
     [Fact]

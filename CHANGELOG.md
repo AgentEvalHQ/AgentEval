@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nested workflow steps now use qualified paths, retain child agent output and tool events, and measure hosts through child execution. A new `FromMAFWorkflow` responder overload answers request ports without inventing loop steps. Missing nested request relays fail promptly; ambiguous nested identities and unsupported stacked catch-all entries are rejected explicitly.
+
 - Parallel-execution assertions now require recorded branch activations, rather than declared fan-out edges. Branch counts use distinct recorded IDs and survive trace replay; a selector that executes zero or one fan-out target cannot pass a parallel-execution check.
 
 - Executor time-limit assertions now fail as not measured when invocation, completion, agent-turn or nested-host timing is unavailable. `TimingNotMeasuredReason` survives workflow trace recording/replay and JSON export; incomplete executor duration totals are omitted. A measured zero duration remains valid.

@@ -15,13 +15,15 @@ public static partial class MAFWorkflowEventBridge
     private sealed class ActivationRecorder(
         IReadOnlySet<string> chatIds, IReadOnlyDictionary<string, string>? idMap,
         IReadOnlyList<string>? executorOrder, WorkflowGraphSnapshot? graph,
-        ChatMessage? inputMessage, Func<TimeSpan> now, IReadOnlySet<string>? subworkflowIds)
+        ChatMessage? inputMessage, Func<TimeSpan> now, IReadOnlySet<string>? subworkflowIds,
+        IReadOnlyDictionary<string, string>? parents)
     {
         private readonly Dictionary<string, Activation> _open = new(StringComparer.Ordinal);
         private readonly List<Activation> _ready = [];
         private readonly List<Activation> _emitted = [];
         private readonly Dictionary<(string Executor, string Call), PendingCall> _pendingCalls = [];
         private readonly Dictionary<string, BranchSummary> _branches = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _reportedPendingRequests = new(StringComparer.Ordinal);
         private int _superstep;
         private int _ordinal;
         private Activation? _lastOutput;
@@ -43,6 +45,7 @@ public static partial class MAFWorkflowEventBridge
             {
                 activation = new(rawId, Normalize(rawId), chatIds.Contains(rawId), subworkflowIds?.Contains(rawId) == true, _superstep, _ordinal++);
                 _open.Add(rawId, activation);
+                if (parents?.TryGetValue(rawId, out var parent) == true) activation.Parent = Get(parent);
             }
             return activation;
         }
@@ -56,7 +59,9 @@ public static partial class MAFWorkflowEventBridge
                     break;
                 case MAFWorkflows.ExecutorInvokedEvent invoked:
                     var activation = Get(invoked.ExecutorId);
-                    if (activation.Start is not null &&
+                    var isAnswer = invoked.Data is MAFWorkflows.ExternalResponse answer &&
+                        (activation.PendingRequests.Contains(answer.RequestId) || activation.IsSubworkflow);
+                    if (!isAnswer && activation.Start is not null &&
                         ((!activation.IsChat && activation.LastSuperstep != _superstep) ||
                          (activation.IsChat && activation.HasTurn && activation.Running == 0)))
                     {
@@ -66,6 +71,11 @@ public static partial class MAFWorkflowEventBridge
                     activation.Start ??= now();
                     activation.LastSuperstep = _superstep;
                     activation.Running++;
+                    for (var parent = activation.Parent; parent is not null; parent = parent.Parent)
+                    {
+                        parent.HasNestedActivity = true;
+                        parent.NestedRunning++;
+                    }
                     activation.Inputs.Add(invoked.Data!);
                     activation.HasTurn |= !activation.IsChat || !IsChatProtocolAccumulation(invoked.Data);
                     activation.PairedReturn = null;
@@ -101,6 +111,10 @@ public static partial class MAFWorkflowEventBridge
                 case MAFWorkflows.ExecutorCompletedEvent completed:
                     var completedOwner = Get(completed.ExecutorId);
                     CompleteDelivery(completedOwner);
+                    if (completed.Data is MAFWorkflows.ExternalRequest pendingRequest)
+                        completedOwner.PendingRequests.Add(pendingRequest.RequestId);
+                    if (completed.Data is MAFWorkflows.ExternalResponse completedResponse)
+                        completedOwner.PendingRequests.Remove(completedResponse.RequestId);
                     if (completedOwner.Text.Length == 0 && completed.Data is not null)
                     {
                         var text = ExtractTextFromResult(completed.Data, inputMessage);
@@ -111,7 +125,9 @@ public static partial class MAFWorkflowEventBridge
                             completedOwner.PairedReturn = completed.Data;
                         }
                     }
-                    if (completed.Data is not null) completedOwner.Returns.Add(completed.Data);
+                    if (completed.Data is MAFWorkflows.ExternalResponse returnedResponse && returnedResponse.TryGetDataAs<object>(out var answerValue))
+                        completedOwner.Returns.Add(answerValue);
+                    else if (completed.Data is not null) completedOwner.Returns.Add(completed.Data);
                     FlushText(completedOwner);
                     break;
 
@@ -141,6 +157,7 @@ public static partial class MAFWorkflowEventBridge
 
                 case MAFWorkflows.WorkflowOutputEvent output:
                     var outputOwner = Get(output.ExecutorId);
+                    if (outputOwner.IsSubworkflow) outputOwner.End = now();
                     _lastOutput = outputOwner;
                     FlushText(outputOwner);
                     if (outputOwner.PairedReturn is null || !Equals(outputOwner.PairedReturn, output.Data))
@@ -167,21 +184,38 @@ public static partial class MAFWorkflowEventBridge
 
                 case MAFWorkflows.RequestInfoEvent request:
                     var port = Normalize(request.Request.PortInfo.PortId);
+                    _reportedPendingRequests.Add(request.Request.RequestId);
                     yield return new ExecutorErrorEvent(port,
                         $"Expected: completed workflow. Actual: request '{request.Request.RequestId}' is waiting on port '{port}'. " +
                         "Suggestions: use a workflow host that can supply the required response.");
                     break;
 
                 case MAFWorkflows.SuperStepCompletedEvent:
-                    foreach (var ready in _open.Values.Where(item => item.Running == 0 && (!item.IsChat || item.HasTurn)).ToArray())
+                    foreach (var ready in _open.Values.Where(item => !item.IsSubworkflow && item.PendingRequests.Count == 0 &&
+                        item.Running == 0 && (!item.IsChat || item.HasTurn)).ToArray())
                         Close(ready);
-                    foreach (var translated in EmitReady()) yield return translated;
+                    // Nested host steps must precede their children and remain open across child supersteps.
+                    // MAF exposes no host-completed event, so buffer nested runs until their stream finishes.
+                    if (parents is null || parents.Count == 0)
+                        foreach (var translated in EmitReady()) yield return translated;
                     break;
             }
         }
 
-        public IEnumerable<WorkflowEvent> Finish()
+        public IEnumerable<WorkflowEvent> Finish(bool streamCompleted)
         {
+            if (!streamCompleted)
+                foreach (var host in _open.Values.Concat(_ready).Where(item => item.IsSubworkflow))
+                    host.NestedIncomplete = true;
+            foreach (var pending in _open.Values)
+                foreach (var request in pending.PendingRequests)
+                    if (_reportedPendingRequests.Add(request))
+                        yield return new ExecutorErrorEvent(pending.Id,
+                            $"Expected: completed workflow. Actual: request '{request}' is waiting on port '{pending.Id}'. " +
+                            "Suggestions: expose nested requests through an outer request-port relay and provide a responder.");
+            foreach (var child in _open.Values.Where(item => TimingNotMeasuredReason(item) is not null))
+                for (var parent = child.Parent; parent is not null; parent = parent.Parent)
+                    parent.NestedIncomplete = true;
             foreach (var activation in _open.Values.ToArray()) Close(activation);
             foreach (var translated in EmitReady()) yield return translated;
             foreach (var branch in _branches.Values.Where(branch => branch.Measured))
@@ -193,6 +227,12 @@ public static partial class MAFWorkflowEventBridge
         {
             activation.End = now();
             activation.Running = Math.Max(0, activation.Running - 1);
+            for (var parent = activation.Parent; parent is not null; parent = parent.Parent)
+            {
+                parent.End = activation.End;
+                parent.LastSuperstep = _superstep;
+                parent.NestedRunning = Math.Max(0, parent.NestedRunning - 1);
+            }
         }
 
         private static void FlushText(Activation activation)
@@ -204,6 +244,9 @@ public static partial class MAFWorkflowEventBridge
 
         private void Close(Activation activation)
         {
+            if (TimingNotMeasuredReason(activation) is not null)
+                for (var parent = activation.Parent; parent is not null; parent = parent.Parent)
+                    parent.NestedIncomplete = true;
             FlushText(activation);
             _open.Remove(activation.RawId);
             _ready.Add(activation);
@@ -234,6 +277,7 @@ public static partial class MAFWorkflowEventBridge
                 if (activation.BranchId is null && activation.Incoming.Count == 1 &&
                     activation.Incoming[0].EdgeType != EdgeType.ParallelFanIn)
                     activation.BranchId = _emitted[activation.Incoming[0].SourceStepIndex!.Value].BranchId;
+                activation.BranchId ??= activation.Parent?.BranchId;
 
                 foreach (var edge in activation.Incoming) yield return edge;
                 yield return Stamp(activation, new ExecutorOutputEvent(activation.Id, string.Empty)
@@ -302,7 +346,9 @@ public static partial class MAFWorkflowEventBridge
         }
 
         private static string? TimingNotMeasuredReason(Activation activation) =>
-            activation.IsSubworkflow ? "Sub-workflow host duration does not cover its nested execution." :
+            activation.IsSubworkflow && (!activation.HasNestedActivity || activation.NestedRunning != 0 || activation.NestedIncomplete)
+                ? "Sub-workflow completion was not fully observed." :
+            activation.PendingRequests.Count > 0 ? "The request port is waiting for a response." :
             activation.Start is null ? "Executor invocation was not observed." :
             activation.End is null || activation.Running != 0 ? "Executor completion was not observed before the event stream ended." :
             activation.IsChat && !activation.HasTurn ? "Agent turn was not observed; only chat accumulation was delivered." : null;
@@ -313,6 +359,11 @@ public static partial class MAFWorkflowEventBridge
             public string Id { get; } = id;
             public bool IsChat { get; } = isChat;
             public bool IsSubworkflow { get; } = isSubworkflow;
+            public Activation? Parent { get; set; }
+            public bool HasNestedActivity { get; set; }
+            public int NestedRunning { get; set; }
+            public bool NestedIncomplete { get; set; }
+            public HashSet<string> PendingRequests { get; } = new(StringComparer.Ordinal);
             public int FirstSuperstep { get; } = superstep;
             public int LastSuperstep { get; set; } = superstep;
             public int Ordinal { get; } = ordinal;
