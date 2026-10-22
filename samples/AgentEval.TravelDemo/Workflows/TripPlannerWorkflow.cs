@@ -17,7 +17,8 @@ public static class TripPlannerWorkflow
     /// <summary>
     /// Builds the workflow and returns it together with the ordered executor IDs.
     /// </summary>
-    public static (Workflow Workflow, string[] ExecutorIds) Create()
+    /// <param name="build">Optional builder used by evaluation hosts to attach owned instrumentation.</param>
+    public static (Workflow Workflow, string[] ExecutorIds) Create(Func<WorkflowBuilder, Workflow>? build = null)
     {
         // One chat client on the configured provider, shared by all four agents.
         var chatClient = Config.CreateChatClient();
@@ -35,15 +36,14 @@ public static class TripPlannerWorkflow
         var presenterExecutor         = presenter.BindAsExecutor(emitEvents: true);
 
         // ── Wire sequential pipeline ─────────────────────────────────────────
-        var workflow = new WorkflowBuilder(tripPlannerExecutor)
+        var workflowBuilder = new WorkflowBuilder(tripPlannerExecutor)
             .AddEdge(tripPlannerExecutor, flightReservationExecutor)
             .AddEdge(flightReservationExecutor, hotelReservationExecutor)
             .AddEdge(hotelReservationExecutor, presenterExecutor)
             .WithOutputFrom(presenterExecutor)
             .WithName("TripPlanner")
-            .WithDescription("Trip planning pipeline: plan → flights → hotels → present")
-            .WithOpenTelemetry() // Producer spans establish executor timing.
-            .Build();
+            .WithDescription("Trip planning pipeline: plan → flights → hotels → present");
+        var workflow = build is null ? workflowBuilder.Build() : build(workflowBuilder);
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

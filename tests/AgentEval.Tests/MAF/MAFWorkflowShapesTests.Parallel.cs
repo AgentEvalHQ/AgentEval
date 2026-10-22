@@ -23,7 +23,7 @@ public sealed partial class MAFWorkflowShapesTests
         var joinCalls = 0;
         var join = Function("Join", () => { joinCalls++; return "joined"; });
         var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right])
-            .AddEdge<string>(left, join, _ => true).AddEdge<string>(right, join, _ => false).WithOutputFrom(join).WithOpenTelemetry().Build();
+            .AddEdge<string>(left, join, _ => true).AddEdge<string>(right, join, _ => false).WithOutputFrom(join).BuildWithTiming(_timing);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "ambiguous sender", ["Start", "Left", "Right", "Join"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -61,7 +61,7 @@ public sealed partial class MAFWorkflowShapesTests
             return ValueTask.FromResult(input + "|");
         })).BindAsExecutor<string, string>("Join");
         var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right])
-            .AddFanInBarrierEdge([left, right], join).WithOutputFrom(join).WithOpenTelemetry().Build();
+            .AddFanInBarrierEdge([left, right], join).WithOutputFrom(join).BuildWithTiming(_timing);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "barrier", ["Start", "Right", "Left", "Join"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -110,7 +110,7 @@ public sealed partial class MAFWorkflowShapesTests
         var left = ToolAgent("Left", 40);
         var right = ToolAgent("Right", 20);
         var workflow = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right])
-            .WithOutputFrom(left, right).WithOpenTelemetry().Build();
+            .WithOutputFrom(left, right).BuildWithTiming(_timing);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "agent fan-out", ["Start", "Right", "Left"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -144,7 +144,7 @@ public sealed partial class MAFWorkflowShapesTests
         var builder = new MAFWorkflows.WorkflowBuilder(start).AddFanOutEdge(start, [left, right]);
         if (barrier) builder.AddFanInBarrierEdge([left, right], join);
         else builder.AddEdge(left, join).AddEdge(right, join);
-        var workflow = builder.WithOutputFrom(join).WithOpenTelemetry().Build();
+        var workflow = builder.WithOutputFrom(join).BuildWithTiming(_timing);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "agent fan-in", ["Start", "Right", "Left", "Join"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));

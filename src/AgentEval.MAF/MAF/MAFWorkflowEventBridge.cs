@@ -50,8 +50,8 @@ namespace AgentEval.MAF;
 /// by when its output arrives. The bridge stamps each <see cref="ExecutorOutputEvent"/> with
 /// <see cref="ExecutorOutputEvent.StartOffset"/> and <see cref="ExecutorOutputEvent.Duration"/> instead: a step runs
 /// from its first delivery's producer-side <c>executor.process</c> span start until its latest delivery's span ends.
-/// Enable MAF's <c>WithOpenTelemetry()</c> on the workflow builder, using its default activity source; otherwise
-/// executor timing is explicitly unmeasured. The bridge preserves the caller's telemetry configuration.
+/// Build the workflow with <see cref="MAFWorkflowInstrumentation"/> to establish producer ownership; otherwise
+/// executor timing is explicitly unmeasured. The bridge preserves the built workflow's telemetry configuration.
 /// Event queue arrival times are never used as production execution durations. An agent's first delivery is the chat messages it
 /// accumulates, which MAF hands over in the same superstep as the <c>TurnToken</c> that runs the turn, so the step
 /// starts when its turn starts; the start agent's input can land one superstep before its <c>TurnToken</c>, and its
@@ -96,7 +96,6 @@ public static partial class MAFWorkflowEventBridge
         // Step timings count from here, when the caller started enumerating this run, so they share their origin
         // with the caller's own clock (MAFWorkflowAdapter starts its clock just before it enumerates this stream).
         var runStartedAt = TimeProvider.System.GetTimestamp();
-        using var timing = new MAFWorkflowTimingCapture(runStartedAt);
 
         // Start the MAF workflow execution via InProcessExecution.
         // Detect if workflow uses ChatProtocol (AIAgent-based executors via BindAsExecutor)
@@ -109,6 +108,7 @@ public static partial class MAFWorkflowEventBridge
         // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
         // run starts so a reflection failure cannot leak a started run.
         topology ??= MAFWorkflowTopology.Create(workflow, executorOrder, executorIdMap);
+        using var timing = new MAFWorkflowTimingCapture(runStartedAt, topology.TimingSources);
         // A subworkflow host advertises a catch-all route, hiding its entry agent's chat protocol.
         // Resolve that protocol through containment so the child receives both input and TurnToken.
         isChatProtocol |= topology.ChatIds.Contains(workflow.StartExecutorId);
@@ -126,7 +126,7 @@ public static partial class MAFWorkflowEventBridge
             inputMessage = new ChatMessage(ChatRole.User, input);
             using var timingScope = timing.Enter();
             run = await MAFWorkflows.InProcessExecution
-                .RunStreamingAsync(workflow, inputMessage, cancellationToken: cancellationToken)
+                .RunStreamingAsync(workflow, inputMessage, sessionId: timing.SessionId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         else
@@ -134,7 +134,7 @@ public static partial class MAFWorkflowEventBridge
             using var timingScope = timing.Enter();
             // Function-based executors (Func<string, ValueTask<string>>) handle string input directly.
             run = await MAFWorkflows.InProcessExecution
-                .RunStreamingAsync<string>(workflow, input, cancellationToken: cancellationToken)
+                .RunStreamingAsync<string>(workflow, input, sessionId: timing.SessionId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
 

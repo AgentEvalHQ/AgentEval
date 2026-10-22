@@ -18,8 +18,11 @@ using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.Tests.MAF;
 
-public sealed class MAFWorkflowTimingMeasurementTests
+public sealed class MAFWorkflowTimingMeasurementTests : IDisposable
 {
+    private readonly MAFWorkflowInstrumentation _timing = new();
+    public void Dispose() => _timing.Dispose();
+
     [Fact]
     public async Task ExecuteWorkflowAsync_TraceRoundTrip_PreservesUnavailableTimingAndOmitsPartialTotals()
     {
@@ -114,9 +117,9 @@ public sealed class MAFWorkflowTimingMeasurementTests
             await Task.Delay(30, ct);
             return "child reply";
         })).BindAsExecutor<string, string>("Child");
-        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).WithOpenTelemetry().Build();
+        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).BuildWithTiming(_timing);
         var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
-        var outer = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).WithOpenTelemetry().Build();
+        var outer = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).BuildWithTiming(_timing);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(outer, "nested timing", ["Sub", "Child"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));

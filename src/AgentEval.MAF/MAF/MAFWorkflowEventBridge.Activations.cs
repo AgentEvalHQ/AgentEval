@@ -409,7 +409,7 @@ public static partial class MAFWorkflowEventBridge
 
         private static string? TimingNotMeasuredReason(Activation activation) =>
             activation.RequiresProducerTiming && !HasCompleteProducerTiming(activation)
-                ? "Producer execution timing was not observed. Enable MAF WithOpenTelemetry() with its default activity source and executor process spans." :
+                ? "Producer execution timing could not be attributed to this operation. Build the root and declared child workflows with MAFWorkflowInstrumentation and keep it alive until execution finishes." :
             activation.IsSubworkflow && (!activation.HasNestedActivity || activation.NestedRunning != 0 || activation.NestedIncomplete)
                 ? "Sub-workflow completion was not fully observed." :
             activation.PendingRequests.Count > 0 ? "The request port is waiting for a response." :

@@ -19,8 +19,11 @@ namespace AgentEval.Tests.MAF;
 /// Tests for <see cref="MAFWorkflowEventBridge"/>.
 /// Verifies translation of MAF workflow events to AgentEval events.
 /// </summary>
-public partial class MAFWorkflowEventBridgeTests
+public partial class MAFWorkflowEventBridgeTests : IDisposable
 {
+    private readonly MAFWorkflowInstrumentation _timing = new();
+    public void Dispose() => _timing.Dispose();
+
     [Fact]
     public async Task StreamAsAgentEvalEvents_ThrowsOnNullWorkflow()
     {
@@ -81,7 +84,7 @@ public partial class MAFWorkflowEventBridgeTests
         var workflow = new MAFWorkflows.WorkflowBuilder(a)
             .AddEdge(a, b)
             .WithOutputFrom(b)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -118,7 +121,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(a, b)
             .AddEdge(b, c)
             .WithOutputFrom(c)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -163,7 +166,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<string>(a, a, (string? _) => count < 2)    // loop back to itself once
             .AddEdge<string>(a, b, (string? _) => count >= 2)   // then proceed to B
             .WithOutputFrom(b)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
 
         // Act
         var events = new List<WorkflowEvent>();
@@ -460,7 +463,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<string>(a, a, (string? _) => count < 2)
             .AddEdge<string>(a, b, (string? _) => count >= 2)
             .WithOutputFrom(b)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "self-loop", ["A", "B"]);
 
         var result = await adapter.ExecuteWorkflowAsync("start");
@@ -491,7 +494,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge<object>(refiner, refiner, (object? _) => refinerClient.Turns < 2)  // loop back once
             .AddEdge<object>(refiner, publisher, (object? _) => refinerClient.Turns >= 2)
             .WithOutputFrom(publisher)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "refine-loop", ["Refiner", "Publisher"]);
 
         var result = await adapter.ExecuteWorkflowAsync("Draft a tagline");
@@ -542,7 +545,7 @@ public partial class MAFWorkflowEventBridgeTests
 
         var a = CreateFuncBinding("A", "output-A");
         var b = CreateFuncBinding("B", "output-B");
-        var functionChain = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).WithOpenTelemetry().Build();
+        var functionChain = new MAFWorkflows.WorkflowBuilder(a).AddEdge(a, b).WithOutputFrom(b).BuildWithTiming(_timing);
         Assert.Empty(MAFWorkflowEventBridge.GetChatProtocolExecutorIds(functionChain));
     }
 
@@ -563,7 +566,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(a, b)
             .AddEdge(b, c)
             .WithOutputFrom(c)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
         var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "slow-chain", ["A", "B", "C"]);
 
         var result = await adapter.ExecuteWorkflowAsync("start");
@@ -765,7 +768,7 @@ public partial class MAFWorkflowEventBridgeTests
     /// agents bound with <c>BindAsExecutor(emitEvents: true)</c> and chained with <c>WorkflowBuilder</c>, each on a
     /// deterministic in-memory chat client (no network, no provider) that calls its tools and then replies.
     /// </summary>
-    private static (MAFWorkflows.Workflow Workflow, string[] ExecutorIds) BuildFourAgentChain(TimeSpan roundTripDelay = default)
+    private (MAFWorkflows.Workflow Workflow, string[] ExecutorIds) BuildFourAgentChain(TimeSpan roundTripDelay = default)
     {
         var tripPlanner = CreateScriptedAgent("TripPlanner", roundTripDelay, "GetDestinationInfo").BindAsExecutor(emitEvents: true);
         var flightReservation = CreateScriptedAgent("FlightReservation", roundTripDelay, "SearchFlights", "BookFlight").BindAsExecutor(emitEvents: true);
@@ -777,7 +780,7 @@ public partial class MAFWorkflowEventBridgeTests
             .AddEdge(flightReservation, hotelReservation)
             .AddEdge(hotelReservation, presenter)
             .WithOutputFrom(presenter)
-            .WithOpenTelemetry().Build();
+            .BuildWithTiming(_timing);
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

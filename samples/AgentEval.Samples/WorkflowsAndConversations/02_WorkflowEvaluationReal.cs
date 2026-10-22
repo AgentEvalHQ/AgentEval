@@ -44,7 +44,8 @@ public static class WorkflowEvaluationReal
 
         Console.WriteLine("📝 Step 1: Building real MAF Workflow with WorkflowBuilder...\n");
 
-        var (workflow, executorIds) = CreateWorkflow();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = CreateWorkflow(timing);
 
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
@@ -302,7 +303,7 @@ public static class WorkflowEvaluationReal
     /// Builds a real MAF Workflow using WorkflowBuilder with 4 ChatClientAgent executors.
     /// Planner → Researcher → Writer → Editor (sequential prompt-chaining pipeline).
     /// </summary>
-    private static (Workflow workflow, string[] executorIds) CreateWorkflow()
+    private static (Workflow workflow, string[] executorIds) CreateWorkflow(MAFWorkflowInstrumentation timing)
     {
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -387,15 +388,14 @@ public static class WorkflowEvaluationReal
 
         // ── Build the sequential workflow: Planner → Researcher → Writer → Editor ──
 
-        var workflow = new WorkflowBuilder(plannerBinding)
+        var workflowBuilder = new WorkflowBuilder(plannerBinding)
             .AddEdge(plannerBinding, researcherBinding)
             .AddEdge(researcherBinding, writerBinding)
             .AddEdge(writerBinding, editorBinding)
             .WithOutputFrom(editorBinding)
             .WithName("ContentPipeline")
-            .WithDescription("Sequential content creation pipeline: plan → research → write → edit")
-            .WithOpenTelemetry() // Producer spans establish executor timing.
-            .Build();
+            .WithDescription("Sequential content creation pipeline: plan → research → write → edit");
+        var workflow = timing.Build(workflowBuilder);
 
         return (workflow, ["Planner", "Researcher", "Writer", "Editor"]);
     }

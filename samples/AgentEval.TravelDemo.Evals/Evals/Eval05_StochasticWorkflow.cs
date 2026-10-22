@@ -79,7 +79,8 @@ public static class Eval05_StochasticWorkflow
             try
             {
                 // ── Rebuild workflow for each run ──────────────────────────────
-                var (workflow, executorIds) = TripPlannerWorkflow.Create();
+                using var timing = new MAFWorkflowInstrumentation();
+                var (workflow, executorIds) = TripPlannerWorkflow.Create(builder => timing.Build(builder));
 
                 var workflowAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
                     workflow,

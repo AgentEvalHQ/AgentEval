@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Workflow executor timing now uses producer-side MAF spans, preventing queued events from understating duration. Enable `WithOpenTelemetry()` with the default source; unavailable spans explicitly prevent executor timing certification. Tool completion remains separate from tool timing (`ExecutorToolCallEvent.HasTiming`); collection-valued barrier messages retain whole-payload source identity.
+- Workflow executor timing now uses producer-side MAF spans, preventing queued events from understating duration. Build the root and declared child workflows with the disposable `MAFWorkflowInstrumentation` owner; dedicated sources and per-run session identity prevent nested operations from replacing parent timings. Unattributed or unavailable spans explicitly prevent executor timing certification. Both workflow tool-duration assertion APIs now refuse missing timing instead of silently passing. Tool completion remains separate from tool timing (`ExecutorToolCallEvent.HasTiming`); collection-valued barrier messages retain whole-payload source identity.
 
 - Buffered fan-in releases preserve every identifiable source activation, including multiple activations of one branch. Evaluation projection and Microsoft logging retain explicit unknown tool outcomes and timing instead of fabricating failures or zero-duration measurements.
 

@@ -37,7 +37,8 @@ public static partial class WorkflowMessageHandlerExecutors
 
         Console.WriteLine("📝 Step 1: Building workflow with [MessageHandler] executors...\n");
 
-        var (workflow, executorIds) = CreateWorkflow();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = CreateWorkflow(timing);
 
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
@@ -214,20 +215,19 @@ public static partial class WorkflowMessageHandlerExecutors
     /// Builds a deterministic workflow using [MessageHandler] source-generated executors.
     /// Pipeline: Sanitizer → Classifier → Formatter
     /// </summary>
-    private static (Workflow workflow, string[] executorIds) CreateWorkflow()
+    private static (Workflow workflow, string[] executorIds) CreateWorkflow(MAFWorkflowInstrumentation timing)
     {
         var sanitizer = new SanitizerExecutor();
         var classifier = new ClassifierExecutor();
         var formatter = new FormatterExecutor();
 
-        var workflow = new WorkflowBuilder(sanitizer)
+        var workflowBuilder = new WorkflowBuilder(sanitizer)
             .AddEdge(sanitizer, classifier)
             .AddEdge(classifier, formatter)
             .WithOutputFrom(formatter)
             .WithName("TextPipeline")
-            .WithDescription("Deterministic text pipeline: sanitize → classify → format")
-            .WithOpenTelemetry() // Producer spans establish executor timing.
-            .Build();
+            .WithDescription("Deterministic text pipeline: sanitize → classify → format");
+        var workflow = timing.Build(workflowBuilder);
 
         return (workflow, ["Sanitizer", "Classifier", "Formatter"]);
     }

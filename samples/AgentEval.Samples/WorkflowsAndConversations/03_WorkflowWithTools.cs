@@ -42,7 +42,8 @@ public static class WorkflowWithTools
 
         Console.WriteLine("📝 Step 1: Building TripPlanner MAF Workflow with tools...\n");
 
-        var (workflow, executorIds) = CreateTripPlannerWorkflow();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = CreateTripPlannerWorkflow(timing);
 
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
@@ -312,7 +313,7 @@ public static class WorkflowWithTools
     /// Builds the TripPlanner MAF Workflow:
     /// TripPlanner → FlightReservation → HotelReservation → Presenter
     /// </summary>
-    private static (Workflow workflow, string[] executorIds) CreateTripPlannerWorkflow()
+    private static (Workflow workflow, string[] executorIds) CreateTripPlannerWorkflow(MAFWorkflowInstrumentation timing)
     {
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -415,15 +416,14 @@ public static class WorkflowWithTools
         var presenterBinding = presenter.BindAsExecutor(emitEvents: true);
 
         // ── Build sequential workflow ──
-        var workflow = new WorkflowBuilder(tripPlannerBinding)
+        var workflowBuilder = new WorkflowBuilder(tripPlannerBinding)
             .AddEdge(tripPlannerBinding, flightBinding)
             .AddEdge(flightBinding, hotelBinding)
             .AddEdge(hotelBinding, presenterBinding)
             .WithOutputFrom(presenterBinding)
             .WithName("TripPlanner")
-            .WithDescription("Trip planning pipeline: plan → flights → hotels → present")
-            .WithOpenTelemetry() // Producer spans establish executor timing.
-            .Build();
+            .WithDescription("Trip planning pipeline: plan → flights → hotels → present");
+        var workflow = timing.Build(workflowBuilder);
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

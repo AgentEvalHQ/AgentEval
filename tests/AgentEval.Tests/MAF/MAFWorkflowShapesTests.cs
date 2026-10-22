@@ -12,8 +12,11 @@ using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 namespace AgentEval.Tests.MAF;
 
 /// <summary>Offline shape contracts against real MAF execution, including its message-delivery protocol.</summary>
-public sealed partial class MAFWorkflowShapesTests
+public sealed partial class MAFWorkflowShapesTests : IDisposable
 {
+    private readonly MAFWorkflowInstrumentation _timing = new();
+    public void Dispose() => _timing.Dispose();
+
     private static readonly TimeSpan WorkDelay = TimeSpan.FromMilliseconds(20);
 
     [Theory]
@@ -48,7 +51,7 @@ public sealed partial class MAFWorkflowShapesTests
         Assert.True(result.TotalDuration >= previousEnd);
     }
 
-    private static (MAFWorkflows.Workflow Workflow, string[] Ids, (string ExecutorId, string Output)[] Expected)
+    private (MAFWorkflows.Workflow Workflow, string[] Ids, (string ExecutorId, string Output)[] Expected)
         CreateCoreShape(string shape)
     {
         var isAgent = shape.StartsWith("agent", StringComparison.Ordinal);
@@ -59,7 +62,7 @@ public sealed partial class MAFWorkflowShapesTests
             var bindings = ids.Select(id => isAgent ? Agent(id) : Function(id, () => id + " reply")).ToArray();
             var workflow = new MAFWorkflows.WorkflowBuilder(bindings[0])
                 .AddEdge(bindings[0], bindings[1]).AddEdge(bindings[1], bindings[2])
-                .WithOutputFrom(bindings[2]).WithOpenTelemetry().Build();
+                .WithOutputFrom(bindings[2]).BuildWithTiming(_timing);
             return (workflow, ids, ids.Select(id => (id, isAgent ? BridgeScriptedChatClient.FinalReply(id, 1) : id + " reply")).ToArray());
         }
 
@@ -75,7 +78,7 @@ public sealed partial class MAFWorkflowShapesTests
             builder.AddEdge<object>(loop, loop, _ => client.Turns < 2).AddEdge<object>(loop, last, _ => client.Turns >= 2);
         else
             builder.AddEdge<string>(loop, loop, _ => turns < 2).AddEdge<string>(loop, last, _ => turns >= 2);
-        return (builder.WithOutputFrom(last).WithOpenTelemetry().Build(), ["Loop", "Last"], isAgent
+        return (builder.WithOutputFrom(last).BuildWithTiming(_timing), ["Loop", "Last"], isAgent
             ? [("Loop", BridgeScriptedChatClient.FinalReply("Loop", 1)), ("Loop", BridgeScriptedChatClient.FinalReply("Loop", 2)),
                 ("Last", BridgeScriptedChatClient.FinalReply("Last", 1))]
             : [("Loop", "pass-1"), ("Loop", "pass-2"), ("Last", "done")]);

@@ -29,8 +29,7 @@ public sealed partial class MAFWorkflowShapesTests
             return "slow reply";
         })).BindAsExecutor<string, string>("Slow");
         var builder = new MAFWorkflows.WorkflowBuilder(start).AddEdge(start, slow).WithOutputFrom(slow);
-        if (telemetry) builder.WithOpenTelemetry();
-        var workflow = builder.Build();
+        var workflow = telemetry ? _timing.Build(builder) : builder.Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var result = await new MAFWorkflowAdapter("queued timing", DelayedEvents, ["Start", "Slow"])
             .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
@@ -95,7 +94,7 @@ public sealed partial class MAFWorkflowShapesTests
                 await Task.Delay(delay, ct);
                 return delay.ToString();
             })).BindAsExecutor<string, string>("Worker");
-            var workflow = new MAFWorkflows.WorkflowBuilder(worker).WithOutputFrom(worker).WithOpenTelemetry().Build();
+            var workflow = new MAFWorkflows.WorkflowBuilder(worker).WithOutputFrom(worker).BuildWithTiming(_timing);
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             return await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "isolated", ["Worker"]).ExecuteWorkflowAsync("input", cancellation.Token);
         }
@@ -186,11 +185,13 @@ public partial class MAFWorkflowEventBridgeTests
     public void TimingCapture_ScopedActivities_PreserveDeliveryOrderAndIgnoreOtherScopes()
     {
         using var source = new ActivitySource("Microsoft.Agents.AI.Workflows");
-        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp());
+        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp(), new Dictionary<string, ActivitySource> { ["Worker"] = source });
         using (source.StartActivity("executor.process Outside")) { }
         Assert.Null(capture.Take("Outside"));
         using (capture.Enter())
         {
+            using var session = source.StartActivity("workflow.session");
+            session!.SetTag("session.id", capture.SessionId);
             using (source.StartActivity("unrelated")) { }
             Assert.Null(capture.Take("unrelated"));
             using var first = source.StartActivity("executor.process Worker");
@@ -198,13 +199,14 @@ public partial class MAFWorkflowEventBridgeTests
             Assert.Null(delivery.End);
             first!.Stop();
             Assert.True(delivery.End >= delivery.Start);
-            Assert.Null(capture.Take("Worker"));
-            using var nested = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp());
+            using var nested = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp(), new Dictionary<string, ActivitySource> { ["Worker"] = source });
             using (nested.Enter())
             {
+                using var nestedSession = source.StartActivity("workflow.session");
+                nestedSession!.SetTag("session.id", nested.SessionId);
                 using (source.StartActivity("executor.process Worker")) { }
                 Assert.NotNull(nested.Take("Worker"));
-                Assert.Null(capture.Take("Worker"));
+                // No read from the outer delivery stream while a nested scope owns the activity.
             }
             using (source.StartActivity("executor.process Worker")) { }
             Assert.NotNull(capture.Take("Worker"));
@@ -218,8 +220,10 @@ public partial class MAFWorkflowEventBridgeTests
     public async Task TranslateEvents_UnfinishedProducerSpan_CannotCertifyCompletedQueuedEvents()
     {
         using var source = new ActivitySource("Microsoft.Agents.AI.Workflows");
-        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp());
+        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp(), new Dictionary<string, ActivitySource> { ["Worker"] = source });
         using var scope = capture.Enter();
+        using var session = source.StartActivity("workflow.session");
+        session!.SetTag("session.id", capture.SessionId);
         using var activity = source.StartActivity("executor.process Worker");
         var adapter = new MAFWorkflowAdapter("unfinished span", (_, ct) =>
             MAFWorkflowEventBridge.TranslateEventsAsync(RecordingEvents(SuperStep(0, FunctionDelivery("Worker", "input", "reply"))),

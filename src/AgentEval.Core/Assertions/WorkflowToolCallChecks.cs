@@ -110,8 +110,10 @@ internal static class WorkflowToolCallChecks
     {
         if (!call.HasTiming)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"[AgentEval] Skipping duration assertion for '{toolName}' {context} - timing not available.");
+            addFailure(
+                $"Expected: '{toolName}' {context} duration under {max.TotalMilliseconds:F0}ms. " +
+                "Actual: time not measured. Suggestions: capture this tool call's start and completion before checking its duration.",
+                because);
             return;
         }
 

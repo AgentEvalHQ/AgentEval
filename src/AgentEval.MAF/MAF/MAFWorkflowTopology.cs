@@ -15,6 +15,7 @@ internal sealed class MAFWorkflowTopology
     public Dictionary<string, string> Parents { get; } = new(StringComparer.Ordinal);
     public HashSet<string> ChatIds { get; } = new(StringComparer.Ordinal);
     public HashSet<string> HostIds { get; } = new(StringComparer.Ordinal);
+    public Dictionary<string, System.Diagnostics.ActivitySource> TimingSources { get; } = new(StringComparer.Ordinal);
     public WorkflowGraphSnapshot Graph { get; private set; } = null!;
 
     public MAFWorkflows.WorkflowEvent RestoreNestedAgentEvent(MAFWorkflows.WorkflowEvent evt)
@@ -60,6 +61,7 @@ internal sealed class MAFWorkflowTopology
         WorkflowGraphSnapshot Visit(MAFWorkflows.Workflow current, string? parent, string prefix, string portPrefix)
         {
             var bindings = current.ReflectExecutors();
+            var timingSource = MAFWorkflowInstrumentation.SourceFor(current);
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var id in bindings.Keys)
             {
@@ -76,6 +78,7 @@ internal sealed class MAFWorkflowTopology
                     throw new ArgumentException($"Expected: distinct executor display names. Actual: more than one executor maps to '{display}'. Suggestions: supply distinct names.", nameof(names));
                 map.Add(id, display);
                 result.IdMap.Add(id, display);
+                if (timingSource is not null) result.TimingSources.Add(id, timingSource);
                 if (parent is not null) result.Parents.Add(id, parent);
                 if (bindings[id] is MAFWorkflows.AIAgentBinding agent) result._agents.Add((agent.Agent.Id, id));
                 if (bindings[id] is MAFWorkflows.RequestPortBinding && portPrefix.Length > 0)

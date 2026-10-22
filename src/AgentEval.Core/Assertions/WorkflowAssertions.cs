@@ -1421,7 +1421,7 @@ public class WorkflowToolCallAssertionBuilder
 
     /// <summary>
     /// Assert tool duration is under a maximum.
-    /// If timing information is not available, the assertion is skipped.
+    /// If timing information is not available, validation fails because the duration requirement cannot be established.
     /// </summary>
     /// <param name="max">The maximum allowed duration.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -1604,7 +1604,7 @@ public class ExecutorToolCallAssertionBuilder
 
     /// <summary>
     /// Assert tool duration is under a maximum.
-    /// If timing information is not available, the assertion is skipped.
+    /// If timing information is not available, validation fails because the duration requirement cannot be established.
     /// </summary>
     /// <param name="max">The maximum allowed duration.</param>
     /// <param name="because">Optional reason for the assertion.</param>

@@ -46,7 +46,8 @@ public static class Eval02_TripPlannerEvals
         var evaluator       = new ChatClientEvaluator(evaluatorClient);
 
         // ── Workflow from AgentEval.TravelDemo (no duplication) ─────────────────────────
-        var (workflow, executorIds) = TripPlannerWorkflow.Create();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = TripPlannerWorkflow.Create(builder => timing.Build(builder));
 
         var workflowAdapter = MAFWorkflowAdapter.FromMAFWorkflow(
             workflow,
