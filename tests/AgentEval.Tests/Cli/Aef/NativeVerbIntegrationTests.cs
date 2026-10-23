@@ -1960,6 +1960,21 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (failure is "success" or "mock")
             Assert.Equal(exit, (int)JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!["exitCode"]!);
         if (failure != "cancel") Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        if (failure is "success" or "report-error")
+        {
+            // Compare recorded evaluation facts, not custody/status: report failure can abort the command
+            // after the legacy evaluation completed. Select that exact manifest rather than rediscovering by ID.
+            var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+            var convertedPath = Path.Combine(_root, "converted");
+            AgentEval.Results.Adapters.StoreV1.StoreV1Exporter.ExportWorkspaceRun(workspace, legacy, convertedPath,
+                new() { ContentCapture = AefCliOptions.ContentCapture });
+            var reader = new AgentEval.Results.Adapters.Comparison.AefComparisonReader();
+            var native = reader.Read(dir);
+            var converted = reader.Read(convertedPath);
+            Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal),
+                converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal));
+            Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
+        }
     }
 
     [Theory]
