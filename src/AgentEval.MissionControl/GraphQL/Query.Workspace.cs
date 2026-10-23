@@ -12,6 +12,14 @@ namespace AgentEval.MissionControl.GraphQL;
 
 public sealed partial class Query
 {
+    /// <summary>Every canonical result in one case, including trial roots and descendants. Selection never discards siblings.</summary>
+    [UseRequestScope]
+    [Cost(100.0)]
+    public async Task<WorkspaceResultTree?> ScenarioResultTree([Service] IWorkspaceRunSource source, string runId,
+        string scenarioId, string? sourceId = null, string? resultId = null, CancellationToken ct = default) =>
+        WorkspaceRunSource.Find(await source.ReadAsync(ct), runId, sourceId) is { } run
+            ? WorkspaceTreeProjector.Tree(run, scenarioId, resultId) : null;
+
     /// <summary>Evidence availability is independent of whether solution configuration exists.</summary>
     [UseRequestScope]
     [Cost(100.0)]

@@ -27,8 +27,8 @@ export const queryKeys = {
     scenarios: (runId: string) => ["runs", "scenarios", runId] as const,
     scenario: (runId: string, scenarioId: string) =>
       ["runs", "scenario", runId, scenarioId] as const,
-    scenarioTree: (runId: string, scenarioId: string) =>
-      ["runs", "tree", runId, scenarioId] as const,
+    scenarioTree: (runId: string, scenarioId: string, sourceId?: string | null, resultId?: string | null) =>
+      ["runs", "tree", runId, scenarioId, sourceId ?? null, resultId ?? null] as const,
     // Plan-08 T2.3 (2026-05-25): trace JSON for the waterfall page.
     trace: (runId: string, sourceId?: string | null) => ["runs", "trace", runId, sourceId ?? null] as const,
   },

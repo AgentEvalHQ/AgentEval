@@ -80,28 +80,28 @@ The portal exposes both REST and GraphQL surfaces. Reads → GraphQL; binary str
 }
 ```
 
-### Recursive eval-result tree (the GraphQL killer feature)
+### Canonical scenario tree
+
+Use `scenarioResultTree` for native AEF and converted legacy evidence. Pass the `sourceId` returned by `recentRuns` when selecting a run; duplicate run IDs require it. An optional `resultId` selects a node without dropping its siblings or other trials.
 
 ```graphql
-{
-  scenarioTree(runId: "2026-05-09_14-30-22_a3f91c2b", scenarioId: "scenario-1") {
-    metric { key name }
-    score { value passed severity }
-    details {
-      aggregationStrategy
-      subResults {
-        metric { key name }
-        score { value passed }
-        details {
-          subResults { metric { key } score { value } }
-        }
-      }
+query CaseTree($runId: String!, $scenarioId: String!, $sourceId: String) {
+  scenarioResultTree(runId: $runId, scenarioId: $scenarioId, sourceId: $sourceId) {
+    sourceId caseId rootResultIds
+    metrics { id kind direction scale minimum maximum unit }
+    nodes {
+      resultId parentResultId path trial evaluatorId state
+      scores { metricId value normalized }
+      startedAt endedAt durationMs
+      recordedJson
     }
   }
 }
 ```
 
-A single fragment walks the whole composite tree in **one round-trip**. Compare with REST, which would require either a fat endpoint (large response) or a `?depth=N` parameter (chatty).
+The response contains a flat list of every recorded node in the case, including trial and final roots. Follow `parentResultId` to reconstruct the hierarchy without recursive GraphQL selection limits. Cases larger than 10,000 nodes are refused explicitly; inspect their AEF results directly. Missing times, costs and scores remain unknown, and metric definitions determine each score's meaning. `recordedJson` retains fields outside the typed projection, including producer extensions.
+
+Canonical descendants remain available with content capture off. Captured artifacts are listed separately and are downloadable only when their bytes exist in the verified snapshot. The older `scenarioTree` operation remains a legacy compatibility surface; it does not provide this canonical native view.
 
 ### Compliance dashboard matrix
 

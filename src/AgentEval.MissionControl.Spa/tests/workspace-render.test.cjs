@@ -37,8 +37,49 @@ const { RunsListPage } = load(path.join(root, 'pages/RunsListPage'));
 const { AppShell } = load(path.join(root, 'components/AppShell'));
 const { SubjectDetailPage } = load(path.join(root, 'pages/SubjectDetailPage'));
 const { SubjectCard } = load(path.join(root, 'components/SubjectCard'));
+const { treeRows } = load(path.join(root, 'lib/canonical-tree'));
+const { ScenarioTreePage } = load(path.join(root, 'pages/ScenarioTreePage'));
 const { ManifestHashBadge } = load(path.join(root, 'components/ManifestHashBadge'));
 const h = React.createElement;
+
+function canonicalTree() {
+  const node = (resultId, parentResultId, evaluatorId, state) => ({
+    resultId, parentResultId, caseId: 'case%25', path: resultId, trial: null, evaluatorId, evaluatorVersion: '2', state,
+    startedAt: null, endedAt: null, durationMs: null, reason: null, severity: null,
+    scores: state === 'not_measured' ? [] : [{ metricId: 'latency', value: 75, normalized: null, label: null }],
+    trials: null, component: null, aggregation: null, annotator: null, verdictRule: null,
+    usage: [], evidenceIds: [], recordedJson: '{}',
+  });
+  return { scenarioResultTree: {
+    sourceId: 'source/a', runId: 'native', caseId: 'case%25', selectedResultId: 'result-1', contentCapture: 'off',
+    evidence: { integrity: 'intact', imported: false, signatureTrust: 'not_checked' }, rootResultIds: ['result-1'],
+    metrics: [{ id: 'latency', kind: 'score', direction: 'none', scale: 'unbounded', minimum: null, maximum: null, unit: 'ms', description: null }],
+    nodes: [node('result-1', null, 'root-evaluator', 'scored'), node('result-2', 'result-1', 'child-evaluator', 'not_measured')],
+    artifacts: [],
+  } };
+}
+
+test('scenario-tree cache and navigation retain source and result selection', () => {
+  assert.notDeepEqual(queryKeys.runs.scenarioTree('native', 'case', 'a', 'one'), queryKeys.runs.scenarioTree('native', 'case', 'b', 'one'));
+  assert.notDeepEqual(queryKeys.runs.scenarioTree('native', 'case', 'a', 'one'), queryKeys.runs.scenarioTree('native', 'case', 'a', 'two'));
+  const html = render(RunDetailPage, '/runs/native?sourceId=source-a', '/runs/:runId',
+    [[queryKeys.runs.detail('native', 'source-a'), detail()]]);
+  assert.match(html, /\/scenarios\/case\?sourceId=source-a&amp;resultId=result-a/);
+});
+
+test('canonical tree renders capture-off nodes with raw metric scale and exact route identity', () => {
+  const html = render(ScenarioTreePage, '/runs/native/scenarios/case%2525?sourceId=source%2Fa&resultId=result-1', '/runs/:runId/scenarios/:scenarioId',
+    [[queryKeys.runs.scenarioTree('native', 'case%25', 'source/a', 'result-1'), canonicalTree()]]);
+  assert.match(html, /root-evaluator/);
+  assert.match(html, /child-evaluator/);
+  assert.match(html, /scored/i);
+  assert.match(html, /not.measured/i);
+  assert.match(html, /75/);
+  assert.match(html, /ms/);
+  assert.match(html, /not recorded/i);
+  assert.match(html, /\/runs\/native\?sourceId=source%2Fa/);
+  assert.doesNotMatch(html, /7500%|1970|Invalid Date|NaN|Trace JSON|>FAIL</);
+});
 function render(Component, url, route, entries, shell = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryOnMount: false, staleTime: Infinity, gcTime: Infinity } } });
   for (const [key, data] of entries) {
@@ -225,4 +266,44 @@ test('subject history keeps unscored runs and never mixes matching display names
     [[queryKeys.subjects.detail('AGENT', 'A', 'agent:%41'), data]]);
   assert.match(html, /\/runs\/selected\?sourceId=source-a/);
   assert.doesNotMatch(html, /unrelated/);
+});
+
+
+test('canonical forest includes deep nodes and repeated evaluator identities in each trial', () => {
+  const tree = canonicalTree().scenarioResultTree;
+  const template = tree.nodes[0];
+  tree.nodes = [];
+  tree.rootResultIds = [];
+  for (const trial of [0, 1, null]) {
+    const prefix = trial === null ? 'final' : `trial-${trial}`;
+    tree.rootResultIds.push(`${prefix}-0`);
+    for (let depth = 0; depth < 2000; depth++) tree.nodes.push({ ...template,
+      resultId: `${prefix}-${depth}`, parentResultId: depth === 0 ? null : `${prefix}-${depth - 1}`,
+      evaluatorId: 'repeated', trial });
+  }
+  const rows = treeRows(tree);
+  assert.equal(rows.length, 6000);
+  assert.equal(rows[1999].depth, 1999);
+  assert.equal(rows[2000].depth, 0);
+  assert.equal(rows[5999].node.resultId, 'final-1999');
+});
+for (const [name, mutate] of [
+  ['missing root', tree => { tree.rootResultIds = ['missing']; }],
+  ['repeated root', tree => { tree.rootResultIds.push(tree.rootResultIds[0]); }],
+  ['duplicate identity', tree => { tree.nodes.push({ ...tree.nodes[0] }); }],
+  ['disconnected child', tree => { tree.nodes[1].parentResultId = 'missing'; }],
+  ['cycle', tree => { tree.nodes[0].parentResultId = tree.nodes[1].resultId; }],
+]) test(`canonical forest refuses ${name} instead of showing a partial tree`, () => {
+  const tree = canonicalTree().scenarioResultTree;
+  mutate(tree);
+  assert.throws(() => treeRows(tree), /inconsistent|disconnected/);
+});
+test('canonical tree preserves imported custody uncertainty and absence without a numeric score', () => {
+  const data = canonicalTree();
+  data.scenarioResultTree.evidence.imported = true;
+  const html = render(ScenarioTreePage, '/runs/native/scenarios/case%2525?sourceId=source%2Fa&resultId=result-1', '/runs/:runId/scenarios/:scenarioId',
+    [[queryKeys.runs.scenarioTree('native', 'case%25', 'source/a', 'result-1'), data]]);
+  assert.match(html, /original execution custody not established/);
+  assert.match(html, /No numeric score recorded/);
+  assert.doesNotMatch(html, /not sealed when it ran/);
 });

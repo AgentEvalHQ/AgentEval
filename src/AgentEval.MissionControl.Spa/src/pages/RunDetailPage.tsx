@@ -340,7 +340,7 @@ export function RunDetailPage() {
                       <tr key={s.resultId} className="hover:bg-slate-50">
                         <td className="px-4 py-2 text-slate-900">
                           <Link
-                            to={`/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(s.id)}`}
+                            to={`/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(s.id)}?${new URLSearchParams({ ...(sourceId ? { sourceId } : {}), resultId: s.resultId })}`}
                             className="text-accent-700 hover:text-accent-500"
                           >
                             {s.name}
