@@ -12,13 +12,24 @@ public static partial class StoreV1Exporter
     private static readonly StringComparer WorkspacePathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
+    /// <summary>Discovers exact canonical run folders in a legacy workspace. Incomplete discovery throws.</summary>
+    public static IReadOnlyList<string> DiscoverWorkspaceRunDirectories(string workspaceDirectory, CancellationToken ct = default)
+    {
+        var workspace = Path.GetFullPath(workspaceDirectory);
+        var root = Path.Combine(workspace, "subjects");
+        ct.ThrowIfCancellationRequested();
+        if (!Path.Exists(root)) return [];
+        return Array.AsReadOnly(DiscoverLegacyDirectories(root, "manifest.json", ct)
+            .Where(path => TryRunParts(workspace, path, out _)).OrderBy(path => path, StringComparer.Ordinal).ToArray());
+    }
+
     /// <summary>Resolves a legacy workspace run ID only when exactly one canonical run folder matches.
     /// Incomplete discovery or duplicate IDs require an explicit folder instead.</summary>
     public static string ResolveWorkspaceRunDirectory(string workspaceDirectory, string runId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         var workspace = Path.GetFullPath(workspaceDirectory);
-        var candidates = DiscoverLegacyDirectories(Path.Combine(workspace, "subjects"), "manifest.json", ct)
+        var candidates = DiscoverWorkspaceRunDirectories(workspace, ct)
             .Where(path => TryRunParts(workspace, path, out var parts) && parts[4] == runId).ToArray();
         return candidates.Length switch
         {
@@ -33,6 +44,10 @@ public static partial class StoreV1Exporter
     /// reference does not verify original custody; the resulting AEF run remains imported.</summary>
     public static AefConversion ExportWorkspaceRun(string workspaceDirectory, string runDirectory, string outputDirectory,
         StoreV1ExportOptions? options = null, CancellationToken ct = default)
+        => ExportWorkspaceRunBounded(workspaceDirectory, runDirectory, outputDirectory, options, ct, null);
+
+    internal static AefConversion ExportWorkspaceRunBounded(string workspaceDirectory, string runDirectory, string outputDirectory,
+        StoreV1ExportOptions? options, CancellationToken ct, AefReadBudget? budget)
     {
         var workspace = Path.GetFullPath(workspaceDirectory);
         var source = Path.TrimEndingDirectorySeparator(Path.GetFullPath(runDirectory));
@@ -45,11 +60,11 @@ public static partial class StoreV1Exporter
             var kind = manifest.Subject.Kind == SubjectKind.Workflow ? "workflows" : "agents";
             if (!WorkspacePathComparer.Equals(manifest.Run.RunId, parts[4]) || !WorkspacePathComparer.Equals(kind, parts[1]))
                 throw InvalidSource("The selected folder disagrees with its manifest run ID or subject kind.");
-            return EnrichWorkspaceRun(workspace, parts[2], run, ct);
-        });
+            return EnrichWorkspaceRun(workspace, parts[2], run, ct, budget);
+        }, budget);
     }
 
-    private static StoreV1Run EnrichWorkspaceRun(string workspace, string subjectDirectory, StoreV1Run run, CancellationToken ct)
+    private static StoreV1Run EnrichWorkspaceRun(string workspace, string subjectDirectory, StoreV1Run run, CancellationToken ct, AefReadBudget? budget)
     {
         var root = Path.Combine(workspace, "compliance");
         if (!Path.Exists(root)) return run;
@@ -67,7 +82,7 @@ public static partial class StoreV1Exporter
         long bytes = 0;
         foreach (var path in paths)
         {
-            var captured = CaptureComplianceDirectory(path, ct);
+            var captured = CaptureComplianceDirectory(path, ct, budget);
             var evidence = captured[0].Document.Evidence;
             // The directory name alone is not a subject or execution identity.
             if (evidence.Subject.Name != run.Manifest.Subject.Name || evidence.Subject.Kind != run.Manifest.Subject.Kind

@@ -58,12 +58,14 @@ public static partial class StoreV1Exporter
 
     private sealed record CapturedCompliance(AefComplianceDocument Document, byte[] Bytes);
 
-    private static List<CapturedCompliance> CaptureComplianceDirectory(string sourceDirectory, CancellationToken ct)
+    private static List<CapturedCompliance> CaptureComplianceDirectory(string sourceDirectory, CancellationToken ct, AefReadBudget? budget = null)
     {
-        using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), new AefStagingOptions
+        var limits = new AefStagingOptions
         {
             MaxFiles = 1000, MaxBytes = 256L << 20, MaxFileBytes = 64L << 20,
-        }, ct);
+        };
+        using var snapshot = budget is null ? AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), limits, ct)
+            : budget.Capture(Path.GetFullPath(sourceDirectory), limits, ct);
         if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(snapshot.FullName, name))))
             throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");
         var reader = new AefComplianceArtifactReader();

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added a verified AEF workspace-reading boundary for native runs and converted legacy sources. It preserves full result trees and score definitions, keeps importer-supplied timing unknown, distinguishes source identity from run ID, and applies shared source-byte limits before legacy conversion. Mission Control integration is still in progress.
 - `compliance render` reads verified native AEF artifacts and converts legacy rich reports through the shared StoreV1 converter. It preserves import custody, refuses conflicting or malformed evidence and missing captured content, and writes PDFs outside the sealed source run.
 - StoreV1 workspace import preserves the exact selected run folder and captured rich compliance reports. ID-only requests reject duplicate run IDs; report identity and source-reference conflicts are refused before output.
 - `compare` verifies AEF inputs before calculating deltas and routes legacy results through the shared StoreV1 converter. Copied run folders and scenario-only collections remain supported, with imported custody, supplied header fields and unknown execution metadata disclosed. Tampered or malformed evidence is refused without score deltas.

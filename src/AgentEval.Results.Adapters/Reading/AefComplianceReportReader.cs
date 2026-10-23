@@ -4,7 +4,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using AgentEval.Results.Adapters.StoreV1;
-using AgentEval.Results.Ingestion;
 
 namespace AgentEval.Results.Adapters.Reading;
 
@@ -43,7 +42,7 @@ public sealed class AefComplianceReportReader : IAefComplianceReportReader
         var unavailableAt = new List<DateTimeOffset?>();
         var unidentifiedNative = false;
         var reader = new AefComplianceArtifactReader();
-        foreach (var directory in DiscoverNative(nativeRunsRoot, ct))
+        foreach (var directory in AefEvidenceDiscovery.Discover(nativeRunsRoot, ct: ct))
         {
             using var run = AefVerifiedRun.Open(directory, ct);
             if (!MatchesSubject(run.Info.SubjectRef, subjectName)) continue;
@@ -124,21 +123,6 @@ public sealed class AefComplianceReportReader : IAefComplianceReportReader
             return;
         }
         reports.Add(new(document, run, document.Evidence.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture)));
-    }
-
-    private static IEnumerable<string> DiscoverNative(string root, CancellationToken ct)
-    {
-        root = Path.GetFullPath(root);
-        if (!Path.Exists(root)) return [];
-        var directories = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        foreach (var marker in new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" })
-        {
-            var discovered = AefRunDiscovery.DiscoverByMarker(root, marker, new(), ct);
-            if (!discovered.Complete) throw Bad("The native evidence scan was incomplete: " + string.Join(", ", discovered.Issues.Select(i => i.Kind)));
-            directories.UnionWith(discovered.Candidates.Select(c => c.Directory));
-        }
-        if (directories.Count > 1000) throw Bad("More than 1000 native run directories were found.");
-        return directories.OrderBy(p => p, StringComparer.Ordinal);
     }
 
     private static bool MatchesSubject(string subjectRef, string name) =>

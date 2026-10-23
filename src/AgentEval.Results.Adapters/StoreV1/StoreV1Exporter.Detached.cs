@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Ingestion;
 using AgentEval.Results.Writing;
 
@@ -20,12 +21,14 @@ public static partial class StoreV1Exporter
         => ExportDirectoryCore(sourceDirectory, outputDirectory, options ?? new(), CancellationToken.None);
 
     private static AefConversion ExportDirectoryCore(string sourceDirectory, string outputDirectory, StoreV1ExportOptions options,
-        CancellationToken ct, Func<StoreV1Run, StoreV1Run>? enrich = null)
+        CancellationToken ct, Func<StoreV1Run, StoreV1Run>? enrich = null, AefReadBudget? budget = null)
     {
-        using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), new AefStagingOptions
+        var limits = new AefStagingOptions
         {
             MaxFiles = 100_000, MaxBytes = 1L << 30, MaxFileBytes = 1L << 30,
-        }, ct);
+        };
+        using var snapshot = budget is null ? AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), limits, ct)
+            : budget.Capture(Path.GetFullPath(sourceDirectory), limits, ct);
         var root = snapshot.FullName;
         if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(root, name))))
             throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");

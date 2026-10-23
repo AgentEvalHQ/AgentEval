@@ -36,12 +36,13 @@ internal sealed class AefVerifiedRun : IDisposable
     internal AefRunFolder Folder { get; }
     internal AefRunDocuments Documents { get; }
     internal AefRunReadInfo Info { get; }
+    internal long Bytes => _snapshot.Bytes;
 
-    internal static AefVerifiedRun Open(string directory, CancellationToken ct = default)
+    internal static AefVerifiedRun Open(string directory, CancellationToken ct = default, long maxBytes = 1L << 30)
     {
         var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(directory), new AefStagingOptions
         {
-            MaxFiles = 100_000, MaxBytes = 1L << 30, MaxFileBytes = 1L << 30,
+            MaxFiles = 100_000, MaxBytes = maxBytes, MaxFileBytes = maxBytes,
         }, ct);
         try
         {
