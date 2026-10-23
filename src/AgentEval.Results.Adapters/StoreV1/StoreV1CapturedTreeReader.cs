@@ -5,7 +5,9 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using AgentEval.Evals;
+using AgentEval.Output;
 using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Writing;
 
@@ -14,6 +16,12 @@ namespace AgentEval.Results.Adapters.StoreV1;
 // Legacy presentation only. Native results stay canonical; no EvalResult is synthesized for them.
 internal static class StoreV1CapturedTreeReader
 {
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+    };
+
     internal static EvalResult? Read(AefRunEvidence run, string resultId)
     {
         var root = run.Results.SingleOrDefault(r => r.GetProperty("resultId").GetString() == resultId);
@@ -94,7 +102,21 @@ internal static class StoreV1CapturedTreeReader
             throw Bad("Captured severity conflicts with canonical evidence.");
         if (line["annotator"] is { } annotator)
         {
-            var expected = StoreV1Exporter.Annotator(EvalResultPersistence.ComparabilityOf(tree, null), tree)?.ToJson();
+            var facts = EvalResultPersistence.ComparabilityOf(tree, null);
+            // ComparisonObservation is transient. A serialized composite can retain no instrument
+            // in provenance even though its scenario separately recorded the grading facts.
+            if (facts.EffectiveInstrumentKind == EvaluationInstrumentKind.Unknown
+                && line["ext"]?[StoreV1Exporter.ExtName]?["comparability"] is { } recorded)
+            {
+                try { facts = recorded.Deserialize<ComparabilityFacts>(Json) ?? throw Bad("Recorded grading facts are null."); }
+                catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
+                { throw Bad("Recorded grading facts are unreadable.", error); }
+                if (facts.EvalKey != tree.Metric.Key || facts.EvalVersion != tree.Metric.Version
+                    || facts.EffectiveBar != tree.Score.Threshold || !Enum.IsDefined(facts.EffectiveInstrumentKind)
+                    || facts.Judge is not null && facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Model)
+                    throw Bad("Recorded grading facts conflict with the captured evaluator or instrument.");
+            }
+            var expected = StoreV1Exporter.Annotator(facts, tree)?.ToJson();
             if (!Matches(expected, annotator)) throw Bad("Captured grading instrument conflicts with canonical evidence.");
         }
         foreach (var usage in line["usage"]?.AsArray() ?? [])

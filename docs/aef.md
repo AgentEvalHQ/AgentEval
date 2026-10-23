@@ -502,6 +502,12 @@ scenarios retain their original names. Alternate benchmark/preset observations r
 original scenario label, including with capture off; a missing label keeps the ID fallback. The ID alone does not
 establish a display name. A present comparison name with a non-string value is refused.
 
+Mission Control scenario lists retain recognized recorded v1 names while keeping canonical case IDs unchanged.
+Missing names and unfamiliar metadata versions keep the ID fallback. The workspace catalog also includes
+recorded child runs from `.agenteval/aef/jobs/<jobId>/runs/`, using the same bounded discovery and per-run
+verification as ordinary runs. A job's own seal is not a child-run seal, and a child run does not establish parent
+job completion or integrity. Incomplete or unsafe job-folder discovery refuses a partial catalog.
+
 `bench gdpr --runs N` and `bench eu-ai-act --runs N` preserve each trial's tree and a corresponding
 majority-vote rollup tree. Ties choose the more severe label; a pass supported by only some requested trials
 becomes a warning. Error and skipped trials contribute no vote.

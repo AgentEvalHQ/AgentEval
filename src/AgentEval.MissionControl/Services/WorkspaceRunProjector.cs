@@ -83,12 +83,25 @@ internal static class WorkspaceRunProjector
         var measured = state is "passed" or "failed" or "warn" or "scored" or "inconclusive";
         var duration = Number(r, "durationMs");
         var usage = Array(At(r, "usage")).ToArray();
-        return new WorkspaceScenario(id, Text(r, "resultId")!, Text(r, "ext", "agenteval.store-v1", "name") ?? id, state,
+        return new WorkspaceScenario(id, Text(r, "resultId")!, ScenarioName(r, id), state,
             state == "passed" ? true : state == "failed" ? false : null,
             measured ? Number(score, "value") : null, measured ? null : state == "not_applicable" ? "not_applicable" : "not_measured",
             duration is { } ms ? TimeSpan.FromMilliseconds(ms) : null,
             usage.Length > 0 && usage.All(u => Number(u, "costUsd") is not null) ? usage.Sum(u => Number(u, "costUsd")!.Value) : null);
     }).ToArray();
+
+    private static string ScenarioName(JsonElement result, string id)
+    {
+        if (Text(result, "ext", "agenteval.store-v1", "name") is { } legacy) return legacy;
+        var comparison = At(result, "ext", "agenteval.comparison");
+        if (Number(comparison, "version") == 1 && At(comparison, "name") is { } name)
+        {
+            if (name.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException("Expected: a recorded comparison name string. Actual: a malformed name. Suggestions: restore the producer's evidence. Because: presentation must not coerce or invent a label.");
+            return name.GetString()!;
+        }
+        return id;
+    }
 
     private static IEnumerable<JsonElement> Roots(AefRunEvidence read) => read.Results.Where(r => At(r, "parentResultId") is null && At(r, "trial") is null);
     private static double? SummaryScore(AefRunEvidence read)

@@ -25,12 +25,19 @@ public sealed class AefCapturedLegacyTreeTests : IDisposable
         new("atomic-llm", "recorded-judge", "prompt", "short-hash", 4, 0.01, false),
         DateTimeOffset.Parse("2026-10-23T10:00:00Z"));
 
-    private async Task<string> Fixture(AefContentCapture capture = AefContentCapture.On)
+    private async Task<string> Fixture(AefContentCapture capture = AefContentCapture.On, EvaluationInstrumentKind? aggregateInstrument = null)
     {
         var store = new FileSystemOutputStore(Path.Combine(_root.FullName, "store"));
         await store.InitializeSolutionAsync("captured-tree");
         var manifest = await store.StartRunAsync(new(SubjectKind.Agent, "Agent"), new("tests", ".", "offline", null, null, "eval"));
-        var scenario = EvalResultPersistence.ToScenarioResult(Node("root", Node("child", Node("leaf"))), "case", "Case", []);
+        var tree = Node("root", Node("child", Node("leaf")));
+        if (aggregateInstrument is { } instrument)
+            tree = tree with
+            {
+                Provenance = tree.Provenance with { Type = "composite", JudgeModel = null },
+                ComparisonObservation = new("root", "1.0") { EffectiveBar = 0.5, InstrumentKind = instrument },
+            };
+        var scenario = EvalResultPersistence.ToScenarioResult(tree, "case", "Case", []);
         var directory = Path.Combine(_root.FullName, "aef");
         StoreV1Exporter.Export(new(manifest, null, [scenario], null, []), directory, new() { ContentCapture = capture });
         return directory;
@@ -118,6 +125,37 @@ public sealed class AefCapturedLegacyTreeTests : IDisposable
         var result = Assert.IsType<EvalResult>(Read(await Fixture()));
         Assert.Equal("Recorded recommendation", Assert.Single(result.Details.Recommendations!));
         Assert.Equal("leaf", Assert.Single(Assert.Single(result.Details.SubResults!).Details.SubResults!).Metric.Key);
+    }
+
+    [Theory]
+    [InlineData(EvaluationInstrumentKind.Deterministic)]
+    [InlineData(EvaluationInstrumentKind.Model)]
+    [InlineData(EvaluationInstrumentKind.Unknown)]
+    public async Task Read_AggregateInstrumentRecordedOutsideCapture_RetainsTree(EvaluationInstrumentKind instrument)
+    {
+        var directory = await Fixture(aggregateInstrument: instrument);
+        var result = Assert.IsType<EvalResult>(Read(directory));
+        Assert.Equal("composite", result.Provenance.Type);
+        Assert.Null(result.Provenance.JudgeModel);
+        Assert.Equal("child", Assert.Single(result.Details.SubResults!).Metric.Key);
+    }
+
+    [Theory]
+    [InlineData("instrumentKind", "model")]
+    [InlineData("instrumentKind", "unsupported")]
+    [InlineData("evalKey", "other")]
+    [InlineData("evalVersion", "2.0")]
+    [InlineData("effectiveBar", "0.6")]
+    public async Task Read_ConflictingRecordedAggregateFacts_RefusesRichPresentation(string field, string value)
+    {
+        var directory = await Fixture(aggregateInstrument: EvaluationInstrumentKind.Deterministic);
+        var path = Path.Combine(directory, "results.ndjson");
+        var lines = File.ReadAllLines(path).Select(line => JsonNode.Parse(line)!).ToArray();
+        var facts = lines.Single(n => n["parentResultId"] is null)["ext"]![StoreV1Exporter.ExtName]!["comparability"]!;
+        facts[field] = field == "effectiveBar" ? JsonValue.Create(0.6) : JsonValue.Create(value);
+        File.WriteAllText(path, string.Join("\n", lines.Select(n => n.ToJsonString())) + "\n");
+        Reseal(directory);
+        Assert.Throws<InvalidDataException>(() => Read(directory));
     }
 
     [Theory]

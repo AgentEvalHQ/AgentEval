@@ -113,6 +113,22 @@ public sealed class RunnerCommandTests : IDisposable
         foreach (var run in report["runs"]!.AsArray())
             Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(Path.Combine(job, "runs", (string)run!)).Outcome);
         Assert.DoesNotContain("private-input", string.Concat(Directory.GetFiles(job, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+#if NET10_0_OR_GREATER
+        if (scenario == "sealed")
+        {
+            var source = new AgentEval.MissionControl.Services.WorkspaceRunSource(
+                new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")),
+                new AgentEval.Results.Adapters.Reading.AefWorkspaceEvidenceReader());
+            var catalog = await source.ReadAsync(default);
+            foreach (var saved in report["runs"]!.AsArray())
+            {
+                var directory = Path.Combine(job, "runs", (string)saved!);
+                await MissionControlProducerAssertions.ReadAsync(directory);
+                var read = new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(directory);
+                Assert.Contains(catalog, run => run.Evidence.Info.RunId == read.Info.RunId);
+            }
+        }
+#endif
     }
 
     private JsonObject CreatePlan(string endpoint)

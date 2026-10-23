@@ -126,6 +126,36 @@ public sealed class AefWorkspaceGraphQLTests : IDisposable
         Assert.Equal(JsonValueKind.Null, scenario.GetProperty("duration").ValueKind);
     }
 
+    [Theory]
+    [InlineData("recorded")]
+    [InlineData("absent")]
+    [InlineData("future")]
+    [InlineData("number")]
+    public async Task Scenarios_NativeName_UsesRecordedV1OrHonestFallback(string shape)
+    {
+        var directory = Native();
+        var lines = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToArray();
+        var root = Assert.Single(lines, l => l["parentResultId"] is null && l["trial"] is null);
+        var metadata = root["ext"]!["agenteval.comparison"]!.AsObject();
+        if (shape == "absent") metadata.Remove("name");
+        else if (shape == "number") metadata["name"] = 42;
+        else metadata["name"] = "Recorded native scenario";
+        if (shape == "future") metadata["version"] = 2;
+        File.WriteAllText(Path.Combine(directory, "results.ndjson"), string.Join("\n", lines.Select(l => l.ToJsonString(new() { WriteIndented = false }))) + "\n");
+        File.Delete(Path.Combine(directory, "seal.json"));
+        AefSealer.Seal(directory);
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, $$"""{ scenarios(runId:"{{RunId(directory)}}") { id name } }""");
+        if (shape == "number")
+        {
+            Assert.True(json.RootElement.TryGetProperty("errors", out _));
+            return;
+        }
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var scenario = Assert.Single(json.RootElement.GetProperty("data").GetProperty("scenarios").EnumerateArray());
+        Assert.Equal(shape == "recorded" ? "Recorded native scenario" : scenario.GetProperty("id").GetString(), scenario.GetProperty("name").GetString());
+    }
+
     [Fact]
     public async Task Run_ImportedPlaceholderTimes_RemainUnknownExecutionTimes()
     {

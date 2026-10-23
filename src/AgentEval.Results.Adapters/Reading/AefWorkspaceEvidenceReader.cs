@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using AgentEval.Results.Adapters.StoreV1;
 using AgentEval.Output;
+using AgentEval.Results.Ingestion;
 
 namespace AgentEval.Results.Adapters.Reading;
 
@@ -77,7 +78,8 @@ public sealed partial class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceRe
             return evidence;
         }
 
-        foreach (var directory in AefEvidenceDiscovery.Discover(Path.Combine(workspace, "aef", "runs"), ct: ct))
+        foreach (var directory in AefEvidenceDiscovery.Discover(Path.Combine(workspace, "aef", "runs"), ct: ct)
+            .Concat(JobRunDirectories(workspace, ct)))
         {
             var evidence = ReadRun(directory);
             runs.Add(new(SourceId(workspace, directory), evidence, Aliases(evidence)));
@@ -107,6 +109,27 @@ public sealed partial class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceRe
         }
         ct.ThrowIfCancellationRequested();
         return new(runs);
+    }
+
+    private static IReadOnlyList<string> JobRunDirectories(string workspace, CancellationToken ct)
+    {
+        var root = Path.Combine(workspace, "aef", "jobs");
+        if (!Path.Exists(root)) return [];
+        // runner.json locates job folders; only their child runs are verified/presented here.
+        // A job's own seal.json is not a native execution-run seal or a parent-completion claim.
+        var jobs = AefRunDiscovery.DiscoverByMarker(root, "runner.json",
+            new() { MaxDepth = 1, MaxEntries = 100_000, MaxRuns = 1000 }, ct);
+        if (!jobs.Complete) throw Bad("Runner job discovery is incomplete; refusing a partial catalog.");
+        var runs = new List<string>();
+        foreach (var job in jobs.Candidates)
+        {
+            if (Path.GetRelativePath(root, job.Directory).Split(Path.DirectorySeparatorChar).Length != 1
+                || Path.GetFullPath(job.Directory) == Path.GetFullPath(root))
+                throw Bad("A runner job marker is outside the expected direct job-folder layout.");
+            runs.AddRange(AefEvidenceDiscovery.Discover(Path.Combine(job.Directory, "runs"), ct: ct));
+            if (runs.Count > 1000) throw Bad("More than 1000 runner child-run source folders were found.");
+        }
+        return runs;
     }
 
     internal static IReadOnlyList<string> Aliases(AefRunEvidence evidence)

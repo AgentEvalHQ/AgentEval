@@ -18,14 +18,62 @@ public sealed class AefWorkspaceEvidenceReaderTests : IDisposable
     private readonly AefWorkspaceEvidenceReader _reader = new();
     public void Dispose() => AefTestRuns.Delete(_root);
 
-    private static string Native(string workspace, string subject = "agent:x", string? alias = null, bool trials = false)
+    private static string Native(string workspace, string subject = "agent:x", string? alias = null, bool trials = false, string? job = null)
     {
         var start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
         var leaf = new EvalResult(new("case", "case", "test", "1.0.0"), new(0.8, null, "scored", false, null, "none", null),
             new(null, null, null, null, null), new("atomic-code", null, null, null, null, 0, false), start);
-        return AefCompositeRunWriter.Write(Path.Combine(workspace, "aef", "runs"), leaf, AefCompositeRunWriter.Undescribed,
+        var output = Path.Combine(workspace, "aef", "runs");
+        if (job is not null)
+        {
+            var parent = Directory.CreateDirectory(Path.Combine(workspace, "aef", "jobs", job));
+            File.WriteAllText(Path.Combine(parent.FullName, "runner.json"), "{}"); // Locator only; no parent-job claim.
+            File.WriteAllText(Path.Combine(parent.FullName, "seal.json"), "{}"); // Never treated as a child-run seal.
+            output = Path.Combine(parent.FullName, "runs");
+        }
+        return AefCompositeRunWriter.Write(output, leaf, AefCompositeRunWriter.Undescribed,
             new() { SubjectRef = subject, TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test",
                 StoreV1 = alias is null ? null : trials ? new() { TrialRunIds = [alias] } : new() { RunId = alias } }, start, start.AddSeconds(1)).Directory;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Read_JobChildRun_UsesSameVerificationWithoutInferringParentStatus(bool tamper)
+    {
+        var directory = Native(_root, subject: "model:job", job: "job-proof");
+        if (tamper)
+        {
+            var path = Path.Combine(directory, "run.json");
+            var header = AefTestRuns.Document(directory, "run.json");
+            header["subject"]!["ref"] = "model:changed";
+            File.WriteAllText(path, header.ToJsonString());
+            Assert.Throws<InvalidDataException>(() => _reader.Read(_root));
+            return;
+        }
+        var run = Assert.Single(_reader.Read(_root).Runs);
+        Assert.False(run.Evidence.Info.Imported);
+        Assert.Equal("intact", run.Evidence.Info.Integrity);
+        Assert.Equal("model:job", run.Evidence.Info.SubjectRef);
+        Assert.Equal(run.SourceId, Assert.Single(_reader.Read(_root).Runs).SourceId);
+    }
+
+    [Fact]
+    public void Read_JobChildRuns_ShareTheWorkspaceByteBudget()
+    {
+        Native(_root);
+        Native(_root, job: "job-proof");
+        var runs = _reader.Read(_root).Runs;
+        Assert.Equal(2, runs.Count);
+        Assert.ThrowsAny<IOException>(() => _reader.Read(_root, runs.Sum(r => r.Evidence.Bytes) - 1));
+    }
+
+    [Fact]
+    public void Read_JobWithNestedRunsButMissingLocator_RefusesPartialDiscovery()
+    {
+        Native(_root, job: "job-proof");
+        File.Delete(Path.Combine(_root, "aef", "jobs", "job-proof", "runner.json"));
+        Assert.Throws<InvalidDataException>(() => _reader.Read(_root));
     }
 
     [Fact]

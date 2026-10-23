@@ -145,6 +145,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (runs > 1) Assert.Null(config["metrics"]);
         else Assert.Equal("code_toxicity", (string?)Assert.Single(config["metrics"]!.AsArray()));
         Assert.DoesNotContain("secret-one", File.ReadAllText(Path.Combine(dir, "run.json")));
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(dir);
+#endif
     }
 
     [Theory]
@@ -270,6 +273,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             AssertIntact(run);
             Assert.Equal("mocked", (string?)Document(run, "run.json")["execution"]!["targetMode"]);
             AssertAutoAuditDefinition(run, scripted: true);
+#if NET10_0_OR_GREATER
+            await MissionControlProducerAssertions.ReadAsync(run);
+#endif
             var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
             Assert.Equal("inconclusive", (string?)gate["outcome"]);
             Assert.Equal(11, (int)gate["exitCode"]!);
@@ -836,6 +842,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(endpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
         Assert.Equal(judgeEndpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!);
         AssertStoreLink(RunDirectory(aef.FullName));
+#if NET10_0_OR_GREATER
+        if (family == "owasp" && !fromEnvironment) await MissionControlProducerAssertions.ReadAsync(RunDirectory(aef.FullName));
+#endif
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
         // The historical comparison unit is the entire benchmark, not one of its probe resistance readings.
@@ -1520,6 +1529,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var directory = RunDirectory(destination.FullName);
         AssertIntact(directory);
         AssertMemoryRecipe(directory);
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
         if (cancelBeforeCalls) Assert.Empty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
         else
         {
@@ -1603,6 +1615,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["observedQuestions"]!);
         Assert.False((bool)diagnostics["gating"]!);
         Assert.False(File.Exists(Path.Combine(directory, "gates.ndjson")));
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
         if (!cancelBeforeQuestions)
         {
             var workspace = Path.Combine(_root, ".agenteval");
@@ -1713,6 +1728,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (runs == 1) AssertStoreLink(directory);
         else AssertCompositeStoreLinks(directory, runs);
         await CompositeComparisonAssertions.MatchesFinalAsync(workspace, directory, capture: true);
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
     }
 
     [Theory]

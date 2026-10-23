@@ -50,6 +50,11 @@ public sealed class PerformanceProducerParityTests
             converted.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
         Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
         Assert.Equal(ComparisonVerdict.Comparable, native.CompareTo(converted).Verdict);
+#if NET10_0_OR_GREATER
+        var nativeView = await MissionControlProducerAssertions.ReadAsync(nativePath, (string?)original["name"]);
+        var convertedView = await MissionControlProducerAssertions.ReadAsync(convertedPath, (string?)original["name"]);
+        Assert.Equal(nativeView.Select(s => (s.Name, s.State, s.Score, s.Passed)), convertedView.Select(s => (s.Name, s.State, s.Score, s.Passed)));
+#endif
     }
 
     private sealed class MeasuredAgent : IEvaluableAgent
