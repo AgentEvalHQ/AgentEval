@@ -14,6 +14,7 @@ public static partial class StoreV1Exporter
     private static IReadOnlyList<StoreV1ReportArtifact> Reports(string snapshot, AefContentCapture capture) =>
         capture == AefContentCapture.Off ? [] : new[] { "markdown", "md", "html", "junit", "sarif", "xml" }
             .Select(format => new StoreV1ReportArtifact(format, Path.Combine(snapshot, "reports", "report." + format)))
+            .Append(new StoreV1ReportArtifact("native-json", Path.Combine(snapshot, "report-native.json")))
             .Where(report => File.Exists(report.SnapshotPath)).ToArray();
 
     private static void AddReports(AefRunWriter writer, IReadOnlyList<StoreV1ReportArtifact> reports, AefContentCapture capture)

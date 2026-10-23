@@ -28,7 +28,7 @@ internal static class StoreV1EvalTree
 
     internal static EvalResult? TryParse(string output) => LooksLikeEvalTree(output) ? Parse(output) : null;
 
-    internal static EvalResult Parse(string output)
+    internal static EvalResult Parse(string output, bool nativePropertyNames = false)
     {
         // Identify the envelope before typed deserialization. An invalid recognized tree must not
         // fall through to an ordinary flat scenario when the legacy deserializer returns null.
@@ -38,11 +38,16 @@ internal static class StoreV1EvalTree
             CheckUniqueMembers(json.RootElement);
             var rawCount = 0;
             ValidateRaw(json.RootElement, 0);
-            var tree = json.RootElement.Deserialize<EvalResult>(new JsonSerializerOptions(Json) { MaxDepth = 128 })
+            var tree = json.RootElement.Deserialize<EvalResult>(new JsonSerializerOptions(Json)
+                { PropertyNamingPolicy = nativePropertyNames ? null : JsonNamingPolicy.CamelCase, MaxDepth = 128 })
                 ?? throw InvalidSource("The eval-result tree is null.");
             var count = 0;
             Validate(json.RootElement, tree, 0);
             return tree;
+
+            string Name(string name) => nativePropertyNames ? char.ToUpperInvariant(name[0]) + name[1..] : name;
+            bool TryProperty(JsonElement node, string name, out JsonElement value) => node.TryGetProperty(Name(name), out value);
+            JsonElement Property(JsonElement node, string name) => node.GetProperty(Name(name));
 
             void ValidateRaw(JsonElement node, int depth)
             {
@@ -51,11 +56,11 @@ internal static class StoreV1EvalTree
                 CheckObject(node);
                 foreach (var section in new[] { "metric", "score", "provenance", "details" })
                 {
-                    if (!node.TryGetProperty(section, out var part))
+                    if (!TryProperty(node, section, out var part))
                         throw InvalidSource("The eval-result tree omits a required section.");
                     CheckObject(part);
                 }
-                if (!node.GetProperty("details").TryGetProperty("subResults", out var children) ||
+                if (!TryProperty(Property(node, "details"), "subResults", out var children) ||
                     children.ValueKind == JsonValueKind.Null) return;
                 if (children.ValueKind != JsonValueKind.Array)
                     throw InvalidSource("The eval-result tree's children must be an array.");
@@ -69,17 +74,21 @@ internal static class StoreV1EvalTree
                 if (node?.Metric is null || node.Score is null || node.Details is null || node.Provenance is null ||
                     !AefConverter.IsResultText(node.Metric.Key, 256) || !AefConverter.IsResultText(node.Metric.Version, 64) ||
                     node.EvaluatedAt == default || !Enum.IsDefined(node.Score.Measurement) ||
-                    node.Score.Value is < 0 or > 1 || string.IsNullOrWhiteSpace(node.Score.Label))
+                    !double.IsFinite(node.Score.Value) ||
+                    ((nativePropertyNames || depth > 0) && (node.Score.Value is < 0 or > 1)) ||
+                    string.IsNullOrWhiteSpace(node.Score.Label))
                     throw InvalidSource("The eval-result tree has incomplete or invalid evaluator facts.");
+                // A generic scenario root's scale is proved by HasNormalizedScoreContract, not by its numeric value.
+                // Native trace reports and projected descendants have the known normalized contract.
                 // Constructor defaults are not observations. Require the value-type facts before projecting them.
-                if (!raw.TryGetProperty("score", out var score) || score.ValueKind != JsonValueKind.Object ||
-                    !score.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Number ||
-                    !score.TryGetProperty("passed", out var passed) || passed.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
-                    !raw.TryGetProperty("provenance", out var provenance) || provenance.ValueKind != JsonValueKind.Object ||
-                    !provenance.TryGetProperty("cacheHit", out var cache) || cache.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                if (!TryProperty(raw, "score", out var score) || score.ValueKind != JsonValueKind.Object ||
+                    !TryProperty(score, "value", out var value) || value.ValueKind != JsonValueKind.Number ||
+                    !TryProperty(score, "passed", out var passed) || passed.ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+                    !TryProperty(raw, "provenance", out var provenance) || provenance.ValueKind != JsonValueKind.Object ||
+                    !TryProperty(provenance, "cacheHit", out var cache) || cache.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                     throw InvalidSource("The eval-result tree omits a required score or provenance fact.");
                 if (node.Details.SubResults is not { Count: > 0 } children) return;
-                var rawChildren = raw.GetProperty("details").GetProperty("subResults");
+                var rawChildren = Property(Property(raw, "details"), "subResults");
                 for (var i = 0; i < children.Count; i++) Validate(rawChildren[i], children[i], depth + 1);
             }
         }

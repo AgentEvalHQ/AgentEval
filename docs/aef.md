@@ -314,6 +314,18 @@ An exported store run is marked as imported, and lists what the exporter *suppli
 exported run is never passed off as live evidence unless you say it was. The full mapping is in the specification,
 §7.5.
 
+Legacy trace-fidelity and workflow-trace-fidelity runs can record their evaluator tree in
+`report-native.json` without scenario files. Conversion projects that recorded tree into cases;
+inputs, input hashes and per-case durations remain absent when the report did not record them.
+With content capture on, the original report bytes are also retained as `E-report-native-json`.
+Other benchmark families' native reports are preserved as opaque evidence, without inferring cases
+from a different report schema. Content capture off omits the original report blob.
+
+A generic scenario's recorded finite score can have an unbounded scale. Conversion declares it
+normalized only when its recorded metric contract supports that interpretation; it does not clamp
+the score into 0–1. Known normalized trace results and projected descendant metrics still require
+values in that domain.
+
 ## Runs from eval, redteam and bench
 
 `bench autoaudit --subject-version <version>` records that exact version for each audited subject, including

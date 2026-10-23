@@ -194,6 +194,8 @@ public static partial class StoreV1Exporter
 
         notes.Add("Store v1 records no suite version or digest: run.json has no suite.");
         notes.Add("Store v1 records no deployment: run.json has no deployment.");
+        if (run.NativeReportProjection)
+            notes.Add("Canonical cases are projected from the recorded report-native.json EvalResult tree, not original scenario files. Inputs, input hashes and per-case durations were not recorded there and remain absent.");
 
         // [RUN-5]: a run CompleteRunAsync finished has a summary and a final verdict; anything else never completed.
         var startedAt = manifest.Run.Timestamp;
@@ -876,4 +878,5 @@ public sealed record StoreV1Run(
     internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
     internal string? TraceSnapshotPath { get; init; }
     internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
+    internal bool NativeReportProjection { get; init; }
 }

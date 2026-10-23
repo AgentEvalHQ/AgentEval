@@ -37,6 +37,8 @@ public static partial class StoreV1Exporter
         var scenarios = (Directory.Exists(scenarioDirectory) ? Directory.GetFiles(scenarioDirectory, "*.json") : [])
             .OrderBy(f => f, StringComparer.Ordinal)
             .Select(ReadRequired<ScenarioResult>).ToList();
+        var nativeReport = scenarios.Count == 0 ? TraceReportScenarios(root, manifest) : null;
+        if (nativeReport is not null) scenarios.AddRange(nativeReport);
         if ((scenarios.Count == 0 && manifest is null) || scenarios.Any(s => string.IsNullOrWhiteSpace(s.Id)))
             throw InvalidSource("No usable scenario results with recorded scenario IDs were found.");
         var summary = ReadOptional<RunSummary>(Path.Combine(root, "summary.json"));
@@ -49,6 +51,7 @@ public static partial class StoreV1Exporter
             {
                 Reports = Reports(root, options.ContentCapture),
                 TraceSnapshotPath = trace is null ? null : tracePath,
+                NativeReportProjection = nativeReport is not null,
             };
             ct.ThrowIfCancellationRequested();
             run = enrich is null ? run : enrich(run);
