@@ -86,6 +86,7 @@ internal static class StochasticBenchRunner
         var (score, note) = Vote(trials, first.Score.Threshold);
         return first with
         {
+            ObservedDuration = null,
             ComparisonObservation = comparison,
             Observation = new(
                 trials.All(t => t.Observation?.Query == first.Observation?.Query) ? first.Observation?.Query : null,

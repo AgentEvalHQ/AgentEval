@@ -932,6 +932,7 @@ sealed class AgentEval.Evals.EvalResult : IEquatable<AgentEval.Evals.EvalResult>
     DateTimeOffset EvaluatedAt { get; init; }
     Int32 GetHashCode()
     String ToString()
+    TimeSpan? ObservedDuration { get; init; }
     Void Deconstruct(out AgentEval.Evals.EvalMetadata Metric, out AgentEval.Evals.EvalScore Score, out AgentEval.Evals.EvalDetails Details, out AgentEval.Evals.EvalProvenance Provenance, out DateTimeOffset EvaluatedAt)
     ctor(AgentEval.Evals.EvalMetadata Metric, AgentEval.Evals.EvalScore Score, AgentEval.Evals.EvalDetails Details, AgentEval.Evals.EvalProvenance Provenance, DateTimeOffset EvaluatedAt)
     static AgentEval.Evals.EvalResult Skipped(AgentEval.Evals.IEval eval, String reason)

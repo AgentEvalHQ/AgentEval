@@ -12,6 +12,26 @@ public sealed record EvalResult(
     EvalProvenance Provenance,
     DateTimeOffset EvaluatedAt)
 {
+    private readonly TimeSpan? _observedDuration;
+
+    /// <summary>The elapsed interval observed for this evaluation boundary, or null when it was not recorded.</summary>
+    /// <remarks>
+    /// Transient writer context, excluded from legacy result JSON. Zero is an observed duration, not an unknown.
+    /// A parent or trial rollup must record its own interval rather than borrow or sum child observations.
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public TimeSpan? ObservedDuration
+    {
+        get => _observedDuration;
+        init
+        {
+            if (value is { } duration && duration < TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(ObservedDuration), value,
+                    "Expected: a nonnegative observed elapsed interval. Actual: negative duration. Suggestions: record the actual boundary interval or leave it unknown. Because: elapsed evidence cannot precede its start.");
+            _observedDuration = value;
+        }
+    }
+
     /// <summary>The input observed at this result's evaluation boundary, when recorded.</summary>
     /// <remarks>
     /// Transient context for output writers, excluded from result JSON to avoid implicit prompt capture.

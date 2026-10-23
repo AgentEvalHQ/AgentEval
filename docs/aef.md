@@ -498,6 +498,14 @@ entry records the preset's own aggregate value and verdict, with an `agenteval.*
 `not_measured` when the preset withholds its score. These are distinct metrics because AEF allows only one
 summary entry per lane, metric and path.
 
+Native composite results retain `EvalResult.ObservedDuration` as `durationMs` when the producer recorded
+that boundary's elapsed interval. The optional observation is excluded from legacy result JSON; null
+stays unknown and zero stays an observed zero. Category-memory uses its reported benchmark/category
+intervals, independently of CLI persistence time. Synthetic trial rollups do not borrow a trial's duration.
+Memory category DTOs do not identify their grading instrument, so configuration alone does not establish
+a model or code annotator. For memory questions, recorded judge calls establish model grading only for
+measured outcomes; an unrecorded model identity stays absent. Missing instrument evidence stays unknown.
+
 Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
 

@@ -1526,6 +1526,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 var observed = Assert.Single(native, r => (string?)r["evaluator"]!["id"] == key);
                 Assert.Equal((double)category["Weight"]!, (double)observed["component"]!["weight"]!);
                 Assert.Equal((double)category["Score"]! / 100, (double)observed["scores"]![0]!["value"]!);
+                Assert.Equal(TimeSpan.Parse((string)category["Duration"]!, System.Globalization.CultureInfo.InvariantCulture).TotalMilliseconds,
+                    (double?)observed["durationMs"]);
             }
         }
     }

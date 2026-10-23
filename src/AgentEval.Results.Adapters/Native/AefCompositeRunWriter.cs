@@ -157,6 +157,7 @@ public static class AefCompositeRunWriter
         if (options.AbortReason is null) throw new ArgumentException("An aborted trial run requires an abort reason.", nameof(options));
         var preset = trials[0] with
         {
+            ObservedDuration = null,
             Score = new EvalScore(0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
         };
         return WriteCore(runsRoot, preset, shape, options, startedAt, endedAt, trials, abortedTrials: true);
@@ -383,6 +384,7 @@ public static class AefCompositeRunWriter
         var llm = instrument.EffectiveInstrumentKind == AgentEval.Output.EvaluationInstrumentKind.Model;
         var line = new AefResult
         {
+            DurationMs = node.ObservedDuration?.TotalMilliseconds,
             Evidence = artifactEvidence,
             CaseId = caseId,
             Path = path,
@@ -452,6 +454,7 @@ public static class AefCompositeRunWriter
             var children = childCounts.GetValueOrDefault((group.Key.CaseId, group.Key.Path));
             var rollup = first.Result with
             {
+                DurationMs = null,
                 Evidence = first.Parent is null ? artifactLinks.GetValueOrDefault(group.Key.CaseId) : null,
                 Reasoning = null,
                 Trial = null,

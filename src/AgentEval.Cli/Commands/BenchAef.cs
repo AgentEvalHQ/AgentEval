@@ -149,8 +149,9 @@ internal static class BenchAef
                 new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, label == "pass" ? "none" : "", null),
                 new EvalDetails(null, null, null, null, null),
                 // A category the benchmark's judge graded is not priced here (null, never $0); a skipped one spent nothing.
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, c.Skipped ? 0 : null, false),
-                DateTimeOffset.UtcNow);
+                // The category DTO records no instrument; configured model identity cannot establish one.
+                new EvalProvenance("unknown", null, null, null, null, c.Skipped ? 0 : null, false),
+                DateTimeOffset.UtcNow) { ObservedDuration = c.Duration };
         }).ToList();
         // One case, the benchmark, with its categories as weighted parts below it: the weights reach the run as each
         // part's component weight and the case's aggregation is WeightedSum, as the overall score is computed. An
@@ -164,7 +165,7 @@ internal static class BenchAef
             },
             new EvalDetails(null, null, null, categories, "WeightedSum"),
             new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(categories).EstimatedCost, false),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow) { ObservedDuration = result.Duration };
         var root = new EvalResult(benchmark.Metric, benchmark.Score, new EvalDetails(null, null, null, [benchmark], null), benchmark.Provenance, DateTimeOffset.UtcNow);
         return (root, new AefComponentShape(1, true, "Averaged",
         [
@@ -194,7 +195,7 @@ internal static class BenchAef
                 },
                 new EvalDetails(null, null, null, null, null),
                 // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, q.JudgeLlmCallCount > 0 ? null : 0, false),
+                QuestionProvenance(label is "pass" or "fail", q, judgeModel),
                 DateTimeOffset.UtcNow);
         }).ToList();
         // No accuracy means no question was scored, and an INCONCLUSIVE verdict (nothing scored, or an interrupted run)
@@ -382,7 +383,7 @@ internal static class BenchAef
                 },
                 new EvalDetails(null, null, null, null, null),
                 // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, q.JudgeLlmCallCount > 0 ? null : 0, false),
+                QuestionProvenance(label == "scored", q, judgeModel),
                 DateTimeOffset.UtcNow);
         }).ToList();
         var root = new EvalResult(
@@ -395,5 +396,12 @@ internal static class BenchAef
             new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(questions).EstimatedCost, false),
             DateTimeOffset.UtcNow);
         return (root, ext);
+    }
+
+    private static EvalProvenance QuestionProvenance(bool measured, AgentEval.Memory.External.Models.QuestionResult question, string? model)
+    {
+        var observedJudge = measured && question.JudgeLlmCallCount > 0;
+        return new(observedJudge ? "atomic-llm" : "unknown", observedJudge ? model : null,
+            null, null, null, question.JudgeLlmCallCount > 0 ? null : 0, false);
     }
 }
