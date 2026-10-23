@@ -201,7 +201,7 @@ public static class BenchCommand
             AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("bench", $"gdpr/{preset}"), benchmark, evalInput, runs);
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = storeOverride ?? new FileSystemOutputStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp) left behind by killed benchmark processes. Only CLI writer
         // entry points sweep — Mission Control (read-only viewer) must not.
@@ -220,7 +220,7 @@ public static class BenchCommand
         string? storeRunId = null;
         var trialRunIds = new List<string>();
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null && trialRunIds.Count == 0 ? null : new()
+            store.WorkspaceRoot is null || (storeRunId is null && trialRunIds.Count == 0) ? null : new()
             {
                 RunId = storeRunId,
                 TrialRunIds = runs > 1 ? trialRunIds.ToArray() : null,
@@ -305,6 +305,11 @@ public static class BenchCommand
             var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            if (store.WorkspaceRoot is null)
+            {
+                await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, evidence.Base, ct);
+                await CliRunOutput.WriteReportAsync(Path.Combine(outputDir, "gdpr-evidence.json"), evidence, ct);
+            }
             complianceArtifacts = () => ComplianceAef.Composite(Path.Combine(outputDir, "gdpr-evidence.json"), evidence.Base, compositeResult, evidence);
 
             // Markdown report

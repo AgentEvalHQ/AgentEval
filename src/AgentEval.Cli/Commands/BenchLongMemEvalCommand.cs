@@ -167,8 +167,8 @@ public static class BenchLongMemEvalCommand
                 subjectVersion, agentEvalDir, aef, noAef, chatClientOverride is null, agentEndpoint, ct, onPairedQuestionCompleted);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -185,7 +185,7 @@ public static class BenchLongMemEvalCommand
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string? storeRunId = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null, int? exitCode = null)
         {
             if (noAef) return false;
@@ -281,7 +281,7 @@ public static class BenchLongMemEvalCommand
             // Write the native ExternalBenchmarkResult JSON alongside the manifest.
             // Resolve via the store so the report path matches the manifest exactly; hand-building
             // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
-            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
+            var runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "longmemeval");
             await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
                 nativeReportJson);
@@ -296,7 +296,7 @@ public static class BenchLongMemEvalCommand
                 (verdict == "WARN" ? $" — {result.QuestionResults.Count - result.ScoredQuestions} of {result.QuestionResults.Count} questions were not scored, so the pass is a warn" : ""));
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
-            Console.WriteLine($"   Canonical: {runDir}");
+            Console.WriteLine($"   Reports:   {runDir}");
             Console.WriteLine($"   Native:    {Path.Combine(runDir, "report-native.json")}");
             ct.ThrowIfCancellationRequested();
         }

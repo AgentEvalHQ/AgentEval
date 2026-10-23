@@ -30,11 +30,14 @@ internal static class BenchAef
         try
         {
             var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
+            var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 };
+            if (complianceArtifacts is not null)
+                settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel) { Name = comparisonName },
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
-                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
+                Config = new AefRunConfig { Settings = settings },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
                 Seal = AefCliOptions.Seal,
@@ -223,6 +226,8 @@ internal static class BenchAef
         {
             var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 };
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
+            if (report is not null || complianceArtifacts is not null)
+                settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
             var options = new AefCompositeRunOptions
             {
                 Report = report,

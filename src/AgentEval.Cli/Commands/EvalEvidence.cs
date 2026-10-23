@@ -76,7 +76,7 @@ internal sealed class EvalEvidence : IDisposable
 
     private void Failed(Exception ex)
     {
-        _failed |= _options.Aef is not null;
+        _failed |= _options.Aef is not null || (!AefCliOptions.LegacyOutput && _options.OutputDir is not null);
         if (_failed || !_options.Quiet)
             Console.Error.WriteLine($"  {(_failed ? "Error" : "Warning")}: the AEF run {(_session is null ? "was not written" : "could not be completed")}: {ex.Message}");
         _session?.Dispose();

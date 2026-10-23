@@ -235,8 +235,8 @@ agenteval eval --dataset <path> --endpoint <url> [--model <name>] [--azure --dep
 **What it does**
 
 Loads a YAML, JSON, JSONL, CSV, or TSV dataset, evaluates the agent, and exports results as JSON,
-JUnit/XML, Markdown, TRX, CSV, or a structured directory. It supports stochastic reruns (`--runs`),
-LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 directory export.
+JUnit/XML, Markdown, TRX or CSV, with AEF as the run record. It supports stochastic reruns (`--runs`),
+LLM-as-judge, named metrics (`--metrics`), and AEF evidence under `--output-dir`.
 
 **Key options**
 
@@ -256,7 +256,7 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
 | `--format <fmt>` | Export format. Default `json`. In stochastic mode, one entry per test case (below). |
 | `-o, --output <path>` | Output file for single-file formats. Default: stdout. |
-| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+| `--output-dir <path>` | Sealed AEF evidence destination. Cannot conflict with `--no-aef` or a different `--aef` directory. |
 | `--save-golden <path>` | Save this run as a golden trace: each test case's verdict, output, and tool calls with their arguments, as JSON to commit beside the dataset (below). |
 | `--golden <path>` | Compare this run with a golden trace and exit on regressions only (below). |
 | `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
@@ -274,13 +274,13 @@ least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative
 `--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
 
 A table and a pass/fail line per test case, and a closing summary, are printed to stderr. The export (`--format`,
-`-o`, `--output-dir`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
+`-o`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
 score is the mean over the runs. Every format carries the runs as four metric columns: `stochastic_runs`,
 `stochastic_runs_passed`, `stochastic_pass_rate` (0–100) and `stochastic_score_sd`. A failed test case's message names
 its pass rate and the threshold (`3 of 5 runs passed (60.0%), below the 80% threshold.`). JUnit system-out and TRX
 stdout also list each run with its score or error and the confidence interval for the mean. The report's name ends in
 `(stochastic, N runs per test)`, and `Mode`, `RunsPerTest` and `SuccessThreshold` are recorded in the JSON export's
-`metadata` and in the directory export's `run.json`. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
+`metadata`. AEF (`--aef` or `--output-dir`) retains trials and rollups separately. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
 
 **Golden traces (`--save-golden`, `--golden`)**
 

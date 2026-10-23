@@ -38,10 +38,10 @@ public sealed class AefWriterCensusTests
         // New source ownership requires an explicit census decision; this deliberately does not inspect arbitrary IL.
         var owners = Directory.EnumerateFiles(cli, "*.cs", SearchOption.AllDirectories)
             .Where(path => !Path.GetRelativePath(cli, path).Split(Path.DirectorySeparatorChar).Any(p => p is "bin" or "obj"))
-            .Where(path => Regex.IsMatch(File.ReadAllText(path), @"\bnew\s+FileSystemOutputStore\b|\bIOutputStore\b"))
+            .Where(path => Regex.IsMatch(File.ReadAllText(path), @"\bnew\s+FileSystemOutputStore\b|\bIOutputStore\b|\bCliRunOutput\.CreateStore\b"))
             .Select(path => Path.GetRelativePath(cli, path).Replace('\\', '/')).OrderBy(p => p, StringComparer.Ordinal);
         var expected = BenchProducers.Where(p => p.LegacyOwner is not null).Select(p => "Commands/" + p.LegacyOwner)
-            .Append("Commands/StochasticRunner.cs").OrderBy(p => p, StringComparer.Ordinal);
+            .Append("Commands/StochasticRunner.cs").Append("Commands/CliRunOutput.cs").OrderBy(p => p, StringComparer.Ordinal);
         Assert.Equal(expected, owners);
     }
 

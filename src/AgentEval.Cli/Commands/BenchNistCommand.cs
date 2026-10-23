@@ -160,11 +160,11 @@ public static class BenchNistCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        FileSystemOutputStore? store = null;
+        IOutputStore? store = null;
         if (!isMock)
         {
-            store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
         }
@@ -175,7 +175,7 @@ public static class BenchNistCommand
         var comparisonName = $"NIST AI RMF — {preset}";
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -268,7 +268,7 @@ public static class BenchNistCommand
                     Stats: runStats,
                     Metrics: metrics);
                 await store!.CompleteRunAsync(manifest, summary, ct);
-                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+                Console.WriteLine(store.WorkspaceRoot is null ? $"Prepared transient report source {runId}" : $"Persisted run {runId} to {agentEvalDir}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -282,6 +282,15 @@ public static class BenchNistCommand
                 var reporter = new NistAiRmfComplianceReporter();
                 await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
                     new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+                if (store!.WorkspaceRoot is null)
+                {
+                    await foreach (var pointer in store.ListComplianceEvidenceAsync(NistAiRmfComplianceReporter.Regulation, subjectIdentity, ct))
+                    {
+                        var evidence = await store.GetComplianceEvidenceAsync(pointer.Regulation, subjectIdentity, pointer.Timestamp, ct)
+                            ?? throw new InvalidOperationException("The just-generated NIST report is unavailable.");
+                        await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, evidence, ct);
+                    }
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {

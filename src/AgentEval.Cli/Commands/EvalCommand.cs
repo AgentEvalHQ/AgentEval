@@ -99,10 +99,10 @@ internal static class EvalCommand
 
         // Output
         var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit (alias xml) | markdown (alias md) | trx | csv. For the structured directory, use --output-dir." };
+            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit (alias xml) | markdown (alias md) | trx | csv. For AEF evidence, use --output-dir." };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
         var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
-            { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };
+            { Description = "Write sealed AEF run evidence under this directory" };
 
         // Golden trace (regression against a saved run)
         var saveGoldenOpt = new Option<FileInfo?>("--save-golden")
@@ -244,6 +244,21 @@ internal static class EvalCommand
         if (ValidateRuns(opts) is { } runsError)
         {
             Console.Error.WriteLine($"  Error: {runsError}");
+            return ExitCodes.UsageError;
+        }
+
+        if (!AefCliOptions.LegacyOutput && opts.OutputDir is not null &&
+            (opts.NoAef || (opts.Aef is not null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.Aef.FullName)).Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.OutputDir.FullName)), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
+        {
+            Console.Error.WriteLine("  Error: --output-dir writes AEF evidence; it cannot conflict with --no-aef or a different --aef directory.");
+            return ExitCodes.UsageError;
+        }
+
+        if (opts.OutputDir is null && (opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase) ||
+            opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.Error.WriteLine("  Error: directory output requires --output-dir <path>.");
             return ExitCodes.UsageError;
         }
 
@@ -755,7 +770,8 @@ internal static class EvalCommand
 
     /// <summary>
     /// Writes <paramref name="report"/> in the requested <c>--format</c> (to <c>-o</c>, or stdout) and, with
-    /// <c>--output-dir</c>, as the ADR-002 directory too. The single-run and the stochastic path both export here.
+    /// <c>--output-dir</c>, as the ADR-002 directory only when legacy output is enabled. Native directory publication
+    /// is owned by the AEF session. The single-run and stochastic paths both export reports here.
     /// </summary>
     private static async Task ExportReportAsync(EvalOptions opts, EvaluationReport report, CancellationToken ct)
     {
@@ -765,15 +781,14 @@ internal static class EvalCommand
 
         if (isDirectoryFormat && opts.OutputDir is null)
             throw new ArgumentException(
-                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
-                "Specify --output-dir <path> to write the directory output.",
+                "Specify --output-dir <path> to write directory output.",
                 nameof(opts.Format));
 
         if (!isDirectoryFormat)
             await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
 
         // Directory export (ADR-002) — can coexist with single-file export
-        if (opts.OutputDir is not null)
+        if (opts.OutputDir is not null && AefCliOptions.LegacyOutput)
         {
             var dirName = DirectoryExporter.GenerateDirectoryName(report);
             var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
@@ -964,7 +979,8 @@ internal static class EvalCommand
 internal static class EvalAef
 {
     /// <summary>The AEF root a run goes to: <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>, else none.</summary>
-    public static string? Root(EvalOptions opts) => opts.NoAef ? null : Root(opts.Aef);
+    public static string? Root(EvalOptions opts) => opts.NoAef ? null :
+        Root(opts.Aef ?? (AefCliOptions.LegacyOutput ? null : opts.OutputDir));
 
     /// <summary>Where a command writes AEF runs: <paramref name="aef"/>, else a workspace's <c>.agenteval/aef</c>, else null.</summary>
     public static string? Root(DirectoryInfo? aef)

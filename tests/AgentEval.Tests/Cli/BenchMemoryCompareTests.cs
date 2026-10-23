@@ -58,8 +58,8 @@ public sealed class BenchMemoryCompareTests : IDisposable
     [Fact]
     public async Task TwoMemoryRuns_WriteScenarioResults_AndCompareReadsThem()
     {
-        var first = await BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient());
-        var second = await BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient());
+        var first = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient()));
+        var second = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient()));
         Assert.NotEqual(ExitCodes.UsageError, first);
         Assert.NotEqual(ExitCodes.UsageError, second);
 
@@ -97,7 +97,7 @@ public sealed class BenchMemoryCompareTests : IDisposable
         int exit;
         try
         {
-            exit = await BenchMemoryCommand.RunAsync("quick", "mem-incomplete", _root, new NoScoreChatClient());
+            exit = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-incomplete", _root, new NoScoreChatClient()));
         }
         finally
         {
@@ -136,7 +136,7 @@ public sealed class BenchMemoryCompareTests : IDisposable
     }
 
     [Fact]
-    public void Compare_OnARunWithNoScenarios_RefusesByName_InsteadOfCrashing()
+    public void Compare_OnMalformedRunWithoutScenarios_RefusesExplicitlyInsteadOfCrashing()
     {
         var run = Path.Combine(_root, "run-without-scenarios");
         Directory.CreateDirectory(run);
@@ -157,6 +157,7 @@ public sealed class BenchMemoryCompareTests : IDisposable
         }
 
         Assert.Equal(ExitCodes.UsageError, exit);
-        Assert.Contains("is not a scenario result", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("--baseline", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Expected: readable legacy", stderr.ToString(), StringComparison.Ordinal);
     }
 }

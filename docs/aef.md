@@ -574,7 +574,18 @@ TypedMemEval exposes the same progress method and retains typed outcomes on inte
 the aggregate score and gate; a missing typed vector never substitutes the compatibility accuracy field. Returned
 full results remain available after persistence or report failure.
 
-Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
+CLI commands use AEF as their default run record. They do not write legacy manifests, scenarios or history by default.
+`eval --output-dir` selects an AEF destination; it cannot conflict with `--no-aef` or a different `--aef` directory.
+Single-file exports and standalone benchmark reports remain supported. Perf, memory and trace-family reports live under
+`.agenteval/reports/<family>/<subject>/<source-id>`; compliance and agentic reports retain their existing report locations.
+Standalone exports keep their report content. Copies of their original JSON inside AEF follow the configured AEF capture policy.
+Existing report builders can assemble a transient in-memory source manifest. Its ID/hash identifies that assembly input,
+not a persisted legacy folder or an independently verifiable execution. When present, `config.reportSourceManifestStorage`
+discloses `transient-in-memory` or `store-v1`. No StoreV1 link is written for a transient source.
+The CLI's compatibility writer is private RC feedback support, outside the 1.0 promise, scheduled for removal at 1.0.0
+if feedback finds nothing. Legacy reading/conversion remains supported throughout 1.x; library output-store APIs are unchanged.
+
+When the compatibility writer is enabled, perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
 in `run.json` under `ext.agenteval.store-v1.runId`. The AEF run keeps its own identity. No directory path is stored;
 an interrupted run may link an incomplete manifest, while a run stopped before manifest creation has no link.
 Agentic benchmarks also link their created store manifests, including interrupted runs.

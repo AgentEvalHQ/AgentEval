@@ -85,12 +85,12 @@ public class BenchScanNothingConclusiveTests : IDisposable
         var agent = new UnreachableAgent();
         var judge = new AnswersPreflightOnlyJudge();
 
-        var result = family switch
+        var result = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(async () => family switch
         {
             "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
             "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
             _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
-        };
+        });
 
         Assert.NotEqual(0, result.ExitCode);   // nothing measured is not a pass
         var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;

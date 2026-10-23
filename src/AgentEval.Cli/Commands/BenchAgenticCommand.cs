@@ -231,10 +231,10 @@ public static class BenchAgenticCommand
                 benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1, budgetTier: appliedBudgetTier);
         }
 
-        var store = new FileSystemOutputStore(agentEvalDir);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
         // CLI writer paths sweep; MC (read-only viewer) does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
@@ -248,7 +248,7 @@ public static class BenchAgenticCommand
         var progress = new CompositeProgress(benchmark);
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         try
         {
             string runId;
@@ -286,6 +286,8 @@ public static class BenchAgenticCommand
             var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
             var reportFile = Path.Combine(outputDir, "agentic-result.json");
+            if (store.WorkspaceRoot is null)
+                await CliRunOutput.WriteReportAsync(reportFile, result, ct);
             if (new FileInfo(reportFile).Length > 64L << 20)
                 throw new InvalidDataException("The agentic report exceeds the 64 MiB capture limit.");
             reportArtifact = new()

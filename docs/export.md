@@ -176,12 +176,12 @@ var dirName = DirectoryExporter.GenerateDirectoryName(report);
 await exporter.ExportToDirectoryAsync(report, $"./results/{dirName}");
 ```
 
-**CLI usage:** `agenteval eval` writes the directory with `--output-dir` (`--format directory` is refused with that
-hint). The `bench` commands do not run exporters: each stores its run under `.agenteval/` (summary, results and its own
-Markdown and PDF report), and `agenteval render` re-renders those reports later at no LLM cost.
+**Library usage:** `DirectoryExporter` retains the ADR-002 layout below. The CLI writes AEF as its run record;
+`eval --output-dir` selects an AEF destination. Benchmark JSON/Markdown/HTML/PDF reports remain separate exports,
+and `agenteval render` can re-render captured agentic reports from verified AEF at no LLM cost.
 
 ```bash
-# The structured directory from an evaluation run
+# Native AEF evidence from an evaluation run
 agenteval eval --dataset cases.yaml --endpoint http://localhost:1234/v1 --model my-model --output-dir ./results/baseline
 
 # A benchmark run is stored, not exported; re-render its report later (no LLM cost):

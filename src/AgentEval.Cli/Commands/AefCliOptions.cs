@@ -19,6 +19,7 @@ internal sealed class AefCliOptions
     internal static IAefSigner? Signer => Active.Value?.Signer;
     internal static AefContentCapture ContentCapture => Active.Value?.ContentCapture ?? AefContentCapture.Off;
     internal static AefContentCapture? RequestedContentCapture => Active.Value?.RequestedContentCapture;
+    internal static bool LegacyOutput => Active.Value?.LegacyOutput ?? false;
 
     internal AefCliOptions(Command root) => Register(root);
 
@@ -39,7 +40,9 @@ internal sealed class AefCliOptions
                 ? "Assert on|off matches the saved plan's contentCapture; defaults to the plan and never overrides it"
                 : "Capture observed content in AEF evidence blobs: on|off (default: off)" };
             command.Options.Add(content);
-            _commands.Add(command, new(key, unsealed, content, verb));
+            var legacy = runner ? null : new Option<bool>("--legacy-output") { Hidden = true };
+            if (legacy is not null) command.Options.Add(legacy);
+            _commands.Add(command, new(key, unsealed, content, legacy, verb));
         }
         foreach (var child in command.Subcommands) Register(child, verb);
     }
@@ -90,7 +93,8 @@ internal sealed class AefCliOptions
         {
             Active.Value = new(!unsealed, signer, content == "on" ? AefContentCapture.On : AefContentCapture.Off,
                 content is null ? null : content == "on" ? AefContentCapture.On : AefContentCapture.Off,
-                IsRunner(parsed.CommandResult.Command) ? null : await AgentEval.Cli.Infrastructure.CliGitProvenance.CaptureAsync(binding.Verb, Environment.CurrentDirectory));
+                IsRunner(parsed.CommandResult.Command) ? null : await AgentEval.Cli.Infrastructure.CliGitProvenance.CaptureAsync(binding.Verb, Environment.CurrentDirectory),
+                binding.Legacy is not null && parsed.GetValue(binding.Legacy));
             return await invoke();
         }
         finally
@@ -120,7 +124,7 @@ internal sealed class AefCliOptions
             Console.Error.WriteLine("  AEF note: no exact subject version was recorded; this run cannot satisfy a checkpoint lane. Record an exact subject version when producing checkpoint evidence.");
     }
 
-    private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content, string Verb);
+    private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content, Option<bool>? Legacy, string Verb);
     private static bool IsRunner(Command command) => command.Name == "run" && command.Options.Any(o => o.Name == "--plan");
-    private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture, AefContentCapture? RequestedContentCapture, AefCliProvenance? Provenance);
+    private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture, AefContentCapture? RequestedContentCapture, AefCliProvenance? Provenance, bool LegacyOutput);
 }

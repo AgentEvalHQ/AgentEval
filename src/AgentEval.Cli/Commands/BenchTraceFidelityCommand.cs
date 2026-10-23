@@ -86,8 +86,9 @@ public static class BenchTraceFidelityCommand
 
         // ── Persist via the canonical output store (manifest + native report) ──
         string? storeRunId = null;
+        IOutputStore? store = null;
         byte[]? nativeReportJson = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
@@ -96,8 +97,8 @@ public static class BenchTraceFidelityCommand
         try
         {
             nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
-            var store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
@@ -129,7 +130,7 @@ public static class BenchTraceFidelityCommand
                 Metrics: new Dictionary<string, double> { ["trace_fidelity_score100"] = result.Score.Value * 100 });
             await store.CompleteRunAsync(manifest, summary, ct);
 
-            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
+            var runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "trace-fidelity");
             await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
                 nativeReportJson,
@@ -144,7 +145,7 @@ public static class BenchTraceFidelityCommand
 
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
-            Console.WriteLine($"   Canonical: {runDir}");
+            Console.WriteLine($"   Reports:   {runDir}");
             // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
             ct.ThrowIfCancellationRequested();
             if (WriteEvidence())

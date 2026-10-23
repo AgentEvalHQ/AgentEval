@@ -180,11 +180,11 @@ public static class BenchOwaspCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        FileSystemOutputStore? store = null;
+        IOutputStore? store = null;
         if (!isMock)
         {
-            store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
         }
@@ -195,7 +195,7 @@ public static class BenchOwaspCommand
         var comparisonName = $"OWASP LLM Top 10 — {preset}";
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -298,7 +298,7 @@ public static class BenchOwaspCommand
                     Stats: runStats,
                     Metrics: metrics);
                 await store!.CompleteRunAsync(manifest, summary, ct);
-                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+                Console.WriteLine(store.WorkspaceRoot is null ? $"Prepared transient report source {runId}" : $"Persisted run {runId} to {agentEvalDir}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -312,6 +312,8 @@ public static class BenchOwaspCommand
                 var reporter = new OWASPComplianceReporter();
                 var complianceEvidence = await reporter.SaveReportWithEvidenceAsync(store!, subjectIdentity, runId, redTeamResult,
                     new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+                if (store!.WorkspaceRoot is null)
+                    await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, complianceEvidence, ct);
                 complianceArtifacts = () => ComplianceAef.Scan(agentEvalDir, complianceEvidence, redTeamResult);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)

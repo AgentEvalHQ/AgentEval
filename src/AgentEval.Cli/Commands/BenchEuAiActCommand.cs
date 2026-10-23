@@ -201,7 +201,7 @@ public static class BenchEuAiActCommand
             AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("bench", $"eu-ai-act/{preset}"), benchmark, evalInput, runs);
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = storeOverride ?? new FileSystemOutputStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels (.invalid.json / .lock
         // / .tmp). Phase-0 0.9: only CLI writer paths sweep; MC does not.
         if (store is FileSystemOutputStore fileStore)
@@ -218,7 +218,7 @@ public static class BenchEuAiActCommand
         string? storeRunId = null;
         var trialRunIds = new List<string>();
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null && trialRunIds.Count == 0 ? null : new()
+            store.WorkspaceRoot is null || (storeRunId is null && trialRunIds.Count == 0) ? null : new()
             {
                 RunId = storeRunId,
                 TrialRunIds = runs > 1 ? trialRunIds.ToArray() : null,
@@ -293,6 +293,11 @@ public static class BenchEuAiActCommand
             var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            if (store.WorkspaceRoot is null)
+            {
+                await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, evidence.Base, ct);
+                await CliRunOutput.WriteReportAsync(Path.Combine(outputDir, "eu-ai-act-evidence.json"), evidence, ct);
+            }
             complianceArtifacts = () => ComplianceAef.Composite(Path.Combine(outputDir, "eu-ai-act-evidence.json"), evidence.Base, compositeResult, evidence);
 
             // Markdown report
