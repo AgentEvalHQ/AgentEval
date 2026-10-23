@@ -1,6 +1,7 @@
 import { Gavel, Users, AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   type EvalResultNodeShape,
+  capturedScore,
   dimensionsToRecord,
   isAdjudicatedNode,
 } from "@/lib/eval-tree";
@@ -92,7 +93,7 @@ export function AdjudicationFlow({ node }: Props) {
               <span>
                 Score:{" "}
                 <span className="font-mono">
-                  {formatScore(adjudicator.score.value)}
+                  {formatScore(capturedScore(adjudicator))}
                 </span>
               </span>
               {adjudicator.provenance.judgeModel && (
@@ -107,7 +108,7 @@ export function AdjudicationFlow({ node }: Props) {
                   panel DISAGREEMENT. Matches EvalResultNode.tsx's rendering. */}
               <PromptHashPill promptHash={adjudicator.provenance.promptHash} />
               <span className="text-slate-500">
-                {formatCost(adjudicator.provenance.estimatedCost)}
+                {adjudicator.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(adjudicator.provenance.estimatedCost)}
               </span>
             </div>
           </div>
@@ -130,7 +131,7 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
         />
       </div>
       <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-600">
-        <span className="font-mono">{formatScore(judge.score.value)}</span>
+        <span className="font-mono">{formatScore(capturedScore(judge))}</span>
         {judge.provenance.judgeModel && (
           <ModelBadge
             model={judge.provenance.judgeModel}
@@ -141,9 +142,9 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
             cards were the one place promptHash still didn't render
             (EvalResultNode.tsx and ScenarioTreePage.tsx already show it). */}
         <PromptHashPill promptHash={judge.provenance.promptHash} />
-        {judge.provenance.estimatedCost > 0 && (
+        {(
           <span className="text-slate-500">
-            {formatCost(judge.provenance.estimatedCost)}
+            {judge.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(judge.provenance.estimatedCost)}
           </span>
         )}
       </div>

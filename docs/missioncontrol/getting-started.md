@@ -103,6 +103,8 @@ The response contains a flat list of every recorded node in the case, including 
 
 Canonical descendants remain available with content capture off. Captured artifacts are listed separately and are downloadable only when their bytes exist in the verified snapshot. The older `scenarioTree` operation remains a legacy compatibility surface; it does not provide this canonical native view.
 
+When an import includes a captured legacy evaluation tree, the page also shows **Captured legacy details** using the existing judge, adjudication, dimensions and recommendation panels. These details are checked against their canonical results before display; conflicting captures are refused. Missing measurements and costs remain explicitly unrecorded, while a recorded zero cost stays zero. Older imports can retain descendants only in this attachment; they do not acquire invented canonical result IDs. Both tree operations accept source/result selection for disambiguation.
+
 ### Compliance dashboard matrix
 
 ```graphql

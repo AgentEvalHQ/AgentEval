@@ -6,10 +6,7 @@
 // Dimensions therefore arrive as that shape and are converted to a plain
 // Record<string, number> for ergonomic React access.
 //
-// The depth-8 query cap (Program.cs MaxAllowedExecutionDepth) means we can
-// fetch up to four `details { subResults { ... } }` nestings per round-trip.
-// Beyond that the SPA shows "subtree truncated" so users know the JSON trace
-// is the source of truth.
+// The canonical page supplies a validated captured document, independent of GraphQL nesting depth.
 
 export type Severity = "none" | "low" | "medium" | "high" | "critical";
 
@@ -21,6 +18,7 @@ export interface EvalMetricNode {
 }
 
 export interface EvalScoreNode {
+  measurement?: string;
   value: number;
   ordinal: number | null;
   label: string;
@@ -36,7 +34,7 @@ export interface EvalProvenanceNode {
   promptId: string | null;
   promptHash: string | null;
   tokensUsed: number | null;
-  estimatedCost: number;
+  estimatedCost: number | null;
   cacheHit: boolean;
 }
 
@@ -125,4 +123,35 @@ export interface ChatTurnNode {
   promptTokens: number;
   completionTokens: number;
   latencyMs: number;
+}
+
+
+/** Legacy placeholder values are not measured scores. */
+export function capturedScore(node: EvalResultNodeShape): number | null {
+  const measurement = node.score.measurement?.toLowerCase();
+  return (measurement && measurement !== 'measured') ||
+    ['error', 'skipped', 'inapplicable', 'not_measured'].includes(node.score.label.toLowerCase()) ? null : node.score.value;
+}
+
+type StoredEvalTree = Omit<EvalResultNodeShape, 'details'> & {
+  details: Omit<EvalDetailsNode, 'dimensions' | 'subResults'> & {
+    dimensions?: Record<string, number> | null; subResults?: StoredEvalTree[] | null;
+  };
+};
+/** Adapt the server-validated captured JSON to the existing rich components' dictionary shape. */
+export function capturedTree(document: string): EvalResultNodeShape {
+  function adapt(node: StoredEvalTree): EvalResultNodeShape {
+    return { ...node,
+      score: { ...node.score, ordinal: node.score.ordinal ?? null, threshold: node.score.threshold ?? null,
+        confidence: node.score.confidence ?? null },
+      provenance: { ...node.provenance, judgeModel: node.provenance.judgeModel ?? null, promptId: node.provenance.promptId ?? null,
+        promptHash: node.provenance.promptHash ?? null, tokensUsed: node.provenance.tokensUsed ?? null,
+        estimatedCost: node.provenance.estimatedCost ?? null },
+      details: { ...node.details,
+        dimensions: node.details.dimensions == null ? null : Object.entries(node.details.dimensions).map(([key, value]) => ({ key, value })),
+        recommendations: node.details.recommendations ?? null, aggregationStrategy: node.details.aggregationStrategy ?? null,
+        subResults: node.details.subResults?.map(adapt) ?? null },
+    };
+  }
+  return adapt(JSON.parse(document) as StoredEvalTree);
 }

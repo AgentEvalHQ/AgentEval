@@ -4,6 +4,7 @@
 using System.Text.Json;
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.Results.Adapters.Reading;
+using AgentEval.Results.Adapters.StoreV1;
 
 namespace AgentEval.MissionControl.Services;
 
@@ -17,7 +18,12 @@ internal static class WorkspaceTreeProjector
         // A case view is all-or-nothing. Large evidence needs a paged viewer, never an undisclosed partial tree.
         if (lines.Length > 10_000)
             throw new InvalidDataException("Expected: at most 10,000 nodes in a case view. Actual: a larger recorded case. Suggestions: inspect the AEF results directly. Because: the viewer must not silently truncate evidence.");
-        var nodes = lines.Select(Node).ToArray();
+        var nodes = lines.Select(line =>
+        {
+            var node = Node(line);
+            var captured = node.ParentResultId is null ? WorkspaceRunProjector.CapturedLegacyTree(run, node.ResultId) : null;
+            return node with { CapturedLegacyJson = captured is null ? null : StoreV1EvalTree.Serialize(captured) };
+        }).ToArray();
         var evidenceIds = nodes.SelectMany(n => n.EvidenceIds).ToHashSet(StringComparer.Ordinal);
         return new(run.SourceId, run.Evidence.Info.RunId, caseId, resultId,
             Text(run.Evidence.Header, "contentCapture")!, run.Evidence.Info,

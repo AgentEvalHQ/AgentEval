@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval.Results.Adapters.Tests" />
+    <InternalsVisibleTo Include="AgentEval.MissionControl" />
   </ItemGroup>
 
   <ItemGroup>

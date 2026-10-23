@@ -454,7 +454,7 @@ public static partial class StoreV1Exporter
 
     // A dimension's metric id: its name, unless the store lifted it from the tree (_lifted.*: the severity and confidence,
     // mapped elsewhere), it names one of the exporter's metrics, or it is longer than an id may be.
-    private static string? DimensionMetric(string name) =>
+    internal static string? DimensionMetric(string name) =>
         name.StartsWith("_lifted.", StringComparison.Ordinal) || name.Length is 0 or > 256 ? null
         : name is PassMetric or ScoreMetric ? "dimension:" + name
         : name;
@@ -678,7 +678,7 @@ public static partial class StoreV1Exporter
 
     // Who graded: the judge the comparability facts name (an LLM), a deterministic eval (code), or, without facts, the
     // tree's judge model.
-    private static AefAnnotator? Annotator(ComparabilityFacts? facts, EvalResult? tree)
+    internal static AefAnnotator? Annotator(ComparabilityFacts? facts, EvalResult? tree)
     {
         if (facts?.Judge is { } judge)
         {

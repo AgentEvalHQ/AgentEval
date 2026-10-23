@@ -19,7 +19,7 @@ export interface CanonicalNode {
   usage: { role: string; model: string | null; costUsd: number | null; costSource: string | null;
     inputTokens: number | null; outputTokens: number | null; cacheReadInputTokens: number | null;
     cacheWriteInputTokens: number | null; reasoningOutputTokens: number | null }[];
-  evidenceIds: string[]; recordedJson: string;
+  evidenceIds: string[]; recordedJson: string; capturedLegacyJson?: string | null;
 }
 export interface CanonicalTree {
   sourceId: string; runId: string; caseId: string; selectedResultId: string | null; contentCapture: string;

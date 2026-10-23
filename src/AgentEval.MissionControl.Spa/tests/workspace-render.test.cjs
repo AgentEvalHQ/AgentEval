@@ -307,3 +307,41 @@ test('canonical tree preserves imported custody uncertainty and absence without 
   assert.match(html, /No numeric score recorded/);
   assert.doesNotMatch(html, /not sealed when it ran/);
 });
+
+
+function capturedPanel() {
+  const node = key => ({ metric: { key, name: key, category: 'test', version: '1' },
+    score: { value: 0.8, label: 'pass', passed: true, threshold: 0.5, severity: 'none', measurement: 'measured' },
+    provenance: { type: 'atomic-llm', judgeModel: 'recorded-model', promptHash: 'recorded-prompt', estimatedCost: null, cacheHit: false },
+    details: { dimensions: { agreement: 1 }, recommendations: ['Recorded recommendation'] },
+    evaluatedAt: '2026-10-23T10:00:00Z' });
+  const panel = node('captured-panel');
+  panel.provenance.type = 'composite';
+  panel.details.aggregationStrategy = 'MajorityVote';
+  panel.details.subResults = [node('judge-one'), node('judge-two')];
+  panel.details.subResults[1].provenance.estimatedCost = 0;
+  return panel;
+}
+test('canonical page restores existing captured judge panels and recommendations', () => {
+  const data = canonicalTree();
+  data.scenarioResultTree.evidence.imported = true;
+  data.scenarioResultTree.nodes[0].capturedLegacyJson = JSON.stringify(capturedPanel());
+  const html = render(ScenarioTreePage, '/runs/native/scenarios/case%2525?sourceId=source%2Fa&resultId=result-1', '/runs/:runId/scenarios/:scenarioId',
+    [[queryKeys.runs.scenarioTree('native', 'case%25', 'source/a', 'result-1'), data]]);
+  assert.match(html, /Captured legacy details/);
+  assert.match(html, /captured-panel/);
+  assert.match(html, /Judge panel \(2\)/);
+  assert.match(html, /Recorded recommendation/);
+  assert.match(html, /judge-one/);
+  assert.match(html, /judge-two/);
+  assert.match(html, /cost not recorded/i);
+  assert.match(html, /\$0/);
+});
+test('captured absent judge score does not display its numeric placeholder', () => {
+  const { EvalResultNode } = load(path.join(root, 'components/EvalResultNode'));
+  const absent = capturedPanel().details.subResults[0];
+  absent.score = { ...absent.score, value: 0.12345, passed: false, label: 'not_measured', measurement: 'notMeasured' };
+  absent.details.dimensions = [];
+  const html = renderToStaticMarkup(h(EvalResultNode, { node: absent, defaultExpanded: true }));
+  assert.doesNotMatch(html, /0\.12/);
+});

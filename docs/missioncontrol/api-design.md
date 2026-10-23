@@ -137,7 +137,7 @@ Query.runSummary(runId)                        RunSummary?
 Query.runCostBreakdown(runId)                  RunCostBreakdown?  ← per-tier cost
 Query.scenarios(runId)                         [ScenarioResult!]!
 Query.scenario(runId, scenarioId)              ScenarioResult?
-Query.scenarioTree(runId, scenarioId)          EvalResult?        ← legacy compatibility
+Query.scenarioTree(runId, scenarioId, sourceId?, resultId?) EvalResult? ← checked captured legacy details
 Query.scenarioResultTree(runId, scenarioId, sourceId?, resultId?) WorkspaceResultTree? ← canonical case forest
 Query.compliance                               [ComplianceRegulationSummary!]!
 Query.complianceMatrix(regulation)             ComplianceMatrix!  ← killer feature

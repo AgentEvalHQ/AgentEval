@@ -21,7 +21,11 @@ public sealed record WorkspaceResultNode(string ResultId, string? ParentResultId
     string? StartedAt, string? EndedAt, double? DurationMs, IReadOnlyList<WorkspaceResultScore> Scores,
     WorkspaceResultTrials? Trials, WorkspaceResultComponent? Component, WorkspaceResultAggregation? Aggregation,
     WorkspaceResultAnnotator? Annotator, WorkspaceResultRule? VerdictRule, IReadOnlyList<WorkspaceResultUsage> Usage,
-    IReadOnlyList<string> EvidenceIds, string RecordedJson);
+    IReadOnlyList<string> EvidenceIds, string RecordedJson)
+{
+    /// <summary>Validated captured legacy details on a root, when present; native records are never synthesized.</summary>
+    public string? CapturedLegacyJson { get; init; }
+}
 
 /// <summary>A recorded numeric score; a normalized value exists only when explicitly recorded.</summary>
 public sealed record WorkspaceResultScore(string MetricId, double Value, double? Normalized, string? Label);

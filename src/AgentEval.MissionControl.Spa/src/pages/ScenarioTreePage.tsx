@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
 import { restUrls } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
+import { EvalResultNode } from "@/components/EvalResultNode";
+import { capturedTree } from "@/lib/eval-tree";
 import { DataState } from "@/components/DataState";
 import { treeRows, type CanonicalTree, type CanonicalNode, type CanonicalMetric } from "@/lib/canonical-tree";
 
@@ -16,7 +18,7 @@ const SCENARIO_TREE_QUERY = /* GraphQL */ `
       artifacts { evidenceId kind description captured }
       nodes {
         resultId parentResultId caseId path trial evaluatorId evaluatorVersion state reason severity
-        startedAt endedAt durationMs evidenceIds recordedJson
+        startedAt endedAt durationMs evidenceIds recordedJson capturedLegacyJson
         scores { metricId value normalized label }
         trials { n passed aggregation agree k }
         component { weight required }
@@ -69,6 +71,11 @@ function CaseTree({ tree }: { tree: CanonicalTree }) {
     <section aria-label="Recorded result tree" className="space-y-3">
       {rows.map(({ node, depth }) => <ResultCard key={node.resultId} node={node} depth={depth} metrics={metrics} selected={tree.selectedResultId === node.resultId} />)}
     </section>
+    {tree.nodes.filter(node => node.capturedLegacyJson).map(node => <section key={node.resultId} className="space-y-3">
+      <h3 className="font-semibold">Captured legacy details</h3>
+      <p className="text-xs text-slate-500">These details come from the captured attachment for {node.path}. Older imports may retain descendants only in this attachment.</p>
+      <EvalResultNode node={capturedTree(node.capturedLegacyJson!)} defaultExpanded />
+    </section>)}
     <section className="rounded-lg border border-slate-200 bg-white p-4">
       <h3 className="font-semibold">Captured case artifacts</h3>
       {tree.artifacts.length === 0 ? <p className="mt-2 text-sm text-slate-500">No captured artifacts are linked to this case.</p> :

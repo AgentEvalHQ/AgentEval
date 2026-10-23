@@ -407,34 +407,29 @@ public sealed partial class Query
     // ─── Recursive EvalResult tree (MC1.4.6) ─────────────────────────────────
 
     /// <summary>
-    /// Returns the recursive <see cref="EvalResult"/> tree for a given scenario,
-    /// reconstituted from the JSON stored in <see cref="ScenarioResult.Output"/> via
-    /// <see cref="EvalResultPersistence.FromScenarioResult"/>. Returns <c>null</c>
-    /// when the scenario doesn't exist or its <c>Output</c> field is not a serialised
-    /// EvalResult tree (e.g., legacy flat scenarios where Output is just the agent's
-    /// response text).
+    /// Returns a captured legacy <see cref="EvalResult"/> tree from the selected verified
+    /// workspace source, checked against its canonical results. Returns <c>null</c> when
+    /// the scenario or captured tree is absent. Native results use <c>scenarioResultTree</c>.
     /// </summary>
     /// <remarks>
-    /// This is the demonstration of plan-07 §3 Challenge 1's central justification:
-    /// a single GraphQL fragment walks the whole composite tree in one round-trip.
-    /// Compare with REST: returning the full tree requires either a fat endpoint
-    /// (large response) or a depth/cursor parameter (chatty client).
+    /// Source and result IDs disambiguate imported runs and scenarios. Capture-off imports
+    /// retain their canonical descendants without synthesizing legacy presentation data.
     /// </remarks>
+    [Cost(100.0)]
+    [HotChocolate.Types.UseRequestScope]
     public async Task<EvalResult?> ScenarioTree(
-        [Service] IOutputStoreReader store,
+        [Service] IWorkspaceRunSource source,
         string runId,
         string scenarioId,
+        string? sourceId = null,
+        string? resultId = null,
         CancellationToken ct = default)
     {
-        if (!store.IsAvailable) return null;
-        if (!FileSystemLayout.IsSafePathSegment(runId)) return null;
-        if (!FileSystemLayout.IsSafePathSegment(scenarioId)) return null;
-        await foreach (var s in store.GetScenarioResultsAsync(runId, ct))
-        {
-            if (string.Equals(s.Id, scenarioId, StringComparison.Ordinal))
-                return EvalResultPersistence.FromScenarioResult(s);
-        }
-        return null;
+        var run = WorkspaceRunSource.Find(await source.ReadAsync(ct), runId, sourceId);
+        if (run is null) return null;
+        var scenario = WorkspaceRunProjector.Scenarios(run).SingleOrDefault(s => s.Id == scenarioId
+            && (resultId is null || s.ResultId == resultId));
+        return scenario is null ? null : WorkspaceRunProjector.CapturedLegacyTree(run, scenario.ResultId);
     }
 
     // ─── Per-evaluator timeline (Wave 8b / MC1.6.9) ──────────────────────────

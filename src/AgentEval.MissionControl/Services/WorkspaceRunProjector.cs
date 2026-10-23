@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using AgentEval.Evals;
 using AgentEval.MissionControl.GraphQL;
 using AgentEval.Results.Adapters.Reading;
@@ -13,27 +12,9 @@ namespace AgentEval.MissionControl.Services;
 // Projects recorded facts only. In particular, completed/aborted are not pass/fail decisions.
 internal static class WorkspaceRunProjector
 {
-    private static readonly JsonSerializerOptions CapturedJson = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
+    internal static EvalResult? CapturedLegacyTree(AefWorkspaceRun source, string resultId) =>
+        AgentEval.Results.Adapters.StoreV1.StoreV1CapturedTreeReader.Read(source.Evidence, resultId);
 
-    internal static EvalResult? CapturedLegacyTree(AefWorkspaceRun source, string resultId)
-    {
-        var root = source.Evidence.Results.Single(r => Text(r, "resultId") == resultId);
-        if (At(root, "ext", "agenteval.store-v1") is null) return null;
-        var candidates = Array(At(root, "evidence")).Select(x => x.GetString()!)
-            .Where(id => id.StartsWith("E-s", StringComparison.Ordinal) && id.EndsWith("-eval", StringComparison.Ordinal)).ToArray();
-        if (candidates.Length == 0) return null;
-        if (candidates.Length != 1 || source.Evidence.CapturedContent(candidates[0]) is not { } content)
-            throw new InvalidDataException("Expected: one captured legacy result tree. Actual: ambiguous or absent content. Suggestions: inspect the source evidence. Because: a result cannot be reconstructed from another source.");
-        var tree = JsonSerializer.Deserialize<EvalResult>(content.Span, CapturedJson);
-        if (tree?.Metric is null || tree.Score is null || tree.Details is null || tree.Provenance is null
-            || tree.Metric.Key != Text(root, "evaluator", "id"))
-            throw new InvalidDataException("Expected: a captured tree agreeing with its result identity. Actual: missing or conflicting tree metadata. Suggestions: inspect the recorded artifact. Because: captured content must not replace canonical result identity.");
-        return tree;
-    }
     internal static WorkspaceRunView Run(AefWorkspaceRun source)
     {
         var read = source.Evidence;

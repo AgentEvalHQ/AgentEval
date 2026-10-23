@@ -59,7 +59,7 @@ public sealed class AefScenarioTreeTests : IDisposable
               trials { n passed k }
               aggregation { measured total unmeasured { state count } }
               usage { inputTokens outputTokens }
-              recordedJson
+              recordedJson capturedLegacyJson
             }
           }
         }
@@ -86,6 +86,14 @@ public sealed class AefScenarioTreeTests : IDisposable
         Assert.True(result.GetProperty("evidence").GetProperty("imported").GetBoolean());
         var nodes = result.GetProperty("nodes").EnumerateArray().ToArray();
         Assert.Equal(4, nodes.Length);
+        var capturedRoot = Assert.Single(nodes, n => n.GetProperty("parentResultId").ValueKind == JsonValueKind.Null).GetProperty("capturedLegacyJson");
+        Assert.Equal(capture == AefContentCapture.On ? JsonValueKind.String : JsonValueKind.Null, capturedRoot.ValueKind);
+        if (capture == AefContentCapture.On)
+        {
+            using var rich = JsonDocument.Parse(capturedRoot.GetString()!);
+            Assert.Equal("root", rich.RootElement.GetProperty("metric").GetProperty("key").GetString());
+            Assert.Equal("branch", rich.RootElement.GetProperty("details").GetProperty("subResults")[0].GetProperty("metric").GetProperty("key").GetString());
+        }
         var missing = Assert.Single(nodes, n => n.GetProperty("evaluatorId").GetString() == "absent");
         Assert.Equal("not_applicable", missing.GetProperty("state").GetString());
         Assert.Empty(missing.GetProperty("scores").EnumerateArray());
@@ -94,6 +102,24 @@ public sealed class AefScenarioTreeTests : IDisposable
         Assert.Equal(capture == AefContentCapture.On, captured.Length > 0);
         foreach (var node in nodes)
             Assert.Contains(read.Results, original => original.GetProperty("resultId").GetString() == node.GetProperty("resultId").GetString());
+        const string legacyQuery = """
+            query Legacy($runId:String!, $sourceId:String!, $resultId:String!) {
+              scenarioTree(runId:$runId,scenarioId:"case",sourceId:$sourceId,resultId:$resultId) { metric { key } }
+            }
+            """;
+        var sourceId = result.GetProperty("sourceId").GetString()!;
+        var resultId = Assert.Single(nodes, n => n.GetProperty("parentResultId").ValueKind == JsonValueKind.Null).GetProperty("resultId").GetString()!;
+        using var legacy = await Send(client, legacyQuery, new { runId = read.Info.RunId, sourceId, resultId });
+        Assert.False(legacy.RootElement.TryGetProperty("errors", out _), legacy.RootElement.ToString());
+        var legacyTree = legacy.RootElement.GetProperty("data").GetProperty("scenarioTree");
+        if (capture == AefContentCapture.On) Assert.Equal("root", legacyTree.GetProperty("metric").GetProperty("key").GetString());
+        else Assert.Equal(JsonValueKind.Null, legacyTree.ValueKind);
+        foreach (var selection in new[] { new { sourceId, resultId = "unknown" }, new { sourceId = "unknown", resultId } })
+        {
+            using var unknown = await Send(client, legacyQuery, new { runId = read.Info.RunId, selection.sourceId, selection.resultId });
+            Assert.False(unknown.RootElement.TryGetProperty("errors", out _), unknown.RootElement.ToString());
+            Assert.Equal(JsonValueKind.Null, unknown.RootElement.GetProperty("data").GetProperty("scenarioTree").ValueKind);
+        }
     }
 
     [Fact]
