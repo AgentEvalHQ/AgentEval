@@ -6,8 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using AgentEval.Output;
 using AgentEval.Results.Adapters.StoreV1;
-using AgentEval.Results.Ingestion;
-using AgentEval.Results.Integrity;
+using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Runs;
 
 namespace AgentEval.Results.Adapters.Comparison;
@@ -68,16 +67,8 @@ public sealed class AefComparisonReader : IAefComparisonReader
     /// <inheritdoc />
     public AefComparisonRun Read(string directory)
     {
-        using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(directory), new AefStagingOptions
-        {
-            MaxFiles = 100_000, MaxBytes = 1L << 30, MaxFileBytes = 1L << 30,
-        }, CancellationToken.None);
-        var folder = AefRunFolder.Open(snapshot.FullName);
-        var verification = AefRunVerifier.Verify(folder);
-        if (verification.Outcome == AefOutcome.Invalid)
-            throw Bad("invalid AEF evidence: " + string.Join(", ", verification.Problems.Select(p => $"{p.Path}: {p.Code}")));
-        // These are the same invocation-owned bytes that were verified, not another read of the caller's directory.
-        var documents = AefRunDocuments.Read(folder);
+        using var run = AefVerifiedRun.Open(directory);
+        var documents = run.Documents;
         var final = documents.Results.Objects.Select(x => x.Value).Where(x => x["trial"] is null).ToList();
         var hasSelection = final.Any(x => (x["ext"] as JsonObject)?.ContainsKey(AefComparisonMetadata.Extension) == true);
         if (hasSelection) ValidateSelection(final, documents);
@@ -98,11 +89,10 @@ public sealed class AefComparisonReader : IAefComparisonReader
             metrics.Add(scenarios[i].Id, new(id, (string)metric["kind"]!, (string)metric["direction"]!,
                 AefNode.Number(scale?["min"]), AefNode.Number(scale?["max"]), AefNode.String(metric["unit"])));
         }
-        return new(scenarios, AefRunVerification.Name(verification.Outcome), verification.RunHash?.Value,
-            documents.Status ?? "unknown", documents.Run?["imported"] is not null, metrics)
+        return new(scenarios, run.Info.Integrity, run.Info.RunHash, run.Info.Status, run.Info.Imported, metrics)
         {
-            Asserted = (documents.Run?["imported"]?["asserted"] as JsonArray)?.Select(x => x!.GetValue<string>()).ToArray() ?? [],
-            AbortReason = (string?)documents.Run?["abortReason"],
+            Asserted = run.Info.Asserted,
+            AbortReason = run.Info.AbortReason,
         };
     }
 

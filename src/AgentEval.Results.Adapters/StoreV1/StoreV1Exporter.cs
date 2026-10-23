@@ -237,6 +237,7 @@ public static partial class StoreV1Exporter
         internal RunSummary? Summary { get; init; }
         internal AgentTrace? Trace { get; init; }
         internal IReadOnlyList<ComplianceEvidence> ComplianceEvidence { get; init; } = [];
+        internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
     }
 
     private static AefConversion Export(ExportData data, string outputDirectory, StoreV1ExportOptions options)
@@ -260,6 +261,17 @@ public static partial class StoreV1Exporter
         {
             writer.SetMetrics(Metrics(data.Scenarios));
             var compliance = AddCompliance(writer, data.ComplianceEvidence);
+            if (options.ContentCapture == AefContentCapture.On)
+            {
+                for (var i = 0; i < data.ComplianceArtifacts.Count; i++)
+                    writer.AddEvidence(new AefEvidence
+                    {
+                        EvidenceId = $"E-compliance-original-{i + 1}",
+                        Kind = AefEvidenceKind.ComplianceArtifact,
+                        Link = AefEvidenceLink.ToBlob(writer.PutBlob(data.ComplianceArtifacts[i])),
+                        Description = "Original legacy compliance document bytes; ingest custody begins at conversion.",
+                    });
+            }
             var traceEvidence = AddTrace(writer, data.Trace, options.ContentCapture);
             var index = 0;
             foreach (var scenario in data.Scenarios)

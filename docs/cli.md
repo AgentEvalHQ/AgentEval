@@ -838,10 +838,16 @@ agenteval compliance render --regulation <reg> --subject <name> [--ts <timestamp
 |--------|-------------|
 | `--regulation <reg>` | Required. Regulation identifier: `gdpr` or `eu-ai-act`. |
 | `--subject <name>` | Required. Subject name to render evidence for. |
-| `--ts <timestamp>` | Timestamp directory (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent. |
+| `--ts <timestamp>` | Recorded report timestamp (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent; an explicit timestamp can select an older captured report. |
 | `--root <path>` | Workspace root. Default: auto-detected. |
 
 A missing `--regulation` or `--subject` exits `2`.
+
+The reader verifies native AEF runs under `.agenteval/aef/runs` and reads captured rich compliance artifacts from those verified bytes. Legacy timestamp directories pass through the shared StoreV1 converter. Imported reports retain their exact bytes and are labeled **imported: not sealed when it ran**; an ingest seal establishes custody from conversion onward. A standalone report does not establish its original execution's timing, completion or provenance.
+
+Missing captured content, malformed reports, conflicting identities and invalid native evidence exit `1`. A legacy sibling cannot recover content omitted by the native capture policy. Selecting the latest report does not silently substitute an older captured report when a newer native report is unavailable. The bounded native scan verifies candidates before subject filtering, so an invalid or incompletely scanned native source must be resolved before rendering.
+
+PDFs are written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.pdf`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
 
 ---
 
