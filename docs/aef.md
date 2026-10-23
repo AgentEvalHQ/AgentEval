@@ -592,6 +592,12 @@ Eval uses `config.thresholds.case` when every dataset case has the same passing 
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
 come from the evaluation definition, so they remain distinct from the producer package version.
+Named metric absences retain their existing typed cause in `ext.agenteval.metric.notMeasuredCause` and a safe
+reason even with content capture off. Missing input is `not_measured`; an unreadable judge reply, failed judge
+call or timed-out check is `error`; nothing applicable to check is `not_applicable`. Their aggregation counts
+remain separate. Older results without a typed cause say that it was not recorded. Free-form explanations may
+contain case content and continue to be captured only when content capture is on; an absent reading never gains
+a placeholder score or grading instrument.
 Without a captured definition, probe and composite suite digests identify only their observed or legacy
 case/component-key roster, including the sole key for a single-case benchmark. Dataset adapter calls
 without a definition retain dataset-byte identity. These compatibility scopes do not establish full

@@ -634,20 +634,31 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
-    [Fact]
-    public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate()
+    [Theory]
+    [InlineData("code_toxicity", "passed", null, 0)]
+    [InlineData("llm_faithfulness", "not_measured", "missingInput", 11)]
+    [InlineData("llm_relevance", "error", "judgeReplyUnreadable", 11)]
+    public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate(string name, string state, string? cause, int exit)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync();
-        var options = Options(endpoint.Endpoint, metrics: "code_toxicity");
-        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
-        Assert.Single(endpoint.Requests);
+        var options = Options(endpoint.Endpoint, metrics: name);
+        Assert.Equal(exit, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        if (name != "llm_relevance") Assert.Single(endpoint.Requests); // Missing context spends no judge call.
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal("passed", (string?)lines[0]["state"]);
-        var metric = Assert.Single(lines, l => (string?)l["path"] == "case/metrics/code_toxicity");
+        var metric = Assert.Single(lines, l => (string?)l["path"] == "case/metrics/" + name);
         Assert.Equal((string?)lines[0]["resultId"], (string?)metric["parentResultId"]);
-        Assert.Equal("code_toxicity", (string?)metric["scores"]![0]!["metric"]);
+        Assert.Equal(state, (string?)metric["state"]);
+        if (cause is null) Assert.Equal(name, (string?)metric["scores"]![0]!["metric"]);
+        else
+        {
+            Assert.Equal(cause, (string?)metric["ext"]!["agenteval.metric"]!["notMeasuredCause"]);
+            Assert.NotNull(metric["reason"]);
+            Assert.Null(metric["scores"]);
+            Assert.Null(metric["annotator"]);
+        }
         Assert.DoesNotContain("secret-prompt", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
