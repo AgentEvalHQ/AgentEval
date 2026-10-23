@@ -217,6 +217,15 @@
     href: export.md
   - name: AEF Evidence Format
     href: aef.md
+  - name: AEF Identifier Pages
+    href: aef/1/index.md
+    items:
+    - name: Run Evidence Predicate
+      href: aef/1/evidence/index.md
+    - name: Overlay Batch Predicate
+      href: aef/1/overlay-batch/index.md
+    - name: Artifact-Evidence Profile v1
+      href: attestation/artifact-evidence/v1/index.md
   - name: AEF ingestion
     href: aef-ingestion.md
   - name: OTLP observations

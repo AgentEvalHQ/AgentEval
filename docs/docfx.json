@@ -26,6 +26,16 @@
         "files": ["images/**"]
       },
       {
+        "src": "../contracts/aef/1/schemas",
+        "files": ["**/*.schema.json"],
+        "dest": "aef/1"
+      },
+      {
+        "src": "../schemas",
+        "files": ["**/*.schema.json"],
+        "dest": "schemas"
+      },
+      {
         "src": "../samples",
         "files": ["**/*.cs"],
         "dest": "samples"
