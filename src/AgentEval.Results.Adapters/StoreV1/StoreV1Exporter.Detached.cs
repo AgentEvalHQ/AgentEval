@@ -41,10 +41,15 @@ public static partial class StoreV1Exporter
             throw InvalidSource("No usable scenario results with recorded scenario IDs were found.");
         var summary = ReadOptional<RunSummary>(Path.Combine(root, "summary.json"));
         ValidateSummary(summary);
-        var trace = ReadOptional<AgentTrace>(Path.Combine(root, "traces", "agent-trace.json"));
+        var tracePath = Path.Combine(root, "traces", "agent-trace.json");
+        var trace = ReadOptional<AgentTrace>(tracePath);
         if (manifest is not null)
         {
-            var run = new StoreV1Run(manifest, summary, scenarios, trace, []);
+            var run = new StoreV1Run(manifest, summary, scenarios, trace, [])
+            {
+                Reports = Reports(root, options.ContentCapture),
+                TraceSnapshotPath = trace is null ? null : tracePath,
+            };
             ct.ThrowIfCancellationRequested();
             run = enrich is null ? run : enrich(run);
             if (budget is not null) options = options with { WriteBudget = new(budget.Limit(64L << 20), ct, budget.Charge) };
@@ -80,6 +85,8 @@ public static partial class StoreV1Exporter
         return Export(new ExportData(header, scenarios, DefaultLane, DateTimeOffset.UnixEpoch, reason, notes)
         {
             Trace = trace,
+            TraceSnapshotPath = trace is null ? null : tracePath,
+            Reports = Reports(root, options.ContentCapture),
         }, outputDirectory, options);
     }
 

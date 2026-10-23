@@ -113,7 +113,7 @@ public sealed class CostBreakdownLeafOnceTests : IClassFixture<SeededMissionCont
             Leaf("leaf-unpriced", null));
         var (store, runId) = await SeedAsync(tree, Flat("flat", 0.004));
 
-        var breakdown = await new Query().RunCostBreakdown(store, runId);
+        var breakdown = await new Query().RunCostBreakdown(new AgentEval.MissionControl.Services.WorkspaceRunSource(store, new AgentEval.Results.Adapters.Reading.AefWorkspaceEvidenceReader()), runId);
 
         Assert.NotNull(breakdown);
         Assert.Equal(0.003, breakdown!.UnknownKeyCost, precision: 10);
@@ -129,7 +129,7 @@ public sealed class CostBreakdownLeafOnceTests : IClassFixture<SeededMissionCont
         var tree = Composite("root", Leaf("leaf-a", 0.001), Composite("mid", Leaf("leaf-b", 0.002), Leaf("leaf-c", 0.003)));
         var (store, runId) = await SeedAsync(tree, Flat("flat", 0.004));
 
-        var breakdown = await new Query().RunCostBreakdown(store, runId);
+        var breakdown = await new Query().RunCostBreakdown(new AgentEval.MissionControl.Services.WorkspaceRunSource(store, new AgentEval.Results.Adapters.Reading.AefWorkspaceEvidenceReader()), runId);
 
         Assert.NotNull(breakdown);
         // The breakdown agrees with the cost the run itself rolled up: the tree's root plus the flat scenario.

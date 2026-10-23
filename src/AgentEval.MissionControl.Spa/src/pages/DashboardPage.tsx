@@ -22,12 +22,14 @@ interface SubjectsConnectionResponse {
     edges: {
       node: {
         identity: {
-          kind: "AGENT" | "WORKFLOW";
+          kind: string;
+          rawKind: string;
+          ref: string;
           name: string;
         };
         lastRun: {
           runId: string;
-          verdict: Verdict;
+          verdict: Verdict | null;
         } | null;
       };
     }[];
@@ -42,9 +44,10 @@ interface RecentRunsResponse {
   recentRuns: {
     runId: string;
     subjectName: string;
-    verdict: Verdict;
-    timestamp: string;
-    kind: "AGENT" | "WORKFLOW" | null;
+    subjectRef: string;
+    verdict: Verdict | null;
+    timestamp: string | null;
+    kind: string | null;
     score: number | null;
   }[];
 }
@@ -60,6 +63,8 @@ const SUBJECTS_QUERY = /* GraphQL */ `
         node {
           identity {
             kind
+            rawKind
+            ref
             name
           }
           lastRun {
@@ -81,6 +86,7 @@ const RECENT_RUNS_QUERY = /* GraphQL */ `
     recentRuns(count: 50) {
       runId
       subjectName
+      subjectRef
       verdict
       timestamp
       kind
@@ -106,8 +112,7 @@ export function DashboardPage() {
   });
 
   // Build the trend (sparkline data) per subject by filtering recentRuns.
-  // Phase-7 Task 7.9: key by `${kind}::${name}` so an agent and a workflow
-  // with the same name don't share a sparkline.
+  // Exact subject refs prevent display-name collisions from mixing trends.
   const trendBySubject = buildTrendIndex(recentRunsQ.data?.recentRuns ?? []);
   // T3.8 — pull node out of each Connection edge. Connection shape
   // gives us totalCount + hasNextPage which we surface in the section
@@ -115,10 +120,12 @@ export function DashboardPage() {
   const conn = subjectsQ.data?.subjectsConnection;
   const cards: SubjectCardData[] = (conn?.edges ?? []).map(({ node: s }) => ({
     kind: s.identity.kind,
+    rawKind: s.identity.rawKind,
+    ref: s.identity.ref,
     name: s.identity.name,
     lastVerdict: s.lastRun?.verdict ?? null,
     lastRunId: s.lastRun?.runId ?? null,
-    trend: trendBySubject.get(`${s.identity.kind}::${s.identity.name}`) ?? [],
+    trend: trendBySubject.get(s.identity.ref) ?? [],
   }));
   const subjectsOverflow = conn ? conn.totalCount > cards.length : false;
 
@@ -185,7 +192,7 @@ export function DashboardPage() {
             <>
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {cards.map((c) => (
-                  <SubjectCard key={`${c.kind}-${c.name}`} subject={c} />
+                  <SubjectCard key={c.ref} subject={c} />
                 ))}
               </div>
               {subjectsOverflow && (
@@ -209,16 +216,15 @@ export function DashboardPage() {
 function buildTrendIndex(
   runs: RecentRunsResponse["recentRuns"],
 ): Map<string, { value: number }[]> {
-  // Phase-7 Task 7.9: key the trend map by `${kind}::${name}` so an agent and
-  // a workflow sharing a name don't have their sparklines merged. Runs with
+  // Keep each exact subject reference in its own trend. Runs with
   // a null kind (legacy / not-yet-backfilled run pointers) bucket under an
   // explicit `UNKNOWN::{name}` so they still appear if any subject lookup
   // happens to match — but they will not show up on the agent OR workflow
   // detail page, which is the right answer for ambiguous legacy data.
   const byKey = new Map<string, { ts: string; value: number }[]>();
   for (const r of runs) {
-    if (r.score === null) continue;
-    const key = `${r.kind ?? "UNKNOWN"}::${r.subjectName}`;
+    if (r.score === null || r.timestamp === null) continue;
+    const key = r.subjectRef;
     const list = byKey.get(key) ?? [];
     list.push({ ts: r.timestamp, value: r.score });
     byKey.set(key, list);

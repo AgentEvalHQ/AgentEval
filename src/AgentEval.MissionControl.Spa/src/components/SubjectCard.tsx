@@ -13,7 +13,9 @@ import { Sparkline } from "./charts/Sparkline";
 // of N runs" footer surfaces when the cap is engaged.
 
 export interface SubjectCardData {
-  kind: "AGENT" | "WORKFLOW";
+  kind: string;
+  rawKind: string;
+  ref: string;
   name: string;
   lastVerdict: Verdict | null;
   lastRunId: string | null;
@@ -28,7 +30,7 @@ interface SubjectCardProps {
 const SPARKLINE_MAX_POINTS = 30;
 
 export function SubjectCard({ subject }: SubjectCardProps) {
-  const detailHref = `/subjects/${subject.kind.toLowerCase()}/${encodeURIComponent(subject.name)}`;
+  const detailHref = `/subjects/${subject.kind.toLowerCase()}/${encodeURIComponent(subject.name)}?subjectRef=${encodeURIComponent(subject.ref)}`;
   const total = subject.trend.length;
   const cappedTrend =
     total > SPARKLINE_MAX_POINTS
@@ -42,7 +44,7 @@ export function SubjectCard({ subject }: SubjectCardProps) {
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <span className="text-[10px] uppercase tracking-wider text-slate-400">
-            {subject.kind}
+            {subject.rawKind}
           </span>
           <h3 className="font-semibold text-slate-900 mt-0.5">{subject.name}</h3>
         </div>

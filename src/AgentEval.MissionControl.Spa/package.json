@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "node --test tests/*.test.cjs",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

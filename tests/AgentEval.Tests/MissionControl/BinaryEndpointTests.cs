@@ -377,6 +377,8 @@ public sealed class FilesystemSeededFactory : WebApplicationFactory<Query>, IDis
             ParentInvocationId: null,
             Kind: "eval"));
 
+        await store.WriteScenarioResultAsync(manifest.Run.RunId, new("smoke", "Smoke", "input", "output", true, 1,
+            new Dictionary<string, double>(), [], TimeSpan.Zero, 0));
         await store.AppendTraceAsync(manifest.Run.RunId, new AgentTrace(
             RunId: manifest.Run.RunId,
             ScenarioId: "smoke",

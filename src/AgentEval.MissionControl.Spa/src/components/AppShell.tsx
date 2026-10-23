@@ -12,6 +12,7 @@ import { WorkspaceLandingPage } from "@/pages/WorkspaceLandingPage";
 // the legacy workspace to be initialized.
 
 interface WorkspaceStateResponse {
+  hasRunEvidence: boolean;
   workspace: {
     initialized: boolean;
     root: string | null;
@@ -21,6 +22,7 @@ interface WorkspaceStateResponse {
 
 const WORKSPACE_STATE_QUERY = /* GraphQL */ `
   query WorkspaceState {
+    hasRunEvidence
     workspace {
       initialized
       root
@@ -57,7 +59,7 @@ export function AppShell() {
   // landing page if uninitialised. On query error we fall back to the
   // outlet — better to show partial functionality than block on a
   // degraded probe.
-  const needsWorkspace = wsQ.data?.workspace.initialized === false;
+  const needsWorkspace = wsQ.data?.workspace.initialized === false && wsQ.data?.hasRunEvidence === false;
   const showLanding = needsWorkspace && !location.pathname.startsWith("/governance");
 
   return (

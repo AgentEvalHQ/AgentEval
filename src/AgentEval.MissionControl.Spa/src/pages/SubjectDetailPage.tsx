@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
@@ -14,7 +14,9 @@ import { formatDateTime, formatScore } from "@/lib/format";
 interface SubjectDetailResponse {
   subject: {
     identity: {
-      kind: "AGENT" | "WORKFLOW";
+      kind: string;
+      rawKind: string;
+      ref: string;
       name: string;
       framework: string | null;
       modelId: string | null;
@@ -22,24 +24,28 @@ interface SubjectDetailResponse {
     };
     lastRun: {
       runId: string;
-      verdict: Verdict;
+      verdict: Verdict | null;
     } | null;
   } | null;
   recentRuns: {
     runId: string;
     subjectName: string;
-    verdict: Verdict;
-    timestamp: string;
-    kind: "AGENT" | "WORKFLOW" | null;
+    subjectRef: string;
+    sourceId: string;
+    verdict: Verdict | null;
+    timestamp: string | null;
+    kind: string | null;
     score: number | null;
   }[];
 }
 
 const SUBJECT_DETAIL_QUERY = /* GraphQL */ `
-  query SubjectDetail($kind: SubjectKind!, $name: String!) {
-    subject(kind: $kind, name: $name) {
+  query SubjectDetail($kind: AefSubjectKind!, $name: String!, $subjectRef: String) {
+    subject(kind: $kind, name: $name, subjectRef: $subjectRef) {
       identity {
         kind
+        rawKind
+        ref
         name
         framework
         modelId
@@ -53,6 +59,8 @@ const SUBJECT_DETAIL_QUERY = /* GraphQL */ `
     recentRuns(count: 100) {
       runId
       subjectName
+      subjectRef
+      sourceId
       verdict
       timestamp
       kind
@@ -63,20 +71,23 @@ const SUBJECT_DETAIL_QUERY = /* GraphQL */ `
 
 export function SubjectDetailPage() {
   const params = useParams<{ kind: string; name: string }>();
-  const kindParam = (params.kind ?? "").toUpperCase() as "AGENT" | "WORKFLOW";
-  const name = params.name ? decodeURIComponent(params.name) : "";
+  const kindParam = (params.kind ?? "").toUpperCase() as string;
+  const name = params.name ?? "";
+  const [search] = useSearchParams();
+  const subjectRef = search.get("subjectRef");
 
   const detailQ = useQuery({
-    queryKey: queryKeys.subjects.detail(kindParam, name),
+    queryKey: queryKeys.subjects.detail(kindParam, name, subjectRef),
     queryFn: () =>
       gqlRequest<SubjectDetailResponse>(SUBJECT_DETAIL_QUERY, {
         kind: kindParam,
         name,
+        subjectRef,
       }),
-    enabled: kindParam === "AGENT" || kindParam === "WORKFLOW",
+    enabled: ["AGENT", "WORKFLOW", "MODEL", "ENDPOINT", "MCP_SERVER", "OTHER"].includes(kindParam),
   });
 
-  if (kindParam !== "AGENT" && kindParam !== "WORKFLOW") {
+  if (!["AGENT", "WORKFLOW", "MODEL", "ENDPOINT", "MCP_SERVER", "OTHER"].includes(kindParam)) {
     return (
       <BackLink message={`Unknown subject kind '${params.kind}'.`} />
     );
@@ -100,24 +111,12 @@ export function SubjectDetailPage() {
           );
         }
 
-        // Phase-7 Task 7.9: filter by BOTH kind AND name. An agent and a
-        // workflow can legitimately share a name; the prior name-only filter
-        // mixed their runs on the detail page. Run pointers with kind=null
-        // (legacy / not yet backfilled) are accepted as a soft match — they
-        // would otherwise disappear from history entirely.
-        const subjectRuns = d.recentRuns
-          .filter((r) => r.subjectName === name)
-          .filter((r) => r.kind == null || r.kind === kindParam)
-          .filter((r) => r.score !== null);
-
-        const timelinePoints: TimelinePoint[] = subjectRuns.map((r) => ({
-          timestamp: r.timestamp,
-          score: r.score as number,
-          runId: r.runId,
-          verdict: r.verdict,
-        }));
-
-        const scoreList = subjectRuns.map((r) => r.score as number);
+        // Exact references distinguish subjects whose display names happen to match.
+        const subjectRuns = d.recentRuns.filter((r) => r.subjectRef === d.subject!.identity.ref);
+        const timelinePoints: TimelinePoint[] = subjectRuns
+          .filter((r) => r.timestamp !== null && r.score !== null)
+          .map((r) => ({ timestamp: r.timestamp!, score: r.score!, runId: r.runId, verdict: r.verdict }));
+        const scoreList = subjectRuns.flatMap((r) => r.score === null ? [] : [r.score]);
 
         return (
           <div className="space-y-6">
@@ -125,7 +124,7 @@ export function SubjectDetailPage() {
 
             <header>
               <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                {d.subject.identity.kind}
+                {d.subject.identity.rawKind}
               </span>
               <h2 className="text-2xl font-bold text-slate-900 mt-1">
                 {d.subject.identity.name}
@@ -143,7 +142,7 @@ export function SubjectDetailPage() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Score over time ({subjectRuns.length} runs)
+                Score over time ({timelinePoints.length} dated runs)
               </h3>
               <TimelineChart data={timelinePoints} threshold={0.7} />
             </section>
@@ -161,11 +160,11 @@ export function SubjectDetailPage() {
                   Recent runs
                 </h3>
                 <ul className="divide-y divide-slate-100">
-                  {subjectRuns.slice(-10).reverse().map((r) => (
-                    <li key={r.runId} className="py-2 flex items-center justify-between gap-4">
+                  {subjectRuns.slice(0, 10).map((r) => (
+                    <li key={r.sourceId} className="py-2 flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <div className="text-sm font-mono text-slate-900 truncate">
-                          {r.runId}
+                          <Link to={`/runs/${encodeURIComponent(r.runId)}?sourceId=${encodeURIComponent(r.sourceId)}`}>{r.runId}</Link>
                         </div>
                         <div className="text-xs text-slate-500">
                           {formatDateTime(r.timestamp)}
@@ -181,7 +180,7 @@ export function SubjectDetailPage() {
                   ))}
                   {subjectRuns.length === 0 && (
                     <li className="py-3 text-sm text-slate-500 italic">
-                      No runs with scored results yet.
+                      No recorded runs yet.
                     </li>
                   )}
                 </ul>

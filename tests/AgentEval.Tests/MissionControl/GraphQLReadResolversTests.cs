@@ -232,8 +232,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
 
         Assert.Equal("PASS", summary.GetProperty("verdict").GetString());
         var stats = summary.GetProperty("stats");
-        Assert.Equal(2, stats.GetProperty("total").GetInt32());
-        Assert.Equal(2, stats.GetProperty("passed").GetInt32());
+        Assert.Equal(3, stats.GetProperty("total").GetInt32());
+        Assert.Equal(3, stats.GetProperty("passed").GetInt32());
         Assert.Equal(0, stats.GetProperty("failed").GetInt32());
         // The run page's "Not measured" tile reads this; a field missing from the schema fails the whole query.
         Assert.Equal(0, stats.GetProperty("skipped").GetInt32());
@@ -912,7 +912,7 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
             SchemaVersion: "1.0",
             RunId: manifest.Run.RunId,
             Verdict: "PASS",
-            Stats: new RunStats(Total: 2, Passed: 2, Failed: 0, Warnings: 0),
+            Stats: new RunStats(Total: 3, Passed: 3, Failed: 0, Warnings: 0),
             Metrics: new Dictionary<string, double> { ["score"] = 0.92 });
 
         await store.CompleteRunAsync(manifest, summary);

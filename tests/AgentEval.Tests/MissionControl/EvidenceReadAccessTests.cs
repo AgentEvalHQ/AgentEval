@@ -16,6 +16,9 @@ namespace AgentEval.Tests.MissionControl;
 
 public sealed class EvidenceReadAccessTests
 {
+    private static readonly string[] ReadRoutes = ["/graphql", "/api/v1/evidence/events", "/api/v1/runs/id/trace",
+        "/api/v1/runs/id/reports/md", "/api/v1/runs/id/artifacts/E-data", "/api/v1/compliance/gdpr/agent/time/report.pdf",
+        "/api/v1/subjects/agent/name/history"];
     private const string Key = "fixture-only-read-key-0123456789012345";
     private static async Task<WebApplication> Start(string? peer = "127.0.0.1", bool https = false,
         bool key = false, bool enabled = true, bool realSocket = false)
@@ -40,6 +43,7 @@ public sealed class EvidenceReadAccessTests
         EvidenceReadAccess.Use(app);
         app.MapGet("/graphql", () => "authorized-read");
         app.MapGet("/api/v1/evidence/events", () => "authorized-stream");
+        foreach (var path in ReadRoutes.Skip(2)) app.MapGet(path, () => "authorized-artifact");
         app.MapGet("/unrelated", () => "unchanged");
         await app.StartAsync(); return app;
     }
@@ -62,11 +66,11 @@ public sealed class EvidenceReadAccessTests
     [InlineData("192.0.2.1", "service.example", true, true, false, null, null, 401)]
     [InlineData("192.0.2.1", "service.example", true, true, true, "https://service.example", "same-origin", 200)]
     [InlineData("192.0.2.1", "service.example", true, false, false, null, null, 403)]
-    public async Task ReadAccess_PeerHostOriginAndKey_EnforceSameBoundaryForQueriesAndStreams(string? peer, string host,
+    public async Task ReadAccess_PeerHostOriginAndKey_EnforceSameBoundaryForQueriesStreamsAndDownloads(string? peer, string host,
         bool https, bool configuredKey, bool correctKey, string? origin, string? site, int expected)
     {
         await using var app = await Start(peer, https, configuredKey); using var client = app.GetTestClient();
-        foreach (var path in new[] { "/graphql", "/api/v1/evidence/events" })
+        foreach (var path in ReadRoutes)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, path);
             request.Headers.Host = host;
@@ -95,7 +99,12 @@ public sealed class EvidenceReadAccessTests
     public async Task ReadAccess_DisabledCapabilityAndUnrelatedRoutes_PreserveExistingBehavior()
     {
         await using var disabled = await Start(peer: "192.0.2.1", enabled: false); using var client = disabled.GetTestClient();
-        using var legacy = await client.GetAsync("/graphql"); Assert.Equal(HttpStatusCode.OK, legacy.StatusCode);
+        foreach (var path in ReadRoutes)
+        {
+            using var legacy = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.OK, legacy.StatusCode);
+            Assert.Null(legacy.Headers.CacheControl);
+        }
         await using var enabled = await Start(peer: "192.0.2.1"); using var enabledClient = enabled.GetTestClient();
         using var unrelated = await enabledClient.GetAsync("/unrelated"); Assert.Equal(HttpStatusCode.OK, unrelated.StatusCode);
     }

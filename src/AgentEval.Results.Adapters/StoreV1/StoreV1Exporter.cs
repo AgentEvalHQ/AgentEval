@@ -229,6 +229,8 @@ public static partial class StoreV1Exporter
         {
             Summary = run.Summary, Trace = run.Trace, ComplianceEvidence = run.ComplianceEvidence,
             ComplianceArtifacts = run.ComplianceArtifacts,
+            Reports = run.Reports,
+            TraceSnapshotPath = run.TraceSnapshotPath,
         }, outputDirectory, options);
     }
 
@@ -256,8 +258,10 @@ public static partial class StoreV1Exporter
     {
         internal RunSummary? Summary { get; init; }
         internal AgentTrace? Trace { get; init; }
+        internal string? TraceSnapshotPath { get; init; }
         internal IReadOnlyList<ComplianceEvidence> ComplianceEvidence { get; init; } = [];
         internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+        internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
     }
 
     private static AefConversion Export(ExportData data, string outputDirectory, StoreV1ExportOptions options)
@@ -301,7 +305,8 @@ public static partial class StoreV1Exporter
                     }
                 }
             }
-            var traceEvidence = AddTrace(writer, data.Trace, options.ContentCapture);
+            var traceEvidence = AddTrace(writer, data.Trace, data.TraceSnapshotPath, options.ContentCapture);
+            AddReports(writer, data.Reports, options.ContentCapture);
             var index = 0;
             foreach (var scenario in data.Scenarios)
             {
@@ -489,20 +494,27 @@ public static partial class StoreV1Exporter
 
     // The run's agent trace (one file per run in store v1): a transcript blob, cited by the scenario it names. Content:
     // written only when the run keeps content ([RUN-11]).
-    private static (string ScenarioId, string EvidenceId)? AddTrace(AefRunWriter writer, AgentTrace? trace, AefContentCapture capture)
+    private static (string ScenarioId, string EvidenceId)? AddTrace(AefRunWriter writer, AgentTrace? trace,
+        string? snapshotPath, AefContentCapture capture)
     {
         if (trace is null || capture == AefContentCapture.Off)
         {
             return null;
         }
 
-        var blob = writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(trace, s_store));
+        // Filesystem imports retain the owned snapshot's exact bytes, including
+        // absent fields and unfamiliar properties. Reserializing would turn a
+        // missing timestamp into the DTO's default and discard unknown evidence.
+        using var input = snapshotPath is null ? null : File.OpenRead(snapshotPath);
+        var blob = input is null ? writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(trace, s_store)) : writer.PutBlob(input);
         writer.AddEvidence(new AefEvidence
         {
             EvidenceId = "E-trace",
             Kind = AefEvidenceKind.Transcript,
             Link = AefEvidenceLink.ToBlob(blob),
-            Description = "AgentEval store v1 agent trace (traces/agent-trace.json), as the store reads it.",
+            Description = snapshotPath is null ? "AgentEval store v1 agent trace, as supplied by the semantic store."
+                : "AgentEval store v1 agent trace (traces/agent-trace.json), captured without rewriting.",
+            Ext = new JsonObject { [ExtName] = new JsonObject { ["traceFormat"] = "agent-trace-v1" } },
         });
         return (trace.ScenarioId, "E-trace");
     }
@@ -859,4 +871,6 @@ public sealed record StoreV1Run(
 {
     // Exact bytes captured by the filesystem importer, after validating their generic evidence identity.
     internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+    internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
+    internal string? TraceSnapshotPath { get; init; }
 }
