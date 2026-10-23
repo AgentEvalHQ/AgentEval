@@ -24,7 +24,7 @@ namespace AgentEval.TravelDemo.Evals;
 /// A tight band (e.g. 90–100) would disprove it.
 ///
 /// A run whose model call or judge failed is NOT a score of 0: it is counted as not measured,
-/// kept out of the statistics, and rules out a clean PASS (<see cref="StochasticTally"/>).
+/// kept out of the statistics; the library decides whether missing runs can change the verdict (<see cref="StochasticTally"/>).
 ///
 /// ⏱️ Runtime: ~2–4 minutes (5 × ~30 s agent runs + 5 LLM judge calls)
 /// 💰 Cost: 5 × agent calls + 5 × small judge calls (~$0.05–$0.20)
@@ -108,9 +108,8 @@ public static class Eval04_StochasticAgent
 
         // ── Errored runs are NOT scores ──────────────────────────────────────────
         // The harness turns a failed model call (or a judge with no verdict) into a placeholder Score 0. The runner's
-        // statistics leave such runs out (StochasticResult.NotMeasuredCount), and so does the tally, which also keeps
-        // this demo's stricter rule: any unmeasured run rules out a clean PASS (the core rule passes when the measured
-        // passes alone reach the threshold).
+        // statistics leave such runs out (StochasticResult.NotMeasuredCount), and so does the tally. Both use the
+        // library's verdict: measured passes may settle the threshold even when other runs are missing.
         var tally = new StochasticTally(
             [.. stochResult.IndividualResults.Select((r, i) => RunClassifier.FromAgentRun(i + 1, r, PassingScore, ex => Config.Redact(ex)))],
             Threshold);
@@ -148,12 +147,18 @@ public static class Eval04_StochasticAgent
         }
         else
         {
-            // This demo gives no PASS and no hypothesis call while a run was not measured, so the library's assertion is
-            // not run (it would pass when the measured passes alone reach the threshold).
-            Console.ForegroundColor = tally.Verdict == StochasticVerdict.Fail ? ConsoleColor.Red : ConsoleColor.Yellow;
+            // A pass-rate verdict can be settled, but missing scores cannot support a full-spread hypothesis.
+            Console.ForegroundColor = tally.Verdict switch
+            {
+                StochasticVerdict.Passed => ConsoleColor.Green,
+                StochasticVerdict.Failed => ConsoleColor.Red,
+                _ => ConsoleColor.Yellow,
+            };
             Console.WriteLine(tally.Verdict switch
             {
-                StochasticVerdict.Fail =>
+                StochasticVerdict.Passed =>
+                    $"  ✅ PASSED — {tally.PassedCount}/{tally.Total} planned runs already reach {Threshold * 100:F0}%; missing runs cannot undo this.",
+                StochasticVerdict.Failed =>
                     $"  ❌ FAILED — {tally.PassedCount}/{tally.Measured} measured runs passed; even if the {tally.Errored} unmeasured " +
                     $"run(s) had passed, the pass rate would miss {Threshold * 100:F0}%.",
                 StochasticVerdict.NotMeasured =>
@@ -161,7 +166,7 @@ public static class Eval04_StochasticAgent
                 _ =>
                     $"  ⚠️  INCOMPLETE — {tally.Errored} of {tally.Total} runs were not measured; no PASS and no hypothesis signal from this run.",
             });
-            Console.WriteLine("     The stochastic assertion was not run: this demo gives no PASS while a run was not measured.");
+            Console.WriteLine("     Missing scores remain absent; no full-spread hypothesis signal from this run.");
             Console.ResetColor();
         }
 
@@ -193,7 +198,7 @@ public static class Eval04_StochasticAgent
             ErroredRuns  = tally.Errored,
             UnscoredRuns = tally.Unscored,   // 0 here: the judge grades every finished agent run, empty answers included
             PassRate     = tally.PassRate,
-            Passed       = tally.Verdict == StochasticVerdict.Pass,
+            Passed       = tally.Verdict == StochasticVerdict.Passed,
             PassedCount  = tally.PassedCount,
             MinScore     = scores.Min(),
             MaxScore     = scores.Max(),

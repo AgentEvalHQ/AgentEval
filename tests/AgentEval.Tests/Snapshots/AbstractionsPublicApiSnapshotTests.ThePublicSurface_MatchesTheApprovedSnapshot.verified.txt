@@ -270,6 +270,7 @@ class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.St
     ValueTuple<AgentEval.Models.TestResult, TimeSpan>? SlowestRun { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, out AgentEval.Comparison.StochasticStatistics Statistics, out AgentEval.Comparison.StochasticOptions Options, out Boolean Passed)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, AgentEval.Comparison.StochasticStatistics Statistics, AgentEval.Comparison.StochasticOptions Options, Boolean Passed)
+    static AgentEval.Comparison.StochasticVerdict DecideVerdict(Int32 passedRuns, Int32 notMeasuredRuns, Int32 totalRuns, Double successRateThreshold)
 class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Comparison.StochasticStatistics>
     AgentEval.Comparison.ConfidenceInterval ConfidenceInterval { get; init; }
     AgentEval.Comparison.StochasticStatistics <Clone>$()

@@ -490,15 +490,18 @@ public static class EvalPrinter
         // Architecture + overall verdict
         var (verdictText, verdictColor) = tally.Verdict switch
         {
-            StochasticVerdict.Pass       => ("✅ PASSED", ConsoleColor.Green),
-            StochasticVerdict.Fail       => ("❌ FAILED", ConsoleColor.Red),
-            StochasticVerdict.Incomplete => ($"⚠️ INCOMPLETE — {tally.Errored} of {tally.Total} runs not measured", ConsoleColor.Yellow),
+            StochasticVerdict.Passed       => ("✅ PASSED", ConsoleColor.Green),
+            StochasticVerdict.Failed       => ("❌ FAILED", ConsoleColor.Red),
+            StochasticVerdict.Undecided => ($"⚠️ INCOMPLETE — {tally.Errored} of {tally.Total} runs not measured", ConsoleColor.Yellow),
             _                            => ("⚠️ NOT MEASURED — no run produced a verdict", ConsoleColor.Yellow),
         };
         // Two rows: the verdict on its own, so a long one (INCOMPLETE — k of N …) is never cut by the box.
         ContentRow($"  Architecture: {architecture}");
         Console.ForegroundColor = verdictColor;
         ContentRow($"  Verdict     : {verdictText}");
+        ContentRow(tally.Total > 0
+            ? $"  Known passes: {tally.PassedCount}/{tally.Total} planned runs   threshold: {tally.Threshold * 100:F0}%"
+            : $"  Known passes: n/a (no runs)   threshold: {tally.Threshold * 100:F0}%");
         Console.ResetColor();
 
         Divider();
@@ -524,8 +527,8 @@ public static class EvalPrinter
         // cover when that is not every run: a spread over 4 of 5 runs is not a spread over 5.
         var over = scores.Count > 0 && scores.Count < tally.Total ? $"   (over {scores.Count} of {tally.Total} runs)" : "";
         ContentRow(tally.Measured > 0
-            ? $"  Pass rate  : {tally.PassedCount}/{tally.Measured}  ({tally.PassRate * 100:F1}%)   threshold: {tally.Threshold * 100:F0}%"
-            : $"  Pass rate  : n/a (no run measured)   threshold: {tally.Threshold * 100:F0}%");
+            ? $"  Pass rate  : {tally.PassedCount}/{tally.Measured}  ({tally.PassRate * 100:F1}%)   measured runs only"
+            : "  Pass rate  : n/a (no run measured)");
         ContentRow($"  Mean score : {(scores.Count > 0 ? $"{mean:F1}/100{over}" : "n/a")}");
         ContentRow($"  Min / Max  : {(scores.Count > 0 ? $"{scores.Min()} / {scores.Max()}{over}" : "n/a")}");
         ContentRow($"  Variance   : {(scores.Count > 0 ? $"{scores.Select(s => Math.Pow(s - mean, 2)).Average():F1}{over}" : "n/a")}");
@@ -539,7 +542,8 @@ public static class EvalPrinter
         if (tally.Errored > 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            ContentRow($"  Not measured: {tally.Errored} of {tally.Total} runs (model call or judge failed) — excluded above");
+            ContentRow($"  Not measured: {tally.Errored} of {tally.Total} runs (model call or judge failed)");
+            ContentRow("                absent from statistics; unknown in the verdict over all planned runs");
         }
         Console.ResetColor();
 

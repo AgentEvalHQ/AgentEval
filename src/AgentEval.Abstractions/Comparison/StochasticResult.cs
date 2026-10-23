@@ -121,9 +121,21 @@ public record StochasticResult(
     /// The share is compared as the runner always compared it (passed / total ≥ threshold), so a result with every run
     /// measured gets the verdict it always had. Kept in one method so the rule can be changed in one place.
     /// </remarks>
-    internal static StochasticVerdict DecideVerdict(int passedRuns, int notMeasuredRuns, int totalRuns, double successRateThreshold)
+    /// <returns>The verdict, including <see cref="StochasticVerdict.NotMeasured"/> when no run was measured.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// A count is negative, the passed and unmeasured counts overlap or exceed the total, or the threshold is not finite and within [0, 1].
+    /// </exception>
+    public static StochasticVerdict DecideVerdict(int passedRuns, int notMeasuredRuns, int totalRuns, double successRateThreshold)
     {
-        if (totalRuns <= 0 || notMeasuredRuns >= totalRuns)
+        ArgumentOutOfRangeException.ThrowIfNegative(totalRuns);
+        if (notMeasuredRuns < 0 || notMeasuredRuns > totalRuns)
+            throw new ArgumentOutOfRangeException(nameof(notMeasuredRuns), notMeasuredRuns, "Expected a count between zero and totalRuns.");
+        if (passedRuns < 0 || passedRuns > totalRuns - notMeasuredRuns)
+            throw new ArgumentOutOfRangeException(nameof(passedRuns), passedRuns, "Expected a count between zero and the number of measured runs.");
+        if (!double.IsFinite(successRateThreshold) || successRateThreshold < 0 || successRateThreshold > 1)
+            throw new ArgumentOutOfRangeException(nameof(successRateThreshold), successRateThreshold, "Expected a finite threshold between zero and one.");
+
+        if (totalRuns == 0 || notMeasuredRuns == totalRuns)
             return StochasticVerdict.NotMeasured;
         if ((double)passedRuns / totalRuns >= successRateThreshold)
             return StochasticVerdict.Passed;

@@ -167,26 +167,10 @@ public static class RunClassifier
     }
 }
 
-/// <summary>The verdict of a stochastic eval.</summary>
-public enum StochasticVerdict
-{
-    /// <summary>Every run was measured and the pass rate met the threshold.</summary>
-    Pass,
-
-    /// <summary>The pass rate misses the threshold even if every unmeasured run had passed.</summary>
-    Fail,
-
-    /// <summary>Some runs were not measured and the measured ones cannot settle it either way — never a clean pass.</summary>
-    Incomplete,
-
-    /// <summary>No run produced a verdict.</summary>
-    NotMeasured,
-}
-
 /// <summary>
 /// The statistics of a stochastic eval with errored runs kept OUT of them: a failed model call or judge is not a
-/// score of 0, so it never widens the spread, lowers the mean or counts against the pass rate. It is counted and shown
-/// instead, and any errored run rules out a clean <see cref="StochasticVerdict.Pass"/>.
+/// score of 0, so it never widens the spread or lowers the mean. The observed pass rate covers measured runs only;
+/// the verdict uses the library's rule over all planned runs, preserving missing verdicts as unknown.
 /// </summary>
 /// <remarks>
 /// A measured run with no judge score (<see cref="Unscored"/>: no output to grade, or a failed structure the judge
@@ -214,15 +198,6 @@ public sealed record StochasticTally(IReadOnlyList<RunOutcome> Runs, double Thre
     /// <summary>The judged scores of the measured runs.</summary>
     public IReadOnlyList<int> Scores => [.. Runs.Where(r => r.Measured && r.Score is not null).Select(r => r.Score!.Value)];
 
-    public StochasticVerdict Verdict
-    {
-        get
-        {
-            if (Measured == 0) return StochasticVerdict.NotMeasured;
-            if (Errored == 0) return PassRate >= Threshold ? StochasticVerdict.Pass : StochasticVerdict.Fail;
-            // Errored runs could have gone either way: fail only if even all of them passing would miss the threshold.
-            double bestCase = (double)(PassedCount + Errored) / Total;
-            return bestCase < Threshold ? StochasticVerdict.Fail : StochasticVerdict.Incomplete;
-        }
-    }
+    /// <summary>The shared verdict over every planned run; missing runs never count as passes.</summary>
+    public StochasticVerdict Verdict => StochasticResult.DecideVerdict(PassedCount, Errored, Total, Threshold);
 }

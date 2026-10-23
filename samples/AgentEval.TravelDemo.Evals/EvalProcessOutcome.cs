@@ -20,9 +20,9 @@ internal static class EvalProcessOutcome
 
     internal static void Record(StochasticVerdict verdict, string reason) => Record(verdict switch
     {
-        StochasticVerdict.Pass => RunVerdict.Pass,
-        StochasticVerdict.Fail => RunVerdict.Fail,
-        StochasticVerdict.Incomplete or StochasticVerdict.NotMeasured => RunVerdict.Incomplete,
+        StochasticVerdict.Passed => RunVerdict.Pass,
+        StochasticVerdict.Failed => RunVerdict.Fail,
+        StochasticVerdict.Undecided or StochasticVerdict.NotMeasured => RunVerdict.Incomplete,
         _ => throw new ArgumentOutOfRangeException(nameof(verdict), verdict, "Unknown stochastic verdict."),
     }, reason);
 }

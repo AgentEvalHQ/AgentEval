@@ -24,7 +24,7 @@ namespace AgentEval.TravelDemo.Evals;
 ///
 /// A run passes only when the harness's structural checks (executor order, expected tools, duration,
 /// no errors) AND the judge's score pass. A run whose agent call, workflow or judge failed is not
-/// measured: kept out of the statistics, counted, and never part of a clean PASS (<see cref="RunClassifier"/>).
+/// measured: kept out of the statistics, counted, and unknown in the shared verdict (<see cref="RunClassifier"/>).
 ///
 /// ⏱️ Runtime: ~8–15 minutes (5 × ~90–180s workflow runs + 5 judge calls)
 /// 💰 Cost: 5 × 4-agent workflow calls + 5 × small judge calls (~$0.15–$0.50)
@@ -167,20 +167,20 @@ public static class Eval05_StochasticWorkflow
             label:        "Eval 05 — Stochastic Workflow (5 runs · top-3 criteria)");
 
         // ── Verdict ──────────────────────────────────────────────────────────────
-        // A run counts as passed only when structure AND score passed; an unmeasured run rules out a clean pass.
+        // A run passes only when structure AND score passed; the library decides whether missing runs can change the verdict.
         Console.ForegroundColor = tally.Verdict switch
         {
-            StochasticVerdict.Pass => ConsoleColor.Green,
-            StochasticVerdict.Fail => ConsoleColor.Red,
+            StochasticVerdict.Passed => ConsoleColor.Green,
+            StochasticVerdict.Failed => ConsoleColor.Red,
             _                      => ConsoleColor.Yellow,
         };
         Console.WriteLine(tally.Verdict switch
         {
-            StochasticVerdict.Pass =>
-                $"  ✅ Workflow meets {Threshold * 100:F0}% consistency threshold  ({tally.PassedCount}/{tally.Total} runs passed structure + score)",
-            StochasticVerdict.Fail =>
+            StochasticVerdict.Passed =>
+                $"  ✅ Workflow meets {Threshold * 100:F0}% success-rate threshold  ({tally.PassedCount}/{tally.Total} runs passed structure + score)",
+            StochasticVerdict.Failed =>
                 $"  ❌ Workflow below {Threshold * 100:F0}% threshold ({tally.PassedCount}/{tally.Measured} measured runs passed structure + score)",
-            StochasticVerdict.Incomplete =>
+            StochasticVerdict.Undecided =>
                 $"  ⚠️  INCOMPLETE — {tally.Errored} of {tally.Total} runs not measured; {tally.PassedCount}/{tally.Measured} measured runs passed. No PASS.",
             _ =>
                 "  ⚠️  NOT MEASURED — no run produced a verdict.",
@@ -229,7 +229,7 @@ public static class Eval05_StochasticWorkflow
             ErroredRuns  = tally.Errored,
             UnscoredRuns = tally.Unscored,   // failed runs with no score: Eval 3 withholds the consistency verdict
             PassRate     = tally.PassRate,
-            Passed       = tally.Verdict == StochasticVerdict.Pass,
+            Passed       = tally.Verdict == StochasticVerdict.Passed,
             PassedCount  = tally.PassedCount,
             MinScore     = scores.Min(),
             MaxScore     = scores.Max(),

@@ -30,6 +30,7 @@ public static class TravelDemoSelfTest
         RedactionDropsTheProvidersFreeText();
         Console.WriteLine("  ── Run accounting ──");
         ErroredRunsAreNotScores();
+        StochasticVerdictsMatchLibrary();
         WorkflowRunNeedsStructureAndScore();
         StructureFailureBeatsAJudgeFailure();
         NoOutputRunIsAFailedUnscoredRun();
@@ -367,7 +368,7 @@ public static class TravelDemoSelfTest
               shown.Contains("Zhipu") && shown.Contains("GLM-5.3 Flash") && !shown.Contains(Config.ProviderMessageHidden));
     }
 
-    // U5: a failed model call or judge is not a score of 0 — kept out of the scores and the pass rate, never a PASS.
+    // U5: a failed model call or judge is not a score of 0; known passes can still settle the verdict.
     private static void ErroredRunsAreNotScores()
     {
         static TestResult Run(int score, bool passed, Exception? error = null, bool judgeFailed = false) =>
@@ -388,13 +389,51 @@ public static class TravelDemoSelfTest
         Check("errored runs are left out of the scores and the pass rate (3/3 measured, scores 90/80/70)",
               tally.Errored == 2 && tally.Measured == 3 && tally.PassRate == 1.0 && tally.Scores.SequenceEqual([90, 80, 70]),
               $"errored={tally.Errored} measured={tally.Measured} passRate={tally.PassRate} scores=[{string.Join(",", tally.Scores)}]");
-        Check("a run with errors is never a clean PASS (INCOMPLETE)", tally.Verdict == StochasticVerdict.Incomplete);
+        Check("three known passes reach 60% of five even with two missing results", tally.Verdict == StochasticVerdict.Passed);
 
         var hopeless = new StochasticTally(
             [RunOutcome.NotMeasured(1, "x"), new RunOutcome(2, 10, false), new RunOutcome(3, 20, false), new RunOutcome(4, 30, false), new RunOutcome(5, 40, false)], 0.60);
-        Check("…but still a FAIL when even all unmeasured runs passing would miss the threshold", hopeless.Verdict == StochasticVerdict.Fail);
+        Check("…but still a FAIL when even all unmeasured runs passing would miss the threshold", hopeless.Verdict == StochasticVerdict.Failed);
         Check("no measured run → NOT MEASURED, not a 0% pass rate",
               new StochasticTally([RunOutcome.NotMeasured(1, "x"), RunOutcome.NotMeasured(2, "y")], 0.6).Verdict == StochasticVerdict.NotMeasured);
+    }
+
+    private static void StochasticVerdictsMatchLibrary()
+    {
+        foreach (var (passed, failed, missing, threshold, expected) in new (int, int, int, double, StochasticVerdict)[]
+        {
+            (3, 0, 2, 0.6, StochasticVerdict.Passed),
+            (3, 0, 2, 0.8, StochasticVerdict.Undecided),
+            (0, 4, 1, 0.6, StochasticVerdict.Failed),
+            (2, 2, 1, 0.6, StochasticVerdict.Undecided),
+            (0, 0, 5, 0, StochasticVerdict.NotMeasured),
+            (0, 0, 0, 0.6, StochasticVerdict.NotMeasured),
+            (0, 1, 0, 0, StochasticVerdict.Passed),
+            (5, 0, 0, 1, StochasticVerdict.Passed),
+        })
+        {
+            var runs = Enumerable.Range(0, passed + failed + missing).Select(i => new TestResult
+            {
+                TestName = "selftest", Score = i < passed ? 90 : 0, Passed = i < passed,
+                JudgeFailed = i >= passed + failed,
+            }).ToArray();
+            var result = new StochasticResult(new() { Name = "selftest", Input = "offline" }, runs, null,
+                new(SuccessRateThreshold: threshold), expected == StochasticVerdict.Passed);
+            var tally = new StochasticTally(runs.Select((r, i) =>
+                RunClassifier.FromAgentRun(i + 1, r, 60, ex => ex.Message)).ToArray(), threshold);
+            Check($"shared stochastic verdict: {passed} pass / {failed} fail / {missing} missing at {threshold:P0}",
+                result.Verdict == expected && tally.Verdict == result.Verdict);
+        }
+
+        SampleOutcome.Reset();
+        var partial = new StochasticTally([new(1, 90, true), new(2, 80, true), new(3, 70, true),
+            RunOutcome.NotMeasured(4, "model failure"), RunOutcome.NotMeasured(5, "judge failure")], 0.6);
+        var text = Capture(() => EvalPrinter.PrintStochasticSummary("selftest", partial, 60));
+        Check("settled partial PASS records exit 0 and distinguishes planned counts from observed statistics",
+            text.Contains("PASSED") && text.Contains("3/5 planned runs") && text.Contains("3/3")
+            && text.Contains("measured runs only") && text.Contains("over 3 of 5 runs")
+            && SampleOutcome.ExitCode == 0 && !partial.SpreadCoversEveryRun);
+        SampleOutcome.Reset();
     }
 
     // U15: Eval 05 shows a pass only when the harness's structural checks AND the judge's score pass.
