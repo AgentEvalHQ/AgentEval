@@ -36,7 +36,8 @@ public sealed record StoreV1ExportOptions : AefConversionOptions
 /// <item>the run is an imported run ([RUN-15]): <c>producer</c> is the exporter, <c>imported.from</c> names store v1 and
 /// the AgentEval version that wrote it, and <c>imported.asserted</c> lists every run.json field the exporter supplied;</item>
 /// <item>each scenario is a root line at <see cref="ScenarioPath"/>, each of its assertions a child line at
-/// <see cref="AssertionPathPrefix"/> and its 1-based position;</item>
+/// <see cref="AssertionPathPrefix"/> and its 1-based position; nested evaluators use ordinal paths under
+/// <c>scenario/eval</c>, independently of content capture;</item>
 /// <item>a scenario's state comes from its eval-result tree (<c>ScenarioResult.Output</c>, when it holds one): its
 /// <c>MeasurementState</c> and label (<c>pass</c> → <c>passed</c>, <c>fail</c> → <c>failed</c>, <c>warn</c>,
 /// <c>error</c>, <c>skipped</c>, <c>inapplicable</c> → <c>not_applicable</c>, not measured → <c>not_measured</c>), else
@@ -283,7 +284,10 @@ public static partial class StoreV1Exporter
 
         try
         {
-            writer.SetMetrics(Metrics(data.Scenarios));
+            var trees = data.Scenarios.Select(PrepareTree).ToArray();
+            var metrics = Metrics(data.Scenarios, trees);
+            var treeScoreMetric = AddTreeMetrics(metrics, trees);
+            writer.SetMetrics(metrics);
             var compliance = AddCompliance(writer, data.ComplianceEvidence);
             if (options.ContentCapture == AefContentCapture.On)
             {
@@ -311,7 +315,7 @@ public static partial class StoreV1Exporter
             foreach (var scenario in data.Scenarios)
             {
                 index++;
-                AddScenario(writer, scenario, index, data.Lane, options.ContentCapture, compliance, traceEvidence);
+                AddScenario(writer, scenario, trees[index - 1], treeScoreMetric, index, data.Lane, options.ContentCapture, compliance, traceEvidence);
             }
 
             data.Notes.Add("Severity and typed absences come only from a scenario's eval-result tree; a scenario without one is passed or failed, with no severity.");
@@ -399,11 +403,11 @@ public static partial class StoreV1Exporter
 
     // ---------------------------------------------------------------- metrics.json
 
-    private static List<AefMetric> Metrics(IReadOnlyList<ScenarioResult> scenarios)
+    private static List<AefMetric> Metrics(IReadOnlyList<ScenarioResult> scenarios, IReadOnlyList<EvalResult?> trees)
     {
         // A generic ScenarioResult has no declared domain. Refine the shared metric only when every scenario
         // proves the EvalScore contract from its recorded result, never merely because observed values fit 0..1.
-        var normalized = scenarios.Count > 0 && scenarios.All(HasNormalizedScoreContract);
+        var normalized = scenarios.Count > 0 && scenarios.Select((scenario, i) => HasNormalizedScoreContract(scenario, trees[i])).All(value => value);
         var metrics = new List<AefMetric>
         {
             new()
@@ -435,9 +439,8 @@ public static partial class StoreV1Exporter
         return metrics;
     }
 
-    private static bool HasNormalizedScoreContract(ScenarioResult scenario)
+    private static bool HasNormalizedScoreContract(ScenarioResult scenario, EvalResult? tree)
     {
-        var tree = Tree(scenario);
         if (tree?.Details is null || tree.Provenance is null || tree.EvaluatedAt == default ||
             string.IsNullOrWhiteSpace(tree.Metric.Key) || string.IsNullOrWhiteSpace(tree.Metric.Version) ||
             string.IsNullOrWhiteSpace(tree.Score.Label) || !Enum.IsDefined(tree.Score.Measurement) ||
@@ -522,7 +525,7 @@ public static partial class StoreV1Exporter
     // ---------------------------------------------------------------- results.ndjson
 
     private static void AddScenario(
-        AefRunWriter writer, ScenarioResult scenario, int index, string lane, AefContentCapture capture,
+        AefRunWriter writer, ScenarioResult scenario, EvalResult? tree, string treeScoreMetric, int index, string lane, AefContentCapture capture,
         Dictionary<string, List<string>> compliance, (string ScenarioId, string EvidenceId)? trace)
     {
         if (!AefConverter.IsResultText(scenario.Id, 256))
@@ -530,7 +533,6 @@ public static partial class StoreV1Exporter
             throw new InvalidDataException($"The scenario id '{scenario.Id}' is not an AEF case id (1-256 characters, no control character).");
         }
 
-        var tree = Tree(scenario);
         var (state, reason, severity) = ScenarioState(scenario, tree, capture);
         var evidence = new List<string>();
         if (capture == AefContentCapture.On)
@@ -556,6 +558,9 @@ public static partial class StoreV1Exporter
 
         // The assertions, as children: Passed → passed, Failed → failed, Inconclusive → not_measured.
         var children = scenario.Assertions.Select((a, i) => Assertion(scenario.Id, a, i, lane)).ToList();
+        var evalChildren = (tree?.Details?.SubResults ?? []).Select((node, i) =>
+            ProjectTree(node, scenario.Id, ScenarioPath + "/eval/" + (i + 1).ToString(CultureInfo.InvariantCulture), treeScoreMetric, lane, capture)).ToList();
+        var allChildren = children.Concat(evalChildren.Select(n => n.Result)).ToList();
         var measured = IsMeasured(state);
         var facts = scenario.Comparability;
         var root = new AefResult
@@ -570,9 +575,9 @@ public static partial class StoreV1Exporter
                 ? new AefVerdictRule("the eval's own rule against its threshold", bar, "AgentEval eval threshold (store v1 comparability.effectiveBar)")
                 : null,
             Annotator = Annotator(facts, tree),
-            Aggregation = children.Count == 0 ? null : Aggregation(scenario, state, children, facts),
+            Aggregation = allChildren.Count == 0 ? null : Aggregation(scenario.Score, facts?.EffectiveBar, state, allChildren),
             Evidence = evidence.Count > 0 ? evidence : null,
-            Ext = new JsonObject { [ExtName] = ScenarioExt(scenario, capture) },
+            Ext = new JsonObject { [ExtName] = ScenarioExt(scenario, capture, tree is not null) },
             Lane = lane,
             Severity = severity,
             DurationMs = scenario.Duration is { } duration && duration >= TimeSpan.Zero ? duration.TotalMilliseconds : null,
@@ -596,6 +601,7 @@ public static partial class StoreV1Exporter
         {
             handle.AddChild(child);
         }
+        foreach (var child in evalChildren) WriteTree(handle, child);
     }
 
     private static string Content(AefRunWriter writer, string id, AefEvidenceKind kind, string text, string description)
@@ -603,26 +609,6 @@ public static partial class StoreV1Exporter
         var blob = writer.PutBlob(Encoding.UTF8.GetBytes(text));
         writer.AddEvidence(new AefEvidence { EvidenceId = id, Kind = kind, Link = AefEvidenceLink.ToBlob(blob), Description = description });
         return id;
-    }
-
-    // The scenario's eval-result tree, when ScenarioResult.Output holds one (EvalResultPersistence writes it there).
-    private static EvalResult? Tree(ScenarioResult scenario)
-    {
-        var output = scenario.Output.AsSpan().TrimStart();
-        if (output.Length == 0 || output[0] != '{')
-        {
-            return null;
-        }
-
-        try
-        {
-            var tree = EvalResultPersistence.FromScenarioResult(scenario);
-            return tree?.Metric is not null && tree.Score is not null ? tree : null;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException or JsonException)
-        {
-            return null;   // not a tree this version reads: the scenario's own pass flag decides
-        }
     }
 
     // §7.5: MeasurementState and labels → state. An unknown label is read by the score's pass flag (as AgentEval's own
@@ -640,22 +626,13 @@ public static partial class StoreV1Exporter
             return (scenario.Passed ? AefState.Passed : AefState.Failed, null, null);
         }
 
+        return TreeState(tree, capture);
+    }
+
+    private static (AefState State, string? Reason, AefSeverity? Severity) TreeState(EvalResult tree, AefContentCapture capture)
+    {
         var score = tree.Score;
-        var state = score.Measurement switch
-        {
-            MeasurementState.NotApplicable => AefState.NotApplicable,
-            MeasurementState.NotMeasured => AefState.NotMeasured,
-            _ => score.Label switch
-            {
-                "pass" => AefState.Passed,
-                "fail" => AefState.Failed,
-                "warn" => AefState.Warn,
-                "error" => AefState.Error,
-                "skipped" => AefState.Skipped,
-                "inapplicable" => AefState.NotApplicable,
-                _ => score.Passed ? AefState.Passed : AefState.Failed,
-            },
-        };
+        var state = EvalScoreState.Of(score);
 
         AefSeverity? severity = state is AefState.Failed or AefState.Warn && AefNames.TryParse<AefSeverity>(score.Severity, out var s) ? s : null;
 
@@ -729,7 +706,7 @@ public static partial class StoreV1Exporter
     // [RES-5]: a scenario with assertions is a composite. Store v1 records the scenario's own verdict and its assertions
     // beside it, not how one led to the other: the aggregation describes the scenario's own score against its threshold
     // (or nothing measured), its children weigh nothing and are not required, and no child is named decisive.
-    private static AefAggregation Aggregation(ScenarioResult scenario, AefState state, List<AefResult> children, ComparabilityFacts? facts)
+    private static AefAggregation Aggregation(double? score, double? threshold, AefState state, List<AefResult> children)
     {
         var count = (AefState s) => (long)children.Count(c => c.State == s);
         var unmeasured = new AefUnmeasured
@@ -743,8 +720,8 @@ public static partial class StoreV1Exporter
         return new AefAggregation
         {
             Strategy = AefAggregationStrategy.Own,
-            Threshold = facts?.EffectiveBar,
-            Score = IsMeasured(state) && scenario.Score is { } score && double.IsFinite(score) ? score : null,
+            Threshold = threshold,
+            Score = IsMeasured(state) && score is { } value && double.IsFinite(value) ? value : null,
             RulePath = IsMeasured(state) ? AefRulePath.Threshold : AefRulePath.NothingMeasured,
             Measured = measured,
             Total = children.Count,
@@ -780,7 +757,7 @@ public static partial class StoreV1Exporter
         };
     }
 
-    private static JsonObject ScenarioExt(ScenarioResult scenario, AefContentCapture capture)
+    private static JsonObject ScenarioExt(ScenarioResult scenario, AefContentCapture capture, bool hasTree)
     {
         var ext = new JsonObject
         {
@@ -788,6 +765,7 @@ public static partial class StoreV1Exporter
             ["passed"] = scenario.Passed,
             ["score"] = scenario.Score is { } score && double.IsFinite(score) ? score : null,
         };
+        if (hasTree) ext["evalTreeProjectionVersion"] = 1;
         if (capture == AefContentCapture.On && scenario.StimulusHash is { } stimulus)
         {
             ext["stimulusHash"] = stimulus;   // a digest of the input: kept only with content ([RUN-11])

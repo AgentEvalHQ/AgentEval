@@ -324,31 +324,7 @@ public static class AefCompositeRunWriter
     public static AefComponentShape Undescribed { get; } = new(0, false, "Averaged", []);
 
     /// <summary>A score's AEF state: its measurement first, then its label (§7.5); an unknown label by its pass flag.</summary>
-    public static AefState StateOf(EvalScore score)
-    {
-        ArgumentNullException.ThrowIfNull(score);
-        return score.Measurement switch
-        {
-            MeasurementState.NotApplicable => AefState.NotApplicable,
-            MeasurementState.NotMeasured => score.Label switch
-            {
-                "error" => AefState.Error,
-                "skipped" => AefState.Skipped,
-                _ => AefState.NotMeasured,
-            },
-            _ => score.Label switch
-            {
-                "pass" => AefState.Passed,
-                "fail" => AefState.Failed,
-                "warn" => AefState.Warn,
-                "error" => AefState.Error,
-                "skipped" => AefState.Skipped,
-                "inapplicable" => AefState.NotApplicable,
-                "scored" => AefState.Scored,   // measured, with no verdict: a benchmark that publishes no pass mark
-                _ => score.Passed ? AefState.Passed : AefState.Failed,
-            },
-        };
-    }
+    public static AefState StateOf(EvalScore score) => EvalScoreState.Of(score);
 
     private static void Add(AefRunWriter writer, EvalResult node, AefComponentShape shape, string caseId, string path,
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,

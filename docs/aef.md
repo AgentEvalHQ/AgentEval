@@ -272,6 +272,13 @@ and lists converter-supplied fields in `imported.asserted`. A new seal uses `sea
 the converted evidence from import onward, not the original execution's earlier history. Interrupted
 legacy runs retain their observed results and are marked aborted. Legacy store compatibility remains for 1.x.
 
+Nested evaluator results are converted into canonical AEF child nodes even with content capture off.
+Their parent links and ordinal paths preserve repeated evaluator names; scenario roots and comparison
+units keep their existing identities. Narrative summaries and raw legacy result JSON still require
+capture on. Recognized malformed or oversized trees are refused instead of being flattened. Parent
+costs may include child costs; do not sum both when calculating a run total.
+
+
 Pass a run folder inside its original `.agenteval/subjects/<kind>/<name>/runs/<run-id>/` workspace,
 or pass the `.agenteval` workspace with `--run`. Keep the workspace structure when moving legacy evidence.
 The destination must be absent or empty; subsequent readers can use the resulting AEF folder.

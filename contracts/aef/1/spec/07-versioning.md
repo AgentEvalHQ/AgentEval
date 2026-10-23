@@ -104,9 +104,11 @@ that migrates store v1 runs, and no conformance class of §9.1.
 |---|---|
 | a `ScenarioResult` | a root line: `caseId` the scenario's id, `path` `scenario`, `lane` the run's kind (`main` when the kind is not an id); `evaluator` the eval's key and version from the scenario's `ComparabilityFacts`, else its eval-result tree's metric key and version, else `agenteval.scenario` with no version |
 | each assertion of the scenario | a child line at `scenario/assertions/<n>`, `<n>` its 1-based position in the scenario (names repeat, and may hold `/`); `evaluator.id` the assertion's name |
-| a scenario with assertions | `aggregation`: `strategy: Own`, `rulePath: threshold` (`nothing-measured` when the scenario is a typed absence), `score` and `threshold` the scenario's score and the eval's effective bar, no `decisive`; each child `component: {weight: 0, required: false}` ([RES-6]). Store v1 records the scenario's own verdict and its assertions beside it, not how one led to the other |
+| nested `EvalResult` children | canonical children at `scenario/eval/<n>[/<n>...]`, with 1-based sibling ordinals and explicit parent IDs; present with either capture policy. Duplicate evaluator keys remain distinct. Root scenario and assertion paths remain unchanged |
+| a scenario with assertions or nested evaluator results | `aggregation`: `strategy: Own`, `rulePath: threshold` (`nothing-measured` when the scenario is a typed absence), `score` and `threshold` the scenario's score and the eval's effective bar, no `decisive`; each child `component: {weight: 0, required: false}` ([RES-6]). Store v1 records the scenario's own verdict and its assertions beside it, not how one led to the other |
 | `MeasurementState` and labels of the eval-result tree | `state`: `pass` → `passed`, `fail` → `failed`, `warn` → `warn`, `error` → `error`, `skipped` → `skipped`, `inapplicable` → `not_applicable`, not measured → `not_measured`; `severity` the score's, on a `failed` or `warn` line |
-| a label outside those six (free text) | read by the score's pass flag: `passed` or `failed`, as AgentEval's own report reads it |
+| `scored` and `inconclusive` labels | the corresponding measured AEF state, without converting the pass flag into a failure |
+| another label (free text) | read by the score's pass flag: `passed` or `failed`, as AgentEval's own report reads it |
 | a scenario with no eval-result tree | `passed` or `failed` from its pass flag (`ScenarioResult.Passed`), with no `severity` |
 | an assertion's `Inconclusive` (it could not decide) | `not_measured`, with the assertion's message as `reason`: AEF's `inconclusive` is measured, and this is not |
 | the scenario's score and metrics | `scores` on a measured root: `score`, and each metric under its own name, declared with `direction: none` |
@@ -114,6 +116,21 @@ that migrates store v1 runs, and no conformance class of §9.1.
 | its estimated cost | a `usage` entry with role `other` on the root |
 | its other fields (name, pass flag, score, comparability facts; its input's digest only with `contentCapture: on`) | the root's `ext."agenteval.store-v1"` |
 | compliance evidence (`compliance/<regulation>/<subject>/<ts>/evidence.json`) | each document whose `sourceRun.runId` is the run's id belongs to the run: an evidence record of kind `compliance_artifact`, with the document as its blob, cited by the root of each scenario its controls name. The blob **SHOULD** be the document's original bytes; a migration that can only read a re-serialized form says so in the record's `description`. The store's hash chain is not an AEF seal |
+
+The StoreV1 converter records `ext."agenteval.store-v1".evalTreeProjectionVersion: 1`
+when it projects a complete readable evaluator tree. Descendant scores use a separate normalized
+metric (`agenteval.eval.score`, with a numeric suffix on collision); adding descendants does not
+change the root `score` metric's meaning or the root-based comparison unit. Dimension metrics
+retain unknown direction and scale. An earlier imported artifact without this marker may contain
+only a captured legacy tree, rather than canonical descendants.
+
+The converter does not recover component weights, required flags or decisive children from a
+stored tree. Nested composites use the same `Own` mapping, with zero-weight, nonrequired children;
+`threshold` is a descriptive mapping convention, not evidence that an unrecorded component policy ran.
+Node costs may already include descendant costs, so consumers must not add parent rollups to their
+children. Failed or skipped grading attempts may retain cost without claiming an annotator.
+Recognized malformed trees and trees exceeding 10,000 nodes or 32 evaluator levels beneath the root
+are refused; the converter must not silently flatten them. Narrative content remains capture-dependent.
 
 **The summary**
 
