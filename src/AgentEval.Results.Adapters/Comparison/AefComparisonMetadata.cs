@@ -22,7 +22,7 @@ internal static class AefComparisonMetadata
     };
 
     internal static JsonObject Attach(JsonObject? extensions, EvalResult result, AefContentCapture capture,
-        bool? selected = null, string? id = null)
+        bool? selected = null, string? id = null, string? name = null)
     {
         var output = extensions?.DeepClone().AsObject() ?? new JsonObject();
         if (output.ContainsKey(Extension))
@@ -36,6 +36,7 @@ internal static class AefComparisonMetadata
             ["version"] = 1,
             ["selected"] = selected ?? result.Details.SubResults is not { Count: > 0 },
             ["id"] = id ?? result.Metric.Key,
+            ["name"] = name,
             ["metric"] = "score",
             ["stimulusHash"] = capture == AefContentCapture.On ? AgentEval.Output.StimulusHash.Of(result.Observation?.Query) : null,
             ["facts"] = JsonSerializer.SerializeToNode(facts, Json),

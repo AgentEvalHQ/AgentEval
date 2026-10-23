@@ -124,7 +124,7 @@ public sealed partial class AefComparisonReader : IAefComparisonReader
         var metric = (string?)metadata?["metric"] ?? StoreV1Exporter.ScoreMetric;
         var score = measured ? (line["scores"] as JsonArray)?.OfType<JsonObject>()
             .SingleOrDefault(s => (string?)s["metric"] == metric)?["value"]?.GetValue<double>() : null;
-        return new ScenarioResult(id, (string?)legacy?["name"] ?? id, "", "", state == "passed", score,
+        return new ScenarioResult(id, (string?)metadata?["name"] ?? (string?)legacy?["name"] ?? id, "", "", state == "passed", score,
             new Dictionary<string, double>(), [], null, null)
         {
             Comparability = facts,
@@ -171,6 +171,8 @@ public sealed partial class AefComparisonReader : IAefComparisonReader
             throw Bad("comparison metric is not declared");
         if (metadata["stimulusHash"] is not null && AefNode.String(metadata["stimulusHash"]) is null)
             throw Bad("comparison stimulus hash is not a string");
+        if (metadata["name"] is not null && AefNode.String(metadata["name"]) is null)
+            throw Bad("comparison name is not a string");
         ComparabilityFacts facts;
         try
         {

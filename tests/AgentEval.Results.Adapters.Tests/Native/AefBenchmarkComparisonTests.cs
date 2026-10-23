@@ -33,6 +33,7 @@ public sealed class AefBenchmarkComparisonTests : IDisposable
         var result = Result(measurement, label, passed);
         var directory = Write(result);
         var scenario = Assert.Single(new AefComparisonReader().Read(directory).Scenarios);
+        Assert.Equal("owasp-smoke", scenario.Name);
         var legacy = EvalResultPersistence.ToScenarioResult(result, "owasp-smoke", "benchmark", subjectModel: "subject-x");
         Assert.Equal((legacy.Id, expectedScore, legacy.Passed, legacy.Measurement, legacy.Comparability),
             (scenario.Id, scenario.Score, scenario.Passed, scenario.Measurement, scenario.Comparability));

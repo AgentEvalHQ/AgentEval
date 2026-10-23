@@ -450,7 +450,8 @@ public static class AefCompositeRunWriter
                     node.Details.Summary, node.Details.Evidence, node.Details.Recommendations,
                 }),
             });
-        line = line with { Ext = AgentEval.Results.Adapters.Comparison.AefComparisonMetadata.Attach(line.Ext, node, contentCapture, comparisonSelected, comparisonId) };
+        line = line with { Ext = AgentEval.Results.Adapters.Comparison.AefComparisonMetadata.Attach(line.Ext, node, contentCapture, comparisonSelected, comparisonId,
+            name: comparisonId is null ? node.Metric.Name : null) };
         var handle = writer.AddResult(line, parent);
         capture?.Invoke(line, parent);
 

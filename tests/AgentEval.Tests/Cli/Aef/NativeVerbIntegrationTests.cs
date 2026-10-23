@@ -1689,6 +1689,30 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public async Task Composite_Completed_ConversionPreservesAtomicComparison(bool euAiAct, int runs)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        await new AgentEval.Output.FileSystemOutputStore(workspace).InitializeSolutionAsync("composite-parity");
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var exit = await WithCapture(true, () => euAiAct
+            ? BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef)
+            : BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef));
+        Assert.Equal(0, exit);
+        var directory = RunDirectory(aef.FullName);
+        AssertIntact(directory);
+        Assert.Equal("completed", (string?)Document(directory, "run.json")["status"]);
+        if (runs == 1) AssertStoreLink(directory);
+        else AssertCompositeStoreLinks(directory, runs);
+        await CompositeComparisonAssertions.MatchesFinalAsync(workspace, directory, capture: true);
+    }
+
+    [Theory]
     [InlineData(false, 1, false, false)]
     [InlineData(true, 1, false, false)]
     [InlineData(false, 2, false, false)]
@@ -1725,6 +1749,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        await CompositeComparisonAssertions.MatchesFinalAsync(workspace, dir, capture: false, workspaceEnrichment: false);
     }
 
     [Theory]
