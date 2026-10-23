@@ -7,6 +7,9 @@ using AgentEval.Memory.External.Models;
 using AgentEval.Memory.Models;
 using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Writing;
+using AgentEval.Evals;
+using AgentEval.Output;
+using Json.Schema;
 
 namespace AgentEval.Tests.Cli.Aef;
 
@@ -14,12 +17,50 @@ public sealed class MemoryProjectionObservationTests : IDisposable
 {
     private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("memory-observations-");
     public void Dispose() => _root.Delete(true);
-    private static MemoryBenchmarkResult Memory() => new()
+    private static MemoryBenchmarkResult Memory(double score = 80) => new()
     {
         BenchmarkName = "Memory", Duration = TimeSpan.FromMilliseconds(50),
         CategoryResults = [new() { CategoryName = "Category", ScenarioType = BenchmarkScenarioType.BasicRetention,
-            Weight = 1, Score = 80, Duration = TimeSpan.FromMilliseconds(34.5) }],
+            Weight = 1, Score = score, Duration = TimeSpan.FromMilliseconds(34.5) }],
     };
+
+    [Theory]
+    [InlineData("memory", true)]
+    [InlineData("longmemeval", true)]
+    [InlineData("typedmemeval", true)]
+    [InlineData("memory", false)]
+    [InlineData("longmemeval", false)]
+    [InlineData("typedmemeval", false)]
+    public void Projection_UnknownInstrument_UsesExistingProvenanceVocabulary(string family, bool passed)
+    {
+        var question = new QuestionResult { QuestionId = "q", QuestionType = "test", Question = "q", GoldAnswer = "g",
+            AgentResponse = "a", Correct = passed, RawScore = null, TypedOutcome = new()
+            { Shape = "recency", Outcome = passed ? TypedMemEvalOutcome.Correct : TypedMemEvalOutcome.Wrong, Attribution = TypedMemEvalEvidenceAttribution.Unobserved } };
+        EvalResult tree;
+        if (family == "memory") (tree, _) = BenchAef.MemoryTree(Memory(passed ? 80 : 20), "quick", passed ? "PASS" : "FAIL", "configured-only");
+        else if (family == "typedmemeval") (tree, _) = BenchAef.TypedTree([question], passed ? 1 : 0, "episodic", "configured-only");
+        else tree = BenchAef.QuestionTree(new ExternalBenchmarkResult { BenchmarkId = "longmemeval", BenchmarkName = "LongMemEval",
+            QuestionResults = [question], OverallAccuracy = passed ? 100 : 0, TaskAveragedAccuracy = null, PerTypeResults = [],
+            Duration = TimeSpan.FromSeconds(1), Options = new() }, "longmemeval", "quick", passed ? "PASS" : "FAIL", "configured-only");
+        var assembly = typeof(FileSystemOutputStore).Assembly;
+        using var resource = assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().Single(n => n.EndsWith(".eval-result.schema.json", StringComparison.Ordinal)))!;
+        using var reader = new StreamReader(resource);
+        var schemaText = reader.ReadToEnd();
+        var schema = JsonSchema.FromText(schemaText);
+        var output = EvalResultPersistence.ToScenarioResult(tree, "case", "Case", []).Output;
+        if (family != "typedmemeval") Assert.True(schema.Evaluate(JsonNode.Parse(output)).IsValid, output);
+        else
+        {
+            // TypedTree is an AEF projection: its nongating "scored" state has never belonged to legacy EvalResult JSON.
+            // Check the reused provenance contract without extending legacy labels or changing the typed outcome.
+            var provenance = JsonNode.Parse(schemaText)!["properties"]!["provenance"]!;
+            var provenanceSchema = JsonSchema.FromText(provenance.ToJsonString());
+            var document = JsonNode.Parse(output)!;
+            Assert.Equal("scored", (string?)document["score"]!["label"]);
+            Assert.True(provenanceSchema.Evaluate(document["provenance"]).IsValid);
+            Assert.All(document["details"]!["subResults"]!.AsArray(), child => Assert.True(provenanceSchema.Evaluate(child!["provenance"]).IsValid));
+        }
+    }
     private JsonNode[] Write(AgentEval.Evals.EvalResult tree, AefComponentShape? shape = null)
     {
         var now = DateTimeOffset.Parse("2026-10-01T09:00:00Z", System.Globalization.CultureInfo.InvariantCulture);

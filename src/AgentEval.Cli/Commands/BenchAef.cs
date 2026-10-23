@@ -146,11 +146,11 @@ internal static class BenchAef
             return new EvalResult(
                 new EvalMetadata("memory." + c.CategoryName.ToLowerInvariant().Replace(' ', '-'), c.CategoryName, "memory", "1.0.0"),
                 // No severity: the benchmark grades a score, it does not say how bad a low one is.
-                new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, label == "pass" ? "none" : "", null),
+                new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, "none", null),
                 new EvalDetails(null, null, null, null, null),
                 // A category the benchmark's judge graded is not priced here (null, never $0); a skipped one spent nothing.
                 // The category DTO records no instrument; configured model identity cannot establish one.
-                new EvalProvenance("unknown", null, null, null, null, c.Skipped ? 0 : null, false),
+                new EvalProvenance("composite", null, null, null, null, c.Skipped ? 0 : null, false),
                 DateTimeOffset.UtcNow) { ObservedDuration = c.Duration };
         }).ToList();
         // One case, the benchmark, with its categories as weighted parts below it: the weights reach the run as each
@@ -186,17 +186,14 @@ internal static class BenchAef
         {
             var agentFailed = q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed;
             var label = agentFailed ? "error" : q.Correct is true ? "pass" : q.Correct is false ? "fail" : "inconclusive";
-            return new EvalResult(
+            return ObservedQuestion(
                 new EvalMetadata(q.QuestionId, q.QuestionId, q.QuestionType, "1.0.0"),
-                new EvalScore(q.Correct is true ? 1 : 0, null, label, q.Correct is true, null, label == "pass" ? "none" : "", null)
+                new EvalScore(q.Correct is true ? 1 : 0, null, label, q.Correct is true, null, "none", null)
                 {
                     // An unscored judgment is a typed absence: not measured, never a failure.
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
-                new EvalDetails(null, null, null, null, null),
-                // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
-                QuestionProvenance(label is "pass" or "fail", q, judgeModel),
-                DateTimeOffset.UtcNow);
+                q, judgeModel);
         }).ToList();
         // No accuracy means no question was scored, and an INCONCLUSIVE verdict (nothing scored, or an interrupted run)
         // decided nothing: the root is not measured, never a failure at 0.
@@ -375,16 +372,13 @@ internal static class BenchAef
             }
 
             var correct = outcome == AgentEval.Memory.External.Models.TypedMemEvalOutcome.Correct;
-            return new EvalResult(
+            return ObservedQuestion(
                 new EvalMetadata(q.QuestionId, q.QuestionId, q.QuestionType, "1.0.0"),
                 new EvalScore(correct ? 1 : 0, null, label, false, null, "none", null)
                 {
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
-                new EvalDetails(null, null, null, null, null),
-                // A judged question is not priced here (null, never $0); one no judge was called for spent nothing.
-                QuestionProvenance(label == "scored", q, judgeModel),
-                DateTimeOffset.UtcNow);
+                q, judgeModel);
         }).ToList();
         var root = new EvalResult(
             new EvalMetadata($"typedmemeval.{vertical}", $"TypedMemEval {vertical}", "typedmemeval", "1.0.0"),
@@ -398,10 +392,17 @@ internal static class BenchAef
         return (root, ext);
     }
 
-    private static EvalProvenance QuestionProvenance(bool measured, AgentEval.Memory.External.Models.QuestionResult question, string? model)
+    private static EvalResult ObservedQuestion(EvalMetadata metric, EvalScore score, AgentEval.Memory.External.Models.QuestionResult question, string? model)
     {
-        var observedJudge = measured && question.JudgeLlmCallCount > 0;
-        return new(observedJudge ? "atomic-llm" : "unknown", observedJudge ? model : null,
-            null, null, null, question.JudgeLlmCallCount > 0 ? null : 0, false);
+        var observedJudge = score.MeasuredValue() is not null && question.JudgeLlmCallCount > 0;
+        var result = new EvalResult(metric, score, new(null, null, null, null, null),
+            new(observedJudge ? "atomic-llm" : "atomic-decision", observedJudge ? model : null,
+                null, null, null, question.JudgeLlmCallCount > 0 ? null : 0, false), DateTimeOffset.UtcNow);
+        // The decision's observed instrument is separate from its schema-valid producer classification.
+        return observedJudge ? result : result with
+        {
+            ComparisonObservation = new AgentEval.Output.ComparabilityFacts(metric.Key, metric.Version)
+            { EffectiveBar = score.Threshold, InstrumentKind = AgentEval.Output.EvaluationInstrumentKind.Unknown },
+        };
     }
 }
