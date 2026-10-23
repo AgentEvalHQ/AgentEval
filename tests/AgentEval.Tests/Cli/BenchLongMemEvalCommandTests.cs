@@ -14,8 +14,10 @@ namespace AgentEval.Tests.Cli;
 [Collection("EnvVarTests")]
 public sealed class BenchLongMemEvalCommandTests
 {
-    [Fact]
-    public async Task RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering(bool capture)
     {
         using var fixture = WorkspaceFixture.Create(
             Question("q-yes"),
@@ -29,12 +31,12 @@ public sealed class BenchLongMemEvalCommandTests
             "agent answer two", "no",
             "agent answer three", string.Empty, string.Empty);
 
-        var invocation = await CaptureConsoleAsync(() =>
+        var invocation = await CaptureConsoleAsync(() => Aef.NativeVerbIntegrationTests.WithCapture(capture, () =>
             BenchLongMemEvalCommand.RunAsync(
                 preset: "subset",
                 subject: "cli-longmemeval",
                 rootOverride: fixture.Root,
-                chatClientOverride: client));
+                chatClientOverride: client)));
 
         // B6c-9: 1 of 3 questions is inconclusive, so the 50% pass rests on part of them: a warn, exit 10 (it was PASS, 0).
         Assert.Equal(AgentEval.Cli.ExitCodes.GateWarning, invocation.ExitCode);
@@ -69,7 +71,8 @@ public sealed class BenchLongMemEvalCommandTests
             .Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]).Order().ToList();
         Assert.Equal(["failed", "not_measured", "passed"], states);
         var aefText = string.Concat(Directory.GetFiles(aefDir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
-        Assert.DoesNotContain("agent answer", aefText, StringComparison.Ordinal);
+        if (!capture) Assert.DoesNotContain("agent answer", aefText, StringComparison.Ordinal);
+        Assert.DoesNotContain("agent answer", File.ReadAllText(Path.Combine(aefDir, "results.ndjson")), StringComparison.Ordinal);
         var stats = summary.RootElement.GetProperty("stats");
         Assert.Equal(3, stats.GetProperty("total").GetInt32());
         Assert.Equal(1, stats.GetProperty("passed").GetInt32());
@@ -89,6 +92,7 @@ public sealed class BenchLongMemEvalCommandTests
         var importedReport = Aef.LegacyMemoryReportAssertions.Import(Path.Combine(fixture.Root, ".agenteval"), runDirectory,
             "BenchLongMemEvalCommand", reportOnly: true);
         Aef.LegacyMemoryReportAssertions.NativeQuestions(aefDir, importedReport);
+        Aef.NativeReportAssertions.MatchesProducer(aefDir, runDirectory, capture);
     }
 
     [Fact]
@@ -144,13 +148,13 @@ public sealed class BenchLongMemEvalCommandTests
         var aef = new DirectoryInfo(Path.Combine(fixture.Root, "evidence"));
         if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
         string? observed = null;
-        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "subject", fixture.Root,
+        var invocation = await CaptureConsoleAsync(() => Aef.NativeVerbIntegrationTests.WithCapture(true, () => BenchLongMemEvalCommand.RunAsync("subset", "subject", fixture.Root,
             client, cancel.Token, aef, noAef, onQuestionCompleted: question =>
             {
                 observed = question.QuestionId;
                 if (fail) throw new InvalidOperationException("test failure after question");
                 cancel.Cancel();
-            }));
+            })));
         Assert.Equal(invalidOutput ? 3 : 1, invocation.ExitCode);
         Assert.NotNull(observed);
         if (noAef || invalidOutput)
@@ -165,6 +169,7 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Empty(verified.Problems);
         var run = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!;
         Assert.Equal("aborted", (string?)run["status"]);
+        Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         Assert.Equal("mocked", (string?)run["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;

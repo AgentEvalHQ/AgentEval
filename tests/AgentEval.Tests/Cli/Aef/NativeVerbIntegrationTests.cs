@@ -20,7 +20,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "aef-native-" + Guid.NewGuid().ToString("N"));
 
-    private static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke)
+    internal static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke)
     {
         var command = new Command("test");
         command.Options.Add(new Option<DirectoryInfo?>("--aef"));
@@ -1459,12 +1459,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (afterReport) Console.SetOut(output);
-            var exit = await BenchMemoryCommand.RunAsync("quick", "memory-subject", _root, client, cancel.Token,
+            var exit = await WithCapture(true, () => BenchMemoryCommand.RunAsync("quick", "memory-subject", _root, client, cancel.Token,
                 aef, noAef, onCategoryCompleted: category =>
                 {
                     completed++;
                     if (!afterReport) cancel.Cancel();
-                });
+                }));
             Assert.Equal(invalidOutput ? 3 : 1, exit);
         }
         finally { Console.SetOut(original); }
@@ -1484,13 +1484,20 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(completed, lines.Count(l => ((string?)l["path"])?.StartsWith("case/", StringComparison.Ordinal) == true));
+        if (afterReport)
+        {
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories)))!;
+            NativeReportAssertions.MatchesProducer(dir, source, capture: true);
+        }
+        else Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         AssertMemoryRecipe(dir);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls, bool capture)
     {
         Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
         await InitCommand.RunAsync("memory-definition", _root);
@@ -1503,7 +1510,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeCalls) Console.SetOut(output);
-            exit = await BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination);
+            exit = await WithCapture(capture, () => BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination));
         }
         finally { Console.SetOut(original); }
         Assert.Equal(cancelBeforeCalls ? 1 : 0, exit);
@@ -1516,6 +1523,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var workspace = Path.Combine(_root, ".agenteval");
             var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
             var report = LegacyMemoryReportAssertions.Import(workspace, source, "BenchMemoryCommand", reportOnly: false);
+            NativeReportAssertions.MatchesProducer(directory, source, capture);
             var native = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
             Assert.Single(native, r => r["parentResultId"] is null);
             var categories = report["CategoryResults"]!.AsArray();
@@ -1546,13 +1554,16 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Episodic", false)]
-    [InlineData("Episodic", true)]
-    [InlineData("WorkingMemory", false)]
-    [InlineData("WorkingMemory", true)]
-    [InlineData("Forgetting", false)]
-    [InlineData("Forgetting", true)]
-    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions)
+    [InlineData("Episodic", false, false)]
+    [InlineData("Episodic", false, true)]
+    [InlineData("Episodic", true, false)]
+    [InlineData("WorkingMemory", false, false)]
+    [InlineData("WorkingMemory", false, true)]
+    [InlineData("WorkingMemory", true, false)]
+    [InlineData("Forgetting", false, false)]
+    [InlineData("Forgetting", false, true)]
+    [InlineData("Forgetting", true, false)]
+    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions, bool capture)
     {
         await InitCommand.RunAsync("typed-definition", _root);
         var descriptor = AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
@@ -1568,7 +1579,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeQuestions) Console.SetOut(output);
-            exit = await BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination);
+            exit = await WithCapture(capture, () => BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination));
         }
         finally { Console.SetOut(previous); }
         Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
@@ -1595,6 +1606,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
             var report = LegacyMemoryReportAssertions.Import(workspace, source, "BenchTypedMemEvalCommand", reportOnly: true);
             LegacyMemoryReportAssertions.NativeQuestions(directory, report);
+            NativeReportAssertions.MatchesProducer(directory, source, capture);
         }
         if (vertical == "WorkingMemory")
         {
@@ -1636,13 +1648,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var aef = new DirectoryInfo(Path.Combine(_root, "typed-aef"));
         if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
         string? observed = null;
-        var exit = await BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token,
+        var exit = await WithCapture(true, () => BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token,
             aef, noAef, onQuestionCompleted: question =>
             {
                 observed = question.QuestionId;
                 if (fail) throw new InvalidOperationException("test failure after typed question");
                 cancel.Cancel();
-            });
+            }));
         Assert.Equal(invalidOutput ? 3 : 1, exit);
         Assert.NotNull(observed);
         if (noAef || invalidOutput)
@@ -1654,6 +1666,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;

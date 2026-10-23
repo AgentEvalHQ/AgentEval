@@ -128,6 +128,7 @@ public static class BenchMemoryCommand
         var suiteDefinition = noAef ? null : AgentEval.Cli.Infrastructure.MemorySuiteDefinition.Create(
             preset, benchmark, model, chatClientOverride is null ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override");
         MemoryBenchmarkResult? result = null;
+        byte[]? nativeReportJson = null;
         var completed = new List<BenchmarkCategoryResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string Verdict(MemoryBenchmarkResult value) => !value.IsComplete ? "INCOMPLETE"
@@ -150,7 +151,7 @@ public static class BenchMemoryCommand
             return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
                 startedAt, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
-                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition);
+                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition, nativeReportJson: nativeReportJson);
         }
         try
         {
@@ -170,6 +171,7 @@ public static class BenchMemoryCommand
         // ── Persist via output store ─────────────────────────────────────────
         try
         {
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -243,9 +245,9 @@ public static class BenchMemoryCommand
             // Resolve via the store so the report path matches the manifest exactly; hand-building
             // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
             var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                nativeReportJson);
 
             Console.WriteLine();
             if (result.IsComplete)

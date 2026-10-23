@@ -78,9 +78,9 @@ internal static class BenchAef
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
         string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null) =>
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -115,8 +115,8 @@ internal static class BenchAef
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
-        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition);
+        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, byte[]? nativeReportJson = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition, nativeReportJson: nativeReportJson);
 
     /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
     internal static AefCommandGate Gate(string label, int exitCode) => new()
@@ -216,7 +216,7 @@ internal static class BenchAef
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null)
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -226,6 +226,8 @@ internal static class BenchAef
             var options = new AefCompositeRunOptions
             {
                 Report = report,
+                // Explicit nullable null avoids the array conversion's empty ReadOnlyMemory value.
+                NativeReportJson = nativeReportJson is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(nativeReportJson),
                 PresetComparisonId = family == "perf" ? $"perf-{preset.ToLowerInvariant()}" : null,
                 Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },

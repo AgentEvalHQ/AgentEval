@@ -190,6 +190,7 @@ public static class BenchTypedMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult? result = null;
+        byte[]? nativeReportJson = null;
         AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
@@ -208,7 +209,7 @@ public static class BenchTypedMemEvalCommand
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
                 emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition,
                 summaryExt: AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.Create(result?.QuestionResults ?? completed,
-                    verticalName, complete: reason is null && result?.TypedOutcomes is not null));
+                    verticalName, complete: reason is null && result?.TypedOutcomes is not null), nativeReportJson: nativeReportJson);
         }
         try
         {
@@ -261,6 +262,7 @@ public static class BenchTypedMemEvalCommand
         string runDir;
         try
         {
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -340,9 +342,9 @@ public static class BenchTypedMemEvalCommand
             // Resolve via the store so the report path matches the manifest exactly; hand-building
             // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
             runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                nativeReportJson);
             PrintTypedReport(descriptor, result, typed, runId, runDir);
             ct.ThrowIfCancellationRequested();
         }

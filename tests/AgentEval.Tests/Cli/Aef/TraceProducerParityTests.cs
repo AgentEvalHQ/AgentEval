@@ -38,14 +38,15 @@ public sealed class TraceProducerParityTests
         }, trace);
         else await TraceSerializer.SaveToFileAsync(new AgentEval.Tracing.AgentTrace(), trace);
         var nativeDirectory = Path.Combine(temp.Path, "native");
-        var exit = workflow
-            ? await BenchWorkflowTraceFidelityCommand.RunAsync(trace, "standard", "subject", temp.Path, aef: new(nativeDirectory))
-            : await BenchTraceFidelityCommand.RunAsync(trace, trace, "standard", "subject", temp.Path, aef: new(nativeDirectory));
+        var exit = await NativeVerbIntegrationTests.WithCapture(capture, () => workflow
+            ? BenchWorkflowTraceFidelityCommand.RunAsync(trace, "standard", "subject", temp.Path, aef: new(nativeDirectory))
+            : BenchTraceFidelityCommand.RunAsync(trace, trace, "standard", "subject", temp.Path, aef: new(nativeDirectory)));
         Assert.True(exit is 0 or 9 or 10 or 11, "The actual offline benchmark must finish with a domain outcome, not setup/IO failure.");
         var nativePath = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(nativeDirectory, "run.json", SearchOption.AllDirectories)))!;
         var native = new AefRunEvidenceReader().Read(nativePath);
         var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(workspace, "subjects"), "report-native.json", SearchOption.AllDirectories)))!;
         var original = File.ReadAllBytes(Path.Combine(legacy, "report-native.json"));
+        NativeReportAssertions.MatchesProducer(nativePath, legacy, capture);
         Assert.NotEmpty(native.Results);
         var output = Path.Combine(temp.Path, "converted");
         StoreV1Exporter.ExportWorkspaceRun(workspace, legacy, output, new() { ContentCapture = capture ? AefContentCapture.On : AefContentCapture.Off });

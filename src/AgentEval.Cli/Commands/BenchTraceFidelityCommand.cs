@@ -86,14 +86,16 @@ public static class BenchTraceFidelityCommand
 
         // ── Persist via the canonical output store (manifest + native report) ──
         string? storeRunId = null;
+        byte[]? nativeReportJson = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
             subjectKind: "agent", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, storeV1: StoreLink(), definition: definition);
+            abortReason: reason, storeV1: StoreLink(), definition: definition, nativeReportJson: nativeReportJson);
         try
         {
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
             var store = new FileSystemOutputStore(agentEvalDir);
             await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
             var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
@@ -128,9 +130,9 @@ public static class BenchTraceFidelityCommand
             await store.CompleteRunAsync(manifest, summary, ct);
 
             var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }),
+                nativeReportJson,
                 ct);
 
             Console.WriteLine();

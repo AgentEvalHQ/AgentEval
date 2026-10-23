@@ -338,6 +338,13 @@ values in that domain.
 
 ## Runs from eval, redteam and bench
 
+With `--aef-content on`, memory, LongMemEval, TypedMemEval, trace-fidelity and workflow-trace-fidelity
+also retain their exact producer-native JSON report as `E-report-native-json` document evidence.
+The original report is separate from the canonical evaluator rows; its schema and unrecorded source identity
+are not inferred. Capture off omits the document. A partial evaluation without a returned report does not
+invent a complete one; a returned report can remain available if later persistence or reporting fails.
+Verified artifact reads use the captured bytes without recovering a sibling legacy file.
+
 `bench agentic --aef-content on` retains the original agentic report as document evidence. The recorded report
 identity names its generation time and original source references; those references are not an execution seal.
 `render --benchmark agentic` reads the verified document, or converts an old report folder, and uses the existing

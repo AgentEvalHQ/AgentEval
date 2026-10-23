@@ -25,6 +25,10 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Exact producer-native JSON report bytes, captured as a document only when content capture is on.</summary>
+    /// <remarks>When captured, the snapshot must be an unambiguous UTF-8 JSON object of at most 64 MiB.
+    /// No report identity or evaluator facts are inferred from this optional snapshot.</remarks>
+    public ReadOnlyMemory<byte>? NativeReportJson { get; init; }
     /// <summary>An original report document; identity is retained and bytes follow content-capture policy.</summary>
     public AefReportArtifact? Report { get; init; }
     /// <summary>
@@ -172,6 +176,7 @@ public static class AefCompositeRunWriter
         ArgumentNullException.ThrowIfNull(shape);
         ArgumentNullException.ThrowIfNull(options);
         AefNativeFinalization.Validate(options.Seal, options.Signer);
+        var nativeReport = ValidateNativeReport(options);
         // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
         // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
         if (options.PresetComparisonId is { } comparisonId && !AefConverter.IsResultText(comparisonId, 256))
@@ -229,6 +234,13 @@ public static class AefCompositeRunWriter
         {
             binding.Write(writer);
             options.Report?.Write(writer, options.ContentCapture);
+            if (nativeReport is { } reportBytes)
+                writer.AddEvidence(new()
+                {
+                    EvidenceId = "E-report-native-json", Kind = AefEvidenceKind.Document,
+                    Link = AefEvidenceLink.ToBlob(writer.PutBlob(reportBytes.Span)),
+                    Description = "Original producer-native result document. No source identity is inferred from its contents.",
+                });
             writer.SetMetrics(
             [
                 new AefMetric
@@ -331,6 +343,19 @@ public static class AefCompositeRunWriter
 
     /// <summary>A part whose definition is not known: weight 0, not required, recorded beside its parent's verdict.</summary>
     public static AefComponentShape Undescribed { get; } = new(0, false, "Averaged", []);
+
+    private static ReadOnlyMemory<byte>? ValidateNativeReport(AefCompositeRunOptions options)
+    {
+        if (options.ContentCapture != AefContentCapture.On || options.NativeReportJson is not { } bytes) return null;
+        if (bytes.Length > 64 << 20)
+            throw new ArgumentException("Expected: native JSON report at most 64 MiB. Actual: oversized report. Suggestions: reduce captured report content. Because: evidence snapshots are bounded.", nameof(options));
+        try { AgentEval.Results.Json.AefJsonReader.ParseDocument(bytes.Span, 64 << 20); }
+        catch (AgentEval.Results.Json.AefReadException error)
+        {
+            throw new ArgumentException("Expected: unambiguous UTF-8 native report JSON object. Actual: invalid report. Suggestions: pass the original serializer output. Because: document capture must not repair or reinterpret report bytes.", nameof(options), error);
+        }
+        return bytes;
+    }
 
     /// <summary>A score's AEF state: its measurement first, then its label (§7.5); an unknown label by its pass flag.</summary>
     public static AefState StateOf(EvalScore score) => EvalScoreState.Of(score);
