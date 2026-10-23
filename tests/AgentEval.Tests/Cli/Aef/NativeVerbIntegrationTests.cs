@@ -848,9 +848,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var converted = comparisonReader.Read(convertedPath);
         Assert.Equal(family + "-smoke", Assert.Single(converted.Scenarios).Id);
         Assert.Equal(AgentEval.Output.ComparisonVerdict.Comparable, converted.CompareTo(converted).Verdict);
+        var originalScenario = JsonNode.Parse(File.ReadAllBytes(Assert.Single(
+            Directory.GetFiles(Path.Combine(legacy, "scenarios"), "*.json"))))!;
+        Assert.Equal((string?)originalScenario["name"], Assert.Single(converted.Scenarios).Name);
         var native = comparisonReader.Read(RunDirectory(aef.FullName));
-        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
-            converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
+        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
+            converted.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
         Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
         var notWritten = new DirectoryInfo(Path.Combine(_root, "disabled-aef"));
         var disabled = await Run(notWritten, true);

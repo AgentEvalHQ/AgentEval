@@ -40,11 +40,14 @@ public sealed class PerformanceProducerParityTests
         var reader = new AefComparisonReader();
         var native = reader.Read(nativePath);
         var converted = reader.Read(convertedPath);
+        var original = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllBytes(Assert.Single(
+            Directory.GetFiles(Path.Combine(legacyPath, "scenarios"), "*.json"))))!;
+        Assert.Equal((string?)original["name"], Assert.Single(converted.Scenarios).Name);
         var scenario = Assert.Single(native.Scenarios);
         Assert.Equal("perf-" + preset, scenario.Id);
         Assert.Equal(capture ? StimulusHash.Of("workload") : null, scenario.StimulusHash);
-        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
-            converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
+        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
+            converted.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
         Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
         Assert.Equal(ComparisonVerdict.Comparable, native.CompareTo(converted).Verdict);
     }

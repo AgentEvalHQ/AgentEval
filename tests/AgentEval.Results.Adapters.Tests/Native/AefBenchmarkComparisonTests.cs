@@ -142,6 +142,7 @@ public sealed class AefBenchmarkComparisonTests : IDisposable
     [InlineData("selection")]
     [InlineData("metric")]
     [InlineData("facts")]
+    [InlineData("comparison-name")]
     [InlineData("evaluator")]
     [InlineData("instrument")]
     [InlineData("hash")]
@@ -173,6 +174,7 @@ public sealed class AefBenchmarkComparisonTests : IDisposable
             case "selection": metadata["selected"] = false; break;
             case "metric": metadata["metric"] = "resisted"; break;
             case "facts": metadata["facts"] = null; break;
+            case "comparison-name": metadata["name"] = false; break;
             case "evaluator": observation["evaluator"]!["id"] = "another-evaluator"; break;
             case "instrument": metadata["facts"]!["instrumentKind"] = "deterministic"; break;
             case "hash": metadata["stimulusHash"] = "not-a-digest"; break;
@@ -216,10 +218,21 @@ public sealed class AefBenchmarkComparisonTests : IDisposable
         Assert.Throws<InvalidDataException>(() => new AefComparisonReader().Read(directory));
     }
 
-    private string Write(EvalResult result, AefContentCapture capture = AefContentCapture.Off) =>
+    [Theory]
+    [InlineData(AefContentCapture.On)]
+    [InlineData(AefContentCapture.Off)]
+    public void Read_OriginalScenarioName_PreservesCallerRecordedLabel(AefContentCapture capture)
+    {
+        var directory = Write(Result(), capture, "Original benchmark — title");
+        var scenario = Assert.Single(new AefComparisonReader().Read(directory).Scenarios);
+        Assert.Equal("owasp-smoke", scenario.Id);
+        Assert.Equal("Original benchmark — title", scenario.Name);
+    }
+
+    private string Write(EvalResult result, AefContentCapture capture = AefContentCapture.Off, string? name = null) =>
         AefProbeRunWriter.Write(_out, Probes(), Options() with
         {
-            ContentCapture = capture, BenchmarkComparison = new("owasp-smoke", result, "subject-x"),
+            ContentCapture = capture, BenchmarkComparison = new("owasp-smoke", result, "subject-x") { Name = name },
         }, Start, Start.AddSeconds(1)).Directory;
 
     private static AefProbeRunOptions Options() => new()

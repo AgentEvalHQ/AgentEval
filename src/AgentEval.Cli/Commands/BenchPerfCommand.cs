@@ -184,6 +184,7 @@ public static class BenchPerfCommand
 
         EvalResult? result = null;
         var startedAt = DateTimeOffset.UtcNow;
+        var comparisonName = $"Performance — {preset}";
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
@@ -192,7 +193,7 @@ public static class BenchPerfCommand
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
             abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null,
-            definition: suiteDefinition);
+            definition: suiteDefinition, comparisonName: comparisonName);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);
@@ -222,7 +223,7 @@ public static class BenchPerfCommand
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 result,
                 scenarioId: $"perf-{preset.ToLowerInvariant()}",
-                scenarioName: $"Performance — {preset}");
+                scenarioName: comparisonName);
             await store.WriteScenarioResultAsync(runId, scenarioResult);
 
             var runStats = new[] { result.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)

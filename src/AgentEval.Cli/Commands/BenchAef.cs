@@ -24,7 +24,7 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null, string? comparisonName = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -32,7 +32,7 @@ internal static class BenchAef
             var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
-                BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel),
+                BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel) { Name = comparisonName },
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
                 StoreV1 = storeV1,
@@ -78,9 +78,9 @@ internal static class BenchAef
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
         string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null) =>
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null, string? comparisonName = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson, comparisonName: comparisonName);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -216,7 +216,7 @@ internal static class BenchAef
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null)
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null, string? comparisonName = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -229,6 +229,7 @@ internal static class BenchAef
                 // Explicit nullable null avoids the array conversion's empty ReadOnlyMemory value.
                 NativeReportJson = nativeReportJson is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(nativeReportJson),
                 PresetComparisonId = family == "perf" ? $"perf-{preset.ToLowerInvariant()}" : null,
+                PresetComparisonName = comparisonName,
                 Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,

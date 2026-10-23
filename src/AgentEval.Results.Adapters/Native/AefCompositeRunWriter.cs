@@ -38,6 +38,9 @@ public sealed record AefCompositeRunOptions
     /// </summary>
     public string? PresetComparisonId { get; init; }
 
+    /// <summary>The original scenario display name for <see cref="PresetComparisonId"/>; null keeps its identity fallback.</summary>
+    public string? PresetComparisonName { get; init; }
+
     /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
     public AefCliProvenance? Cli { get; init; }
 
@@ -177,6 +180,8 @@ public static class AefCompositeRunWriter
         ArgumentNullException.ThrowIfNull(options);
         AefNativeFinalization.Validate(options.Seal, options.Signer);
         var nativeReport = ValidateNativeReport(options);
+        if (options.PresetComparisonName is not null && options.PresetComparisonId is null)
+            throw new ArgumentException("Expected: a preset comparison identity alongside its recorded display name. Actual: name without identity. Suggestions: supply the original scenario ID or omit the name. Because: a label alone cannot select a comparison unit.", nameof(options));
         // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
         // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
         if (options.PresetComparisonId is { } comparisonId && !AefConverter.IsResultText(comparisonId, 256))
@@ -272,7 +277,7 @@ public static class AefCompositeRunWriter
                     for (var i = 0; i < trialCases.Count; i++)
                         Add(writer, trialCases[i], caseShapes[i], trialCases[i].Metric.Key, CasePath, null, null, trial: t,
                             capture: (line, parent) => captured.Add((line, parent?.Path)), contentCapture: options.ContentCapture,
-                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
+                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId, comparisonName: options.PresetComparisonName);
                 }
                 AddAbortedRollups(writer, captured, artifactLinks);
             }
@@ -283,13 +288,13 @@ public static class AefCompositeRunWriter
                 {
                     for (var t = 0; t < caseTrials.Count; t++)
                         Add(writer, caseTrials[t], caseShapes[i], cases[i].Metric.Key, CasePath, null, null, trial: t, contentCapture: options.ContentCapture,
-                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
+                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId, comparisonName: options.PresetComparisonName);
                 }
                 Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null,
                     options.CaseExt is { } caseExt && caseExt.TryGetValue(cases[i].Metric.Key, out var ext) ? ext : null,
                     trials: caseTrials, presetMeasured: presetMeasured, contentCapture: options.ContentCapture,
                     artifactEvidence: artifactLinks.GetValueOrDefault(cases[i].Metric.Key),
-                    comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
+                    comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId, comparisonName: options.PresetComparisonName);
             }
 
             if (options.AbortReason is null)
@@ -364,7 +369,7 @@ public static class AefCompositeRunWriter
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,
         IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false,
         Action<AefResult, AefResultHandle?>? capture = null, AefContentCapture contentCapture = AefContentCapture.Off,
-        IReadOnlyList<string>? artifactEvidence = null, bool? comparisonSelected = null, string? comparisonId = null)
+        IReadOnlyList<string>? artifactEvidence = null, bool? comparisonSelected = null, string? comparisonId = null, string? comparisonName = null)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -451,7 +456,7 @@ public static class AefCompositeRunWriter
                 }),
             });
         line = line with { Ext = AgentEval.Results.Adapters.Comparison.AefComparisonMetadata.Attach(line.Ext, node, contentCapture, comparisonSelected, comparisonId,
-            name: comparisonId is null ? node.Metric.Name : null) };
+            name: comparisonId is null ? node.Metric.Name : comparisonName) };
         var handle = writer.AddResult(line, parent);
         capture?.Invoke(line, parent);
 

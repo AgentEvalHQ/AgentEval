@@ -498,8 +498,9 @@ even when the containing run has a valid seal. Ordinary evaluation trees retain 
 
 Native composite comparison observations retain the recorded evaluator display name for their original leaf
 identities, including with capture off. Older evidence without that name keeps its ID fallback; converted legacy
-scenarios retain their original names. An alternate benchmark scenario ID does not establish its historical
-display name. A present comparison name with a non-string value is refused.
+scenarios retain their original names. Alternate benchmark/preset observations retain an explicitly supplied
+original scenario label, including with capture off; a missing label keeps the ID fallback. The ID alone does not
+establish a display name. A present comparison name with a non-string value is refused.
 
 `bench gdpr --runs N` and `bench eu-ai-act --runs N` preserve each trial's tree and a corresponding
 majority-vote rollup tree. Ties choose the more severe label; a pass supported by only some requested trials

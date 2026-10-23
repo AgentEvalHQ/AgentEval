@@ -15,6 +15,9 @@ namespace AgentEval.Results.Adapters.Native;
 /// <param name="SubjectModel">Known subject model context, used only when the result did not record its own observation.</param>
 public sealed record AefBenchmarkComparison(string Id, EvalResult Result, string? SubjectModel = null)
 {
+    /// <summary>The original caller-recorded scenario display name; null keeps the comparison identity fallback.</summary>
+    public string? Name { get; init; }
+
     internal JsonObject Encode(AefContentCapture capture)
     {
         ArgumentNullException.ThrowIfNull(Result);
@@ -32,7 +35,7 @@ public sealed record AefBenchmarkComparison(string Id, EvalResult Result, string
             {
                 ["caseId"] = Id,
                 ["evaluator"] = new JsonObject { ["id"] = Result.Metric.Key, ["version"] = Result.Metric.Version },
-                ["ext"] = AefComparisonMetadata.Attach(null, attributed, capture, selected: true, id: Id),
+                ["ext"] = AefComparisonMetadata.Attach(null, attributed, capture, selected: true, id: Id, name: Name),
             },
         };
     }

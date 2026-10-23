@@ -15,12 +15,13 @@ public sealed class AefComparisonNameTests : IDisposable
     private readonly string _out = AefTestRuns.TempPath("comparison-name");
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
     public void Dispose() => AefTestRuns.Delete(_out);
-    private string Write(AefContentCapture capture = AefContentCapture.Off) => AefCompositeRunWriter.Write(_out,
+    private string Write(AefContentCapture capture = AefContentCapture.Off, string? presetId = null, string? presetName = null) => AefCompositeRunWriter.Write(_out,
         new EvalResult(new("case", "Article 13 — recorded title", "test", "1"), new(1, null, "pass", true, .5, "none", null),
             new(null, null, null, null, null), new("code", null, null, null, null, 0, false), Start),
         AefCompositeRunWriter.Undescribed, new()
         {
             SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "test:names", ContentCapture = capture,
+            PresetComparisonId = presetId, PresetComparisonName = presetName,
         }, Start, Start.AddSeconds(1)).Directory;
 
     [Theory]
@@ -30,6 +31,26 @@ public sealed class AefComparisonNameTests : IDisposable
     {
         var directory = Write(capture);
         Assert.Equal("Article 13 — recorded title", Assert.Single(new AefComparisonReader().Read(directory).Scenarios).Name);
+    }
+
+    [Theory]
+    [InlineData(AefContentCapture.On, true)]
+    [InlineData(AefContentCapture.Off, true)]
+    [InlineData(AefContentCapture.On, false)]
+    [InlineData(AefContentCapture.Off, false)]
+    public void Read_AlternateScenario_UsesOnlyCallerRecordedName(AefContentCapture capture, bool named)
+    {
+        var directory = Write(capture, "historical-case", named ? "Original scenario — title" : null);
+        var scenario = Assert.Single(new AefComparisonReader().Read(directory).Scenarios);
+        Assert.Equal("historical-case", scenario.Id);
+        Assert.Equal(named ? "Original scenario — title" : "historical-case", scenario.Name);
+    }
+
+    [Fact]
+    public void Write_PresetNameWithoutIdentity_RefusesBeforeCreatingRun()
+    {
+        Assert.Contains("comparison identity", Assert.Throws<ArgumentException>(() => Write(presetName: "orphan label")).Message);
+        Assert.False(Directory.Exists(_out));
     }
 
     [Theory]
