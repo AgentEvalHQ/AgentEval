@@ -99,6 +99,7 @@ public static class Eval04_StochasticAgent
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"\n  ❌ Stochastic run failed — NOT measured (no verdict, no snapshot): {Config.Redact(ex)}");
+            SampleOutcome.Skip("Eval 04: stochastic run failed without a measured verdict.");
             Console.ResetColor();
             return;
         }
@@ -230,7 +231,11 @@ public static class Eval04_StochasticAgent
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Eval 04");
+    private static void PrintMissingCredentials()
+    {
+        SampleOutcome.Skip("Eval 04: no model configured.");
+        Config.PrintMissingProvider("Eval 04");
+    }
 
     private static void PrintHeader()
     {

@@ -266,7 +266,11 @@ public static class Eval05_StochasticWorkflow
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Eval 05");
+    private static void PrintMissingCredentials()
+    {
+        SampleOutcome.Skip("Eval 05: no model configured.");
+        Config.PrintMissingProvider("Eval 05");
+    }
 
     private static void PrintHeader()
     {

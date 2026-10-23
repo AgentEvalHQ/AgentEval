@@ -16,6 +16,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Share the established sample exit-code contract without a dependency on the Samples executable. -->
+    <Compile Include="../AgentEval.Samples/SampleOutcome.cs" Link="SampleOutcome.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Reference the demo project — agents and workflow factories live there -->
     <ProjectReference Include="../AgentEval.TravelDemo/AgentEval.TravelDemo.csproj" />
     <!-- AgentEval libraries referenced directly (evaluator, assertions, comparison, MAF harness,

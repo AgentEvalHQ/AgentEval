@@ -342,10 +342,12 @@ public static class Eval02_TripPlannerEvals
     /// The run's verdict over BOTH dimensions (<see cref="RunVerdicts.Combine"/>): a failed structure is a FAIL whatever
     /// the judge said, a failed quality gate on a sound structure is a WARN, and an unmeasured quality gate is never a PASS.
     /// </summary>
-    private static void PrintOverallVerdict(bool structurePassed, bool? qualityPassed)
+    internal static void PrintOverallVerdict(bool structurePassed, bool? qualityPassed)
     {
+        var verdict = RunVerdicts.Combine(structurePassed, qualityPassed);
+        EvalProcessOutcome.Record(verdict, $"Eval 02 RESULT: {verdict}");
         var quality = qualityPassed switch { true => "passed", false => "failed", null => "not measured" };
-        var (text, color) = RunVerdicts.Combine(structurePassed, qualityPassed) switch
+        var (text, color) = verdict switch
         {
             RunVerdict.Fail => ($"❌ RESULT: FAIL — the workflow's structure / tool checks failed (quality gate {quality}).", ConsoleColor.Red),
             RunVerdict.Pass => ("✅ RESULT: PASS — structure, tools and the quality gate all passed.", ConsoleColor.Green),
@@ -359,6 +361,7 @@ public static class Eval02_TripPlannerEvals
 
     private static void PrintNotMeasured(string why)
     {
+        SampleOutcome.Skip($"Eval 02: {why} before anything could be checked.");
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"\n  ⚠️  RESULT: NOT MEASURED — {why} before anything could be checked.");
         Console.ResetColor();
@@ -378,7 +381,11 @@ public static class Eval02_TripPlannerEvals
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Eval 02");
+    private static void PrintMissingCredentials()
+    {
+        SampleOutcome.Skip("Eval 02: no model configured.");
+        Config.PrintMissingProvider("Eval 02");
+    }
 
     private static void PrintPass(string message)
     {

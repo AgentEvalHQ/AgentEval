@@ -478,6 +478,7 @@ public static class EvalPrinter
         int passingScore,
         string label = "Stochastic Evaluation")
     {
+        EvalProcessOutcome.Record(tally.Verdict, $"{label}: {tally.Verdict}");
         var scores  = tally.Scores;
         double mean = scores.Count > 0 ? scores.Average() : 0;
 

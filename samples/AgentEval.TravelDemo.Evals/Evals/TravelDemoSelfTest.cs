@@ -48,6 +48,8 @@ public static class TravelDemoSelfTest
         StochasticSummaryPrintsItsOwnThreshold();
         StochasticSummaryShowsUnscoredRuns();
         LowerIsBetterRowsNameTheRightWinner();
+        Console.WriteLine("  ── Printed verdicts reach the process outcome ──");
+        PrintedVerdictsRecordExitCodes();
 
         Console.WriteLine(_failures == 0 ? "  TravelDemo selftest OK" : $"  TravelDemo selftest FAILED ({_failures} check(s))");
         return _failures == 0 ? 0 : 1;
@@ -718,6 +720,64 @@ public static class TravelDemoSelfTest
         var text = Capture(() => EvalPrinter.PrintWorkflowResult(result, ["Search", "Book"], "selftest"));
         Check("grouped tool timeline lists each step's own calls (1 call, then 2)",
               text.Contains("▸ Planner  (1 call)") && text.Contains("▸ Planner  (2 calls)") && !text.Contains("(3 calls)"));
+    }
+
+    private static void PrintedVerdictsRecordExitCodes()
+    {
+        try
+        {
+            foreach (var (verdict, code, text, checks, quality) in new (RunVerdict, int, string, bool, bool?)[]
+            {
+                (RunVerdict.Pass, 0, "RESULT: PASS", true, true),
+                (RunVerdict.Fail, 1, "RESULT: FAIL", false, true),
+                (RunVerdict.Warn, 10, "RESULT: WARN", true, false),
+                (RunVerdict.Incomplete, 11, "RESULT: INCOMPLETE", true, null),
+            })
+            {
+                SampleOutcome.Reset();
+                var agentText = Capture(() => Eval01_TravelAgentEvals.PrintOverallVerdict(verdict, [], quality));
+                Check($"Eval 1 printed {verdict} records exit {code}",
+                    agentText.Contains(text) && SampleOutcome.ExitCode == code);
+                SampleOutcome.Reset();
+                var workflowText = Capture(() => Eval02_TripPlannerEvals.PrintOverallVerdict(checks, quality));
+                Check($"Eval 2 printed {verdict} records exit {code}",
+                    workflowText.Contains(text) && SampleOutcome.ExitCode == code);
+            }
+
+            foreach (var (runs, code, text) in new (RunOutcome[], int, string)[]
+            {
+                ([new(1, 90, true)], 0, "PASSED"),
+                ([new(1, 20, false)], 1, "FAILED"),
+                ([new(1, 90, true), RunOutcome.NotMeasured(2, "unavailable")], 11, "INCOMPLETE"),
+                ([RunOutcome.NotMeasured(1, "unavailable")], 11, "NOT MEASURED"),
+            })
+            {
+                SampleOutcome.Reset();
+                var output = Capture(() => EvalPrinter.PrintStochasticSummary("selftest", new(runs, 1), 60));
+                Check($"Stochastic panel printed {text} records exit {code}",
+                    output.Contains(text) && SampleOutcome.ExitCode == code);
+            }
+
+            SampleOutcome.Reset();
+            Capture(() => Eval02_TripPlannerEvals.PrintOverallVerdict(false, true));
+            Capture(() => Eval02_TripPlannerEvals.PrintOverallVerdict(true, true));
+            Check("A later printed PASS does not erase an earlier FAIL", SampleOutcome.ExitCode == 1);
+
+            SampleOutcome.Reset();
+            try
+            {
+                Eval01_TravelAgentEvals.PrintOverallVerdict((RunVerdict)42, [], true);
+                Check("An unknown displayed verdict cannot report completion", false);
+            }
+            catch (ArgumentOutOfRangeException) { Check("An unknown displayed verdict cannot report completion", true); }
+            try
+            {
+                EvalProcessOutcome.Record((StochasticVerdict)42, "corrupt verdict");
+                Check("An unknown stochastic verdict cannot report completion", false);
+            }
+            catch (ArgumentOutOfRangeException) { Check("An unknown stochastic verdict cannot report completion", true); }
+        }
+        finally { SampleOutcome.Reset(); }
     }
 
     private static string Capture(Action print)

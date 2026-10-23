@@ -114,6 +114,7 @@ public static class Eval01_TravelAgentEvals
                 PrintFail($"The agent run failed — this run was NOT measured (no verdict, no snapshot): {Config.Redact(runError)}");
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("\n  ⚠️  RESULT: NOT MEASURED — the agent run failed before anything could be checked.");
+                SampleOutcome.Skip("Eval 01: the agent run failed before anything could be checked.");
                 Console.ResetColor();
                 return;
             }
@@ -381,8 +382,9 @@ public static class Eval01_TravelAgentEvals
     }
 
     /// <summary>The RESULT line: every failed dimension named; never a clean PASS hiding one.</summary>
-    private static void PrintOverallVerdict(RunVerdict verdict, IReadOnlyList<CheckOutcome> checks, bool? qualityPassed)
+    internal static void PrintOverallVerdict(RunVerdict verdict, IReadOnlyList<CheckOutcome> checks, bool? qualityPassed)
     {
+        EvalProcessOutcome.Record(verdict, $"Eval 01 RESULT: {verdict}");
         var quality   = qualityPassed switch { true => "passed", false => "failed", null => "not measured" };
         var failed     = checks.Where(c => c.Passed == false).Select(c => c.Name).ToList();
         var notChecked = checks.Where(c => c.Passed is null).Select(c => c.Name).ToList();
@@ -444,7 +446,11 @@ public static class Eval01_TravelAgentEvals
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Eval 01");
+    private static void PrintMissingCredentials()
+    {
+        SampleOutcome.Skip("Eval 01: no model configured.");
+        Config.PrintMissingProvider("Eval 01");
+    }
 
     private static void PrintPass(string message)
     {

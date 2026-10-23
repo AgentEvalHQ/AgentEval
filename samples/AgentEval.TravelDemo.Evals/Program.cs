@@ -53,14 +53,15 @@ if (parsedArgs.ModelValueMissing)
     return;
 }
 IDisposable? logScope = null;
-if (parsedArgs.LogRequested) logScope = ConsoleLogRecorder.StartLogging(parsedArgs.LogPath);
 if (!string.IsNullOrEmpty(parsedArgs.ModelOverride)) Config.ModelOverride = parsedArgs.ModelOverride;
 // --hide-model wins over --show-model and over TRAVELDEMO_SHOW_MODEL; neither flag leaves the variable in charge.
 if (parsedArgs.HideModel) Config.ShowModelRequested = false;
 else if (parsedArgs.ShowModel) Config.ShowModelRequested = true;
+SampleOutcome.Reset();
 
 try
 {
+    if (parsedArgs.LogRequested) logScope = ConsoleLogRecorder.StartLogging(parsedArgs.LogPath);
     // TravelDemo resolves its provider with its own copy of the rules (it does not reference AgentEval).
     // Stop here, before any model call, if that copy has drifted from AgentEval's resolver.
     if (!ProviderDriftGuard.Check())
@@ -90,14 +91,16 @@ try
 catch (Exception ex)
 {
     // Last resort: nothing may reach the runtime's own crash printer, which writes the provider's raw error text
-    // (host, model) and runs after --log has been closed. Redacted here, inside the log scope, with exit code 1.
+    // (host, model) and runs after --log has been closed. Redacted here, inside the log scope, with runtime-error 3.
     Console.ForegroundColor = ConsoleColor.Red;
     Console.Error.WriteLine($"\n  ❌ Unhandled {ex.GetType().Name}: {Config.Redact(ex, includeStackTrace: true)}");
     Console.ResetColor();
-    Environment.ExitCode = 1;
+    Environment.ExitCode = SampleOutcome.RuntimeError;
 }
 finally
 {
+    if (Environment.ExitCode == 0) Environment.ExitCode = SampleOutcome.ExitCode;
+    foreach (var line in SampleOutcome.Describe(Environment.ExitCode)) Console.WriteLine(line);
     logScope?.Dispose();
 }
 
@@ -159,6 +162,10 @@ static void PrintUsage()
 
         The model provider comes from AI_INFERENCE_PROVIDER and that provider's variables
         (see samples/AgentEval.TravelDemo/Config.cs).
+
+        Exit codes: 0 completed/PASS, 1 failed check, 2 usage, 3 runtime error,
+                    10 quality WARN, 11 incomplete/not measured (including no provider).
+        In an interactive session the worst recorded outcome determines the final exit code.
         """);
 }
 

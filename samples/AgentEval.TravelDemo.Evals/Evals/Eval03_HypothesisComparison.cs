@@ -32,6 +32,7 @@ public static class Eval03_HypothesisComparison
         // ── Age warnings ────────────────────────────────────────────────────────
         if (agentSnapshot is null)
         {
+            SampleOutcome.Skip("Eval 03: no agent snapshot available.");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  No agent snapshot found. Run Eval 1 first.\n");
             Console.ResetColor();
@@ -45,6 +46,7 @@ public static class Eval03_HypothesisComparison
 
         if (workflowSnapshot is null)
         {
+            SampleOutcome.Skip("Eval 03: no workflow snapshot available.");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  No workflow snapshot found. Run Eval 2 first.\n");
             Console.ResetColor();
@@ -68,6 +70,7 @@ public static class Eval03_HypothesisComparison
             ? ForSingleRuns(agentSnapshot, workflowSnapshot, Config.ShowModel)
             : null;
         PrintProvenanceWarning(noVerdict);
+        if (noVerdict is not null) SampleOutcome.Skip($"Eval 03: {noVerdict.Short}");
 
         // ── Main comparison panel ────────────────────────────────────────────────
         EvalPrinter.PrintComparison(
@@ -101,6 +104,8 @@ public static class Eval03_HypothesisComparison
                 ? ForStochastic(agentStoch, workflowStoch, Config.ShowModel)
                 : null;
             PrintProvenanceWarning(stochNoVerdict);
+            if (agentStoch is null || workflowStoch is null || stochNoVerdict is not null)
+                SampleOutcome.Skip("Eval 03: stochastic snapshots do not support a comparison verdict.");
 
             EvalPrinter.PrintStochasticComparison(
                 agentStoch,

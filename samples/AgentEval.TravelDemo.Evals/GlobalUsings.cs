@@ -8,3 +8,4 @@ global using AgentEval.TravelDemo.Evals;             // Eval01–05, EvalPrinter
 global using AgentEval.Comparison;          // StochasticRunner, StochasticOptions, StochasticResult
 global using AgentEval.Core;               // ChatClientEvaluator, EvaluationOptions
 global using AgentEval.Models;             // TestCase, TestResult, WorkflowTestCase, etc.
+global using AgentEval.Samples;            // Shared sample process outcome/exit codes.
