@@ -12,8 +12,8 @@ namespace AgentEval.Tests.MissionControl;
 
 /// <summary>
 /// Phase-5 Task 5.4 — regression test for the <c>MaxTreeWalkDepth=32</c> cap
-/// that guards <see cref="Query"/>'s recursive walkers (<c>WalkAndAccumulate</c>
-/// for cost-tier aggregation, <c>FindEvaluatorNode</c> for evaluator timelines)
+/// that guards <see cref="Query"/>'s recursive cost-tier walker (<c>WalkAndAccumulate</c>).
+/// Canonical evaluator timelines use flat recorded results rather than recursive legacy traversal
 /// against pathological / hostile composite trees. Without the cap a deep tree
 /// would stack-overflow the resolver thread.
 /// </summary>
@@ -40,35 +40,6 @@ public class MaxTreeWalkDepthTests
         Assert.Equal(1.0, unknown);
         Assert.True(unknown < 40,
             $"Sanity: expected the depth cap to engage and prevent walking all 40 levels; got {unknown}.");
-    }
-
-    [Fact]
-    public void FindEvaluatorNode_KeyOnlyAtLeafBeyondCap_ReturnsNull()
-    {
-        // Put the target key ONLY on the leaf at depth 40. The cap is 32 so the
-        // walker must not reach the leaf — null is the correct answer.
-        var deepTree = BuildLinearChain(depth: 40, costPerLevel: 0, deepestKey: "target.at.depth.40");
-
-        var found = Query.FindEvaluatorNode(deepTree, "target.at.depth.40");
-
-        Assert.Null(found);
-    }
-
-    [Fact]
-    public void FindEvaluatorNode_KeyAtShallowDepth_StillReturnsMatch()
-    {
-        // Same 40-deep tree but a different key is also on the ROOT.
-        // The walker must return the root match BEFORE the cap engages — pre-order traversal.
-        var deepTree = BuildLinearChain(depth: 40, costPerLevel: 0, deepestKey: "buried");
-        var rooted = deepTree with
-        {
-            Metric = new EvalMetadata("at-root", "AtRoot", "test", "1.0.0"),
-        };
-
-        var found = Query.FindEvaluatorNode(rooted, "at-root");
-
-        Assert.NotNull(found);
-        Assert.Equal("at-root", found!.Metric.Key);
     }
 
     private static EvalResult BuildLinearChain(int depth, double costPerLevel, string? deepestKey = null)

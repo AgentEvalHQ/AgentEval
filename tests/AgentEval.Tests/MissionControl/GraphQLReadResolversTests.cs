@@ -701,6 +701,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
                   evaluatorTimeline(evaluatorKey: "composite-root", count: 5) {
                     score
                     passed
+                    scores { metricId value }
+                    metrics { id scale }
                   }
                 }
                 """
@@ -713,7 +715,11 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
 
         Assert.Equal(JsonValueKind.Array, points.ValueKind);
         Assert.True(points.GetArrayLength() >= 1);
-        Assert.Equal(0.885, points[0].GetProperty("score").GetDouble(), 3);
+        // Other generic scenarios make the shared root score metric unbounded. Keep its value without calling it normalized.
+        Assert.Equal(JsonValueKind.Null, points[0].GetProperty("score").ValueKind);
+        var rawScore = Assert.Single(points[0].GetProperty("scores").EnumerateArray(), p => p.GetProperty("metricId").GetString() == "score");
+        Assert.Equal(0.885, rawScore.GetProperty("value").GetDouble(), 3);
+        Assert.Equal("unbounded", Assert.Single(points[0].GetProperty("metrics").EnumerateArray(), m => m.GetProperty("id").GetString() == "score").GetProperty("scale").GetString());
     }
 
     [Fact]

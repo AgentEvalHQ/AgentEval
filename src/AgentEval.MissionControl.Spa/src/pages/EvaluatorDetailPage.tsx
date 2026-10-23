@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink, FileCode } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
-import { TimelineChart, type TimelinePoint } from "@/components/charts/TimelineChart";
+import { EvaluatorTimeline, type EvaluatorOccurrence } from "@/components/EvaluatorTimeline";
 import { GenericEvaluatorRenderer } from "@/components/GenericEvaluatorRenderer";
 import { CostTierPill } from "./EvaluatorsPage";
 
@@ -14,23 +14,15 @@ import { CostTierPill } from "./EvaluatorsPage";
 // judge_agreement, calibration_accuracy, confidence_calibration) this is the
 // drift / calibration surface called out in plan-07 §6.1.
 
-interface EvaluatorTimelineResponse {
-  evaluatorTimeline: {
-    runId: string;
-    timestamp: string;
-    subjectKind: "AGENT" | "WORKFLOW";
-    subjectName: string;
-    score: number;
-    passed: boolean;
-    severity: string;
-    confidence: number | null;
-    manifestHash: string;
-  }[];
-}
+interface EvaluatorTimelineResponse { evaluatorTimeline: EvaluatorOccurrence[]; }
 
 const EVALUATOR_TIMELINE_QUERY = /* GraphQL */ `
   query EvaluatorTimeline($key: String!, $count: Int!) {
     evaluatorTimeline(evaluatorKey: $key, count: $count) {
+      sourceId resultId caseId path trial evaluatorVersion subjectRef state scoreMetricId threshold
+      scores { metricId value normalized }
+      metrics { id kind direction scale minimum maximum unit }
+      evidence { integrity imported signatureTrust }
       runId
       timestamp
       subjectKind
@@ -202,9 +194,8 @@ export function EvaluatorDetailPage() {
               </p>
             </section>
 
-            <TimelineSection
+            <EvaluatorTimeline
               evaluatorKey={ev.key}
-              threshold={ev.defaultThreshold ?? undefined}
               points={timelineQ.data?.evaluatorTimeline ?? null}
               isPending={timelineQ.isPending}
               isError={timelineQ.isError}
@@ -297,68 +288,5 @@ function BackLink() {
     >
       <ArrowLeft size={14} /> Back to evaluator registry
     </Link>
-  );
-}
-
-function TimelineSection({
-  evaluatorKey,
-  threshold,
-  points,
-  isPending,
-  isError,
-}: {
-  evaluatorKey: string;
-  threshold?: number;
-  points: EvaluatorTimelineResponse["evaluatorTimeline"] | null;
-  isPending: boolean;
-  isError: boolean;
-}) {
-  // Verdict mapping (keep aligned with VerdictBadge):
-  //   passed=true                                                  → PASS
-  //   passed=true  + severity in {medium}                          → WARN (drift detected, still under threshold)
-  //   passed=false + severity in {low, medium}                     → WARN
-  //   passed=false + severity in {high, critical}  (or unknown)    → FAIL
-  // `severity = "none"` defers entirely to `passed`.
-  const chartPoints: TimelinePoint[] = (points ?? []).map((p) => {
-    const sev = (p.severity ?? "").toLowerCase();
-    const isWarnSeverity = sev === "low" || sev === "medium";
-    const verdict: TimelinePoint["verdict"] = p.passed
-      ? sev === "medium" ? "WARN" : "PASS"
-      : isWarnSeverity ? "WARN" : "FAIL";
-    return {
-      timestamp: p.timestamp,
-      score: p.score,
-      runId: p.runId,
-      verdict,
-    };
-  });
-
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <header className="flex items-baseline justify-between mb-2">
-        <h3 className="text-sm font-semibold text-slate-700">
-          Score over recent runs
-        </h3>
-        <span className="text-xs text-slate-500">
-          {chartPoints.length > 0 && `${chartPoints.length} runs`}
-        </span>
-      </header>
-      {isPending ? (
-        <div className="text-sm text-slate-500 italic py-12 text-center">
-          Loading timeline…
-        </div>
-      ) : isError ? (
-        <div className="text-sm text-red-600 italic py-12 text-center">
-          Failed to load timeline.
-        </div>
-      ) : chartPoints.length === 0 ? (
-        <div className="text-sm text-slate-500 italic py-12 text-center">
-          <code className="font-mono text-xs">{evaluatorKey}</code> hasn't been
-          recorded in any recent runs yet.
-        </div>
-      ) : (
-        <TimelineChart data={chartPoints} threshold={threshold} />
-      )}
-    </section>
   );
 }

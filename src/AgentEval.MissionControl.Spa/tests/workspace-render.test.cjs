@@ -379,3 +379,60 @@ test('compliance imported detail explains ingest custody without claiming a hash
   assert.match(html, /original execution custody is not established/);
   assert.doesNotMatch(html, /hash-mismatch/);
 });
+
+
+function occurrence() {
+  return { sourceId: 'source/a', runId: 'native', resultId: 'result-one', caseId: 'case', path: 'case', trial: null,
+    evaluatorVersion: '1', subjectRef: 'model:test', subjectKind: 'MODEL', subjectName: 'test',
+    timestamp: '2026-10-23T10:00:00Z', score: 0.8, scoreMetricId: 'score', threshold: 0.75, state: 'scored', passed: null,
+    scores: [{ metricId: 'score', value: 0.8, normalized: null }],
+    metrics: [{ id: 'score', kind: 'score', direction: 'higher_better', scale: 'bounded', minimum: 0, maximum: 1, unit: null }],
+    evidence: { integrity: 'intact', imported: false, signatureTrust: 'not_checked' } };
+}
+
+test('evaluator chart accepts one declared comparable context', () => {
+  const { comparableTimeline } = load(path.join(root, 'components/EvaluatorTimeline'));
+  const p = occurrence();
+  const data = comparableTimeline([p, { ...p, runId: 'second', timestamp: '2026-10-24T10:00:00Z' }]);
+  assert.equal(data.length, 2);
+  assert.equal(data[0].score, 0.8);
+  assert.equal(data[0].verdict, null);
+});
+
+for (const [name, mutate] of [
+  ['unknown time', p => ({ ...p, timestamp: null })],
+  ['absent measurement', p => ({ ...p, score: null })],
+  ['different subject', p => ({ ...p, subjectRef: 'model:other' })],
+  ['different evaluator version', p => ({ ...p, evaluatorVersion: '2' })],
+  ['different recorded threshold', p => ({ ...p, threshold: 0.5 })],
+  ['trial', p => ({ ...p, trial: 0 })],
+  ['different case path', p => ({ ...p, path: 'case/child' })],
+  ['different metric meaning', p => ({ ...p, metrics: [{ ...p.metrics[0], maximum: 100, unit: 'ms' }] })],
+]) test(`evaluator chart refuses ${name} as a comparable series`, () => {
+  const { comparableTimeline } = load(path.join(root, 'components/EvaluatorTimeline'));
+  const p = occurrence();
+  assert.deepEqual(comparableTimeline([p, mutate(p)]), []);
+});
+
+test('evaluator occurrences render absence and exact source links without an epoch or failure', () => {
+  const { EvaluatorTimeline } = load(path.join(root, 'components/EvaluatorTimeline'));
+  const p = { ...occurrence(), timestamp: null, score: null, scoreMetricId: null, state: 'not_measured', scores: [] };
+  const html = renderToStaticMarkup(h(MemoryRouter, null, h(EvaluatorTimeline, { evaluatorKey: 'eval', points: [p], isPending: false, isError: false })));
+  assert.match(html, /time not recorded/);
+  assert.match(html, /No numeric score recorded/);
+  assert.match(html, /href="\/runs\/native\?sourceId=source%2Fa"/);
+  assert.doesNotMatch(html, /1970|FAIL/);
+});
+
+test('evaluator occurrences display raw metric units without treating them as normalized scores', () => {
+  const { EvaluatorTimeline } = load(path.join(root, 'components/EvaluatorTimeline'));
+  const p = { ...occurrence(), score: null, scoreMetricId: null,
+    scores: [{ metricId: 'latency', value: 75, normalized: null }],
+    metrics: [{ id: 'latency', kind: 'score', direction: 'none', scale: 'unbounded', minimum: null, maximum: null, unit: 'ms' }] };
+  const html = renderToStaticMarkup(h(MemoryRouter, null, h(EvaluatorTimeline, { evaluatorKey: 'eval', points: [p], isPending: false, isError: false })));
+  assert.match(html, /75/);
+  assert.match(html, /ms/);
+  assert.match(html, /unbounded/);
+  assert.match(html, /Chart unavailable/);
+  assert.doesNotMatch(html, /FAIL/);
+});

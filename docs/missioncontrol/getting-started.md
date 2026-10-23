@@ -80,6 +80,12 @@ The portal exposes both REST and GraphQL surfaces. Reads → GraphQL; binary str
 }
 ```
 
+### Evaluator occurrences
+
+The evaluator detail page reads verified canonical results, including native capture-off runs, repeated evaluator keys and trial nodes. `evaluatorTimeline` limits occurrences (default 30, maximum 200), rather than keeping an arbitrary first match per run. Each row retains source, run, result, case/path, trial, evaluator version and score meanings. Unknown or importer-asserted execution times stay null; unmeasured states do not become zero scores or failed decisions.
+
+The compatibility `score` field is populated only for one unambiguous declared score on a 0..1 scale with higher-better direction and no unit. All recorded values remain in `scores` with their `metrics` definitions, including unbounded values. The existing chart appears only for one comparable context with observed dates and measurements; it uses the recorded threshold. Mixed contexts or trials remain visible in the table. `manifestHash` is optional legacy metadata; `evidence` separately describes container integrity/import custody.
+
 ### Canonical scenario tree
 
 Use `scenarioResultTree` for native AEF and converted legacy evidence. Pass the `sourceId` returned by `recentRuns` when selecting a run; duplicate run IDs require it. An optional `resultId` selects a node without dropping its siblings or other trials.

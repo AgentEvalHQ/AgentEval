@@ -62,7 +62,7 @@ internal static class WorkspaceTreeProjector
             Strings(At(line, "evidence")), line.GetRawText());
     }
 
-    private static WorkspaceMetricDefinition Metric(JsonElement metric)
+    internal static WorkspaceMetricDefinition Metric(JsonElement metric)
     {
         var scale = At(metric, "scale");
         return new(Text(metric, "id")!, Text(metric, "kind")!, Text(metric, "direction")!,

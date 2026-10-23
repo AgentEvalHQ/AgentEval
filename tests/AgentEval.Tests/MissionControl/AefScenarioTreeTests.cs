@@ -33,11 +33,11 @@ public sealed class AefScenarioTreeTests : IDisposable
         new(key, key, "test", "1.0"), new(0.8, null, "pass", true, 0.5, "none", null),
         new(null, null, null, children.Length == 0 ? null : children, null),
         new("code", null, null, null, null, 0, false), DateTimeOffset.Parse("2026-10-23T10:00:00Z"));
-    private string Native()
+    private string Native(string subjectRef = "agent:tree")
     {
         var tree = Node("preset", Node("case", Node("repeated"), Node("repeated", Node("deep", Node("deeper", Node("leaf"))))));
         return AefCompositeRunWriter.WriteTrials(Runs, tree, [tree, tree], AefCompositeRunWriter.Undescribed,
-            new() { SubjectRef = "agent:tree", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:tree", ContentCapture = AefContentCapture.Off },
+            new() { SubjectRef = subjectRef, TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:tree", ContentCapture = AefContentCapture.Off },
             tree.EvaluatedAt, tree.EvaluatedAt.AddSeconds(1)).Directory;
     }
     private static async Task<JsonDocument> Send(HttpClient client, string query, object? variables = null)
@@ -64,6 +64,117 @@ public sealed class AefScenarioTreeTests : IDisposable
           }
         }
         """;
+
+    [Fact]
+    public async Task Timeline_NativeCaptureOff_RetainsAllRecordedOccurrencesAndTrialIdentity()
+    {
+        var directory = Native();
+        var read = new AefRunEvidenceReader().Read(directory);
+        var matches = read.Results.Where(r => r.GetProperty("evaluator").GetProperty("id").GetString() == "repeated").ToArray();
+        Assert.True(matches.Length > 1);
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var compatible = await Send(client, "{ evaluatorTimeline(evaluatorKey:\"repeated\",count:100) { runId score } }");
+        Assert.False(compatible.RootElement.TryGetProperty("errors", out _), compatible.RootElement.ToString());
+        Assert.Equal(matches.Length, compatible.RootElement.GetProperty("data").GetProperty("evaluatorTimeline").GetArrayLength());
+        using var json = await Send(client, """
+            { evaluatorTimeline(evaluatorKey:"repeated",count:100) {
+              sourceId runId resultId caseId path trial evaluatorVersion state timestamp passed score scoreMetricId
+              scores { metricId value } metrics { id kind direction scale minimum maximum unit }
+              evidence { integrity imported }
+            } }
+            """);
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var points = json.RootElement.GetProperty("data").GetProperty("evaluatorTimeline").EnumerateArray().ToArray();
+        Assert.Equal(matches.Length, points.Length);
+        Assert.Contains(points, p => p.GetProperty("trial").ValueKind == JsonValueKind.Number);
+        foreach (var point in points)
+        {
+            Assert.Equal(read.Info.RunId, point.GetProperty("runId").GetString());
+            Assert.StartsWith("source-", point.GetProperty("sourceId").GetString());
+            Assert.Contains(matches, r => r.GetProperty("resultId").GetString() == point.GetProperty("resultId").GetString());
+            Assert.Equal("intact", point.GetProperty("evidence").GetProperty("integrity").GetString());
+        }
+    }
+
+    private static void Reseal(string directory)
+    {
+        File.Delete(Path.Combine(directory, "seal.json"));
+        AefSealer.Seal(directory, new() { SealedBy = AefSealedBy.Ingest });
+        _ = new AefRunEvidenceReader().Read(directory);
+    }
+
+    [Fact]
+    public async Task Timeline_UnboundedMetricAndModelSubject_KeepsRawMeaning()
+    {
+        var directory = Native("model:tree");
+        var path = Path.Combine(directory, "metrics.json");
+        var metrics = JsonNode.Parse(File.ReadAllText(path))!;
+        var score = metrics["metrics"]!.AsArray().Single(m => (string?)m!["id"] == "score")!;
+        score["scale"] = "unbounded";
+        score["direction"] = "none";
+        score["unit"] = "ms";
+        File.WriteAllText(path, metrics.ToJsonString());
+        Reseal(directory);
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, """
+            { evaluatorTimeline(evaluatorKey:"repeated") { score subjectKind subjectRef scores { value metricId } metrics { id scale unit } } }
+            """);
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var points = json.RootElement.GetProperty("data").GetProperty("evaluatorTimeline").EnumerateArray().ToArray();
+        Assert.NotEmpty(points);
+        foreach (var point in points)
+        {
+            Assert.Equal(JsonValueKind.Null, point.GetProperty("score").ValueKind);
+            Assert.Equal("MODEL", point.GetProperty("subjectKind").GetString());
+            Assert.Equal("model:tree", point.GetProperty("subjectRef").GetString());
+            Assert.Equal(0.8, Assert.Single(point.GetProperty("scores").EnumerateArray()).GetProperty("value").GetDouble());
+            Assert.Equal("ms", Assert.Single(point.GetProperty("metrics").EnumerateArray()).GetProperty("unit").GetString());
+        }
+    }
+
+    [Fact]
+    public async Task Timeline_ImporterAssertedStart_RemainsUnknown()
+    {
+        var directory = Native();
+        var path = Path.Combine(directory, "run.json");
+        var header = JsonNode.Parse(File.ReadAllText(path))!;
+        header["imported"] = new JsonObject { ["from"] = "test importer", ["asserted"] = new JsonArray("startedAt") };
+        File.WriteAllText(path, header.ToJsonString());
+        Reseal(directory);
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, "{ evaluatorTimeline(evaluatorKey:\"repeated\") { timestamp evidence { imported } } }");
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var points = json.RootElement.GetProperty("data").GetProperty("evaluatorTimeline").EnumerateArray().ToArray();
+        Assert.NotEmpty(points);
+        Assert.All(points, p => Assert.Equal(JsonValueKind.Null, p.GetProperty("timestamp").ValueKind));
+    }
+
+    [Fact]
+    public async Task Timeline_TamperedSource_RefusesBeforeSelection()
+    {
+        var directory = Native();
+        File.AppendAllText(Path.Combine(directory, "run.json"), " ");
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, "{ evaluatorTimeline(evaluatorKey:\"repeated\") { runId } }");
+        Assert.True(json.RootElement.TryGetProperty("errors", out _));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(-1, 0)]
+    [InlineData(1, 1)]
+    [InlineData(int.MaxValue, 200)]
+    public async Task Timeline_CountBounds_ApplyToRecordedOccurrences(int count, int expected)
+    {
+        var tree = Node("preset", Node("case", Enumerable.Range(0, 201).Select(_ => Node("many")).ToArray()));
+        AefCompositeRunWriter.Write(Runs, tree, AefCompositeRunWriter.Undescribed,
+            new() { SubjectRef = "agent:many", TargetMode = AefTargetMode.Mocked, Lane = "test", SuiteRef = "bench:test", ContentCapture = AefContentCapture.Off },
+            tree.EvaluatedAt, tree.EvaluatedAt.AddSeconds(1));
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, "query T($n:Int!) { evaluatorTimeline(evaluatorKey:\"many\",count:$n) { resultId } }", new { n = count });
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        Assert.Equal(expected, json.RootElement.GetProperty("data").GetProperty("evaluatorTimeline").GetArrayLength());
+    }
 
     [Theory]
     [InlineData(AefContentCapture.Off)]
