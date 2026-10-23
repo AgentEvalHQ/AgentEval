@@ -64,6 +64,23 @@ public sealed class AefComplianceArtifactReader : IAefComplianceArtifactReader
         return new(run.Info, documents);
     }
 
+    // Workspace callers already own verified bytes. Reopening paths here could mix two source revisions.
+    internal AefComplianceReadResult Read(AefRunEvidence run, CancellationToken ct = default)
+    {
+        var documents = new List<AefComplianceDocument>();
+        foreach (var artifact in run.Evidence.Where(e => e.GetProperty("kind").GetString() == "compliance_artifact"))
+        {
+            ct.ThrowIfCancellationRequested();
+            var id = artifact.GetProperty("evidenceId").GetString()!;
+            if (run.CapturedContent(id) is not { } bytes)
+                throw Bad("Compliance artifact " + id + " is not a captured local blob.");
+            if (bytes.Length > _maxArtifactBytes)
+                throw Bad("Compliance artifact " + id + " exceeds the configured artifact byte limit.");
+            AddDocument(documents, ReadDocument(bytes.ToArray(), id, run.Info.SubjectRef));
+        }
+        return new(run.Info, documents);
+    }
+
     // Legacy conversion uses exactly the same shape and ambiguity checks before preserving the bytes.
     internal AefComplianceDocument ReadDocument(byte[] bytes, string id, string? subjectRef = null)
     {
