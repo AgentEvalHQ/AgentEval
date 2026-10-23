@@ -838,6 +838,20 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertStoreLink(RunDirectory(aef.FullName));
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
+        // The historical comparison unit is the entire benchmark, not one of its probe resistance readings.
+        var workspace = Path.Combine(_root, ".agenteval");
+        var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+        var convertedPath = Path.Combine(_root, "converted-scan");
+        AgentEval.Results.Adapters.StoreV1.StoreV1Exporter.ExportWorkspaceRun(workspace, legacy, convertedPath,
+            new() { ContentCapture = AefCliOptions.ContentCapture });
+        var comparisonReader = new AgentEval.Results.Adapters.Comparison.AefComparisonReader();
+        var converted = comparisonReader.Read(convertedPath);
+        Assert.Equal(family + "-smoke", Assert.Single(converted.Scenarios).Id);
+        Assert.Equal(AgentEval.Output.ComparisonVerdict.Comparable, converted.CompareTo(converted).Verdict);
+        var native = comparisonReader.Read(RunDirectory(aef.FullName));
+        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
+            converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
+        Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
         var notWritten = new DirectoryInfo(Path.Combine(_root, "disabled-aef"));
         var disabled = await Run(notWritten, true);
 

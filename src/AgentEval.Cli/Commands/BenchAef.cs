@@ -24,7 +24,7 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -32,6 +32,7 @@ internal static class BenchAef
             var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
+                BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel),
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
                 StoreV1 = storeV1,

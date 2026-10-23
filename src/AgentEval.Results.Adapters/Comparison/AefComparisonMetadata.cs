@@ -14,6 +14,7 @@ namespace AgentEval.Results.Adapters.Comparison;
 internal static class AefComparisonMetadata
 {
     internal const string Extension = "agenteval.comparison";
+    internal const string OmittedDerivation = "Derivation text omitted by content-capture policy.";
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -29,7 +30,7 @@ internal static class AefComparisonMetadata
                 "Suggestions: use another extension name. Because: caller metadata cannot replace observed comparison facts.");
         var facts = EvalResultPersistence.ComparabilityOf(result, result.Observation?.SubjectModel);
         if (capture == AefContentCapture.Off && facts.ChanceFloor is { } floor)
-            facts = facts with { ChanceFloor = floor with { Derivation = "Derivation text omitted by content-capture policy." } };
+            facts = facts with { ChanceFloor = floor with { Derivation = OmittedDerivation } };
         output[Extension] = new JsonObject
         {
             ["version"] = 1,

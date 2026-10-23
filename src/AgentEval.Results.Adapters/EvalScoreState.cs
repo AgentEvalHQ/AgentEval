@@ -13,16 +13,20 @@ internal static class EvalScoreState
     internal static AefState Of(EvalScore score)
     {
         ArgumentNullException.ThrowIfNull(score);
-        return score.Measurement switch
+        return Of(score.Measurement, score.Label, score.Passed);
+    }
+
+    // Summary observations retain these exact facts without manufacturing a numeric placeholder.
+    internal static AefState Of(MeasurementState measurement, string label, bool passed) => measurement switch
         {
             MeasurementState.NotApplicable => AefState.NotApplicable,
-            MeasurementState.NotMeasured => score.Label switch
+            MeasurementState.NotMeasured => label switch
             {
                 "error" => AefState.Error,
                 "skipped" => AefState.Skipped,
                 _ => AefState.NotMeasured,
             },
-            _ => score.Label switch
+            _ => label switch
             {
                 "pass" => AefState.Passed,
                 "fail" => AefState.Failed,
@@ -32,8 +36,7 @@ internal static class EvalScoreState
                 "inapplicable" => AefState.NotApplicable,
                 "inconclusive" => AefState.Inconclusive,
                 "scored" => AefState.Scored,   // measured, with no verdict: a benchmark that publishes no pass mark
-                _ => score.Passed ? AefState.Passed : AefState.Failed,
+                _ => passed ? AefState.Passed : AefState.Failed,
             },
         };
-    }
 }

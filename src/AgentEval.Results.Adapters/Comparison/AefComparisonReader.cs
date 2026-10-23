@@ -56,7 +56,7 @@ public interface IAefComparisonReader
 }
 
 /// <summary>One bounded AEF reading path for native evidence and converted legacy evidence.</summary>
-public sealed class AefComparisonReader : IAefComparisonReader
+public sealed partial class AefComparisonReader : IAefComparisonReader
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -70,11 +70,17 @@ public sealed class AefComparisonReader : IAefComparisonReader
         using var run = AefVerifiedRun.Open(directory);
         var documents = run.Documents;
         var final = documents.Results.Objects.Select(x => x.Value).Where(x => x["trial"] is null).ToList();
-        var hasSelection = final.Any(x => (x["ext"] as JsonObject)?.ContainsKey(AefComparisonMetadata.Extension) == true);
-        if (hasSelection) ValidateSelection(final, documents);
-        var selected = hasSelection ? final.Where(x => ComparisonMetadata(x)?["selected"]?.GetValue<bool>() == true)
-            : final.Where(x => x["parentResultId"] is null);
-        var selectedLines = selected.ToList();
+        var benchmark = BenchmarkObservation(documents);
+        List<JsonObject> selectedLines;
+        if (benchmark is not null) selectedLines = [benchmark];
+        else
+        {
+            var hasSelection = final.Any(x => (x["ext"] as JsonObject)?.ContainsKey(AefComparisonMetadata.Extension) == true);
+            if (hasSelection) ValidateSelection(final, documents);
+            var selected = hasSelection ? final.Where(x => ComparisonMetadata(x)?["selected"]?.GetValue<bool>() == true)
+                : final.Where(x => x["parentResultId"] is null);
+            selectedLines = selected.ToList();
+        }
         var scenarios = selectedLines.Select(Project).ToList();
         if (scenarios.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != scenarios.Count)
             throw Bad("multiple final roots for one case; the comparison unit is ambiguous");
@@ -133,42 +139,7 @@ public sealed class AefComparisonReader : IAefComparisonReader
     private static void ValidateSelection(IReadOnlyList<JsonObject> lines, AefRunDocuments documents)
     {
         var metrics = AefNode.Objects(documents.Metrics?["metrics"]).Select(m => (string)m["id"]!).ToHashSet(StringComparer.Ordinal);
-        foreach (var line in lines)
-        {
-            var metadata = ComparisonMetadata(line) ?? throw Bad("comparison metadata is missing or is not an object");
-            if (metadata["version"] is not JsonValue version || !version.TryGetValue<int>(out var number) || number != 1)
-                throw Bad("unsupported comparison metadata version");
-            if (metadata["selected"] is not JsonValue selection || !selection.TryGetValue<bool>(out _))
-                throw Bad("comparison selection is not a boolean");
-            if (AefNode.String(metadata["id"]) is not { Length: > 0 } id || string.IsNullOrWhiteSpace(id))
-                throw Bad("comparison identity is missing");
-            if (AefNode.String(metadata["metric"]) is not { } metric || !metrics.Contains(metric))
-                throw Bad("comparison metric is not declared");
-            if (metadata["stimulusHash"] is not null && AefNode.String(metadata["stimulusHash"]) is null)
-                throw Bad("comparison stimulus hash is not a string");
-            ComparabilityFacts facts;
-            try
-            {
-                facts = metadata["facts"]?.Deserialize<ComparabilityFacts>(Json) ?? throw Bad("comparison facts are missing");
-            }
-            catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
-            {
-                throw Bad("unreadable comparison facts", error);
-            }
-            if (facts.EvalKey != AefNode.String(line["evaluator"]?["id"]) ||
-                facts.EvalVersion != AefNode.String(line["evaluator"]?["version"]))
-                throw Bad("comparison evaluator identity differs from the recorded evaluator");
-            var annotator = line["annotator"];
-            if (!Enum.IsDefined(facts.EffectiveInstrumentKind) ||
-                facts.Judge is not null && facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Model ||
-                facts.Judge?.RubricDigest is { } namedRubric && facts.RubricDigest is { } unnamedRubric && namedRubric != unnamedRubric)
-                throw Bad("comparison instrument facts are inconsistent");
-            if (AefNode.String(annotator?["kind"]) == "CODE" && facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Deterministic ||
-                AefNode.String(annotator?["kind"]) == "LLM" &&
-                (facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Model || facts.Judge?.ModelId != AefNode.String(annotator?["model"]) ||
-                 AefNode.String(annotator?["rubricDigest"]) is { } rubric && rubric != facts.EffectiveRubricDigest))
-                throw Bad("comparison judge differs from the recorded annotator");
-        }
+        foreach (var line in lines) ValidateObservation(line, metrics);
 
         // Selection is a partition of the final result tree. Each terminal result belongs to exactly one
         // selected observation (itself or an ancestor); selecting nothing or both parent and child is not a partition.
@@ -185,6 +156,44 @@ public sealed class AefComparisonReader : IAefComparisonReader
             }
             if (selected != 1) throw Bad("comparison selection omits or overlaps recorded results");
         }
+    }
+
+    private static ComparabilityFacts ValidateObservation(JsonObject line, HashSet<string> metrics)
+    {
+        var metadata = ComparisonMetadata(line) ?? throw Bad("comparison metadata is missing or is not an object");
+        if (metadata["version"] is not JsonValue version || !version.TryGetValue<int>(out var number) || number != 1)
+            throw Bad("unsupported comparison metadata version");
+        if (metadata["selected"] is not JsonValue selection || !selection.TryGetValue<bool>(out _))
+            throw Bad("comparison selection is not a boolean");
+        if (AefNode.String(metadata["id"]) is not { Length: > 0 } id || string.IsNullOrWhiteSpace(id))
+            throw Bad("comparison identity is missing");
+        if (AefNode.String(metadata["metric"]) is not { } metric || !metrics.Contains(metric))
+            throw Bad("comparison metric is not declared");
+        if (metadata["stimulusHash"] is not null && AefNode.String(metadata["stimulusHash"]) is null)
+            throw Bad("comparison stimulus hash is not a string");
+        ComparabilityFacts facts;
+        try
+        {
+            facts = metadata["facts"]?.Deserialize<ComparabilityFacts>(Json) ?? throw Bad("comparison facts are missing");
+        }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
+        {
+            throw Bad("unreadable comparison facts", error);
+        }
+        if (facts.EvalKey != AefNode.String(line["evaluator"]?["id"]) ||
+            facts.EvalVersion != AefNode.String(line["evaluator"]?["version"]))
+            throw Bad("comparison evaluator identity differs from the recorded evaluator");
+        var annotator = line["annotator"];
+        if (!Enum.IsDefined(facts.EffectiveInstrumentKind) ||
+            facts.Judge is not null && facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Model ||
+            facts.Judge?.RubricDigest is { } namedRubric && facts.RubricDigest is { } unnamedRubric && namedRubric != unnamedRubric)
+            throw Bad("comparison instrument facts are inconsistent");
+        if (AefNode.String(annotator?["kind"]) == "CODE" && facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Deterministic ||
+            AefNode.String(annotator?["kind"]) == "LLM" &&
+            (facts.EffectiveInstrumentKind != EvaluationInstrumentKind.Model || facts.Judge?.ModelId != AefNode.String(annotator?["model"]) ||
+             AefNode.String(annotator?["rubricDigest"]) is { } rubric && rubric != facts.EffectiveRubricDigest))
+            throw Bad("comparison judge differs from the recorded annotator");
+        return facts;
     }
 
     private static InvalidDataException Bad(string actual, Exception? inner = null) => new(

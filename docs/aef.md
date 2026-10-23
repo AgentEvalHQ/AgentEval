@@ -467,6 +467,18 @@ preflight/help side effects and verifies signed identity and unsealed evidence w
 | `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
 
+OWASP, MITRE and NIST retain their historical whole-benchmark comparison unit separately from the probe
+results. `summary.ext["agenteval.bench"]` holds the producer's original `label` and nullable `score`;
+its optional `comparison` profile (version 1) records the original `measurement`, `passed` flag and an
+`observation` with `caseId`, evaluator identity and `agenteval.comparison` facts. The observation names the
+declared normalized `score` metric; it does not duplicate the summary's numeric score. Comparison reads this
+unit only for probe-only evidence, preserving the benchmark scenario identity, evaluation policy, instrument,
+threshold and known subject/judge relationship. It never substitutes a resistance rate for the benchmark score.
+Unmeasured scores stay absent. Capture off omits the stimulus hash and chance-floor derivation text; it retains
+the recorded numeric and instrument facts. Partial scans without a returned benchmark evaluation publish no
+aggregate comparison profile. A malformed profile or contradictory identity, metric or measurement is refused
+even when the containing run has a valid seal. Ordinary evaluation trees retain their existing selection rules.
+
 `bench gdpr --runs N` and `bench eu-ai-act --runs N` preserve each trial's tree and a corresponding
 majority-vote rollup tree. Ties choose the more severe label; a pass supported by only some requested trials
 becomes a warning. Error and skipped trials contribute no vote.

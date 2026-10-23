@@ -195,7 +195,7 @@ public static class BenchNistCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"NIST AI RMF scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition, subjectModel: agentModel))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -207,7 +207,7 @@ public static class BenchNistCommand
             {
                 if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
-                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition))
+                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition, subjectModel: agentModel))
                     return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench nist",
                     $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
@@ -328,7 +328,7 @@ public static class BenchNistCommand
             // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, definition: suiteDefinition))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, definition: suiteDefinition, subjectModel: agentModel))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -357,7 +357,7 @@ public static class BenchNistCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition, subjectModel: agentModel))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
