@@ -50,9 +50,8 @@ internal static class EndpointFactory
                 .GetChatClient(model).AsIChatClient();
         }
 
-        // Not wrapped in MinimalReasoningChatClient: it sends a rejected reasoning level again, which would make
-        // more than one attempt per call and let the runner's per-role call budget be exceeded. The runner's
-        // clients run at the provider's default reasoning.
+        // The target resolves reasoning during budgeted readiness, then freezes it for cases.
+        // Keep this transport to one SDK attempt; no reasoning fallback may hide inside accounting.
         var openAIOptions = new OpenAIClientOptions { Endpoint = uri, RetryPolicy = new ClientRetryPolicy(0) };
         return new OpenAIClient(new ApiKeyCredential(apiKey ?? "no-key-needed"), openAIOptions)
             .GetChatClient(model).AsIChatClient();

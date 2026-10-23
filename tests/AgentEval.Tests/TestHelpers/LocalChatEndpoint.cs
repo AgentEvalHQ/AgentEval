@@ -34,7 +34,8 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
     public IReadOnlyList<string> ApiKeyHeaders => _apiKeyHeaders.ToArray();
 
     public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply,
-        int statusCode = StatusCodes.Status200OK, Func<JsonObject, (long? Input, long? Output)?>? usage = null, string? probePack = null)
+        int statusCode = StatusCodes.Status200OK, Func<JsonObject, (long? Input, long? Output)?>? usage = null, string? probePack = null,
+        Func<JsonObject, int>? responseStatus = null)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
         builder.Logging.ClearProviders();
@@ -48,9 +49,10 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
             endpoint._requests.Enqueue(request);
             endpoint._authorizationHeaders.Enqueue(context.Request.Headers.Authorization.ToString());
             endpoint._apiKeyHeaders.Enqueue(context.Request.Headers["api-key"].ToString());
-            if (statusCode != StatusCodes.Status200OK)
+            var selectedStatus = responseStatus?.Invoke(request) ?? statusCode;
+            if (selectedStatus != StatusCodes.Status200OK)
             {
-                context.Response.StatusCode = statusCode;
+                context.Response.StatusCode = selectedStatus;
                 await context.Response.WriteAsJsonAsync(new { error = new { message = "Scripted endpoint failure", type = "server_error" } },
                     context.RequestAborted);
                 return;

@@ -4,6 +4,7 @@
 
 using AgentEval.Results.Writing;
 using AgentEval.Results.Suites;
+using System.Text.Json.Nodes;
 
 namespace AgentEval.Results.Runner;
 
@@ -59,6 +60,8 @@ public interface IAefJobSuite
     long PreparationSecondsBound => 0;
     /// <summary>Preparation cost incurred so far, including on interruption.</summary>
     double PreparationIncurredUsd => 0;
+    /// <summary>Optional content-free preparation facts, preserved in ext/agenteval/preparation.json even on failure.</summary>
+    JsonObject? PreparationMetadata => null;
     /// <summary>Prepares the run after its first case and preparation jointly fit the remaining limits.</summary>
     ValueTask<AefJobPreparationResult> PrepareAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult(new AefJobPreparationResult(true, 0, 0));

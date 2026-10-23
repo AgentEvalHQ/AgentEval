@@ -126,6 +126,13 @@ This runner uses process isolation and an endpoint that is already running. The 
 signing identity; a signed job records its public `signingKeyId` in its options and events.
 
 Run a plan with `agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json`.
+Before dataset cases start, readiness resolves each subject/judge endpoint's minimal reasoning setting using the
+same policy as `eval`: `none`, then `low`, then an omitted setting (the provider default). Every rejected probe
+counts as an attempt and retains its cost reservation when usage is unavailable. Dry-run estimates reserve up
+to three readiness attempts per role and suite; unused attempts are not charged. Case requests keep the resolved
+setting and make no reasoning fallback or SDK transport retry. Sealed `ext/agenteval/preparation.json` records
+per-role attempts, incurred preparation cost and the resolved setting, including with content capture off.
+Failed preparation records unresolved roles honestly and starts no cases.
 The root must exist; when omitted it is discovered from the current directory, falling back to that directory.
 The job writes `.agenteval/aef/jobs/<jobId>/` with exact `plan.json` bytes, `runner.json`, `events.ndjson`, and
 `runs/<runId>/`. Existing job directories are refused. `--json` prints a terminal report containing the job ID,

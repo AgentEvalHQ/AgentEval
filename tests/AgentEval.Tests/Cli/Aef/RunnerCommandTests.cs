@@ -163,7 +163,7 @@ public sealed class RunnerCommandTests : IDisposable
         if (expectedExit == 0)
         {
             Assert.Equal(1, (int)report["cases"]!);
-            Assert.Equal(2, (int)report["calls"]!["target"]!);
+            Assert.Equal(4, (int)report["calls"]!["target"]!);
             Assert.Equal(0, (int)report["calls"]!["judge"]!);
             Assert.Equal(65, (int)report["durationRange"]!["high"]!);
             Assert.True((double)report["costRange"]!["high"]! > 0);
@@ -217,8 +217,8 @@ public sealed class RunnerCommandTests : IDisposable
             environment: _ => null, home: _root, dryRun: true));
         var report = JsonNode.Parse(stdout.ToString())!;
         Assert.Equal(2, (int)report["cases"]!);
-        Assert.Equal(8, (int)report["calls"]!["target"]!);
-        Assert.Equal(10, (int)report["calls"]!["judge"]!);
+        Assert.Equal(12, (int)report["calls"]!["target"]!);
+        Assert.Equal(14, (int)report["calls"]!["judge"]!);
         Assert.Equal(130, (int)report["durationRange"]!["high"]!);
         Assert.Equal(2, report["models"]!.AsArray().Count);
         Assert.Equal(2, report["suites"]!.AsArray().Count);
