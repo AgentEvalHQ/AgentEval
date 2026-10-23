@@ -82,6 +82,7 @@ public static partial class StoreV1Exporter
 
         var documents = new List<AefComplianceDocument>();
         var artifacts = new List<byte[]>();
+        var pdfs = new List<(ComplianceEvidence Evidence, byte[] Bytes)>();
         long bytes = 0;
         foreach (var path in paths)
         {
@@ -94,19 +95,23 @@ public static partial class StoreV1Exporter
                 throw InvalidSource("A compliance report's recorded source hash disagrees with the selected run manifest.");
             foreach (var artifact in captured)
             {
-                bytes += artifact.Bytes.LongLength;
+                bytes += artifact.Bytes.LongLength + (artifact.Pdf?.LongLength ?? 0);
                 if (bytes > 256L << 20) throw InvalidSource("Matching workspace compliance reports exceed 256 MiB.");
                 var count = documents.Count;
                 AefComplianceArtifactReader.AddDocument(documents, artifact.Document);
                 if (artifact.Document.IsRich && documents.Count != count) artifacts.Add(artifact.Bytes);
+                if (artifact.Pdf is { } pdf) pdfs.Add((artifact.Document.Evidence, pdf));
             }
         }
         ct.ThrowIfCancellationRequested();
+        var evidenceDocuments = documents.GroupBy(d => (d.Evidence.Regulation, d.Evidence.GeneratedAt))
+            .Select(g => g.First().Evidence).ToArray();
         return run with
         {
-            ComplianceEvidence = documents.GroupBy(d => (d.Evidence.Regulation, d.Evidence.GeneratedAt))
-                .Select(g => g.First().Evidence).ToArray(),
+            ComplianceEvidence = evidenceDocuments,
             ComplianceArtifacts = artifacts,
+            CompliancePdfs = pdfs.Select(p => new StoreV1CompliancePdf("E-compliance-" +
+                (Array.FindIndex(evidenceDocuments, e => AefComplianceArtifactReader.SameIdentity(e, p.Evidence)) + 1), p.Bytes)).ToArray(),
         };
     }
 

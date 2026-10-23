@@ -43,6 +43,13 @@ const { ManifestHashBadge } = load(path.join(root, 'components/ManifestHashBadge
 const { RedTeamCampaigns } = load(path.join(root, 'pages/RedTeamCampaigns'));
 const h = React.createElement;
 
+test('PDF URL retains encoded report identity, subject kind and exact source', () => {
+  const url = new URL(restUrls.compliancePdf('GDPR', 'Name %', '2026-10-23_10-00-00', 'WORKFLOW', 'source/a'), 'http://localhost');
+  assert.equal(url.pathname, '/api/v1/compliance/GDPR/Name%20%25/2026-10-23_10-00-00/report.pdf');
+  assert.equal(url.searchParams.get('kind'), 'workflow');
+  assert.equal(url.searchParams.get('sourceId'), 'source/a');
+});
+
 test('campaign registration without completion does not claim execution is running', () => {
   const html = render(RedTeamCampaigns, '/red-team', '/red-team', [[queryKeys.redTeam.list(), { redTeamCampaigns: [
     { campaignId: 'registered', name: 'Inventory', startedAt: '2026-10-23T10:00:00Z', targets: [], mode: 'standard', completedAt: null },
@@ -401,6 +408,7 @@ test('compliance imported detail explains ingest custody without claiming a hash
       } }
     }]]);
   assert.match(html, /href="\/runs\/native-container\?sourceId=source%2Fa"/);
+  assert.match(html, /report\.pdf\?kind=agent&amp;sourceId=source%2Fa/);
   assert.match(html, /not sealed when it ran/);
   assert.match(html, /original execution custody is not established/);
   assert.doesNotMatch(html, /hash-mismatch/);

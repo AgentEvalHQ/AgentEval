@@ -58,10 +58,12 @@ public static partial class StoreV1Exporter
         return Export(new ExportData(header, [], DefaultLane, DateTimeOffset.UnixEpoch, reason, notes)
         {
             ComplianceArtifacts = artifacts,
+            CompliancePdfs = captured.Select((c, i) => (c, i)).Where(x => x.c.Pdf is not null)
+                .Select(x => new StoreV1CompliancePdf("E-compliance-original-" + (x.i + 1), x.c.Pdf!)).ToArray(),
         }, outputDirectory, options);
     }
 
-    private sealed record CapturedCompliance(AefComplianceDocument Document, byte[] Bytes);
+    private sealed record CapturedCompliance(AefComplianceDocument Document, byte[] Bytes, byte[]? Pdf = null);
 
     private static List<CapturedCompliance> CaptureComplianceDirectory(string sourceDirectory, CancellationToken ct, AefReadBudget? budget = null)
     {
@@ -90,6 +92,8 @@ public static partial class StoreV1Exporter
             artifacts.Add(new(document, bytes));
         }
         if (documents.Count == 0) throw InvalidSource("No supported compliance documents were found.");
+        var pdf = Path.Combine(snapshot.FullName, "report.pdf");
+        if (File.Exists(pdf)) artifacts[0] = artifacts[0] with { Pdf = File.ReadAllBytes(pdf) };
         return artifacts;
     }
 }

@@ -31,6 +31,24 @@ takes precedence over its explicitly linked legacy run entries; capture-off cont
 from that sibling. Independent sources remain source-qualified, without an invented total chronology.
 An orphan index's `containerRunId` identifies a temporary import container, not an original execution.
 
+## Source compliance PDFs
+
+`GET /api/v1/compliance/{regulation}/{subjectName}/{timestamp}/report.pdf` serves captured PDF bytes
+from verified workspace evidence, including converted legacy reports. It does not read a live sibling
+file after selecting AEF evidence, re-render a report or fetch an external link. Optional `kind=agent`
+or `kind=workflow` and `sourceId` qualify the selection; the detail page supplies them when available.
+An ambiguous selection returns 409, unavailable PDF content returns 404 (`pdf_not_captured`), and
+invalid/tampered evidence returns 422. Downloads use `Cache-Control: no-store`.
+
+A source PDF is a `document` evidence artifact whose `ext.agenteval.compliance.pdfFor` names the
+`evidenceId` of its captured `compliance_artifact` JSON document. This explicit link supplies the recorded
+report identity; the filename alone does not. The converter preserves `report.pdf` through both workspace-run
+and standalone compliance-directory conversion when content capture is on. Capture-off omits its bytes
+and digest. Stored AEF evidence takes precedence over linked legacy reports. A PDF-only legacy file
+without a recorded compliance document is unavailable through this route; no report identity is invented.
+As with other imported artifacts, the ingest seal protects the captured bytes from conversion onward and
+does not establish original execution custody or independent signature trust.
+
 ## Campaign registrations
 
 `redTeamCampaigns` and `redTeamCampaign` retain the existing registration inventory: campaign ID,

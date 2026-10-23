@@ -201,7 +201,7 @@ export function EvidenceDetailPage() {
                   Overall: {ev.summary.overallStatus}
                 </span>
                 <a
-                  href={restUrls.compliancePdf(regulation, name, ts)}
+                  href={restUrls.compliancePdf(regulation, name, ts, ev.subject.kind, wrapper.sourceId)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"

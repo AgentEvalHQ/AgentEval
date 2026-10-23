@@ -103,8 +103,12 @@ export const restUrls = {
     `${REST_BASE}/runs/${encodeURIComponent(runId)}/reports/${encodeURIComponent(format)}${sourceQuery(sourceId)}`,
   artifact: (runId: string, evidenceId: string, sourceId?: string | null) =>
     `${REST_BASE}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(evidenceId)}${sourceQuery(sourceId)}`,
-  compliancePdf: (regulation: string, subjectName: string, ts: string) =>
-    `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/${encodeURIComponent(subjectName)}/${encodeURIComponent(ts)}/report.pdf`,
+  compliancePdf: (regulation: string, subjectName: string, ts: string, kind?: string | null, sourceId?: string | null) => {
+    const query = new URLSearchParams();
+    if (kind != null) query.set("kind", kind.toLowerCase());
+    if (sourceId != null) query.set("sourceId", sourceId);
+    return `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/${encodeURIComponent(subjectName)}/${encodeURIComponent(ts)}/report.pdf${query.size ? `?${query}` : ""}`;
+  },
   complianceSchema: (regulation: string) =>
     `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/schema`,
   history: (kind: string, name: string) =>

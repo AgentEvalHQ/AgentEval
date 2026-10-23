@@ -234,6 +234,7 @@ public static partial class StoreV1Exporter
         {
             Summary = run.Summary, Trace = run.Trace, ComplianceEvidence = run.ComplianceEvidence,
             ComplianceArtifacts = run.ComplianceArtifacts,
+            CompliancePdfs = run.CompliancePdfs,
             Reports = run.Reports,
             TraceSnapshotPath = run.TraceSnapshotPath,
             HistoryRecords = run.HistoryRecords,
@@ -268,6 +269,7 @@ public static partial class StoreV1Exporter
         internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
         internal IReadOnlyList<ComplianceEvidence> ComplianceEvidence { get; init; } = [];
         internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+        internal IReadOnlyList<StoreV1CompliancePdf> CompliancePdfs { get; init; } = [];
         internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
     }
 
@@ -321,6 +323,7 @@ public static partial class StoreV1Exporter
                 }
             }
             var traceEvidence = AddTrace(writer, data.Trace, data.TraceSnapshotPath, options.ContentCapture);
+            AddCompliancePdfs(writer, data.CompliancePdfs, options.ContentCapture);
             AddReports(writer, data.Reports, options.ContentCapture);
             if (options.ContentCapture == AefContentCapture.On && data.HistoryRecords is { } historyRecords)
                 writer.AddEvidence(new AefEvidence
@@ -869,6 +872,7 @@ public sealed record StoreV1Run(
 {
     // Exact bytes captured by the filesystem importer, after validating their generic evidence identity.
     internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+    internal IReadOnlyList<StoreV1CompliancePdf> CompliancePdfs { get; init; } = [];
     internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
     internal string? TraceSnapshotPath { get; init; }
     internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }

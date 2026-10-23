@@ -14,6 +14,7 @@ internal sealed record WorkspaceComplianceReport(AefComplianceDocument Document,
     bool SourceAvailable, string? SourceId)
 {
     internal ComplianceEvidence Evidence => Document.Evidence;
+    internal ReadOnlyMemory<byte>? Pdf { get; init; }
     internal string? CustodyWarning => Container.Imported
         ? SourceAvailable ? "imported-not-sealed-when-run" : "source-run-not-found"
         : Container.Integrity == "intact" ? null : "unsealed-evidence";
@@ -41,8 +42,10 @@ internal sealed class WorkspaceComplianceSource(IOutputStoreReader store, IWorks
         {
             budget.Charge(run.Evidence.Bytes);
             var captured = reader.Read(run.Evidence, ct).Documents;
+            var pdfs = AefCompliancePdfReader.Read(run.Evidence, ct);
             foreach (var document in captured)
-                Add(document, run.Evidence.Info, Timestamp(document.Evidence.GeneratedAt), true, run.SourceId);
+                Add(document, run.Evidence.Info, Timestamp(document.Evidence.GeneratedAt), true, run.SourceId,
+                    AefCompliancePdfReader.Select(pdfs, document.Evidence));
             if (!run.Evidence.Info.Imported && run.Evidence.Header.TryGetProperty("suite", out var suite)
                 && suite.TryGetProperty("ref", out var reference) && reference.GetString() is { } suiteRef
                 && suiteRef.StartsWith("bench:", StringComparison.Ordinal) && suiteRef.IndexOf('/') is var slash && slash > 6)
@@ -108,6 +111,7 @@ internal sealed class WorkspaceComplianceSource(IOutputStoreReader store, IWorks
                 var converted = StoreV1Exporter.ExportComplianceDirectoryBounded(directory,
                     Path.Combine(temporary.FullName, "run"), null, ct, budget);
                 var snapshot = new AefRunEvidenceReader().Read(converted.Directory, 64L << 20, ct);
+                var pdfs = AefCompliancePdfReader.Read(snapshot, ct);
                 foreach (var document in reader.Read(snapshot, ct).Documents)
                 {
                     var e = document.Evidence;
@@ -125,17 +129,26 @@ internal sealed class WorkspaceComplianceSource(IOutputStoreReader store, IWorks
                     // Match the existing report reader: an unidentified native invocation cannot authorize legacy recovery.
                     if (_unavailable.Any(u => u.Run.RunAliases.Count == 0
                         && MatchesSubject(u.Run.Evidence.Info.SubjectRef, e.Subject) && SameRegulation(u.Regulation, e.Regulation))) continue;
-                    Add(document, snapshot.Info, timestamp, false);
+                    Add(document, snapshot.Info, timestamp, false, pdf: AefCompliancePdfReader.Select(pdfs, document.Evidence));
                 }
             }
             finally { temporary.Delete(true); }
         }
 
-        void Add(AefComplianceDocument document, AefRunReadInfo info, string timestamp, bool sourceAvailable, string? sourceId = null)
+        void Add(AefComplianceDocument document, AefRunReadInfo info, string timestamp, bool sourceAvailable, string? sourceId = null,
+            ReadOnlyMemory<byte>? pdf = null)
         {
             AefComplianceArtifactReader.AddDocument(documents, document);
-            if (reports.Any(r => AefComplianceArtifactReader.SameIdentity(r.Evidence, document.Evidence))) return;
-            reports.Add(new(document, info, timestamp, sourceAvailable, sourceId));
+            var index = reports.FindIndex(r => AefComplianceArtifactReader.SameIdentity(r.Evidence, document.Evidence));
+            if (index >= 0)
+            {
+                var prior = reports[index];
+                // Select already resolved one PDF per identity within this immutable snapshot.
+                if (prior.Container.RunId == info.RunId && prior.SourceId == sourceId) return;
+                // Preserve independent PDF source identities so a download must select explicitly.
+                if (prior.Pdf is null && pdf is null) return;
+            }
+            reports.Add(new(document, info, timestamp, sourceAvailable, sourceId) { Pdf = pdf });
         }
     }
 

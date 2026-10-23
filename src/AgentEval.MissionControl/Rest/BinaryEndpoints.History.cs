@@ -12,7 +12,11 @@ namespace AgentEval.MissionControl.Rest;
 
 internal static partial class BinaryEndpoints
 {
-    private static readonly JsonSerializerOptions s_historyJson = new(s_traceJson) { DefaultIgnoreCondition = JsonIgnoreCondition.Never };
+    private static readonly JsonSerializerOptions s_historyJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
 
     private static void MapHistoryDownload(this WebApplication app) => app.MapGet("/api/v1/subjects/{kind}/{name}/history", async (
         HttpContext context, string kind, string name, IOutputStoreReader store, IWorkspaceRunSource source, CancellationToken ct) =>

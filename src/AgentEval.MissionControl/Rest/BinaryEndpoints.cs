@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using AgentEval.Output;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
 
@@ -17,43 +15,11 @@ namespace AgentEval.MissionControl.Rest;
 /// </summary>
 internal static partial class BinaryEndpoints
 {
-    private static readonly JsonSerializerOptions s_traceJson = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-    };
-
     public static void MapBinaryEndpoints(this WebApplication app)
     {
         app.MapRunDownloads();
         app.MapHistoryDownload();
-
-        // ─── MC1.3.4 — compliance PDF stream ─────────────────────────────────
-        app.MapGet("/api/v1/compliance/{regulation}/{subjectName}/{ts}/report.pdf", async (
-            string regulation,
-            string subjectName,
-            string ts,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            if (!FileSystemLayout.IsSafePathSegment(regulation)) return HttpResults.BadRequest("Invalid regulation.");
-            if (!FileSystemLayout.IsSafePathSegment(subjectName)) return HttpResults.BadRequest("Invalid subjectName.");
-            if (!FileSystemLayout.IsSafePathSegment(ts)) return HttpResults.BadRequest("Invalid timestamp.");
-            if (string.IsNullOrEmpty(store.WorkspaceRoot)) return HttpResults.NotFound();
-
-            // Compliance evidence on disk is keyed by subject NAME only — the kind
-            // doesn't appear in the path. Try both kinds; whichever resolves wins.
-            var layout = new FileSystemLayout(store.WorkspaceRoot);
-            foreach (var kind in new[] { SubjectKind.Agent, SubjectKind.Workflow })
-            {
-                var pdfPath = layout.ComplianceReportPdf(regulation, new SubjectIdentity(kind, subjectName), ts);
-                if (File.Exists(pdfPath))
-                    return HttpResults.File(File.OpenRead(pdfPath), "application/pdf");
-            }
-            await Task.CompletedTask;  // placate analyser; nothing to await on the not-found path
-            return HttpResults.NotFound();
-        });
+        app.MapCompliancePdfDownload();
 
         // ─── MC1.3.5 — compliance evidence JSON schema ───────────────────────
         // Returns the JSON schema for a regulation's evidence so a generic SPA can
