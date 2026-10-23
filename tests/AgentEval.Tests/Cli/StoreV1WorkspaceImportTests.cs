@@ -54,7 +54,7 @@ public sealed class StoreV1WorkspaceImportTests : IDisposable
     [Fact]
     public async Task Export_SelectedRunFolderWithDuplicateId_UsesExactlyThatFolder()
     {
-        var (workspace, first, evidence, _) = await CreateAsync();
+        var (workspace, first, evidence, reportBytes) = await CreateAsync();
         var second = DuplicateRun(workspace, first, evidence.Base.SourceRun.RunId);
         foreach (var (source, name) in new[] { (first, "WorkspaceAgent"), (second, "OtherAgent") })
         {
@@ -63,6 +63,14 @@ public sealed class StoreV1WorkspaceImportTests : IDisposable
             Assert.Equal(ExitCodes.Success, exit);
             var header = JsonNode.Parse(File.ReadAllText(Path.Combine(destination, "run.json")))!;
             Assert.Equal("agent:" + name, header["subject"]!["ref"]!.GetValue<string>());
+            var imported = new AefComplianceArtifactReader().Read(destination);
+            if (source == first)
+            {
+                Assert.Equal(2, imported.Documents.Count);
+                Assert.All(imported.Documents, document => Assert.Equal(evidence.Base.SourceRun, document.Evidence.SourceRun));
+                Assert.Equal(System.Text.Encoding.UTF8.GetString(reportBytes), Assert.Single(imported.Documents, d => d.IsRich).Document.GetRawText());
+            }
+            else Assert.Empty(imported.Documents); // Same run ID cannot attach another subject's report.
         }
     }
 
