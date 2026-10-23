@@ -144,7 +144,18 @@ public static partial class StoreV1Exporter
             }
         }
 
-        return new StoreV1Run(manifest, summary, scenarios, trace, compliance);
+        var history = new List<StoreV1HistoryRecord>();
+        var ordinal = 0;
+        await foreach (var entry in store.GetHistoryAsync(subject, ct: ct).ConfigureAwait(false))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (++ordinal > StoreV1History.MaxRecords) throw InvalidSource("History exceeds the bounded record count.");
+            if (!double.IsFinite(entry.Score)) throw InvalidSource("History score is not finite.");
+            accountant?.Account(entry);
+            var recorded = StoreV1History.Parse(JsonSerializer.SerializeToElement(entry, s_store), ordinal);
+            if (entry.RunId == runId) history.Add(recorded);
+        }
+        return new StoreV1Run(manifest, summary, scenarios, trace, compliance) { HistoryRecords = history };
     }
 
     /// <summary>Exports a store v1 run already read.</summary>
@@ -234,6 +245,7 @@ public static partial class StoreV1Exporter
             ComplianceArtifacts = run.ComplianceArtifacts,
             Reports = run.Reports,
             TraceSnapshotPath = run.TraceSnapshotPath,
+            HistoryRecords = run.HistoryRecords,
         }, outputDirectory, options);
     }
 
@@ -262,6 +274,7 @@ public static partial class StoreV1Exporter
         internal RunSummary? Summary { get; init; }
         internal AgentTrace? Trace { get; init; }
         internal string? TraceSnapshotPath { get; init; }
+        internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
         internal IReadOnlyList<ComplianceEvidence> ComplianceEvidence { get; init; } = [];
         internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
         internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
@@ -273,6 +286,11 @@ public static partial class StoreV1Exporter
         if (data.Scenarios.Any(s => s.Input is null || s.Output is null || s.Metrics is null
             || s.Assertions?.Any(a => a is null) == true))
             throw InvalidSource("A legacy scenario contains null input, output, metrics or assertion evidence.");
+        if (data.HistoryRecords is { } history && data.Header.Ext?[ExtName] is JsonObject legacy)
+            legacy["history"] = new JsonObject
+            {
+                ["version"] = 1, ["entries"] = history.Count, ["captured"] = options.ContentCapture == AefContentCapture.On
+            };
         var existed = Directory.Exists(outputDirectory);
         AefRunWriter writer;
         try
@@ -313,6 +331,13 @@ public static partial class StoreV1Exporter
             }
             var traceEvidence = AddTrace(writer, data.Trace, data.TraceSnapshotPath, options.ContentCapture);
             AddReports(writer, data.Reports, options.ContentCapture);
+            if (options.ContentCapture == AefContentCapture.On && data.HistoryRecords is { } historyRecords)
+                writer.AddEvidence(new AefEvidence
+                {
+                    EvidenceId = StoreV1History.EvidenceId, Kind = AefEvidenceKind.Document,
+                    Link = AefEvidenceLink.ToBlob(writer.PutBlob(StoreV1History.Encode(historyRecords))),
+                    Description = "Recorded legacy history entries associated with this run, in original index order. Index claims do not verify execution; ingest custody begins at conversion."
+                });
             var index = 0;
             foreach (var scenario in data.Scenarios)
             {
@@ -855,4 +880,5 @@ public sealed record StoreV1Run(
     internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
     internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
     internal string? TraceSnapshotPath { get; init; }
+    internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
 }

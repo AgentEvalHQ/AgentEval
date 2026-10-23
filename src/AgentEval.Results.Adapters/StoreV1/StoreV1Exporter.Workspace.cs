@@ -60,6 +60,9 @@ public static partial class StoreV1Exporter
             var kind = manifest.Subject.Kind == SubjectKind.Workflow ? "workflows" : "agents";
             if (!WorkspacePathComparer.Equals(manifest.Run.RunId, parts[4]) || !WorkspacePathComparer.Equals(kind, parts[1]))
                 throw InvalidSource("The selected folder disagrees with its manifest run ID or subject kind.");
+            var subjectDirectory = Path.GetDirectoryName(Path.GetDirectoryName(source)!)!;
+            var history = StoreV1History.ReadFile(Path.Combine(subjectDirectory, "history.jsonl"), ct, budget);
+            run = run with { HistoryRecords = history?.Where(r => r.Entry.RunId == manifest.Run.RunId).ToArray() };
             return EnrichWorkspaceRun(workspace, parts[2], run, ct, budget);
         }, budget);
     }
