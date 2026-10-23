@@ -35,6 +35,7 @@
       "inspect_ai": "0.3.277"
     },
     "scorers": [
+      null,
       {
         "name": "correct",
         "options": {},
@@ -71,6 +72,7 @@
     "total_samples": 6,
     "completed_samples": 4,
     "scores": [
+      null,
       {
         "name": "correct",
         "scorer": "includes",
@@ -148,6 +150,7 @@
     }
   },
   "samples": [
+    null,
     {
       "id": 1,
       "epoch": 1,
@@ -555,10 +558,12 @@
     }
   ],
   "reductions": [
+    null,
     {
       "scorer": "correct",
       "reducer": "mode",
       "samples": [
+        null,
         {
           "value": "C",
           "sample_id": 1
@@ -577,6 +582,7 @@
       "scorer": "quality",
       "reducer": "mode",
       "samples": [
+        null,
         {
           "value": 0.8,
           "sample_id": 1
@@ -595,6 +601,7 @@
       "scorer": "checks",
       "reducer": "mode",
       "samples": [
+        null,
         {
           "value": {
             "cites_policy": "C",

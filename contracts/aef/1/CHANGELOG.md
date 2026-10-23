@@ -5,6 +5,12 @@
 AEF 1.0 is settled but not yet tagged. These are changes to 1.0 itself, made before the `aef-1.0` tag: what critic
 round 11 found, and what AgentEval needs to write AEF natively. None is an erratum.
 
+- **Release text and Inspect null entries** (2026-10-24): RUN-4 explicitly permits sealing, attestation, overlays
+  and authorized withholding after close; governance follows the normative compatibility/errata rules. Overlay
+  truncation requires an externally retained or anchored latest head, rather than a deletable local signature.
+  Interop summaries distinguish optional artifact binding and lossy native EvalPort identity projection. The result
+  field description includes `scored`. Inspect null entries in object lists are skipped as absent in both
+  implementations; the existing informative Inspect fixture now includes them with unchanged mapped output.
 - **Licence: Apache-2.0 alone** (GOVERNANCE.md, "Licence and patents"). The lead editor decided on 2026-10-20 that
   AEF 1.0 is released under Apache-2.0 for everything in `contracts/aef/`: the text, schemas, corpus and tools. The
   plan to put the specification text under the Community Specification License 1.0 is dropped, and `SCOPE.md`, which

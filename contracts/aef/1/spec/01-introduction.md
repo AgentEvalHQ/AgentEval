@@ -77,7 +77,7 @@ Paths in this specification use `/` as the separator. "Byte" means an octet. Hex
 | **Run** | One execution of an evaluation: a folder holding `run.json` and the files of §3. |
 | **Result** | One node of a run's result tree: a line of `results.ndjson`. |
 | **Case** | One item of the evaluated suite; a case has one or more results (a tree, or several trials). |
-| **Closed** | A run whose `status` is `completed` or `aborted`. A closed run's files never change (§3.1). |
+| **Closed** | A run whose `status` is `completed` or `aborted`. Its evaluation files are immutable, with only the sealing, attestation, overlay and authorized-withholding exceptions of [RUN-4] (§3.1). |
 | **Seal** | `seal.json`: an in-toto Statement listing the SHA-256 of every sealed file of a closed run (§4.1). |
 | **Run hash** | The SHA-256 of a run's manifest (§4.1); it identifies the run's exact content. |
 | **Overlay** | An event added to a closed run after it closed (an approval, a waiver, a note), in `overlays/` (§4.2). |

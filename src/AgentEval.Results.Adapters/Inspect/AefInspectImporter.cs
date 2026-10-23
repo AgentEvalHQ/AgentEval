@@ -686,6 +686,11 @@ public static partial class AefInspectImporter
         for (var i = 0; i < samples.Count; i++)
         {
             var where = $"samples[{i.ToString(CultureInfo.InvariantCulture)}]";
+            if (samples[i] is null)
+            {
+                continue;   // Optional null object-list entries are absent ("Member types").
+            }
+
             var sample = samples[i] as JsonObject ?? throw Refuse("IN-8", $"{where} is not an object.");
             if (sample["invalidation"] is not null)
             {
@@ -837,6 +842,11 @@ public static partial class AefInspectImporter
             for (var r = 0; r < reductions.Count; r++)
             {
                 var where = $"reductions[{r.ToString(CultureInfo.InvariantCulture)}]";
+                if (reductions[r] is null)
+                {
+                    continue;
+                }
+
                 var reduction = reductions[r] as JsonObject ?? throw Refuse("IN-8", $"{where} is not an object.");
                 var scorer = Text(reduction["scorer"]) is { Length: > 0 } sc ? sc : throw Refuse("IN-8", $"{where} has no scorer.");
                 var reducerName = Text(reduction["reducer"]) ?? throw Refuse("IN-8", $"{where} has no reducer.");
@@ -846,6 +856,11 @@ public static partial class AefInspectImporter
                 for (var j = 0; j < reduced.Count; j++)
                 {
                     var at = $"{where}.samples[{j.ToString(CultureInfo.InvariantCulture)}]";
+                    if (reduced[j] is null)
+                    {
+                        continue;
+                    }
+
                     var score = reduced[j] as JsonObject ?? throw Refuse("IN-8", $"{at} is not an object.");
                     var caseId = CaseId(score["sample_id"], $"{at}.sample_id");
                     if (!trialStates.TryGetValue((caseId, scorer), out var states))

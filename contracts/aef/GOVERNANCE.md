@@ -52,11 +52,12 @@ Every commit to `contracts/aef/` carries a **Developer Certificate of Origin** s
   `conformance/index.json`).
 - **Release criteria for 1.0:** the reference implementation passes the whole corpus, and every conformance class
   ([§9.1](1/spec/09-conformance.md#91-classes)) has a second implementation passing its vectors (AgentEval's,
-  or an independent one). A class without one is released marked **at risk** in the release notes, and may change in
-  1.1 more than a minor normally allows.
+  or an independent one). A class without one is released marked **at risk** in the release notes. Any incompatible
+  change still follows [VER-5] and requires a new major version.
 - Deprecation: [VER-7]. A deprecated field stays valid for at least one minor version and is removed only by a major.
-- Errata (a rule whose text contradicts its vectors or schema) are fixed in the next minor and listed in its
-  changelog; the corpus vector is the tie-breaker until then.
+- Errata (a rule whose text contradicts its vectors or schema) are recorded in the changelog and corrected subject
+  to [VER-5]. Until resolved, [§1.5](1/spec/01-introduction.md#15-conventions) applies: the stricter prose/schema
+  requirement governs. A contradictory corpus vector is a defect, not an override of those requirements.
 
 ## Identifiers
 
