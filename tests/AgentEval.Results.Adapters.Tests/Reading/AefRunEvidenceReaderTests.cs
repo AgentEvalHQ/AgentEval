@@ -205,6 +205,41 @@ public sealed class AefRunEvidenceReaderTests : IDisposable
     public void Discover_InvalidBoundsEvenWhenMissing_Refuses() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => AefEvidenceDiscovery.Discover(_root, new() { MaxRuns = 0 }));
 
+    [Fact]
+    public async Task CapturedContent_SourceRemoved_ReturnsTheVerifiedOwnedBytes()
+    {
+        using var fixture = await StoreV1Fixture.CreateAsync();
+        StoreV1Exporter.ExportWorkspaceRun(fixture.Root, fixture.RunDirectory, _root);
+        var read = new AefRunEvidenceReader().Read(_root);
+        var trace = read.CapturedContent("E-trace");
+        Assert.NotNull(trace);
+        using var document = JsonDocument.Parse(trace.Value);
+        Assert.Equal(fixture.RunId, document.RootElement.GetProperty("runId").GetString());
+        var bytes = trace.Value.ToArray();
+        Directory.Delete(_root, recursive: true);
+        Assert.Equal(bytes, read.CapturedContent("E-trace")!.Value.ToArray());
+        Assert.Null(read.CapturedContent("absent"));
+    }
+
+    [Fact]
+    public async Task CapturedContent_CaptureOff_DoesNotExposeLegacyTrace()
+    {
+        using var fixture = await StoreV1Fixture.CreateAsync();
+        StoreV1Exporter.ExportWorkspaceRun(fixture.Root, fixture.RunDirectory, _root,
+            new() { ContentCapture = AefContentCapture.Off });
+        Assert.Null(new AefRunEvidenceReader().Read(_root).CapturedContent("E-trace"));
+    }
+
+    [Fact]
+    public async Task CapturedContent_TamperedBlob_IsRejectedBeforeExposure()
+    {
+        using var fixture = await StoreV1Fixture.CreateAsync();
+        StoreV1Exporter.ExportWorkspaceRun(fixture.Root, fixture.RunDirectory, _root);
+        var blob = Directory.EnumerateFiles(Path.Combine(_root, "blobs"), "*", SearchOption.AllDirectories).First();
+        File.AppendAllText(blob, "tampered");
+        Assert.Throws<InvalidDataException>(() => new AefRunEvidenceReader().Read(_root));
+    }
+
     private static void AssertJson(string expected, JsonElement actual) =>
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual.GetRawText())));
 

@@ -4,12 +4,14 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AgentEval.Results.Runs;
 
 namespace AgentEval.Results.Adapters.Reading;
 
 /// <summary>Verified, detached documents for presentation readers. No legacy metadata or result selection is invented.</summary>
 public sealed class AefRunEvidence
 {
+    private readonly Dictionary<string, ReadOnlyMemory<byte>> _content = new(StringComparer.Ordinal);
     internal AefRunEvidence(AefVerifiedRun run)
     {
         var documents = run.Documents;
@@ -21,6 +23,17 @@ public sealed class AefRunEvidence
         Results = Array.AsReadOnly(documents.Results.Objects.Select(line => Copy(line.Value)).ToArray());
         Gates = Array.AsReadOnly(documents.Gates.Objects.Select(line => Copy(line.Value)).ToArray());
         Evidence = Array.AsReadOnly(documents.Evidence.Objects.Select(line => Copy(line.Value)).ToArray());
+        var blobs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (var (_, artifact) in documents.Evidence.Objects)
+        {
+            if ((string?)artifact["link"]?["blob"] is not { } digest) continue;
+            if (!blobs.TryGetValue(digest, out var bytes))
+            {
+                bytes = run.Folder.Read(AefRunFolder.BlobPath(digest["sha256:".Length..]), run.Bytes);
+                blobs.Add(digest, bytes);
+            }
+            _content.Add((string)artifact["evidenceId"]!, bytes);
+        }
         StartedAt = ObservedTime("startedAt");
         EndedAt = ObservedTime("endedAt");
     }
@@ -41,6 +54,9 @@ public sealed class AefRunEvidence
     public IReadOnlyList<JsonElement> Gates { get; }
     /// <summary>Evidence descriptors. This read does not expose blob content through filesystem paths.</summary>
     public IReadOnlyList<JsonElement> Evidence { get; }
+    /// <summary>Returns only captured local content from the verified snapshot. External links are never fetched.</summary>
+    public ReadOnlyMemory<byte>? CapturedContent(string evidenceId) =>
+        _content.TryGetValue(evidenceId, out var bytes) ? bytes : (ReadOnlyMemory<byte>?)null;
     /// <summary>Recorded execution start, or null when absent or supplied by the importer.</summary>
     public DateTimeOffset? StartedAt { get; }
     /// <summary>Recorded execution end, or null when absent or supplied by the importer.</summary>
