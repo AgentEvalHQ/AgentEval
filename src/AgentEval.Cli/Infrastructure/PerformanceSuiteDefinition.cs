@@ -35,8 +35,8 @@ internal static class PerformanceSuiteDefinition
         return new SuiteDefinitionReader().Read(AefJsonWriter.Document(new JsonObject
         {
             ["schemaVersion"] = "1.0", ["kind"] = "composite", ["suiteRef"] = "bench:perf/" + preset,
-            ["definitionVersion"] = "performance-definition-1", ["frozen"] = true, ["inputs"] = inputs,
-            ["caseIds"] = new JsonArray("perf_latency", "perf_throughput", "perf_cost"),
+            ["definitionVersion"] = "performance-definition-2", ["frozen"] = true, ["inputs"] = inputs,
+            ["caseIds"] = new JsonArray("perf_benchmark", "perf_latency", "perf_throughput", "perf_cost"),
             ["definition"] = new JsonObject
             {
                 ["producer"] = "perf", ["promptCount"] = plan.Prompts.Count,

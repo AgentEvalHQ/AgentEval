@@ -226,6 +226,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
+                PresetComparisonId = family == "perf" ? $"perf-{preset.ToLowerInvariant()}" : null,
                 Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,

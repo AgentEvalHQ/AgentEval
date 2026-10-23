@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AgentEval.Results\AgentEval.Results.csproj" />
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\AgentEval.Interop.AssertAi\AgentEval.Interop.AssertAi.csproj" />
   </ItemGroup>
 </Project>

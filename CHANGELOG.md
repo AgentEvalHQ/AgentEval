@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- `compare` verifies AEF inputs before calculating deltas and routes legacy results through the shared StoreV1 converter. Copied run folders and scenario-only collections remain supported, with imported custody, supplied header fields and unknown execution metadata disclosed. Tampered or malformed evidence is refused without score deltas.
+- Comparison now checks metric meaning and recorded evaluation policy alongside evaluator, instrument and stimulus facts. Performance results carry the budgets and sampling policy actually used; incompatible trials cannot form a shared comparison instrument. Native composite output preserves actual observed inputs and unknown judge identity, and performance comparisons select the whole benchmark verdict.
+- StoreV1 conversion preserves the normalized score contract of consistent recorded EvalResult collections while retaining unbounded generic legacy scores. `EvalResult.Observation` and `ComparisonObservation` are transient writer context; they are excluded from serialized EvalResult JSON.
+
 - Workflow executor timing now uses producer-side MAF spans, preventing queued events from understating duration. Build the root and declared child workflows with the disposable `MAFWorkflowInstrumentation` owner; dedicated sources and per-run session identity prevent nested operations from replacing parent timings. Unattributed or unavailable spans explicitly prevent executor timing certification. Both workflow tool-duration assertion APIs now refuse missing timing instead of silently passing. Tool completion remains separate from tool timing (`ExecutorToolCallEvent.HasTiming`); collection-valued barrier messages retain whole-payload source identity.
 
 - Buffered fan-in releases preserve every identifiable source activation, including multiple activations of one branch. Evaluation projection and Microsoft logging retain explicit unknown tool outcomes and timing instead of fabricating failures or zero-duration measurements.

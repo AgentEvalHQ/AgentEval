@@ -166,7 +166,7 @@ public sealed record RunComparison(
 {
     /// <summary>The axes this comparison gates on, in render order.</summary>
     public static IReadOnlyList<string> GatingAxes { get; } =
-        ["evalKey", "evalVersion", "effectiveBar", "judge", "judge.modelId", "judge.rubricDigest", "stimulus"];
+        ["evalKey", "evalVersion", "effectiveBar", "evaluationPolicyDigest", "judge", "judge.modelId", "judge.rubricDigest", "stimulus"];
 
     /// <summary>Scenarios carrying at least one blocking axis.</summary>
     public IReadOnlyList<ScenarioComparison> Blocked =>
@@ -356,14 +356,20 @@ public sealed record RunComparison(
                 "the two runs applied different pass bars, so their pass/fail verdicts are not the same measurement",
                 "neither run recorded the bar it applied, so nothing shows the two used the same one"));
 
-            axes.Add(Presence("judge", fa.Judge is not null, fb.Judge is not null,
-                "one run was judged by a model and the other was deterministic",
-                "neither run used a judge"));
+            axes.Add(Text("evaluationPolicyDigest", fa.EvaluationPolicyDigest, fb.EvaluationPolicyDigest,
+                "the runs used different evaluation configurations; their scores may use different rules or measurement protocols",
+                "neither run recorded its evaluation configuration, so equivalence of scoring rules and measurement protocols is unpinned",
+                comparison: StringComparison.Ordinal));
+
+            axes.Add(Text("judge", InstrumentName(fa), InstrumentName(fb),
+                "the runs used different kinds of evaluation instrument",
+                "neither run established its evaluation instrument; missing model identity does not establish deterministic evaluation"));
 
             axes.Add(Text("judge.modelId", fa.Judge?.ModelId, fb.Judge?.ModelId,
                 "two different judges graded these runs",
-                "neither run used a judge, so there is no judge to differ"));
-            axes.Add(Text("judge.rubricDigest", fa.Judge?.RubricDigest, fb.Judge?.RubricDigest,
+                fa.EffectiveInstrumentKind == EvaluationInstrumentKind.Deterministic && fb.EffectiveInstrumentKind == EvaluationInstrumentKind.Deterministic
+                    ? "neither run used a judge, so there is no judge to differ" : "neither run recorded a common judge model identity"));
+            axes.Add(Text("judge.rubricDigest", fa.EffectiveRubricDigest, fb.EffectiveRubricDigest,
                 "the judge was given different rubrics; the same model against a different rubric is a different instrument",
                 "neither run recorded a rubric digest, so nothing shows the judge was given the same rubric"));
 
@@ -389,7 +395,8 @@ public sealed record RunComparison(
     // ── Axis constructors. Each encodes the same three-state rule, once. ─────────────────────
 
     private static ComparabilityAxis Text(
-        string name, string? a, string? b, string mismatchDetail, string? unpinnedDetail = null)
+        string name, string? a, string? b, string mismatchDetail, string? unpinnedDetail = null,
+        StringComparison comparison = StringComparison.OrdinalIgnoreCase)
     {
         bool hasA = !string.IsNullOrWhiteSpace(a);
         bool hasB = !string.IsNullOrWhiteSpace(b);
@@ -406,7 +413,7 @@ public sealed record RunComparison(
                 $"only one run recorded {name} — an asymmetry is a difference, not a gap");
         }
 
-        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
+        return string.Equals(a, b, comparison)
             ? new ComparabilityAxis(name, ComparabilityAxisState.Match, a, b, "identical")
             : new ComparabilityAxis(name, ComparabilityAxisState.Mismatch, a, b, mismatchDetail);
     }
@@ -433,21 +440,12 @@ public sealed record RunComparison(
             : new ComparabilityAxis(name, ComparabilityAxisState.Mismatch, ra, rb, mismatchDetail);
     }
 
-    private static ComparabilityAxis Presence(
-        string name, bool a, bool b, string mismatchDetail, string bothAbsentDetail)
+    private static string? InstrumentName(ComparabilityFacts facts) => facts.EffectiveInstrumentKind switch
     {
-        if (a == b)
-        {
-            // Both-absent is a MATCH here, not unpinned: a null judge is a declared fact — "this
-            // eval used no judge" — not a missing record. ComparabilityFacts says so explicitly.
-            return new ComparabilityAxis(name, ComparabilityAxisState.Match,
-                a ? "present" : "none", b ? "present" : "none",
-                a ? "both runs were judged" : bothAbsentDetail);
-        }
-
-        return new ComparabilityAxis(name, ComparabilityAxisState.Mismatch,
-            a ? "present" : "none", b ? "present" : "none", mismatchDetail);
-    }
+        EvaluationInstrumentKind.Deterministic => "none",
+        EvaluationInstrumentKind.Model => "present",
+        _ => null,
+    };
 
     private static ComparabilityAxis Stimulus(string? a, string? b)
     {

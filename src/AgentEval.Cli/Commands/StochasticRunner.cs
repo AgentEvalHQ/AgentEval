@@ -77,6 +77,7 @@ internal static class StochasticBenchRunner
     {
         if (trials.Count == 0) throw new ArgumentException("At least one trial is required.", nameof(trials));
         var first = trials[0];
+        var comparison = EvalResultPersistence.AggregateComparability(trials);
         var children = first.Details.SubResults ?? [];
         if (trials.Any(t => t.Metric.Key != first.Metric.Key || (t.Details.SubResults?.Count ?? 0) != children.Count))
             throw new ArgumentException("Repeated benchmark trees must have matching ordered metric keys and structure.", nameof(trials));
@@ -85,6 +86,10 @@ internal static class StochasticBenchRunner
         var (score, note) = Vote(trials, first.Score.Threshold);
         return first with
         {
+            ComparisonObservation = comparison,
+            Observation = new(
+                trials.All(t => t.Observation?.Query == first.Observation?.Query) ? first.Observation?.Query : null,
+                trials.All(t => t.Observation?.SubjectModel == first.Observation?.SubjectModel) ? first.Observation?.SubjectModel : null),
             Score = score,
             Details = new EvalDetails(null, null, null, rollups, "MajorityVote") { Summary = note },
             Provenance = new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(trials).EstimatedCost, false),
@@ -104,8 +109,7 @@ internal static class StochasticBenchRunner
         var leaves = Leaves(rollup).ToList();
         foreach (var leaf in leaves)
             await store.WriteScenarioResultAsync(manifest.Run.RunId,
-                EvalResultPersistence.ToScenarioResult(leaf, leaf.Metric.Key, leaf.Metric.Name,
-                    input: input.Query, subjectModel: input.SubjectModel), ct);
+                EvalResultPersistence.ToScenarioResult(leaf, leaf.Metric.Key, leaf.Metric.Name), ct);
         var stats = leaves.Select(l => l.Score).ToRunStats();
         // The voted root's score only when it is a reading (T13): with no run counted it wrote overallScore 0.
         var metrics = rollup.Score.MeasuredValue() is { } overallScore

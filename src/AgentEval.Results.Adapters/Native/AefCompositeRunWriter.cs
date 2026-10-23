@@ -25,6 +25,13 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>
+    /// Select the entire preset as one comparison observation with this identity, retaining its parts as supporting
+    /// results. Null keeps the default component cases and leaf comparison observations. The producer supplies the
+    /// historical scenario identity when compatibility requires comparing a whole benchmark.
+    /// </summary>
+    public string? PresetComparisonId { get; init; }
+
     /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
     public AefCliProvenance? Cli { get; init; }
 
@@ -164,7 +171,9 @@ public static class AefCompositeRunWriter
         AefNativeFinalization.Validate(options.Seal, options.Signer);
         // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
         // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
-        var single = (preset.Details.SubResults ?? []).Count == 0;
+        if (options.PresetComparisonId is { } comparisonId && !AefConverter.IsResultText(comparisonId, 256))
+            throw new ArgumentException("Expected: a nonempty comparison identity of at most 256 characters without control characters. Actual: invalid preset comparison identity. Suggestions: supply the producer's scenario identity. Because: comparison units must be unambiguous.", nameof(options));
+        var single = options.PresetComparisonId is not null || (preset.Details.SubResults ?? []).Count == 0;
         IReadOnlyList<EvalResult> cases = emptyResults ? [] : single ? [preset] : preset.Details.SubResults!;
         IReadOnlyList<AefComponentShape> caseShapes = emptyResults ? [] : single ? [shape]
             : shape.Children.Count == 0 ? cases.Select(_ => Undescribed).ToList()
@@ -241,7 +250,8 @@ public static class AefCompositeRunWriter
                         throw new ArgumentException("Repeated presets must have the same ordered case keys.", nameof(trials));
                     for (var i = 0; i < trialCases.Count; i++)
                         Add(writer, trialCases[i], caseShapes[i], trialCases[i].Metric.Key, CasePath, null, null, trial: t,
-                            capture: (line, parent) => captured.Add((line, parent?.Path)), contentCapture: options.ContentCapture);
+                            capture: (line, parent) => captured.Add((line, parent?.Path)), contentCapture: options.ContentCapture,
+                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
                 }
                 AddAbortedRollups(writer, captured, artifactLinks);
             }
@@ -251,12 +261,14 @@ public static class AefCompositeRunWriter
                 if (caseTrials is not null)
                 {
                     for (var t = 0; t < caseTrials.Count; t++)
-                        Add(writer, caseTrials[t], caseShapes[i], cases[i].Metric.Key, CasePath, null, null, trial: t, contentCapture: options.ContentCapture);
+                        Add(writer, caseTrials[t], caseShapes[i], cases[i].Metric.Key, CasePath, null, null, trial: t, contentCapture: options.ContentCapture,
+                            comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
                 }
                 Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null,
                     options.CaseExt is { } caseExt && caseExt.TryGetValue(cases[i].Metric.Key, out var ext) ? ext : null,
                     trials: caseTrials, presetMeasured: presetMeasured, contentCapture: options.ContentCapture,
-                    artifactEvidence: artifactLinks.GetValueOrDefault(cases[i].Metric.Key));
+                    artifactEvidence: artifactLinks.GetValueOrDefault(cases[i].Metric.Key),
+                    comparisonSelected: options.PresetComparisonId is null ? null : true, comparisonId: options.PresetComparisonId);
             }
 
             if (options.AbortReason is null)
@@ -342,7 +354,7 @@ public static class AefCompositeRunWriter
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,
         IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false,
         Action<AefResult, AefResultHandle?>? capture = null, AefContentCapture contentCapture = AefContentCapture.Off,
-        IReadOnlyList<string>? artifactEvidence = null)
+        IReadOnlyList<string>? artifactEvidence = null, bool? comparisonSelected = null, string? comparisonId = null)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -383,8 +395,8 @@ public static class AefCompositeRunWriter
         }
 
         AefSeverity? severity = state is AefState.Failed or AefState.Warn && AefNames.TryParse<AefSeverity>(node.Score.Severity, out var s) ? s : null;
-        var llm = node.Provenance.Type is "atomic-llm" or "atomic-decision"
-            && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel);
+        var instrument = EvalResultPersistence.ComparabilityOf(node, node.Observation?.SubjectModel);
+        var llm = instrument.EffectiveInstrumentKind == AgentEval.Output.EvaluationInstrumentKind.Model;
         var line = new AefResult
         {
             Evidence = artifactEvidence,
@@ -406,9 +418,10 @@ public static class AefCompositeRunWriter
                 : null,
             Annotator = subs.Count > 0 || !measured || trials is not null ? null : new AefAnnotator
             {
-                Kind = llm ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code,
-                Model = llm ? node.Provenance.JudgeModel : null,
-                RubricDigest = llm ? node.Provenance.RubricDigest : null,
+                Kind = llm ? AefAnnotatorKind.Llm : instrument.EffectiveInstrumentKind == AgentEval.Output.EvaluationInstrumentKind.Deterministic
+                    ? AefAnnotatorKind.Code : AefAnnotatorKind.Other,
+                Model = llm ? instrument.Judge?.ModelId : null,
+                RubricDigest = llm ? AefConverter.Sha256Uri(instrument.EffectiveRubricDigest) : null,
             },
             Aggregation = aggregation,
             Component = component,
@@ -426,6 +439,7 @@ public static class AefCompositeRunWriter
                     node.Details.Summary, node.Details.Evidence, node.Details.Recommendations,
                 }),
             });
+        line = line with { Ext = AgentEval.Results.Adapters.Comparison.AefComparisonMetadata.Attach(line.Ext, node, contentCapture, comparisonSelected, comparisonId) };
         var handle = writer.AddResult(line, parent);
         capture?.Invoke(line, parent);
 
@@ -433,7 +447,8 @@ public static class AefCompositeRunWriter
         {
             var child = described ? shape.Children[i] : Undescribed;
             Add(writer, subs[i], child, caseId, childPaths[i], handle, new AefComponent(child.Weight, child.Required),
-                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList(), capture: capture, contentCapture: contentCapture);
+                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList(), capture: capture, contentCapture: contentCapture,
+                comparisonSelected: comparisonSelected is null ? null : false);
         }
     }
 

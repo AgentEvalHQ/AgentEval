@@ -1281,7 +1281,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
         var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
             dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
-        Assert.Equal(new[] { "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
+        Assert.Equal(new[] { "perf_benchmark", "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
         Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);

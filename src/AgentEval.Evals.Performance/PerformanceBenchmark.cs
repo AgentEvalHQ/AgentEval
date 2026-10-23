@@ -592,7 +592,18 @@ public class PerformanceBenchmark
                 SubResults: leaves,
                 AggregationStrategy: "CapByWorst"),
             Provenance: new("composite", null, null, null, null, 0.0, false),
-            EvaluatedAt: DateTimeOffset.UtcNow);
+            EvaluatedAt: DateTimeOffset.UtcNow)
+        {
+            // The resolved workload overrides Query. A multi-prompt run has no single observed query; recording
+            // that absence prevents output writers from borrowing an outer placeholder as the stimulus.
+            Observation = new(prompts.Count == 1 ? prompts[0] : null, null),
+            ComparisonObservation = new AgentEval.Output.ComparabilityFacts("perf_benchmark", "1.0.0")
+            {
+                EffectiveBar = opts.CompositePassThreshold,
+                EvaluationPolicyDigest = plan.ComparisonPolicyDigest,
+                InstrumentKind = AgentEval.Output.EvaluationInstrumentKind.Deterministic,
+            },
+        };
     }
 
     // ── Adapter helpers ───────────────────────────────────────────────────────

@@ -865,6 +865,16 @@ static class AgentEval.Evals.EvalInputAgentBinding
     const String AgentMetadataKey
     static Boolean TryReadAgent(AgentEval.Evals.EvalInput input, out AgentEval.Core.IEvaluableAgent agent)
     static String AbsentAgentReason(String family, String typedEntryPoint)
+sealed class AgentEval.Evals.EvalInputObservation : IEquatable<AgentEval.Evals.EvalInputObservation>
+    AgentEval.Evals.EvalInputObservation <Clone>$()
+    Boolean Equals(AgentEval.Evals.EvalInputObservation other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Query { get; init; }
+    String SubjectModel { get; init; }
+    String ToString()
+    Void Deconstruct(out String Query, out String SubjectModel)
+    ctor(String Query, String SubjectModel)
 sealed class AgentEval.Evals.EvalLineage : IEquatable<AgentEval.Evals.EvalLineage>
     AgentEval.Evals.EvalLineage <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalLineage other)
@@ -911,10 +921,12 @@ static class AgentEval.Evals.EvalReportHelpers
     static String TruncateForPreview(String text, Int32 maxLen = 80)
 sealed class AgentEval.Evals.EvalResult : IEquatable<AgentEval.Evals.EvalResult>
     AgentEval.Evals.EvalDetails Details { get; init; }
+    AgentEval.Evals.EvalInputObservation Observation { get; init; }
     AgentEval.Evals.EvalMetadata Metric { get; init; }
     AgentEval.Evals.EvalProvenance Provenance { get; init; }
     AgentEval.Evals.EvalResult <Clone>$()
     AgentEval.Evals.EvalScore Score { get; init; }
+    AgentEval.Output.ComparabilityFacts ComparisonObservation { get; init; }
     Boolean Equals(AgentEval.Evals.EvalResult other)
     Boolean Equals(Object obj)
     DateTimeOffset EvaluatedAt { get; init; }
@@ -1894,14 +1906,19 @@ static class AgentEval.Output.BaselinePromotion
     static Void EnsurePromotable(AgentEval.Output.RunSummary summary)
 sealed class AgentEval.Output.ComparabilityFacts : IEquatable<AgentEval.Output.ComparabilityFacts>
     AgentEval.Output.ComparabilityFacts <Clone>$()
+    AgentEval.Output.EvaluationInstrumentKind EffectiveInstrumentKind { get; }
+    AgentEval.Output.EvaluationInstrumentKind? InstrumentKind { get; init; }
     AgentEval.Output.JudgeFingerprint Judge { get; init; }
     AgentEval.Output.RecordedChanceFloor ChanceFloor { get; init; }
     Boolean Equals(AgentEval.Output.ComparabilityFacts other)
     Boolean Equals(Object obj)
     Double? EffectiveBar { get; init; }
     Int32 GetHashCode()
+    String EffectiveRubricDigest { get; }
     String EvalKey { get; init; }
     String EvalVersion { get; init; }
+    String EvaluationPolicyDigest { get; init; }
+    String RubricDigest { get; init; }
     String ToString()
     Void Deconstruct(out String EvalKey, out String EvalVersion)
     const String ChanceFloorDimension
@@ -1959,6 +1976,10 @@ sealed class AgentEval.Output.EnvRef : IEquatable<AgentEval.Output.EnvRef>
     String ToString()
     Void Deconstruct(out String Machine, out String Os, out String DotnetVersion, out Boolean Ci, out String CiSystem, out String Runner)
     ctor(String Machine, String Os, String DotnetVersion, Boolean Ci, String CiSystem, String Runner)
+enum AgentEval.Output.EvaluationInstrumentKind
+    Unknown
+    Deterministic
+    Model
 sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.EvidenceControl>
     AgentEval.Output.EvidenceControl <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceControl other)

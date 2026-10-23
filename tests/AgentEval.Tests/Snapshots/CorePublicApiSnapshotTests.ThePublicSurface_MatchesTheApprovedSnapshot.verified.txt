@@ -1049,6 +1049,7 @@ sealed class AgentEval.Evals.EvalRegistry : AgentEval.Evals.IEvalRegistry
     static AgentEval.Evals.EvalRegistry Shared { get; }
 static class AgentEval.Evals.EvalResultPersistence
     static AgentEval.Evals.EvalResult FromScenarioResult(AgentEval.Output.ScenarioResult sr)
+    static AgentEval.Output.ComparabilityFacts AggregateComparability(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> trials)
     static AgentEval.Output.ScenarioResult ToScenarioResult(AgentEval.Evals.EvalResult result, System.String scenarioId, System.String scenarioName, System.Collections.Generic.IReadOnlyList<AgentEval.Output.AssertionResult> assertions = null, System.String input = null, System.String subjectModel = null)
 sealed class AgentEval.Evals.EvaluatorCardRegistry
     AgentEval.Evals.EvaluatorCard Get(System.String key)

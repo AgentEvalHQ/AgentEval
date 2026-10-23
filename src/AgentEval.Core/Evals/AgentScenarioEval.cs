@@ -87,13 +87,15 @@ public sealed class AgentScenarioEval : IEval
                 SubResults: null,
                 AggregationStrategy: null),
             Provenance: new("atomic-code", null, null, null, null, 0, false),
-            EvaluatedAt: DateTimeOffset.UtcNow);
+            EvaluatedAt: DateTimeOffset.UtcNow) { Observation = new(_scenarioInput, input.SubjectModel) };
 
         string response;
+        string? subjectModel;
         try
         {
             var agentResponse = await _agent.InvokeAsync(_scenarioInput, ct);
             response = agentResponse?.Text ?? "";
+            subjectModel = string.IsNullOrWhiteSpace(agentResponse?.ModelId) ? input.SubjectModel : agentResponse.ModelId;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -122,7 +124,7 @@ public sealed class AgentScenarioEval : IEval
             return ErrorLeaf("The agent under test returned an empty response for this scenario.");
 
         // Substitute the scenario prompt + the agent's real answer, then judge as usual.
-        var driven = input with { Query = _scenarioInput, Response = response };
+        var driven = input with { Query = _scenarioInput, Response = response, SubjectModel = subjectModel };
         return await _inner.EvaluateAsync(driven, ct);
     }
 }

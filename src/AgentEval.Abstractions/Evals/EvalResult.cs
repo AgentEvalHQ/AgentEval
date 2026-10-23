@@ -12,6 +12,21 @@ public sealed record EvalResult(
     EvalProvenance Provenance,
     DateTimeOffset EvaluatedAt)
 {
+    /// <summary>The input observed at this result's evaluation boundary, when recorded.</summary>
+    /// <remarks>
+    /// Transient context for output writers, excluded from result JSON to avoid implicit prompt capture.
+    /// Writers explicitly project it under their content-capture policy. A deserialized result has no observation;
+    /// callers must not reconstruct one from an outer composite's input. An observation with null fields records
+    /// an explicit unknown (for example, trials with different stimuli).
+    /// </remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public EvalInputObservation? Observation { get; init; }
+
+    /// <summary>Agreed comparison facts retained by an aggregate independently of its execution provenance.</summary>
+    /// <remarks>Transient writer context, explicitly projected into persisted comparison facts.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public AgentEval.Output.ComparabilityFacts? ComparisonObservation { get; init; }
+
     /// <summary>Creates a skipped result for <paramref name="eval"/> with a human-readable <paramref name="reason"/>.</summary>
     /// <param name="eval">The eval that did not run.</param>
     /// <param name="reason">
@@ -39,3 +54,8 @@ public sealed record EvalResult(
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }
+
+/// <summary>Input facts observed by an evaluator; null fields mean unknown, never an outer-input fallback.</summary>
+/// <param name="Query">The actual query received by the evaluator, or null when no single query is known.</param>
+/// <param name="SubjectModel">The reported subject model, with the declared model used only when none was reported.</param>
+public sealed record EvalInputObservation(string? Query, string? SubjectModel);

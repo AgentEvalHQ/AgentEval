@@ -430,8 +430,7 @@ Scenario scores and deltas are nullable. If either side did not measure a scenar
 `delta` fields where absent. The library's `RunComparison.MeanScoreDelta` is null when no matched pair
 was measured; a genuinely zero delta stays zero. Comparability checks and regression exit rules still apply.
 
-Compare two runs from the `.agenteval/` store, and print score deltas only when the two runs can be shown to
-have measured the same thing.
+Compare two AEF or legacy store runs, and print score deltas only when their recorded comparison facts agree.
 
 **Synopsis**
 
@@ -441,23 +440,42 @@ agenteval compare --baseline <run-dir> --candidate <run-dir> [--strict] [--json]
 
 **What it does**
 
-Reads the scenario files of two run directories — the folders under
-`.agenteval/subjects/<kind>/<name>/runs/<runId>/` that hold `manifest.json`, `summary.json` and `scenarios/`.
-Pointing at the `scenarios/` folder itself also works. Nothing else is read: no manifest, no workspace
-discovery, no network. The `eval --output-dir` layout (`results.jsonl`, `summary.json`, `run.json`) is a
-different format with no scenario files.
+Accepts native AEF run directories, legacy store run directories, copied legacy run folders and directories
+containing legacy scenario JSON files. A legacy run is converted through the store-v1 converter
+into temporary AEF evidence; its original files are unchanged. Pointing at its `scenarios/` folder also works.
+Both inputs are verified before comparison, and invalid AEF evidence is refused. The report includes integrity,
+run status and whether evidence was imported. An import seal protects the converted evidence from import onward;
+it does not establish that the original run was sealed when it executed. Signature trust is not checked here.
+The report lists importer-supplied header fields. Without a legacy manifest, original execution identity,
+timing and completion are unknown: the temporary import uses a new ID, an unknown subject and explicit
+placeholder timestamps, with an aborted status explaining that missing evidence. A malformed manifest is
+refused. Copied folders use a bounded snapshot of ordinary files; links and special files are refused.
+
+Comparison uses final observations, excluding individual trial rows. Native composite evaluations select their
+evaluation leaves; performance benchmarks select the whole benchmark score and retain component readings as
+supporting evidence. A readable AEF run still needs recorded, unambiguous comparison facts to produce deltas.
+The historical `eval --output-dir` report layout (`results.jsonl`, `summary.json`, `run.json`) is not a legacy
+scenario-store folder.
 
 The comparison is **refused** — the reasons are printed and no delta is — when:
 
 - the two runs do not hold the same set of scenario ids, or share none;
 - either run recorded no comparability facts for a shared scenario (runs written before those facts existed); or
 - for a shared scenario, one of these axes differs between the runs, or only one run recorded it: `evalKey`,
-  `evalVersion`, `effectiveBar` (the pass bar applied, compared exactly), `judge` (judged by a model or not),
-  `judge.modelId`, `judge.rubricDigest`, and `stimulus` (a hash of what the scenario was asked).
+  `evalVersion`, `effectiveBar` (the pass bar applied, compared exactly), `evaluationPolicyDigest`
+  (scoring configuration and measurement protocol), `judge` (model, deterministic or unknown instrument),
+  `judge.modelId`, `judge.rubricDigest`, and `stimulus` (a hash of what the scenario was asked);
+- the selected scores have different recorded metric identities, kinds, directions, scales or units.
 
 An axis that **neither** run recorded is not counted as a match: it is printed as a blind spot, before the
 deltas. `--strict` refuses on it instead. When neither run used a judge, `judge` matches but `judge.modelId` is
 such a blind spot, so `--strict` refuses two runs that were both graded without a judge.
+
+Performance policy evidence includes normalization budgets, sampling settings, aggregation and the frozen pricing
+schedule. It excludes subject identity and observed outcomes: different agents can be compared under the same
+policy. Older runs without a policy digest expose that absence; `--strict` refuses it. A digest recorded on only
+one side blocks even without strict mode. Different-policy trials cannot be rolled into one comparison instrument.
+Stimulus digests in AEF require content capture to be enabled; missing or heterogeneous stimuli remain unknown.
 
 When the runs are comparable, the report lists each shared scenario's baseline score, candidate score and delta,
 then the mean delta and how many scenarios recovered (failed, then passed) or regressed (passed, then failed).

@@ -243,6 +243,12 @@ public sealed class AtomicLlmEval : AtomicEval
     /// <inheritdoc/>
     public override async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
     {
+        var result = await EvaluateCoreAsync(input, ct).ConfigureAwait(false);
+        return result with { Observation = new(input.Query, input.SubjectModel) };
+    }
+
+    private async Task<EvalResult> EvaluateCoreAsync(EvalInput input, CancellationToken ct)
+    {
         ArgumentNullException.ThrowIfNull(input);
         if (input.Response is null)
             throw new InvalidOperationException("AtomicLlmEval requires EvalInput.Response to be set.");

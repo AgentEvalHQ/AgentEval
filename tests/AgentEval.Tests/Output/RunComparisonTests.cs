@@ -369,7 +369,7 @@ public class RunComparisonTests
     }
 
     [Fact]
-    public void GatingAxes_AreTheSevenNamed()
+    public void GatingAxes_MatchThePublishedNames()
     {
         var c = Compare(Scenario(), Scenario());
 
