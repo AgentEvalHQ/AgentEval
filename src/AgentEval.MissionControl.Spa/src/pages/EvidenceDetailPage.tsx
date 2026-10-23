@@ -17,11 +17,13 @@ import { formatDate, formatDateTime, formatPercentage } from "@/lib/format";
 // the per-doc audit chain is broken (source-run-not-found or hash-mismatch).
 
 type CellStatus = "pass" | "warn" | "fail";
-type ChainBreakReason = "source-run-not-found" | "hash-mismatch";
+type ChainBreakReason = "source-run-not-found" | "hash-mismatch" | "imported-not-sealed-when-run" | "unsealed-evidence";
 
 interface EvidenceDetailResponse {
   complianceEvidence: {
     chainValid: boolean;
+    sourceId: string | null;
+    containerRunId: string | null;
     chainBreakReason: ChainBreakReason | null;
     evidence: {
       schemaVersion: string;
@@ -65,6 +67,8 @@ const EVIDENCE_QUERY = /* GraphQL */ `
     complianceEvidence(regulation: $regulation, subjectKind: $kind, subjectName: $name, timestamp: $ts) {
       chainValid
       chainBreakReason
+      sourceId
+      containerRunId
       evidence {
         schemaVersion
         regulation
@@ -87,6 +91,10 @@ const EVIDENCE_QUERY = /* GraphQL */ `
 `;
 
 const CHAIN_BREAK_MESSAGE: Record<ChainBreakReason, string> = {
+  "imported-not-sealed-when-run":
+    "Imported: not sealed when it ran. The ingest seal protects this captured report from conversion onward; original execution custody is not established.",
+  "unsealed-evidence":
+    "This report is captured in unsealed AEF evidence. Original execution integrity is not established.",
   "source-run-not-found":
     "The source run referenced by this evidence is missing from the workspace. The evidence may be orphaned or the run was deleted after attestation.",
   "hash-mismatch":
@@ -165,7 +173,7 @@ export function EvidenceDetailPage() {
                 <ShieldAlert className="text-red-600 shrink-0 mt-0.5" size={20} aria-hidden="true" />
                 <div>
                   <h3 className="text-sm font-semibold text-red-900">
-                    Audit chain broken ({wrapper.chainBreakReason})
+                    Evidence custody warning ({wrapper.chainBreakReason})
                   </h3>
                   <p className="text-sm text-red-800 mt-1">
                     {CHAIN_BREAK_MESSAGE[wrapper.chainBreakReason]}
@@ -200,12 +208,12 @@ export function EvidenceDetailPage() {
                 >
                   Source PDF <ExternalLink size={12} />
                 </a>
-                <Link
-                  to={`/runs/${encodeURIComponent(ev.sourceRun.runId)}`}
+                {wrapper.containerRunId && wrapper.sourceId && <Link
+                  to={`/runs/${encodeURIComponent(wrapper.containerRunId)}?sourceId=${encodeURIComponent(wrapper.sourceId)}`}
                   className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
                 >
-                  Source run
-                </Link>
+                  Captured run
+                </Link>}
               </div>
             </header>
 

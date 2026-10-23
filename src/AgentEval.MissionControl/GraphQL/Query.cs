@@ -199,6 +199,8 @@ public sealed partial class Query
     /// per-regulation aggregate stats (subject count, total evidence count, latest
     /// evidence timestamp + overall status).
     /// </summary>
+    [Cost(100.0)]
+    [HotChocolate.Types.UseRequestScope]
     public Task<IReadOnlyList<ComplianceRegulationSummary>> Compliance(
         [Service] ComplianceMatrixService service,
         CancellationToken ct = default) =>
@@ -209,76 +211,25 @@ public sealed partial class Query
     /// <c>&lt;ComplianceMatrix/&gt;</c> component (a CSS grid heatmap, no chart
     /// library) renders directly from this shape.
     /// </summary>
+    [Cost(100.0)]
+    [HotChocolate.Types.UseRequestScope]
     public Task<ComplianceMatrix> ComplianceMatrix(
         [Service] ComplianceMatrixService service,
         string regulation,
         CancellationToken ct = default) =>
         service.BuildMatrixAsync(regulation, ct);
 
-    /// <summary>
-    /// Returns a single compliance evidence document together with its per-doc
-    /// audit-chain verdict. Plan-07 §7 requires every evidence read to enforce
-    /// that <c>evidence.SourceRun.ManifestHash</c> matches the actual source
-    /// <c>RunManifest.ContentHash</c>; this resolver makes the verdict explicit
-    /// so the SPA can surface a tampering warning on the evidence-detail page.
-    /// (Regulation-specific wrappers like <c>GdprComplianceEvidence</c> arrive
-    /// in a follow-up once the GraphQL interface + inline-fragment support per
-    /// plan-07 §8.3 lands.)
-    /// </summary>
-    /// <remarks>
-    /// <c>ChainBreakReason</c> values:
-    /// <list type="bullet">
-    ///   <item><c>null</c> — chain valid; the stored manifest hash matches the recomputed source-run content hash.</item>
-    ///   <item><c>"source-run-not-found"</c> — evidence references a run that no longer exists under <c>runs/&lt;run-id&gt;/manifest.json</c>.</item>
-    ///   <item><c>"hash-mismatch"</c> — the source run exists, but its <c>ContentHash</c> differs from <c>evidence.SourceRun.ManifestHash</c> (tamper signal).</item>
-    /// </list>
-    /// The resolver returns the evidence WITH the broken-chain bit set rather
-    /// than throwing or returning <c>null</c>, so the SPA can render a visible
-    /// warning instead of silently failing.
-    /// </remarks>
-    public async Task<ComplianceEvidenceWithChain?> ComplianceEvidence(
-        [Service] IOutputStoreReader store,
+    /// <summary>Returns the selected verified report with its container location and custody warning.</summary>
+    /// <remarks>Imports do not establish original execution custody. Invalid or ambiguous evidence is refused.</remarks>
+    [Cost(100.0)]
+    [HotChocolate.Types.UseRequestScope]
+    public Task<ComplianceEvidenceWithChain?> ComplianceEvidence(
+        [Service] ComplianceMatrixService service,
         string regulation,
         SubjectKind subjectKind,
         string subjectName,
         string timestamp,
-        CancellationToken ct = default)
-    {
-        if (!store.IsAvailable) return null;
-        if (!FileSystemLayout.IsSafePathSegment(regulation)) return null;
-        if (!FileSystemLayout.IsSafePathSegment(subjectName)) return null;
-        if (!FileSystemLayout.IsSafePathSegment(timestamp)) return null;
-        var identity = new SubjectIdentity(subjectKind, subjectName);
-        var evidence = await store.GetComplianceEvidenceAsync(regulation, identity, timestamp, ct);
-        if (evidence is null) return null;
-
-        // Per-doc audit-chain check (plan-07 §7). Mirrors the verdict
-        // ComplianceMatrixService.BuildMatrixAsync already computes for the
-        // aggregated matrix, surfaced here per-document so the evidence-detail
-        // page can render a visible tampering warning.
-        //
-        // Defense-in-depth: `evidence.SourceRun.RunId` is read from the
-        // workspace's own evidence.json. A hostile workspace could ship a
-        // path-traversal payload (e.g. `../../../etc/passwd`) hoping
-        // `GetRunManifestAsync` reads outside the workspace. The store layer
-        // does its own scoping, but a path-segment guard here closes the
-        // theoretical hole at the resolver boundary too (Phase-0 gap-review
-        // concern #2 / 2026-05-13). If the segment is unsafe, treat it as
-        // source-run-not-found rather than throwing — same UX as the
-        // legitimately-orphaned-evidence case.
-        if (!FileSystemLayout.IsSafePathSegment(evidence.SourceRun.RunId))
-            return new ComplianceEvidenceWithChain(evidence, ChainValid: false, ChainBreakReason: "source-run-not-found");
-
-        var manifest = await store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
-        string? breakReason = manifest switch
-        {
-            null => "source-run-not-found",
-            _ when !string.Equals(manifest.ContentHash, evidence.SourceRun.ManifestHash, StringComparison.Ordinal)
-                => "hash-mismatch",
-            _ => null,
-        };
-        return new ComplianceEvidenceWithChain(evidence, breakReason is null, breakReason);
-    }
+        CancellationToken ct = default) => service.ReadEvidenceAsync(regulation, subjectKind, subjectName, timestamp, ct);
 
     // ─── Cost-tier breakdown (MC1.4.3) ───────────────────────────────────────
 

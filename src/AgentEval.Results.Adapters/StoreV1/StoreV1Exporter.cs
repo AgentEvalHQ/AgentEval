@@ -138,6 +138,8 @@ public static partial class StoreV1Exporter
             accountant?.Account(evidence);
             if (evidence is not null && evidence.SourceRun.RunId == runId)
             {
+                if (evidence.SourceRun.ManifestHash != manifest.ContentHash)
+                    throw InvalidSource("A compliance report's recorded source hash disagrees with the selected run manifest.");
                 compliance.Add(evidence);
             }
         }
@@ -461,6 +463,8 @@ public static partial class StoreV1Exporter
 
     // ---------------------------------------------------------------- evidence
 
+    internal static byte[] SerializeComplianceEvidence(ComplianceEvidence evidence) => JsonSerializer.SerializeToUtf8Bytes(evidence, s_store);
+
     // Each compliance evidence document of the run: a blob (as the store reads it, re-serialized) and a record; the
     // scenarios each control names cite it.
     private static Dictionary<string, List<string>> AddCompliance(AefRunWriter writer, IReadOnlyList<ComplianceEvidence> documents)
@@ -471,7 +475,7 @@ public static partial class StoreV1Exporter
         {
             index++;
             var id = $"E-compliance-{index}";
-            var blob = writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(document, s_store));
+            var blob = writer.PutBlob(SerializeComplianceEvidence(document));
             writer.AddEvidence(new AefEvidence
             {
                 EvidenceId = id,

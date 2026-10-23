@@ -30,6 +30,8 @@ public static partial class StoreV1Exporter
     // The store still owns allocations made before it returns a record.
     internal sealed class SemanticAccountant
     {
+        internal SemanticAccountant(AefReadBudget budget, CancellationToken ct)
+            : this(new AefWriteBudget(budget.Limit(64L << 20), ct, budget.Charge)) { }
         private readonly AefWriteBudget _budget;
         private readonly JsonSerializerOptions _options;
 

@@ -72,4 +72,42 @@ public sealed class AefComplianceSnapshotTests : IDisposable
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(() => new AefComplianceArtifactReader().Read(snapshot, cancellation.Token));
     }
+    [Theory]
+    [InlineData("subject.version")]
+    [InlineData("subject.framework")]
+    [InlineData("subject.modelId")]
+    [InlineData("subject.sourceProject")]
+    [InlineData("subject.sourcePath")]
+    [InlineData("subject.tags")]
+    [InlineData("configurationId")]
+    [InlineData("notes")]
+    [InlineData("regressedFromBaseline")]
+    public async Task AddDocument_OptionalNullAndOmission_AreEquivalent(string field)
+    {
+        var reader = new AefComplianceArtifactReader();
+        var captured = Assert.Single(reader.Read(await Fixture()).Documents);
+        var json = JsonNode.Parse(captured.Document.GetRawText())!;
+        var target = field.StartsWith("subject.", StringComparison.Ordinal) ? json["subject"]!.AsObject()
+            : field == "configurationId" ? json["attestation"]!.AsObject() : json["controls"]![0]!.AsObject();
+        var member = field.StartsWith("subject.", StringComparison.Ordinal) ? field[8..] : field;
+        target.Remove(member);
+        var original = reader.ReadDocument(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), "original");
+        target[member] = null;
+        var candidate = reader.ReadDocument(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), "other");
+        var documents = new List<AefComplianceDocument> { original };
+        AefComplianceArtifactReader.AddDocument(documents, candidate);
+        Assert.Single(documents);
+    }
+
+    [Fact]
+    public async Task AddDocument_UnknownNullMember_StillRefusesConflict()
+    {
+        var reader = new AefComplianceArtifactReader();
+        var original = Assert.Single(reader.Read(await Fixture()).Documents);
+        var json = JsonNode.Parse(original.Document.GetRawText())!;
+        json["unfamiliarEvidence"] = null;
+        var candidate = reader.ReadDocument(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), "other");
+        Assert.Throws<InvalidDataException>(() => AefComplianceArtifactReader.AddDocument([original], candidate));
+    }
+
 }

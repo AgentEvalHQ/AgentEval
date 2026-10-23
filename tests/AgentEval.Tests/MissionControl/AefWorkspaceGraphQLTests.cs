@@ -42,6 +42,46 @@ public sealed class AefWorkspaceGraphQLTests : IDisposable
     }
 
     private static string RunId(string directory) => JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "run.json")))!["runId"]!.GetValue<string>();
+
+    [Fact]
+    public async Task Compliance_NativeOnlyWithoutSolution_ListsAndSelectsCapturedEvidence()
+    {
+        var evidence = ComplianceRenderCommandTests.MakeFixtureEvidence("NativeAgent");
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(evidence.Base with
+        {
+            Controls = [new AgentEval.Output.EvidenceControl("Art17", "Erasure", "pass", 0.9, ["gdpr.art17.erasure"], null)]
+        }, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        });
+        var directory = AefCompositeRunWriter.Write(Runs, evidence.CompositeTree, AefCompositeRunWriter.Undescribed, new()
+        {
+            SubjectRef = "agent:NativeAgent", TargetMode = AefTargetMode.Mocked, Lane = "gdpr",
+            SuiteRef = "bench:gdpr/smoke", ContentCapture = AefContentCapture.On,
+            ComplianceArtifacts = [new() { Bytes = bytes, CaseIds = ["gdpr.art17.erasure"] }]
+        }, evidence.Base.GeneratedAt, evidence.Base.GeneratedAt).Directory;
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, """
+            { compliance { regulation evidenceCount subjectCount }
+              complianceMatrix(regulation:"gdpr") { subjects { name kind } cells { timestamp controlId passRate } } }
+            """);
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var data = json.RootElement.GetProperty("data");
+        Assert.Equal(1, Assert.Single(data.GetProperty("compliance").EnumerateArray()).GetProperty("evidenceCount").GetInt32());
+        var matrix = data.GetProperty("complianceMatrix");
+        Assert.Equal("NativeAgent", Assert.Single(matrix.GetProperty("subjects").EnumerateArray()).GetProperty("name").GetString());
+        var timestamp = matrix.GetProperty("cells")[0].GetProperty("timestamp").GetString();
+        using var detail = await Send(client, """
+            query Detail($ts:String!) { complianceEvidence(regulation:"gdpr",subjectKind:AGENT,subjectName:"NativeAgent",timestamp:$ts) {
+              sourceId containerRunId evidence { regulation subject { name } controls { id passRate } } } }
+            """, new { ts = timestamp });
+        Assert.False(detail.RootElement.TryGetProperty("errors", out _), detail.RootElement.ToString());
+        Assert.Equal(RunId(directory), detail.RootElement.GetProperty("data").GetProperty("complianceEvidence").GetProperty("containerRunId").GetString());
+        Assert.StartsWith("source-", detail.RootElement.GetProperty("data").GetProperty("complianceEvidence").GetProperty("sourceId").GetString());
+        Assert.Equal("NativeAgent", detail.RootElement.GetProperty("data").GetProperty("complianceEvidence")
+            .GetProperty("evidence").GetProperty("subject").GetProperty("name").GetString());
+    }
     private static async Task<JsonDocument> Send(HttpClient client, string query, object? variables = null)
     {
         using var response = await client.PostAsJsonAsync("/graphql", new { query, variables });

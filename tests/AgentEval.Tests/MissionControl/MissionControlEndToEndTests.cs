@@ -196,7 +196,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── compliance matrix ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task ComplianceMatrix_Gdpr_HasCellsAndChainsValid()
+    public async Task ComplianceMatrix_Gdpr_HasCellsWithImportedCustodyWarning()
     {
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
@@ -215,8 +215,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
 
-        Assert.True(m.GetProperty("allChainsValid").GetBoolean(),
-            "Audit chain must validate clean against the fixture's sealed manifests.");
+        Assert.False(m.GetProperty("allChainsValid").GetBoolean(),
+            "Legacy imports cannot establish original execution custody.");
         // Fixture seeds GDPR evidence for 2 subjects × 2 dates (T1, T2).
         // ComplianceMatrixService picks LATEST-evidence-per-subject → uses
         // T2 for both subjects. T2 evidence has 4 controls each.
@@ -243,7 +243,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
-        Assert.True(m.GetProperty("allChainsValid").GetBoolean());
+        Assert.False(m.GetProperty("allChainsValid").GetBoolean());
         // Fixture seeds EU AI Act evidence for TripPlanner only at T2, with
         // 3 controls. So exactly 1 subject × 3 controls = 3 cells.
         Assert.Equal(3, m.GetProperty("cells").GetArrayLength());
@@ -614,12 +614,9 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var wrapper = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
         Assert.NotEqual(JsonValueKind.Null, wrapper.ValueKind);
-        // The seeded fixture should produce a valid audit chain (no tamper applied).
-        Assert.True(wrapper.GetProperty("chainValid").GetBoolean(),
-            "Seeded fixture must produce a valid audit chain — chainBreakReason: "
-            + (wrapper.GetProperty("chainBreakReason").ValueKind == JsonValueKind.Null
-                ? "null"
-                : wrapper.GetProperty("chainBreakReason").GetString()));
+        // The legacy checksum was checked during conversion; original execution custody remains unestablished.
+        Assert.False(wrapper.GetProperty("chainValid").GetBoolean());
+        Assert.Equal("imported-not-sealed-when-run", wrapper.GetProperty("chainBreakReason").GetString());
         var e = wrapper.GetProperty("evidence");
         Assert.Equal(ev.Regulation, e.GetProperty("regulation").GetString());
         Assert.Equal(ev.SourceRunId, e.GetProperty("sourceRun").GetProperty("runId").GetString());
@@ -709,11 +706,10 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             resp.EnsureSuccessStatusCode();
             var body = await resp.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(body);
-            var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
+            Assert.True(doc.RootElement.TryGetProperty("errors", out _), body);
+            Assert.True(doc.RootElement.GetProperty("data").ValueKind == JsonValueKind.Null
+                || doc.RootElement.GetProperty("data").GetProperty("complianceMatrix").ValueKind == JsonValueKind.Null);
 
-            Assert.False(m.GetProperty("allChainsValid").GetBoolean(),
-                $"Tampering with manifest.contentHash must flip allChainsValid to false. Tampered runId={runId}. Matrix response: {body}");
-            Assert.NotEmpty(m.GetProperty("cells").EnumerateArray().ToArray());
         }
         finally
         {

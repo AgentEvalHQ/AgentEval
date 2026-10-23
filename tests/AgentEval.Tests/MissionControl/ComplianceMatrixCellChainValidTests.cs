@@ -33,7 +33,7 @@ public class ComplianceMatrixCellChainValidTests : IDisposable
     }
 
     [Fact]
-    public async Task BuildMatrixAsync_ValidChain_CellReportsChainValidTrue()
+    public async Task BuildMatrixAsync_ImportedLegacyReport_CellRetainsCustodyWarning()
     {
         // Arrange — seed real evidence pointing at an existing run with a matching hash.
         var (store, subject) = await SeedSolutionAsync();
@@ -46,12 +46,12 @@ public class ComplianceMatrixCellChainValidTests : IDisposable
         var matrix = await matrixService.BuildMatrixAsync("gdpr");
 
         // Assert — valid chain on every cell + matrix-wide aggregate.
-        Assert.True(matrix.AllChainsValid);
+        Assert.False(matrix.AllChainsValid);
         Assert.NotEmpty(matrix.Cells);
         foreach (var cell in matrix.Cells)
         {
-            Assert.True(cell.ChainValid, $"Cell ({cell.SubjectName}, {cell.ControlId}) expected ChainValid=true");
-            Assert.Null(cell.ChainBreakReason);
+            Assert.False(cell.ChainValid);
+            Assert.Equal("imported-not-sealed-when-run", cell.ChainBreakReason);
         }
     }
 
@@ -74,16 +74,8 @@ public class ComplianceMatrixCellChainValidTests : IDisposable
 
         // Act
         var matrixService = new ComplianceMatrixService(store);
-        var matrix = await matrixService.BuildMatrixAsync("gdpr");
-
-        // Assert
-        Assert.False(matrix.AllChainsValid);
-        Assert.NotEmpty(matrix.Cells);
-        foreach (var cell in matrix.Cells)
-        {
-            Assert.False(cell.ChainValid, $"Cell ({cell.SubjectName}, {cell.ControlId}) expected ChainValid=false");
-            Assert.Equal("hash-mismatch", cell.ChainBreakReason);
-        }
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => matrixService.BuildMatrixAsync("gdpr"));
+        Assert.Contains("source hash", error.Message);
     }
 
     [Fact]

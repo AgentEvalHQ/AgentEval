@@ -124,7 +124,13 @@ When an import includes a captured legacy evaluation tree, the page also shows *
 }
 ```
 
-`allChainsValid` reports `true` when every cell's source-evidence `manifest_hash` matches its run's `content_hash` — this is the audit-chain integrity check.
+Compliance list, matrix and detail views read verified AEF snapshots. Existing legacy reports pass through the converter, including standalone reports whose source run is missing. Cells retain the recorded subject kind/name, status, nullable pass rate and timestamp selector.
+
+For compatibility the fields retain the names `allChainsValid`, `chainValid` and `chainBreakReason`. A true value means the displayed reports are captured in intact native AEF containers; signature trust is not checked. Imports display `imported-not-sealed-when-run`, orphan reports display `source-run-not-found`, and unsealed native evidence displays `unsealed-evidence`. A conversion seal protects captured bytes from ingest onward and does not establish original execution custody. Conflicting or tampered evidence is refused explicitly.
+
+The detail wrapper exposes `containerRunId` and `sourceId` for navigation to the exact verified workspace source. The report's `sourceRun` remains its recorded original reference; a standalone orphan has no invented workspace run link.
+
+A newer uncaptured report cannot silently select an older report as the latest. An explicit timestamp can still select an older captured report. Native capture-off evidence cannot recover report content through a legacy sibling.
 
 ### Evaluator registry
 
@@ -205,7 +211,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 
 **`GraphQL ... allowed depth: 10`** — you're issuing a query that recurses deeper than 10 levels. The depth limit guards against unbounded-tree attacks. Restructure the query — most production trees fit within 3 nested `details { subResults { ... } }` pairs.
 
-**Tampered evidence detected** — `complianceMatrix.allChainsValid: false` means at least one piece of evidence's `manifest_hash` no longer matches its source run's `content_hash`. Run `agenteval doctor` to identify the affected runs.
+**Evidence custody warning** — inspect the per-cell `chainBreakReason`: an import or missing source is not itself proof of tampering. Invalid containers and conflicting source hashes produce explicit read errors.
 
 ---
 

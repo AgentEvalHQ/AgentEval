@@ -345,3 +345,37 @@ test('captured absent judge score does not display its numeric placeholder', () 
   const html = renderToStaticMarkup(h(EvalResultNode, { node: absent, defaultExpanded: true }));
   assert.doesNotMatch(html, /0\.12/);
 });
+
+
+test('compliance cells keep agent and workflow identities with the same name', () => {
+  const { ComplianceMatrix } = load(path.join(root, 'components/ComplianceMatrix'));
+  const cell = (subjectKind, status) => ({ subjectName: 'Same', subjectKind, controlId: 'C1', status,
+    passRate: null, lastEvidenceAt: '2026-10-23T10:00:00Z', timestamp: '2026-10-23_12-00-00',
+    lastEvidenceRunId: 'source', regressedFromBaseline: null, chainValid: false,
+    chainBreakReason: 'imported-not-sealed-when-run' });
+  const html = renderToStaticMarkup(h(ComplianceMatrix, {
+    subjects: [{ name: 'Same', kind: 'AGENT' }, { name: 'Same', kind: 'WORKFLOW' }],
+    controls: [{ id: 'C1', title: 'Recorded control' }], cells: [cell('AGENT', 'pass'), cell('WORKFLOW', 'fail')]
+  }));
+  assert.match(html, /status pass/);
+  assert.match(html, /status fail/);
+  assert.match(html, /evidence custody warning/);
+  assert.doesNotMatch(html, /source-run hash does not match/);
+});
+
+test('compliance imported detail explains ingest custody without claiming a hash mismatch', () => {
+  const { EvidenceDetailPage } = load(path.join(root, 'pages/EvidenceDetailPage'));
+  const html = render(EvidenceDetailPage, '/compliance/gdpr/agent/Same/2026-10-23_12-00-00',
+    '/compliance/:regulation/:kind/:name/:ts', [[queryKeys.compliance.evidence('gdpr', 'AGENT', 'Same', '2026-10-23_12-00-00'), {
+      complianceEvidence: { chainValid: false, chainBreakReason: 'imported-not-sealed-when-run', containerRunId: 'native-container', sourceId: 'source/a', evidence: {
+        regulation: 'gdpr', subject: { kind: 'AGENT', name: 'Same' }, generatedAt: '2026-10-23T10:00:00Z',
+        sourceRun: { runId: 'source', manifestHash: 'recorded-source-hash' }, summary: { controlsTotal: 1, passed: 0,
+          warnings: 0, failed: 0, overallStatus: 'not_evaluated' }, controls: [],
+        attestation: { agentEvalVersion: '1', configurationId: null, evaluator: null, evaluatorModel: null }
+      } }
+    }]]);
+  assert.match(html, /href="\/runs\/native-container\?sourceId=source%2Fa"/);
+  assert.match(html, /not sealed when it ran/);
+  assert.match(html, /original execution custody is not established/);
+  assert.doesNotMatch(html, /hash-mismatch/);
+});

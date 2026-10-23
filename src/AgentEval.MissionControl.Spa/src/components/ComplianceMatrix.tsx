@@ -42,6 +42,7 @@ export interface MatrixControl {
 
 export interface MatrixCell {
   subjectName: string;
+  subjectKind?: "AGENT" | "WORKFLOW" | null;
   controlId: string;
   // As stored in the evidence, e.g. "PASS"; see cellStatus().
   status: string;
@@ -63,7 +64,7 @@ interface ComplianceMatrixProps {
   subjects: MatrixSubject[];
   controls: MatrixControl[];
   cells: MatrixCell[];
-  onCellClick?: (subject: string, controlId: string) => void;
+  onCellClick?: (subject: string, controlId: string, kind?: MatrixSubject["kind"]) => void;
 }
 
 const CELL_TONE: Record<CellStatus, string> = {
@@ -103,7 +104,7 @@ export function ComplianceMatrix({
   // Index cells for O(1) lookup.
   const cellIndex = new Map<string, MatrixCell>();
   for (const c of cells) {
-    cellIndex.set(`${c.subjectName}::${c.controlId}`, c);
+    cellIndex.set(`${c.subjectKind ?? ""}::${c.subjectName}::${c.controlId}`, c);
   }
 
   return (
@@ -157,7 +158,7 @@ function Row({
   subject: MatrixSubject;
   controls: MatrixControl[];
   cellIndex: Map<string, MatrixCell>;
-  onCellClick?: (subject: string, controlId: string) => void;
+  onCellClick?: (subject: string, controlId: string, kind?: MatrixSubject["kind"]) => void;
 }) {
   return (
     <>
@@ -168,7 +169,7 @@ function Row({
         <span className="font-medium text-slate-900">{subject.name}</span>
       </div>
       {controls.map((c) => {
-        const cell = cellIndex.get(`${subject.name}::${c.id}`);
+        const cell = cellIndex.get(`${subject.kind}::${subject.name}::${c.id}`) ?? cellIndex.get(`::${subject.name}::${c.id}`);
         const status: CellStatus = cell ? cellStatus(cell.status) : "no-data";
         // Plan-08 portal-review A1 (2026-05-24): when the per-cell audit-chain check
         // fails, overlay a diagonal yellow-stripe pattern + "⚠" badge over the cell's
@@ -178,7 +179,7 @@ function Row({
         return (
           <button
             key={`${subject.name}-${c.id}`}
-            onClick={() => onCellClick?.(subject.name, c.id)}
+            onClick={() => onCellClick?.(subject.name, c.id, subject.kind)}
             className={`${CELL_TONE[status]} ${chainBroken ? "ring-2 ring-amber-500 ring-inset relative" : ""} border border-slate-50 grid place-items-center text-xs font-medium text-slate-700 transition`}
             style={
               chainBroken
@@ -195,12 +196,12 @@ function Row({
             // just the glyph (✓ / ! / ✗ / ·) which is meaningless out loud.
             aria-label={
               cell
-                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${formatPercentage(cell.passRate)}${chainBroken ? `, audit chain broken: ${cell.chainBreakReason}` : ""}`
+                ? `${subject.name}, ${c.id}, status ${cell.status}, pass rate ${formatPercentage(cell.passRate)}${chainBroken ? `, evidence custody warning: ${cell.chainBreakReason}` : ""}`
                 : `${subject.name}, ${c.id}, no evidence`
             }
             title={
               cell
-                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${formatPercentage(cell.passRate)}\nLast evidence: ${cell.lastEvidenceAt}${chainBroken ? `\n\n⚠ AUDIT CHAIN BROKEN: ${cell.chainBreakReason}\nThis cell's source-run hash does not match the stored evidence hash. The displayed status reflects what the evidence claims, NOT verified data.` : ""}`
+                ? `${subject.name} · ${c.id}\nStatus: ${cell.status}\nPass rate: ${formatPercentage(cell.passRate)}\nLast evidence: ${cell.lastEvidenceAt}${chainBroken ? `\n\n⚠ EVIDENCE CUSTODY WARNING: ${cell.chainBreakReason}\nThe report has no established original execution custody. Its status is a recorded claim. See the evidence detail for the warning.` : ""}`
                 : `${subject.name} · ${c.id}\nNo evidence`
             }
           >

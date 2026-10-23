@@ -18,8 +18,7 @@ public sealed record ComplianceRegulationSummary(
     string? OverallStatus);
 
 /// <summary>
-/// One subject row in <see cref="ComplianceMatrix"/>. Kind comes from the subjects
-/// store (compliance evidence on disk is keyed by name only — see plan-07 §8).
+/// One subject row in <see cref="ComplianceMatrix"/>. Kind and name come from the recorded report.
 /// </summary>
 public sealed record ComplianceMatrixSubject(string Name, SubjectKind Kind);
 
@@ -49,7 +48,11 @@ public sealed record ComplianceMatrixCell(
     string Timestamp,
     bool? RegressedFromBaseline,
     bool ChainValid = true,
-    string? ChainBreakReason = null);
+    string? ChainBreakReason = null)
+{
+    /// <summary>Recorded subject kind, disambiguating agent/workflow rows with the same name.</summary>
+    public SubjectKind? SubjectKind { get; init; }
+}
 // ChainValid + ChainBreakReason added 2026-05-24 per plan-08 portal-review finding A1.
 // The aggregate `ComplianceMatrix.AllChainsValid` boolean answered "is at least one
 // cell broken?" without telling the SPA WHICH cell. A tampered cell whose pre-tamper
@@ -63,9 +66,8 @@ public sealed record ComplianceMatrixCell(
 /// computed from the latest evidence per subject. Plan-07 §10 / §8.
 /// </summary>
 /// <remarks>
-/// <see cref="UnreadableEvidence"/> counts indexed evidence that could not be read (unknown subject, or the
-/// evidence file is gone). It separates "there is no evidence" from "the evidence was deleted": both can produce a
-/// matrix with no subjects, and only the second is a broken audit chain.
+/// UnreadableEvidence is retained for schema compatibility. Complete verified reads refuse unreadable or
+/// conflicting evidence explicitly rather than returning a partially populated matrix.
 /// </remarks>
 public sealed record ComplianceMatrix(
     string Regulation,

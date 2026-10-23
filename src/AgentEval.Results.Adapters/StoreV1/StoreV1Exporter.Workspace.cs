@@ -107,7 +107,7 @@ public static partial class StoreV1Exporter
         };
     }
 
-    private static IReadOnlyList<string> DiscoverLegacyDirectories(string root, string marker, CancellationToken ct)
+    internal static IReadOnlyList<string> DiscoverLegacyDirectories(string root, string marker, CancellationToken ct)
     {
         var result = AefRunDiscovery.DiscoverByMarker(root, marker,
             new() { MaxDepth = 8, MaxEntries = 100_000, MaxRuns = 1000 }, ct);

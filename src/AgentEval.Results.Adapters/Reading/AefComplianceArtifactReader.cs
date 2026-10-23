@@ -104,11 +104,27 @@ public sealed class AefComplianceArtifactReader : IAefComplianceArtifactReader
         var sameFormat = prior.FirstOrDefault(d => d.IsRich == candidate.IsRich);
         if (sameFormat is not null)
         {
-            if (!JsonNode.DeepEquals(JsonNode.Parse(sameFormat.Document.GetRawText()), JsonNode.Parse(candidate.Document.GetRawText())))
+            if (!JsonNode.DeepEquals(ComparableDocument(sameFormat), ComparableDocument(candidate)))
                 throw Bad("Conflicting compliance documents claim the same identity and format.");
             return;
         }
         documents.Add(candidate);
+    }
+
+    // The legacy writer omits optional nulls; another valid producer may spell them explicitly.
+    // Normalize only those declared optional fields. Required null passRate and unknown members stay intact.
+    private static JsonNode ComparableDocument(AefComplianceDocument document)
+    {
+        var json = JsonNode.Parse(document.Document.GetRawText())!;
+        var basis = document.IsRich ? json["base"]! : json;
+        if (basis["attestation"] is JsonObject attestation && attestation["configurationId"] is null)
+            attestation.Remove("configurationId");
+        foreach (var name in new[] { "version", "framework", "modelId", "sourceProject", "sourcePath", "tags" })
+            if (basis["subject"]![name] is null) basis["subject"]!.AsObject().Remove(name);
+        foreach (var control in basis["controls"]!.AsArray())
+            foreach (var name in new[] { "notes", "regressedFromBaseline" })
+                if (control![name] is null) control.AsObject().Remove(name);
+        return json;
     }
 
     private JsonDocument Parse(byte[] bytes, string id)

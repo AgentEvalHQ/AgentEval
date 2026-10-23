@@ -356,8 +356,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.Equal("warn", art17Cell.GetProperty("status").GetString());
         Assert.Equal(0.75, art17Cell.GetProperty("passRate").GetDouble());
 
-        // Audit chain valid because the seeded evidence references the seeded run's hash.
-        Assert.True(matrix.GetProperty("allChainsValid").GetBoolean());
+        // Conversion checks the legacy hash but does not establish original execution custody.
+        Assert.False(matrix.GetProperty("allChainsValid").GetBoolean());
     }
 
     [Fact]

@@ -17,9 +17,14 @@ public static partial class StoreV1Exporter
     /// </summary>
     public static AefConversion ExportComplianceDirectory(string sourceDirectory, string outputDirectory,
         StoreV1ExportOptions? options = null, CancellationToken ct = default)
+        => ExportComplianceDirectoryBounded(sourceDirectory, outputDirectory, options, ct, null);
+
+    internal static AefConversion ExportComplianceDirectoryBounded(string sourceDirectory, string outputDirectory,
+        StoreV1ExportOptions? options, CancellationToken ct, AefReadBudget? budget)
     {
         options ??= new();
-        var captured = CaptureComplianceDirectory(sourceDirectory, ct);
+        var captured = CaptureComplianceDirectory(sourceDirectory, ct, budget);
+        if (budget is not null) options = options with { WriteBudget = new(budget.Limit(64L << 20), ct, budget.Charge) };
         var documents = captured.Select(c => c.Document).ToList();
         var artifacts = captured.Select(c => c.Bytes).ToList();
         var subject = documents[0].Evidence.Subject;
