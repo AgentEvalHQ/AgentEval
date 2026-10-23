@@ -19,29 +19,9 @@ public static partial class StoreV1Exporter
         StoreV1ExportOptions? options = null, CancellationToken ct = default)
     {
         options ??= new();
-        using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), new AefStagingOptions
-        {
-            MaxFiles = 1000, MaxBytes = 256L << 20, MaxFileBytes = 64L << 20,
-        }, ct);
-        if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(snapshot.FullName, name))))
-            throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");
-        var reader = new AefComplianceArtifactReader();
-        var documents = new List<AefComplianceDocument>();
-        var artifacts = new List<byte[]>();
-        foreach (var name in new[] { "evidence.json", "gdpr-evidence.json", "eu-ai-act-evidence.json" })
-        {
-            ct.ThrowIfCancellationRequested();
-            var path = Path.Combine(snapshot.FullName, name);
-            if (!File.Exists(path)) continue;
-            var bytes = File.ReadAllBytes(path);
-            var document = reader.ReadDocument(bytes, name);
-            var first = documents.FirstOrDefault()?.Evidence;
-            if (first is not null && !AefComplianceArtifactReader.SameIdentity(first, document.Evidence))
-                throw InvalidSource("Reports in the selected compliance directory name different evidence identities.");
-            AefComplianceArtifactReader.AddDocument(documents, document);
-            artifacts.Add(bytes);
-        }
-        if (documents.Count == 0) throw InvalidSource("No supported compliance documents were found.");
+        var captured = CaptureComplianceDirectory(sourceDirectory, ct);
+        var documents = captured.Select(c => c.Document).ToList();
+        var artifacts = captured.Select(c => c.Bytes).ToList();
         var subject = documents[0].Evidence.Subject;
         const string reason = "Original execution timing, completion and results are unknown: only legacy compliance reports were supplied.";
         var notes = new List<string>
@@ -74,5 +54,35 @@ public static partial class StoreV1Exporter
         {
             ComplianceArtifacts = artifacts,
         }, outputDirectory, options);
+    }
+
+    private sealed record CapturedCompliance(AefComplianceDocument Document, byte[] Bytes);
+
+    private static List<CapturedCompliance> CaptureComplianceDirectory(string sourceDirectory, CancellationToken ct)
+    {
+        using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), new AefStagingOptions
+        {
+            MaxFiles = 1000, MaxBytes = 256L << 20, MaxFileBytes = 64L << 20,
+        }, ct);
+        if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(snapshot.FullName, name))))
+            throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");
+        var reader = new AefComplianceArtifactReader();
+        var documents = new List<AefComplianceDocument>();
+        var artifacts = new List<CapturedCompliance>();
+        foreach (var name in new[] { "evidence.json", "gdpr-evidence.json", "eu-ai-act-evidence.json" })
+        {
+            ct.ThrowIfCancellationRequested();
+            var path = Path.Combine(snapshot.FullName, name);
+            if (!File.Exists(path)) continue;
+            var bytes = File.ReadAllBytes(path);
+            var document = reader.ReadDocument(bytes, name);
+            var first = documents.FirstOrDefault()?.Evidence;
+            if (first is not null && !AefComplianceArtifactReader.SameIdentity(first, document.Evidence))
+                throw InvalidSource("Reports in the selected compliance directory name different evidence identities.");
+            AefComplianceArtifactReader.AddDocument(documents, document);
+            artifacts.Add(new(document, bytes));
+        }
+        if (documents.Count == 0) throw InvalidSource("No supported compliance documents were found.");
+        return artifacts;
     }
 }

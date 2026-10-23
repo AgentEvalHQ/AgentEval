@@ -50,13 +50,13 @@ public class ComplianceRenderCommandTests : IDisposable
 
     private async Task<string> WriteFixtureEvidenceAsync(string subjectName)
     {
-        var ts = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+        var evidence = MakeFixtureEvidence(subjectName);
+        var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         var sanitizedSubject = subjectName.Replace(' ', '-');
         var evidenceDir = Path.Combine(
             _root, ".agenteval", "compliance", "GDPR", sanitizedSubject, ts);
         Directory.CreateDirectory(evidenceDir);
 
-        var evidence = MakeFixtureEvidence(subjectName);
         var evidenceFile = Path.Combine(evidenceDir, "gdpr-evidence.json");
         await using var stream = File.Create(evidenceFile);
         await JsonSerializer.SerializeAsync(stream, evidence, s_jsonOpts);

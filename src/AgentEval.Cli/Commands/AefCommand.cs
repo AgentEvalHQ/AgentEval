@@ -430,7 +430,13 @@ internal static partial class AefCommand
         return cmd;
     }
 
-    internal static async Task<int> RunExportAsync(
+    internal static Task<int> RunExportAsync(
+        string storeDirectory, string outputDirectory, string? runId, string targetMode, string contentCapture, bool noSeal, string? keyPath,
+        bool asJson, TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, CancellationToken ct = default)
+        => Task.FromResult(RunExport(storeDirectory, outputDirectory, runId, targetMode, contentCapture, noSeal, keyPath,
+            asJson, stdout, stderr, clock, ct));
+
+    private static int RunExport(
         string storeDirectory, string outputDirectory, string? runId, string targetMode, string contentCapture, bool noSeal, string? keyPath,
         bool asJson, TextWriter stdout, TextWriter stderr, TimeProvider? clock = null, CancellationToken ct = default)
     {
@@ -456,14 +462,16 @@ internal static partial class AefCommand
         try
         {
             signer = keyPath is null ? null : AefSigningKey.Load(keyPath);
-            var conversion = await StoreV1Exporter.ExportAsync(new FileSystemOutputStore(root), id, outputDirectory, new StoreV1ExportOptions
+            var source = File.Exists(Path.Combine(storeDirectory, "manifest.json")) ? Path.GetFullPath(storeDirectory)
+                : StoreV1Exporter.ResolveWorkspaceRunDirectory(root, id, ct);
+            var conversion = StoreV1Exporter.ExportWorkspaceRun(root, source, outputDirectory, new StoreV1ExportOptions
             {
                 TargetMode = mode.Value,
                 ContentCapture = capture.Value,
                 Seal = !noSeal,
                 Signer = signer,
                 TimeProvider = clock,
-            }, ct).ConfigureAwait(false);
+            }, ct);
             WarnNativeTwin(root, id, stderr);
             return Converted(conversion, asJson, stdout);
         }
@@ -533,7 +541,8 @@ internal static partial class AefCommand
     private static bool TryLocateStoreRun(string storeDirectory, string? runId, out string root, out string id, out string error)
     {
         (root, id, error) = ("", "", "");
-        var full = Path.GetFullPath(storeDirectory);
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(storeDirectory));
+        var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!Directory.Exists(full))
         {
             error = $"{storeDirectory} does not exist.";
@@ -544,13 +553,13 @@ internal static partial class AefCommand
         {
             var runs = Directory.GetParent(full);
             var subjects = runs?.Parent?.Parent?.Parent;
-            if (runs?.Name != "runs" || subjects?.Name != "subjects" || subjects.Parent is null)
+            if (!string.Equals(runs?.Name, "runs", pathComparison) || !string.Equals(subjects?.Name, "subjects", pathComparison) || subjects?.Parent is null)
             {
                 error = $"{storeDirectory} holds a manifest.json but is not a run folder of an AgentEval workspace (.agenteval/subjects/<kind>/<name>/runs/<run-id>/).";
                 return false;
             }
 
-            if (runId is not null && runId != Path.GetFileName(full))
+            if (runId is not null && !string.Equals(runId, Path.GetFileName(full), pathComparison))
             {
                 error = $"--run {runId} names another run than the folder {Path.GetFileName(full)}.";
                 return false;

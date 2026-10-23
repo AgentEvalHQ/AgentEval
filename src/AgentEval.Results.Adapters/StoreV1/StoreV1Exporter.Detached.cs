@@ -17,28 +17,35 @@ public static partial class StoreV1Exporter
     /// </summary>
     /// <remarks>Workspace-level compliance evidence is unavailable in a detached folder.</remarks>
     public static AefConversion ExportDirectory(string sourceDirectory, string outputDirectory, StoreV1ExportOptions? options = null)
+        => ExportDirectoryCore(sourceDirectory, outputDirectory, options ?? new(), CancellationToken.None);
+
+    private static AefConversion ExportDirectoryCore(string sourceDirectory, string outputDirectory, StoreV1ExportOptions options,
+        CancellationToken ct, Func<StoreV1Run, StoreV1Run>? enrich = null)
     {
-        options ??= new();
         using var snapshot = AefOwnedSnapshot.Capture(Path.GetFullPath(sourceDirectory), new AefStagingOptions
         {
             MaxFiles = 100_000, MaxBytes = 1L << 30, MaxFileBytes = 1L << 30,
-        }, CancellationToken.None);
+        }, ct);
         var root = snapshot.FullName;
         if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(root, name))))
             throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");
         var manifest = ReadOptional<RunManifest>(Path.Combine(root, "manifest.json"));
-        var scenarioDirectory = Directory.Exists(Path.Combine(root, "scenarios")) ? Path.Combine(root, "scenarios") : root;
-        var scenarios = Directory.GetFiles(scenarioDirectory, "*.json").OrderBy(f => f, StringComparer.Ordinal)
+        var scenarioDirectory = manifest is not null || Directory.Exists(Path.Combine(root, "scenarios")) ? Path.Combine(root, "scenarios") : root;
+        var scenarios = (Directory.Exists(scenarioDirectory) ? Directory.GetFiles(scenarioDirectory, "*.json") : [])
+            .OrderBy(f => f, StringComparer.Ordinal)
             .Select(ReadRequired<ScenarioResult>).ToList();
-        if (scenarios.Count == 0 || scenarios.Any(s => string.IsNullOrWhiteSpace(s.Id)))
+        if ((scenarios.Count == 0 && manifest is null) || scenarios.Any(s => string.IsNullOrWhiteSpace(s.Id)))
             throw InvalidSource("No usable scenario results with recorded scenario IDs were found.");
         var summary = ReadOptional<RunSummary>(Path.Combine(root, "summary.json"));
         ValidateSummary(summary);
         var trace = ReadOptional<AgentTrace>(Path.Combine(root, "traces", "agent-trace.json"));
         if (manifest is not null)
         {
-            return Export(new StoreV1Run(manifest, summary, scenarios, trace, []), outputDirectory, options);
+            var run = new StoreV1Run(manifest, summary, scenarios, trace, []);
+            ct.ThrowIfCancellationRequested();
+            return Export(enrich is null ? run : enrich(run), outputDirectory, options);
         }
+        if (enrich is not null) throw InvalidSource("A workspace run requires its original manifest.");
 
         const string reason = "Original execution timing and completion are unknown because the legacy manifest is missing.";
         var notes = new List<string>

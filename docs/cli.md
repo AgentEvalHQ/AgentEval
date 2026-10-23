@@ -1064,6 +1064,12 @@ through the same converter as the retained `export` spelling. Its report says **
 an ingest seal protects the conversion from import onward, not the original execution's history. Source files
 are preserved. See [legacy import](aef.md#import-a-legacy-run-check-it-sign-it) for the source-folder contract.
 
+An explicit workspace run folder is imported exactly as selected. A workspace plus `--run` must identify one
+folder; duplicate IDs across subjects are refused as ambiguous. Matching compliance reports must agree on
+subject, source run ID and the recorded source hash. With `--content-capture on`, rich report bytes are retained
+and cited by the corresponding scenarios; `off` retains only generic compliance evidence. Agreement with a
+recorded hash does not establish the original execution's custody.
+
 **`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
 which trusted identities signed it, and lets authorized redactions withhold blobs; with `--anchors`, whether one of
 the run hashes you trust is the run's. Exit `1` when the run is invalid.

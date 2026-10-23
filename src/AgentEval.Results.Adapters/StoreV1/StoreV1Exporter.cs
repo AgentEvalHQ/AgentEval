@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.StoreV1;
@@ -80,6 +81,8 @@ public static partial class StoreV1Exporter
     };
 
     /// <summary>Exports run <paramref name="runId"/> of <paramref name="store"/> to <paramref name="outputDirectory"/>.</summary>
+    /// <remarks>This semantic reader API can preserve only the generic compliance evidence exposed by the
+    /// reader. Use <see cref="ExportWorkspaceRun"/> for exact filesystem selection and original rich reports.</remarks>
     /// <param name="store">The store v1 workspace.</param>
     /// <param name="runId">The run.</param>
     /// <param name="outputDirectory">The AEF run folder to write: it must not exist, or be empty.</param>
@@ -143,6 +146,15 @@ public static partial class StoreV1Exporter
         options ??= new StoreV1ExportOptions();
         var manifest = run.Manifest;
         ValidateManifest(manifest);
+        ValidateSummary(run.Summary);
+        if (run.Summary is { } summary)
+        {
+            if (summary.RunId != manifest.Run.RunId)
+                throw InvalidSource("The summary names a different execution than the selected manifest.");
+            if (manifest.Run.Verdict != "PENDING" &&
+                (manifest.Run.ScenarioCount != run.Scenarios.Count || summary.Stats.Total != run.Scenarios.Count))
+                throw InvalidSource("The completed run's recorded scenario counts disagree with the supplied results.");
+        }
         var capture = options.ContentCapture;
         var runId = manifest.Run.RunId;
         if (!AefConverter.IsId(runId))
@@ -209,6 +221,7 @@ public static partial class StoreV1Exporter
         return Export(new ExportData(header, run.Scenarios, lane, endedAt, abortReason, notes)
         {
             Summary = run.Summary, Trace = run.Trace, ComplianceEvidence = run.ComplianceEvidence,
+            ComplianceArtifacts = run.ComplianceArtifacts,
         }, outputDirectory, options);
     }
 
@@ -264,13 +277,22 @@ public static partial class StoreV1Exporter
             if (options.ContentCapture == AefContentCapture.On)
             {
                 for (var i = 0; i < data.ComplianceArtifacts.Count; i++)
+                {
+                    var id = $"E-compliance-original-{i + 1}";
+                    var document = new AefComplianceArtifactReader().ReadDocument(data.ComplianceArtifacts[i], id);
                     writer.AddEvidence(new AefEvidence
                     {
-                        EvidenceId = $"E-compliance-original-{i + 1}",
+                        EvidenceId = id,
                         Kind = AefEvidenceKind.ComplianceArtifact,
                         Link = AefEvidenceLink.ToBlob(writer.PutBlob(data.ComplianceArtifacts[i])),
                         Description = "Original legacy compliance document bytes; ingest custody begins at conversion.",
                     });
+                    foreach (var scenario in document.Evidence.Controls.SelectMany(c => c.ScenarioRefs).Distinct(StringComparer.Ordinal))
+                    {
+                        if (!compliance.TryGetValue(scenario, out var ids)) compliance[scenario] = ids = [];
+                        ids.Add(id);
+                    }
+                }
             }
             var traceEvidence = AddTrace(writer, data.Trace, options.ContentCapture);
             var index = 0;
@@ -826,4 +848,8 @@ public sealed record StoreV1Run(
     RunSummary? Summary,
     IReadOnlyList<ScenarioResult> Scenarios,
     AgentTrace? Trace,
-    IReadOnlyList<ComplianceEvidence> ComplianceEvidence);
+    IReadOnlyList<ComplianceEvidence> ComplianceEvidence)
+{
+    // Exact bytes captured by the filesystem importer, after validating their generic evidence identity.
+    internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+}
