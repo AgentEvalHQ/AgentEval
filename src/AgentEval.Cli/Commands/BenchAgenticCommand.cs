@@ -243,6 +243,7 @@ public static class BenchAgenticCommand
             AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("bench", $"agentic/{preset}"), benchmark, evalInput, 1);
 
         var evidenceFinalized = false;
+        AgentEval.Results.Adapters.Native.AefReportArtifact? reportArtifact = null;
         var startedAt = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
         string? storeRunId = null;
@@ -284,6 +285,16 @@ public static class BenchAgenticCommand
             var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            var reportFile = Path.Combine(outputDir, "agentic-result.json");
+            if (new FileInfo(reportFile).Length > 64L << 20)
+                throw new InvalidDataException("The agentic report exceeds the 64 MiB capture limit.");
+            reportArtifact = new()
+            {
+                Type = "agentic-result", GeneratedAt = result.GeneratedAt,
+                SourceRunId = result.SourceRunId, SourceManifestHash = result.SourceManifestHash,
+                Bytes = AefCliOptions.ContentCapture == AgentEval.Results.Writing.AefContentCapture.On
+                    ? File.ReadAllBytes(reportFile) : ReadOnlyMemory<byte>.Empty,
+            };
 
             // Markdown report
             try
@@ -338,7 +349,7 @@ public static class BenchAgenticCommand
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition, report: reportArtifact))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -363,7 +374,7 @@ public static class BenchAgenticCommand
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
+                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition, report: reportArtifact))
                 return ExitCodes.RuntimeError;
             return 1;
         }

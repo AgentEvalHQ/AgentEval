@@ -117,7 +117,7 @@ public static class ComplianceRenderCommand
         GdprComplianceEvidence evidence;
         try
         {
-            evidence = ComplianceReportJson.Read<GdprComplianceEvidence>(report.Document.Document, s_jsonOpts, "gdpr-evidence.schema.json");
+            evidence = BenchmarkReportJson.Read<GdprComplianceEvidence>(report.Document.Document, s_jsonOpts, "gdpr-evidence.schema.json");
         }
         catch (Exception ex)
         {
@@ -165,7 +165,7 @@ public static class ComplianceRenderCommand
         EuAiActComplianceEvidence evidence;
         try
         {
-            evidence = ComplianceReportJson.Read<EuAiActComplianceEvidence>(document.Document, s_jsonOpts, "eu-ai-act-evidence.schema.json");
+            evidence = BenchmarkReportJson.Read<EuAiActComplianceEvidence>(document.Document, s_jsonOpts, "eu-ai-act-evidence.schema.json");
         }
         catch (Exception ex)
         {

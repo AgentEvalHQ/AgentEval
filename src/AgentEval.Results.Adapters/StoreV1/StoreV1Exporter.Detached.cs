@@ -33,6 +33,14 @@ public static partial class StoreV1Exporter
         if (new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }.Any(name => Path.Exists(Path.Combine(root, name))))
             throw InvalidSource("The directory contains AEF markers and requires direct AEF verification.");
         var manifest = ReadOptional<RunManifest>(Path.Combine(root, "manifest.json"));
+        if (manifest is null && File.Exists(Path.Combine(root, "agentic-result.json")))
+        {
+            if (enrich is not null || Directory.Exists(Path.Combine(root, "scenarios"))
+                || Directory.GetFiles(root, "*.json").Any(p => Path.GetFileName(p) != "agentic-result.json"))
+                throw InvalidSource("An agentic report-only import cannot also claim scenario or workspace execution files.");
+            return ExportAgenticReport(AgenticReportDocument.Read(File.ReadAllBytes(Path.Combine(root, "agentic-result.json"))),
+                outputDirectory, options, ct, budget);
+        }
         var scenarioDirectory = manifest is not null || Directory.Exists(Path.Combine(root, "scenarios")) ? Path.Combine(root, "scenarios") : root;
         var scenarios = (Directory.Exists(scenarioDirectory) ? Directory.GetFiles(scenarioDirectory, "*.json") : [])
             .OrderBy(f => f, StringComparer.Ordinal)

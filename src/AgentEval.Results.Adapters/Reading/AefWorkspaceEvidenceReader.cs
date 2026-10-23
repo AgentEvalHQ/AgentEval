@@ -109,7 +109,7 @@ public sealed partial class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceRe
         return new(runs);
     }
 
-    private static IReadOnlyList<string> Aliases(AefRunEvidence evidence)
+    internal static IReadOnlyList<string> Aliases(AefRunEvidence evidence)
     {
         if (!evidence.Header.TryGetProperty("ext", out var ext) || !ext.TryGetProperty("agenteval.store-v1", out var link)) return [];
         if (link.ValueKind != JsonValueKind.Object) throw Bad("The legacy source link is not an object.");

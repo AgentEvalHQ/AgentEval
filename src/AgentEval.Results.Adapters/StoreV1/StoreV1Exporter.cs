@@ -231,6 +231,7 @@ public static partial class StoreV1Exporter
             Execution = new AefExecution { TargetMode = options.TargetMode },
             Imported = new AefImported { From = from, Asserted = asserted },
         };
+        if (run.Report is { } report) header.Ext![Native.AefReportArtifact.Extension] = report.Metadata(capture);
 
         return Export(new ExportData(header, run.Scenarios, lane, endedAt, abortReason, notes)
         {
@@ -240,6 +241,7 @@ public static partial class StoreV1Exporter
             Reports = run.Reports,
             TraceSnapshotPath = run.TraceSnapshotPath,
             HistoryRecords = run.HistoryRecords,
+            Report = run.Report,
         }, outputDirectory, options);
     }
 
@@ -273,6 +275,7 @@ public static partial class StoreV1Exporter
         internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
         internal IReadOnlyList<StoreV1CompliancePdf> CompliancePdfs { get; init; } = [];
         internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
+        internal Native.AefReportArtifact? Report { get; init; }
     }
 
     private static AefConversion Export(ExportData data, string outputDirectory, StoreV1ExportOptions options)
@@ -327,6 +330,7 @@ public static partial class StoreV1Exporter
             var traceEvidence = AddTrace(writer, data.Trace, data.TraceSnapshotPath, options.ContentCapture);
             AddCompliancePdfs(writer, data.CompliancePdfs, options.ContentCapture);
             AddReports(writer, data.Reports, options.ContentCapture);
+            data.Report?.Write(writer, options.ContentCapture);
             if (options.ContentCapture == AefContentCapture.On && data.HistoryRecords is { } historyRecords)
                 writer.AddEvidence(new AefEvidence
                 {
@@ -879,4 +883,5 @@ public sealed record StoreV1Run(
     internal string? TraceSnapshotPath { get; init; }
     internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
     internal bool NativeReportProjection { get; init; }
+    internal Native.AefReportArtifact? Report { get; init; }
 }

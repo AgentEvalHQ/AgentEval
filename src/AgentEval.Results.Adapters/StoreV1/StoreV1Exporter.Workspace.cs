@@ -63,6 +63,7 @@ public static partial class StoreV1Exporter
             var subjectDirectory = Path.GetDirectoryName(Path.GetDirectoryName(source)!)!;
             var history = StoreV1History.ReadFile(Path.Combine(subjectDirectory, "history.jsonl"), ct, budget);
             run = run with { HistoryRecords = history?.Where(r => r.Entry.RunId == manifest.Run.RunId).ToArray() };
+            run = EnrichAgenticReport(workspace, parts[2], run, ct, budget);
             return EnrichWorkspaceRun(workspace, parts[2], run, ct, budget);
         }, budget);
     }

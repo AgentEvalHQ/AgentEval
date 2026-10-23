@@ -25,6 +25,8 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>An original report document; identity is retained and bytes follow content-capture policy.</summary>
+    public AefReportArtifact? Report { get; init; }
     /// <summary>
     /// Select the entire preset as one comparison observation with this identity, retaining its parts as supporting
     /// results. Null keeps the default component cases and leaf comparison observations. The producer supplies the
@@ -188,6 +190,11 @@ public static class AefCompositeRunWriter
         if (summaryExtension.ContainsKey("agenteval.bench"))
             throw new ArgumentException("Expected: producer diagnostics outside agenteval.bench. Actual: reserved summary extension supplied. Suggestions: use a distinct namespaced key. Because: diagnostics must not replace the benchmark verdict.");
         var storeExtension = AefCliProvenance.Extension(options.Cli, options.StoreV1);
+        if (options.Report is { } report)
+        {
+            storeExtension ??= new JsonObject();
+            storeExtension[AefReportArtifact.Extension] = report.Metadata(options.ContentCapture);
+        }
         var binding = AefNativeSuiteDefinition.Bind("composite", options.SuiteRef, preset.Metric.Version,
             cases.SelectMany(c => Keys(c).Prepend(c.Metric.Key)), options.Definition, storeExtension,
             options.AbortReason is not null || abortedTrials || emptyResults, executionPolicy: options.ExecutionPolicy,
@@ -220,6 +227,7 @@ public static class AefCompositeRunWriter
         try
         {
             binding.Write(writer);
+            options.Report?.Write(writer, options.ContentCapture);
             writer.SetMetrics(
             [
                 new AefMetric

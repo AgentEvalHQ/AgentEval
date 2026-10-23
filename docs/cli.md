@@ -853,7 +853,7 @@ PDFs are written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/re
 
 ### `agenteval render`
 
-Re-render a Markdown report from existing benchmark results — no LLM cost.
+Re-render Markdown and PDF from an original agentic report in verified AEF — no LLM cost.
 
 **Synopsis**
 
@@ -869,6 +869,12 @@ agenteval render --benchmark <kind> --subject <name> [--ts <timestamp>] [--root 
 | `--root <path>` | Workspace root. Default: auto-detected. |
 
 A missing `--benchmark` or `--subject` exits `2`.
+
+Native runs need `--aef-content on` when the benchmark runs to retain the original report for later rendering.
+Capture off keeps the report identity but omits its document. Rendering returns `1` when captured content is
+unavailable or evidence is invalid or ambiguous; it does not fall back to a dual-written legacy report.
+Existing legacy report folders are converted on read, with ingest custody labelled separately from original
+execution provenance. Reports still go to `.agenteval/benchmarks/agentic/<subject>/<timestamp>/`.
 
 ---
 

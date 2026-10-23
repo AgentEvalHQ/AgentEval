@@ -7,12 +7,13 @@ using System.Text.Json.Serialization;
 using AgentEval.Evals.Agentic.Reporting;
 using AgentEval.Evals.Agentic.Reporting.Pdf;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Reading;
 
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval render</c> subcommand.
-/// Reads an existing <c>agentic-result.json</c> and renders a Markdown report and a PDF report without any LLM cost.
+/// Reads a verified original agentic report (converting legacy inputs) and renders Markdown/PDF without LLM cost.
 /// </summary>
 public static class RenderCommand
 {
@@ -75,75 +76,43 @@ public static class RenderCommand
         var sanitizedSubject = FileSystemLayout.Sanitize(subject);
         var benchmarkDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject);
 
-        if (!Directory.Exists(benchmarkDir))
+        var result = resultOverride;
+        var selectedTimestamp = ts;
+        if (result is null)
         {
-            Console.Error.WriteLine($"No agentic benchmark results found at {benchmarkDir}.");
-            return 1;
-        }
-
-        return await RenderAgenticAsync(benchmarkDir, ts, resultOverride);
-    }
-
-    private static async Task<int> RenderAgenticAsync(
-        string benchmarkDir,
-        string? ts,
-        AgenticBenchmarkResult? resultOverride)
-    {
-        // ── Resolve timestamp directory ──────────────────────────────────────
-        string resultDir;
-        if (!string.IsNullOrWhiteSpace(ts))
-        {
-            resultDir = Path.Combine(benchmarkDir, ts);
-        }
-        else
-        {
-            var dirs = Directory.GetDirectories(benchmarkDir).OrderByDescending(d => d).ToList();
-            if (dirs.Count == 0)
-            {
-                Console.Error.WriteLine($"No result directories found under {benchmarkDir}.");
-                return 1;
-            }
-            resultDir = dirs[0];
-        }
-
-        if (!Directory.Exists(resultDir))
-        {
-            Console.Error.WriteLine($"Result directory not found: {resultDir}.");
-            return 1;
-        }
-
-        // ── Load agentic-result.json ─────────────────────────────────────────
-        AgenticBenchmarkResult result;
-        if (resultOverride is not null)
-        {
-            result = resultOverride;
-        }
-        else
-        {
-            var resultFile = Path.Combine(resultDir, "agentic-result.json");
-            if (!File.Exists(resultFile))
-            {
-                Console.Error.WriteLine($"agentic-result.json not found at {resultFile}.");
-                return 1;
-            }
-
             try
             {
-                await using var stream = File.OpenRead(resultFile);
-                result = await JsonSerializer.DeserializeAsync<AgenticBenchmarkResult>(stream, s_jsonOpts)
-                    ?? throw new InvalidOperationException("Deserialized result was null.");
+                var legacy = Directory.Exists(benchmarkDir) ? Directory.EnumerateDirectories(benchmarkDir).Take(1001).ToArray() : [];
+                var report = new AefAgenticReportReader().Read(Path.Combine(agentEvalDir, "aef", "runs"), legacy,
+                    subject, string.IsNullOrWhiteSpace(ts) ? null : ts);
+                if (report is null)
+                {
+                    Console.Error.WriteLine("No captured original agentic report is available. Native evidence takes precedence; missing content cannot be recovered from a legacy sibling.");
+                    return 1;
+                }
+                result = BenchmarkReportJson.Read<AgenticBenchmarkResult>(report.Document, s_jsonOpts, "agentic-result.schema.json");
+                selectedTimestamp = report.Timestamp;
+                Console.WriteLine($"Evidence integrity: {report.Run.Integrity}; signature trust: {report.Run.SignatureTrust}.");
+                if (report.Run.Imported) Console.WriteLine("Imported: not sealed when it ran. The ingest seal does not establish original execution custody.");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Failed to read result file: {ex.Message}");
+                Console.Error.WriteLine($"Failed to read verified agentic report: {ex.Message}");
                 return 1;
             }
         }
+        var resultDir = Path.Combine(benchmarkDir, string.IsNullOrWhiteSpace(selectedTimestamp)
+            ? result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture) : selectedTimestamp);
+        return await RenderAgenticAsync(resultDir, result);
+    }
 
+    private static async Task<int> RenderAgenticAsync(string resultDir, AgenticBenchmarkResult result)
+    {
         // ── Render Markdown ──────────────────────────────────────────────────
         var mdPath = Path.Combine(resultDir, "report.md");
         try
         {
+            Directory.CreateDirectory(resultDir);
             var renderer = new AgenticMarkdownRenderer();
             var md = renderer.Render(result);
             await File.WriteAllTextAsync(mdPath, md);

@@ -9,7 +9,7 @@ using Json.Schema;
 namespace AgentEval.Cli.Commands;
 
 // The CLI knows the reporting assemblies. Results.Adapters retains rich payloads without depending on those packs.
-internal static class ComplianceReportJson
+internal static class BenchmarkReportJson
 {
     private static readonly ConcurrentDictionary<Type, JsonSchema> Schemas = new();
 
@@ -59,6 +59,6 @@ internal static class ComplianceReportJson
     private static JsonElement Member(JsonElement value, string name, JsonValueKind kind) =>
         value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var member) && member.ValueKind == kind
             ? member : throw Bad(name + " is missing or has the wrong type.");
-    private static InvalidDataException Bad(string actual) => new("Expected: a complete recorded compliance report. Actual: " + actual +
+    private static InvalidDataException Bad(string actual) => new("Expected: a complete recorded benchmark report. Actual: " + actual +
         " Suggestions: select the original valid report. Because: absent fields must not be rendered as measured zeroes or default outcomes.");
 }

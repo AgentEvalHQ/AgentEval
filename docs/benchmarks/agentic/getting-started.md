@@ -213,7 +213,10 @@ agenteval bench agentic --preset conversational --subject MyTravelAgent --budget
 # Run calibration and write a calibration report
 agenteval bench agentic calibrate
 
-# Re-render an existing report without LLM cost
+# Retain the original report in AEF for later offline rendering
+agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt --aef-content on
+
+# Re-render the captured report without LLM cost
 agenteval render --benchmark agentic --subject MyTravelAgent
 ```
 
@@ -332,7 +335,12 @@ For a full per-evaluator cost-tier table and cost estimation guidance, see [Cost
 
 ## Output
 
-Each run writes to `.agenteval/benchmarks/agentic/{subject}/{timestamp}/`. The timestamp format is `yyyy-MM-dd_HH-mm-ss`.
+Native run evidence goes to `.agenteval/aef/runs/`. With `--aef-content on`, it also captures the original
+`agentic-result.json` bytes for verified offline rendering. Capture off keeps report identity and omits content;
+the renderer does not recover it from a legacy sibling. Old report folders remain readable through conversion,
+labelled as imported without original execution custody.
+
+Report exports go to `.agenteval/benchmarks/agentic/{subject}/{timestamp}/`. The timestamp format is `yyyy-MM-dd_HH-mm-ss`.
 
 ```
 .agenteval/benchmarks/agentic/MyTravelAgent/2026-05-09_10-15-00/

@@ -328,6 +328,11 @@ values in that domain.
 
 ## Runs from eval, redteam and bench
 
+`bench agentic --aef-content on` retains the original agentic report as document evidence. The recorded report
+identity names its generation time and original source references; those references are not an execution seal.
+`render --benchmark agentic` reads the verified document, or converts an old report folder, and uses the existing
+Markdown/PDF renderers. Missing native capture stays unavailable, including when a legacy copy remains nearby.
+
 `bench autoaudit --subject-version <version>` records that exact version for each audited subject, including
 interrupted runs. Run separate audits when subjects have different versions. Without the flag, the version stays unknown.
 

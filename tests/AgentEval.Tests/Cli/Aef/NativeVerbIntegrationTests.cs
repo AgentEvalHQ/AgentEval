@@ -9,6 +9,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Results.Integrity;
+using AgentEval.Results.Writing;
 using AgentEval.Tests.TestHelpers;
 using Xunit;
 
@@ -1974,6 +1975,62 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal),
                 converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal));
             Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true, "dual")]
+    [InlineData(true, "legacy-only")]
+    [InlineData(true, "tamper")]
+    [InlineData(true, "descriptor")]
+    [InlineData(true, "subject")]
+    [InlineData(true, "invalid-report")]
+    [InlineData(true, "alias-conflict")]
+    public async Task Agentic_Render_UsesVerifiedCapturedReportWithoutLegacyFallback(bool capture, string? mode = null)
+    {
+        await InitCommand.RunAsync("agentic-render", _root);
+        var exit = await WithCapture(capture, () => BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root,
+            "question", "answer", new PassingEvaluator(), budgetTier: "HIGH"));
+        Assert.Equal(11, exit); // Required tool evidence is absent, not a measured pass.
+        var reportRoot = Path.Combine(_root, ".agenteval", "benchmarks", "agentic", "subject");
+        var report = Assert.Single(Directory.GetFiles(reportRoot, "agentic-result.json", SearchOption.AllDirectories));
+        var directory = Path.GetDirectoryName(report)!;
+        var timestamp = Path.GetFileName(directory);
+        var markdown = File.ReadAllText(Path.Combine(directory, "report.md"));
+        var workspace = Path.Combine(_root, ".agenteval");
+        var native = RunDirectory(Path.Combine(workspace, "aef"));
+        if (capture && mode is null) Directory.Delete(reportRoot, recursive: true);
+        if (mode is "legacy-only" or "subject" or "invalid-report")
+            Directory.Delete(Path.Combine(workspace, "aef"), recursive: true);
+        if (mode == "legacy-only") Directory.Delete(Path.Combine(workspace, "subjects"), recursive: true);
+        if (mode == "tamper") File.AppendAllText(Path.Combine(native, "run.json"), " ");
+        if (mode == "descriptor")
+        {
+            var header = Document(native, "run.json");
+            header["ext"]!["agenteval.report"]!["sourceRunId"] = "different-source";
+            File.WriteAllText(Path.Combine(native, "run.json"), header.ToJsonString());
+            File.Delete(Path.Combine(native, "seal.json"));
+            AefSealer.Seal(native);
+            AssertIntact(native); // Semantic identity conflicts still refuse with an intact seal.
+        }
+        if (mode is "subject" or "invalid-report" or "alias-conflict")
+        {
+            var document = JsonNode.Parse(File.ReadAllText(report))!;
+            if (mode == "subject") document["subject"]!["name"] = "other-subject";
+            else if (mode == "invalid-report") document["compositeTree"]!["score"]!.AsObject().Remove("passed");
+            else document["disclaimer"] = "different report bytes";
+            File.WriteAllText(report, document.ToJsonString());
+        }
+
+        var succeeds = capture && mode is null or "dual" or "legacy-only";
+        Assert.Equal(succeeds ? 0 : 1, await RenderCommand.RunAsync("agentic", "subject", timestamp, _root));
+        if (succeeds)
+        {
+            Assert.Equal(markdown, File.ReadAllText(Path.Combine(directory, "report.md")));
+            using var pdf = UglyToad.PdfPig.PdfDocument.Open(File.ReadAllBytes(Path.Combine(directory, "report.pdf")));
+            Assert.Contains("subject", string.Join(" ", pdf.GetPages().Select(p => p.Text)));
         }
     }
 
