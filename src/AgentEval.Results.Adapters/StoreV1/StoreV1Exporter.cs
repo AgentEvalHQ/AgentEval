@@ -164,7 +164,8 @@ public static partial class StoreV1Exporter
             if (summary.RunId != manifest.Run.RunId)
                 throw InvalidSource("The summary names a different execution than the selected manifest.");
             if (manifest.Run.Verdict != "PENDING" &&
-                (manifest.Run.ScenarioCount != run.Scenarios.Count || summary.Stats.Total != run.Scenarios.Count))
+                (manifest.Run.ScenarioCount != (run.ReportOnlyQuestionCount ?? run.Scenarios.Count)
+                    || summary.Stats.Total != (run.ReportOnlyQuestionCount ?? run.Scenarios.Count)))
                 throw InvalidSource("The completed run's recorded scenario counts disagree with the supplied results.");
         }
         var capture = options.ContentCapture;
@@ -196,6 +197,8 @@ public static partial class StoreV1Exporter
         notes.Add("Store v1 records no deployment: run.json has no deployment.");
         if (run.NativeReportProjection)
             notes.Add("Canonical cases are projected from the recorded report-native.json EvalResult tree, not original scenario files. Inputs, input hashes and per-case durations were not recorded there and remain absent.");
+        if (run.ReportOnlyQuestionCount is { } questionCount)
+            notes.Add($"The legacy external memory producer recorded {questionCount} questions in report-native.json and no ScenarioResult files. Original question counts remain in legacy metadata; no canonical evaluator results or comparison facts are inferred from this report-only DTO.");
 
         // [RUN-5]: a run CompleteRunAsync finished has a summary and a final verdict; anything else never completed.
         var startedAt = manifest.Run.Timestamp;
@@ -883,5 +886,6 @@ public sealed record StoreV1Run(
     internal string? TraceSnapshotPath { get; init; }
     internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
     internal bool NativeReportProjection { get; init; }
+    internal int? ReportOnlyQuestionCount { get; init; }
     internal Native.AefReportArtifact? Report { get; init; }
 }

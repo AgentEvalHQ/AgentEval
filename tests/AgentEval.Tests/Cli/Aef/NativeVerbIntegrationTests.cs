@@ -1511,7 +1511,23 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(directory);
         AssertMemoryRecipe(directory);
         if (cancelBeforeCalls) Assert.Empty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
-        else Assert.NotEmpty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+        else
+        {
+            var workspace = Path.Combine(_root, ".agenteval");
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+            var report = LegacyMemoryReportAssertions.Import(workspace, source, "BenchMemoryCommand", reportOnly: false);
+            var native = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+            Assert.Single(native, r => r["parentResultId"] is null);
+            var categories = report["CategoryResults"]!.AsArray();
+            Assert.Equal(categories.Count, native.Count(r => r["parentResultId"] is not null));
+            foreach (var category in categories)
+            {
+                var key = "memory." + ((string)category!["CategoryName"]!).ToLowerInvariant().Replace(' ', '-');
+                var observed = Assert.Single(native, r => (string?)r["evaluator"]!["id"] == key);
+                Assert.Equal((double)category["Weight"]!, (double)observed["component"]!["weight"]!);
+                Assert.Equal((double)category["Score"]! / 100, (double)observed["scores"]![0]!["value"]!);
+            }
+        }
     }
 
     private static void AssertMemoryRecipe(string directory)
@@ -1571,6 +1587,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["observedQuestions"]!);
         Assert.False((bool)diagnostics["gating"]!);
         Assert.False(File.Exists(Path.Combine(directory, "gates.ndjson")));
+        if (!cancelBeforeQuestions)
+        {
+            var workspace = Path.Combine(_root, ".agenteval");
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+            var report = LegacyMemoryReportAssertions.Import(workspace, source, "BenchTypedMemEvalCommand", reportOnly: true);
+            LegacyMemoryReportAssertions.NativeQuestions(directory, report);
+        }
         if (vertical == "WorkingMemory")
         {
             var buckets = diagnostics["byDistanceSessions"]!.AsObject();

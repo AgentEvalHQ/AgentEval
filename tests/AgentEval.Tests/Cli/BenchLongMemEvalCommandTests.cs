@@ -86,6 +86,9 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Equal(50, native.OverallAccuracy);
         Assert.Equal(2, native.ScoredQuestions);
         Assert.Equal(3, native.SelectedQuestions);
+        var importedReport = Aef.LegacyMemoryReportAssertions.Import(Path.Combine(fixture.Root, ".agenteval"), runDirectory,
+            "BenchLongMemEvalCommand", reportOnly: true);
+        Aef.LegacyMemoryReportAssertions.NativeQuestions(aefDir, importedReport);
     }
 
     [Fact]
@@ -120,6 +123,11 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.False(summary.RootElement.GetProperty("metrics").TryGetProperty(
             "overall_accuracy",
             out _));
+        var importedReport = Aef.LegacyMemoryReportAssertions.Import(Path.Combine(fixture.Root, ".agenteval"), runDirectory,
+            "BenchLongMemEvalCommand", reportOnly: true);
+        var aefDirectory = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(fixture.Root, ".agenteval", "aef"),
+            "run.json", SearchOption.AllDirectories)))!;
+        Aef.LegacyMemoryReportAssertions.NativeQuestions(aefDirectory, importedReport);
     }
 
     [Theory]

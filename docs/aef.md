@@ -321,6 +321,16 @@ With content capture on, the original report bytes are also retained as `E-repor
 Other benchmark families' native reports are preserved as opaque evidence, without inferring cases
 from a different report schema. Content capture off omits the original report blob.
 
+LongMemEval and TypedMemEval historically record question counts in the manifest/summary and a
+report-only `ExternalBenchmarkResult` DTO, with no scenario files. For these known producers, conversion
+checks the report's benchmark identity and recorded question count, preserving the original summary
+and count metadata while leaving canonical evaluator results empty. Those counts describe questions;
+they do not claim missing scenario files or establish per-question comparison facts. Malformed or
+contradictory reports still refuse, as do ordinary scenario runs whose recorded counts disagree with
+their files. Category-memory scenarios retain their recorded values and unrecorded comparison facts.
+Report-only conversion requires the original filesystem report: a semantic store reader that exposes
+only manifests, summaries and scenarios cannot establish these report facts from counts alone.
+
 A generic scenario's recorded finite score can have an unbounded scale. Conversion declares it
 normalized only when its recorded metric contract supports that interpretation; it does not clamp
 the score into 0–1. Known normalized trace results and projected descendant metrics still require
