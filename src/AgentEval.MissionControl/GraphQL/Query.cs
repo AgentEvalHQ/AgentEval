@@ -163,9 +163,9 @@ public sealed partial class Query
     // ─── Red-team campaigns (MC1.4.5 / T3.6, 2026-05-25) ─────────────────────
 
     /// <summary>
-    /// T3.6 (2026-05-25) — lists all red-team campaign manifests stored under
-    /// <c>.agenteval/red-team/</c>. Returns an empty list when the store is
-    /// unavailable or no campaigns exist. Drives the SPA <c>/red-team</c> page.
+    /// Lists registered campaign inventory, not execution findings or verified AEF outcomes.
+    /// Dates and completion are registration declarations. Returns an empty list when the store is
+    /// unavailable or no registrations exist. Execution evidence uses the workspace run queries.
     /// </summary>
     public async IAsyncEnumerable<RedTeamCampaignManifest> RedTeamCampaigns(
         [Service] IOutputStoreReader store,
@@ -179,7 +179,7 @@ public sealed partial class Query
     }
 
     /// <summary>
-    /// T3.6 (2026-05-25) — fetches a single red-team campaign by id, or
+    /// Fetches a campaign registration by inventory ID (not an AEF run ID), or
     /// <c>null</c> when the id is unknown / unsafe.
     /// </summary>
     public Task<RedTeamCampaignManifest?> RedTeamCampaign(

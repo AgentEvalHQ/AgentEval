@@ -10,7 +10,11 @@ using AgentEval.Output;
 namespace AgentEval.Results.Adapters.Reading;
 
 /// <summary>One verified workspace source. Source identity is distinct from the execution's recorded run ID.</summary>
-public sealed record AefWorkspaceRun(string SourceId, AefRunEvidence Evidence, IReadOnlyList<string> RunAliases);
+public sealed record AefWorkspaceRun(string SourceId, AefRunEvidence Evidence, IReadOnlyList<string> RunAliases)
+{
+    // Temporary conversions are not independent stored snapshots of the subject's history index.
+    internal bool ConvertedOnRead { get; init; }
+}
 
 /// <summary>Complete bounded workspace evidence. Inventory and solution configuration are separate concerns.</summary>
 public sealed class AefWorkspaceEvidence
@@ -97,7 +101,7 @@ public sealed partial class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceRe
                     && n.RunAliases.Contains(evidence.Info.RunId, StringComparer.Ordinal)).ToArray();
                 if (linked.Length > 1) throw Bad("Multiple native sources claim the same legacy execution.");
                 if (linked.Length == 1) continue;
-                runs.Add(new(SourceId(workspace, directory), evidence, []));
+                runs.Add(new(SourceId(workspace, directory), evidence, []) { ConvertedOnRead = true });
             }
             finally { temporary.Delete(recursive: true); }
         }

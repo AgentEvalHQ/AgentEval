@@ -49,7 +49,7 @@ public sealed partial class AefWorkspaceEvidenceReader
                 // The snapshot is still independently bounded and verified.
                 var evidence = new AefRunEvidenceReader().Read(conversion.Directory, 64L << 20, ct);
                 var sourceId = "semantic-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(runId))).ToLowerInvariant();
-                runs.Add(new(sourceId, evidence, []));
+                runs.Add(new(sourceId, evidence, []) { ConvertedOnRead = true });
             }
             finally { temporary.Delete(recursive: true); }
         }

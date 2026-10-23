@@ -144,18 +144,9 @@ public static partial class StoreV1Exporter
             }
         }
 
-        var history = new List<StoreV1HistoryRecord>();
-        var ordinal = 0;
-        await foreach (var entry in store.GetHistoryAsync(subject, ct: ct).ConfigureAwait(false))
-        {
-            ct.ThrowIfCancellationRequested();
-            if (++ordinal > StoreV1History.MaxRecords) throw InvalidSource("History exceeds the bounded record count.");
-            if (!double.IsFinite(entry.Score)) throw InvalidSource("History score is not finite.");
-            accountant?.Account(entry);
-            var recorded = StoreV1History.Parse(JsonSerializer.SerializeToElement(entry, s_store), ordinal);
-            if (entry.RunId == runId) history.Add(recorded);
-        }
-        return new StoreV1Run(manifest, summary, scenarios, trace, compliance) { HistoryRecords = history };
+        var history = await ReadSubjectHistoryAsync(store, subject, ct, budget).ConfigureAwait(false);
+        return new StoreV1Run(manifest, summary, scenarios, trace, compliance)
+            { HistoryRecords = history?.Where(r => r.Entry.RunId == runId).ToArray() };
     }
 
     /// <summary>Exports a store v1 run already read.</summary>
@@ -336,7 +327,7 @@ public static partial class StoreV1Exporter
                 {
                     EvidenceId = StoreV1History.EvidenceId, Kind = AefEvidenceKind.Document,
                     Link = AefEvidenceLink.ToBlob(writer.PutBlob(StoreV1History.Encode(historyRecords))),
-                    Description = "Recorded legacy history entries associated with this run, in original index order. Index claims do not verify execution; ingest custody begins at conversion."
+                    Description = "Recorded legacy history index entries, in original index order. References and index claims do not verify execution; ingest custody begins at conversion."
                 });
             var index = 0;
             foreach (var scenario in data.Scenarios)

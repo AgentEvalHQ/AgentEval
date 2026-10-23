@@ -12,6 +12,7 @@ using AgentEval.Results.Runs;
 namespace AgentEval.Results.Adapters.StoreV1;
 
 internal sealed record StoreV1HistoryRecord(int SourceOrdinal, HistoryEntry Entry, JsonElement Recorded);
+internal sealed record StoreV1HistoryCapture(bool Captured, int Count, IReadOnlyList<StoreV1HistoryRecord> Records);
 
 // Legacy index parsing only: recorded index values are claims, not reconstructed execution outcomes.
 internal static class StoreV1History
@@ -83,6 +84,48 @@ internal static class StoreV1History
             ["entry"] = JsonNode.Parse(r.Recorded.GetRawText())
         }).ToArray())
     });
+
+    internal static StoreV1HistoryCapture? ReadCaptured(AefRunEvidence run, CancellationToken ct)
+    {
+        if (!run.Header.TryGetProperty("ext", out var ext) || !ext.TryGetProperty(StoreV1Exporter.ExtName, out var legacy)
+            || !legacy.TryGetProperty("history", out var marker)) return null;
+        if (marker.ValueKind != JsonValueKind.Object
+            || !marker.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var v) || v != 1
+            || !marker.TryGetProperty("entries", out var count) || count.ValueKind != JsonValueKind.Number || !count.TryGetInt32(out var n) || n is < 0 or > MaxRecords
+            || !marker.TryGetProperty("captured", out var flag) || flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw Bad("The captured history marker is invalid or unsupported.");
+        var content = run.CapturedContent(EvidenceId);
+        if (!flag.GetBoolean())
+        {
+            if (content is not null) throw Bad("History content contradicts the capture-off marker.");
+            return new(false, n, []);
+        }
+        if (run.Info.ContentCapture != "on" || content is not { } bytes || bytes.Length > MaxBytes)
+            throw Bad("The marked history content is unavailable or exceeds its bound.");
+        try
+        {
+            AefJsonReader.Check(bytes.Span, checked((int)MaxBytes));
+            using var json = JsonDocument.Parse(bytes);
+            var root = json.RootElement;
+            if (!root.TryGetProperty("version", out var encodedVersion) || encodedVersion.ValueKind != JsonValueKind.Number || !encodedVersion.TryGetInt32(out var ev) || ev != 1
+                || !root.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array || entries.GetArrayLength() != n)
+                throw Bad("Captured history disagrees with its declared version or entry count.");
+            var records = new List<StoreV1HistoryRecord>();
+            var previous = 0;
+            foreach (var row in entries.EnumerateArray())
+            {
+                ct.ThrowIfCancellationRequested();
+                if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("sourceOrdinal", out var ordinal)
+                    || ordinal.ValueKind != JsonValueKind.Number || !ordinal.TryGetInt32(out var index) || index <= previous || index > MaxRecords
+                    || !row.TryGetProperty("entry", out var entry)) throw Bad("Captured history order or entry is invalid.");
+                records.Add(Parse(entry, index));
+                previous = index;
+            }
+            return new(true, n, records);
+        }
+        catch (Exception error) when (error is JsonException or AefEncodingException or InvalidOperationException)
+        { throw Bad("Captured history is not the supported JSON envelope.", error); }
+    }
 
     private static bool HasOffset(string value) => value.EndsWith('Z') ||
         value.Length >= 6 && value[^6] is '+' or '-' && value[^3] == ':';

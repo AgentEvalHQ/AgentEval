@@ -40,7 +40,33 @@ const { SubjectCard } = load(path.join(root, 'components/SubjectCard'));
 const { treeRows } = load(path.join(root, 'lib/canonical-tree'));
 const { ScenarioTreePage } = load(path.join(root, 'pages/ScenarioTreePage'));
 const { ManifestHashBadge } = load(path.join(root, 'components/ManifestHashBadge'));
+const { RedTeamCampaigns } = load(path.join(root, 'pages/RedTeamCampaigns'));
 const h = React.createElement;
+
+test('campaign registration without completion does not claim execution is running', () => {
+  const html = render(RedTeamCampaigns, '/red-team', '/red-team', [[queryKeys.redTeam.list(), { redTeamCampaigns: [
+    { campaignId: 'registered', name: 'Inventory', startedAt: '2026-10-23T10:00:00Z', targets: [], mode: 'standard', completedAt: null },
+  ] }]]);
+  assert.match(html, /Completion not recorded/);
+  assert.match(html, /Registered/);
+  assert.match(html, /href="\/runs"/);
+  assert.doesNotMatch(html, /IN PROGRESS/);
+});
+
+test('campaign completion remains an inventory declaration', () => {
+  const html = render(RedTeamCampaigns, '/red-team', '/red-team', [[queryKeys.redTeam.list(), { redTeamCampaigns: [
+    { campaignId: 'declared', name: 'Inventory', startedAt: '2026-10-23T10:00:00Z', targets: [], mode: 'standard', completedAt: '2026-10-23T10:30:00Z' },
+  ] }]]);
+  assert.match(html, /Completion recorded/);
+  assert.match(html, /verified execution evidence/);
+});
+
+test('empty campaign inventory directs users to execution evidence without claiming CLI registration', () => {
+  const html = render(RedTeamCampaigns, '/red-team', '/red-team', [[queryKeys.redTeam.list(), { redTeamCampaigns: [] }]]);
+  assert.match(html, /No campaign registrations/);
+  assert.match(html, /href="\/runs"/);
+  assert.doesNotMatch(html, /agenteval red-team|to start one/);
+});
 
 function canonicalTree() {
   const node = (resultId, parentResultId, evaluatorId, state) => ({

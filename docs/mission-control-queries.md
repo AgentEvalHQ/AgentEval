@@ -5,6 +5,41 @@ Scenario `score` and `duration` fields are nullable. A missing score is not zero
 states. A recorded zero score or duration remains zero. Legacy numeric scores explicitly marked
 unmeasured are normalized to null when read.
 
+## Subject history downloads
+
+`GET /api/v1/subjects/{kind}/{name}/history` reads verified workspace evidence without requiring
+solution configuration or an optional index. Supported kinds are `agent`, `workflow`, `model`,
+`endpoint`, `mcp-server` and `other`. The response is `application/x-ndjson` with `Cache-Control: no-store`.
+The complete selection is verified before any history is emitted; invalid, ambiguous or over-budget
+evidence returns 422. The download is bounded to 100,000 rows and 64 MiB.
+
+Each row retains `runId`, nullable `timestamp`, `verdict`, `score` and `notes`, with `sourceId`,
+`containerRunId`, `recordKind` and container `evidence` metadata. `legacy_index` rows preserve recorded
+index order, duplicate entries, explicit notes and orphan run references. `sourceOrdinal` is the original
+one-based index position, not chronological order. `recordedEntry` retains the captured entry, including
+additional producer fields. These are index claims; the import seal does not prove original execution custody.
+
+`execution_summary` rows reuse the verified execution summary projection. Their `timestampBasis` is
+`execution-start`; an importer-asserted start remains null. Completion is not converted into a passing
+verdict. A native summary's metric definitions and recorded summary are included as `metrics` and
+`summary`; a legacy index score has only the meaning its original producer recorded. Do not compare
+these scalar scores as if they all had the same normalized scale. No notes are reconstructed from summaries.
+
+`historyAvailability` distinguishes captured entries, `recorded_empty`, `not_captured` and `not_recorded`.
+`recordedEntryCount` retains a known empty or uncaptured count when available. A stored AEF snapshot
+takes precedence over its explicitly linked legacy run entries; capture-off content is never recovered
+from that sibling. Independent sources remain source-qualified, without an invented total chronology.
+An orphan index's `containerRunId` identifies a temporary import container, not an original execution.
+
+## Campaign registrations
+
+`redTeamCampaigns` and `redTeamCampaign` retain the existing registration inventory: campaign ID,
+name, declared targets/mode, registration timestamp and optional completion declaration. They do not
+read execution findings or establish an AEF run's outcome. Missing completion metadata means completion
+was not recorded; it does not prove an execution is still running. The campaign page links to Runs for
+verified execution evidence. A CLI red-team execution writes an AEF run and does not automatically
+create a campaign registration or invent a campaign-to-run identity.
+
 
 ## Implemented UI and desktop scope
 

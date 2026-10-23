@@ -27,6 +27,7 @@ internal static partial class BinaryEndpoints
     public static void MapBinaryEndpoints(this WebApplication app)
     {
         app.MapRunDownloads();
+        app.MapHistoryDownload();
 
         // ─── MC1.3.4 — compliance PDF stream ─────────────────────────────────
         app.MapGet("/api/v1/compliance/{regulation}/{subjectName}/{ts}/report.pdf", async (
@@ -82,44 +83,6 @@ internal static partial class BinaryEndpoints
             return HttpResults.Content(schema, "application/schema+json");
         });
 
-        // ─── MC1.3.6 — subject history JSONL stream ──────────────────────────
-        app.MapGet("/api/v1/subjects/{kind}/{name}/history", async (
-            HttpContext httpContext,
-            string kind,
-            string name,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            // Accept "agent"/"workflow" in any case so the URL stays user-friendly.
-            if (!Enum.TryParse<SubjectKind>(kind, ignoreCase: true, out var kindEnum))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await httpContext.Response.WriteAsync($"Unknown subject kind '{kind}'.", ct);
-                return;
-            }
-            if (!FileSystemLayout.IsSafePathSegment(name))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await httpContext.Response.WriteAsync("Invalid subject name.", ct);
-                return;
-            }
-            if (!store.IsAvailable)
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
-
-            var subject = new SubjectIdentity(kindEnum, name);
-            httpContext.Response.ContentType = "application/x-ndjson";
-            httpContext.Response.Headers["Cache-Control"] = "no-store";
-
-            await foreach (var entry in store.GetHistoryAsync(subject, range: null, ct))
-            {
-                var line = JsonSerializer.Serialize(entry, s_traceJson);
-                await httpContext.Response.WriteAsync(line, ct);
-                await httpContext.Response.WriteAsync("\n", ct);
-            }
-        });
     }
 
     // Single source of truth for accepted report formats — the rejection message is derived from
