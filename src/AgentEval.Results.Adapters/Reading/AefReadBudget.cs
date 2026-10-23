@@ -17,7 +17,13 @@ internal sealed class AefReadBudget(long bytes)
         return Math.Min(Remaining, maximum);
     }
 
-    internal void Charge(long capturedBytes) => Remaining -= capturedBytes;
+    internal void Charge(long capturedBytes)
+    {
+        if (capturedBytes < 0 || capturedBytes > Remaining)
+            throw new InvalidDataException("Expected: evidence within the remaining workspace budget. Actual: byte budget exhausted. " +
+                "Suggestions: narrow the source or increase the bounded budget. Because: input and conversion work share one limit.");
+        Remaining -= capturedBytes;
+    }
 
     internal AefOwnedSnapshot Capture(string directory, AefStagingOptions limits, CancellationToken ct)
     {

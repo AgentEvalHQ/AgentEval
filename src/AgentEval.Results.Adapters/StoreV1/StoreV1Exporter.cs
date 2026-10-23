@@ -110,24 +110,31 @@ public static partial class StoreV1Exporter
         return Export(run, outputDirectory, options);
     }
 
-    private static async Task<StoreV1Run> ReadAsync(IOutputStoreReader store, string runId, CancellationToken ct)
+    private static async Task<StoreV1Run> ReadAsync(IOutputStoreReader store, string runId, CancellationToken ct, AefWriteBudget? budget = null)
     {
+        var accountant = budget is null ? null : new SemanticAccountant(budget);
         var manifest = await store.GetRunManifestAsync(runId, ct).ConfigureAwait(false)
             ?? throw new InvalidDataException($"The store has no run {runId} (no manifest.json for it under subjects/*/*/runs/).");
         ValidateManifest(manifest);
+        accountant?.Account(manifest);
         var summary = await store.GetRunSummaryAsync(runId, ct).ConfigureAwait(false);
+        accountant?.Account(summary);
         var scenarios = new List<ScenarioResult>();
         await foreach (var scenario in store.GetScenarioResultsAsync(runId, ct).ConfigureAwait(false))
         {
+            accountant?.Account(scenario);
             scenarios.Add(scenario);
         }
 
         var trace = await store.GetTraceAsync(runId, ct).ConfigureAwait(false);
+        accountant?.Account(trace);
         var compliance = new List<ComplianceEvidence>();
         var subject = manifest.Subject.ToIdentity();
         await foreach (var pointer in store.ListComplianceEvidenceAsync(subject: subject, ct: ct).ConfigureAwait(false))
         {
+            accountant?.Account(pointer);
             var evidence = await store.GetComplianceEvidenceAsync(pointer.Regulation, subject, pointer.Timestamp, ct).ConfigureAwait(false);
+            accountant?.Account(evidence);
             if (evidence is not null && evidence.SourceRun.RunId == runId)
             {
                 compliance.Add(evidence);
@@ -263,7 +270,7 @@ public static partial class StoreV1Exporter
         AefRunWriter writer;
         try
         {
-            writer = AefRunWriter.Create(outputDirectory, data.Header);
+            writer = AefRunWriter.Create(outputDirectory, data.Header, options.WriteBudget);
         }
         catch (ArgumentException e) when (e.ParamName != "directory")
         {

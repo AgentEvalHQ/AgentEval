@@ -46,7 +46,9 @@ public static partial class StoreV1Exporter
         {
             var run = new StoreV1Run(manifest, summary, scenarios, trace, []);
             ct.ThrowIfCancellationRequested();
-            return Export(enrich is null ? run : enrich(run), outputDirectory, options);
+            run = enrich is null ? run : enrich(run);
+            if (budget is not null) options = options with { WriteBudget = new(budget.Limit(64L << 20), ct, budget.Charge) };
+            return Export(run, outputDirectory, options);
         }
         if (enrich is not null) throw InvalidSource("A workspace run requires its original manifest.");
 

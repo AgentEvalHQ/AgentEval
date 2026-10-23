@@ -36,6 +36,7 @@ public sealed record AefConversion(
 /// <summary>How a conversion writes the AEF run, and whether it seals it.</summary>
 public abstract record AefConversionOptions
 {
+    internal AefWriteBudget? WriteBudget { get; init; }
     /// <summary>The converter, as run.json's <c>producer</c> ([RUN-15]). Default: <c>agenteval-cli</c> and AgentEval's version.</summary>
     public AefProducer? Producer { get; init; }
 
@@ -222,6 +223,7 @@ internal static partial class AefConverter
                 SealedBy = AefSealedBy.Ingest,
                 Signer = options.Signer,
                 TimeProvider = options.TimeProvider,
+                  WriteBudget = options.WriteBudget,
             });
             verification = seal.Verification;
         }

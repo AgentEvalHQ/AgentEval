@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AgentEval.Results.Adapters.StoreV1;
+using AgentEval.Output;
 
 namespace AgentEval.Results.Adapters.Reading;
 
@@ -38,15 +39,22 @@ public sealed class AefWorkspaceEvidence
 public interface IAefWorkspaceEvidenceReader
 {
     /// <summary>Reads an authorized .agenteval directory without modifying it or creating an index. The byte budget
-    /// includes captured legacy inputs and converted AEF output. Throws on partial or invalid evidence.</summary>
+    /// includes captured legacy inputs and cumulative conversion writes, including rewrites and sealing.
+    /// Native snapshots count their captured bytes. Throws on partial or invalid evidence.</summary>
     AefWorkspaceEvidence Read(string workspaceDirectory, long maxBytes = 256L << 20, CancellationToken ct = default);
+
+    /// <summary>Reads a configured store. Filesystem stores use exact directory discovery; semantic stores are
+    /// converted with a cumulative input and output work budget, including discovery, rewrites and sealing.
+    /// Semantic serialization also checks conservative token scratch and buffer capacity before allocation;
+    /// a record may be refused even when its final serialized bytes alone would fit.</summary>
+    Task<AefWorkspaceEvidence> ReadAsync(IOutputStoreReader store, long maxBytes = 256L << 20, CancellationToken ct = default);
 }
 
 /// <summary>
 /// Verifies every native candidate before considering legacy input. Alias matching is subject-scoped and only
 /// suppresses duplicate sources; it never establishes original execution custody or recovers uncaptured content.
 /// </summary>
-public sealed class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceReader
+public sealed partial class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceReader
 {
     /// <inheritdoc />
     public AefWorkspaceEvidence Read(string workspaceDirectory, long maxBytes = 256L << 20, CancellationToken ct = default)
@@ -82,7 +90,9 @@ public sealed class AefWorkspaceEvidenceReader : IAefWorkspaceEvidenceReader
             {
                 // Exact-directory conversion avoids the legacy store's first-ID-match lookup.
                 var conversion = StoreV1Exporter.ExportWorkspaceRunBounded(workspace, directory, Path.Combine(temporary.FullName, "run"), null, ct, budget);
-                var evidence = ReadRun(conversion.Directory);
+                // Conversion writes were charged before writing, including the seal;
+                // verification captures the same output without charging it a second time.
+                var evidence = reader.Read(conversion.Directory, 64L << 20, ct);
                 var linked = native.Where(n => n.Evidence.Info.SubjectRef == evidence.Info.SubjectRef
                     && n.RunAliases.Contains(evidence.Info.RunId, StringComparer.Ordinal)).ToArray();
                 if (linked.Length > 1) throw Bad("Multiple native sources claim the same legacy execution.");

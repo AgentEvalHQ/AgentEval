@@ -31,7 +31,7 @@ public sealed class AefWriteException : InvalidOperationException
 }
 
 /// <summary>
-/// Writes one AEF 1.0 run folder (contracts/aef/1/spec/03-run.md) as a producer: <see cref="Create"/> starts it
+/// Writes one AEF 1.0 run folder (contracts/aef/1/spec/03-run.md) as a producer: <see cref="Create(string, AefRunHeader)"/> starts it
 /// (<c>status: running</c>, with run.json, an empty metrics.json and an empty results.ndjson), the producer adds result
 /// lines, blobs, evidence, gate decisions, telemetry and its metrics, and <see cref="Close"/> ends it: it writes
 /// summary.json (computed by <see cref="AefSummaryWriter"/>) and the closed run.json, and runs the run verifier
@@ -89,12 +89,14 @@ public sealed class AefRunWriter
     private readonly HashSet<(string Trace, string Span)> _spans = [];
     private Dictionary<string, AefMetricKind> _metrics = new(StringComparer.Ordinal);
     private AefSummary? _summary;
+    private readonly AefWriteBudget? _writeBudget;
 
-    private AefRunWriter(string directory, AefRunHeader header)
+    private AefRunWriter(string directory, AefRunHeader header, AefWriteBudget? writeBudget)
     {
         Directory = directory;
         _header = header;
         _contentOff = header.ContentCapture == AefContentCapture.Off;
+        _writeBudget = writeBudget;
     }
 
     /// <summary>The run folder.</summary>
@@ -116,7 +118,9 @@ public sealed class AefRunWriter
     /// §3.9 about run.json (<c>calibration</c>, <c>execution-policy</c>).
     /// </exception>
     /// <exception cref="IOException">The folder cannot be written.</exception>
-    public static AefRunWriter Create(string directory, AefRunHeader header)
+    public static AefRunWriter Create(string directory, AefRunHeader header) => Create(directory, header, null);
+
+    internal static AefRunWriter Create(string directory, AefRunHeader header, AefWriteBudget? writeBudget)
     {
         ArgumentNullException.ThrowIfNull(directory);
         ArgumentNullException.ThrowIfNull(header);
@@ -129,10 +133,13 @@ public sealed class AefRunWriter
         Valid("run", run, "run.json");
         CheckHeader(header);
 
-        var writer = new AefRunWriter(directory, header);
+        var writer = new AefRunWriter(directory, header, writeBudget);
+        var headerBytes = AefJsonWriter.Document(run);
+        var metricBytes = AefJsonWriter.Document(MetricsJson([], null));
+        writeBudget?.Check((long)headerBytes.Length + metricBytes.Length);
         System.IO.Directory.CreateDirectory(directory);
-        writer.WriteFile(RunPath, AefJsonWriter.Document(run));
-        writer.WriteFile(MetricsPath, AefJsonWriter.Document(MetricsJson([], null)));
+        writer.WriteFile(RunPath, headerBytes);
+        writer.WriteFile(MetricsPath, metricBytes);
         writer.WriteFile(ResultsPath, []);
         return writer;
     }
@@ -344,6 +351,7 @@ public sealed class AefRunWriter
                         throw new AefInputException($"A blob is at most {AefLimits.MaxBlobBytes} bytes ([ENC-17]).", nameof(content));
                     }
 
+                    _writeBudget?.Charge(read);
                     hash.AppendData(buffer, 0, read);
                     output.Write(buffer, 0, read);
                 }
@@ -627,6 +635,7 @@ public sealed class AefRunWriter
         Valid("run", closed, "run.json");
         var (summaryBytes, closedBytes) = (AefJsonWriter.Document(summary), AefJsonWriter.Document(closed));
 
+        _writeBudget?.Check((long)summaryBytes.Length + closedBytes.Length);
         WriteFile(SummaryPath, summaryBytes);
         WriteFile(RunPath, closedBytes);
         var verification = AefRunVerifier.Verify(Directory);
@@ -969,6 +978,7 @@ public sealed class AefRunWriter
 
     private void WriteFile(string path, ReadOnlySpan<byte> bytes)
     {
+        _writeBudget?.Charge(bytes.Length);
         var full = Full(path);
         System.IO.Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         using (var stream = new FileStream(full, FileMode.Create, FileAccess.Write, FileShare.Read))
@@ -981,6 +991,7 @@ public sealed class AefRunWriter
 
     private void AppendLine(string path, byte[] line)
     {
+        _writeBudget?.Charge(line.Length);
         using (var stream = new FileStream(Full(path), FileMode.Append, FileAccess.Write, FileShare.Read))
         {
             stream.Write(line);

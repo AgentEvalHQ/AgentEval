@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Workspace reads of semantic legacy stores enforce a shared input/conversion budget while enumerating records and writing output, including temporary blobs and sealing. Nested text and dictionary keys are checked before serialization allocates large buffers; failed conversions discard their partial output.
 - Added a verified AEF workspace-reading boundary for native runs and converted legacy sources. It preserves full result trees and score definitions, keeps importer-supplied timing unknown, distinguishes source identity from run ID, and applies shared source-byte limits before legacy conversion. Captured local evidence content is available from the same verified snapshot; absent or capture-off content stays absent, and external links are never fetched. Mission Control integration is still in progress.
 - `compliance render` reads verified native AEF artifacts and converts legacy rich reports through the shared StoreV1 converter. It preserves import custody, refuses conflicting or malformed evidence and missing captured content, and writes PDFs outside the sealed source run.
 - StoreV1 workspace import preserves the exact selected run folder and captured rich compliance reports. ID-only requests reject duplicate run IDs; report identity and source-reference conflicts are refused before output.
