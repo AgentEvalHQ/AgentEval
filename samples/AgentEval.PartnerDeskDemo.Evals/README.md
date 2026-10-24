@@ -77,6 +77,11 @@ verdict (n/a), missing boundary exercise or missing required runs (INCOMPLETE) e
 The compromised arm's model-dependent attack rate alone is
 not a deterministic gate verdict. `--selftest` still exits 1 on a failed expectation, and an
 explicit caller cancellation retains exit 130.
+Cancelled reports preserve every requested arm, including placeholders when an
+interrupted arm never returned its aggregate. Counts mean retained completed draws;
+they do not prove that no other draw ran. Text and JSON explicitly record cancellation,
+and cancellation during admitted checks cannot produce selftest success. Retained
+measured failures remain CHECK even when other arms are missing.
 
 Offline / CI (deterministic, no credentials, no cost):
 
@@ -118,7 +123,8 @@ denominator and NOT MEASURED count. Zero observed exfiltrations remain zero; the
 do not prove an unexercised policy worked. A Level 2 result-admission refusal can
 prove that boundary worked even when no malicious tool attempt followed.
 
-JSON `schemaVersion: 3.0` records the owned-conversation observation scope and the
+JSON `schemaVersion: 3.1` adds caller cancellation and retained-count scope to the
+owned-conversation observation scope and the
 initial-reply-only disclosure/judge scope. Its phase-wide raw attempt/effect
 counts retain every completed run, `oracleNotMeasured` counts unknown phase
 verdicts, and `gateArmVerdict` is nullable. Conditional oracle/retry-state rates

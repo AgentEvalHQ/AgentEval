@@ -138,6 +138,25 @@ public static class Program
         }
 
         var run = new EvalRun(modelLabel, runsPerArm, DateTimeOffset.UtcNow, results);
+        return await FinishReportAsync(run, arms, selfTest, cancelled || cts.IsCancellationRequested,
+            checkFailures, jsonPath).ConfigureAwait(false);
+    }
+
+    // One owner for final reporting, requested-arm completeness and process outcome.
+    private static async Task<int> FinishReportAsync(
+        EvalRun run,
+        IReadOnlyList<DemoPhase> requestedArms,
+        bool selfTest,
+        bool cancelled,
+        IReadOnlyList<string> checkFailures,
+        string? jsonPath)
+    {
+        // An interrupted arm may have completed draws internally without returning its aggregate.
+        // A placeholder means zero RETAINED draws, not proof that no execution happened.
+        var reportedArms = requestedArms
+            .Select(phase => run.Find(phase) ?? new ArmResult(phase, [], []))
+            .ToArray();
+        run = new EvalRun(run.ModelLabel, run.RunsPerArm, run.TimestampUtc, reportedArms, cancelled);
         EvalReport.WriteText(Console.Out, run);
 
         if (!string.IsNullOrWhiteSpace(jsonPath))
@@ -148,18 +167,17 @@ public static class Program
             Console.WriteLine($"  JSON written to {jsonPath}");
         }
 
-        if (selfTest)
-        {
-            return RunSelfTestAssertions(run, checkFailures);
-        }
-
         // A measured failure settles the all-runs predicate even when some requested draws are missing.
         // Keep missing-only reports unmeasured; caller cancellation retains its explicit exit contract.
         if (cancelled)
             return 130;
+        if (selfTest)
+        {
+            return RunSelfTestAssertions(run, checkFailures);
+        }
         if (run.GateArmVerdict == false)
             return SampleOutcome.Warning;
-        if (results.Any(arm => arm.Runs != runsPerArm))
+        if (run.HasMissingRuns)
         {
             Console.Error.WriteLine("RESULT: INCOMPLETE — some requested runs could not be measured.");
             return SampleOutcome.NotMeasured;

@@ -25,16 +25,20 @@ public static class EvalReport
         writer.WriteLine("  every rate below is a proportion with a 95% Wilson interval, measured over the tool");
         writer.WriteLine("  trace and gate verdicts — never console text; the judge column, when present, is shadow.");
         writer.WriteLine("  Phase signals include initial + retry; disclosure and shadow judge cover the initial reply only.");
+        if (run.Cancelled)
+            writer.WriteLine("  RUN CANCELLED — counts cover retained completed draws; interrupted-arm partial results may not be retained.");
         writer.WriteLine(new string('=', 96));
 
         var shortArms = run.Arms.Where(arm => arm.Runs < run.RunsPerArm).ToArray();
         if (shortArms.Length > 0)
         {
             writer.WriteLine();
-            writer.WriteLine("  NOTE: some runs were skipped after errors — these arms have fewer runs than requested:");
+            writer.WriteLine(run.Cancelled
+                ? "  NOTE: some requested arm results were not retained after cancellation:"
+                : "  NOTE: some runs were skipped after errors — these arms have fewer runs than requested:");
             foreach (var arm in shortArms)
             {
-                writer.WriteLine($"        Phase {(int)arm.Phase}: {arm.Runs}/{run.RunsPerArm} completed");
+                writer.WriteLine($"        Phase {(int)arm.Phase}: {arm.Runs}/{run.RunsPerArm} retained completed draws");
             }
         }
 
@@ -118,6 +122,10 @@ public static class EvalReport
         writer.WriteLine();
         writer.WriteLine("  RESULT: " + run.GateArmVerdict switch
         {
+            true when run.HasMissingRuns
+                => "INCOMPLETE — the retained gated/clean oracle held, but other requested arm results are missing.",
+            true when run.Cancelled
+                => "CANCELLED — retained normal-arm oracles held; the whole evaluation/check sequence did not complete.",
             true => "PASS — every gated/clean arm held its oracle on every run; the compromised arm is " +
                     "model-dependent by design.",
             false => "CHECK — a gated/clean arm failed its oracle on at least one run (see the arm tables above); " +
@@ -173,7 +181,9 @@ public static class EvalReport
 
         var root = new JsonObject
         {
-            ["schemaVersion"] = "3.0",
+            ["schemaVersion"] = "3.1",
+            ["cancelled"] = run.Cancelled,
+            ["runCountScope"] = "retained completed draws; interrupted-arm partial results may not be retained",
             ["observationScope"] = "initial conversation and attached runner-triggered retry; leak/disclosure paired within each conversation",
             ["disclosureScope"] = "initial-conversation reply only",
             ["model"] = run.ModelLabel,
@@ -225,12 +235,14 @@ public static class EvalReport
 public sealed class EvalRun
 {
     /// <summary>Creates the run.</summary>
-    public EvalRun(string modelLabel, int runsPerArm, DateTimeOffset timestampUtc, IReadOnlyList<ArmResult> arms)
+    public EvalRun(string modelLabel, int runsPerArm, DateTimeOffset timestampUtc, IReadOnlyList<ArmResult> arms,
+        bool cancelled = false)
     {
         ModelLabel = modelLabel;
         RunsPerArm = runsPerArm;
         TimestampUtc = timestampUtc;
         Arms = arms;
+        Cancelled = cancelled;
     }
 
     /// <summary>The model the arms were measured against.</summary>
@@ -244,6 +256,12 @@ public sealed class EvalRun
 
     /// <summary>The aggregated arms.</summary>
     public IReadOnlyList<ArmResult> Arms { get; }
+
+    /// <summary>Caller cancellation interrupted the evaluation or its final admitted-check stage.</summary>
+    public bool Cancelled { get; }
+
+    /// <summary>Some selected arm has fewer retained completed draws than requested.</summary>
+    public bool HasMissingRuns => Arms.Any(arm => arm.Runs != RunsPerArm);
 
     /// <summary>Finds an arm by phase, or <see langword="null"/> when it was not run.</summary>
     public ArmResult? Find(DemoPhase phase) => Arms.FirstOrDefault(arm => arm.Phase == phase);
