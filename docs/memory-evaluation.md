@@ -113,8 +113,11 @@ var result = await runner.RunAsync(agent, config, new ExternalBenchmarkOptions
     PreserveSessionBoundaries = true,  // session markers in history
 });
 
-Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o = 57.7%)");
+Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o full-history S, no CoN = 60.6%)");
 ```
+
+The historical reference is from [Figure 3b of the LongMemEval paper](https://arxiv.org/html/2410.10813v2#S3.F3).
+Comparisons require the same history, reading method, question set and judge; a sampled run is not a reproduction of the full-paper score.
 
 What's preserved from the official benchmark:
 - **Stratified sampling** across all 6 question types (`single-session-user`, `single-session-assistant`, `single-session-preference`, `multi-session`, `temporal-reasoning`, `knowledge-update`)
@@ -299,7 +302,7 @@ This page used to quote a score range for the `Standard` preset on one model. No
 
 **What we recommend today:**
 - Use the native benchmark as a **regression gate** — track your own delta over time, not the absolute number.
-- Use **LongMemEval** (Sample G8 / G10) for **cross-platform comparable** numbers — it's calibrated to the published GPT-4o = 57.7% baseline.
+- Use **LongMemEval** (Sample G8 / G10) for **cross-platform comparisons with matched settings** — the historical GPT-4o reference is 60.6% for full-history S without Chain-of-Note ([paper, Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)); it does not calibrate a run with a different protocol.
 - Use the **Diagnostic** and **Overflow** presets to apply real context pressure.
 
 **Current limitation:** the native benchmark is better suited to regression tracking than fine-grained model differentiation, especially when stronger models can solve many scenarios through retrieval alone.

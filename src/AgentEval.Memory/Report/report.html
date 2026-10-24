@@ -265,7 +265,7 @@ function renderOverview(){
   const refEl=document.getElementById('refScores');
   if(isExternal()&&getBenchmarkSource()==='longmemeval'){
     const refHtml=Object.entries(LME_REF).map(([m,s])=>`<span style="margin-right:16px"><span style="color:var(--td)">${m}:</span> <span style="color:${gc(s)}">${s}%</span></span>`).join('');
-    refEl.innerHTML=`<div style="font-size:11px;padding:8px 12px;background:var(--cardBg);border:1px solid var(--border);border-radius:6px;margin-top:4px">Published reference (ICLR 2025, S mode): ${refHtml}</div>`;
+    refEl.innerHTML=`<div style="font-size:11px;padding:8px 12px;background:var(--cardBg);border:1px solid var(--border);border-radius:6px;margin-top:4px">Published reference (<a href="https://arxiv.org/html/2410.10813v2#S3.F3" target="_blank" rel="noopener noreferrer">ICLR 2025, Fig. 3b</a>, full-history S, no Chain-of-Note): ${refHtml}</div>`;
     refEl.style.display='block';
   }else{refEl.style.display='none';}
 }
@@ -393,7 +393,7 @@ const EXT_DIM_INFO={
   'Knowledge Update':{s:'Can the agent return the latest version of corrected/updated facts?',color:'#f472b6',cats:['knowledge-update']},
   'Abstention':{s:'Does the agent refuse to fabricate answers about non-existent info?',color:'#fb923c',cats:[]}
 };
-const LME_REF={'GPT-4o':57.7,'GPT-4o-mini':42.8,'Claude 3.5 Sonnet':53.0,'Llama-3.1-70B':39.8};
+const LME_REF={'GPT-4o':60.6,'Llama-3.1-70B':33.4};
 
 function renderTimeline(){
   const labels=baselines.map(b=>b.name);

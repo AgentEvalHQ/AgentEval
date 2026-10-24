@@ -195,7 +195,7 @@ Console.WriteLine($"Report folder: {store.GetReportDirectory("MemoryAgent")}");
 - **5 memory metrics** — retention, reach-back, temporal, noise resilience, reducer fidelity
 - **5 benchmark presets** — Quick / Standard / Full / Diagnostic / Overflow (up to 192K tokens)
 - **HTML pentagon reports** — saved baselines overlaid, per-category deltas between any two, a score timeline (a baseline stores scores, not transcripts, so there is no per-scenario drill-down)
-- **LongMemEval (ICLR 2025)** — re-implemented in .NET, with the paper's published scores (GPT-4o: 57.7%, S mode) shipped as a reference
+- **LongMemEval (ICLR 2025)** — re-implemented in .NET, with historical paper references (GPT-4o: 60.6%, full-history S without Chain-of-Note; [Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3))
 - **MAF-native** — works with `AIContextProvider`, `ChatHistoryProvider`, `CompactionStrategy`
 
 > **Honest note:** use the native `Standard` benchmark primarily as a regression gate for changes in your own agent, and use **LongMemEval** when you need broader cross-platform comparability.

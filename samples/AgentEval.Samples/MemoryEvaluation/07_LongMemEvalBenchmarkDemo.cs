@@ -163,7 +163,8 @@ public static class LongMemEvalBenchmarkDemo
         var truncated = LongMemEvalSampleSupport.PrintHaystackDelivery(answerClient.Calls);
 
         // Reference scores: context, not a comparison.
-        Console.WriteLine("\n   Published reference (LongMemEval paper):");
+        Console.WriteLine("\n   Published reference (LongMemEval Fig. 3b, full-history S, no Chain-of-Note):");
+        Console.WriteLine("   https://arxiv.org/html/2410.10813v2#S3.F3");
         foreach (var (referenceModel, score) in LongMemEvalReferenceScores.OverallAccuracy)
             Console.WriteLine($"     {referenceModel,-25} {score:F1}%");
         Console.ForegroundColor = ConsoleColor.DarkYellow;

@@ -885,6 +885,10 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **LongMemEval references mixed different experiments.** Published full-history S references now use Figure 3b's
+  60.6% for GPT-4o and 33.4% for Llama-3.1-70B Instruct without Chain-of-Note, consistently in the library, report,
+  samples and documentation. Unsupported Mini/Claude reference entries are removed; the separately labelled
+  57.7% ChatGPT commercial-memory result remains distinct.
 - **Repeated GDPR benchmark reports referenced an unsaved run.** The voted result is now persisted before report
   generation, so `bench gdpr --runs N` can finish and write its report and AEF trial evidence.
 - **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child

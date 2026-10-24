@@ -481,7 +481,7 @@ Console.WriteLine($"Report folder: {store.GetReportDirectory("MemoryAgent")}");
 | **5 memory metrics** | Retention, ReachBack, Temporal, NoiseResilience, ReducerFidelity |
 | **5 benchmark presets** | Quick (3 cats) → Standard (8) → Full (12) → Diagnostic / Overflow (192K-token haystacks) |
 | **HTML pentagon reports** | Saved baselines overlaid, per-category deltas between any two, a score timeline (a baseline stores scores, not transcripts, so there is no per-scenario drill-down) |
-| **LongMemEval (ICLR 2025)** | Re-implemented in .NET, with the paper's published scores shipped as a reference (GPT-4o = 57.7%, S mode) |
+| **LongMemEval (ICLR 2025)** | Re-implemented in .NET, with historical paper references (GPT-4o = 60.6%, full-history S without Chain-of-Note; [Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)) |
 | **MAF-native** | Compatible with `AIContextProvider`, `ChatHistoryProvider`, `CompactionStrategy` |
 | **Custom scenarios** | Build your own with `MemoryFact` / `MemoryQuery` / `MemoryTestRunner` |
 
@@ -594,7 +594,7 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | 14 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D; SkillInjection added for MAF Agent Skills) | Medium |
 | **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end (same targets as OWASP; graded judge first) | Same 14 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
 | **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | Same 14 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
-| **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
+| **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — historical GPT-4o reference 60.6% (full-history S, no Chain-of-Note; [Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)) | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **TypedMemEval** | one preset per vertical: `prospective` / `episodic` / `arithmetic` / `workingmemory` / `forgetting` / `bitemporal` / `semantic` / `conjunction` / `procedural` / `temporal` | ✅ `agenteval bench typedmemeval` | AgentEval's own typed memory corpora, embedded (no download); results are not comparable with LongMemEval numbers | Medium |
 | **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |

@@ -90,14 +90,18 @@ The official scoring is **binary** (0 or 1), not 0-100. The judge (GPT-4o) answe
 - **Overall accuracy**: Mean across all 500 questions (micro-average)
 - **Abstention accuracy**: Mean across the 30 abstention questions only
 
-### Reference Scores (S mode, from the paper)
+### Reference Scores (full-history S, without Chain-of-Note)
 
 | Model | Overall | Task-Avg |
 |-------|:-------:|:--------:|
-| GPT-4o | 57.7% | — |
-| GPT-4o-mini | 42.8% | — |
-| Claude 3.5 Sonnet | 53.0% | — |
-| Llama-3.1-70B | 39.8% | — |
+| GPT-4o | 60.6% | — |
+| Llama-3.1-70B Instruct | 33.4% | — |
+
+Source: [LongMemEval paper, Figure 3b](https://arxiv.org/html/2410.10813v2#S3.F3).
+The separate 57.7% ChatGPT commercial-memory result in Figure 3a used 97 questions
+with shorter histories; it is not the full-history S baseline. These are historical
+reference results, not calibration of an AgentEval run. Previously listed Mini/Claude
+figures are omitted because this paper does not establish them for this setting.
 
 ---
 

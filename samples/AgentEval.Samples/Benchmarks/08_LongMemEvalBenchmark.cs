@@ -306,7 +306,8 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   - Default reports contain status/count diagnostics but no raw question, answer,");
         Console.WriteLine("     response, judge-explanation, or evidence content.");
         Console.WriteLine($"   - Set {WriteNativeReportEnvVar}=true only for access-controlled native diagnostics.");
-        Console.WriteLine("   - Reference (paper, S mode): GPT-4o = 57.7%; small samples are high variance.");
+        Console.WriteLine("   - Reference (paper Fig. 3b, full-history S, no Chain-of-Note): GPT-4o = 60.6%; small samples are high variance.");
+        Console.WriteLine("     https://arxiv.org/html/2410.10813v2#S3.F3");
         Console.WriteLine("   - v0.10.1+: Smoke=10Q, Standard=50Q, AuditGrade=~500Q — all real dataset.");
     }
 
