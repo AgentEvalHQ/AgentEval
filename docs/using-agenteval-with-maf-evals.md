@@ -30,13 +30,33 @@ simply:
 *final answer*. Grading with `IAgentEvaluator` is like having the full worked solution in front of
 you — every step (every tool call) is visible.
 
-**Why this changes tool-metric results.** When you pass an `IEvaluator`, MAF wraps it in an internal
+**Why this changes tool-metric results (.NET MAF 1.24.0).** When you pass an `IEvaluator` to
+`agent.EvaluateAsync`, MAF wraps it in an internal
 adapter that *splits* each conversation and forwards only the query half + the final response — the
 middle, where the agent actually **called the tools**, is dropped. So a code-based metric that checks
 "did it call `SearchFlights`?" sees nothing → **it can't credit the call**. When you implement
 `IAgentEvaluator`, MAF gives you the whole `EvalItem`; AgentEval's `AgentEvalAgentEvaluator` forwards
 `EvalItem.Conversation` (tool-call turns included), so the code metric sees the real calls → **scores
-them correctly**. (LLM-judged metrics grade the answer text and work either way.)
+them correctly**. Text-only judges can still grade the final answer, but judges needing tool-result
+evidence lose that evidence too; this affects misinformation and groundedness checks.
+
+The projection has two parts: MAF's orchestration retains the transcript in `EvalItem.Conversation`
+but builds `RawResponse` from its last returned message; its MEAI adapter sends the split's query
+messages and that response. A local synthetic transcript containing an assistant function call,
+tool result and final assistant reply confirmed the following with the pinned package:
+
+| Route | Messages received by the wrapped MEAI evaluator | Current turn's tool call/result |
+|---|---|---|
+| Built-in MEAI overload, default splitter | User query plus final response | Absent |
+| Built-in MEAI overload, `ConversationSplitters.Full`, same single-query transcript | User query plus final response | Absent |
+| AgentEval `AsAgentEvaluator` native route | Full captured conversation plus final response | Retained |
+
+This is a projection check, not a model-quality test or proof that a real tool executed. A caller
+invoking an MEAI evaluator directly, supplying a different `RawResponse`, or implementing a custom
+splitter can provide different evidence. The loss described here is in the built-in orchestration
+and adapter, not an AgentEval removal of tool turns. See the upstream
+[orchestration](https://github.com/microsoft/agent-framework/blob/4982e4c61ec81cc4f9ba0cbdb5594ed530dbbcfe/dotnet/src/Microsoft.Agents.AI/Evaluation/AgentEvaluationExtensions.cs)
+and [MEAI adapter](https://github.com/microsoft/agent-framework/blob/4982e4c61ec81cc4f9ba0cbdb5594ed530dbbcfe/dotnet/src/Microsoft.Agents.AI/Evaluation/MeaiEvaluatorAdapter.cs).
 
 **Recommendation:** use the native path.
 
