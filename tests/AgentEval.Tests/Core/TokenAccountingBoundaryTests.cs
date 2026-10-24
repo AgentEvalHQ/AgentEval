@@ -88,16 +88,27 @@ public sealed class TokenAccountingBoundaryTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ChatAdapter_StreamingLatestUsageSnapshot_SupersedesEarlierSnapshot(bool invalidFirst)
+    public async Task ChatAdapter_StreamingUsageUpdates_AccumulatesValidCountsAndKeepsInvalidity(bool invalidFirst)
     {
-        // This adapter replaces snapshots; it does not accumulate the two UsageContent values.
-        // Preserve that policy while validating each snapshot at the mapping boundary.
+        // Ordinary UsageContent updates are additive, as in the pinned MEAI combiner.
+        // A later valid update cannot establish a complete total after an invalid component.
         var first = new UsageDetails { InputTokenCount = invalidFirst ? -100 : 10, OutputTokenCount = 0 };
         var final = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 20 };
         var adapter = new ChatClientAgentAdapter(new SnapshotClient([first, final]), "subject");
         AgentResponseChunk? last = null;
         await foreach (var chunk in adapter.InvokeStreamingAsync("question")) last = chunk;
-        Assert.Equal(120, last!.Usage!.TotalTokens);
+        Assert.NotNull(last);
+        if (invalidFirst)
+            Assert.Null(last.Usage);
+        else
+        {
+            Assert.Equal(110, last.Usage!.PromptTokens);
+            Assert.Equal(20, last.Usage.CompletionTokens);
+            Assert.Equal(130, last.Usage.TotalTokens);
+            var sdk = await new SnapshotClient([first, final]).GetStreamingResponseAsync([]).ToChatResponseAsync();
+            Assert.Equal(sdk.Usage!.InputTokenCount, last.Usage.PromptTokens);
+            Assert.Equal(sdk.Usage.OutputTokenCount, last.Usage.CompletionTokens);
+        }
     }
 
     [Theory]

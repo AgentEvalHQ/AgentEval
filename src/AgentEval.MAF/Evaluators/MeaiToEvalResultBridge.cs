@@ -95,6 +95,7 @@ public static class MeaiToEvalResultBridge
 
         double score0To100;
         string? markerLabel = null, markerSeverity = null;
+        var measurement = MeasurementState.Measured;
         var marker = reason is null ? Match.Empty : s_scoreMarker.Match(reason);
 
         // Without AgentEval's marker, a metric MEAI could not score is no verdict (#203 review round 4, B10q): an error
@@ -127,6 +128,12 @@ public static class MeaiToEvalResultBridge
             score0To100 = Math.Clamp(double.Parse(marker.Groups[1].Value, CultureInfo.InvariantCulture), 0, 100);
             if (marker.Groups[2].Success) markerLabel = marker.Groups[2].Value.Trim();
             if (marker.Groups[3].Success) markerSeverity = marker.Groups[3].Value.Trim();
+            // The marker preserves the original number and verdict, not evidence that it was measured.
+            // The forward bridge explicitly emits null/Inconclusive for withheld and neutral scores.
+            if (metric is NumericMetric { Value: null } or BooleanMetric { Value: null }
+                || metric.Interpretation?.Rating == EvaluationRating.Inconclusive)
+                measurement = string.Equals(markerLabel, "inapplicable", StringComparison.OrdinalIgnoreCase)
+                    ? MeasurementState.NotApplicable : MeasurementState.NotMeasured;
         }
         else if (metric is NumericMetric { Value: { } v })
         {
@@ -160,11 +167,11 @@ public static class MeaiToEvalResultBridge
         // Prefer the original AgentEval verdict embedded in the marker (label + severity, so a "critical"
         // leaf isn't flattened to "high"); else honour an explicit MEAI Failed flag; else derive pass/fail
         // from the recovered score (threshold 70) — a low score can never render as a green "pass".
-        var passed = markerLabel is not null
+        var passed = measurement == MeasurementState.Measured && (markerLabel is not null
             ? string.Equals(markerLabel, "pass", StringComparison.OrdinalIgnoreCase)
-            : metric.Interpretation?.Failed is bool failed ? !failed : score0To100 >= 70.0;
-        var label = markerLabel ?? (passed ? "pass" : "fail");
-        var severity = markerSeverity ?? (passed ? "none" : "high");
+            : metric.Interpretation?.Failed is bool failed ? !failed : score0To100 >= 70.0);
+        var label = markerLabel ?? (measurement != MeasurementState.Measured ? "error" : passed ? "pass" : "fail");
+        var severity = markerSeverity ?? (measurement != MeasurementState.Measured || passed ? "none" : "high");
 
         // AgentEval metric names are prefixed code_* (deterministic, no LLM) or llm_* (LLM-as-judge).
         var isLlm = metric.Name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase);
@@ -183,7 +190,7 @@ public static class MeaiToEvalResultBridge
                 Passed: passed,
                 Threshold: 0.70,
                 Severity: severity,
-                Confidence: null),
+                Confidence: null) { Measurement = measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: evidence,
