@@ -486,7 +486,7 @@ public class ToolUsageAssertions
             var qualifying = _report.Calls
                 .Where(c => c.Order < targetCall.Order)
                 .Where(c => confirmTools.Contains(c.Name, StringComparer.OrdinalIgnoreCase))
-                .Where(c => !c.HasError)
+                .Where(c => c.WasExecuted && !c.HasError)
                 .Where(c => confirmationMatches is null || confirmationMatches(c, targetCall))
                 .ToList();
 
@@ -536,7 +536,7 @@ public class ToolUsageAssertions
         var lines = new List<string> { "Tool call timeline:" };
         foreach (var call in _report.Calls.OrderBy(c => c.Order))
         {
-            var status = call.HasError ? "✗" : "✓";
+            var status = call.HasError ? "✗" : call.WasExecuted ? "✓" : "○";
             var duration = call.HasTiming ? $" ({call.Duration?.TotalMilliseconds:F0}ms)" : "";
             lines.Add($"  {call.Order}. [{status}] {call.Name}{duration}");
         }

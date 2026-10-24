@@ -236,7 +236,11 @@ public static class TableFormatter
             ? "N/A (No calls made)"
             : summary.AllCallsSucceeded 
                 ? $"{statusIcon} 100% Success" 
-                : $"{statusIcon} {summary.RunsWithErrors} errors";
+                : summary.RunsWithErrors > 0
+                    ? $"{statusIcon} {summary.RunsWithErrors} runs with errors"
+                    : summary.ExecutedCalls is { } executed
+                        ? $"{statusIcon} {executed}/{summary.TotalCalls} executed; {summary.TotalCalls - executed} not executed"
+                        : "N/A (execution not recorded)";
         writer.WriteLine($"{indent}{{0,-20}} {{1}}", "Status:", statusText);
         writer.WriteLine($"{indent}" + new string('─', 50));
     }
@@ -529,8 +533,8 @@ public static class TableFormatter
         
         if (runsWithTools.Count == 0) return null;
         
-        var runsWithoutErrors = runsWithTools.Count(r => !r.ToolUsage!.Calls.Any(c => c.HasError));
-        return (double)runsWithoutErrors / runsWithTools.Count;
+        var successfulRuns = runsWithTools.Count(r => r.ToolUsage!.Calls.All(c => c.WasExecuted && !c.HasError));
+        return (double)successfulRuns / runsWithTools.Count;
     }
 
     // A metric row with nothing to describe: N/A in every column and 0 samples, never a row of zeros.

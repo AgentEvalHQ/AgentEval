@@ -56,6 +56,12 @@ public record ToolUsageSummary(
     /// <summary>Whether every run that tracked tool usage invoked this tool; false when no run tracked it.</summary>
     public bool AllRunsCalled => CallCountStats is { } stats && RunsWithTool == stats.SampleSize;
     
-    /// <summary>Whether all tool calls succeeded without errors.</summary>
-    public bool AllCallsSucceeded => RunsWithErrors == 0;
+    /// <summary>
+    /// Calls with recorded execution, or null when execution information was not supplied by the summary's producer.
+    /// An emitted or rejected call is not an execution.
+    /// </summary>
+    public int? ExecutedCalls { get; init; }
+
+    /// <summary>Whether every call has recorded execution without error. No calls is vacuously true.</summary>
+    public bool AllCallsSucceeded => RunsWithErrors == 0 && (TotalCalls == 0 || ExecutedCalls == TotalCalls);
 }

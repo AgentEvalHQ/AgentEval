@@ -222,12 +222,14 @@ public record StochasticResult(
         int runsWithTool = 0;
         int runsWithErrors = 0;
         int totalCalls = 0;
+        int executedCalls = 0;
 
         foreach (var result in IndividualResults.Where(r => r.ToolUsage != null))
         {
             var toolCalls = result.ToolUsage!.GetCallsByName(toolName).ToList();
             callCounts.Add(toolCalls.Count);
             totalCalls += toolCalls.Count;
+            executedCalls += toolCalls.Count(call => call.WasExecuted);
             if (toolCalls.Count > 0)
             {
                 runsWithTool++;
@@ -250,7 +252,7 @@ public record StochasticResult(
             TotalCalls: totalCalls,
             CallCountStats: callStats,
             CallRate: callRate,
-            ErrorRate: errorRate);
+            ErrorRate: errorRate) { ExecutedCalls = executedCalls };
     }
 
     // PERF-06: build stats from a single materialization, returning null for an empty source.

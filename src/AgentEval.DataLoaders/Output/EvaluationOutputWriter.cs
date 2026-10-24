@@ -95,9 +95,10 @@ public class EvaluationOutputWriter
 
         if (result.ToolUsage is not null)
         {
-            var errorCount = result.ToolUsage.Calls.Count(c => c.HasError);
-            var successCount = result.ToolUsage.Count - errorCount;
-            _output.WriteLine($"  Tool calls: {result.ToolUsage.Count} ({successCount} succeeded)");
+            var successCount = result.ToolUsage.Calls.Count(c => c.WasExecuted && !c.HasError);
+            var notExecuted = result.ToolUsage.Calls.Count(c => !c.WasExecuted && !c.HasError);
+            var pending = notExecuted > 0 ? $", {notExecuted} not executed" : "";
+            _output.WriteLine($"  Tool calls: {result.ToolUsage.Count} ({successCount} succeeded{pending})");
         }
 
         if (result.Performance?.TotalTokens > 0)
@@ -232,11 +233,12 @@ public class EvaluationOutputWriter
 
         foreach (var call in sortedCalls)
         {
-            var statusIcon = !call.HasError ? "✓" : "✗";
+            var statusIcon = call.HasError ? "✗" : call.WasExecuted ? "✓" : "○";
             var duration = call.Duration?.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) + "ms" ?? "?ms";
             
             var line = new StringBuilder();
             line.Append($"   {statusIcon} [{call.Order}] {call.Name} ({duration})");
+            if (!call.WasExecuted && !call.HasError) line.Append(" — not executed");
 
             if (_settings.IncludeToolArguments && call.Arguments?.Count > 0)
             {

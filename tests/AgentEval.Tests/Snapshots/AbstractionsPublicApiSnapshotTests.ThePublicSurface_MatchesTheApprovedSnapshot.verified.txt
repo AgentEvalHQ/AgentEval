@@ -308,6 +308,7 @@ class AgentEval.Comparison.ToolUsageSummary : IEquatable<AgentEval.Comparison.To
     Int32 RunsWithErrors { get; init; }
     Int32 RunsWithTool { get; init; }
     Int32 TotalCalls { get; init; }
+    Int32? ExecutedCalls { get; init; }
     String ToString()
     String ToolName { get; init; }
     Void Deconstruct(out String ToolName, out Int32 RunsWithTool, out Int32 RunsWithErrors, out Int32 TotalCalls, out AgentEval.Comparison.DistributionStatistics CallCountStats, out Double? CallRate, out Double? ErrorRate)
