@@ -42,6 +42,41 @@ public sealed class BenchTargetCommandLineTests : IDisposable
             .OrderBy(e => e, StringComparer.Ordinal)
             .ToArray();
 
+    public static TheoryData<string[], string> RequiredInputs => new()
+    {
+        { ["bench", "gdpr"], "--subject is required" },
+        { ["bench", "eu-ai-act"], "--subject is required" },
+        { ["bench", "eu-ai-act", "--subject", "A"], "--input is required" },
+        { ["bench", "agentic"], "--subject is required" },
+        { ["bench", "owasp"], "--subject is required" },
+        { ["bench", "mitre"], "--subject is required" },
+        { ["bench", "nist"], "--subject is required" },
+        { ["bench", "longmemeval"], "--subject is required" },
+        { ["bench", "memory"], "--subject is required" },
+        { ["bench", "typedmemeval"], "--vertical is required" },
+        { ["bench", "typedmemeval", "--vertical", "episodic"], "--subject is required" },
+        { ["bench", "typedmemeval", "--vertical", "episodic", "--subject", "A", "--evidence-detail", "unsupported"], "--evidence-detail must be" },
+        { ["bench", "trace-fidelity"], "--agent-trace and --chat-trace are required" },
+        { ["bench", "trace-fidelity", "--agent-trace", "agent.json", "--chat-trace", "chat.json"], "--subject is required" },
+        { ["bench", "workflow-trace-fidelity"], "--workflow-trace is required" },
+        { ["bench", "workflow-trace-fidelity", "--workflow-trace", "workflow.json"], "--subject is required" },
+        { ["render"], "--benchmark and --subject are required" },
+        { ["compliance", "render"], "--regulation and --subject are required" },
+    };
+
+    [Theory]
+    [MemberData(nameof(RequiredInputs))]
+    public async Task MissingOrInvalidRequiredInput_IsExplicitUsageError_WithoutWorkspaceWrites(string[] args, string diagnostic)
+    {
+        var before = WorkspaceEntries();
+
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync([.. args, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains(diagnostic, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
     public static TheoryData<string[]> NoTarget => new()
     {
         new[] { "bench", "owasp", "--subject", "A" },
