@@ -885,6 +885,9 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **LongMemEval judge retries repeated an undersized output budget.** The initial default is now 1,024 tokens;
+  existing logical retries double the request up to 4,096. Response-format fallbacks keep the attempt's budget,
+  and call accounting, failure policies and TypedMemEval's separate calibrated budget remain unchanged.
 - **Text cost reports omitted the bundled pricing date.** Comparison metrics, CLI summaries and evaluation
   performance output now show the historical table identity and distinguish it from custom/provider rates
   and live quotes. Rates are unchanged; monthly/before-release maintenance is documented.

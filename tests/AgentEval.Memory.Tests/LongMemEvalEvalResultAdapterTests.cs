@@ -53,7 +53,7 @@ public sealed class LongMemEvalEvalResultAdapterTests
         Assert.Equal(1, report.Details.Dimensions["inconclusiveQuestions"]);
         Assert.Equal((int)JudgeFailurePolicy.RetryThenInconclusive,
             report.Details.Dimensions["judgeFailurePolicy"]);
-        Assert.Equal(256, report.Details.Dimensions["judgeMaxOutputTokens"]);
+        Assert.Equal(1024, report.Details.Dimensions["judgeMaxOutputTokens"]);
         Assert.Equal(0, report.Details.Dimensions["judgeTemperatureConfigured"]);
 
         var type = Assert.Single(report.Details.SubResults!);
