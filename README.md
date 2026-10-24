@@ -640,6 +640,8 @@ AgentEval ships as two packages released together on one version: the `AgentEval
 
 ---
 
+Upgrading from 0.43? Read the [1.0 migration guide](docs/upgrading-to-1.0.md).
+
 ## Installation
 
 ```bash

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.1]
+
+Release candidate for feedback before 1.0.0. See the [upgrade guide](docs/upgrading-to-1.0.md) for the source, result and CLI migrations from 0.43.0-beta.
+
 - The disclaimer and actual NuGet README now describe rc.1 as a prerelease, semver for stable APIs/CLI behavior from 1.0.0, and the existing Beta/Experimental exceptions. They preserve independent review, testing and hardening requirements and share the root maturity policy.
 - API snapshot guards now cover the remaining declared library assemblies and record Gatekeeper sealing, bases/interfaces and subclass-visible protected members through the existing shared renderer. Packaging dependency checks follow the actual embedded project declarations. Runtime APIs and existing maturity exceptions are unchanged.
 - MAF evaluation guidance now records the verified .NET 1.24.0 query/final-response projection, its loss of current-turn tool evidence even for tool-aware LLM judges, and the existing native `AsAgentEvaluator` alternative. No MAF or AgentEval runtime behavior changed.
@@ -18,10 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI commands write AEF as their default run record, without the old StoreV1/ADR-002 result folders. `eval --output-dir` selects an AEF destination. Single-file exports and benchmark JSON/Markdown/HTML/PDF reports remain available; transient report-source manifests are disclosed and never linked as persisted legacy runs. A private compatibility switch exists only for the RC feedback window, outside the 1.0 promise, and is scheduled for removal at 1.0.0 if feedback finds no need for it. Existing legacy runs remain readable through conversion throughout 1.x.
 - TravelDemo stochastic evaluations use the library's single verdict rule: known passes can meet the threshold despite missing runs, while undecidable results remain incomplete. Missing scores remain absent from statistics and full-spread comparisons. `StochasticResult.DecideVerdict` is public for consumers with classified run counts and rejects invalid counts or thresholds.
 - TravelDemo evals propagate their displayed verdict to the process exit code: failed checks return 1, quality warnings 10, incomplete or unavailable measurements 11, and unhandled runtime errors 3. Completed comparisons remain 0 and usage errors remain 2. Interactive sessions retain the worst recorded outcome through the shared sample outcome contract.
-- Mission Control lists native AEF and converted legacy runs through verified, source-qualified snapshots. Run details preserve unknown execution facts and captured-content availability. Trace/report downloads retain the selected source, refuse ambiguous or invalid evidence, and enforce the configured evidence-read policy. Native artifacts support generic downloads; external references are never fetched. Trace charts show observed timestamp spans and inter-event gaps without inventing operation durations. Remaining tree, timeline, compliance and history integration is in progress.
+- Mission Control lists native AEF and converted legacy runs through verified, source-qualified snapshots. Run details preserve unknown execution facts and captured-content availability. Trace/report downloads retain the selected source, refuse ambiguous or invalid evidence, and enforce the configured evidence-read policy. Native artifacts support generic downloads; external references are never fetched. Trace charts show observed timestamp spans and inter-event gaps without inventing operation durations.
 - StoreV1 filesystem conversion captures allowlisted formatted reports inside AEF under the shared input/output budget. Exact `md` and `markdown` files stay distinct; capture-off imports retain neither report content nor its digest. Trace descriptors declare their legacy event format explicitly.
 - Workspace reads of semantic legacy stores enforce a shared input/conversion budget while enumerating records and writing output, including temporary blobs and sealing. Nested text and dictionary keys are checked before serialization allocates large buffers; failed conversions discard their partial output.
-- Added a verified AEF workspace-reading boundary for native runs and converted legacy sources. It preserves full result trees and score definitions, keeps importer-supplied timing unknown, distinguishes source identity from run ID, and applies shared source-byte limits before legacy conversion. Captured local evidence content is available from the same verified snapshot; absent or capture-off content stays absent, and external links are never fetched. Mission Control integration is still in progress.
+- Added a verified AEF workspace-reading boundary for native runs and converted legacy sources. It preserves full result trees and score definitions, keeps importer-supplied timing unknown, distinguishes source identity from run ID, and applies shared source-byte limits before legacy conversion. Captured local evidence content is available from the same verified snapshot; absent or capture-off content stays absent, and external links are never fetched.
 - `compliance render` reads verified native AEF artifacts and converts legacy rich reports through the shared StoreV1 converter. It preserves import custody, refuses conflicting or malformed evidence and missing captured content, and writes PDFs outside the sealed source run.
 - StoreV1 workspace import preserves the exact selected run folder and captured rich compliance reports. ID-only requests reject duplicate run IDs; report identity and source-reference conflicts are refused before output.
 - `compare` verifies AEF inputs before calculating deltas and routes legacy results through the shared StoreV1 converter. Copied run folders and scenario-only collections remain supported, with imported custody, supplied header fields and unknown execution metadata disclosed. Tampered or malformed evidence is refused without score deltas.
@@ -381,7 +385,7 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   scan limits and nested judges; dynamic external dependencies remain unclassified. Explicit composite mocks retain a pre-execution
   manifest through cancellation, identifying their fixed placeholder judge without claiming an LLM prompt. Interrupted snapshots expand configured wrappers to preserve
   the same planned tree shape as the evidence writer. Trace-fidelity and workflow-trace-fidelity also bind pre-reconciliation policy and planned checks,
-  excluding observed trace values from suite identity. Other composite producer capture remains in progress.
+  excluding observed trace values from suite identity. Capture availability remains producer-specific.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run
@@ -9000,7 +9004,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...v1.0.0-rc.1
 [0.43.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...v0.43.0-beta
 [0.42.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...v0.42.0-beta
 [0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta
