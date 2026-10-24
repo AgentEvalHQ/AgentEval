@@ -309,6 +309,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         if (toolEvent.HasResult && pendingToolRecords.Remove(toolKey, out var pendingCall))
                         {
                             pendingCall.Result = toolEvent.Result;
+                            pendingCall.Exception = toolEvent.Exception;
                             pendingCall.WasExecuted = true;
                             pendingCall.StartTime = toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt;
                             pendingCall.EndTime = toolEvent.HasTiming ? observedAt : null;
@@ -325,6 +326,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             CallId = toolCallId,
                             Arguments = toolEvent.Arguments,
                             Result = toolEvent.Result,
+                            Exception = toolEvent.Exception,
                             WasExecuted = toolEvent.HasResult,
                             StartTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt,
                             EndTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt : null,
@@ -766,6 +768,12 @@ public record ExecutorToolCallEvent(
     /// compatibility with event sources that emit only completed calls. False never certifies execution or timing.
     /// </summary>
     public bool HasResult { get; init; } = true;
+
+    /// <summary>
+    /// The exception reported by a paired tool result, even when the agent catches it and completes normally.
+    /// A result with a null value and no exception remains a successful execution.
+    /// </summary>
+    public Exception? Exception { get; init; }
 
     /// <summary>
     /// Whether <see cref="Duration"/> was measured at the tool's execution boundaries. A paired result alone

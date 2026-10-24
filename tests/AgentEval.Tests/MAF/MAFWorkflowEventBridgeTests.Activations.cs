@@ -3,14 +3,116 @@
 // Licensed under the MIT License.
 
 using AgentEval.MAF;
+using AgentEval.Core;
+using AgentEval.Metrics.Agentic;
+using AgentEval.Models;
+using AgentEval.Tracing;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using ChatRole = Microsoft.Extensions.AI.ChatRole;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
 
 namespace AgentEval.Tests.MAF;
 
 public partial class MAFWorkflowEventBridgeTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TranslateEvents_ToolFailureCaughtByAgent_PreservesExecutionError(bool lateResult)
+    {
+        var (result, _) = await RecordToolOutcome(lateResult, failed: true);
+        var call = Assert.Single(result.ToolUsage!.Calls, call => call.Name == "lookup");
+
+        Assert.True(result.IsSuccess); // The agent recovered; this is not an executor failure.
+        Assert.True(call.WasExecuted);
+        Assert.IsType<InvalidOperationException>(call.Exception);
+        Assert.Equal("lookup failed", call.Exception!.Message);
+        Assert.Equal("diagnostic", call.Result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ToolSuccessMetric_CaughtWorkflowToolFailure_DoesNotClaimSuccess(bool lateResult)
+    {
+        var (result, _) = await RecordToolOutcome(lateResult, failed: true);
+        var metric = await new ToolSuccessMetric().EvaluateAsync(new EvaluationContext
+        {
+            Input = "input", Output = result.FinalOutput, ToolUsage = result.ToolUsage,
+        });
+
+        Assert.Equal(0, metric.Score);
+        Assert.False(metric.Passed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkflowTrace_CaughtToolFailure_PersistsFailedExecution(bool lateResult)
+    {
+        var (_, trace) = await RecordToolOutcome(lateResult, failed: true);
+        using var serialized = new MemoryStream();
+        await WorkflowTraceSerializer.SerializeAsync(trace, serialized);
+        serialized.Position = 0;
+        var reloaded = await WorkflowTraceSerializer.DeserializeAsync(serialized);
+        var call = Assert.Single(reloaded.Steps.SelectMany(step => step.ToolCalls ?? []));
+
+        Assert.True(call.WasExecuted);
+        Assert.False(call.Succeeded);
+        Assert.Equal("lookup failed", call.Error);
+        Assert.Equal("diagnostic", call.Result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TranslateEvents_NullToolResultAndUnfinishedIntent_RemainDistinct(bool lateResult)
+    {
+        var (result, trace) = await RecordToolOutcome(lateResult, failed: false);
+        var executed = Assert.Single(result.ToolUsage!.Calls, call => call.Name == "lookup");
+        var intent = Assert.Single(result.ToolUsage.Calls, call => call.Name == "pending");
+
+        Assert.True(executed.WasExecuted);
+        Assert.Null(executed.Result);
+        Assert.Null(executed.Exception);
+        Assert.False(intent.WasExecuted);
+        Assert.Null(intent.Exception);
+        var calls = trace.Steps.SelectMany(step => step.ToolCalls ?? []).ToList();
+        Assert.True(Assert.Single(calls, call => call.Name == "lookup").Succeeded);
+        Assert.False(Assert.Single(calls, call => call.Name == "pending").Succeeded);
+    }
+
+    private static async Task<(WorkflowExecutionResult Result, WorkflowTrace Trace)> RecordToolOutcome(bool lateResult, bool failed)
+    {
+        var pairedResult = new MAFWorkflows.AgentResponseUpdateEvent("Writer", new AgentResponseUpdate
+        {
+            Contents = [new FunctionResultContent("lookup-id", failed ? "diagnostic" : null)
+            {
+                Exception = failed ? new InvalidOperationException("lookup failed") : null,
+            }],
+        });
+        var events = new List<MAFWorkflows.WorkflowEvent>
+        {
+            new MAFWorkflows.ExecutorInvokedEvent("Writer", new MAFWorkflows.TurnToken(true)),
+            new MAFWorkflows.AgentResponseUpdateEvent("Writer", new AgentResponseUpdate
+                { Contents = [new FunctionCallContent("lookup-id", "lookup")] }),
+        };
+        if (!failed)
+            events.Add(new MAFWorkflows.AgentResponseUpdateEvent("Writer", new AgentResponseUpdate
+                { Contents = [new FunctionCallContent("pending-id", "pending")] }));
+        if (!lateResult) events.Add(pairedResult);
+        events.Add(new MAFWorkflows.AgentResponseEvent("Writer",
+            new Microsoft.Agents.AI.AgentResponse(new ChatMessage(ChatRole.Assistant, "recovered"))));
+        events.Add(new MAFWorkflows.ExecutorCompletedEvent("Writer", null));
+        events.Add(new MAFWorkflows.SuperStepCompletedEvent(0));
+        if (lateResult) events.Add(pairedResult);
+
+        await using var recorder = new WorkflowTraceRecorder(RecordingAdapter(events, ["Writer"], ["Writer"]), "tool-outcome");
+        var result = await recorder.ExecuteWorkflowAsync("input");
+        return (result, recorder.Trace);
+    }
+
     [Fact]
     public async Task TranslateEvents_InterleavedResponses_PreserveUsageAndDuplicateCallIdsPerExecutor()
     {

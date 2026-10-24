@@ -111,6 +111,7 @@ public static partial class MAFWorkflowEventBridge
                         if (id is not null && _pendingCalls.Remove((updateOwner.RawId, id), out var pending))
                         {
                             pending.Result = result.Result;
+                            pending.Exception = result.Exception;
                             pending.End = now();
                             if (pending.Owner.StepIndex >= 0) yield return pending.Event();
                         }
@@ -458,8 +459,9 @@ public static partial class MAFWorkflowEventBridge
             public TimeSpan Start { get; } = start;
             public TimeSpan? End { get; set; }
             public object? Result { get; set; }
+            public Exception? Exception { get; set; }
             public ExecutorToolCallEvent Event() => new(Owner.Id, name, Id, arguments, Result, End is { } end ? end - Start : default)
-                { HasResult = End.HasValue, HasTiming = End.HasValue && !Owner.RequiresProducerTiming };
+                { HasResult = End.HasValue, HasTiming = End.HasValue && !Owner.RequiresProducerTiming, Exception = Exception };
         }
 
         private sealed class BranchSummary(string id)

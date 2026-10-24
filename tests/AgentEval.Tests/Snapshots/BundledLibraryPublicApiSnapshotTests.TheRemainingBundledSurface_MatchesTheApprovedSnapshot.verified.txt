@@ -2773,6 +2773,7 @@ class AgentEval.MAF.ExecutorToolCallEvent : AgentEval.MAF.WorkflowEvent, IEquata
     Boolean Equals(Object obj)
     Boolean HasResult { get; init; }
     Boolean HasTiming { get; init; }
+    Exception Exception { get; init; }
     IDictionary<String, Object> Arguments { get; init; }
     Int32 GetHashCode()
     Object Result { get; init; }
