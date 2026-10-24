@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 
 namespace AgentEval.Samples;
 
@@ -58,14 +59,19 @@ internal static class SampleOutcome
 
     /// <summary>
     /// Records a benchmark's root verdict the way every report reads it (<see cref="EvalScoreExtensions.ReportStatus"/>):
-    /// FAIL fails, WARN warns, and a root that errored or measured nothing (ERROR, SKIPPED) is not measured. PASS
-    /// records nothing.
+    /// A measured FAIL fails, a measured WARN warns, and an unavailable root verdict is not measured.
+    /// A measured PASS records nothing.
     /// </summary>
     /// <param name="what">The benchmark, for the reason line.</param>
     /// <param name="root">The root score of the benchmark's result tree.</param>
     public static void RecordVerdict(string what, EvalScore root)
     {
         ArgumentNullException.ThrowIfNull(root);
+        if (root.CensusBucket() != MeasurementState.Measured)
+        {
+            Skip($"{what}: the root verdict was not measured (root {root.Label})");
+            return;
+        }
         switch (root.ReportStatus())
         {
             case "FAIL":
@@ -74,16 +80,12 @@ internal static class SampleOutcome
             case "WARN":
                 Warn($"{what}: WARN (score {root.Value:P1})");
                 break;
-            case "ERROR":
-            case "SKIPPED":
-                Skip($"{what}: the run measured nothing (root {root.Label})");
-                break;
         }
     }
 
     /// <summary>
     /// Records a benchmark's verdict from its whole result tree: the root's verdict as <see cref="RecordVerdict(string, EvalScore)"/>
-    /// does, and NOT MEASURED when any check below it was skipped or errored. A weighted root skips such leaves, so a
+    /// does, and NOT MEASURED when a required check below it has no measurement. A weighted root skips such leaves, so a
     /// provider or judge that rejected some probes still left a PASS root, and the run exited 0 over probes it never
     /// tested. A leaf labelled <c>inapplicable</c> (not applicable by design, e.g. NIST's governance functions) is not a
     /// gap and is not counted.
@@ -98,16 +100,17 @@ internal static class SampleOutcome
             return;
 
         var leaves = Leaves(result).ToList();
-        var unmeasured = leaves.Where(l => l.Score.Label.ToLowerInvariant() is "skipped" or "error").ToList();
+        var unmeasured = leaves.Where(l => l.Score.CensusBucket() == MeasurementState.NotMeasured).ToList();
         if (unmeasured.Count > 0)
         {
             // Say which: an errored check failed to run; a skipped one may simply be outside the preset (Smoke covers
             // two OWASP categories of ten), which is still a check this run did not measure.
             var errored = unmeasured.Count(l => l.Score.Label.Equals("error", StringComparison.OrdinalIgnoreCase));
+            var skipped = unmeasured.Count(l => l.Score.Label.Equals("skipped", StringComparison.OrdinalIgnoreCase));
             var names = unmeasured.Select(l => l.Metric.Name).ToList();
             var named = string.Join(", ", names.Take(5)) + (names.Count > 5 ? $" and {names.Count - 5} more" : "");
-            Skip($"{what}: {unmeasured.Count} of {leaves.Count} checks were not measured ({unmeasured.Count - errored} skipped, " +
-                 $"{errored} errored; a smaller preset skips the checks it does not cover): {named}");
+            Skip($"{what}: {unmeasured.Count} of {leaves.Count} checks were not measured ({skipped} skipped, " +
+                 $"{errored} errored, {unmeasured.Count - skipped - errored} withheld): {named}");
         }
 
         static IEnumerable<EvalResult> Leaves(EvalResult node) =>

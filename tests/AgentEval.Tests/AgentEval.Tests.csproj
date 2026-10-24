@@ -102,6 +102,8 @@
          depends on AIConfig or the catalogue. -->
     <Compile Include="../../samples/AgentEval.Samples/SampleOutcome.cs"
              Link="Samples/SampleOutcome.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Benchmarks/BenchmarkSampleReporting.cs"
+             Link="Samples/BenchmarkSampleReporting.cs" />
     <Compile Include="../../samples/AgentEval.Samples/OfflineSampleCheck.cs"
              Link="Samples/OfflineSampleCheck.cs" />
 

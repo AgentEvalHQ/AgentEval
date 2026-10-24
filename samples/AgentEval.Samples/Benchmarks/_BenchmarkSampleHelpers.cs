@@ -280,7 +280,7 @@ internal static class BenchmarkSampleHelpers
         // (H2 / H3 / H6 / H7) or by RunCompliancePresetWithAgentProbesAsync
         // (H4 / H5). Either way, walking SubResults yields the atomic leaves.
         var leafIndex = 0;
-        foreach (var (scenarioId, leaf) in EnumerateAtomicLeaves(result))
+        foreach (var (scenarioId, leaf) in BenchmarkSampleReporting.EnumerateAtomicLeaves(result))
         {
             // ScenarioResult.Id must be unique within a run — append the ordinal
             // index to disambiguate the case where two leaves share a Metric.Key
@@ -292,7 +292,7 @@ internal static class BenchmarkSampleHelpers
         }
 
         // ── 4. Complete the run (this fills in ContentHash) ────────────────────
-        var summary = BuildRunSummary(result, runId);
+        var summary = BenchmarkSampleReporting.BuildRunSummary(result, runId);
         await store.CompleteRunAsync(manifest, summary, ct);
 
         // ── 5. Fetch the post-completion manifest to retrieve the audit hash ───
@@ -467,57 +467,6 @@ internal static class BenchmarkSampleHelpers
         }
     }
 
-    /// <summary>
-    /// Walks the <paramref name="node"/> EvalResult tree leaf-first, yielding
-    /// each atomic leaf paired with its metric key. Mirrors
-    /// <c>GdprBenchmarkRunner.EnumerateAtomicLeaves</c>.
-    /// </summary>
-    private static IEnumerable<(string Id, EvalResult Result)> EnumerateAtomicLeaves(EvalResult node)
-    {
-        var subs = node.Details.SubResults;
-        if (subs is null || subs.Count == 0)
-        {
-            yield return (node.Metric.Key, node);
-            yield break;
-        }
-        foreach (var child in subs)
-            foreach (var leaf in EnumerateAtomicLeaves(child))
-                yield return leaf;
-    }
-
-    /// <summary>
-    /// Builds a <see cref="RunSummary"/> from a composite result's verdict and
-    /// the rolled-up leaf statistics. Mirrors the shape the GDPR / OWASP CLI
-    /// commands produce so Mission Control's view is identical.
-    /// </summary>
-    private static RunSummary BuildRunSummary(EvalResult root, string runId)
-    {
-        var leaves = EnumerateAtomicLeaves(root).Select(l => l.Result).ToList();
-        static bool IsWarning(EvalResult leaf) =>
-            leaf.Score.Label is "warn" or "inconclusive";
-        var passed = leaves.Count(l => l.Score.Passed && !IsWarning(l));
-        var failed = leaves.Count(l => !l.Score.Passed && !IsWarning(l));
-        var warnings = leaves.Count(IsWarning);
-
-        var verdict = root.Score.Label.ToUpperInvariant() switch
-        {
-            "PASS" => "PASS",
-            "WARN" => "WARN",
-            "INCONCLUSIVE" => "WARN",
-            _      => "FAIL",
-        };
-
-        return new RunSummary(
-            SchemaVersion: "1.0",
-            RunId: runId,
-            Verdict: verdict,
-            Stats: new RunStats(leaves.Count, passed, failed, warnings),
-            Metrics: new Dictionary<string, double>
-            {
-                ["overallScore"] = root.Score.Value,
-            });
-    }
-
     /// <summary>Prints a per-sample header banner.</summary>
     public static void PrintHeader(string title, string subtitle)
     {
@@ -546,10 +495,7 @@ internal static class BenchmarkSampleHelpers
         Console.WriteLine("   +------------------------------------------------------------+");
         Console.WriteLine("   |                       SUMMARY                              |");
         Console.WriteLine("   +------------------------------------------------------------+");
-        var label = string.Equals(result.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase)
-            ? "NOT TESTED"
-            : result.Score.Label.ToUpperInvariant();
-        Console.WriteLine($"   Verdict:  {label}   Score: {result.Score.Value:P1}   Severity: {result.Score.Severity}");
+        Console.WriteLine(BenchmarkSampleReporting.FormatVerdict(result));
         Console.WriteLine();
         Console.WriteLine($"   JSON: {paths.json}");
         Console.WriteLine($"   HTML: {paths.html}");
@@ -568,10 +514,7 @@ internal static class BenchmarkSampleHelpers
         Console.WriteLine("   +------------------------------------------------------------+");
         Console.WriteLine("   |                       SUMMARY                              |");
         Console.WriteLine("   +------------------------------------------------------------+");
-        var label = string.Equals(result.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase)
-            ? "NOT TESTED"
-            : result.Score.Label.ToUpperInvariant();
-        Console.WriteLine($"   Verdict:  {label}   Score: {result.Score.Value:P1}   Severity: {result.Score.Severity}");
+        Console.WriteLine(BenchmarkSampleReporting.FormatVerdict(result));
         Console.WriteLine();
         Console.WriteLine($"   Run ID:   {paths.RunId}");
         if (paths.AuditHash is not null)

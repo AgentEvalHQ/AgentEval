@@ -132,7 +132,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                 ? "NOT TESTED"
                 : root.Score.Label.ToUpperInvariant();
             col.Item().Background(sevColor).Padding(12)
-                .Text($"OVERALL: {label} ({root.Score.Value:P0})")
+                .Text($"OVERALL: {label} ({FormatScore(root.Score, "P0")})")
                 .FontColor(Colors.White).FontSize(20).Bold();
 
             // Why the overall verdict is what it is: the root's own summary and recommendations were rendered nowhere, so a
@@ -199,7 +199,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                 {
                     var isSkipped = string.Equals(child.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase);
                     table.Cell().Padding(5).Text(child.Metric.Key);
-                    table.Cell().Padding(5).Text(isSkipped ? "—" : child.Score.Value.ToString("P0"));
+                    table.Cell().Padding(5).Text(isSkipped ? "—" : FormatScore(child.Score, "P0"));
                     table.Cell().Padding(5).Text(isSkipped ? "NOT TESTED" : child.Score.Label.ToUpperInvariant());
                     table.Cell().Padding(5).Text(child.Score.Severity ?? "none");
                 }
@@ -225,7 +225,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().PaddingTop(8).Text(
                 isSkipped
                     ? "Status: NOT TESTED"
-                    : $"Score: {leaf.Score.Value:P1}  •  Label: {leaf.Score.Label.ToUpperInvariant()}  •  Severity: {leaf.Score.Severity}")
+                    : $"Score: {FormatScore(leaf.Score, "P1")}  •  Label: {leaf.Score.Label.ToUpperInvariant()}  •  Severity: {leaf.Score.Severity}")
                 .FontSize(12);
 
             if (opts.IncludeProvenance)
@@ -362,6 +362,9 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             t.TotalPages();
         });
     }
+
+    private static string FormatScore(EvalScore score, string format) =>
+        score.MeasuredValue() is { } value ? value.ToString(format) : "not measured";
 
     private static string SeverityColor(string? severity, string? label)
     {
