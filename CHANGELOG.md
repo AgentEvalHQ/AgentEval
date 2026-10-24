@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The disclaimer and actual NuGet README now describe rc.1 as a prerelease, semver for stable APIs/CLI behavior from 1.0.0, and the existing Beta/Experimental exceptions. They preserve independent review, testing and hardening requirements and share the root maturity policy.
 - API snapshot guards now cover the remaining declared library assemblies and record Gatekeeper sealing, bases/interfaces and subclass-visible protected members through the existing shared renderer. Packaging dependency checks follow the actual embedded project declarations. Runtime APIs and existing maturity exceptions are unchanged.
 - MAF evaluation guidance now records the verified .NET 1.24.0 query/final-response projection, its loss of current-turn tool evidence even for tool-aware LLM judges, and the existing native `AsAgentEvaluator` alternative. No MAF or AgentEval runtime behavior changed.
 - Embedding guidance treats thresholds as model/task-dependent, aligns generic score labels with `ScoreNormalizer`, and preserves unmeasured results in the combined-metric example. Defaults and APIs are unchanged; similarity alone does not establish factual correctness.

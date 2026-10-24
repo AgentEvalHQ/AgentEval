@@ -4,7 +4,7 @@
 
 Built first for **Microsoft Agent Framework (MAF)** and **Microsoft.Extensions.AI**. What RAGAS and DeepEval do for Python, AgentEval does for .NET.
 
-> **Preview.** AgentEval is experimental: APIs and behavior may change without notice, and breaking changes are listed in the [CHANGELOG](https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md). Only the Gatekeeper public surface is frozen by a test. Do not use it in production or safety-critical systems without your own review and testing.
+> **Release candidate: 1.0.0-rc.1.** This prerelease is for feedback and can still change before 1.0.0. From 1.0.0, stable library APIs and documented CLI commands, options and exit codes follow semantic versioning; incompatible changes require a major version. Types marked `[Experimental]` and fronts labelled Beta or Experimental remain outside that promise: see the authoritative [Feature Maturity table](https://github.com/AgentEvalHQ/AgentEval#feature-maturity). API snapshots record the bundled library's current shape without promoting those exceptions. Changes are listed in the [CHANGELOG](https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md). Do not use AgentEval in production or safety-critical systems without independent review, testing and hardening; see the [disclaimer](https://github.com/AgentEvalHQ/AgentEval/blob/main/DISCLAIMER.md).
 
 ## Features
 
