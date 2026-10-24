@@ -89,6 +89,70 @@ public sealed class MicrosoftEvaluatorTokenBoundaryTests
         Assert.Equal(0d, result.Provenance.EstimatedCost);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Meter_UsageBeforeInterruptedOrAbandonedStream_DoesNotReportCompleteUsage(bool abandon, bool recover)
+    {
+        IEval adapter = new MicrosoftEvaluatorAdapter(
+            new StreamBoundaryEvaluator(abandon, recover), new InterruptedUsageClient(), name: "Fluency")
+            { JudgeModel = "gpt-4o-mini" };
+
+        var result = await adapter.EvaluateAsync(new EvalInput("q", Response: "a"));
+
+        Assert.Equal(abandon || recover ? "pass" : "error", result.Score.Label);
+        AssertUnavailable(result);
+    }
+
+    private sealed class StreamBoundaryEvaluator(bool abandon, bool recover) : MeaiEvaluator
+    {
+        public IReadOnlyCollection<string> EvaluationMetricNames => ["Fluency"];
+
+        public async ValueTask<MeaiResult> EvaluateAsync(IEnumerable<ChatMessage> messages, ChatResponse modelResponse,
+            Microsoft.Extensions.AI.Evaluation.ChatConfiguration? chatConfiguration = null,
+            IEnumerable<MeaiContext>? additionalContext = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await foreach (var update in chatConfiguration!.ChatClient.GetStreamingResponseAsync(
+                    messages, cancellationToken: cancellationToken))
+                {
+                    if (abandon) break;
+                }
+            }
+            catch (IOException) when (recover) { }
+
+            var result = new MeaiResult();
+            result.Metrics["Fluency"] = new Microsoft.Extensions.AI.Evaluation.NumericMetric("Fluency", 4);
+            return result;
+        }
+    }
+
+    private sealed class InterruptedUsageClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return new ChatResponseUpdate
+            {
+                Role = ChatRole.Assistant,
+                ModelId = "gpt-4o-mini",
+                Contents = [new UsageContent(new UsageDetails { InputTokenCount = 1000, OutputTokenCount = 200 })]
+            };
+            throw new IOException("stream lost after reported usage");
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
+
     private static void AssertUnavailable(EvalResult result)
     {
         Assert.Null(result.Provenance.TokensUsed);

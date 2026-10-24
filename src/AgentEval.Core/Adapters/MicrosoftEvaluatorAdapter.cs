@@ -326,7 +326,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            bool sawInput = false, sawOutput = false;
+            bool sawInput = false, sawOutput = false, completed = false;
             try
             {
                 await foreach (var update in inner.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
@@ -344,10 +344,12 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                         Record(null, update.ModelId);
                     yield return update;
                 }
+                completed = true;
             }
             finally
             {
-                EndCall(sawInput, sawOutput);
+                // Usage can precede a failure or early disposal; only natural EOF completes the account.
+                EndCall(completed && sawInput, completed && sawOutput);
             }
         }
 
