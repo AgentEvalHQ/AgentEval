@@ -5,11 +5,9 @@ import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
 import { VerdictBadge, type Verdict } from "@/components/VerdictBadge";
-import { TimelineChart, type TimelinePoint } from "@/components/charts/TimelineChart";
-import { HistogramChart } from "@/components/charts/HistogramChart";
 import { formatDateTime, formatScore } from "@/lib/format";
 
-// Plan-08 Wave 2: per-subject detail with timeline + histogram.
+// Subject history retains raw scores; whole-run scalars alone do not establish chart comparability.
 
 interface SubjectDetailResponse {
   subject: {
@@ -113,10 +111,6 @@ export function SubjectDetailPage() {
 
         // Exact references distinguish subjects whose display names happen to match.
         const subjectRuns = d.recentRuns.filter((r) => r.subjectRef === d.subject!.identity.ref);
-        const timelinePoints: TimelinePoint[] = subjectRuns
-          .filter((r) => r.timestamp !== null && r.score !== null)
-          .map((r) => ({ timestamp: r.timestamp!, score: r.score!, runId: r.runId, verdict: r.verdict }));
-        const scoreList = subjectRuns.flatMap((r) => r.score === null ? [] : [r.score]);
 
         return (
           <div className="space-y-6">
@@ -142,20 +136,15 @@ export function SubjectDetailPage() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Score over time ({timelinePoints.length} dated runs)
+                Score history
               </h3>
-              <TimelineChart data={timelinePoints} threshold={0.7} />
+              <p className="text-sm text-slate-500">
+                Score charts unavailable. This history does not establish a shared metric and scale.
+                View the raw scores below or open a run for details.
+              </p>
             </section>
 
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                  Score distribution
-                </h3>
-                <HistogramChart scores={scoreList} />
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-3">
                   Recent runs
                 </h3>
@@ -184,7 +173,6 @@ export function SubjectDetailPage() {
                     </li>
                   )}
                 </ul>
-              </div>
             </section>
           </div>
         );

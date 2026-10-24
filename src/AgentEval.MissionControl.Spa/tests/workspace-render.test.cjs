@@ -379,6 +379,65 @@ test('captured absent judge score does not display its numeric placeholder', () 
   assert.doesNotMatch(html, /0\.12/);
 });
 
+for (const scores of [[20, 50, 80], [0.2, 0.5, 0.8]]) {
+  test(`subject scores without shared metric context stay raw: ${scores}`, () => {
+    const data = { subject: { identity: { kind: 'AGENT', rawKind: 'agent', ref: 'agent:A', name: 'A',
+      framework: null, modelId: null, sourceProject: null }, lastRun: null },
+      recentRuns: scores.map((score, i) => ({ runId: `raw-${i}`, sourceId: `source-${i}`, subjectRef: 'agent:A',
+        subjectName: 'A', kind: 'AGENT', timestamp: `2026-10-2${i + 1}T10:00:00Z`, score, verdict: null })) };
+    const html = render(SubjectDetailPage, '/subjects/agent/A?subjectRef=agent%3AA', '/subjects/:kind/:name',
+      [[queryKeys.subjects.detail('AGENT', 'A', 'agent:A'), data]]);
+    assert.match(html, /Score charts unavailable/);
+    assert.doesNotMatch(html, /recharts-responsive-container|Score distribution/);
+    for (const [i, score] of scores.entries()) {
+      assert.ok(html.includes(score.toFixed(2)));
+      assert.ok(html.includes(`/runs/raw-${i}?sourceId=source-${i}`));
+    }
+  });
+}
+
+test('dashboard does not plot unqualified subject scores as a comparable trend', () => {
+  const { DashboardPage } = load(path.join(root, 'pages/DashboardPage'));
+  const identity = { kind: 'AGENT', rawKind: 'agent', ref: 'agent:A', name: 'A' };
+  const html = render(DashboardPage, '/', '/', [
+    [queryKeys.version(), { version: 'test', mode: 'read-only' }],
+    [queryKeys.subjects.list(), { subjectsConnection: { totalCount: 1,
+      edges: [{ node: { identity, lastRun: null } }], pageInfo: { hasNextPage: false, endCursor: null } } }],
+    [queryKeys.runs.recent(50), { recentRuns: [20, 50, 80].map((score, i) => ({ runId: `raw-${i}`,
+      subjectName: 'A', subjectRef: 'agent:A', verdict: null, timestamp: `2026-10-2${i + 1}T10:00:00Z`, kind: 'AGENT', score })) }],
+  ]);
+  assert.match(html, /No comparable score history/);
+  assert.doesNotMatch(html, /recharts-responsive-container/);
+  assert.match(html, /subjectRef=agent%3AA/);
+});
+
+for (const [measurement, expected] of [['notMeasured', 'NOT MEASURED'], ['notApplicable', 'NOT APPLICABLE']]) {
+  for (const label of ['pass', 'warn']) {
+    test(`captured root, judge and adjudicator badges prefer ${measurement} over ${label}`, () => {
+      const { EvalResultNode } = load(path.join(root, 'components/EvalResultNode'));
+      const { capturedTree } = load(path.join(root, 'lib/eval-tree'));
+      const panel = capturedPanel();
+      panel.provenance.type = 'multi-judge-adjudicated';
+      panel.details.dimensions = { agreement: 0, disputed: 1 };
+      for (const node of [panel, ...panel.details.subResults])
+        node.score = { ...node.score, value: 0.12345, label, passed: false, measurement };
+      const html = renderToStaticMarkup(h(EvalResultNode, { node: capturedTree(JSON.stringify(panel)), defaultExpanded: true }));
+      assert.ok((html.match(new RegExp(expected, 'g')) ?? []).length >= 3);
+      assert.doesNotMatch(html, />PASS<|>WARN<|0\.12/);
+      assert.doesNotMatch(html, /adjudicator override/);
+    });
+  }
+}
+
+test('captured legacy measured label remains a verdict when measurement metadata is absent', () => {
+  const { EvalResultNode } = load(path.join(root, 'components/EvalResultNode'));
+  const { capturedTree } = load(path.join(root, 'lib/eval-tree'));
+  const panel = capturedPanel();
+  for (const node of [panel, ...panel.details.subResults]) delete node.score.measurement;
+  const html = renderToStaticMarkup(h(EvalResultNode, { node: capturedTree(JSON.stringify(panel)), defaultExpanded: true }));
+  assert.match(html, />PASS</);
+});
+
 
 test('compliance cells keep agent and workflow identities with the same name', () => {
   const { ComplianceMatrix } = load(path.join(root, 'components/ComplianceMatrix'));

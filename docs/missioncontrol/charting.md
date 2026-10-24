@@ -24,9 +24,9 @@ not built: both shipped as CSS grid / flexbox views, which keeps a single chart 
 
 | Component | Where it appears | How it is drawn |
 |---|---|---|
-| `TimelineChart` (`components/charts/TimelineChart.tsx`) | Subject detail page ("Score over time", dashed threshold line fixed at 0.7) and evaluator detail page ("Score over recent runs", threshold line at the card's `defaultThreshold`) | Recharts `LineChart`, y-axis fixed to 0–1 |
-| `Sparkline` (`components/charts/Sparkline.tsx`) | `SubjectCard` on the dashboard, latest 30 runs | Recharts `LineChart` with no axes, tooltip or legend |
-| `HistogramChart` (`components/charts/HistogramChart.tsx`) | Subject detail page ("Score distribution") | Recharts `BarChart`; scores binned into 10 buckets of width 0.1 |
+| `TimelineChart` (`components/charts/TimelineChart.tsx`) | Evaluator occurrences with one established comparable context, a declared 0–1 scale and any recorded threshold | Recharts `LineChart`, y-axis fixed to 0–1 |
+| `Sparkline` (`components/charts/Sparkline.tsx`) | Reusable normalized-series component; current dashboard subject cards have no established comparable score history | Recharts `LineChart` with no axes, tooltip or legend |
+| `HistogramChart` (`components/charts/HistogramChart.tsx`) | Retained normalized-series component; not used for raw subject history | Recharts `BarChart`; normalized scores binned into 10 buckets of width 0.1 |
 | `CostTierBreakdownChart` (`components/charts/CostTierBreakdownChart.tsx`) | Run detail page ("Cost by tier"), only when the run's total cost is above 0 | Recharts horizontal stacked `BarChart`: one segment per cost tier (trivial, low, medium, high) plus `unknown` |
 | `TraceWaterfallPage` (`pages/TraceWaterfallPage.tsx`) | `/runs/:runId/trace` | Recharts horizontal `BarChart` with two stacked bars per event: a transparent one for the offset from the first event, and a visible one whose length is the gap to the next event. A trace event carries a single timestamp and no span, so the gap is the only duration available |
 | `ComplianceMatrix` (`components/ComplianceMatrix.tsx`) | `/compliance/:regulation` | CSS grid of subjects × controls; each cell is a button coloured pass / warn / fail / no-data. A cell whose audit-chain check failed gets an amber ring, a striped overlay and a ⚠ glyph |

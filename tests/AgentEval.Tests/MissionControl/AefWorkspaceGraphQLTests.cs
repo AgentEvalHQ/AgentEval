@@ -314,6 +314,42 @@ public sealed class AefWorkspaceGraphQLTests : IDisposable
         Assert.Single(data.GetProperty("scenarios").EnumerateArray());
     }
 
+    [Theory]
+    [InlineData("known", 15L, 5L)]
+    [InlineData("zero", 0L, 0L)]
+    [InlineData("partial", null, 5L)]
+    [InlineData("integral-spelling", 15L, 5L)]
+    public async Task Summary_RecordedNativeUsage_PreservesTotalsAndUnknownDimensions(string shape, long? input, long? output)
+    {
+        var start = DateTimeOffset.Parse("2026-10-24T00:00:00Z");
+        var zero = shape == "zero";
+        var directory = AefProbeRunWriter.Write(Runs,
+            [new() { CaseId = "probe", State = AefState.Passed, Annotator = AefAnnotatorKind.Code }],
+            new()
+            {
+                SubjectRef = "agent:NativeAgent", TargetMode = AefTargetMode.Mocked, SuiteRef = "redteam:usage",
+                Usage = [new() { Role = AefUsageRole.Agent, Model = "agent", InputTokens = zero ? 0 : 10, OutputTokens = zero ? 0 : 3 },
+                    new() { Role = AefUsageRole.Judge, Model = "judge", InputTokens = shape == "partial" ? null : zero ? 0 : 5,
+                        OutputTokens = zero ? 0 : 2 }],
+            }, start, start.AddSeconds(1)).Directory;
+        if (shape == "integral-spelling")
+        {
+            var path = Path.Combine(directory, "summary.json");
+            var text = File.ReadAllText(path);
+            text = System.Text.RegularExpressions.Regex.Replace(text, "(\"gen_ai\\.usage\\.input_tokens\"\\s*:\\s*)10\\b", "${1}1e1");
+            text = System.Text.RegularExpressions.Regex.Replace(text, "(\"gen_ai\\.usage\\.output_tokens\"\\s*:\\s*)3\\b", "${1}3.0");
+            Assert.Contains("1e1", text); Assert.Contains("3.0", text);
+            File.WriteAllText(path, text);
+            File.Delete(Path.Combine(directory, "seal.json")); AefSealer.Seal(directory);
+        }
+        using var factory = Factory(); using var client = factory.CreateClient();
+        using var json = await Send(client, $$"""{ runSummary(runId:"{{RunId(directory)}}") { cost { promptTokens completionTokens } } }""");
+        Assert.False(json.RootElement.TryGetProperty("errors", out _), json.RootElement.ToString());
+        var cost = json.RootElement.GetProperty("data").GetProperty("runSummary").GetProperty("cost");
+        Assert.Equal(input, cost.GetProperty("promptTokens").ValueKind == JsonValueKind.Null ? (long?)null : cost.GetProperty("promptTokens").GetInt64());
+        Assert.Equal(output, cost.GetProperty("completionTokens").ValueKind == JsonValueKind.Null ? (long?)null : cost.GetProperty("completionTokens").GetInt64());
+    }
+
     private sealed class CountingReader : IAefWorkspaceEvidenceReader
     {
         public int Reads;

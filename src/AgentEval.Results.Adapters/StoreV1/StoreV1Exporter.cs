@@ -253,12 +253,17 @@ public static partial class StoreV1Exporter
         if (manifest is null || manifest.Run is null || manifest.Subject is null || manifest.Solution is null
             || manifest.Git is null || manifest.AgentEval is null || manifest.Environment is null)
             throw InvalidSource("The legacy manifest is incomplete.");
+        if (!Enum.IsDefined(manifest.Subject.Kind) || manifest.Run.Duration < TimeSpan.Zero
+            || manifest.Run.ScenarioCount < 0 || string.IsNullOrWhiteSpace(manifest.Run.Verdict))
+            throw InvalidSource("The legacy manifest has an unknown subject kind, negative duration/count or missing completion verdict.");
     }
 
     private static void ValidateSummary(RunSummary? summary)
     {
         if (summary is not null && (summary.Metrics is null || summary.Stats is null))
             throw InvalidSource("The legacy summary is incomplete.");
+        if (summary?.Stats is { } stats && (stats.Total < 0 || stats.Passed < 0 || stats.Failed < 0 || stats.Warnings < 0 || stats.Skipped < 0))
+            throw InvalidSource("The legacy summary contains a negative recorded count.");
     }
 
     private static InvalidDataException InvalidSource(string actual, Exception? inner = null) => new(

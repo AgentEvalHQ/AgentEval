@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using System.Text.Json;
 using AgentEval.Output;
 using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Ingestion;
@@ -103,18 +102,4 @@ public static partial class StoreV1Exporter
         }, outputDirectory, options);
     }
 
-    private static T? ReadOptional<T>(string path) where T : class => Path.Exists(path) ? ReadRequired<T>(path) : null;
-
-    private static T ReadRequired<T>(string path) where T : class
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), s_store)
-                ?? throw InvalidSource($"The legacy file {Path.GetFileName(path)} contains null.");
-        }
-        catch (JsonException error)
-        {
-            throw InvalidSource($"The legacy file {Path.GetFileName(path)} is not readable JSON.", error);
-        }
-    }
 }

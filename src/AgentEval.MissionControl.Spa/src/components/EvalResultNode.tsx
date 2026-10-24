@@ -37,7 +37,7 @@ interface Props {
 }
 
 // Phase-7 Task 7.11: labelToVerdict lifted to @/lib/verdict.
-import { labelToVerdict } from "@/lib/verdict";
+import { scoreVerdict } from "@/lib/verdict";
 
 export function EvalResultNode({
   node,
@@ -105,7 +105,7 @@ export function EvalResultNode({
           <span className="font-mono text-sm text-slate-700">
             {formatScore(capturedScore(node))}
           </span>
-          <VerdictBadge verdict={labelToVerdict(node.score.label)} size="sm" />
+          <VerdictBadge verdict={scoreVerdict(node.score)} size="sm" />
           <span className="text-xs text-slate-500">{node.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(node.provenance.estimatedCost)}</span>
         </div>
       </Header>

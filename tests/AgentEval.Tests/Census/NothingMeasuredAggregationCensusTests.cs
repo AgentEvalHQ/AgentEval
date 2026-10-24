@@ -207,6 +207,12 @@ public sealed class NothingMeasuredAggregationCensusTests
         ["AgentEval.Output.ComparisonResultExtensions"] = "prints a StochasticResult through TableFormatter (T71 guards its not-measured rows)",
         ["AgentEval.Output.ExecutionSummary"] = "trace record of one execution: counts, and a cost that is null when not priced",
 
+        // Results.Adapters
+        ["AgentEval.Results.Adapters.Comparison.AefComparisonMetric"] = "metric identity/scale descriptor; no measured value or aggregation (CompareAefTests metric-meaning refusal)",
+        ["AgentEval.Results.Adapters.Comparison.AefComparisonReader"] = "verified projection of recorded observations; absent states keep null scores (AefBenchmarkComparisonTests measurement controls)",
+        ["AgentEval.Results.Adapters.Comparison.AefComparisonRun"] = "CompareTo delegates score arithmetic to RunComparison (row B-4), adding only tested metric-compatibility axes",
+        ["AgentEval.Results.Adapters.Native.AefBenchmarkComparison"] = "encodes an existing benchmark EvalResult, never a probe-derived score (AefBenchmarkComparisonTests absent/measured and no-aggregate controls)",
+
         // Evals.Agentic
         ["AgentEval.Evals.Agentic.Process.ToolCallAccuracyAggregateEval"] = "wraps a CompositeEval with WeightedSum (rows A1)",
         ["AgentEval.Evals.Agentic.Reporting.AgenticBenchmarkResult"] = "evaluation artifact carrying AgenticSummary (row A11)",

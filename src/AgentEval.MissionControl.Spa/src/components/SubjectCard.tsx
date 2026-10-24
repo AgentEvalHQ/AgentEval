@@ -50,7 +50,8 @@ export function SubjectCard({ subject }: SubjectCardProps) {
         </div>
         {subject.lastVerdict && <VerdictBadge verdict={subject.lastVerdict} />}
       </div>
-      <Sparkline data={cappedTrend} height={32} />
+      {total > 0 ? <Sparkline data={cappedTrend} height={32} />
+        : <p className="text-xs text-slate-400 italic">No comparable score history</p>}
       {total > SPARKLINE_MAX_POINTS && (
         <p className="mt-1 text-[10px] text-slate-400">
           showing latest {SPARKLINE_MAX_POINTS} of {total} runs

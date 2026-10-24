@@ -69,7 +69,8 @@ internal static class WorkspaceRunProjector
         var usage = At(read.Summary, "usage");
         var cost = At(read.Summary, "cost");
         return new(read.Info.RunId, Verdict(read), stats,
-            usage is null && cost is null ? null : new(Number(cost, "totalUsd"), SumTokens(usage, "inputTokens"), SumTokens(usage, "outputTokens")))
+            usage is null && cost is null ? null : new(Number(cost, "totalUsd"),
+                SumTokens(usage, "gen_ai.usage.input_tokens"), SumTokens(usage, "gen_ai.usage.output_tokens")))
         {
             States = roots.GroupBy(r => Text(r, "state")!, StringComparer.Ordinal)
                 .OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => new WorkspaceStateCount(g.Key, g.Count())).ToArray(),
@@ -122,8 +123,9 @@ internal static class WorkspaceRunProjector
         long total = 0;
         foreach (var line in lines)
         {
-            if (At(line, name) is not { } value || !value.TryGetInt64(out var number)) return null;
-            try { total = checked(total + number); } catch (OverflowException) { return null; }
+            if (At(line, name) is not { ValueKind: JsonValueKind.Number } value) return null;
+            // Verified AEF integers may use an integral decimal or exponent spelling.
+            try { total = checked(total + (long)value.GetDouble()); } catch (OverflowException) { return null; }
         }
         return total;
     }

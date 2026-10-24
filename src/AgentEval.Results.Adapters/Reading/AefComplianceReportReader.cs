@@ -31,6 +31,10 @@ public sealed class AefComplianceReportReader : IAefComplianceReportReader
     /// <inheritdoc />
     public AefComplianceReport? Read(string nativeRunsRoot, IReadOnlyList<string> legacyDirectories,
         string subjectName, string regulation, string? timestamp = null, CancellationToken ct = default)
+        => ReadBounded(nativeRunsRoot, legacyDirectories, subjectName, regulation, new(256L << 20), timestamp, ct);
+
+    internal AefComplianceReport? ReadBounded(string nativeRunsRoot, IReadOnlyList<string> legacyDirectories,
+        string subjectName, string regulation, AefReadBudget budget, string? timestamp = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(legacyDirectories);
         ArgumentException.ThrowIfNullOrWhiteSpace(subjectName);
@@ -44,7 +48,8 @@ public sealed class AefComplianceReportReader : IAefComplianceReportReader
         var reader = new AefComplianceArtifactReader();
         foreach (var directory in AefEvidenceDiscovery.Discover(nativeRunsRoot, ct: ct))
         {
-            using var run = AefVerifiedRun.Open(directory, ct);
+            using var run = AefVerifiedRun.Open(directory, ct, budget.Limit(1L << 30));
+            budget.Charge(run.Bytes);
             if (!MatchesSubject(run.Info.SubjectRef, subjectName)) continue;
             var read = reader.Read(run, ct);
             var relevant = read.Documents.Where(d => SameRegulation(d.Evidence.Regulation, regulation)).ToArray();
@@ -79,8 +84,10 @@ public sealed class AefComplianceReportReader : IAefComplianceReportReader
             var temporary = Directory.CreateTempSubdirectory("ae-compliance-read-");
             try
             {
-                var conversion = StoreV1Exporter.ExportComplianceDirectory(directory, Path.Combine(temporary.FullName, "run"), ct: ct);
-                var read = reader.Read(conversion.Directory, ct);
+                var conversion = StoreV1Exporter.ExportComplianceDirectoryBounded(directory, Path.Combine(temporary.FullName, "run"), null, ct, budget);
+                using var run = AefVerifiedRun.Open(conversion.Directory, ct, budget.Limit(1L << 30));
+                budget.Charge(run.Bytes);
+                var read = reader.Read(run, ct);
                 foreach (var document in read.Documents.Where(d => d.IsRich))
                 {
                     if (document.Evidence.Subject.Name != subjectName || !SameRegulation(document.Evidence.Regulation, regulation))

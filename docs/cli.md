@@ -61,8 +61,10 @@ provider rejects both (a model with no reasoning setting, such as gpt-4o) with n
 is the provider's default. The level that worked is remembered per provider, endpoint and model for the rest
 of the process, so a rejected level costs one failed call per model. Code that sets `ChatOptions.Reasoning`
 keeps its own level. In your own code, `chatClient.WithMinimalReasoning()` (`AgentEval.Core`) does the same.
-The exception is the AEF dataset runner (`agenteval run --plan`): its clients make at most one attempt per call so
-the per-role call budget holds, and they run at the provider's default reasoning.
+The AEF dataset runner (`agenteval run --plan`) resolves the same `none` → `low` → provider-default
+sequence during readiness, with every attempt charged to its role's call and cost bounds. Cases then use the
+accepted setting for that role without renegotiating it. Each transport call makes one attempt; preparation
+reserves up to three accounted readiness attempts per role and suite.
 Why: on Bitdeer, GLM-5.3-Flash at its default reasoning spent two thirds of its output tokens thinking and
 took 2.2 times as long on an article-length answer (2026-10-21); Bitdeer rejects `none` and accepts `low`,
 which turns GLM's reasoning off. Results measured before 2026-10-21 ran at each provider's default.

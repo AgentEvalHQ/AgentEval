@@ -29,7 +29,7 @@ interface Props {
 }
 
 // Phase-7 Task 7.11: labelToVerdict lifted to @/lib/verdict.
-import { labelToVerdict } from "@/lib/verdict";
+import { scoreVerdict } from "@/lib/verdict";
 
 export function AdjudicationFlow({ node }: Props) {
   const adjudicated = isAdjudicatedNode(node);
@@ -72,7 +72,7 @@ export function AdjudicationFlow({ node }: Props) {
           <div className="flex items-center gap-2 pt-2">
             <AlertTriangle size={14} className="text-amber-600" />
             <span className="text-xs font-medium text-amber-700">
-              Panel disagreed — adjudicator override
+              Panel disagreed — adjudicator result
             </span>
             <span className="text-slate-300">→</span>
           </div>
@@ -85,7 +85,7 @@ export function AdjudicationFlow({ node }: Props) {
                 </span>
               </div>
               <VerdictBadge
-                verdict={labelToVerdict(adjudicator.score.label)}
+                verdict={scoreVerdict(adjudicator.score)}
                 size="sm"
               />
             </div>
@@ -126,7 +126,7 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
           {judge.metric.name}
         </span>
         <VerdictBadge
-          verdict={labelToVerdict(judge.score.label)}
+          verdict={scoreVerdict(judge.score)}
           size="sm"
         />
       </div>

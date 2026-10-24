@@ -40,18 +40,6 @@ interface SubjectsConnectionResponse {
   };
 }
 
-interface RecentRunsResponse {
-  recentRuns: {
-    runId: string;
-    subjectName: string;
-    subjectRef: string;
-    verdict: Verdict | null;
-    timestamp: string | null;
-    kind: string | null;
-    score: number | null;
-  }[];
-}
-
 // T3.8 — paginated Connection shape (max page = 200, per the server-side
 // MaxFirst cap). The dashboard renders only the first page; the totalCount
 // surfaces overflow without forcing a follow-up round-trip.
@@ -81,20 +69,6 @@ const SUBJECTS_QUERY = /* GraphQL */ `
   }
 `;
 
-const RECENT_RUNS_QUERY = /* GraphQL */ `
-  query RecentRuns {
-    recentRuns(count: 50) {
-      runId
-      subjectName
-      subjectRef
-      verdict
-      timestamp
-      kind
-      score
-    }
-  }
-`;
-
 export function DashboardPage() {
   const versionQ = useQuery({
     queryKey: queryKeys.version(),
@@ -106,14 +80,6 @@ export function DashboardPage() {
     queryFn: () => gqlRequest<SubjectsConnectionResponse>(SUBJECTS_QUERY),
   });
 
-  const recentRunsQ = useQuery({
-    queryKey: queryKeys.runs.recent(50),
-    queryFn: () => gqlRequest<RecentRunsResponse>(RECENT_RUNS_QUERY),
-  });
-
-  // Build the trend (sparkline data) per subject by filtering recentRuns.
-  // Exact subject refs prevent display-name collisions from mixing trends.
-  const trendBySubject = buildTrendIndex(recentRunsQ.data?.recentRuns ?? []);
   // T3.8 — pull node out of each Connection edge. Connection shape
   // gives us totalCount + hasNextPage which we surface in the section
   // header below when the operator has more than 200 subjects.
@@ -125,7 +91,8 @@ export function DashboardPage() {
     name: s.identity.name,
     lastVerdict: s.lastRun?.verdict ?? null,
     lastRunId: s.lastRun?.runId ?? null,
-    trend: trendBySubject.get(s.identity.ref) ?? [],
+    // Whole-run scalars do not establish comparable metric/scale context.
+    trend: [],
   }));
   const subjectsOverflow = conn ? conn.totalCount > cards.length : false;
 
@@ -207,35 +174,5 @@ export function DashboardPage() {
         </DataState>
       </section>
     </div>
-  );
-}
-
-// Build a per-subject trend (oldest → newest scores) from a flat list of
-// RunPointers. Filters out scoreless points (null score). Caller can render
-// these via the Sparkline component without further reshaping.
-function buildTrendIndex(
-  runs: RecentRunsResponse["recentRuns"],
-): Map<string, { value: number }[]> {
-  // Keep each exact subject reference in its own trend. Runs with
-  // a null kind (legacy / not-yet-backfilled run pointers) bucket under an
-  // explicit `UNKNOWN::{name}` so they still appear if any subject lookup
-  // happens to match — but they will not show up on the agent OR workflow
-  // detail page, which is the right answer for ambiguous legacy data.
-  const byKey = new Map<string, { ts: string; value: number }[]>();
-  for (const r of runs) {
-    if (r.score === null || r.timestamp === null) continue;
-    const key = r.subjectRef;
-    const list = byKey.get(key) ?? [];
-    list.push({ ts: r.timestamp, value: r.score });
-    byKey.set(key, list);
-  }
-  // Sort each list by timestamp ascending; drop the ts after sort.
-  return new Map(
-    Array.from(byKey.entries()).map(([key, points]) => [
-      key,
-      points
-        .sort((a, b) => a.ts.localeCompare(b.ts))
-        .map((p) => ({ value: p.value })),
-    ]),
   );
 }
