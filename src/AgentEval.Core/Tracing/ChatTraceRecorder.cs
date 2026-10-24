@@ -197,8 +197,11 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             traceToolCalls.Add(new TraceToolCall
             {
                 Name = call.Name,
+                CallId = call.CallId,
+                WasExecuted = call.WasExecuted,
                 Arguments = call.Arguments is { Count: > 0 } ? call.GetArgumentsAsJson() : null,
                 Result = call.Result?.ToString(),
+                Error = call.Exception?.Message,
                 Succeeded = call.WasExecuted && !call.HasError   // a call that never ran did not succeed (T58)
             });
         }

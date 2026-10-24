@@ -22,8 +22,10 @@ public class ChatTraceRecorderToolCallTests
     {
         private readonly string _toolName;
         private readonly bool _toolRuns;
+        private readonly Exception? _toolError;
 
-        public ToolCallingAgent(string toolName, bool toolRuns = true) => (_toolName, _toolRuns) = (toolName, toolRuns);
+        public ToolCallingAgent(string toolName, bool toolRuns = true, Exception? toolError = null) =>
+            (_toolName, _toolRuns, _toolError) = (toolName, toolRuns, toolError);
 
         public string Name => "ToolCallingAgent";
 
@@ -43,12 +45,49 @@ public class ChatTraceRecorderToolCallTests
             {
                 rawMessages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Tool, new List<AIContent>
                 {
-                    new FunctionResultContent(callId, "sunny")
+                    new FunctionResultContent(callId, "sunny") { Exception = _toolError }
                 }));
             }
 
             return Task.FromResult(new AgentResponse { Text = "It is sunny.", RawMessages = rawMessages });
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ToAgentTrace_RecordedExecution_RetainsIdentityAndOutcomeAfterSerialization(bool executed)
+    {
+        await using var recorder = new ChatTraceRecorder(new ToolCallingAgent("get_weather", toolRuns: executed), "execution");
+        await recorder.AddUserTurnAsync("Weather in Berlin?");
+
+        var json = await TraceSerializer.SerializeToStringAsync(recorder.ToAgentTrace());
+        var restored = await TraceSerializer.DeserializeFromStringAsync(json);
+        var call = Assert.Single(restored.Entries.Single(entry => entry.Type == TraceEntryType.Response).ToolCalls!);
+
+        Assert.Equal(executed, call.WasExecuted);
+        Assert.Equal("call-get_weather", call.CallId);
+        Assert.Equal(executed, call.Succeeded);
+        Assert.False(call.Failed); // Intent without execution has no failed outcome.
+        Assert.Null(call.Error);
+    }
+
+    [Fact]
+    public async Task ToAgentTrace_ExecutedToolError_RetainsErrorAfterSerialization()
+    {
+        await using var recorder = new ChatTraceRecorder(
+            new ToolCallingAgent("get_weather", toolError: new TimeoutException("weather offline")), "failure");
+        await recorder.AddUserTurnAsync("Weather in Berlin?");
+
+        var json = await TraceSerializer.SerializeToStringAsync(recorder.ToAgentTrace());
+        var restored = await TraceSerializer.DeserializeFromStringAsync(json);
+        var call = Assert.Single(restored.Entries.Single(entry => entry.Type == TraceEntryType.Response).ToolCalls!);
+
+        Assert.Equal("weather offline", call.Error);
+        Assert.True(call.WasExecuted);
+        Assert.Equal("call-get_weather", call.CallId);
+        Assert.False(call.Succeeded);
+        Assert.True(call.Failed);
     }
 
     [Fact]

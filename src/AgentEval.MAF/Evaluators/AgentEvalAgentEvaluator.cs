@@ -145,7 +145,10 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
                 ? await composite.EvaluateItemAsync(conversation, response, context, wholeConversation: true, cancellationToken).ConfigureAwait(false)
                 : await _evaluator.EvaluateAsync(conversation, response, _chatConfiguration, context, cancellationToken).ConfigureAwait(false);
 
-            FailWhatWasNotScored(result);
+            // The composite owns its root verdict and deliberately keeps absent atomic leaves informational.
+            // The generic missing-value guard would turn those leaves into independent item failures.
+            if (_evaluator is not AgentEvalCompositeEvaluator)
+                FailWhatWasNotScored(result);
             results.Add(result);
         }
 

@@ -175,6 +175,26 @@ public class ConversationExtractorToolUsageTests
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task EvaluateAsync_ApprovalContinuation_PreservesOriginalInput(bool approved, bool bundled)
+    {
+        var request = new ToolApprovalRequestContent("req-1", new FunctionCallContent("c1", "PlaceOrder"));
+        var metric = new CapturingMetric();
+        var messages = new[] { User("Order two of ABC-123"), Assistant(request), User(request.CreateResponse(approved, "reviewed")) };
+
+        if (bundled)
+            await new AgentEvalEvaluator([metric]).EvaluateAsync(messages, Final("Order reviewed."));
+        else
+            await new AgentEvalMetricAdapter(metric).EvaluateAsync(messages, Final("Order reviewed."));
+
+        Assert.Equal("Order two of ABC-123", metric.Captured!.Input);
+        Assert.Equal("PlaceOrder", Assert.Single(metric.Captured.ToolUsage!.Calls).Name);
+    }
+
     [Fact]
     public async Task TheLightPathAdapter_HandsTheMetric_ACallMarkedExecuted()
     {

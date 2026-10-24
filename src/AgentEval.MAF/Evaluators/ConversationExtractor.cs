@@ -42,7 +42,7 @@ public static class ConversationExtractor
 
         for (int i = list.Count - 1; i >= 0; i--)
         {
-            if (list[i].Role == ChatRole.User)
+            if (IsUserPrompt(list[i]))
                 return list[i].Text ?? "";
         }
 
