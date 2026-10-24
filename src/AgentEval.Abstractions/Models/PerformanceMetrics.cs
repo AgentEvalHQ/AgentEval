@@ -112,6 +112,13 @@ public static class ModelPricing
     /// <summary>Identity of the bundled pricing baseline; hosts may override individual rates with <see cref="SetPricing"/>.</summary>
     public const string TableName = "agenteval-model-pricing-2026-10-21";
 
+    /// <summary>
+    /// Display context for the historical bundled table version. This does not identify which rates a
+    /// particular recorded cost used: hosts can override rates, and providers can report their own cost.
+    /// </summary>
+    public const string BaselineNotice = "Bundled pricing baseline: " + TableName +
+        " (historical rates; custom/provider rates may differ; not a live quote).";
+
     private static readonly ConcurrentDictionary<string, (decimal InputPer1K, decimal OutputPer1K)> _pricing = 
         new(StringComparer.OrdinalIgnoreCase)
     {
@@ -150,7 +157,7 @@ public static class ModelPricing
 
         // Bitdeer AI serverless models, keyed by Bitdeer's model id: the prices bitdeer.ai/en/pricing/ai-models charged
         // on 2026-10-21. Rows marked "sale" show a struck-through list price and a lower sale price with no end date;
-        // the row holds the sale price (what a run costs today) and the comment the list price. JudgeCostMap carries
+        // the row holds the observed sale price for historical estimates and the comment the list price. JudgeCostMap carries
         // the same chat-model prices.
         ["zai-org/GLM-5.3-Flash"] = (0.000083m, 0.000275m),                      // sale; list $0.15 / $0.50 per 1M
         ["zai-org/GLM-5.3"] = (0.00063m, 0.00198m),                              // sale; list $1.40 / $4.40 per 1M

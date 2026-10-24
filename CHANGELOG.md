@@ -885,6 +885,9 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Text cost reports omitted the bundled pricing date.** Comparison metrics, CLI summaries and evaluation
+  performance output now show the historical table identity and distinguish it from custom/provider rates
+  and live quotes. Rates are unchanged; monthly/before-release maintenance is documented.
 - **LongMemEval references mixed different experiments.** Published full-history S references now use Figure 3b's
   60.6% for GPT-4o and 33.4% for Llama-3.1-70B Instruct without Chain-of-Note, consistently in the library, report,
   samples and documentation. Unsupported Mini/Claude reference entries are removed; the separately labelled

@@ -58,6 +58,7 @@ internal static class ConsoleReporter
                 ? $"${cost:F4}"
                 : $"not priced ({summary.UnpricedTests.Count} of {summary.TotalCount} tests have no price)";
             Console.Error.WriteLine($"  Duration: {durationText}  Cost: {costText}");
+            Console.Error.WriteLine($"  {ModelPricing.BaselineNotice}");
         }
 
         if (summary.AllPassed)

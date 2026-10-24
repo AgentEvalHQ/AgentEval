@@ -207,6 +207,7 @@ public class EvaluationOutputWriter
         if (performance.EstimatedCost > 0)
         {
             _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"   Est. Cost: ${performance.EstimatedCost:F4}"));
+            _output.WriteLine($"   {ModelPricing.BaselineNotice}");
         }
     }
 

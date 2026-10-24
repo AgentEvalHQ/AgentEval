@@ -337,6 +337,26 @@ Console.WriteLine("Complex flows:\n" + complexComparison.ToMarkdown(MarkdownExpo
 
 ## Cost-Quality Tradeoffs
 
+### Bundled rates are historical estimates
+
+`ModelPricing.TableName` identifies the bundled table version (`agenteval-model-pricing-2026-10-21`),
+not a live quote or proof that a recorded amount used those rates. Text cost reports show this identity
+through `ModelPricing.BaselineNotice`. AEF records the baseline identity in `costPolicy.priceTable`;
+runtime overrides are not fingerprinted by that name. Provider-reported costs and custom rates may differ.
+
+The [Bitdeer rates](https://www.bitdeer.ai/en/pricing/ai-models) were observed on **2026-10-21**.
+Discounted rows retain their then-listed full prices in source comments; no sale end date was supplied.
+The OpenAI rows retain their separate **2026-10-07** source-check date and any last-known-value caveats.
+A table-version date does not mean every provider/model was verified on that day.
+
+Maintainers should re-check provider sources **at least monthly and before a release**. Verify each
+supported row's units, list/sale prices and any promotion end date; retain the actual observation date
+and source. If rates change, update both `ModelPricing` and `JudgeCostMap` where they overlap, their
+comments and the table identity, then run the pricing consistency tests. If a source cannot be verified,
+keep its historical date/caveat rather than calling it current. Packages do not refresh rates automatically.
+For a deployment-specific price or discount, use `ModelPricing.SetPricing`; configure judge rates
+separately with `JudgeCostMap.Register`. Reports remain estimates, not invoices or spending caps.
+
 The built-in cost dimension prices each model at its own rate when each agent names its model ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price yourself, for agents that name no model, price each model's token usage at its own rate with `ModelPricing.EstimateCost`:
 
 ```csharp

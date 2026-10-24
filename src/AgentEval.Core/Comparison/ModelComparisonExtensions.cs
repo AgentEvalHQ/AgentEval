@@ -250,6 +250,9 @@ public static class ModelComparisonExtensions
                 sb.AppendLine($"Total cost not priced for {model.ModelName}: {reason}");
         }
 
+        sb.AppendLine();
+        sb.AppendLine(AgentEval.Models.ModelPricing.BaselineNotice);
+
         return sb.ToString();
     }
 
