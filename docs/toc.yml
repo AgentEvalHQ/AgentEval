@@ -9,6 +9,8 @@
     href: installation.md
   - name: Quick Start
     href: getting-started.md
+  - name: Upgrading to 1.0
+    href: upgrading-to-1.0.md
   - name: Step-by-Step Walkthrough
     href: walkthrough.md
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgentEval — Memory Benchmark Report</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD" crossorigin="anonymous"></script>
 <link href="https://fonts.googleapis.com/css2?family=Anybody:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#060a10;--surface:#0c1118;--s2:#111a24;--border:#1a2538;--bbright:#243348;--t:#94a3b8;--tm:#64748b;--tb:#e2e8f0;--td:#334155;--good:#34d399;--goodD:rgba(52,211,153,.12);--warn:#fb923c;--bad:#f87171;--badD:rgba(248,113,113,.12)}
@@ -148,7 +148,7 @@ canvas{max-width:100%}
 // Debug: show errors visibly on the page
 window.onerror=function(msg,src,line){
   document.getElementById('mastSub').innerHTML=
-    '<span style="color:#f87171">JS Error: '+msg+' (line '+line+')</span>';
+    '<span style="color:#f87171">JS Error: '+safeText(msg)+' (line '+safeText(line)+')</span>';
 };
 
 const PENT=['Recall','Resilience','Temporal','Persistence','Organization'];
@@ -166,9 +166,11 @@ const CAT_INFO={
   'Conflict Resolution':{s:'Can it detect implicit contradictions?',d:'Tests detection of implicit contradictions — not explicit corrections, but conflicting statements planted at different times. Agent must identify which info is current.',v:'KPIs: Recency detection, contradiction awareness. Measures: 5 facts with temporal conflicts (Microsoft→Google, Seattle→Mountain View). 5 queries testing current vs historical. Context: medium corpus, 40 turns.'},
   'Multi-Session Reasoning':{s:'Can it synthesize across sessions?',d:'Tests synthesis of partial information across multiple sessions. Each session provides one piece; the query requires combining them all.',v:'KPIs: Cross-session synthesis accuracy. Measures: 2 facts split across sessions (flight 8am gate B12 + hotel Marriott 3pm). 1 synthesis query (calculate time gap). Requires ISessionResettableAgent. No corpus injection.'}
 };
-Chart.defaults.color='#64748b';
-Chart.defaults.font.family="'IBM Plex Mono',monospace";
-Chart.defaults.font.size=11;
+if(typeof Chart!=='undefined'){
+  Chart.defaults.color='#64748b';
+  Chart.defaults.font.family="'IBM Plex Mono',monospace";
+  Chart.defaults.font.size=11;
+}
 
 let manifest=null,baselines=[],selectedConfigs=new Set();
 let pentChart=null,catBarChart=null,waterfallChart=null;
@@ -204,7 +206,7 @@ function showTab(id){
 function showTT(el,name,desc,tests){
   let tt=el.querySelector('.tooltip');
   if(!tt){tt=document.createElement('div');tt.className='tooltip';el.appendChild(tt);}
-  tt.innerHTML=`<div class="tt-t">${name}</div><div class="tt-d">${desc}</div><div class="tt-v">${tests}</div>`;
+  tt.innerHTML=`<div class="tt-t">${safeText(name)}</div><div class="tt-d">${safeText(desc)}</div><div class="tt-v">${safeText(tests)}</div>`;
   tt.classList.add('show');
 }
 function hideTT(el){const tt=el.querySelector('.tooltip');if(tt)tt.classList.remove('show');}
@@ -217,7 +219,7 @@ async function init(){
     manifest=await resp.json();
   }catch(e){
     document.getElementById('mastSub').innerHTML=
-      '<span style="color:#f87171">Could not load manifest.json: '+e.message+'. Serve this folder with a local HTTP server (python -m http.server 8080).</span>';
+      '<span style="color:#f87171">Could not load manifest.json: '+safeText(e.message)+'. Serve this folder with a local HTTP server (python -m http.server 8080).</span>';
     return;
   }
   // Load baselines from ALL benchmark groups in the manifest
@@ -235,12 +237,12 @@ async function init(){
   if(typeof Chart==='undefined'){document.getElementById('mastSub').innerHTML='<span style="color:#f87171">Chart.js failed to load from CDN. Check your internet connection.</span>';return;}
   baselines.forEach((b,i)=>{if(i>=baselines.length-2)selectedConfigs.add(i);});
   const src=getBenchmarkSource();
-  const srcBadge=src!=='native'?`<span class="pill" style="background:#1e3a5f;color:#60a5fa">${src==='longmemeval'?'LongMemEval (ICLR 2025)':src}</span>`:'';
+  const srcBadge=src!=='native'?`<span class="pill" style="background:#1e3a5f;color:#60a5fa">${src==='longmemeval'?'LongMemEval (ICLR 2025)':safeText(src)}</span>`:'';
   const scoringBadge=isExternal()?'<span class="pill" style="background:#3b1f1f;color:#fb923c">Binary Scoring (0/1)</span>':'';
   document.getElementById('mastSub').innerHTML=
-    `<span>${manifest.agent.name}</span>`+
+    `<span>${safeText(manifest.agent.name)}</span>`+
     srcBadge+scoringBadge+
-    `<span class="pill">${manifest.benchmarks.map(g=>g.preset).join(', ')} · ${new Set(manifest.benchmarks.flatMap(g=>g.categories)).size} categories</span>`+
+    `<span class="pill">${safeText(manifest.benchmarks.map(g=>g.preset).join(', '))} · ${new Set(manifest.benchmarks.flatMap(g=>g.categories)).size} categories</span>`+
     `<span class="pill">${baselines.length} baselines</span>`;
   renderOverview();renderCfgCards();renderDimKpis();renderPentChart();renderCatBars();renderTimeline();setupComparer();
 }
@@ -252,23 +254,28 @@ function renderOverview(){
   const dO=score!==null&&previous!==null?+(score-previous).toFixed(1):null;
   document.getElementById('gradeHero').innerHTML=`
     <div class="gr"><div class="gn" style="color:${c.is_complete===true?gc(score):'var(--tm)'}">${score===null?'n/a':`${score.toFixed(1)}<span class="gp">%</span>`}</div></div>
-    <div class="gi"><h3>${c.name}</h3>
-      <div style="color:var(--t);font-size:13px">${gradeText(c)}</div>
-      <div style="font-size:12px;color:var(--t);margin-top:4px">${c.agent_config?.model_id||''} · ${c.agent_config?.reducer_strategy||''}</div>
-      ${dO!==null?`<div style="font-size:11px;margin-top:6px">Observed change: ${dO>0?'+':''}${dO}% vs ${prev.name} (${evidenceStatus(prev)})</div>`:''}
+    <div class="gi"><h3>${safeText(c.name)}</h3>
+      <div style="color:var(--t);font-size:13px">${safeText(gradeText(c))}</div>
+      <div style="font-size:12px;color:var(--t);margin-top:4px">${safeText(c.agent_config?.model_id||'')} · ${safeText(c.agent_config?.reducer_strategy||'')}</div>
+      ${dO!==null?`<div style="font-size:11px;margin-top:6px">Observed change: ${dO>0?'+':''}${dO}% vs ${safeText(prev.name)} (${evidenceStatus(prev)})</div>`:''}
     </div>`;
   const cats=Object.entries(c.category_results);
   document.getElementById('kpiGrid').innerHTML=cats.map(([name,cat])=>{
     const s=catScore(c,name);
     const info=getCatInfo(name);
-    return `<div class="kpi" onmouseenter="showTT(this,'${name.replace(/'/g,"\\'")}','${info.d.replace(/'/g,"\\'")}','${info.v.replace(/'/g,"\\'")}')" onmouseleave="hideTT(this)">
-      <div class="kl">${name}</div>
+    return `<div class="kpi">
+      <div class="kl">${safeText(name)}</div>
       <div class="kv" style="color:${s===null?'var(--td)':gc(s)}">${cat.errored?'NOT MEASURED':cat.skipped?'SKIP':pct(s,0)}</div>
-      <div class="ks">${info.s}<br>${categoryStatus(c,name)}</div>
+      <div class="ks">${safeText(info.s)}<br>${categoryStatus(c,name)}</div>
       <div class="kb ${gbc(s)}" style="width:${s??0}%"></div>
-      ${cat.recommendation?`<div style="font-size:10px;color:var(--tm);margin-top:8px">${cat.recommendation}</div>`:''}
+      ${cat.recommendation?`<div style="font-size:10px;color:var(--tm);margin-top:8px">${safeText(cat.recommendation)}</div>`:''}
     </div>`;
   }).join('');
+  document.querySelectorAll('#kpiGrid .kpi').forEach((card,i)=>{
+    const name=cats[i][0], info=getCatInfo(name);
+    card.onmouseenter=()=>showTT(card,name,info.d,info.v);
+    card.onmouseleave=()=>hideTT(card);
+  });
   // Reference scores for external benchmarks
   const refEl=document.getElementById('refScores');
   if(isExternal()&&getBenchmarkSource()==='longmemeval'){
@@ -282,10 +289,10 @@ function renderCfgCards(){
   document.getElementById('cfgCards').innerHTML=baselines.map((b,i)=>`
     <div class="cfg-card${selectedConfigs.has(i)?' active':''}" onclick="toggleCfg(${i})">
       <div class="dot-i" style="background:${b._color}"></div>
-      <span class="cn">${b.name}</span>
+      <span class="cn">${safeText(b.name)}</span>
       <div class="cs" style="color:${b.is_complete===true?gc(overallScore(b)):'var(--tm)'}">${scoreText(b,0)}</div>
       <div class="cm">${evidenceStatus(b)}</div>
-      <div class="cm">${b.agent_config?.model_id||'—'}<br>${b.agent_config?.reducer_strategy||'—'}</div>
+      <div class="cm">${safeText(b.agent_config?.model_id||'—')}<br>${safeText(b.agent_config?.reducer_strategy||'—')}</div>
     </div>`).join('');
 }
 function toggleCfg(i){selectedConfigs.has(i)?selectedConfigs.delete(i):selectedConfigs.add(i);renderCfgCards();renderDimKpis();renderPentChart();renderCatBars();}
@@ -356,12 +363,12 @@ function renderDimCallout(){
   const best=entries[0], worst=entries[entries.length-1];
   const di=isExternal()?EXT_DIM_INFO:DIM_INFO;
   const bc=di[best[0]]?.color||'var(--good)', wc=di[worst[0]]?.color||'var(--bad)';
-  const recs=latest.category_results?Object.entries(latest.category_results).filter(([,v])=>v.recommendation).map(([k,v])=>`<div style="font-size:11px;color:var(--tm);margin-top:4px"><b>${k}</b>: ${v.recommendation}</div>`).join(''):'';
+  const recs=latest.category_results?Object.entries(latest.category_results).filter(([,v])=>v.recommendation).map(([k,v])=>`<div style="font-size:11px;color:var(--tm);margin-top:4px"><b>${safeText(k)}</b>: ${safeText(v.recommendation)}</div>`).join(''):'';
   document.getElementById('dimCallout').innerHTML=`
     <div style="font-size:11px;color:var(--tm)">Observed dimensions · ${evidenceStatus(latest)}</div>
     <div style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
-      <div><span style="color:${bc};font-weight:700">Strongest:</span> ${best[0]} <span style="color:${bc};font-weight:600">${best[1].toFixed(0)}%</span></div>
-      <div><span style="color:${wc};font-weight:700">Weakest:</span> ${worst[0]} <span style="color:${wc};font-weight:600">${worst[1].toFixed(0)}%</span></div>
+      <div><span style="color:${bc};font-weight:700">Strongest:</span> ${safeText(best[0])} <span style="color:${bc};font-weight:600">${best[1].toFixed(0)}%</span></div>
+      <div><span style="color:${wc};font-weight:700">Weakest:</span> ${safeText(worst[0])} <span style="color:${wc};font-weight:600">${worst[1].toFixed(0)}%</span></div>
     </div>${recs}`;
 }
 
@@ -435,9 +442,9 @@ function renderTimeline(){
 }
 
 function setupComparer(){
-  const html=baselines.map((b,i)=>`<option value="${i}">${b.name} (${scoreText(b,0)} · ${evidenceStatus(b)})</option>`).join('');
   const cmpA=document.getElementById('cmpA'),cmpB=document.getElementById('cmpB');
-  cmpA.innerHTML=html;cmpB.innerHTML=html;
+  for(const select of [cmpA,cmpB])
+    select.replaceChildren(...baselines.map((b,i)=>new Option(`${b.name} (${scoreText(b,0)} · ${evidenceStatus(b)})`,String(i))));
   if(baselines.length>1){cmpA.value=0;cmpB.value=baselines.length-1;}
   cmpA.onchange=renderComparer;cmpB.onchange=renderComparer;
   renderComparer();
@@ -467,7 +474,7 @@ function renderComparer(){
       const av=catScore(a,k);
       const bv=catScore(b,k);
       const d=av!==null&&bv!==null?bv-av:null;
-      return `<tr><td>${k}</td><td class="r">${pct(av,0)}</td><td class="r">${pct(bv,0)}</td>
+      return `<tr><td>${safeText(k)}</td><td class="r">${pct(av,0)}</td><td class="r">${pct(bv,0)}</td>
         <td class="r ${d>0?'pos':d<0?'neg':''}">${d===null?'n/a':(d>0?'+':'')+d.toFixed(0)+'%'}</td></tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -493,7 +500,7 @@ async function discoverReports(){
     }
     if(reports.length>1){
       const sel=document.getElementById('reportSelect');
-      sel.innerHTML=reports.map(r=>`<option value="${r.dir}"${r.current?' selected':''}>${r.name}</option>`).join('');
+      sel.replaceChildren(...reports.map(r=>new Option(r.name,r.dir,r.current,r.current)));
       document.getElementById('reportSwitcher').style.display='block';
     }
   }catch(e){}

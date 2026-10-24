@@ -105,7 +105,10 @@ jobs:
   # runner-minutes per push, for the coverage two jobs give.
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The full three-framework coverage run was still passing tests when the old 15-minute
+    # job limit cancelled it on PR #304; restore/UI/build had already consumed five minutes.
+    # Keep a finite job budget for the expanded suite without changing any test or coverage gate.
+    timeout-minutes: 30
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
 
     steps:
