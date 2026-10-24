@@ -601,11 +601,34 @@ public partial class MAFWorkflowEventBridgeTests : IDisposable
         Assert.True(generous.IsValid, string.Join("; ", generous.Failures));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AssertStepsTimedPlausibly_UnattributedTime_StillRequiresKnownStepWork(bool missingTiming)
+    {
+        var work = TimeSpan.FromMilliseconds(200);
+        var result = new WorkflowExecutionResult
+        {
+            FinalOutput = "done",
+            TotalDuration = TimeSpan.FromSeconds(3),
+            Steps = [new ExecutorStep
+            {
+                ExecutorId = "A", Output = "done", StartOffset = TimeSpan.FromSeconds(1),
+                Duration = missingTiming ? TimeSpan.Zero : work,
+            }],
+        };
+
+        if (missingTiming)
+            Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => AssertStepsTimedPlausibly(result, work));
+        else
+            AssertStepsTimedPlausibly(result, work);
+    }
+
     /// <summary>
     /// Asserts the steps are timed as MAF ran them: each step lasts at least half its executor's known work (half,
     /// allowing timer resolution differences while checking the producer span), the steps run in
-    /// order without overlapping inside the run, and together they cover most of the run's total — the rest is MAF
-    /// and bridge overhead before the first step and between supersteps.
+    /// order without overlapping inside the run. Time outside those measured spans remains unattributed;
+    /// startup, scheduling and bridge overhead need not fit a fixed share of the total duration.
     /// </summary>
     private static void AssertStepsTimedPlausibly(WorkflowExecutionResult result, params TimeSpan[] workPerStep)
     {
@@ -623,9 +646,6 @@ public partial class MAFWorkflowEventBridgeTests : IDisposable
 
         Assert.True(previousEnd <= result.TotalDuration,
             $"The last step ends at {previousEnd.TotalMilliseconds:F0} ms, after the run's total of {result.TotalDuration.TotalMilliseconds:F0} ms.");
-        var stepTotal = TimeSpan.FromTicks(result.Steps.Sum(s => s.Duration.Ticks));
-        Assert.True(stepTotal >= result.TotalDuration / 2,
-            $"The steps add up to {stepTotal.TotalMilliseconds:F0} ms of a {result.TotalDuration.TotalMilliseconds:F0} ms run.");
     }
 
     // ── Exact MAF event orderings (TranslateEventsAsync) ────────────────
