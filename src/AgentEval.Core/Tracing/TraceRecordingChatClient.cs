@@ -165,7 +165,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
                 _trace.ModelId ??= resp.ModelId;
                 var responseEntry = TraceEntry.ForChatResponse(
                     i, corr, resp.Text, sw.ElapsedMilliseconds,
-                    inputTokens is not null && outputTokens is not null ? MapUsage(resp.Usage) : null,
+                    completedNaturally && inputTokens is not null && outputTokens is not null ? MapUsage(resp.Usage) : null,
                     MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
                 responseEntry.IsStreaming = true;
                 responseEntry.StreamingChunks = chunks;

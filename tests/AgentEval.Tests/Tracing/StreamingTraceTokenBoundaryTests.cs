@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 using System.Runtime.CompilerServices;
+using AgentEval.Benchmarks;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -46,6 +47,71 @@ public sealed class StreamingTraceTokenBoundaryTests
         var response = await Record(new() { InputTokenCount = 0 }, new() { OutputTokenCount = 0 });
         Assert.NotNull(response.TokenUsage);
         Assert.Equal(0, response.TokenUsage!.TotalTokens);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(100, 20)]
+    public async Task Recorder_BreakAfterUsage_KeepsTextWithoutCertifyingCompleteUsage(long input, long output)
+    {
+        var trace = await RecordUntilUsage(input, output);
+        var response = Assert.Single(trace.Entries, e => e.Type == TraceEntryType.Response);
+
+        Assert.Equal("answer", response.Text);
+        Assert.Equal("answer", Assert.Single(response.StreamingChunks!).Text);
+        Assert.True(response.IsStreaming);
+        Assert.Null(response.TokenUsage);
+    }
+
+    [Fact]
+    public async Task AutoAudit_PersistedStreamBrokenAfterUsage_CannotCertifyAccounting()
+    {
+        var trace = await RecordUntilUsage(100, 20);
+        var reloaded = await TraceSerializer.DeserializeFromStringAsync(await TraceSerializer.SerializeToStringAsync(trace));
+        var result = AutoAuditRunner.Evaluate("partial", reloaded, reloaded);
+
+        Assert.False(result.TokensReported);
+        Assert.False(result.FidelityMeasured);
+        Assert.Null(AutoAuditRunner.Compare([result]).Winner);
+    }
+
+    [Fact]
+    public async Task TraceFidelity_PersistedStreamBrokenAfterUsage_WithholdsCleanVerdict()
+    {
+        var trace = await RecordUntilUsage(100, 20);
+        var reloaded = await TraceSerializer.DeserializeFromStringAsync(await TraceSerializer.SerializeToStringAsync(trace));
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(reloaded, reloaded);
+
+        Assert.False(result.Score.Passed);
+        var tokens = Assert.Single(result.Details!.SubResults!, r => r.Metric.Key == "trace_fidelity.token_under_reporting");
+        Assert.Equal("skipped", tokens.Score.Label);
+    }
+
+    [Fact]
+    public async Task Recorder_CancellationAfterNaturalEof_KeepsCompleteUsage()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var trace = new AgentTrace();
+        using var recorder = new TraceRecordingChatClient(new ChunkClient([new() { InputTokenCount = 100, OutputTokenCount = 20 }]), "subject", trace);
+        await using (var stream = recorder.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "question")], cancellationToken: cancellation.Token).GetAsyncEnumerator())
+        {
+            while (await stream.MoveNextAsync()) { }
+            cancellation.Cancel();
+        }
+
+        Assert.Equal(120, Assert.Single(trace.Entries, e => e.Type == TraceEntryType.Response).TokenUsage!.TotalTokens);
+    }
+
+    private static async Task<AgentTrace> RecordUntilUsage(long input, long output)
+    {
+        var trace = new AgentTrace();
+        using var recorder = new TraceRecordingChatClient(new ChunkClient([new() { InputTokenCount = input, OutputTokenCount = output }]), "subject", trace);
+        await foreach (var update in recorder.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "question")]))
+        {
+            if (update.Contents.OfType<UsageContent>().Any())
+                break; // Even the last update is not evidence that the provider reached EOF.
+        }
+        return trace;
     }
 
     private static UsageDetails Counts(bool input, long count) => new()
