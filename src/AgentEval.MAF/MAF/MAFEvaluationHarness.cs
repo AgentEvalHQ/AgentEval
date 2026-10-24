@@ -663,9 +663,13 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             var invocation = new ToolInvocation
             {
                 ToolName = call.Name,
-                StartTime = (call.StartTime ?? timeline.StartedAt) - timeline.StartedAt,
+                // Trace enrichment anchors duration at UnixEpoch, not at a real start in this run.
+                StartTime = call.StartTime is { } start && start >= timeline.StartedAt
+                    ? start - timeline.StartedAt : TimeSpan.Zero,
                 Duration = call.Duration ?? TimeSpan.Zero,
-                Succeeded = !call.HasError,
+                Succeeded = call.WasExecuted && !call.HasError,
+                OutcomeNotMeasuredReason = !call.WasExecuted && !call.HasError ? "Tool execution was not observed." : null,
+                TimingNotMeasuredReason = !call.HasTiming ? "Tool completion timing was not observed." : null,
                 ErrorMessage = call.Exception?.Message,
                 Arguments = call.GetArgumentsAsJson(),
                 Result = call.Result?.ToString()
