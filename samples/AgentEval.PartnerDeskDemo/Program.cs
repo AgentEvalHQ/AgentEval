@@ -3,6 +3,7 @@
 
 using AgentEval.PartnerDeskDemo.Demo;
 using AgentEval.PartnerDeskDemo.Mcp;
+using AgentEval.Samples;
 
 namespace AgentEval.PartnerDeskDemo;
 
@@ -35,20 +36,22 @@ public static class Program
         }
 
         TrySetUtf8Console();
+        SampleOutcome.Reset();
 
         var output = DemoOutput.Console;
         var forceOffline = args.Contains("--offline", StringComparer.Ordinal);
-        // Live = not --offline AND the provider AI_INFERENCE_PROVIDER selects is configured. With nothing configured
-        // the scripted model runs, and the banner says so.
+        // Scripted execution is deliberate: missing live configuration must not silently substitute a passing fake.
         var model = ModelSelection.Resolve(args, forceOffline);
 
         // A set AI_INFERENCE_PROVIDER asked for a live model. When it does not resolve, the scripted model is not a
         // stand-in — every oracle would hold and --all would exit 0 on a run that measured no live model — so stop
         // with the resolver's reason before the banner, the outbox or the MCP child.
-        if (model.ExplicitSelectionUnresolved)
+        if (!model.IsLive && !forceOffline)
         {
-            Console.Error.WriteLine(model.UnresolvedSelectionError);
-            return 2;
+            Console.Error.WriteLine(model.ExplicitSelectionUnresolved
+                ? model.UnresolvedSelectionError
+                : $"No live model provider is configured. {model.Settings.Diagnostic} {ModelSelection.SetupHint}; or pass --offline.");
+            return SampleOutcome.NotMeasured;
         }
 
         using var cts = new CancellationTokenSource();
@@ -75,10 +78,9 @@ public static class Program
         if (phases.Count > 0)
         {
             var totalWatch = System.Diagnostics.Stopwatch.StartNew();
-            var allHold = true;
             foreach (var phase in phases)
             {
-                allHold &= await RunAndReportAsync(runner, phase, StandardQuestion, output, cts.Token)
+                await RunAndReportAsync(runner, phase, StandardQuestion, output, cts.Token)
                     .ConfigureAwait(false);
             }
 
@@ -89,11 +91,11 @@ public static class Program
 
             output.Line(ConsoleColor.DarkGray,
                 $"  [total wall-clock for {phases.Count} phase(s): {totalWatch.Elapsed.TotalSeconds,0:0.0}s]");
-            return allHold ? 0 : 1;
+            return SampleOutcome.ExitCode;
         }
 
         await MenuLoopAsync(runner, output, cts.Token).ConfigureAwait(false);
-        return 0;
+        return SampleOutcome.ExitCode;
     }
 
     private static async Task MenuLoopAsync(PartnerDeskRunner runner, DemoOutput output, CancellationToken ct)
@@ -171,7 +173,7 @@ public static class Program
         return char.ToLowerInvariant(key.KeyChar);
     }
 
-    private static async Task<bool> RunAndReportAsync(
+    private static async Task RunAndReportAsync(
         PartnerDeskRunner runner,
         DemoPhase phase,
         string question,
@@ -186,7 +188,8 @@ public static class Program
         }
         catch (OperationCanceledException)
         {
-            return false;
+            SampleOutcome.Skip($"Phase {(int)phase} did not complete.");
+            return;
         }
         catch (Exception exception)
         {
@@ -194,7 +197,8 @@ public static class Program
             output.Line();
             output.Line(ConsoleColor.Red, $"  PHASE {(int)phase} DID NOT COMPLETE — {exception.GetType().Name}");
             output.Paragraph(exception.Message, "    ");
-            return false;
+            SampleOutcome.Error($"Phase {(int)phase} did not complete: {exception.GetType().Name}.");
+            return;
         }
         finally
         {
@@ -226,7 +230,8 @@ public static class Program
             output.Paragraph("note: " + observation, "    ");
         }
 
-        return allHold;
+        if (!allHold)
+            SampleOutcome.Fail($"Phase {(int)phase} oracle failed.");
     }
 
     private static IReadOnlyList<DemoPhase> ParsePhases(string[] args)

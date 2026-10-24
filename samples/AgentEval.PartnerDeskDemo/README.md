@@ -50,10 +50,9 @@ there is no SMTP client, no socket, and no HTTP anywhere in either tool.
   Bitdeer, OpenAI, Foundry, OpenAI-compatible), so set it whenever more than one is
   configured. A selector that names a provider with missing variables (or an unknown
   value) does **not** fall back to another host, and does not quietly run scripted
-  either: the demo prints what is missing and exits **2** before any phase runs. Pass
-  `--offline` to run the scripted model on purpose. With the selector unset and no
-  provider at all, the demo runs on a **scripted** provider and the banner says so (see
-  *Offline mode* below).
+  either: the demo prints what is missing and exits **11** before any phase runs.
+  Missing or partial configuration with the selector unset also exits 11. Pass
+  `--offline` to run the scripted model on purpose (see *Offline mode* below).
 
   `--model <name>` overrides the model (or Azure deployment) for one run.
   `--deployment <name>` is the same option under the name it had when the demo was
@@ -177,14 +176,19 @@ a changed endpoint evades a lexical prefilter — is stated in the demo contract
 
 ## Offline mode
 
-When no provider is configured (or `--offline` is passed), the model is a
+When `--offline` is passed, the model is a
 **scripted** provider that replays, turn for turn, the trajectory a live model
 produces. This verifies **the gates**, deterministically, in CI — not the model's
 susceptibility. Everything downstream of the model is still real: the MCP session
 is a genuine child process over stdio, the gates are the shipped gates, and the
 tool effects are the same fakes. A set `AI_INFERENCE_PROVIDER` that does not resolve
-is a failed request for a live model, not "no provider": the demo exits 2 rather than
+is a failed request for a live model: the demo exits 11 rather than
 run the scripted model in its place.
+
+Process outcomes follow the shared sample contract: 0 for completed checks, 1 for a
+failed phase oracle, 3 for a caught phase runtime error, and 11 when live configuration
+is unavailable. Interactive runs retain the worst recorded phase outcome when the
+menu closes; a later successful phase does not erase an earlier failure.
 
 ## Tuning the live attack (Phase 2)
 

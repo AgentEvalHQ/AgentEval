@@ -8,17 +8,16 @@ using AgentEval.Providers;
 namespace AgentEval.PartnerDeskDemo.Tests;
 
 /// <summary>
-/// What the demo and the evaluation do when the environment asks for a live model they cannot have. A set
-/// <c>AI_INFERENCE_PROVIDER</c> is a request for a live run: when it does not resolve, both entry points stop with
-/// exit 2 and the resolver's reason, rather than run the scripted model in its place and report every oracle OK.
+/// Actual process outcomes for unavailable configuration, failed phase oracles, runtime errors and report verdicts.
+/// A live request never silently substitutes a passing scripted run; report text and exits retain their meaning.
 /// </summary>
 /// <remarks>
 /// Each case starts the real binary as a child process — the decision lives in <c>Main</c>, so only the process
 /// shows it — with every provider variable removed from the CHILD's environment and only the case's own set. No
-/// case can resolve a live provider (each one lacks a key or names nothing real), so no request leaves the machine.
-/// Standard input is closed, so a run that reaches the menu quits at once.
+/// Missing-configuration cases cannot resolve a provider; execution cases use only a local response fixture.
+/// Standard input is closed except where a bounded menu sequence is explicitly supplied.
 /// </remarks>
-public sealed class UnresolvedProviderExitTests
+public sealed class ProcessOutcomeTests
 {
     private const string Demo = "AgentEval.PartnerDeskDemo";
     private const string Evals = "AgentEval.PartnerDeskDemo.Evals";
@@ -46,13 +45,13 @@ public sealed class UnresolvedProviderExitTests
 
     [Theory]
     [MemberData(nameof(UnresolvedSelections))]
-    public async Task Demo_AnExplicitSelectorThatDoesNotResolve_ExitsTwoWithTheReason_AndRunsNothingScripted(
+    public async Task Demo_AnExplicitSelectorThatDoesNotResolve_ExitsElevenWithTheReason_AndRunsNothingScripted(
         string[] environment,
         string reason)
     {
         var result = await RunAsync(Demo, ["--all"], environment);
 
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(11, result.ExitCode);
         Assert.Contains(reason, result.StandardError, StringComparison.Ordinal);
         Assert.Contains("--offline", result.StandardError, StringComparison.Ordinal);
         Assert.DoesNotContain(FakeKey, result.StandardError + result.StandardOutput, StringComparison.Ordinal);
@@ -63,13 +62,13 @@ public sealed class UnresolvedProviderExitTests
 
     [Theory]
     [MemberData(nameof(UnresolvedSelections))]
-    public async Task Evals_AnExplicitSelectorThatDoesNotResolve_ExitsTwoWithTheReason_AndMeasuresNothing(
+    public async Task Evals_AnExplicitSelectorThatDoesNotResolve_ExitsElevenWithTheReason_AndMeasuresNothing(
         string[] environment,
         string reason)
     {
         var result = await RunAsync(Evals, ["--runs", "1"], environment);
 
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(11, result.ExitCode);
         Assert.Contains(reason, result.StandardError, StringComparison.Ordinal);
         Assert.Contains("--offline", result.StandardError, StringComparison.Ordinal);
         Assert.DoesNotContain(FakeKey, result.StandardError + result.StandardOutput, StringComparison.Ordinal);
@@ -85,27 +84,78 @@ public sealed class UnresolvedProviderExitTests
         Assert.Contains("Model: SCRIPTED offline provider (--offline).", result.StandardOutput, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Demo_NothingConfigured_StillRunsScripted_AndTheBannerSaysSo()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Demo_NoProviderResolves_ExitsElevenWithoutScriptedSubstitution(bool partialSetup)
     {
-        var result = await RunAsync(Demo, [], []);
+        var result = await RunAsync(Demo, [], partialSetup
+            ? ["AZURE_OPENAI_ENDPOINT=https://example-resource.openai.azure.com/"] : []);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Model: SCRIPTED offline provider.", result.StandardOutput, StringComparison.Ordinal);
-        Assert.Contains("For the live path, set AI_INFERENCE_PROVIDER", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Equal(11, result.ExitCode);
+        Assert.Contains("--offline", result.StandardError, StringComparison.Ordinal);
+        Assert.DoesNotContain("SCRIPTED", result.StandardOutput, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Evals_NothingConfigured_ExitsTwo_UnlessOffline()
+    public async Task Evals_NothingConfigured_ExitsEleven_UnlessOffline()
     {
         var result = await RunAsync(Evals, ["--runs", "1"], []);
 
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(11, result.ExitCode);
         Assert.Contains("No live model provider is configured.", result.StandardError, StringComparison.Ordinal);
         Assert.DoesNotContain("Evaluating", result.StandardOutput, StringComparison.Ordinal);
     }
 
-    private static async Task<ProcessResult> RunAsync(string program, string[] arguments, string[] environment)
+    [Theory]
+    [InlineData(false, false, 3)]
+    [InlineData(true, false, 3)]
+    [InlineData(false, true, 1)]
+    [InlineData(true, true, 1)]
+    public async Task Demo_PhaseOutcome_ReachesExplicitAndInteractiveExit(bool interactive, bool oracleFailure, int expected)
+    {
+        await using var server = new LoopbackChatServer(oracleFailure ? int.MaxValue : 0);
+        var result = await RunAsync(Demo, interactive ? [] : ["--phase", "1"], server.Environment,
+            interactive ? "1\nq\n" : null);
+
+        Assert.Equal(expected, result.ExitCode);
+        Assert.Contains(oracleFailure ? "PHASE 1 ORACLE" : "DID NOT COMPLETE", result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Evals_SomeRequestedRunsCannotComplete_ExitsEleven(int successes)
+    {
+        await using var server = new LoopbackChatServer(successes);
+        var result = await RunAsync(Evals, ["--runs", "2", "--arms", "1"], server.Environment);
+
+        Assert.Equal(11, result.ExitCode);
+        Assert.Contains("SKIPPED after error", result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("1", 10, "RESULT: CHECK")]
+    [InlineData("2", 11, "RESULT: n/a")]
+    public async Task Evals_CompletedReport_UsesExistingTypedGateVerdict(string arm, int expected, string printed)
+    {
+        await using var server = new LoopbackChatServer(int.MaxValue);
+        var result = await RunAsync(Evals, ["--runs", "1", "--arms", arm], server.Environment);
+
+        Assert.Equal(expected, result.ExitCode);
+        Assert.Contains(printed, result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Evals_CompleteOfflineCleanReport_ExitsZero()
+    {
+        var result = await RunAsync(Evals, ["--offline", "--runs", "1", "--arms", "1"], []);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("RESULT: PASS", result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    private static async Task<ProcessResult> RunAsync(string program, string[] arguments, string[] environment, string? input = null)
     {
         var (command, prefix) = Launch(program);
         var start = new ProcessStartInfo(command)
@@ -140,6 +190,8 @@ public sealed class UnresolvedProviderExitTests
 
         using var process = Process.Start(start)
             ?? throw new InvalidOperationException($"Could not start {program}.");
+        if (input is not null)
+            await process.StandardInput.WriteAsync(input);
         process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();

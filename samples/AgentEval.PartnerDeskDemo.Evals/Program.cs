@@ -5,6 +5,7 @@ using AgentEval.PartnerDeskDemo;
 using AgentEval.PartnerDeskDemo.Demo;
 using AgentEval.PartnerDeskDemo.Tools;
 using Microsoft.Extensions.AI;
+using AgentEval.Samples;
 
 namespace AgentEval.PartnerDeskDemo.Evals;
 
@@ -51,7 +52,7 @@ public static class Program
         if (model.ExplicitSelectionUnresolved)
         {
             Console.Error.WriteLine(model.UnresolvedSelectionError);
-            return 2;
+            return SampleOutcome.NotMeasured;
         }
 
         if (!live && !offline)
@@ -60,7 +61,7 @@ public static class Program
             Console.Error.WriteLine(
                 $"For the live evaluation, {ModelSelection.SetupHint}; or pass --offline for the deterministic " +
                 "self-check.");
-            return 2;
+            return SampleOutcome.NotMeasured;
         }
 
         using var cts = new CancellationTokenSource();
@@ -133,7 +134,7 @@ public static class Program
         if (results.Count == 0)
         {
             Console.Error.WriteLine("No arm completed; nothing to report.");
-            return cancelled ? 130 : 1;
+            return cancelled ? 130 : SampleOutcome.NotMeasured;
         }
 
         var run = new EvalRun(modelLabel, runsPerArm, DateTimeOffset.UtcNow, results);
@@ -152,8 +153,21 @@ public static class Program
             return RunSelfTestAssertions(run, checkFailures);
         }
 
-        // A non-self-test run reports; it does not fail on the model-dependent compromised arm.
-        return cancelled ? 130 : 0;
+        // Missing requested runs are unmeasured even when enough survived to print a report. Otherwise use
+        // the same typed gate verdict as EvalReport; the compromised arm remains model-dependent by design.
+        if (cancelled)
+            return 130;
+        if (results.Any(arm => arm.Runs != runsPerArm))
+        {
+            Console.Error.WriteLine("RESULT: INCOMPLETE — some requested runs could not be measured.");
+            return SampleOutcome.NotMeasured;
+        }
+        return run.GateArmVerdict switch
+        {
+            true => SampleOutcome.Completed,
+            false => SampleOutcome.Warning,
+            null => SampleOutcome.NotMeasured
+        };
     }
 
     /// <summary>The identical question the demo uses, so the eval measures the same task.</summary>

@@ -59,10 +59,17 @@ dotnet run --project samples/AgentEval.PartnerDeskDemo.Evals -- --runs 8 --model
 ```
 
 With no provider configured, or with an `AI_INFERENCE_PROVIDER` that does not resolve,
-a live run exits 2 and says what is missing; it never measures the scripted model in
+a live run exits 11 and says what is missing; it never measures the scripted model in
 place of a live one. As in the demo, `--model` / `--deployment` also completes an Azure
 setup that has `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` but no
 `AZURE_OPENAI_DEPLOYMENT`, and never stands in for a key, an endpoint or the selector.
+
+A report with fewer completed runs than requested exits 11 (INCOMPLETE), including
+when all requested runs failed to execute. A complete report uses the same typed
+verdict as its RESULT line: PASS exits 0, CHECK exits 10, and no deterministic gate
+verdict (n/a) exits 11. The compromised arm's model-dependent attack rate alone is
+not a deterministic gate verdict. `--selftest` still exits 1 on a failed expectation, and an
+explicit caller cancellation retains exit 130.
 
 Offline / CI (deterministic, no credentials, no cost):
 
