@@ -46,14 +46,25 @@ public class ListCommandMetricCatalogParityTests
     }
 
     [Fact]
-    public void TheEightPreviouslyMisadvertisedNames_AreNowMarked()
+    public void TheFiveRemainingLibraryOnlyNames_AreMarked()
     {
         var output = Capture();
-        foreach (var name in new[] { "code_tool_selection", "code_tool_arguments", "embed_answer_similarity",
-                     "embed_response_context", "embed_query_context", "code_recall_at_k", "code_mrr", "ConversationCompleteness" })
+        foreach (var name in new[] { "code_tool_selection", "code_tool_arguments",
+                     "code_recall_at_k", "code_mrr", "ConversationCompleteness" })
         {
             var line = output.Split('\n').Single(l => l.TrimStart().StartsWith(name + " ", StringComparison.Ordinal));
             Assert.Contains(ListCommand.LibraryOnlyMarker, line, StringComparison.Ordinal);
         }
+    }
+
+    [Theory]
+    [InlineData("embed_answer_similarity")]
+    [InlineData("embed_response_context")]
+    [InlineData("embed_query_context")]
+    public void EmbeddingMetric_IsSelectableInsteadOfLibraryOnly(string name)
+    {
+        var line = Capture().Split('\n').Single(l => l.TrimStart().StartsWith(name + " ", StringComparison.Ordinal));
+
+        Assert.DoesNotContain(ListCommand.LibraryOnlyMarker, line, StringComparison.Ordinal);
     }
 }

@@ -693,10 +693,12 @@ enum AgentEval.Core.Benchmarks.CostTier
     Low
     Medium
     High
-class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Core.IAnswerSamplingConfigurableAgent, AgentEval.Core.IEvaluableAgent, AgentEval.Core.IHistoryInjectableAgent, AgentEval.Core.ISessionResettableAgent, AgentEval.Core.IStreamableAgent, AgentEval.Core.ITimestampedHistoryInjectableAgent
+class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Comparison.IModelIdentifiable, AgentEval.Core.IAnswerSamplingConfigurableAgent, AgentEval.Core.IEvaluableAgent, AgentEval.Core.IHistoryInjectableAgent, AgentEval.Core.ISessionResettableAgent, AgentEval.Core.IStreamableAgent, AgentEval.Core.ITimestampedHistoryInjectableAgent
     AgentEval.Core.AnswerSamplingAcknowledgement ConfigureAnswerSampling(AgentEval.Core.AnswerSamplingRequest request)
     System.Collections.Generic.IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
     System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> History { get; }
+    System.String ModelDisplayName { get; }
+    System.String ModelId { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task ResetSessionAsync(System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Core.AgentResponse> InvokeAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
@@ -1387,6 +1389,33 @@ sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.O
     System.String ToString()
     System.Void Deconstruct(out System.String ScenarioId, out System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, out System.Double? BaselineScore, out System.Double? CandidateScore, out System.Boolean BaselinePassed, out System.Boolean CandidatePassed, out System.Boolean BaselineHasUsableFloor, out System.Boolean CandidateHasUsableFloor, out System.Boolean JudgeGradedItsOwnSubject)
     ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double? BaselineScore, System.Double? CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
+static class AgentEval.Providers.EmbeddingProviderEnvironment
+    const System.String BitdeerDefaultModel
+    const System.String OpenAIDefaultModel
+    static AgentEval.Providers.EmbeddingProviderSettings Resolve(AgentEval.Providers.InferenceProviderSettings chat, System.Func<System.String, System.String> getEnvironmentVariable)
+    static System.Collections.Generic.IReadOnlyList<System.String> AllEmbeddingVariables
+    static System.String DefaultModelOf(AgentEval.Providers.InferenceProvider provider)
+    static System.String ModelVariableOf(AgentEval.Providers.InferenceProvider provider)
+sealed class AgentEval.Providers.EmbeddingProviderSettings : System.IEquatable<AgentEval.Providers.EmbeddingProviderSettings>
+    AgentEval.Providers.EmbeddingProviderSettings <Clone>$()
+    AgentEval.Providers.InferenceProvider Provider { get; init; }
+    System.Boolean Equals(AgentEval.Providers.EmbeddingProviderSettings other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean IsConfigured { get; }
+    System.Boolean ModelIsDefault { get; init; }
+    System.Boolean UsesAzureProtocol { get; }
+    System.Int32 GetHashCode()
+    System.String ApiKey { get; init; }
+    System.String Diagnostic { get; init; }
+    System.String DisplayName { get; init; }
+    System.String Model { get; init; }
+    System.String ModelIdentity { get; }
+    System.String ModelVariable { get; init; }
+    System.String ProviderTag { get; init; }
+    System.String ToString()
+    System.Uri Endpoint { get; init; }
+    System.Void Deconstruct(out AgentEval.Providers.InferenceProvider Provider, out System.String ProviderTag, out System.String DisplayName, out System.Uri Endpoint, out System.String ApiKey, out System.String Model, out System.String ModelVariable, out System.Boolean ModelIsDefault, out System.String Diagnostic)
+    ctor(AgentEval.Providers.InferenceProvider Provider, System.String ProviderTag, System.String DisplayName, System.Uri Endpoint, System.String ApiKey, System.String Model, System.String ModelVariable, System.Boolean ModelIsDefault, System.String Diagnostic)
 enum AgentEval.Providers.InferenceProvider
     None
     AzureOpenAI

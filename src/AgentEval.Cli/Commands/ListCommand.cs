@@ -126,8 +126,8 @@ internal static class ListCommand
         }
 
         Console.WriteLine();
-        Console.WriteLine("  Names marked library-only need per-case configuration (expected tools, an embedding");
-        Console.WriteLine("  generator, a K) that --metrics has no source for; construct them in code instead.");
+        Console.WriteLine("  Names marked library-only need per-case configuration (expected tools or a K)");
+        Console.WriteLine("  that --metrics has no source for; construct them in code instead.");
     }
 
     internal static void PrintAttacks()

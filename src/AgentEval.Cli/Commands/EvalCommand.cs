@@ -18,9 +18,11 @@ using AgentEval.Comparison;
 using AgentEval.Core;
 using AgentEval.DataLoaders;
 using AgentEval.Exporters;
+using AgentEval.Embeddings;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Output;
+using AgentEval.Providers;
 using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Writing;
 using AgentEval.Snapshots;
@@ -413,10 +415,17 @@ internal static class EvalCommand
             && selectedMetrics?.Any(name => name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
             judgeLedger = new JudgeCallLedger(chatClient);
         IChatClient? metricsEvaluatorClient = judgeLedger ?? chatClient;
+        EmbeddingProviderSettings? embeddingSettings = null;
+        if (opts.Runs <= 1 && selectedMetrics?.Any(name => name.StartsWith("embed_", StringComparison.OrdinalIgnoreCase)) == true)
+            embeddingSettings = EmbeddingProviderEnvironment.Resolve(InferenceProviderEnvironment.Resolve(), Environment.GetEnvironmentVariable);
+        using var embeddingGenerator = embeddingSettings is null ? null : ProviderEmbeddingGeneratorFactory.Create(embeddingSettings);
+        var metricEmbeddings = embeddingGenerator is null ? null : new MEAIEmbeddingAdapter(embeddingGenerator);
+        if (embeddingSettings is not null && !opts.Quiet)
+            Console.Error.WriteLine($"  Embedding instrument: {embeddingSettings.ModelIdentity}");
         if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
-                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient))
+                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient, metricEmbeddings))
                 .ToList();
         }
 
@@ -452,7 +461,7 @@ internal static class EvalCommand
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases, datasetSnapshot,
-                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null),
+                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null, embeddingSettings),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -503,6 +512,11 @@ internal static class EvalCommand
                 agentName: resolvedName,
                 modelName: resolvedName,
                 endpoint: EndpointLabel(opts));
+            if (embeddingSettings is not null)
+            {
+                report.Metadata["EmbeddingModel"] = embeddingSettings.Model!;
+                report.Metadata["EmbeddingProvider"] = embeddingSettings.ProviderTag;
+            }
             await ExportReportAsync(opts, report, ct);
 
             // 8. Summary (unless --quiet)
@@ -692,7 +706,8 @@ internal static class EvalCommand
         ExitCode = ExitCodes.GateIndeterminate,
     };
 
-    internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null)
+    internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null,
+        EmbeddingProviderSettings? embeddingSettings = null)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -705,6 +720,11 @@ internal static class EvalCommand
         if (opts.Runs == 1 && !string.IsNullOrWhiteSpace(opts.Metrics))
             settings["metrics"] = new System.Text.Json.Nodes.JsonArray(opts.Metrics.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                 .Select(name => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(name)).ToArray());
+        if (opts.Runs == 1 && embeddingSettings is not null)
+        {
+            settings["embeddingModel"] = embeddingSettings.Model;
+            settings["embeddingProvider"] = embeddingSettings.ProviderTag;
+        }
         var scores = cases.Select(c => c.ToTestCase().PassingScore).ToArray();
         IReadOnlyDictionary<string, AefThreshold>? thresholds = null;
         if (scores.Length > 0 && scores.Distinct().Count() == 1)
@@ -731,6 +751,11 @@ internal static class EvalCommand
         {
             definitionSettings["metricJudgeModel"] = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName;
             definitionSettings["metricJudgeProvider"] = opts.JudgeEndpoint is null ? subjectProvider : "openai-compatible";
+        }
+        if (opts.Runs == 1 && embeddingSettings is not null)
+        {
+            definitionSettings["embeddingModel"] = embeddingSettings.Model;
+            definitionSettings["embeddingProvider"] = embeddingSettings.ProviderTag;
         }
         var definition = DatasetSuiteDefinition.Create(AefEvalWriter.Ref("dataset", datasetName), "eval-definition-1",
             datasetSnapshot, EvalAef.CaseIds(cases), definitionSettings);

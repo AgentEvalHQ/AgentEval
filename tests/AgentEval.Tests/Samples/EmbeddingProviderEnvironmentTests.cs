@@ -220,6 +220,23 @@ public class EmbeddingProviderEnvironmentTests
     }
 
     [Fact]
+    public void ToString_CredentialBearingEndpoint_DoesNotExposeItsSecrets()
+    {
+        var settings = Resolve(
+            ("AI_INFERENCE_PROVIDER", "openai-compatible"),
+            ("OPENAI_COMPATIBLE_ENDPOINT", "https://url-user:url-password@example.test/path-secret?token=query-secret#fragment-secret"),
+            ("OPENAI_COMPATIBLE_API_KEY", "private-key"),
+            ("OPENAI_COMPATIBLE_MODEL", "subject"),
+            ("OPENAI_COMPATIBLE_EMBEDDING_MODEL", "embedding"));
+        Assert.True(settings.IsConfigured);
+
+        var text = settings.ToString();
+
+        foreach (var secret in new[] { "url-user", "url-password", "path-secret", "query-secret", "fragment-secret", "private-key" })
+            Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EveryProvider_HasAnEmbeddingVariable_AndTheListNamesThemAll()
     {
         var providers = Enum.GetValues<InferenceProvider>().Where(p => p != InferenceProvider.None).ToList();

@@ -123,9 +123,6 @@
              Link="Samples/02_AssertEvidence.cs" />
     <Compile Include="../../samples/AgentEval.Samples/Interop/03_AssertMultiturnBenchmark.cs"
              Link="Samples/03_AssertMultiturnBenchmark.cs" />
-    <!-- The samples' embedding-provider selection (SDK-free), so its tests bind the shipped rules. -->
-    <Compile Include="../../samples/AgentEval.Samples/EmbeddingProviderEnvironment.cs"
-             Link="Samples/EmbeddingProviderEnvironment.cs" />
     <Compile Include="../../samples/AgentEval.AgentSkillsEval/AIConfig.cs"
              Link="Samples/AgentSkillsAIConfig.cs" />
     <Compile Include="../../samples/AgentEval.Samples/MetricsAndQuality/ComprehensiveRagExampleData.cs"

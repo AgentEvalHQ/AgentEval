@@ -27,6 +27,52 @@ AgentEval includes embedding-based metrics that compute semantic similarity usin
 | `ResponseContextSimilarityMetric` | Response ↔ Context | Is the response grounded in context? |
 | `QueryContextSimilarityMetric` | Query ↔ Context | Is the retrieved context relevant? |
 
+## CLI and shared provider settings
+
+The three metrics are available through `eval --metrics` for single-run evaluations:
+
+```powershell
+$env:AI_INFERENCE_PROVIDER = "openai-compatible"
+$env:OPENAI_COMPATIBLE_ENDPOINT = "http://localhost:11434/v1"
+$env:OPENAI_COMPATIBLE_MODEL = "your-chat-model"
+$env:OPENAI_COMPATIBLE_EMBEDDING_MODEL = "your-embedding-model"
+agenteval eval --dataset cases.json --endpoint http://localhost:11434/v1 --model your-chat-model `
+  --metrics embed_answer_similarity,embed_response_context,embed_query_context `
+  --format json --output report.json --aef .agenteval
+```
+
+The embedding model must be served by that endpoint. Configure the provider's API key where required.
+`embed_answer_similarity` needs the case's expected output; both context metrics need its context.
+Missing inputs or failed embedding requests remain unmeasured and make an otherwise successful run
+exit `11`. Missing provider/model configuration exits `3` before subject or metric requests.
+
+Embedding selection follows `AI_INFERENCE_PROVIDER` and that provider's environment endpoint/key.
+An explicit subject `--endpoint` or `--sut`, or an LLM `--judge`, does not select the embedding provider.
+Code, LLM and embedding metrics can be selected together. With `--runs > 1`, the existing CLI policy
+ignores all named metrics with a warning and does not resolve unused embedding configuration.
+
+| Selected provider | Embedding model variable | Default |
+|---|---|---|
+| `azure` | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Required deployment name |
+| `foundry` | `FOUNDRY_EMBEDDING_MODEL` | Required deployment name |
+| `bitdeer` | `BITDEER_EMBEDDING_MODEL` | `BAAI/bge-m3` on the canonical endpoint |
+| `openai` | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` on the canonical endpoint |
+| `openai-compatible` | `OPENAI_COMPATIBLE_EMBEDDING_MODEL` | Required model name |
+
+An overridden Bitdeer/OpenAI endpoint also requires an explicit embedding model. Scores depend on
+the chosen model. CLI JSON report metadata includes `EmbeddingModel` and `EmbeddingProvider`;
+AEF run configuration and suite definition include `embeddingModel` and `embeddingProvider`, so
+changing this instrument changes the definition digest. These are configured identities, not a
+provider-reported backend fingerprint. Embedding calls use AEF usage role `other`, attributed to
+the case. Only SDK-reported token fields are retained: input-only usage leaves output and cost
+unknown, and failed calls retain unknown usage. No completion-token zero or billed cost is inferred.
+
+Hosts can reuse `AgentEval.Providers.EmbeddingProviderEnvironment` and `EmbeddingProviderSettings`
+from Core to resolve the same policy, then construct their own SDK generator. Core has no provider
+SDK dependency. Wrap a Microsoft.Extensions.AI generator with `MEAIEmbeddingAdapter` when an
+`IAgentEvalEmbeddings` implementation is needed. See [eval configuration](cli.md#agenteval-eval) for the
+CLI subject options.
+
 ---
 
 ## How It Works
