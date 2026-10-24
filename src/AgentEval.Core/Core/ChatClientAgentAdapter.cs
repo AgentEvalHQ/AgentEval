@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Text;
+using AgentEval.Comparison;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Core;
@@ -14,7 +15,7 @@ namespace AgentEval.Core;
 /// </summary>
 public class ChatClientAgentAdapter
     : IStreamableAgent, ISessionResettableAgent, IHistoryInjectableAgent,
-      ITimestampedHistoryInjectableAgent, IAnswerSamplingConfigurableAgent
+      ITimestampedHistoryInjectableAgent, IAnswerSamplingConfigurableAgent, IModelIdentifiable
 {
     /// <summary>How an injected timestamp is rendered into a message: <c>[2026/03/03 09:12] </c>.</summary>
     public const string TimestampFormat = "yyyy/MM/dd HH:mm";
@@ -53,6 +54,22 @@ public class ChatClientAgentAdapter
 
     /// <inheritdoc />
     public string Name { get; }
+
+    /// <summary>
+    /// Configured request model, otherwise the client's default model metadata. Empty when unknown;
+    /// the agent's display name is never used to infer a model or a price.
+    /// </summary>
+    public string ModelId
+    {
+        get
+        {
+            var modelId = _chatOptions?.ModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
+            return string.IsNullOrWhiteSpace(modelId) ? string.Empty : modelId;
+        }
+    }
+
+    /// <summary>The agent's existing report label, separate from its pricing identity.</summary>
+    public string ModelDisplayName => Name;
 
     /// <inheritdoc />
     public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)

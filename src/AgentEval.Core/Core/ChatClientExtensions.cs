@@ -24,6 +24,12 @@ public static class ChatClientExtensions
     /// <param name="chatOptions">Optional chat options (temperature, max tokens, tools, etc.).</param>
     /// <param name="includeHistory">Whether to maintain conversation history across calls.</param>
     /// <returns>An <see cref="IStreamableAgent"/> wrapping the chat client.</returns>
+    /// <remarks>
+    /// The adapter exposes <see cref="AgentEval.Comparison.IModelIdentifiable"/> for cost estimation:
+    /// an explicit <see cref="ChatOptions.ModelId"/> takes precedence over
+    /// <see cref="ChatClientMetadata.DefaultModelId"/>. A missing or blank identity stays unpriced;
+    /// <paramref name="name"/> is a display label, not a model hint.
+    /// </remarks>
     /// <example>
     /// <code>
     /// // Azure OpenAI

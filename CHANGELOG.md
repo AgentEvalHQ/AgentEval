@@ -885,6 +885,9 @@ feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, 
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Simple chat-client agents stayed unpriced even with known model metadata.** `AsEvaluableAgent` now
+  exposes the existing model-identity contract, taking a request model override before client-default metadata.
+  Missing/blank or unpriced identities remain unpriced; display names do not supply a guessed model.
 - **LongMemEval judge retries repeated an undersized output budget.** The initial default is now 1,024 tokens;
   existing logical retries double the request up to 4,096. Response-format fallbacks keep the attempt's budget,
   and call accounting, failure policies and TypedMemEval's separate calibrated budget remain unchanged.
