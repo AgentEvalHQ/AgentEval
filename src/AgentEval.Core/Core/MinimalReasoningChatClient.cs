@@ -26,7 +26,7 @@ namespace AgentEval.Core;
 /// A request whose <see cref="ChatOptions.Reasoning"/> is set is sent as it is and never retried: code that sets
 /// reasoning keeps it. Otherwise a request the provider rejects as invalid (HTTP 400 or 422) is sent again at the
 /// next level; any other error is not retried. The level that succeeded is remembered for the provider, endpoint and
-/// model (<see cref="ChatClientMetadata"/>) for the rest of the process, so the rejected levels cost one failed call
+/// requested model (falling back to <see cref="ChatClientMetadata.DefaultModelId"/>) for the rest of the process, so rejected levels cost one failed call
 /// per model, not one per request. A request rejected at every level fails with the provider's error from the last
 /// attempt (sent at the provider's default), and nothing is remembered.
 /// </para>
@@ -40,11 +40,11 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
     private static readonly ReasoningEffort?[] s_levels = [ReasoningEffort.None, ReasoningEffort.Low, null];
 
     // Index into s_levels of the level that last succeeded, per provider/endpoint/model.
-    private static readonly ConcurrentDictionary<string, int> s_accepted = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<(string? Provider, Uri? Endpoint, string? Model), int> s_accepted = new();
 
     private static readonly ConcurrentDictionary<Type, PropertyInfo?> s_statusProperty = new();
 
-    private readonly string _key;
+    private readonly (string? Provider, Uri? Endpoint, string? Model) _defaultKey;
 
     /// <summary>Wraps <paramref name="innerClient"/>.</summary>
     /// <param name="innerClient">The provider's chat client.</param>
@@ -52,13 +52,14 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
         : base(innerClient)
     {
         // No metadata: remember the level for this instance only.
-        _key = innerClient.GetService<ChatClientMetadata>() is { } m
-            ? $"{m.ProviderName}|{m.ProviderUri}|{m.DefaultModelId}"
-            : $"instance:{Guid.NewGuid():N}";
+        _defaultKey = innerClient.GetService<ChatClientMetadata>() is { } m
+            ? (m.ProviderName, m.ProviderUri, m.DefaultModelId)
+            : ($"instance:{Guid.NewGuid():N}", null, null);
     }
 
-    /// <summary>The level a request without its own reasoning setting is sent at now: None, Low, or null (provider default).</summary>
-    public ReasoningEffort? CurrentLevel => s_levels[Start];
+    /// <summary>The remembered level for the client's default model: None, Low, or null (provider default).
+    /// A request's explicit model has its own remembered level.</summary>
+    public ReasoningEffort? CurrentLevel => s_levels[Start(_defaultKey)];
 
     /// <inheritdoc/>
     public override async Task<ChatResponse> GetResponseAsync(
@@ -67,13 +68,14 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
         if (options?.Reasoning is not null)
             return await base.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
 
+        var key = KeyFor(options);
         var sent = messages as IReadOnlyCollection<ChatMessage> ?? messages.ToList();
-        for (var level = Start; ; level++)
+        for (var level = Start(key); ; level++)
         {
             try
             {
                 var response = await base.GetResponseAsync(sent, At(options, level), cancellationToken).ConfigureAwait(false);
-                s_accepted[_key] = level;
+                s_accepted[key] = level;
                 return response;
             }
             catch (Exception ex) when (level < s_levels.Length - 1 && IsRejectedRequest(ex))
@@ -95,8 +97,9 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
             yield break;
         }
 
+        var key = KeyFor(options);
         var sent = messages as IReadOnlyCollection<ChatMessage> ?? messages.ToList();
-        for (var level = Start; ; level++)
+        for (var level = Start(key); ; level++)
         {
             var updates = base.GetStreamingResponseAsync(sent, At(options, level), cancellationToken).GetAsyncEnumerator(cancellationToken);
             try
@@ -111,7 +114,7 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
                     continue; // rejected before the first update: try the next level
                 }
 
-                s_accepted[_key] = level;
+                s_accepted[key] = level;
                 if (!any)
                     yield break;
                 yield return updates.Current;
@@ -126,7 +129,11 @@ public sealed class MinimalReasoningChatClient : DelegatingChatClient
         }
     }
 
-    private int Start => s_accepted.TryGetValue(_key, out var level) ? level : 0;
+    private (string? Provider, Uri? Endpoint, string? Model) KeyFor(ChatOptions? options) =>
+        (_defaultKey.Provider, _defaultKey.Endpoint, options?.ModelId ?? _defaultKey.Model);
+
+    private static int Start((string? Provider, Uri? Endpoint, string? Model) key) =>
+        s_accepted.TryGetValue(key, out var level) ? level : 0;
 
     private static ChatOptions? At(ChatOptions? options, int level)
     {

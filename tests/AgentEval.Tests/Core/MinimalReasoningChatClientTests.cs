@@ -22,6 +22,79 @@ public sealed class MinimalReasoningChatClientTests
 {
     private static readonly ChatMessage[] Prompt = [new(ChatRole.User, "Say ok.")];
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task GetResponseAsync_ChangingRequestModel_KeepsFallbackCachePerModel(bool metadata, bool streaming)
+    {
+        var provider = new RoutingProvider(metadata);
+        using var client = new MinimalReasoningChatClient(provider);
+
+        foreach (var model in new[] { "model-a", "model-b", "model-a" })
+        {
+            var options = new ChatOptions { ModelId = model };
+            if (streaming)
+                await foreach (var _ in client.GetStreamingResponseAsync(Prompt, options)) { }
+            else
+                await client.GetResponseAsync(Prompt, options);
+        }
+
+        Assert.Equal(new (string?, ReasoningEffort?)[]
+        {
+            ("model-a", ReasoningEffort.None), ("model-a", ReasoningEffort.Low), ("model-a", null),
+            ("model-b", ReasoningEffort.None), ("model-a", null),
+        }, provider.Requests);
+        // Requests for other models do not change the default model's view.
+        Assert.Equal(ReasoningEffort.None, client.CurrentLevel);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_ExplicitDefaultModel_ReusesItsLearnedLevelForImplicitRequests()
+    {
+        var provider = new RoutingProvider(metadata: true, defaultModel: "model-a");
+        using var client = new MinimalReasoningChatClient(provider);
+
+        await client.GetResponseAsync(Prompt, new ChatOptions { ModelId = "model-a" });
+        await client.GetResponseAsync(Prompt);
+
+        Assert.Null(client.CurrentLevel);
+        Assert.Equal(new (string?, ReasoningEffort?)[]
+        {
+            ("model-a", ReasoningEffort.None), ("model-a", ReasoningEffort.Low), ("model-a", null), ("model-a", null),
+        }, provider.Requests);
+    }
+
+    private sealed class RoutingProvider(bool metadata, string defaultModel = "default-model") : IChatClient
+    {
+        private readonly ChatClientMetadata _metadata = new("routing", new Uri($"https://routing-{Guid.NewGuid():N}.test/"), defaultModel);
+        public List<(string?, ReasoningEffort?)> Requests { get; } = [];
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var model = options?.ModelId ?? defaultModel;
+            var effort = options?.Reasoning?.Effort;
+            Requests.Add((model, effort));
+            if (model == "model-a" && effort is not null)
+                throw new HttpRequestException("unsupported reasoning", null, HttpStatusCode.BadRequest);
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "ok");
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            metadata && serviceType == typeof(ChatClientMetadata) ? _metadata : null;
+        public void Dispose() { }
+    }
+
     [Fact]
     public async Task ARequestWithoutAReasoningSetting_AsksForNone()
     {

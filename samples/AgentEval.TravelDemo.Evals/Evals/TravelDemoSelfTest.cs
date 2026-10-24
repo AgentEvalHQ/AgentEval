@@ -69,8 +69,43 @@ public static class TravelDemoSelfTest
                   travel.SequenceEqual(core), $"core sent [{Names(core)}]");
         }
 
+        foreach (var metadata in new[] { false, true })
+        foreach (var streaming in new[] { false, true })
+        {
+            var expected = new (string?, ReasoningEffort?)[]
+            {
+                ("model-a", ReasoningEffort.None), ("model-a", ReasoningEffort.Low), ("model-a", null),
+                ("model-b", ReasoningEffort.None), ("model-a", null),
+            };
+            var travel = RoutedLevelsSent(inner => new AgentEval.TravelDemo.MinimalReasoningChatClient(inner), metadata, streaming);
+            var core = RoutedLevelsSent(inner => new AgentEval.Core.MinimalReasoningChatClient(inner), metadata, streaming);
+            Check($"Travel reasoning cache follows requested model (metadata={metadata}, stream={streaming})", travel.SequenceEqual(expected));
+            Check($"Core reasoning cache follows requested model (metadata={metadata}, stream={streaming})", core.SequenceEqual(expected));
+        }
+
         static string Names(IEnumerable<ReasoningEffort?> levels) =>
             string.Join(", ", levels.Select(l => l?.ToString().ToLowerInvariant() ?? "default"));
+    }
+
+    private static List<(string?, ReasoningEffort?)> RoutedLevelsSent(
+        Func<IChatClient, IChatClient> wrap, bool metadata, bool streaming)
+    {
+        var provider = new ReasoningLevelRecorder([ReasoningEffort.None, ReasoningEffort.Low], metadata, requestModels: true);
+        using var client = wrap(provider);
+        foreach (var model in new[] { "model-a", "model-b", "model-a" })
+        {
+            var options = new ChatOptions { ModelId = model };
+            if (streaming)
+                Consume().GetAwaiter().GetResult();
+            else
+                client.GetResponseAsync("hi", options).GetAwaiter().GetResult();
+
+            async Task Consume()
+            {
+                await foreach (var _ in client.GetStreamingResponseAsync("hi", options)) { }
+            }
+        }
+        return provider.Requests;
     }
 
     private static List<ReasoningEffort?> LevelsSent(Func<IChatClient, IChatClient> wrap, ReasoningEffort?[] rejects)
@@ -85,28 +120,35 @@ public static class TravelDemoSelfTest
     }
 
     /// <summary>A provider that records each request's reasoning level and rejects the given ones with HTTP 400.</summary>
-    private sealed class ReasoningLevelRecorder(ReasoningEffort?[] rejects) : IChatClient
+    private sealed class ReasoningLevelRecorder(
+        ReasoningEffort?[] rejects, bool metadata = true, bool requestModels = false) : IChatClient
     {
         private readonly ChatClientMetadata _metadata = new("selftest", new Uri($"https://selftest-{Guid.NewGuid():N}.test/"), "model");
 
         public List<ReasoningEffort?> Levels { get; } = [];
+        public List<(string?, ReasoningEffort?)> Requests { get; } = [];
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             var level = options?.Reasoning?.Effort;
             Levels.Add(level);
-            if (rejects.Contains(level))
+            Requests.Add((options?.ModelId, level));
+            if (rejects.Contains(level) && (!requestModels || options?.ModelId == "model-a"))
                 throw new HttpRequestException("invalid request", null, System.Net.HttpStatusCode.BadRequest);
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")));
         }
 
-        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "ok");
+        }
 
         public object? GetService(Type serviceType, object? serviceKey = null) =>
-            serviceType == typeof(ChatClientMetadata) ? _metadata : null;
+            metadata && serviceType == typeof(ChatClientMetadata) ? _metadata : null;
 
         public void Dispose() { }
     }
