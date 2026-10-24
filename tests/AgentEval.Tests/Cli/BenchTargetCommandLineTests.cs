@@ -155,6 +155,24 @@ public sealed class BenchTargetCommandLineTests : IDisposable
         Assert.Contains("--subject is required", stderr, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("gdpr", "0", "--limit must be at least 1.")]
+    [InlineData("gdpr", "1", "--limit requires --out")]
+    [InlineData("eu-ai-act", "0", "--limit must be at least 1.")]
+    [InlineData("eu-ai-act", "1", "--limit requires --out")]
+    public async Task ComplianceCalibration_InvalidBoundedRun_RefusesBeforeAnyJudge(
+        string family, string limit, string diagnostic)
+    {
+        var before = WorkspaceEntries();
+
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["bench", family, "calibrate", "--limit", limit, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains(diagnostic, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
     [Fact]
     public async Task BenchmarkList_IsAvailableWithoutTarget_AndListsRegisteredFamilies()
     {
