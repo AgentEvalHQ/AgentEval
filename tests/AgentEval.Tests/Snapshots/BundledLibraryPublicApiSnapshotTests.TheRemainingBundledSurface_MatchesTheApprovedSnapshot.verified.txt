@@ -3052,6 +3052,7 @@ class AgentEval.Memory.Engine.MemoryJudge : AgentEval.Memory.Engine.IMemoryJudge
     Task<AgentEval.Memory.Engine.MemoryJudgmentResult> JudgeAsync(String response, AgentEval.Memory.Models.MemoryQuery query, CancellationToken cancellationToken = default)
     ctor(IChatClient chatClient, ILogger<AgentEval.Memory.Engine.MemoryJudge> logger)
 class AgentEval.Memory.Engine.MemoryJudgmentResult
+    Boolean ForbiddenFactsAssessed { get; init; }
     Boolean Measured { get; init; }
     Double Score { get; init; }
     IReadOnlyList<AgentEval.Memory.Models.MemoryFact> ForbiddenFound { get; init; }
@@ -4192,6 +4193,7 @@ class AgentEval.Memory.Models.MemoryQuery
     static AgentEval.Memory.Models.MemoryQuery CreateTemporal(String question, DateTimeOffset queryTime, AgentEval.Memory.Models.MemoryFact[] expectedFacts)
 class AgentEval.Memory.Models.MemoryQueryResult
     AgentEval.Memory.Models.MemoryQuery Query { get; init; }
+    Boolean ForbiddenFactsAssessed { get; init; }
     Boolean Measured { get; init; }
     Boolean Passed { get; }
     Double Score { get; init; }

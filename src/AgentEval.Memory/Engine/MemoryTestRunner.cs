@@ -270,6 +270,7 @@ public class MemoryTestRunner : IMemoryTestRunner
                 FoundFacts = judgmentResult.FoundFacts,
                 MissingFacts = judgmentResult.MissingFacts,
                 ForbiddenFound = judgmentResult.ForbiddenFound,
+                ForbiddenFactsAssessed = judgmentResult.ForbiddenFactsAssessed,
                 Explanation = judgmentResult.Explanation,
                 Duration = queryStopwatch.Elapsed,
                 TokensUsed = judgmentResult.TokensUsed

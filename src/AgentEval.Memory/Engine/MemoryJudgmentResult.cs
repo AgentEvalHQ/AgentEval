@@ -37,6 +37,12 @@ public class MemoryJudgmentResult
     /// Forbidden facts that were incorrectly present in the response.
     /// </summary>
     public required IReadOnlyList<MemoryFact> ForbiddenFound { get; init; }
+
+    /// <summary>
+    /// Whether the judge supplied a usable assessment of forbidden facts. An empty observed list alone does not
+    /// establish absence; score-only replies and legacy/custom judgments without this fact default to false.
+    /// </summary>
+    public bool ForbiddenFactsAssessed { get; init; }
     
     /// <summary>
     /// Detailed explanation of the scoring decision.

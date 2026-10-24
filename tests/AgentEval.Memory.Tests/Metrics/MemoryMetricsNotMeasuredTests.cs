@@ -70,7 +70,7 @@ public sealed class MemoryMetricsNotMeasuredTests
             },
             _ => null,
         };
-        var memory = Result([Query(measured: true)],
+        var memory = Result([Query(measured: true, found: metric == "noise_resilience")],
             scenarioName: metric == "noise_resilience" ? "buried facts" : "s", metadata: metadata);
 
         var result = await faulting.EvaluateAsync(memory.ToEvaluationContext());
@@ -147,13 +147,13 @@ public sealed class MemoryMetricsNotMeasuredTests
         Assert.Equal(2, result.Details["queries_not_measured"]);
     }
 
-    private static MemoryQueryResult Query(bool measured) => new()
+    private static MemoryQueryResult Query(bool measured, bool found = false) => new()
     {
         Query = new() { Question = "q?", ExpectedFacts = [MemoryFact.Create("fact")], QueryTime = DateTimeOffset.UnixEpoch },
         Response = "r",
         Score = measured ? 90 : 0,
         Measured = measured,
-        FoundFacts = [],
+        FoundFacts = found ? [MemoryFact.Create("fact")] : [],
         MissingFacts = [],
         ForbiddenFound = [],
     };
@@ -166,7 +166,7 @@ public sealed class MemoryMetricsNotMeasuredTests
     {
         OverallScore = queries.Any(q => q.Measured) ? 90 : 0,
         QueryResults = queries,
-        FoundFacts = [],
+        FoundFacts = queries.SelectMany(query => query.FoundFacts).ToArray(),
         MissingFacts = [],
         ForbiddenFound = [],
         Duration = TimeSpan.Zero,

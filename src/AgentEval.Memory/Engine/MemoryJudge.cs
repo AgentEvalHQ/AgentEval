@@ -319,7 +319,6 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         {
             FoundFacts = Array.Empty<string>(),
             MissingFacts = Array.Empty<string>(),
-            ForbiddenFound = Array.Empty<string>(),
             Score = score,
             Explanation = score is null
                 ? "Not measured: the judge's reply held no score."
@@ -345,9 +344,9 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         JudgmentResponseData data, MemoryQuery query, (int Input, int Output)? actualUsage, string? judgeModel)
     {
         // Match fact contents to original MemoryFact objects
-        var foundFacts = MatchFactsByContent(data.FoundFacts, query.ExpectedFacts);
-        var missingFacts = MatchFactsByContent(data.MissingFacts, query.ExpectedFacts);
-        var forbiddenFound = MatchFactsByContent(data.ForbiddenFound, query.ForbiddenFacts);
+        var foundFacts = MatchFactsByContent(data.FoundFacts ?? [], query.ExpectedFacts);
+        var missingFacts = MatchFactsByContent(data.MissingFacts ?? [], query.ExpectedFacts);
+        var forbiddenFound = MatchFactsByContent(data.ForbiddenFound ?? [], query.ForbiddenFacts);
 
         // Use actual token counts when available, fall back to estimation (an estimate is never priced)
         var tokensUsed = actualUsage is { } u
@@ -367,6 +366,8 @@ Be strict — any specific fabricated detail (a name, address, number, food item
             FoundFacts = foundFacts,
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,
+            // Explicit empty assessment is valid; omitted/null, blank or unmatched entries cannot certify absence.
+            ForbiddenFactsAssessed = data.ForbiddenFound is { } reported && reported.Count == forbiddenFound.Count,
             Explanation = offScale
                 ? $"Not measured: the judge's score {data.Score!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off the 0-100 scale."
                 : data.Explanation,
@@ -498,13 +499,13 @@ Be strict — any specific fabricated detail (a name, address, number, food item
 internal class JudgmentResponseData
 {
     [JsonPropertyName("found_facts")]
-    public IReadOnlyList<string> FoundFacts { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? FoundFacts { get; set; }
     
     [JsonPropertyName("missing_facts")]
-    public IReadOnlyList<string> MissingFacts { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? MissingFacts { get; set; }
     
     [JsonPropertyName("forbidden_found")]
-    public IReadOnlyList<string> ForbiddenFound { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? ForbiddenFound { get; set; }
     
     [JsonPropertyName("score")]
     public double? Score { get; set; }

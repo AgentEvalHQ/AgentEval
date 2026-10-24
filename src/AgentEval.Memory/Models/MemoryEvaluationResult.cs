@@ -154,6 +154,12 @@ public class MemoryQueryResult
     public required IReadOnlyList<MemoryFact> ForbiddenFound { get; init; }
 
     /// <summary>
+    /// Whether the judge supplied a usable forbidden-fact assessment, independently of the numeric score.
+    /// False when that assessment was absent, including legacy results without this property.
+    /// </summary>
+    public bool ForbiddenFactsAssessed { get; init; }
+
+    /// <summary>
     /// Detailed explanation of the scoring decision.
     /// </summary>
     public string? Explanation { get; init; }

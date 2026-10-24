@@ -30,7 +30,7 @@ public static class MemoryAssertions
     [StackTraceHidden]
     internal static void RecordNotMeasured(AssertionProbe probe, string expected, string? because)
     {
-        var reason = $"Expected {expected}, but the relevant memory judgment was not measured";
+        var reason = $"Expected {expected}, but the relevant memory evidence was not measured";
         if (probe.IsActive)
             probe.MarkInconclusive(reason);
         else
@@ -223,7 +223,8 @@ public class MemoryEvaluationAssertions
                 because: because
             ));
         }
-        else if (_result.QueryResults.Any(query => !query.Measured && query.Query.ForbiddenFacts.Count > 0))
+        else if (_result.QueryResults.Any(query => query.Query.ForbiddenFacts.Count > 0
+            && (!query.Measured || !query.ForbiddenFactsAssessed)))
         {
             MemoryAssertions.RecordNotMeasured(probe, "no forbidden facts recalled", because);
         }
@@ -440,7 +441,8 @@ public class MemoryQueryAssertions
                 because: because
             ));
         }
-        else if (!_result.Measured && _result.Query.ExpectedFacts.Count > 0)
+        else if (_result.Query.ExpectedFacts.Count > 0
+            && (!_result.Measured || !_result.Query.ExpectedFacts.All(fact => _result.FoundFacts.Contains(fact))))
         {
             MemoryAssertions.RecordNotMeasured(probe, $"all {_result.Query.ExpectedFacts.Count} expected facts found", because);
         }

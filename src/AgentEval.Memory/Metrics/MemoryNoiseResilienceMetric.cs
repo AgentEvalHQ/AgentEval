@@ -54,6 +54,24 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
                     "Non-noise scenario - using general memory score"));
             }
 
+            // A numeric score does not establish fact-by-fact classification or the absence of false recalls.
+            // Retain it independently when the evidence needed for this derived measurement is unavailable.
+            var factsAssessed = memoryResult.QueryResults.All(query =>
+                (query.Query.ForbiddenFacts.Count == 0 || query.Measured && query.ForbiddenFactsAssessed)
+                && query.Query.ExpectedFacts.All(fact => query.Measured
+                    && (query.FoundFacts.Contains(fact) || query.MissingFacts.Contains(fact))));
+            if (!factsAssessed || memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count == 0)
+            {
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                    "Noise resilience not measured: relevant fact assessments are incomplete or no expected facts were classified; the numeric memory score is retained separately.",
+                    new Dictionary<string, object>
+                    {
+                        ["overall_score"] = score,
+                        ["observed_forbidden_facts"] = memoryResult.ForbiddenFound.Count,
+                        ["scenario_name"] = memoryResult.ScenarioName,
+                    }));
+            }
+
             // Calculate noise resilience score
             var resilienceScore = CalculateNoiseResilience(memoryResult, score);
             var passed = resilienceScore >= 70; // Higher threshold for noise resilience
