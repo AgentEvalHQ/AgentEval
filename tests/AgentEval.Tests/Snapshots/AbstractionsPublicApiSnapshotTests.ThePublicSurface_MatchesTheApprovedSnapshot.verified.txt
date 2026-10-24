@@ -1462,6 +1462,7 @@ interface AgentEval.Models.IRedTeamResult
     String AgentName { get; }
     String Summary { get; }
 static class AgentEval.Models.ModelPricing
+    const String BaselineNotice
     const String TableName
     static AgentEval.Models.ModelPricingSnapshot CaptureSnapshot()
     static Decimal? EstimateCost(String modelName, Int32 inputTokens, Int32 outputTokens)
