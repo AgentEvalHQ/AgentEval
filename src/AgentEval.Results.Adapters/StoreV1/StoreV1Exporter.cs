@@ -82,8 +82,9 @@ public static partial class StoreV1Exporter
     };
 
     /// <summary>Exports run <paramref name="runId"/> of <paramref name="store"/> to <paramref name="outputDirectory"/>.</summary>
-    /// <remarks>This semantic reader API can preserve only the generic compliance evidence exposed by the
-    /// reader. Use <see cref="ExportWorkspaceRun"/> for exact filesystem selection and original rich reports.</remarks>
+    /// <remarks>Filesystem-backed readers use checked snapshots of the uniquely selected workspace run,
+    /// including original rich reports. Rootless semantic readers preserve the generic compliance evidence
+    /// exposed by the reader. Use <see cref="ExportWorkspaceRun"/> to select an exact filesystem folder.</remarks>
     /// <param name="store">The store v1 workspace.</param>
     /// <param name="runId">The run.</param>
     /// <param name="outputDirectory">The AEF run folder to write: it must not exist, or be empty.</param>
@@ -97,6 +98,8 @@ public static partial class StoreV1Exporter
         ArgumentNullException.ThrowIfNull(store);
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        if (store.WorkspaceRoot is { } root)
+            return ExportWorkspaceRun(root, ResolveWorkspaceRunDirectory(root, runId, ct), outputDirectory, options, ct);
         StoreV1Run run;
         try
         {

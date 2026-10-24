@@ -144,7 +144,7 @@ Query.scenarioTree(runId, scenarioId, sourceId?, resultId?) EvalResult? ← chec
 Query.scenarioResultTree(runId, scenarioId, sourceId?, resultId?) WorkspaceResultTree? ← canonical case forest
 Query.compliance                               [ComplianceRegulationSummary!]!
 Query.complianceMatrix(regulation)             ComplianceMatrix!  ← killer feature
-Query.complianceEvidence(regulation, subjectKind, subjectName, timestamp, sourceId?) ComplianceEvidenceWithChain?
+Query.complianceEvidence(regulation, subjectKind, subjectName, timestamp) ComplianceEvidenceWithChain?
 Query.evaluators(category?, costTier?)         [EvaluatorCard!]!
 Query.evaluator(key)                           EvaluatorCard?
 Query.evaluatorTimeline(evaluatorKey, count = 30) [EvaluatorTimelinePoint!]! ← observed occurrences

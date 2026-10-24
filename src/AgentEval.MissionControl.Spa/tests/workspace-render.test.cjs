@@ -483,6 +483,37 @@ function occurrence() {
     evidence: { integrity: 'intact', imported: false, signatureTrust: 'not_checked' } };
 }
 
+function evaluatorPreview(points) {
+  const { EvaluatorDetailPage } = load(path.join(root, 'pages/EvaluatorDetailPage'));
+  return render(EvaluatorDetailPage, '/evaluators/tool_error_pattern', '/evaluators/:key', [
+    [queryKeys.evaluators.detail('tool_error_pattern'), { evaluator: {
+      key: 'tool_error_pattern', name: 'Tool error pattern', category: 'agentic', version: '1', description: 'Recorded tool errors',
+      costTier: 'TRIVIAL', higherIsBetter: true, defaultThreshold: null, recommendedVisualization: 'heatmap',
+      expectedInputs: [], compatibleWith: [], links: null,
+    } }],
+    [queryKeys.evaluators.timeline('tool_error_pattern', 30), { evaluatorTimeline: points }],
+  ]);
+}
+
+test('evaluator detail preview refuses mixed context while retaining raw occurrences and source links', () => {
+  const first = occurrence();
+  const html = evaluatorPreview([first, { ...first, runId: 'second', resultId: 'second-result', subjectRef: 'model:other' }]);
+  assert.match(html, /Preview unavailable for mixed contexts/);
+  assert.match(html, /Recorded values appear below/);
+  assert.match(html, /second-result/);
+  assert.match(html, /href="\/runs\/native\?sourceId=source%2Fa"/);
+  assert.match(html, /<pre/);
+  assert.doesNotMatch(html, /recharts-responsive-container/);
+});
+
+test('evaluator detail preview retains an eligible measured same-context chart', () => {
+  const first = occurrence();
+  const html = evaluatorPreview([first, { ...first, runId: 'second', resultId: 'second-result', timestamp: '2026-10-24T10:00:00Z' }]);
+  assert.match(html, /Visualisation preview \(heatmap\)/);
+  assert.match(html, /recharts-responsive-container/);
+  assert.doesNotMatch(html, /Preview unavailable|Chart unavailable/);
+});
+
 test('evaluator chart accepts one declared comparable context', () => {
   const { comparableTimeline } = load(path.join(root, 'components/EvaluatorTimeline'));
   const p = occurrence();

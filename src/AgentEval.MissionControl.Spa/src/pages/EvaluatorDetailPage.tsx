@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink, FileCode } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
-import { EvaluatorTimeline, type EvaluatorOccurrence } from "@/components/EvaluatorTimeline";
+import { comparableTimeline, EvaluatorTimeline, type EvaluatorOccurrence } from "@/components/EvaluatorTimeline";
 import { GenericEvaluatorRenderer } from "@/components/GenericEvaluatorRenderer";
 import { CostTierPill } from "./EvaluatorsPage";
 
@@ -129,6 +129,8 @@ export function EvaluatorDetailPage() {
           );
         }
         const ev = d.evaluator;
+        const occurrences = timelineQ.data?.evaluatorTimeline ?? [];
+        const comparable = comparableTimeline(occurrences).length > 0;
         return (
           <div className="space-y-6">
             <BackLink />
@@ -166,21 +168,19 @@ export function EvaluatorDetailPage() {
               </div>
             </header>
 
-            {/* Plan-08 portal-review A5 (T2.2, 2026-05-25): switch on the
-                evaluator's recommendedVisualization hint and render a live
-                preview using the evaluator timeline as payload. Previously
-                the hint string was the only surface — operators had no way
-                to see what shape the evaluator's signal takes. The renderer
-                tolerates a null payload and falls back to JSON for unknown
-                hints; see GenericEvaluatorRenderer.tsx for the switch logic. */}
+            {/* Preview charts use the same recorded-context guard as the timeline.
+                Keep raw JSON available when the observations cannot be compared. */}
             {ev.recommendedVisualization && (
               <section className="rounded-lg border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-3">
                   Visualisation preview ({ev.recommendedVisualization})
                 </h3>
+                {!comparable && <p className="text-xs text-slate-500 mb-3">
+                  Preview unavailable for mixed contexts, trials or unrecorded measurements. Raw recorded data follows.
+                </p>}
                 <GenericEvaluatorRenderer
-                  recommendedVisualization={ev.recommendedVisualization}
-                  payload={timelineQ.data?.evaluatorTimeline ?? []}
+                  recommendedVisualization={comparable ? ev.recommendedVisualization : null}
+                  payload={occurrences}
                 />
               </section>
             )}

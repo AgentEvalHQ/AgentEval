@@ -39,13 +39,16 @@ not built: both shipped as CSS grid / flexbox views, which keeps a single chart 
 ## How `recommendedVisualization` is used
 
 `EvaluatorCard.recommendedVisualization` is a free-text hint. The `EvaluatorCard` XML doc lists `radar`,
-`timeline`, `histogram`, `heatmap`, `sparkline`, `sankey`, `stackedBar` and `none` as intended values; the 60
-cards under `src/AgentEval.Evals.Agentic/EvaluatorCards/` use four of them: `histogram`, `radar`,
-`timeline` and `stackedBar`.
+`timeline`, `histogram`, `heatmap`, `sparkline`, `sankey`, `stackedBar` and `none` as intended values. Shipped
+cards under `src/AgentEval.Evals.Agentic/EvaluatorCards/` use `histogram`, `radar`, `timeline`, `stackedBar`,
+`none` and `heatmap` (the `tool_error_pattern` card).
 
 The SPA reads the hint in one place, the evaluator detail page. It prints the hint, and passes it to
-`GenericEvaluatorRenderer` together with the evaluator's recent-run timeline (one entry per run, with
-`runId`, `timestamp` and `score`) as the payload. The renderer matches the hint case-insensitively:
+`GenericEvaluatorRenderer` together with the evaluator's recorded occurrences as the payload. Chart previews
+require the same comparable-context decision as the timeline: one declared normalized metric, subject,
+evaluator version, case/path and threshold, measured scores/times, and no trial observations. Otherwise the
+page explains why a preview is unavailable and shows raw JSON; the occurrence table and exact source links
+remain available. For eligible observations, the renderer matches the hint case-insensitively:
 
 | Hint | Preview |
 |---|---|
@@ -55,9 +58,10 @@ The SPA reads the hint in one place, the evaluator detail page. It prints the hi
 | `table` | Key / value table |
 | anything else | The payload as pretty-printed JSON |
 
-None of the four values the shipped cards use is in that list, so for every shipped evaluator the preview
-is the JSON view. The same page always draws the score-over-time `TimelineChart` below it, whatever the
-hint says. No component renders a `sankey`, and nothing draws a radar chart from a card's hint.
+The shipped `heatmap` hint can draw a chart when the context guard passes; the other currently shipped hints
+fall back to JSON. The `TimelineChart` below the preview also requires a comparable context and otherwise
+shows recorded values without a combined chart. No component renders a `sankey`, and nothing draws a radar
+chart from a card's hint.
 
 ---
 

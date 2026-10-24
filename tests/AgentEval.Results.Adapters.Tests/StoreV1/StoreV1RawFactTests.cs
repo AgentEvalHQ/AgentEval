@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.Json.Nodes;
+using AgentEval.Output;
 using AgentEval.Results.Adapters.StoreV1;
 using AgentEval.Results.Integrity;
 
@@ -91,6 +92,47 @@ public sealed class StoreV1RawFactTests : IDisposable
         scenario.Remove("measurement");
         File.WriteAllText(scenarioPath, scenario.ToJsonString(), new UTF8Encoding(true));
         Assert.Equal(AefOutcome.Intact, StoreV1Exporter.ExportDirectory(source.RunDirectory, _out).Verification.Outcome);
+    }
+
+    [Fact]
+    public async Task ExportAsync_FileSystemReader_MissingRecordedPassed_RefusesBeforePublishing()
+    {
+        using var source = await StoreV1Fixture.CreateAsync();
+        var path = Source(source, "scenario");
+        var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        Assert.True(json.Remove("passed"));
+        File.WriteAllText(path, json.ToJsonString());
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => StoreV1Exporter.ExportAsync(source.Store, source.RunId, _out));
+        Assert.False(Directory.Exists(_out));
+    }
+
+    [Fact]
+    public async Task ExportAsync_FileSystemReader_DuplicateRawMembers_RefusesBeforePublishing()
+    {
+        using var source = await StoreV1Fixture.CreateAsync();
+        var path = Source(source, "scenario");
+        var json = File.ReadAllText(path).TrimEnd();
+        File.WriteAllText(path, json[..^1] + ",\"unfamiliar\":{\"value\":1,\"value\":2}}");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => StoreV1Exporter.ExportAsync(source.Store, source.RunId, _out));
+        Assert.False(Directory.Exists(_out));
+    }
+
+    [Fact]
+    public async Task ExportAsync_RootlessReader_PreservesRecordedTypedResult()
+    {
+        var store = new InMemoryOutputStore();
+        Assert.Null(store.WorkspaceRoot);
+        var manifest = await store.StartRunAsync(new(SubjectKind.Agent, "typed"), new("test", ".", "offline", null, null, "eval"));
+        await store.WriteScenarioResultAsync(manifest.Run.RunId,
+            new("case", "Case", "input", "output", true, 0.8, new Dictionary<string, double>(), [], TimeSpan.Zero, 0));
+        await store.CompleteRunAsync(manifest,
+            new("1.0", manifest.Run.RunId, "PASS", new(1, 1, 0, 0), new Dictionary<string, double>()));
+
+        var converted = await StoreV1Exporter.ExportAsync(store, manifest.Run.RunId, _out);
+        Assert.Equal(AefOutcome.Intact, converted.Verification.Outcome);
+        Assert.Equal("passed", (string?)AefTestRuns.Results(_out).Single()["state"]);
     }
 
     private static string Source(StoreV1Fixture source, string kind) => kind == "scenario"
