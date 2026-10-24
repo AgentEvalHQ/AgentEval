@@ -530,6 +530,14 @@ result.Performance!.Should()
 ```
 
 ### RAG evaluation — 8 metrics (B1)
+
+B1 identifies its reference data as `b1-capital-landmarks-v2`. The question explicitly asks for
+landmarks in France's capital; documents 2–4 support Paris, the Eiffel Tower and the Louvre.
+The original fixture also expected Versailles from document 8 while excluding it from relevance.
+V2 removes that unsupported city-landmark expectation and keeps document 8 as a distractor.
+The source documents, top-three retrieval and metric thresholds are unchanged; old unversioned
+scores are not directly comparable with v2.
+
 ```csharp
 var llmMetrics = new IMetric[]
 {

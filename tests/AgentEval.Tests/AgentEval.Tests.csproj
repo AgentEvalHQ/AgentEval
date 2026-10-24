@@ -128,6 +128,8 @@
              Link="Samples/EmbeddingProviderEnvironment.cs" />
     <Compile Include="../../samples/AgentEval.AgentSkillsEval/AIConfig.cs"
              Link="Samples/AgentSkillsAIConfig.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/MetricsAndQuality/ComprehensiveRagExampleData.cs"
+             Link="Samples/ComprehensiveRagExampleData.cs" />
   </ItemGroup>
 
 </Project>

@@ -6,6 +6,7 @@ using AgentEval.Core;
 using AgentEval.Metrics.RAG;
 using AgentEval.Metrics.Retrieval;
 using AgentEval.Embeddings;
+using static AgentEval.Samples.ComprehensiveRagExampleData;
 
 namespace AgentEval.Samples;
 
@@ -36,22 +37,10 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class ComprehensiveRAG
 {
-    // Knowledge base documents for our RAG system
-    private static readonly (string Id, string Text)[] KnowledgeBase =
-    [
-        ("doc1", "France is a country in Western Europe. It is known for its rich history, art, and culture. The official language is French, and the currency is the Euro."),
-        ("doc2", "Paris is the capital and largest city of France. It has a population of over 2 million in the city proper and over 12 million in the metropolitan area."),
-        ("doc3", "The Eiffel Tower is a wrought-iron lattice tower in Paris, France. It was constructed from 1887 to 1889 as the entrance arch for the 1889 World's Fair."),
-        ("doc4", "The Louvre Museum in Paris is the world's largest art museum. It houses over 35,000 works of art including the Mona Lisa and the Venus de Milo."),
-        ("doc5", "French cuisine is renowned worldwide. Popular dishes include croissants, baguettes, coq au vin, and crème brûlée. France is also famous for its wines and cheeses."),
-        ("doc6", "The French Revolution began in 1789 and fundamentally changed France. It led to the end of the monarchy and the rise of democratic ideals."),
-        ("doc7", "Mont Blanc is the highest peak in the Alps and Western Europe at 4,808 meters. It is located on the border between France and Italy."),
-        ("doc8", "The Palace of Versailles was the principal royal residence of France from 1682 until the French Revolution. It is known for the Hall of Mirrors and its vast gardens.")
-    ];
-
     public static async Task RunAsync()
     {
         PrintHeader();
+        Console.WriteLine($"   Reference dataset: {DatasetVersion}\n");
 
         if (!AIConfig.IsConfigured)
         {
@@ -77,7 +66,7 @@ public static class ComprehensiveRAG
         {
             Console.WriteLine($"      [{id}] {Truncate(text, 60)}...");
         }
-        Console.WriteLine($"      ... and {KnowledgeBase.Length - 3} more documents\n");
+        Console.WriteLine($"      ... and {KnowledgeBase.Count - 3} more documents\n");
 
         Console.WriteLine("   🔢 Step 1.2: Generating embeddings for all documents...");
         var texts = KnowledgeBase.Select(d => d.Text).ToArray();
@@ -99,7 +88,7 @@ public static class ComprehensiveRAG
 
         Console.WriteLine("   💾 Step 1.3: Storing in MemoryVectorStore...");
         var vectorStore = new MemoryVectorStore();
-        for (int i = 0; i < KnowledgeBase.Length; i++)
+        for (int i = 0; i < KnowledgeBase.Count; i++)
         {
             vectorStore.Add(KnowledgeBase[i].Id, KnowledgeBase[i].Text, embeddings[i]);
         }
@@ -109,8 +98,8 @@ public static class ComprehensiveRAG
 
         Console.WriteLine("\n🔍 PART 2: RAG QUERY PIPELINE\n");
 
-        var userQuery = "What is the capital of France and what famous landmarks are there?";
-        var groundTruth = "Paris is the capital of France. Famous landmarks include the Eiffel Tower, the Louvre Museum, and the Palace of Versailles.";
+        var userQuery = Query;
+        var groundTruth = GroundTruth;
 
         Console.WriteLine($"   ❓ User Query: \"{userQuery}\"\n");
 
@@ -344,12 +333,12 @@ public static class ComprehensiveRAG
         };
         // Set retrieval properties
         irContext.SetProperty("RetrievedDocumentIds", searchResults.Select(r => r.Id).ToList());
-        irContext.SetProperty("RelevantDocumentIds", new List<string> { "doc2", "doc3", "doc4" });
+        irContext.SetProperty("RelevantDocumentIds", RelevantDocumentIds);
 
         Console.WriteLine("   📈 RECALL@K METRIC");
         Console.WriteLine("   Measures: How many relevant docs are in top K results?\n");
         Console.WriteLine($"      Retrieved (top 3): {string.Join(", ", searchResults.Take(3).Select(r => r.Id))}");
-        Console.WriteLine($"      Relevant docs: doc2, doc3, doc4");
+        Console.WriteLine($"      Relevant docs: {string.Join(", ", RelevantDocumentIds)}");
         
         var irRecallResult = await irRecallMetric.EvaluateAsync(irContext);
         Console.WriteLine($"      Recall@3 Score: {irRecallResult.Score:F1}/100");
