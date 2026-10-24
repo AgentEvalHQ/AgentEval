@@ -5,6 +5,10 @@
 AEF 1.0 is settled but not yet tagged. These are changes to 1.0 itself, made before the `aef-1.0` tag: what critic
 round 11 found, and what AgentEval needs to write AEF natively. None is an erratum.
 
+- **Prospective DCO enforcement** (2026-10-24): the lead editor confirmed certification and directed that
+  historical commit messages remain unchanged. Governance records the two exact pre-policy unsigned IDs;
+  CI continues to reject every new unsigned AEF commit, regardless of its date, and fails on an invalid Git range.
+  No history, format rule, schema or licence changes.
 - **Release text and Inspect null entries** (2026-10-24): RUN-4 explicitly permits sealing, attestation, overlays
   and authorized withholding after close; governance follows the normative compatibility/errata rules. Overlay
   truncation requires an externally retained or anchored latest head, rather than a deletable local signature.

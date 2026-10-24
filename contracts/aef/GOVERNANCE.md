@@ -31,9 +31,16 @@
 
 ## Contributions
 
-Every commit to `contracts/aef/` carries a **Developer Certificate of Origin** sign-off (`Signed-off-by: Name
+Every new commit to `contracts/aef/` carries a **Developer Certificate of Origin** sign-off (`Signed-off-by: Name
 <email>`, as `git commit -s` writes it): the contributor certifies they may contribute it under the terms below
 (<https://developercertificate.org/>). There is no separate contributor licence agreement.
+
+On 2026-10-24, the lead editor confirmed certification and chose prospective enforcement without rewriting
+historical commit messages. The two existing unsigned commits at that decision are
+`99ca442360b2be43fa7f7cf3cbe065e85b9d55c8` and `a2421fd9e6e0eb81efbe77c4f4664c992290b2df`.
+CI exempts only these exact IDs. Every other AEF commit in the checked range still needs its sign-off, including
+backdated commits and new IDs made by rewriting old commits. This fixed boundary also applies after a squash merge;
+it does not depend on retaining the old branch or fetching a historical cutoff object. Licensing terms are unchanged.
 
 ## Licence and patents
 
