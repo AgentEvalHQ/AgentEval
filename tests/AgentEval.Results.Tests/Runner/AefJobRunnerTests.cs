@@ -567,11 +567,14 @@ public sealed class AefJobRunnerTests : IDisposable
     [Fact]
     public async Task RunAsync_CaseExceedsTimeBound_CancelsCaseAndSealsError()
     {
+        // The case deadline is one second; this watchdog also allows evidence sealing.
+        // Cancel and await the owned run before fixture cleanup removes its files.
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var result = await Run(new Case(async ct =>
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
             return Passed();
-        }, secondsBound: 1)).WaitAsync(TimeSpan.FromSeconds(10));
+        }, secondsBound: 1), cancel.Token);
         Assert.Equal("job.failed", result.Terminal);
         Assert.Null(result.Limit); // This case's bound expired; the plan has no timeout limit.
         Assert.Contains("time bound", result.Reason);
