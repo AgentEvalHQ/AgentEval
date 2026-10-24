@@ -112,7 +112,7 @@ public static class Program
             output.Line("   3   Phase 3  LEVEL 1                supplier COMPROMISED, tool contracts");
             output.Line("   4   Phase 4  LEVEL 2                supplier COMPROMISED, + admission + containment");
             output.Line("   a   run all four in order");
-            output.Line("   r   re-run the last phase (Phase 2 is probabilistic — up-arrow lands it)");
+            output.Line("   r   re-run the last phase (each run retains its own observed outcome)");
             output.Line("   c   ask a different question against the last phase");
             output.Line("   q   quit");
             output.Line();
@@ -214,13 +214,12 @@ public static class Program
 
         var claims = PhaseOracle.Evaluate(outcome);
         output.Section($"  PHASE {(int)phase} ORACLE — asserted over the trace, the effect ledger, and the verdicts");
-        var allHold = true;
         foreach (var claim in claims)
         {
-            allHold &= claim.Holds;
+            var stamp = claim.Holds switch { true => "OK", false => "FAIL", null => "NOT MEASURED" };
             output.Line(
-                claim.Holds ? ConsoleColor.Green : ConsoleColor.Red,
-                $"    [{(claim.Holds ? "OK  " : "FAIL")}] {claim.Claim}");
+                claim.Holds switch { true => ConsoleColor.Green, false => ConsoleColor.Red, null => ConsoleColor.Yellow },
+                $"    [{stamp}] {claim.Claim}");
             output.Paragraph(claim.Detail, "           ");
         }
 
@@ -230,8 +229,11 @@ public static class Program
             output.Paragraph("note: " + observation, "    ");
         }
 
-        if (!allHold)
+        var verdict = PhaseOracle.Verdict(claims);
+        if (verdict == false)
             SampleOutcome.Fail($"Phase {(int)phase} oracle failed.");
+        else if (verdict is null)
+            SampleOutcome.Skip($"Phase {(int)phase}: required boundary exercise or evidence was not measured.");
     }
 
     private static IReadOnlyList<DemoPhase> ParsePhases(string[] args)
@@ -263,11 +265,11 @@ public static class Program
         output.Line(ConsoleColor.White, "  THE TRUSTED SUPPLIER — the lesson");
         output.Rule('=');
         output.Paragraph(
-            "Level 1 saved us from the damage: the register export and the external send were refused before " +
-            "they ran — but the agent still tried, every run. Safe, and under continuous attack.");
+            "Level 1 is demonstrated when recorded register-export and external-send attempts were refused " +
+            "before execution. Without those attempts, the corresponding contract was not measured.");
         output.Paragraph(
-            "Level 2 stopped the attack: the injected instruction never reached the model, so the agent never " +
-            "formed the intent — and the compromised source was contained, so it cannot try again.");
+            "Level 2 is demonstrated by the recorded result-admission refusal, containment snapshot and " +
+            "refused retry. Zero malicious tool attempts alone do not prove that the gate worked.");
         output.Paragraph(
             "Defence in depth is not one wall. It is a wall, and then removing the attacker — and the whole thing " +
             "is a builder chain and two contracts.");

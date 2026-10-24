@@ -155,6 +155,31 @@ public sealed class ProcessOutcomeTests
         Assert.Contains("RESULT: PASS", result.StandardOutput, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("2")]
+    [InlineData("3")]
+    [InlineData("4")]
+    public async Task Demo_UnexercisedPhase_ExitsEleven(string phase)
+    {
+        await using var server = new LoopbackChatServer(int.MaxValue);
+        var result = await RunAsync(Demo, ["--phase", phase], server.Environment);
+
+        Assert.Equal(11, result.ExitCode);
+        Assert.Contains("NOT MEASURED", result.StandardOutput, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("3")]
+    [InlineData("4")]
+    public async Task Evals_UnexercisedGate_ReportsIncompleteAndExitsEleven(string arm)
+    {
+        await using var server = new LoopbackChatServer(int.MaxValue);
+        var result = await RunAsync(Evals, ["--runs", "1", "--arms", arm], server.Environment);
+
+        Assert.Equal(11, result.ExitCode);
+        Assert.Contains("RESULT: INCOMPLETE", result.StandardOutput, StringComparison.Ordinal);
+    }
+
     private static async Task<ProcessResult> RunAsync(string program, string[] arguments, string[] environment, string? input = null)
     {
         var (command, prefix) = Launch(program);

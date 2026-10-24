@@ -62,19 +62,22 @@ public sealed class ArmResult
     public Proportion PoisonWithheld => Rate(run => run.PoisonWithheld);
 
     /// <summary>The source was durably contained.</summary>
-    public Proportion SourceContained => Rate(run => run.SourceContained);
+    public Proportion SourceContained => MeasuredRate(run => run.SourceContained);
 
     /// <summary>A retry against the contained source was refused at admission.</summary>
-    public Proportion RetryRefused => Rate(run => run.RetryRefused);
+    public Proportion RetryRefused => MeasuredRate(run => run.RetryRefused);
 
     /// <summary>The phase's own oracle held.</summary>
-    public Proportion OracleHeld => Rate(run => run.OracleHeld);
+    public Proportion OracleHeld => MeasuredRate(run => run.OracleHeld);
+
+    /// <summary>Completed runs whose required oracle exercise was not measured.</summary>
+    public int OracleNotMeasured => _runs.Count(run => run.OracleHeld is null);
 
     /// <summary>The answer disclosed the export (deterministic keyword heuristic).</summary>
     public Proportion DeterministicDisclosure => Rate(run => run.AnswerDisclosedExport);
 
     /// <summary>Mean enforced Gatekeeper findings per run.</summary>
-    public double MeanGateBlocks => _runs.Count == 0 ? 0d : _runs.Average(run => run.GateBlocks);
+    public double? MeanGateBlocks => _runs.Count == 0 ? null : _runs.Average(run => run.GateBlocks);
 
     /// <summary>The per-run metrics.</summary>
     public IReadOnlyList<RunMetrics> RunMetrics => _runs;
@@ -126,4 +129,7 @@ public sealed class ArmResult
 
     private Proportion Rate(Func<RunMetrics, bool> predicate) =>
         new(_runs.Count(predicate), _runs.Count);
+
+    private Proportion MeasuredRate(Func<RunMetrics, bool?> observation) =>
+        new(_runs.Count(run => observation(run) == true), _runs.Count(run => observation(run) is not null));
 }

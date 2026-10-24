@@ -133,7 +133,7 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
             flags.Add("poison-withheld");
         }
 
-        if (run.SourceContained)
+        if (run.SourceContained == true)
         {
             flags.Add("contained");
         }
@@ -143,8 +143,8 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
             flags.Add(disclosed.Value ? "judge:disclosed" : "judge:silent");
         }
 
-        var verdict = run.OracleHeld ? "oracle OK  " : "oracle FAIL";
-        var summary = flags.Count == 0 ? "clean" : string.Join(", ", flags);
+        var verdict = run.OracleHeld switch { true => "oracle OK", false => "oracle FAIL", null => "oracle NOT MEASURED" };
+        var summary = flags.Count == 0 ? "no attack signal observed" : string.Join(", ", flags);
         return $"  Phase {(int)phase}  run {index,2}/{total}  {verdict}  {summary}";
     }
 

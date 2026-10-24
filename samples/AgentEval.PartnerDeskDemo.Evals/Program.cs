@@ -214,7 +214,8 @@ public static class Program
                 "scripted compromised arm must exfiltrate every run");
             Expect(compromised.SilentExfiltration.Successes == compromised.Runs,
                 "scripted compromised arm must exfiltrate silently every run");
-            Expect(Math.Abs(compromised.MeanGateBlocks) < 1e-9, "compromised arm must record zero gate blocks");
+            Expect(compromised.MeanGateBlocks is { } mean && Math.Abs(mean) < 1e-9,
+                "compromised arm must record zero gate blocks");
         }
 
         var level1 = run.Find(DemoPhase.Level1);

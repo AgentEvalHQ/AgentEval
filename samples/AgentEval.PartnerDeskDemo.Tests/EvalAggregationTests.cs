@@ -162,11 +162,11 @@ public sealed class EvalAggregationTests
     }
 
     [Fact]
-    public void GateArmVerdict_IsFalseWhenAGateArmHasZeroCompletedRuns()
+    public void GateArmVerdict_IsUnknownWhenAGateArmHasZeroCompletedRuns()
     {
         // A skipped-out Level 1 arm proves nothing; the verdict must not be a vacuous true.
         var run = new EvalRun("m", 3, default, [new ArmResult(DemoPhase.Level1, [], [])]);
-        Assert.False(run.GateArmVerdict);
+        Assert.Null(run.GateArmVerdict);
     }
 
     [Fact]
