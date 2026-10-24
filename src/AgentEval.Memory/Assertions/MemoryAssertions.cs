@@ -26,6 +26,20 @@ public static class MemoryAssertions
     [StackTraceHidden]
     public static MemoryQueryAssertions Should(this MemoryQueryResult result)
         => new(result);
+
+    [StackTraceHidden]
+    internal static void RecordNotMeasured(AssertionProbe probe, string expected, string? because)
+    {
+        var reason = $"Expected {expected}, but the relevant memory judgment was not measured";
+        if (probe.IsActive)
+            probe.MarkInconclusive(reason);
+        else
+            AgentEvalScope.FailWith(new MemoryAssertionException(reason,
+                expected: expected,
+                actual: "not measured",
+                suggestions: ["Run the relevant memory query with a judge that returns usable evidence"],
+                because: because));
+    }
 }
 
 /// <summary>
@@ -209,6 +223,10 @@ public class MemoryEvaluationAssertions
                 because: because
             ));
         }
+        else if (_result.QueryResults.Any(query => !query.Measured && query.Query.ForbiddenFacts.Count > 0))
+        {
+            MemoryAssertions.RecordNotMeasured(probe, "no forbidden facts recalled", because);
+        }
         
         return probe.Complete(this);
     }
@@ -380,6 +398,11 @@ public class MemoryQueryAssertions
     public MemoryQueryAssertions HaveScoreAtLeast(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
+        if (!_result.Measured)
+        {
+            MemoryAssertions.RecordNotMeasured(probe, $"a measured score >= {minimumScore}%", because);
+            return probe.Complete(this);
+        }
         if (_result.Score < minimumScore)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -416,6 +439,10 @@ public class MemoryQueryAssertions
                 },
                 because: because
             ));
+        }
+        else if (!_result.Measured && _result.Query.ExpectedFacts.Count > 0)
+        {
+            MemoryAssertions.RecordNotMeasured(probe, $"all {_result.Query.ExpectedFacts.Count} expected facts found", because);
         }
         
         return probe.Complete(this);
