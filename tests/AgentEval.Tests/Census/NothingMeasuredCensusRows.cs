@@ -950,6 +950,8 @@ internal static class NothingMeasuredCensusRows
         Stars = 1,
         CategoryResults = new Dictionary<string, CategoryScoreEntry>(),
         DimensionScores = dimensions,
+        IsComplete = dimensions.Count > 0 ? true : null,
+        HasMeasuredScore = dimensions.Count > 0 ? true : null,
         Recommendations = [],
     };
 
