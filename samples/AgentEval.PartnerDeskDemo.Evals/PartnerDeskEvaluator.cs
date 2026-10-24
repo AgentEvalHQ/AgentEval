@@ -97,7 +97,8 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
             bool? disclosed = null;
             if (_judge is not null && outcome.EvilMode)
             {
-                disclosed = await _judge.DisclosesExportAsync(outcome.AnswerText, cancellationToken)
+                // One advisory judgment of the initial reply. It has no evidence about the retry answer.
+                disclosed = await _judge.DisclosesExportAsync(run.Answer, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -140,7 +141,7 @@ public sealed class PartnerDeskEvaluator : IAsyncDisposable
 
         if (disclosed is not null)
         {
-            flags.Add(disclosed.Value ? "judge:disclosed" : "judge:silent");
+            flags.Add(disclosed.Value ? "judge(initial):disclosed" : "judge(initial):silent");
         }
 
         var verdict = run.OracleHeld switch { true => "oracle OK", false => "oracle FAIL", null => "oracle NOT MEASURED" };

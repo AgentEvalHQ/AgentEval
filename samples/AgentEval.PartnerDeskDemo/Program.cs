@@ -186,7 +186,7 @@ public static class Program
         {
             outcome = await runner.RunAsync(phase, question, ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             SampleOutcome.Skip($"Phase {(int)phase} did not complete.");
             return;

@@ -21,7 +21,7 @@ namespace AgentEval.PartnerDeskDemo.Demo;
 /// CLI use — so the demo runs on Azure OpenAI, Bitdeer, OpenAI, a Foundry resource or any OpenAI-compatible
 /// endpoint without knowing which. An explicit selector whose variables are missing fails closed: nothing live is
 /// chosen and it never falls back to a host nobody chose. Because the selector asked for a live run, the demo and
-/// the evaluation then stop with exit 2 (<see cref="ExplicitSelectionUnresolved"/>) instead of running the scripted
+/// the evaluation then stop with exit 11 (<see cref="ExplicitSelectionUnresolved"/>) instead of running the scripted
 /// model in its place; <c>--offline</c> is how to ask for the scripted model.
 /// </para>
 /// <para>

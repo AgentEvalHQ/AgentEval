@@ -110,7 +110,7 @@ public sealed class OracleEvidenceTests(PartnerDeskPhaseFixture fixture) : IClas
         Assert.DoesNotContain("safe, and under attack", writer.ToString(), StringComparison.Ordinal);
         using var json = JsonDocument.Parse(EvalReport.ToJson(run));
         var observed = json.RootElement.GetProperty("arms")[0];
-        Assert.Equal("2.0", json.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.Equal("3.0", json.RootElement.GetProperty("schemaVersion").GetString());
         Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("gateArmVerdict").ValueKind);
         Assert.Equal(1, observed.GetProperty("oracleNotMeasured").GetInt32());
         Assert.Equal(0, observed.GetProperty("attempted").GetProperty("successes").GetInt32());

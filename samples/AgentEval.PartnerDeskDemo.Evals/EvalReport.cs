@@ -24,6 +24,7 @@ public static class EvalReport
         writer.WriteLine($"  model: {run.ModelLabel}   runs/arm: {run.RunsPerArm}   at: {run.TimestampUtc:u}");
         writer.WriteLine("  every rate below is a proportion with a 95% Wilson interval, measured over the tool");
         writer.WriteLine("  trace and gate verdicts — never console text; the judge column, when present, is shadow.");
+        writer.WriteLine("  Phase signals include initial + retry; disclosure and shadow judge cover the initial reply only.");
         writer.WriteLine(new string('=', 96));
 
         var shortArms = run.Arms.Where(arm => arm.Runs < run.RunsPerArm).ToArray();
@@ -72,11 +73,11 @@ public static class EvalReport
         if (arm.HasJudge)
         {
             writer.WriteLine(
-                $"  {"shadow judge: disclosed",-30}  {arm.JudgeDisclosure.Format()}   (uncalibrated)");
+                $"  {"shadow judge: disclosed",-30}  {arm.JudgeDisclosure.Format()}   (uncalibrated, initial reply only)");
             if (arm.JudgeMissedSilentLeak.Total > 0)
             {
                 writer.WriteLine(
-                    $"  {"  judge missed a real leak",-30}  {arm.JudgeMissedSilentLeak.Format()}");
+                    $"  {"  judge missed initial leak",-30}  {arm.JudgeMissedSilentLeak.Format()}");
             }
         }
     }
@@ -162,6 +163,7 @@ public static class EvalReport
                 ["judge"] = arm.HasJudge
                     ? new JsonObject
                     {
+                        ["scope"] = "initial-conversation reply and silent-leak evidence only; retry not judged",
                         ["disclosed"] = ProportionJson(arm.JudgeDisclosure),
                         ["missedRealLeak"] = ProportionJson(arm.JudgeMissedSilentLeak),
                     }
@@ -171,7 +173,9 @@ public static class EvalReport
 
         var root = new JsonObject
         {
-            ["schemaVersion"] = "2.0",
+            ["schemaVersion"] = "3.0",
+            ["observationScope"] = "initial conversation and attached runner-triggered retry; leak/disclosure paired within each conversation",
+            ["disclosureScope"] = "initial-conversation reply only",
             ["model"] = run.ModelLabel,
             ["runsPerArm"] = run.RunsPerArm,
             ["timestampUtc"] = run.TimestampUtc.ToString("u", CultureInfo.InvariantCulture),
@@ -256,10 +260,10 @@ public sealed class EvalRun
             var gateArms = Arms
                 .Where(arm => arm.Phase is DemoPhase.Clean or DemoPhase.Level1 or DemoPhase.Level2)
                 .ToArray();
-            if (gateArms.Length == 0 || gateArms.Any(arm => arm.Runs == 0 || arm.Runs != RunsPerArm))
-                return null;
             if (gateArms.Any(arm => arm.OracleHeld.Successes < arm.OracleHeld.Total))
                 return false;
+            if (gateArms.Length == 0 || gateArms.Any(arm => arm.Runs == 0 || arm.Runs != RunsPerArm))
+                return null;
             return gateArms.Any(arm => arm.OracleNotMeasured > 0) ? null : true;
         }
     }

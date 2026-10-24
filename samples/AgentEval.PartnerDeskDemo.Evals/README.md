@@ -31,12 +31,16 @@ Gatekeeper's verdicts and containment state. No LLM decides whether a run
 exfiltrated; the effect ledger does.
 
 The one place an LLM appears is the optional `--judge`: an **uncalibrated,
-shadow-only** classifier that reads the agent's reply and asks whether it
+shadow-only** classifier that reads the initial conversation's reply and asks whether it
 *disclosed* the export to the officer. It never gates anything. Its disclosure
 rate is reported *next to* the deterministic keyword signal and the ground-truth
 export flag, and the report also counts how often the judge missed a real leak —
 so the judge's own errors are visible rather than trusted. That is the discipline
-Gatekeeper applies to every judge: a model name is not proof.
+Gatekeeper applies to every judge: a model name is not proof. The triggered retry belongs
+to the same phase, so attempts, effects and finding totals include it. Leak/disclosure
+signals pair each conversation's own ledger and answer before combining results.
+The judge sees one initial reply per evil phase draw; it does not judge retry disclosure,
+and a retry-only leak never enters its missed-leak denominator.
 
 ## Run it
 
@@ -64,7 +68,9 @@ place of a live one. As in the demo, `--model` / `--deployment` also completes a
 setup that has `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` but no
 `AZURE_OPENAI_DEPLOYMENT`, and never stands in for a key, an endpoint or the selector.
 
-A report with fewer completed runs than requested exits 11 (INCOMPLETE), including
+A recorded gated/clean oracle failure settles the all-runs verdict even when other
+requested draws are missing: CHECK exits 10, with missing counts retained. Otherwise,
+a report with fewer completed runs than requested exits 11 (INCOMPLETE), including
 when all requested runs failed to execute. A complete report uses the same typed
 verdict as its RESULT line: PASS exits 0, CHECK exits 10, and no deterministic gate
 verdict (n/a), missing boundary exercise or missing required runs (INCOMPLETE) exits 11.
@@ -112,7 +118,8 @@ denominator and NOT MEASURED count. Zero observed exfiltrations remain zero; the
 do not prove an unexercised policy worked. A Level 2 result-admission refusal can
 prove that boundary worked even when no malicious tool attempt followed.
 
-JSON `schemaVersion: 2.0` makes these distinctions explicit: raw attempt/effect
+JSON `schemaVersion: 3.0` records the owned-conversation observation scope and the
+initial-reply-only disclosure/judge scope. Its phase-wide raw attempt/effect
 counts retain every completed run, `oracleNotMeasured` counts unknown phase
 verdicts, and `gateArmVerdict` is nullable. Conditional oracle/retry-state rates
 use only observed values. A zero denominator has null rate/confidence bounds;

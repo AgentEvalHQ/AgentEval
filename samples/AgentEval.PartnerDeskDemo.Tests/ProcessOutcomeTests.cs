@@ -123,15 +123,19 @@ public sealed class ProcessOutcomeTests
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public async Task Evals_SomeRequestedRunsCannotComplete_ExitsEleven(int successes)
+    [InlineData(0, 11)]
+    [InlineData(1, 10)]
+    public async Task Evals_SomeRequestedRunsCannotComplete_KeepsKnownFailure(int successes, int expected)
     {
         await using var server = new LoopbackChatServer(successes);
         var result = await RunAsync(Evals, ["--runs", "2", "--arms", "1"], server.Environment);
 
-        Assert.Equal(11, result.ExitCode);
+        Assert.Equal(expected, result.ExitCode);
         Assert.Contains("SKIPPED after error", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains(successes == 0 ? "RESULT: INCOMPLETE" : "RESULT: CHECK",
+            successes == 0 ? result.StandardError : result.StandardOutput, StringComparison.Ordinal);
+        if (successes > 0)
+            Assert.DoesNotContain("RESULT: INCOMPLETE", result.StandardError, StringComparison.Ordinal);
     }
 
     [Theory]

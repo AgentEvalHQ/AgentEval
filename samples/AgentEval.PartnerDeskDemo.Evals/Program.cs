@@ -153,10 +153,12 @@ public static class Program
             return RunSelfTestAssertions(run, checkFailures);
         }
 
-        // Missing requested runs are unmeasured even when enough survived to print a report. Otherwise use
-        // the same typed gate verdict as EvalReport; the compromised arm remains model-dependent by design.
+        // A measured failure settles the all-runs predicate even when some requested draws are missing.
+        // Keep missing-only reports unmeasured; caller cancellation retains its explicit exit contract.
         if (cancelled)
             return 130;
+        if (run.GateArmVerdict == false)
+            return SampleOutcome.Warning;
         if (results.Any(arm => arm.Runs != runsPerArm))
         {
             Console.Error.WriteLine("RESULT: INCOMPLETE — some requested runs could not be measured.");
