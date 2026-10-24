@@ -111,8 +111,8 @@ public static class AdvancedMAFFeatures
 
         var mwSession = await middlewareAgent.CreateSessionAsync();
         var mwResponse = await middlewareAgent.RunAsync("Say hello in one word.", mwSession);
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"   ✅ Response (captured by middleware): {Truncate(mwResponse.Text, 100)}\n");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine($"   Response after middleware invocation: {Truncate(mwResponse.Text, 100)}\n");
         Console.ResetColor();
 
         // ─── Feature 3: Structured Output ─────────────────────────────────────
@@ -153,14 +153,13 @@ public static class AdvancedMAFFeatures
 
         Console.WriteLine($"   Original tool: {transferTool.Name}");
         Console.WriteLine($"   Wrapped tool:  {approvalRequired.Name} (requires approval)");
-        Console.WriteLine($"   ✅ Sensitive operations now gated — evaluation can verify this\n");
+        Console.WriteLine("   Approval wrapper created; no approval request or protected execution exercised.\n");
 
         // ─── Feature 5: Compaction Strategies ─────────────────────────────────
         Console.WriteLine("📝 Feature 5: Compaction — automatic conversation pruning\n");
         Console.WriteLine("   For long conversations, compaction keeps context manageable.\n");
 
-        // MessageCountingChatReducer keeps only the last N messages.
-        // We set a very small window (4 messages) so we can observe the effect.
+        // Configure a small message-history target; this example does not inspect the reduced history.
         var compactedAgent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "CompactedAgent",
@@ -168,13 +167,13 @@ public static class AdvancedMAFFeatures
             ChatHistoryProvider = new InMemoryChatHistoryProvider(
                 new InMemoryChatHistoryProviderOptions
                 {
-                    // Keep only last 4 messages — older turns are pruned by this reducer
+                    // Request a four-message target; history size and token usage are not asserted below.
                     ChatReducer = new MessageCountingChatReducer(4)
                 })
         });
 
-        Console.WriteLine("   Strategy: MessageCountingChatReducer(4) — keeps last 4 messages only");
-        Console.WriteLine("   Planting facts across 3 turns and testing recall...\n");
+        Console.WriteLine("   Strategy configured: MessageCountingChatReducer(4)");
+        Console.WriteLine("   Planting facts across 3 turns and showing the raw recall reply...\n");
 
         var compactSession = await compactedAgent.CreateSessionAsync();
         await compactedAgent.RunAsync("Remember: fact A is the first fact.", compactSession);
@@ -184,8 +183,8 @@ public static class AdvancedMAFFeatures
             "What facts do you remember? List all you know.", compactSession);
 
         Console.WriteLine($"   After 3 turns with window=4, recall: {Truncate(compactResp.Text, 160)}");
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"   ✅ Compaction keeps conversations within token budget (recent facts retained)\n");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("   Reducer configured; pruned history, token budget and fact retention are not asserted.\n");
         Console.ResetColor();
 
         // ─── Feature 6: Agent-as-Tool ─────────────────────────────────────────
@@ -209,8 +208,8 @@ public static class AdvancedMAFFeatures
         var orchResp = await orchestrator.RunAsync(
             "What will the weather be like in Amsterdam tomorrow?", orchSession);
         Console.WriteLine($"   Orchestrator response: {Truncate(orchResp.Text, 160)}");
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("   ✅ Multi-agent composition via tool delegation confirmed\n");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("   Specialist tool registered; actual delegation is not asserted.\n");
         Console.ResetColor();
 
         // ─── Feature 7: OpenTelemetry ─────────────────────────────────────────
@@ -230,16 +229,16 @@ public static class AdvancedMAFFeatures
                 configure: cfg => cfg.EnableSensitiveData = false)  // set true only in dev
             .Build();
 
-        Console.WriteLine($"   Agent '{tracedAgent.Name}' instrumented with OpenTelemetry");
+        Console.WriteLine($"   Agent '{tracedAgent.Name}' configured with OpenTelemetry middleware");
         Console.WriteLine("   Source name : AgentEval.Samples");
         Console.WriteLine("   Sensitive   : disabled (set true only in dev/test)");
         Console.WriteLine("   Exporters   : configure via Sdk.CreateTracerProviderBuilder()\n");
 
-        // Actually invoke the traced agent — spans are emitted to any registered exporter
+        // Invoke the configured agent; this sample does not listen for activities or verify export delivery.
         var tracedResp = await tracedAgent.RunAsync("Hello! Briefly confirm you are running.");
         Console.WriteLine($"   Response: {Truncate(tracedResp.Text, 120)}");
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("   ✅ All RunAsync/RunStreamingAsync calls now emit OTel spans\n");
+        Console.ForegroundColor = ConsoleColor.DarkGray;
+        Console.WriteLine("   OpenTelemetry middleware configured; span emission/export delivery is not observed.\n");
         Console.ResetColor();
 
         PrintKeyTakeaways();
@@ -312,17 +311,17 @@ public static class AdvancedMAFFeatures
 │     Use ChatResponseFormat.ForJsonSchema<T>() for stronger enforcement         │
 │                                                                                 │
 │  4. ApprovalRequired: Wrap sensitive tools for human-in-the-loop               │
-│     Evaluation can verify approval gates are in place                          │
+│     Wrapper configured here; approval flow is not exercised                    │
 │                                                                                 │
 │  5. Compaction: MessageCountingChatReducer keeps conversations trim             │
-│     Essential for long-running evaluation scenarios                            │
+│     Reducer configured; history size/token use not checked                      │
 │                                                                                 │
 │  6. Agent-as-tool: agent.AsAIFunction() for multi-agent composition            │
 │     Add description: param so orchestrator knows when to delegate              │
-│     Orchestrator delegates to specialists via tool calls                       │
+│     Specialist registered; actual delegation is not asserted                   │
 │                                                                                 │
 │  7. OpenTelemetry: agent.AsBuilder().UseOpenTelemetry(sourceName, cfg).Build() │
-│     Wraps agent in OpenTelemetryAgent for full two-layer OTel tracing           │
+│     Middleware configured; span/export delivery not asserted                   │
 │     EnableSensitiveData = false in production; true only in dev/test            │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
