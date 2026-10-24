@@ -137,6 +137,105 @@ public class PerformanceBenchmarkNotMeasuredTests
         Assert.True(leaf.Details.Dimensions!.ContainsKey("cost_usd"));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task RunCostBenchmarkAsync_FailedSibling_LeavesTotalUnknownAndRetainsObservations(int tokens)
+    {
+        var result = await Benchmark(new MixedCostAgent(tokens)).RunCostBenchmarkAsync(["ok", "fails"], "gpt-4o");
+
+        Assert.Null(result.EstimatedCostUSD);
+        Assert.Equal(2, result.TotalPrompts);
+        Assert.Equal(1, result.SuccessfulPrompts);
+        Assert.Single(result.Errors);
+        Assert.Equal(tokens * 2, result.TotalTokens);
+        Assert.Contains("observed", result.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task EvaluateAsync_CostStageFailure_WithholdsLeafAndCompositePass(int tokens)
+    {
+        // Latency sees each prompt once; throughput uses only "ok". Only the later cost-stage visit fails.
+        var result = await Benchmark(new MixedCostAgent(tokens, failOnVisit: 2)).EvaluateAsync(
+            new EvalInput("ignored", Metadata: new Dictionary<string, object?> { ["prompts"] = new[] { "ok", "fails" } }));
+
+        var cost = result.Details.SubResults!.Single(leaf => leaf.Metric.Key == "perf_cost");
+        Assert.False(cost.Score.Passed);
+        Assert.Equal(MeasurementState.NotMeasured, cost.Score.Measurement);
+        Assert.Equal(1, cost.Details.Dimensions!["errors"]);
+        Assert.False(cost.Details.Dimensions.ContainsKey("cost_usd"));
+        Assert.Contains("failed", cost.Details.Recommendations![0], StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(MeasurementState.NotMeasured, result.Score.Measurement);
+        Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ObservedCostAlreadyOverBudget_RetainsKnownFailureWithoutClaimingTotal()
+    {
+        var result = await Benchmark(new MixedCostAgent(1_000_000, failOnVisit: 2)).EvaluateAsync(
+            new EvalInput("ignored", Metadata: new Dictionary<string, object?> { ["prompts"] = new[] { "ok", "fails" } }));
+
+        var cost = result.Details.SubResults!.Single(leaf => leaf.Metric.Key == "perf_cost");
+        Assert.False(cost.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.True(cost.Details.Dimensions["observed_cost_usd"] > 1.0);
+        Assert.Equal("fail", cost.Score.Label);
+        Assert.True(cost.Score.CountsTowardAggregate());
+        Assert.False(result.Score.Passed);
+        Assert.Equal("fail", result.Score.Label);
+        Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
+    }
+
+    [Fact]
+    public async Task RunCostBenchmarkAsync_CompleteRecordedZero_RemainsMeasuredZero()
+    {
+        var result = await Benchmark(new MixedCostAgent(0)).RunCostBenchmarkAsync(["ok"], "gpt-4o");
+        var eval = await Benchmark(new MixedCostAgent(0)).EvaluateAsync(new EvalInput("ok"));
+
+        Assert.Equal(0m, result.EstimatedCostUSD);
+        var cost = eval.Details.SubResults!.Single(leaf => leaf.Metric.Key == "perf_cost");
+        Assert.True(cost.Score.Passed);
+        Assert.Equal(MeasurementState.Measured, cost.Score.Measurement);
+        Assert.Equal(0, cost.Details.Dimensions!["cost_usd"]);
+    }
+
+    [Fact]
+    public async Task RunCostBenchmarkAsync_CallerCancels_PropagatesCancellation()
+    {
+        using var source = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Benchmark(new CancelingAgent(source))
+            .RunCostBenchmarkAsync(["ok"], "gpt-4o", source.Token));
+    }
+
+    private sealed class MixedCostAgent(int tokens, int failOnVisit = 1) : IEvaluableAgent
+    {
+        private int _failedPromptVisits;
+        public string Name => "MixedCostAgent";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            if (prompt == "fails" && Interlocked.Increment(ref _failedPromptVisits) >= failOnVisit)
+                return Task.FromException<AgentResponse>(new HttpRequestException("503 after dispatch"));
+            return Task.FromResult(new AgentResponse
+            {
+                Text = "ok", ModelId = "gpt-4o",
+                TokenUsage = new TokenUsage { PromptTokens = tokens, CompletionTokens = tokens },
+            });
+        }
+    }
+
+    private sealed class CancelingAgent(CancellationTokenSource source) : IEvaluableAgent
+    {
+        public string Name => "CancelingAgent";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            source.Cancel();
+            return Task.FromCanceled<AgentResponse>(cancellationToken);
+        }
+    }
+
     /// <summary>Answers every call, on a priced model, without reporting token usage.</summary>
     private sealed class NoUsageAgent : IEvaluableAgent
     {

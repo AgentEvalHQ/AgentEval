@@ -356,6 +356,7 @@ public class PerformanceBenchmark
 
         foreach (var prompt in prompts)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var response = await _agent.InvokeAsync(prompt, cancellationToken);
@@ -371,7 +372,7 @@ public class PerformanceBenchmark
                     responsesWithoutUsage++;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 errors.Add(ex);
             }
@@ -417,8 +418,8 @@ public class PerformanceBenchmark
         }
 
         // Not measured is null, never $0: no price for the model, no prompt that returned (nothing to price), or a
-        // response that reported no usage (its tokens are unknown, so the total would be priced short).
-        var estimatedCost = pricing != null && results.Count > 0 && responsesWithoutUsage == 0
+        // response that reported no usage, or a failed dispatched call whose usage is unknown.
+        var estimatedCost = pricing != null && results.Count > 0 && responsesWithoutUsage == 0 && errors.Count == 0
             ? (totalInputTokens / 1_000_000m * pricing.Value.InputPricePerMillion) +
               (totalOutputTokens / 1_000_000m * pricing.Value.OutputPricePerMillion)
             : (decimal?)null;
@@ -474,8 +475,8 @@ public class PerformanceBenchmark
     ///         When every request failed there is no throughput: the leaf is an error, not measured.</item>
     ///   <item><b>Cost</b> — EstimatedCostUSD vs <c>CostOptions.MaxCostUSD</c> (default 0.10 USD).
     ///         score = 1 − (cost / maxCost), clamped to [0, 1]. Lower cost → higher score.
-    ///         When cost is unknown (no pricing data, no usage reported, or no prompt returned), the leaf is skipped:
-    ///         not measured, never a $0 pass.</item>
+    ///         When total cost is unknown (no pricing, missing usage, or failed prompts), the leaf cannot pass.
+    ///         A priced observed subtotal above the budget still proves failure; otherwise the leaf is skipped.</item>
     /// </list>
     /// </para>
     /// <para>
@@ -533,7 +534,7 @@ public class PerformanceBenchmark
         // ── Build the three leaf EvalResults ─────────────────────────────────
         var latencyLeaf  = BuildLatencyLeaf(latencyResult,    opts);
         var throughputLeaf = BuildThroughputLeaf(throughputResult, opts);
-        var costLeaf     = BuildCostLeaf(costResult,          opts);
+        var costLeaf     = BuildCostLeaf(costResult,          opts, plan.Pricing);
 
         var leaves = new[] { latencyLeaf, throughputLeaf, costLeaf };
         // CapByWorst over three equally weighted leaves. Weights only: aggregation reads
@@ -549,17 +550,18 @@ public class PerformanceBenchmark
         bool passed = !nothingMeasured
             && compositeScore >= opts.CompositePassThreshold
             && leaves.All(l => l.Score.Label != "fail");
-        // Latency not measured (no call returned, or some failed) withholds the composite's pass: the other leaves
-        // cannot show the latency budget held.
-        var latencyWithheld = passed && latencyLeaf.Score.Measurement == MeasurementState.NotMeasured;
-        if (latencyWithheld)
+        // Other stages cannot certify latency or cost budgets for failed dispatched operations.
+        // An unpriced model still uses the existing optional-cost policy; failed cost-stage calls are different.
+        var verdictWithheld = passed && (latencyLeaf.Score.Measurement == MeasurementState.NotMeasured
+            || costResult.Errors.Count > 0 && costLeaf.Score.Measurement == MeasurementState.NotMeasured);
+        if (verdictWithheld)
         {
             passed = false;
         }
         string label = nothingMeasured
             ? (leaves.Any(l => l.Score.Label == "error") ? "error" : "skipped")
             : passed ? "pass"
-            : latencyWithheld ? "warn"
+            : verdictWithheld ? "warn"
             : leaves.Any(l => l.Score.Severity is "critical" or "high") ? "fail"
             : "warn";
 
@@ -583,7 +585,7 @@ public class PerformanceBenchmark
             Metric: new("perf_benchmark", "Performance Benchmark", "performance", "1.0.0"),
             Score: new(compositeScore, null, label, passed, opts.CompositePassThreshold, compositeSeverity, null)
             {
-                Measurement = latencyWithheld ? MeasurementState.NotMeasured : MeasurementState.Measured,
+                Measurement = verdictWithheld ? MeasurementState.NotMeasured : MeasurementState.Measured,
             },
             Details: new(
                 Dimensions: dimensions,
@@ -781,36 +783,57 @@ public class PerformanceBenchmark
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private static EvalResult BuildCostLeaf(CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
+    private static EvalResult BuildCostLeaf(
+        CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts, ModelPricingSnapshot pricingSnapshot)
     {
         if (r.EstimatedCostUSD is null || r.SuccessfulPrompts == 0)
         {
-            // No prompt returned, a response reported no usage, or no price for the model: the cost was not measured.
-            // Skipped, so it neither passes nor counts toward the composite, and no $0 is reported. The token counts
-            // that were reported are kept.
+            // Keep observations without calling a subtotal the total. A priced lower bound can still prove failure.
+            var price = pricingSnapshot.GetPricing(r.ModelName);
+            decimal? observedCost = price is { } rate && r.SuccessfulPrompts > 0
+                ? r.TotalInputTokens / 1_000_000m * rate.InputPricePerMillion
+                  + r.TotalOutputTokens / 1_000_000m * rate.OutputPricePerMillion
+                : null;
+            var knownViolation = r.Errors.Count > 0 && opts.MaxCostUSD > 0
+                && observedCost is { } observed && (double)observed > opts.MaxCostUSD;
             var reason = r.SuccessfulPrompts == 0
                 ? $"Cost not measured: none of {r.TotalPrompts} prompts returned ({r.Errors.Count} errors), so there is " +
                   "no usage to price."
+                : r.Errors.Count > 0
+                ? $"Cost not measured: {r.Errors.Count} of {r.TotalPrompts} dispatched prompts failed; their usage is unknown. " +
+                  $"Retained tokens are an observed subtotal, not the workload total. " +
+                  (knownViolation ? $"The observed priced lower bound ${observedCost:F6} already exceeds budget ${opts.MaxCostUSD:F6}." : "The budget is not shown to hold.")
                 : r.ResponsesWithoutUsage > 0
                 ? $"Cost not measured: {r.ResponsesWithoutUsage} of {r.SuccessfulPrompts} responses reported no token " +
                   "usage, so their tokens are unknown (not zero). Use an agent whose provider reports usage."
                 : $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
                   "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
+            var dimensions = new Dictionary<string, double>
+            {
+                ["total_tokens"] = r.TotalTokens,
+                ["input_tokens"] = r.TotalInputTokens,
+                ["output_tokens"] = r.TotalOutputTokens,
+            };
+            if (r.Errors.Count > 0)
+            {
+                dimensions["errors"] = r.Errors.Count;
+                dimensions["successful"] = r.SuccessfulPrompts;
+                if (observedCost is { } lowerBound)
+                    dimensions["observed_cost_usd"] = (double)lowerBound;
+            }
             return new EvalResult(
                 Metric: new("perf_cost", "Cost", "performance", "1.0.0"),
-                Score: new(0.0, null, "skipped", false, null, "none", null),
+                Score: new(0.0, null, knownViolation ? "fail" : "skipped", false, null, knownViolation ? "critical" : "none", null)
+                {
+                    Measurement = knownViolation ? MeasurementState.Measured : MeasurementState.NotMeasured,
+                },
                 Details: new(
-                    Dimensions: new Dictionary<string, double>
-                    {
-                        ["total_tokens"] = r.TotalTokens,
-                        ["input_tokens"] = r.TotalInputTokens,
-                        ["output_tokens"] = r.TotalOutputTokens,
-                    },
+                    Dimensions: dimensions,
                     Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", reason)],
                     Recommendations: [reason],
                     SubResults: null,
                     AggregationStrategy: null),
-                Provenance: new("skipped", null, null, null, null, 0.0, false),
+                Provenance: new(knownViolation ? "code" : "skipped", null, null, null, null, 0.0, false),
                 EvaluatedAt: DateTimeOffset.UtcNow);
         }
 
@@ -1031,7 +1054,7 @@ public class CostBenchmarkResult
 
     /// <summary>
     /// Estimated cost in USD, or <see langword="null"/> when not measured: no price for the model, no prompt
-    /// returned, or a response reported no usage. Never $0 for "not measured".
+    /// returned, a dispatched prompt failed, or a response reported no usage. Never $0 for "not measured".
     /// </summary>
     public decimal? EstimatedCostUSD { get; init; }
     
@@ -1041,7 +1064,7 @@ public class CostBenchmarkResult
     public override string ToString() =>
         $"Cost Benchmark: {AgentName} ({ModelName})\n" +
         $"  Prompts: {SuccessfulPrompts}/{TotalPrompts}\n" +
-        $"  Tokens: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens} total\n" +
-        $"  Avg per prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
-        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: not measured (no price, no usage reported, or no prompt returned)");
+        $"  {(Errors.Count > 0 || ResponsesWithoutUsage > 0 ? "Observed tokens (subtotal)" : "Tokens")}: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens}\n" +
+        $"  Avg observed per successful prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
+        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: not measured (no price, missing usage, failed prompt, or no prompt returned)");
 }
