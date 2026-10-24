@@ -52,7 +52,8 @@ public static class ExternalBaselineExtensions
                 Skipped = false,
                 // The score's denominator, not the questions selected: an errored or inconclusive question is not
                 // behind the score, and counting it here made a 1-of-3 category read as measured on 3.
-                ScenarioCount = kvp.Value.ScoredQuestions
+                ScenarioCount = kvp.Value.ScoredQuestions,
+                UnmeasuredQueries = Math.Max(0, kvp.Value.TotalQuestions - kvp.Value.ScoredQuestions),
             });
 
         var dimensionScores = pentagonMapperFull?.Invoke(result.PerTypeResults, result.QuestionResults)
@@ -80,6 +81,9 @@ public static class ExternalBaselineExtensions
             OverallScore = overallScore,
             Grade = ComputeGrade(overallScore),
             Stars = ComputeStars(overallScore),
+            // Completeness follows the configured scoring denominator, including its existing judge-failure policy.
+            IsComplete = result.SelectedQuestions > 0 ? result.ScoredQuestions == result.SelectedQuestions : null,
+            HasMeasuredScore = true,
             CategoryResults = categoryResults,
             DimensionScores = dimensionScores,
             Recommendations = BuildRecommendations(result),

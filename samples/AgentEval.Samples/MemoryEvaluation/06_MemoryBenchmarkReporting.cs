@@ -158,10 +158,15 @@ public static class MemoryBenchmarkReporting
 
         Console.WriteLine($"Step {step + 1}: Export bridge (CI/CD integration)\n");
         var leaders = MemoryComparisonLeaders.Overall(allBaselines);
-        var bestBaseline = leaders[0];
-        Console.WriteLine($"   Best model: {string.Join(" = ", leaders.Select(b => b.Name))} at {bestBaseline.OverallScore:F1}%" +
-                          (leaders.Count > 1 ? " (a tie)" : ""));
-        Console.WriteLine($"   Grade: {bestBaseline.Grade}  Stars: {new string('*', bestBaseline.Stars)}{new string('o', 5 - bestBaseline.Stars)}");
+        if (leaders.Count == 0)
+            Console.WriteLine("   Best model: not established (no baseline has complete recorded evidence).");
+        else
+        {
+            var bestBaseline = leaders[0];
+            Console.WriteLine($"   Best model among complete runs: {string.Join(" = ", leaders.Select(b => b.Name))} at {bestBaseline.OverallScore:F1}%" +
+                              (leaders.Count > 1 ? " (a tie)" : ""));
+            Console.WriteLine($"   Grade: {bestBaseline.Grade}  Stars: {new string('*', bestBaseline.Stars)}{new string('o', 5 - bestBaseline.Stars)}");
+        }
         Console.WriteLine("   Ready for: JsonExporter, CsvExporter, JUnitXmlExporter, MarkdownExporter\n");
 
         // ──────────────────────────────────────────────────────────
@@ -177,11 +182,10 @@ public static class MemoryBenchmarkReporting
     private static void PrintResult(string label, MemoryBenchmarkResult result)
     {
         Console.Write($"   {label}: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green :
+        Console.ForegroundColor = !result.IsComplete ? ConsoleColor.DarkYellow : result.OverallScore >= 80 ? ConsoleColor.Green :
                                   result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.WriteLine(MemoryBenchmarkSampleSupport.FormatSummary(result));
         Console.ResetColor();
-        Console.WriteLine($"  Grade: {result.Grade}  {new string('*', result.Stars)}{new string('o', 5 - result.Stars)}");
 
         MemoryBenchmarkSampleSupport.PrintCategories(result);
         Console.WriteLine();
@@ -192,7 +196,7 @@ public static class MemoryBenchmarkReporting
         // Header
         Console.Write("   | Dimension      ");
         foreach (var bl in comparison.Baselines)
-            Console.Write($"| {Fit(bl.Name, 12),-12} ");
+            Console.Write($"| {Fit(bl.Name + (bl.IsComplete == true ? "" : "*"), 12),-12} ");
         Console.WriteLine("| Winner           |");
 
         Console.Write("   |----------------");
@@ -227,9 +231,10 @@ public static class MemoryBenchmarkReporting
 
         var leaders = MemoryComparisonLeaders.Overall(comparison.Baselines);
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(leaders.Count == 1
-            ? $"\n   Best overall: {leaders[0].Name}"
-            : $"\n   Best overall: a tie — {string.Join(", ", leaders.Select(b => b.Name))} at {leaders[0].OverallScore:F1}%");
+        Console.WriteLine(leaders.Count == 0
+            ? "\n   Best overall: not established (no baseline has complete recorded evidence)."
+            : leaders.Count == 1 ? $"\n   Best overall among complete runs: {leaders[0].Name}"
+            : $"\n   Best overall among complete runs: a tie — {string.Join(", ", leaders.Select(b => b.Name))} at {leaders[0].OverallScore:F1}%");
         Console.ResetColor();
         if (MemoryComparisonLeaders.NoneSeparated(comparison))
             Console.WriteLine("   This preset does not separate these models; a larger one (--preset standard or full) may.");
@@ -239,6 +244,8 @@ public static class MemoryBenchmarkReporting
             Console.WriteLine($"   Not a like-for-like comparison: {string.Join(", ", incomplete)} did not measure every category or question.");
             Console.ResetColor();
         }
+        if (comparison.Baselines.Any(b => b.IsComplete != true))
+            Console.WriteLine("   * Observed scores from incomplete/unverified runs remain visible; they do not establish a winner.");
         Console.WriteLine();
     }
 

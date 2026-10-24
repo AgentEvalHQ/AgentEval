@@ -139,6 +139,8 @@ public class BaselineComparerNotMeasuredTests
         Name = name,
         Timestamp = DateTimeOffset.UtcNow,
         ConfigurationId = "test-config",
+        IsComplete = true,
+        HasMeasuredScore = true,
         AgentConfig = new AgentBenchmarkConfig { AgentName = "TestAgent" },
         Benchmark = new BenchmarkExecutionInfo { Preset = "Quick", Duration = TimeSpan.FromSeconds(5) },
         OverallScore = 70,

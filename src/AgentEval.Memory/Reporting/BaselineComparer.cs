@@ -35,14 +35,14 @@ public class BaselineComparer : IBaselineComparer
             NotMeasuredBy = baselines
                 .Where(b => !b.DimensionScores.ContainsKey(dim))
                 .Select(b => b.Id)
-                .ToList()
+                .ToList(),
+            NotRankedBy = baselines.Where(b => b.IsComplete != true || b.HasMeasuredScore == false).Select(b => b.Id).ToList(),
         }).ToList();
 
-        // The best baseline (highest overall score) among those that measured at least one dimension (T13). A baseline
-        // that measured nothing has a placeholder overall 0; picking among such baselines named a "best" by list order,
-        // so with none measured there is no best (null).
+        // Keep partial observations in the comparison, but require recorded complete evidence to establish a best.
+        // A baseline that measured no dimension cannot win by its empty-run placeholder (T13).
         var bestBaseline = baselines
-            .Where(b => b.DimensionScores.Count > 0)
+            .Where(b => b.IsComplete == true && b.HasMeasuredScore != false && b.DimensionScores.Count > 0)
             .MaxBy(b => b.OverallScore);
 
         // Build radar chart data over the pentagon axes every baseline measured; an axis only some measured is

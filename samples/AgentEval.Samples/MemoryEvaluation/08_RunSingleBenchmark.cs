@@ -141,11 +141,11 @@ public static class RunSingleBenchmark
     {
         Console.WriteLine();
         Console.Write("   Result: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green :
+        Console.ForegroundColor = !result.IsComplete ? ConsoleColor.DarkYellow : result.OverallScore >= 80 ? ConsoleColor.Green :
                                   result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.Write(MemoryBenchmarkSampleSupport.FormatSummary(result));
         Console.ResetColor();
-        Console.WriteLine($"  Grade: {result.Grade}  {new string('*', result.Stars)}{new string('o', 5 - result.Stars)}  ({elapsed.TotalMinutes:F1} min)");
+        Console.WriteLine($"  ({elapsed.TotalMinutes:F1} min)");
         Console.WriteLine();
 
         MemoryBenchmarkSampleSupport.PrintCategories(result);

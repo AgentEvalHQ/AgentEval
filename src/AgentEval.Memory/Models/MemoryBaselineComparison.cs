@@ -23,8 +23,8 @@ public class MemoryBaselineComparison
     public required IReadOnlyList<DimensionComparison> Dimensions { get; init; }
 
     /// <summary>
-    /// ID of the baseline with the highest overall score among those that measured at least one dimension, or
-    /// <see langword="null"/> when none did: a baseline that measured nothing is not a contender.
+    /// ID of the highest-scoring baseline with recorded complete evidence and at least one dimension, or
+    /// <see langword="null"/> when none qualifies. Partial and unverified observations remain in Baselines.
     /// </summary>
     public required string? BestBaselineId { get; init; }
 
@@ -49,13 +49,16 @@ public class DimensionComparison
     /// <summary>IDs of the compared baselines that did not measure this dimension.</summary>
     public IReadOnlyList<string> NotMeasuredBy { get; init; } = [];
 
-    /// <summary>
-    /// Highest score across the baselines that measured this dimension, or <see langword="null"/> when none did: no
-    /// baseline scored 0 there (T13).
-    /// </summary>
-    public double? BestScore => Scores.Count > 0 ? Scores.Values.Max() : null;
+    /// <summary>Baselines whose observations remain in Scores but cannot establish a ranking because run completeness is absent or false.</summary>
+    public IReadOnlyList<string> NotRankedBy { get; init; } = [];
 
-    /// <summary>ID of the baseline with the best score for this dimension, among those that measured it.</summary>
-    /// <remarks>Returns <c>null</c> when there are no scores.</remarks>
-    public string? BestBaselineId => Scores.Count > 0 ? Scores.MaxBy(kvp => kvp.Value).Key : null;
+    /// <summary>
+    /// Highest score eligible for ranking, or null when none qualifies. Scores retains partial observations.
+    /// </summary>
+    public double? BestScore => RankedScores.Select(pair => (double?)pair.Value).Max();
+
+    /// <summary>ID with the highest eligible score for this dimension; null when none qualifies for ranking.</summary>
+    public string? BestBaselineId => RankedScores.OrderByDescending(pair => pair.Value).FirstOrDefault().Key;
+
+    private IEnumerable<KeyValuePair<string, double>> RankedScores => Scores.Where(pair => !NotRankedBy.Contains(pair.Key));
 }

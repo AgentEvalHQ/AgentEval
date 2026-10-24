@@ -34,6 +34,9 @@ public class ExternalBaselineExtensionsTests
         var entry = baseline.CategoryResults["single-session-preference"];
         Assert.Equal(1, entry.ScenarioCount);
         Assert.Equal(0, entry.Score);
+        Assert.Equal(2, entry.UnmeasuredQueries);
+        Assert.False(baseline.IsComplete);
+        Assert.True(baseline.HasMeasuredScore);
     }
 
     [Fact]
@@ -57,6 +60,8 @@ public class ExternalBaselineExtensionsTests
 
         Assert.DoesNotContain(baseline.Recommendations, r => r.Contains("not in the score", StringComparison.Ordinal));
         Assert.Equal(4, baseline.CategoryResults["single-session-preference"].ScenarioCount);
+        Assert.True(baseline.IsComplete);
+        Assert.Equal(0, baseline.CategoryResults["single-session-preference"].UnmeasuredQueries);
     }
 
     [Fact]
@@ -68,6 +73,7 @@ public class ExternalBaselineExtensionsTests
         var baseline = result.ToBaseline("run", Config);
 
         Assert.DoesNotContain(baseline.Recommendations, r => r.Contains("not in the score", StringComparison.Ordinal));
+        Assert.True(baseline.IsComplete);
     }
 
     [Fact]

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Release candidate for feedback before 1.0.0. See the [upgrade guide](docs/upgrading-to-1.0.md) for the source, result and CLI migrations from 0.43.0-beta.
 
+- Memory snapshots and manifests retain run completeness, score availability and category gaps. Partial observations remain saveable and visible; they cannot establish grades, winners or replace current/pinned canonical references. JUnit/TRX distinguish incomplete measurements from unsupported skips and measured failures. Older snapshots remain readable with completeness unrecorded. See [Memory reporting](docs/memory-evaluation.md).
+
 - The disclaimer and actual NuGet README now describe rc.1 as a prerelease, semver for stable APIs/CLI behavior from 1.0.0, and the existing Beta/Experimental exceptions. They preserve independent review, testing and hardening requirements and share the root maturity policy.
 - API snapshot guards now cover the remaining declared library assemblies and record Gatekeeper sealing, bases/interfaces and subclass-visible protected members through the existing shared renderer. Packaging dependency checks follow the actual embedded project declarations. Runtime APIs and existing maturity exceptions are unchanged.
 - MAF evaluation guidance now records the verified .NET 1.24.0 query/final-response projection, its loss of current-turn tool evidence even for tool-aware LLM judges, and the existing native `AsAgentEvaluator` alternative. No MAF or AgentEval runtime behavior changed.

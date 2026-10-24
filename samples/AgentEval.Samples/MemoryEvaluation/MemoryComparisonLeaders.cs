@@ -25,10 +25,11 @@ internal static class MemoryComparisonLeaders
     /// <summary>The baselines sharing the top overall score, in run order: one, or a tie. Empty for no baselines.</summary>
     public static IReadOnlyList<MemoryBaseline> Overall(IReadOnlyList<MemoryBaseline> baselines)
     {
-        if (baselines.Count == 0)
+        var eligible = baselines.Where(b => b.IsComplete == true && b.HasMeasuredScore != false).ToList();
+        if (eligible.Count == 0)
             return [];
-        var top = baselines.Max(b => b.OverallScore);
-        return baselines.Where(b => b.OverallScore == top).ToList();
+        var top = eligible.Max(b => b.OverallScore);
+        return eligible.Where(b => b.OverallScore == top).ToList();
     }
 
     /// <summary>
@@ -42,6 +43,8 @@ internal static class MemoryComparisonLeaders
         var leaders = new List<MemoryBaseline>();
         foreach (var baseline in baselines)
         {
+            if (baseline.IsComplete != true || baseline.HasMeasuredScore == false)
+                continue;
             if (!baseline.DimensionScores.TryGetValue(dimension, out var score))
                 continue;
             if (best is null || score > best)

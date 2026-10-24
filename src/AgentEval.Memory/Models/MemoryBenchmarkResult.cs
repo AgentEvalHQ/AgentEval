@@ -167,6 +167,9 @@ public class MemoryBenchmarkResult
     {
         var recommendations = new List<string>();
 
+        if (!IsComplete)
+            recommendations.Add($"Incomplete run: {UnmeasuredQueries} unscored question(s); observed scores do not establish a full-run grade or verdict.");
+
         // Crashed categories first: they are a run failure to fix, and they count as 0 in the score.
         foreach (var cat in CategoryResults.Where(c => c.Errored))
         {
@@ -213,7 +216,7 @@ public class MemoryBenchmarkResult
             });
         }
 
-        if (weakCategories.Count == 0)
+        if (weakCategories.Count == 0 && IsComplete)
             recommendations.Add("All categories performing well! Consider running the Full benchmark for deeper analysis.");
 
         return recommendations;

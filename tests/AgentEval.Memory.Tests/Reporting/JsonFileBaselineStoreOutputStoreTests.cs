@@ -144,6 +144,8 @@ public class JsonFileBaselineStoreOutputStoreTests : IDisposable
             AgentConfig = config,
             Benchmark = new BenchmarkExecutionInfo { Preset = "Quick", Duration = TimeSpan.FromSeconds(5) },
             OverallScore = overallScore,
+            IsComplete = true,
+            HasMeasuredScore = true,
             Grade = grade,
             Stars = 4,
             CategoryResults = new Dictionary<string, CategoryScoreEntry>

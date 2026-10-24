@@ -92,10 +92,27 @@ internal static class MemoryBenchmarkSampleSupport
 
         // Recall is accuracy, so a score below the pass mark is FAIL, as G3–G6 record it (G2 and G9 used to disagree:
         // one Quick result was FAIL in G2 and WARN in G9). Over the categories that were measured, when some were not.
-        if (!result.Passed && result.CategoryResults.Any(c => !c.Skipped && !c.Errored))
+        if (result.IsComplete && !result.Passed)
             SampleOutcome.Fail($"{label} scored {result.OverallScore:F1}% on {result.BenchmarkName}, below the 70% pass mark" +
                                (result.IsComplete && result.SkippedCategories.Count == 0 ? "" : " (over the categories that were measured)"));
+        else if (!result.IsComplete)
+            foreach (var category in result.CategoryResults.Where(c => !c.Skipped && !c.Errored && c.UnmeasuredQueries == 0 && c.Score < 70))
+                Console.WriteLine($"   Known measured failure: {category.CategoryName} scored {category.Score:F1}% below 70%; the full-run verdict is incomplete.");
     }
+
+    /// <summary>Formats observed scores without giving an incomplete run a grade or treating an empty run as zero.</summary>
+    public static string FormatSummary(MemoryBenchmarkResult result) =>
+        FormatSummary(result.OverallScore, result.Grade, result.Stars, result.HasMeasuredCategory, result.IsComplete);
+
+    /// <summary>Applies the same display rule to native and external saved snapshots.</summary>
+    public static string FormatSummary(MemoryBaseline baseline) =>
+        FormatSummary(baseline.OverallScore, baseline.Grade, baseline.Stars, baseline.HasMeasuredScore != false, baseline.IsComplete);
+
+    private static string FormatSummary(double score, string grade, int stars, bool measured, bool? complete) => !measured
+        ? "not measured (incomplete; grade not established)"
+        : complete != true
+        ? $"{score:F1}% observed ({(complete == false ? "incomplete" : "completeness not recorded")}; grade not established)"
+        : $"{score:F1}%  Grade: {grade}  {new string('*', stars)}{new string('o', 5 - stars)}";
 
     /// <summary>Prints each category, the skipped and crashed ones with their reason, and what the judge left unscored.</summary>
     public static void PrintCategories(MemoryBenchmarkResult result)
@@ -123,7 +140,7 @@ internal static class MemoryBenchmarkSampleSupport
         if (!result.IsComplete)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("     Incomplete run: a category that measured nothing counts as 0 in the overall score, so it is a lower bound.");
+            Console.WriteLine("     Incomplete run: scores describe available observations. Missing categories count as 0; unscored questions are excluded. No full-run grade or verdict is established.");
             Console.ResetColor();
         }
     }

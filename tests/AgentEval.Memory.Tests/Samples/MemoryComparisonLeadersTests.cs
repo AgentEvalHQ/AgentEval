@@ -97,6 +97,8 @@ public class MemoryComparisonLeadersTests
         AgentConfig = new AgentBenchmarkConfig { AgentName = "MemoryAgent", ModelId = name },
         Benchmark = new BenchmarkExecutionInfo { Preset = "Quick", Duration = TimeSpan.FromSeconds(5) },
         OverallScore = overall,
+        IsComplete = true,
+        HasMeasuredScore = true,
         Grade = "C",
         Stars = 3,
         CategoryResults = new Dictionary<string, CategoryScoreEntry>(),

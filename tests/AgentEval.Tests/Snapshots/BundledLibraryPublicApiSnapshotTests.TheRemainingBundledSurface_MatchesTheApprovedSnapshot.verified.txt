@@ -4020,11 +4020,14 @@ enum AgentEval.Memory.Models.BenchmarkScenarioType
     PreferenceExtraction
 class AgentEval.Memory.Models.CategoryScoreEntry
     AgentEval.Memory.Models.StochasticData Stochastic { get; init; }
+    Boolean Errored { get; init; }
     Boolean Skipped { get; init; }
     Double Score { get; init; }
     Int32 ScenarioCount { get; init; }
+    Int32 UnmeasuredQueries { get; init; }
     String Grade { get; init; }
     String Recommendation { get; init; }
+    String SkipReason { get; init; }
     ctor()
 class AgentEval.Memory.Models.CrossSessionFactResult
     Boolean Measured { get; init; }
@@ -4060,6 +4063,7 @@ class AgentEval.Memory.Models.DimensionComparison
     Double? BestScore { get; }
     IReadOnlyDictionary<String, Double> Scores { get; init; }
     IReadOnlyList<String> NotMeasuredBy { get; init; }
+    IReadOnlyList<String> NotRankedBy { get; init; }
     String BestBaselineId { get; }
     String DimensionName { get; init; }
     ctor()
@@ -4070,6 +4074,8 @@ class AgentEval.Memory.Models.ManifestAgentInfo
     String Team { get; init; }
     ctor()
 class AgentEval.Memory.Models.ManifestBaselineEntry
+    Boolean? HasMeasuredScore { get; init; }
+    Boolean? IsComplete { get; init; }
     DateTimeOffset Timestamp { get; init; }
     Double OverallScore { get; init; }
     List<String> Tags { get; init; }
@@ -4088,6 +4094,8 @@ class AgentEval.Memory.Models.ManifestBenchmarkGroup
 class AgentEval.Memory.Models.MemoryBaseline
     AgentEval.Memory.Models.AgentBenchmarkConfig AgentConfig { get; init; }
     AgentEval.Memory.Models.BenchmarkExecutionInfo Benchmark { get; init; }
+    Boolean? HasMeasuredScore { get; init; }
+    Boolean? IsComplete { get; init; }
     DateTimeOffset Timestamp { get; init; }
     Dictionary<String, AgentEval.Memory.Models.CategoryScoreEntry> CategoryResults { get; init; }
     Dictionary<String, Double> DimensionScores { get; init; }

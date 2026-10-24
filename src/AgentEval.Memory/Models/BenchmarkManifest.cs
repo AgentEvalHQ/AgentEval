@@ -91,6 +91,12 @@ public class ManifestBaselineEntry
     /// <summary>Letter grade.</summary>
     public required string Grade { get; init; }
 
+    /// <summary>Recorded run completeness; null means it was not recorded.</summary>
+    public bool? IsComplete { get; init; }
+
+    /// <summary>Recorded score availability; false denotes an empty-run placeholder, null denotes unrecorded availability.</summary>
+    public bool? HasMeasuredScore { get; init; }
+
     /// <summary>Tags for filtering.</summary>
     public List<string> Tags { get; init; } = [];
 }

@@ -197,7 +197,7 @@ public static class LongMemEvalBenchmarkDemo
         await store.SaveAsync(baseline);
 
         Console.WriteLine($"   Saved: {baseline.Name}");
-        Console.WriteLine($"   Score: {baseline.OverallScore:F1}%  Grade: {baseline.Grade}  Stars: {new string('*', baseline.Stars)}{new string('o', 5 - baseline.Stars)}");
+        Console.WriteLine($"   Score: {MemoryBenchmarkSampleSupport.FormatSummary(baseline)}");
         Console.WriteLine($"   Pentagon dimensions: {string.Join(", ", baseline.DimensionScores.Select(kv => $"{kv.Key}={kv.Value:F0}%"))}");
 
         PrintKeyTakeaways();

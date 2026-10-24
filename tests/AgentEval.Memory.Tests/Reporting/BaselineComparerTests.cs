@@ -175,6 +175,8 @@ public class BaselineComparerTests
             AgentConfig = new AgentBenchmarkConfig { AgentName = "TestAgent" },
             Benchmark = new BenchmarkExecutionInfo { Preset = "Quick", Duration = TimeSpan.FromSeconds(5) },
             OverallScore = overall,
+            IsComplete = true,
+            HasMeasuredScore = true,
             Grade = "B",
             Stars = 4,
             CategoryResults = new Dictionary<string, CategoryScoreEntry>
