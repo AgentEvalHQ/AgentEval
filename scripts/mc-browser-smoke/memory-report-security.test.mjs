@@ -76,7 +76,7 @@ async function runCase(name, data, check, tamperCdn = false) {
     results.push({ name, passed: true });
     console.log(`PASS ${name}`);
   } catch (error) {
-    const diagnostics = { pageErrors, header: await page.locator('#mastSub').textContent() };
+    const diagnostics = { pageErrors, header: await page.locator('#mastSub').textContent({ timeout: 500 }).catch(() => null) };
     results.push({ name, passed: false, error: error.message, diagnostics });
     console.error(`FAIL ${name}: ${error.message}\n${JSON.stringify(diagnostics)}`);
   } finally {
@@ -128,6 +128,32 @@ try {
     await page.evaluate(text => window.onerror(text, 'fixture', 7), attack);
     assert.equal(await page.locator('[data-report-attack]').count(), 0);
     assert.ok((await page.locator('#mastSub').innerText()).includes(attack));
+  });
+  await runCase('report directory text cannot become query or fragment syntax', fixture(), async page => {
+    const dir = 'quarter #1?mode=unsafe&label=<report>';
+    await page.locator('#reportSwitcher').waitFor({ state: 'visible' });
+    await page.locator('#reportSelect').evaluate((select, value) => select.add(new Option('Literal directory', value)), dir);
+    await page.locator('#reportSelect').selectOption(dir);
+    await page.waitForURL('http://memory-report.test/' + encodeURIComponent(dir) + '/report.html', { timeout: 2000 });
+    assert.equal(new URL(page.url()).search, '');
+    assert.equal(new URL(page.url()).hash, '');
+  });
+  await runCase('already encoded directory names retain spaces percent Unicode and punctuation', fixture(), async page => {
+    const name = 'Agent 100% café #?%2F', dir = encodeURIComponent(name);
+    await page.locator('#reportSwitcher').waitFor({ state: 'visible' });
+    await page.locator('#reportSelect').evaluate((select, value) => select.add(new Option('Encoded directory', value)), dir);
+    await page.locator('#reportSelect').selectOption(dir);
+    await page.waitForURL('http://memory-report.test/' + dir + '/report.html', { timeout: 2000 });
+    assert.equal(decodeURIComponent(new URL(page.url()).pathname.split('/')[1]), name);
+  });
+  await runCase('empty parent and malformed directory values fail closed', fixture(), async page => {
+    const before = page.url();
+    for (const dir of ['', '.', '..', '%']) {
+      assert.equal(await page.evaluate(value => {
+        try { switchReport(value); return false; } catch { return true; }
+      }, dir), true);
+      assert.equal(page.url(), before);
+    }
   });
   const external = fixture();
   external.baseline.benchmark.benchmark_source = attack;

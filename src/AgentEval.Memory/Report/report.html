@@ -480,6 +480,11 @@ function renderComparer(){
 }
 
 // Report switcher — discover sibling agent reports
+function reportDirectoryPath(dir){
+  const name=decodeURIComponent(dir);
+  if(!name||name==='.'||name==='..')throw new Error('Expected a sibling report directory.');
+  return '../'+encodeURIComponent(name)+'/';
+}
 async function discoverReports(){
   try{
     // Python http.server returns HTML directory listing for ../
@@ -492,7 +497,7 @@ async function discoverReports(){
     const currentDir=location.pathname.split('/').filter(Boolean).slice(-2,-1)[0]||'';
     for(const dir of dirs){
       try{
-        const mResp=await fetch('../'+dir+'/manifest.json');
+        const mResp=await fetch(reportDirectoryPath(dir)+'manifest.json');
         if(!mResp.ok)continue;
         const m=await mResp.json();
         reports.push({dir,name:m.agent?.name||dir,current:dir===currentDir});
@@ -505,7 +510,7 @@ async function discoverReports(){
     }
   }catch(e){}
 }
-function switchReport(dir){location.href='../'+dir+'/report.html';}
+function switchReport(dir){location.href=reportDirectoryPath(dir)+'report.html';}
 
 init();
 discoverReports();
