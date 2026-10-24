@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Release candidate for feedback before 1.0.0. See the [upgrade guide](docs/upgrading-to-1.0.md) for the source, result and CLI migrations from 0.43.0-beta.
 
+- Tool reports, stochastic summaries and successful-confirmation assertions require recorded execution without error. Summaries retain nullable execution counts; emitted and denied requests no longer read as successful. Workflow tool exceptions survive caught errors and late results into metrics and saved traces.
+- Memory fact assertions and noise diagnostics distinguish a usable numeric score from actual fact assessments. Custom judges can declare `ForbiddenFactsAssessed`; omitted or unusable assessments stay unavailable. Numeric thresholds, averaging and benchmark score-completeness policy are unchanged.
+- Interrupted streaming chat traces retain partial text without certifying prefix usage as complete accounting. Performance budgets retain known failures from already-over-budget priced lower bounds even when successful sibling responses omit usage; total cost stays unavailable.
+
 - Memory snapshots and manifests retain run completeness, score availability and category gaps. Partial observations remain saveable and visible; they cannot establish grades, winners or replace current/pinned canonical references. JUnit/TRX distinguish incomplete measurements from unsupported skips and measured failures. Older snapshots remain readable with completeness unrecorded. See [Memory reporting](docs/memory-evaluation.md).
 
 - The disclaimer and actual NuGet README now describe rc.1 as a prerelease, semver for stable APIs/CLI behavior from 1.0.0, and the existing Beta/Experimental exceptions. They preserve independent review, testing and hardening requirements and share the root maturity policy.

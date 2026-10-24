@@ -19,8 +19,9 @@ dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.1
 | Individual metrics | `MetricResult.Measured` and `NotMeasuredCause` distinguish missing input, failed/unreadable judge calls and other unavailable checks. Some compatibility score fields still contain a placeholder zero. | Check availability before using `Score` or `Passed`; retain the reason. An actually observed empty answer can still be a measured quality failure. |
 | Stochastic evaluation | Quality statistics include measured runs only; errored/judge-failed runs remain in execution/reliability accounting. | Use `Statistics`, `MeasuredCount`, `NotMeasuredCount` and `Verdict`. Do not average every `IndividualResults.Score`, including placeholders. |
 | Memory baselines | Saved observations retain `IsComplete`, `HasMeasuredScore` and category gaps. Partial snapshots stay saveable; automatic canonical promotion and winner selection require recorded complete evidence. Older snapshots have unrecorded completeness. | Qualify scores before displaying a grade or ranking. Handle a null `BestBaselineId`; refresh an older `report.html` as described in [Memory reporting](memory-evaluation.md). |
+| Memory fact diagnostics | A usable numeric score does not establish that every expected fact was found or every forbidden fact was assessed. Fact assertions and derived noise diagnostics disclose unavailable assessments. | Custom `IMemoryJudge` implementations set `MemoryJudgmentResult.ForbiddenFactsAssessed` only when they actually assessed forbidden facts; the runner carries it into `MemoryQueryResult`. Older results default to unrecorded assessment. Numeric score thresholds and averaging are unchanged. |
 | Comparison | An unpriced model cannot win as cheapest, and absent latency cannot win as fastest. If a required comparison dimension is unavailable, its relative ranking is withheld. | Inspect `CostNotMeasuredReason`, `SpeedNotMeasuredReason` and `UnrankedReason`. Missing baseline dimensions may have no dictionary entry: use `TryGetValue`. |
-| Tool/security evidence | Recorded no calls, missing capture, an attempted blocked call, execution outcome and timing are distinct facts. | Keep measured-empty separate from unknown. Missing evidence cannot justify a requested security pass; known failures remain failures. |
+| Tool/security evidence | Recorded no calls, missing capture, an attempted blocked call, execution outcome and timing are distinct facts. Reports and qualifying successful confirmations require recorded execution without error. | Keep measured-empty separate from unknown. Set `WasExecuted` on genuine executed-call fixtures. Manually constructed `ToolUsageSummary` instances supply `ExecutedCalls` when known; null cannot certify success. Missing evidence cannot justify a requested security pass; known failures remain failures. |
 
 For example, preserve the metric's availability:
 
@@ -68,12 +69,19 @@ Tool outcome and timing have separate evidence; `ToolStatistics.SuccessRate` is 
 was recorded. See [workflow contracts](workflows.md#maf-event-processing) and
 [nested workflows](workflows.md#nested-workflows-and-external-answers).
 
+A tool exception remains an executed failure even when the agent catches it and completes normally.
+`TraceRecordingChatClient` keeps partial streaming text and chunks after an early consumer break, but
+records complete token usage only after natural stream completion. Accounting consumers treat absent
+usage as unavailable, including after trace save/reload.
+
 ## Model identity, pricing and reasoning
 
 An explicit `EvaluationOptions.ModelName` selects the pricing model. Otherwise the harness can use
 `IModelIdentifiable`; the chat-client adapter takes an explicit request model before client-default
 metadata. A display name supplies no missing model identity. Unknown identity/rates or incomplete
 usage leave cost unavailable. Cost reports use a dated configured pricing baseline, not a provider invoice.
+An observed priced subtotal that already exceeds a performance budget still proves failure, even if
+other responses omitted usage. It is labelled a lower bound and does not become the workload's total.
 
 The CLI and shipped sample/demo factories wrap their constructed chat clients with
 `MinimalReasoningChatClient`. Without an explicit request level, it tries `none`, then `low` after a
