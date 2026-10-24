@@ -13,8 +13,106 @@ namespace AgentEval.Memory.Tests.Samples;
 /// provider does not serve and reported "0/0 scored, 50 selected, 0 inconclusive", exit 0: the questions were gone from
 /// the accounting and the run read as completed. One class, because <see cref="SampleOutcome"/> is process-wide state.
 /// </summary>
+[Collection("LongMemEval console")]
 public class LongMemEvalSampleSupportTests
 {
+    [Fact]
+    public void Accounting_UnscoredQuestions_KeepsFailureCategoriesAndDenominators()
+    {
+        static QuestionResult Question(string id, bool? correct, string? code, JudgeOutcomeStatus? status) => new()
+        {
+            QuestionId = id, QuestionType = "test", Question = "synthetic question", GoldAnswer = "yes",
+            AgentResponse = "synthetic answer", Correct = correct, RawScore = correct is true ? 100 : null,
+            SafeFailureCode = code, JudgeStatus = status,
+        };
+        var result = Result(4, 1, 1, 1, questions:
+        [
+            Question("scored", true, null, null), Question("agent", null, "agent_error", null),
+            Question("judge", null, null, JudgeOutcomeStatus.Empty), Question("unknown", null, null, null),
+        ]);
+
+        var text = Capture(() => LongMemEvalSampleSupport.PrintAccounting(result));
+
+        Assert.Contains("4 selected", text);
+        Assert.Contains("1 scored (1 correct, 0 wrong)", text);
+        Assert.Contains("2 judge-inconclusive", text);
+        Assert.Contains("agent_error ×1", text);
+        Assert.Contains("Empty ×1", text);
+        Assert.Contains("unknown ×1", text);
+        Assert.Contains("never counted right or wrong", text);
+    }
+
+    [Fact]
+    public void PerTypeTable_PartialAndUnscoredTypes_DisclosesActualScoreDenominators()
+    {
+        var types = new Dictionary<string, TypeResult>
+        {
+            ["a-partial"] = new() { TypeName = "a-partial", TotalQuestions = 3, ScoredQuestions = 2,
+                CorrectQuestions = 1, Duration = TimeSpan.Zero },
+            ["b-unscored"] = new() { TypeName = "b-unscored", TotalQuestions = 2, ScoredQuestions = 0,
+                CorrectQuestions = 0, Duration = TimeSpan.Zero },
+        };
+
+        var text = Capture(() => LongMemEvalSampleSupport.PrintPerTypeTable(Result(5, 2, 1, 0, types: types)));
+
+        var partial = Assert.Single(text.Split('\n'), l => l.Contains("a-partial"));
+        var unscored = Assert.Single(text.Split('\n'), l => l.Contains("b-unscored"));
+        Assert.Contains(50d.ToString("F1") + "%", partial);
+        Assert.Contains("n/a", unscored);
+        Assert.Contains("Accuracy is correct / scored", text);
+        Assert.True(text.IndexOf("a-partial", StringComparison.Ordinal) < text.IndexOf("b-unscored", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0d)]
+    [InlineData(40d)]
+    [InlineData(70d)]
+    public void Score_KnownZeroThresholdsAndAbsence_KeepTheirMeaning(double? score)
+    {
+        var expected = score is { } value ? value.ToString("F1") + "%" : "n/a";
+        Assert.Equal(expected, Capture(() => LongMemEvalSampleSupport.PrintScore(score)).Trim());
+    }
+
+    [Fact]
+    public void HaystackDelivery_NoCalls_ReportsNoAnswerAttempt()
+    {
+        var text = Capture(() => Assert.False(LongMemEvalSampleSupport.PrintHaystackDelivery([])));
+        Assert.Contains("no answer call was made", text);
+    }
+
+    [Fact]
+    public void DatasetPath_IsAbsoluteAndNamesTheExpectedDataset()
+    {
+        Assert.True(Path.IsPathFullyQualified(LongMemEvalSampleSupport.DatasetPath));
+        Assert.EndsWith(Path.Combine("src", "AgentEval.Memory", "Data", "longmemeval", "longmemeval_s_cleaned.json"),
+            LongMemEvalSampleSupport.DatasetPath);
+    }
+
+    [Theory]
+    [InlineData(" first line\nsecond line", "first line")]
+    [InlineData("short", "short")]
+    public void Describe_MultilineException_KeepsOnlyItsFirstLine(string message, string expected)
+    {
+        Assert.Equal("InvalidOperationException: " + expected,
+            LongMemEvalSampleSupport.Describe(new InvalidOperationException(message)));
+    }
+
+    [Fact]
+    public void Describe_LongException_IsBounded()
+    {
+        Assert.Equal("InvalidOperationException: " + new string('x', 160) + "…",
+            LongMemEvalSampleSupport.Describe(new InvalidOperationException(new string('x', 170))));
+    }
+
+    private static string Capture(Action action)
+    {
+        var original = Console.Out;
+        using var output = new StringWriter();
+        Console.SetOut(output);
+        try { action(); return output.ToString(); }
+        finally { Console.SetOut(original); }
+    }
     [Fact]
     public void EveryAnswerCallFailing_IsAnError_NotACompletedRun()
     {
@@ -119,7 +217,8 @@ public class LongMemEvalSampleSupportTests
         Assert.Equal("InvalidOperationException: context length exceeded", call.Error);
     }
 
-    private static ExternalBenchmarkResult Result(int selected, int scored, int correct, int agentErrors) => new()
+    private static ExternalBenchmarkResult Result(int selected, int scored, int correct, int agentErrors,
+        QuestionResult[]? questions = null, Dictionary<string, TypeResult>? types = null) => new()
     {
         BenchmarkId = "longmemeval",
         BenchmarkName = $"LongMemEval-S {selected}q",
@@ -132,17 +231,32 @@ public class LongMemEvalSampleSupportTests
         IncorrectQuestions = scored - correct,
         InconclusiveQuestions = selected - agentErrors - scored,
         AgentFailureQuestions = agentErrors,
-        PerTypeResults = new Dictionary<string, TypeResult>(),
-        QuestionResults = [],
+        PerTypeResults = types ?? new Dictionary<string, TypeResult>(),
+        QuestionResults = questions ?? [],
         Duration = TimeSpan.FromSeconds(1),
         Options = new ExternalBenchmarkOptions { DatasetMode = "S" }
     };
+
+    [Fact]
+    public async Task PromptSizeMeter_CallerCancellation_IsNotRecordedAsAProviderFailure()
+    {
+        var meter = new PromptSizeMeter(new FixedUsageClient(inputTokens: 0));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            meter.GetResponseAsync([new ChatMessage(ChatRole.User, "synthetic")], cancellationToken: cancellation.Token));
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Empty(meter.Calls);
+    }
 
     private sealed class FixedUsageClient(long inputTokens, string? fail = null) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (fail is not null)
                 throw new InvalidOperationException(fail);
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok"))
@@ -160,3 +274,6 @@ public class LongMemEvalSampleSupportTests
         public void Dispose() { }
     }
 }
+
+[CollectionDefinition("LongMemEval console", DisableParallelization = true)]
+public sealed class LongMemEvalConsoleCollection;

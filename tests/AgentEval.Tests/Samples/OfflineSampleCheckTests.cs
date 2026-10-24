@@ -161,6 +161,97 @@ public sealed class OfflineSampleCheckTests
         Assert.Contains("no row", OfflineSampleCheck.Judge(Run(0), null), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunAsync_UnreadableOrMalformedTable_FailsBeforeStartingChildren(bool malformed)
+    {
+        using var temp = TempWorkspace.Create("OfflineBadTable");
+        var table = Path.Combine(temp.Path, OfflineSampleCheck.ExpectationsFileName);
+        if (malformed) await File.WriteAllTextAsync(table, "Demo 3 a crash cannot be an expectation\n");
+        var logs = Path.Combine(temp.Path, "logs");
+        var exit = await OfflineSampleCheck.RunAsync([new("X1", "Demo")], table, "no-such-host", [],
+            TimeSpan.FromSeconds(5), logs);
+
+        Assert.Equal(SampleOutcome.Failed, exit);
+        Assert.False(Directory.Exists(logs));
+    }
+
+    [Fact]
+    public async Task RunAsync_EmptyCatalogue_IsUsageErrorInsteadOfVacuousSuccess()
+    {
+        using var temp = TempWorkspace.Create("OfflineEmpty");
+        var table = Path.Combine(temp.Path, OfflineSampleCheck.ExpectationsFileName);
+        await File.WriteAllTextAsync(table, "# no samples\n");
+        var logs = Path.Combine(temp.Path, "logs");
+        var exit = await OfflineSampleCheck.RunAsync([], table, "no-such-host", [], TimeSpan.FromSeconds(5), logs);
+
+        Assert.Equal(SampleOutcome.UsageError, exit);
+        Assert.Empty(Directory.GetFiles(logs, "*.log"));
+    }
+
+    [Theory]
+    [InlineData("x1")]
+    [InlineData("demo")]
+    public async Task RunAsync_SelectedIdOrLabel_RunsPlainAndMockWithSanitizedEnvironment(string selection)
+    {
+        using var temp = TempWorkspace.Create("OfflineEnvironment");
+        var table = Path.Combine(temp.Path, OfflineSampleCheck.ExpectationsFileName);
+        await File.WriteAllTextAsync(table, "Demo 0 synthetic plain\nDemo+mock 0 synthetic mock\nOther 0 excluded\n");
+        var script = Path.Combine(temp.Path, OperatingSystem.IsWindows() ? "check.cmd" : "check.sh");
+        // Only synthetic sentinels are installed in the parent. The actual child must remove them, close stdin,
+        // and receive its mode as arguments, rather than inheriting the parent's mock/provider configuration.
+        var source = OperatingSystem.IsWindows() ? """
+            @echo off
+            if defined OPENAI_API_KEY exit /b 20
+            if defined AGENTEVAL_SAMPLES_MOCK exit /b 21
+            if not "%AGENTEVAL_SAMPLES_NONINTERACTIVE%"=="1" exit /b 22
+            if not "%AGENTEVAL_GATEKEEPER_FORCE_OFFLINE%"=="true" exit /b 23
+            if not "%AGENTEVAL_SAMPLES_OFFLINE_CHECK%"=="1" exit /b 24
+            set /p ignored=
+            if not errorlevel 1 exit /b 25
+            echo arguments: %*
+            exit /b 0
+            """ : """
+            [ -z "$OPENAI_API_KEY" ] || exit 20
+            [ -z "$AGENTEVAL_SAMPLES_MOCK" ] || exit 21
+            [ "$AGENTEVAL_SAMPLES_NONINTERACTIVE" = "1" ] || exit 22
+            [ "$AGENTEVAL_GATEKEEPER_FORCE_OFFLINE" = "true" ] || exit 23
+            [ "$AGENTEVAL_SAMPLES_OFFLINE_CHECK" = "1" ] || exit 24
+            if read -r ignored; then exit 25; fi
+            echo "arguments: $*"
+            exit 0
+            """;
+        await File.WriteAllTextAsync(script, source);
+        var variables = new[] { "OPENAI_API_KEY", "AGENTEVAL_SAMPLES_MOCK" };
+        var previous = variables.Select(Environment.GetEnvironmentVariable).ToArray();
+        var logs = Path.Combine(temp.Path, "logs");
+        try
+        {
+            foreach (var variable in variables) Environment.SetEnvironmentVariable(variable, "synthetic-offline-sentinel");
+            var host = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
+            string[] args = OperatingSystem.IsWindows() ? ["/c", script] : [script];
+            var exit = await OfflineSampleCheck.RunAsync([new("X1", "Demo"), new("X2", "Other")], table, host, args,
+                TimeSpan.FromSeconds(30), logs, new HashSet<string> { selection });
+
+            Assert.Equal(SampleOutcome.Completed, exit);
+        }
+        finally
+        {
+            for (var i = 0; i < variables.Length; i++) Environment.SetEnvironmentVariable(variables[i], previous[i]);
+        }
+
+        var files = Directory.GetFiles(logs, "*.log").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, files.Length);
+        Assert.DoesNotContain(files, file => file.Contains("Other", StringComparison.Ordinal));
+        var plain = await File.ReadAllTextAsync(Path.Combine(logs, "X1-Demo.log"));
+        var mock = await File.ReadAllTextAsync(Path.Combine(logs, "X1+mock-Demo+mock.log"));
+        Assert.Contains("arguments: --sample Demo", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("--mock", plain, StringComparison.Ordinal);
+        Assert.Contains("arguments: --sample Demo --mock", mock, StringComparison.Ordinal);
+        Assert.DoesNotContain("Demo+mock", mock, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ProviderVariables_AreEveryCredentialAndSwitch_ButNotTheToolchain()
     {
