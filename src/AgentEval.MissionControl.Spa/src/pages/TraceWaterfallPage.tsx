@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import {
@@ -20,39 +20,28 @@ import { DataState } from "@/components/DataState";
 import { queryKeys } from "@/lib/keys";
 import {
   fetchTrace,
+  sourceQuery,
   restUrls,
   type AgentTraceDocument,
   type TraceEvent,
   TraceNotFoundError,
 } from "@/lib/rest-client";
 
-// Plan-08 T2.3 (2026-05-25): trace waterfall page (closes portal-review A3
-// drill-down gap from T2.2). The T2.2 placeholder rendered a "coming soon"
-// banner with a "Open trace JSON" link; this replaces it with a real
-// horizontal waterfall driven by the canonical AgentTrace shape served
-// from `/api/v1/runs/{runId}/trace` (BinaryEndpoints.cs MC1.3.2).
-//
-// Trace shape note: the canonical TraceEvent record in
-// src/AgentEval.Abstractions/Output/IOutputStore.cs:102 has a single
-// Timestamp per event — there are no start/end pairs or span IDs. The
-// waterfall therefore renders each event as a horizontal bar whose
-// `durationMs` is the gap to the NEXT event (the last event uses a
-// 1-pixel-equivalent tail so it stays visible). This matches the practical
-// information density: the operator wants to SEE when each step ran and
-// how long it took, not chase a span tree the trace recorder doesn't
-// emit. If a future recorder grows span-tree fidelity (Phase-3 OTLP
-// collector path), this page can be widened additively without breaking
-// the existing data shape.
+// The recorded sequence contains event timestamps, not operation spans. Bars
+// show nonnegative gaps to the next event; a minimum pixel width makes zero
+// gaps and final events visible without inventing a duration.
 
 interface WaterfallRow {
   /** Display index, padded out to keep rows on distinct y-bands. */
   index: number;
   /** "01 — agent.start" etc. — what the y-axis tick prints. */
   label: string;
-  /** Offset from the first event in ms — Bar `dataKey` for the offset stack. */
+  /** Offset from the earliest recorded event in ms — Bar `dataKey` for the offset stack. */
   startMs: number;
-  /** Duration (gap to next event) in ms — Bar `dataKey` for the bar body. */
-  durationMs: number;
+  /** Recorded timestamp difference to the next event, possibly negative; absent on the final event. */
+  gapMs: number | null;
+  /** Nonnegative gap used for drawing only. */
+  visualGapMs: number;
   /** Color band derived from event kind (see kindColor below). */
   kind: string;
   name?: string | null;
@@ -105,51 +94,17 @@ function truncate(s: string, max: number): string {
 }
 
 function projectEvents(trace: AgentTraceDocument): WaterfallRow[] {
-  const events = trace.events ?? [];
+  const events = trace.events;
   if (events.length === 0) return [];
-
-  const t0 = new Date(events[0].timestamp).getTime();
-  if (Number.isNaN(t0)) return [];
-
-  // Last event's "duration" — we don't know how long it actually ran for, so
-  // use the median gap (with a floor of 50 ms) as a visual tail. This keeps
-  // the last bar from collapsing to invisible without lying about its
-  // recorded extent (the tooltip surfaces the heuristic in the duration
-  // suffix below).
-  const gaps: number[] = [];
-  for (let i = 0; i < events.length - 1; i++) {
-    const a = new Date(events[i].timestamp).getTime();
-    const b = new Date(events[i + 1].timestamp).getTime();
-    if (!Number.isNaN(a) && !Number.isNaN(b)) {
-      gaps.push(Math.max(0, b - a));
-    }
-  }
-  const sortedGaps = gaps.slice().sort((a, b) => a - b);
-  const median =
-    sortedGaps.length === 0
-      ? 50
-      : sortedGaps[Math.floor(sortedGaps.length / 2)];
-  const tailMs = Math.max(50, median);
-
-  return events.map((event, idx) => {
-    const t = new Date(event.timestamp).getTime();
-    const startMs = Number.isNaN(t) ? 0 : t - t0;
-    let durationMs: number;
-    if (idx < events.length - 1) {
-      const next = new Date(events[idx + 1].timestamp).getTime();
-      durationMs = Number.isNaN(next) ? tailMs : Math.max(0, next - t);
-    } else {
-      durationMs = tailMs;
-    }
+  const times = events.map(event => new Date(event.timestamp).getTime());
+  if (times.some(time => !Number.isFinite(time))) return [];
+  const first = times.reduce((earliest, time) => Math.min(earliest, time), times[0]);
+  return events.map((event, index) => {
+    const gapMs = index + 1 < times.length ? times[index + 1] - times[index] : null;
     return {
-      index: idx,
-      label: eventLabel(idx, event),
-      startMs,
-      durationMs,
-      kind: event.kind,
-      name: event.name,
-      payload: event.payload,
-      timestamp: event.timestamp,
+      index, label: eventLabel(index, event), startMs: times[index] - first,
+      gapMs, visualGapMs: Math.max(0, gapMs ?? 0), kind: event.kind,
+      name: event.name, payload: event.payload, timestamp: event.timestamp,
     };
   });
 }
@@ -164,12 +119,15 @@ export function TraceWaterfallPage() {
   const { runId: runIdParam } = useParams<{ runId: string }>();
   const runId = runIdParam ? decodeURIComponent(runIdParam) : "";
 
+  const [search] = useSearchParams();
+  const sourceId = search.get("sourceId");
+
   const traceQ = useQuery({
-    queryKey: queryKeys.runs.trace(runId),
-    queryFn: () => fetchTrace(runId),
+    queryKey: queryKeys.runs.trace(runId, sourceId),
+    queryFn: () => fetchTrace(runId, sourceId),
     enabled: runId.length > 0,
-    // 404 (no trace captured) is a stable not-found state, not a transient
-    // failure — disable retry so the empty-state banner renders immediately.
+    // Absent content, unsupported formats and missing sources are stable
+    // availability responses; retrying does not create the required evidence.
     retry: (failureCount, error) => {
       if (error instanceof TraceNotFoundError) return false;
       return failureCount < 2;
@@ -179,7 +137,7 @@ export function TraceWaterfallPage() {
   return (
     <div className="space-y-5">
       <Link
-        to={runId ? `/runs/${encodeURIComponent(runId)}` : "/runs"}
+        to={runId ? `/runs/${encodeURIComponent(runId)}${sourceQuery(sourceId)}` : "/runs"}
         className="inline-flex items-center gap-1 text-sm text-accent-700 hover:text-accent-500"
       >
         <ArrowLeft size={14} /> Back to run
@@ -202,9 +160,9 @@ export function TraceWaterfallPage() {
             </p>
           )}
         </div>
-        {runId && (
+        {traceQ.data && (
           <a
-            href={restUrls.trace(runId)}
+            href={restUrls.trace(runId, sourceId)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
@@ -215,7 +173,7 @@ export function TraceWaterfallPage() {
       </header>
 
       {traceQ.isError && traceQ.error instanceof TraceNotFoundError ? (
-        <EmptyTraceBanner />
+        <TraceUnavailableBanner message={traceQ.error.message} />
       ) : (
         <DataState
           isPending={traceQ.isPending}
@@ -225,7 +183,7 @@ export function TraceWaterfallPage() {
           loadingMessage="Loading trace…"
           errorPrefix="Failed to load trace"
           isEmpty={(d) => (d.events?.length ?? 0) === 0}
-          emptyMessage={<EmptyTraceBanner />}
+          emptyMessage="The captured trace contains no events."
         >
           {(trace) => <Waterfall trace={trace} />}
         </DataState>
@@ -236,10 +194,7 @@ export function TraceWaterfallPage() {
 
 function Waterfall({ trace }: { trace: AgentTraceDocument }) {
   const rows = projectEvents(trace);
-  const totalMs =
-    rows.length === 0
-      ? 0
-      : rows[rows.length - 1].startMs + rows[rows.length - 1].durationMs;
+  const totalMs = rows.reduce((latest, row) => Math.max(latest, row.startMs), 0);
 
   // Recharts horizontal-bar height: ~28 px per row plus chart-frame chrome.
   // Cap the page height at 800 px so very long traces scroll inside the
@@ -255,7 +210,7 @@ function Waterfall({ trace }: { trace: AgentTraceDocument }) {
             <span className="text-slate-400 font-normal">({rows.length})</span>
           </h3>
           <span className="text-xs text-slate-500 font-mono">
-            Total span: {formatMs(totalMs)}
+            Observed timestamp span: {formatMs(totalMs)}
           </span>
         </header>
 
@@ -274,7 +229,7 @@ function Waterfall({ trace }: { trace: AgentTraceDocument }) {
               stroke="#94a3b8"
               fontSize={11}
               label={{
-                value: "ms from trace start",
+                value: "ms from earliest recorded event",
                 position: "insideBottom",
                 offset: -8,
                 fontSize: 11,
@@ -305,7 +260,8 @@ function Waterfall({ trace }: { trace: AgentTraceDocument }) {
               isAnimationActive={false}
             />
             <Bar
-              dataKey="durationMs"
+              dataKey="visualGapMs"
+              minPointSize={2}
               stackId="waterfall"
               isAnimationActive={false}
               radius={[2, 2, 2, 2]}
@@ -321,12 +277,12 @@ function Waterfall({ trace }: { trace: AgentTraceDocument }) {
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold text-slate-700 mb-2">Legend</h3>
         <p className="text-xs text-slate-500 mb-2">
-          Bar color is derived from each event's <code>kind</code>: red for
-          error / fail / exception, green for ok / success / complete, and
-          stable hashed hues otherwise. Last-event duration is a heuristic
-          (median inter-event gap) because the canonical{" "}
-          <code>TraceEvent</code> record carries no end timestamp — see the
-          page comment for context. Hover any bar for the full event payload.
+          Bars show gaps between recorded event timestamps, in recorded event order.
+          Operation durations were not recorded. The chart uses browser millisecond precision.
+          Final and simultaneous events use a
+          minimum visual width only; it does not contribute to the observed timestamp span.
+          Negative gaps indicate out-of-order timestamps and remain visible in the tooltip.
+          Hover a bar for the timestamp and captured payload.
         </p>
       </section>
     </div>
@@ -361,8 +317,8 @@ function WaterfallTooltip({ active, payload }: RechartsTooltipProps) {
         )}
         <dt className="text-slate-500">start</dt>
         <dd className="font-mono">{formatMs(row.startMs)}</dd>
-        <dt className="text-slate-500">duration</dt>
-        <dd className="font-mono">{formatMs(row.durationMs)}</dd>
+        <dt className="text-slate-500">gap to next event</dt>
+        <dd className="font-mono">{row.gapMs === null ? "No following event" : formatMs(row.gapMs)}</dd>
         <dt className="text-slate-500">timestamp</dt>
         <dd className="font-mono">{row.timestamp}</dd>
       </dl>
@@ -378,23 +334,10 @@ function WaterfallTooltip({ active, payload }: RechartsTooltipProps) {
   );
 }
 
-function EmptyTraceBanner() {
+function TraceUnavailableBanner({ message }: { message: string }) {
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
-      <p className="font-medium">No trace data captured for this run.</p>
-      <p className="text-amber-800">
-        Trace recording requires the in-process{" "}
-        <code className="font-mono text-xs bg-amber-100 px-1 rounded">
-          TraceRecordingAgent
-        </code>{" "}
-        wrapper around the subject agent, or{" "}
-        <code className="font-mono text-xs bg-amber-100 px-1 rounded">
-          SaveTraceFiles=true
-        </code>{" "}
-        in the AgentEval settings. If the run completed without either, this
-        page cannot render a waterfall — re-run with tracing enabled to
-        populate it.
-      </p>
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <p>{message}</p>
     </section>
   );
 }

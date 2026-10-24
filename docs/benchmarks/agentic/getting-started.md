@@ -213,7 +213,10 @@ agenteval bench agentic --preset conversational --subject MyTravelAgent --budget
 # Run calibration and write a calibration report
 agenteval bench agentic calibrate
 
-# Re-render an existing report without LLM cost
+# Retain the original report in AEF for later offline rendering
+agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt --aef-content on
+
+# Re-render the captured report without LLM cost
 agenteval render --benchmark agentic --subject MyTravelAgent
 ```
 
@@ -272,7 +275,8 @@ gates' checks, `Fail`, `Warn`, or `Averaged` — the old behaviour, the default 
 
 A report shows five statuses. `PASS`, `WARN` and `FAIL` are verdicts on the agent. `ERROR` means a check produced no
 verdict because its judge or its input failed (for example a judge reply off its rubric's scale); `SKIPPED` means
-nothing was measured. Neither is a verdict on the agent: the overall score then covers only the measured part, an
+nothing was measured. Neither is a verdict on the agent: the overall score is absent (`null` in `agentic-result.json`,
+rendered as `n/a — not measured`). A withheld `WARN` also has no overall score; measured parts remain in the detailed tables. An
 errored check is listed as "produced no verdict", not as a failure to review, and `bench agentic` exits `11`
 (indeterminate), not `9` (gate failed). The run's `summary.json`, whose schema has no ERROR, records `WARN` when part
 of the run was measured and `PENDING` when none was.
@@ -331,7 +335,12 @@ For a full per-evaluator cost-tier table and cost estimation guidance, see [Cost
 
 ## Output
 
-Each run writes to `.agenteval/benchmarks/agentic/{subject}/{timestamp}/`. The timestamp format is `yyyy-MM-dd_HH-mm-ss`.
+Native run evidence goes to `.agenteval/aef/runs/`. With `--aef-content on`, it also captures the original
+`agentic-result.json` bytes for verified offline rendering. Capture off keeps report identity and omits content;
+the renderer does not recover it from a legacy sibling. Old report folders remain readable through conversion,
+labelled as imported without original execution custody.
+
+Report exports go to `.agenteval/benchmarks/agentic/{subject}/{timestamp}/`. The timestamp format is `yyyy-MM-dd_HH-mm-ss`.
 
 ```
 .agenteval/benchmarks/agentic/MyTravelAgent/2026-05-09_10-15-00/
@@ -441,9 +450,12 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
 
 - **A `--sut mock` run measures nothing** — a canned answer graded by a placeholder judge. It exits 11 and is never stored; use it to try the command, never as a result.
 - **Telemetry evaluators require caller-supplied trace data** — `AgenticTelemetry` must be populated by the consuming application (or test harness) before invoking telemetry evaluators. AgentEval does not auto-instrument the agent runtime.
+- **Untracked token counts and latency are `null`** — use `null` for `TokensUsed` or `LatencyMsP50/P95/P99` when that reading was not tracked; `0` is a measured zero. `TokenUsageEval` skips a null count and `LatencyEval` skips a null P99. P99 alone determines the latency score; P50/P95 are supporting evidence and cannot substitute for it. Missing or invalid supporting percentiles are omitted from dimensions. Negative counts and negative or non-finite P99 produce an error. The Telemetry preset warns when a required reading is skipped.
+- **Call counts and tool latency distinguish absence from zero** — `ErrorCount`, `RetryCount`, `TotalCalls`, and `ToolLatencyMs` are nullable. Missing required readings skip the check; both numerator and denominator must be recorded for a rate. `TotalCalls` counts all attempts, including retries. Counts must be non-negative and each numerator must not exceed the total. Recorded zero calls with a zero numerator is not applicable, as is an empty tool-latency map (recorded no tool calls). A null map means not tracked. Every supplied tool latency must be finite and non-negative. Zero errors/retries with positive calls, and zero tool latency, remain measured results. Inapplicable checks are excluded from the Telemetry preset; missing or invalid required readings prevent a passing verdict.
 - **Stochastic Stability requires multiple prior runs** — at least 2 `EvalResult` objects must be supplied via `EvalInput.Metadata["run_results"]`. The evaluator returns a skipped result when fewer than 2 results are available.
 - **English-only scenarios** — all built-in benchmark scenarios and golden entries are authored in English. There are no multi-language scenario packs.
-- **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. If cost tracking is not implemented, `CostEval` scores 1.0 unconditionally (zero cost = within budget).
+- **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. A run whose cost was not tracked passes `null`, and `CostEval` and `CostQualityEfficiencyEval` report it as not measured (skipped); `0` is a measured zero (the run cost nothing) and is scored.
+- **Invalid costs are errors** — negative, NaN, or infinite `EstimatedCostUsd` produces an error without a measurement in both cost evaluators. Cost-quality efficiency also requires `Metadata["scenario_score"]`, a quality score in [0,1].
 - **No workflow-specific evaluators** — `AgentEval.Evals.Agentic` has no evaluators for multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity).
 - **No Foundry cross-calibration** — the project's relationship to upstream Foundry is **conceptual only**: about half of the rubric files are modelled on a Foundry evaluator's concept and name it in their header (see [Prompt Provenance](#prompt-provenance)). No correlation study against Foundry's evaluator SDK on a shared dataset has been run, so agreement between these evaluators and their Foundry counterparts is unmeasured. The previous `FoundryEquivalent` preset was removed because it added no operational value beyond `AgenticExecution` (see the Notes of the CHANGELOG entry that added the Agentic Evaluator Suite).
 - **Calibration coverage and overrides — see the live source-of-truth**: instead of repeating evaluator counts here (which drift between releases), inspect the live state via:
@@ -455,7 +467,7 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
     - **Pure-code telemetry** (`cost`, `error_rate`, `latency`, `retry_rate`, `token_usage`, `tool_latency`): derive scores from caller-supplied `AgenticTelemetry` payloads — no LLM judge involved.
     - **Operational aggregates** (`stochastic_stability`, `cost_quality_efficiency`): consume prior `EvalResult` collections and compute variance / efficiency stats — no LLM involvement.
     - **Judge-quality meta** (`calibration_accuracy`, `judge_agreement`, `judge_drift`): consume other evaluators' outputs as input — their `EvalInput.Metadata` contract is incompatible with the calibration golden's `query/response` shape.
-    - **Golden cases that cannot be graded as written** (`long_conversation_coherence`, `self_correction_quality`, `plan_formulation_quality`). A `CalibrationEntry` can carry `conversationHistory`, `context` and `toolCalls`, which the other multi-turn and trace evaluators now get. These three need new golden cases or an evaluator change: the first one's cases describe the conversation instead of containing it, the second's correction turn has room for one message, and the third's only failing case is skipped as having no plan.
+    - **Golden cases that cannot be graded as written** (`long_conversation_coherence`, `self_correction_quality`, `plan_formulation_quality`). A `CalibrationEntry` can carry `conversationHistory`, `context`, `toolCalls`, `groundTruth` and `systemMessage`, which the other multi-turn and trace evaluators now get. `systemMessage` is the agent's instructions, passed as `EvalInput.SystemMessage`: `task_adherence`'s rule, procedural, presentation and authorization judges grade against them and are not measured without them (the four shipped `task_adherence` goldens carry these instructions as `cal-tad-001` through `cal-tad-004`). These three need new golden cases or an evaluator change: the first one's cases describe the conversation instead of containing it, the second's correction turn has room for one message, and the third's only failing case is skipped as having no plan.
     - **Deterministic non-LLM** (`f1_score`): token-overlap math with no judge, so calibrating it would not measure a judge.
 
   Active per-category thresholds are recorded in the calibration markdown report header. The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.
@@ -473,3 +485,7 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
 - [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.
+
+### Missing scores in reports
+
+Nested summary scores and compliance evidence `controls[].passRate` are explicit `null` when no score was measured. A measured zero remains numeric `0`. Markdown, PDF and Mission Control show missing values as `n/a`; partial agentic categories retain the average of their measured evaluators. Consumers must handle nullable scores and rates, including the GraphQL matrix field. Legacy numeric documents still deserialize and validate; this change does not reinterpret historical numeric placeholders without their original measurement evidence.

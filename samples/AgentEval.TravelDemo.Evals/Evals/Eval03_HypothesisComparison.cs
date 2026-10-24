@@ -32,6 +32,7 @@ public static class Eval03_HypothesisComparison
         // ── Age warnings ────────────────────────────────────────────────────────
         if (agentSnapshot is null)
         {
+            SampleOutcome.Skip("Eval 03: no agent snapshot available.");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  No agent snapshot found. Run Eval 1 first.\n");
             Console.ResetColor();
@@ -45,6 +46,7 @@ public static class Eval03_HypothesisComparison
 
         if (workflowSnapshot is null)
         {
+            SampleOutcome.Skip("Eval 03: no workflow snapshot available.");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  ⚠️  No workflow snapshot found. Run Eval 2 first.\n");
             Console.ResetColor();
@@ -58,11 +60,24 @@ public static class Eval03_HypothesisComparison
 
         Console.WriteLine();
 
+        // ── Provenance: architecture must be the ONLY difference ─────────────────
+        // Each eval picks its provider and model from the environment at run time, and grades with that same model.
+        // Two snapshots from different models (or one that does not say) compare hosts and judges as much as
+        // architectures, so the hypothesis verdict is withheld. Warned either way; the models are named only with
+        // --show-model. So is a side whose structure / tool / policy checks FAILED (or were not recorded): its quality
+        // score says nothing about a run that did not do the job, and comparing scores would hide that.
+        var noVerdict = agentSnapshot is not null && workflowSnapshot is not null
+            ? ForSingleRuns(agentSnapshot, workflowSnapshot, Config.ShowModel)
+            : null;
+        PrintProvenanceWarning(noVerdict);
+        if (noVerdict is not null) SampleOutcome.Skip($"Eval 03: {noVerdict.Short}");
+
         // ── Main comparison panel ────────────────────────────────────────────────
         EvalPrinter.PrintComparison(
             agentSnapshot,
             workflowSnapshot,
-            label: "Eval 03 — Hypothesis: Single Agent vs Workflow");
+            label: "Eval 03 — Hypothesis: Single Agent vs Workflow",
+            noVerdictReason: noVerdict?.Short);
 
         // ── Per-criterion diff (only when both snapshots are present) ────────────
         if (agentSnapshot is { CriteriaDetails.Count: > 0 }
@@ -85,10 +100,18 @@ public static class Eval03_HypothesisComparison
             Console.ResetColor();
             Console.WriteLine();
 
+            var stochNoVerdict = agentStoch is not null && workflowStoch is not null
+                ? ForStochastic(agentStoch, workflowStoch, Config.ShowModel)
+                : null;
+            PrintProvenanceWarning(stochNoVerdict);
+            if (agentStoch is null || workflowStoch is null || stochNoVerdict is not null)
+                SampleOutcome.Skip("Eval 03: stochastic snapshots do not support a comparison verdict.");
+
             EvalPrinter.PrintStochasticComparison(
                 agentStoch,
                 workflowStoch,
-                label: "Eval 03 — Stochastic Spread: Agent vs Workflow");
+                label: "Eval 03 — Stochastic Spread: Agent vs Workflow",
+                noVerdictReason: stochNoVerdict?.Short);
         }
         else
         {
@@ -104,6 +127,114 @@ public static class Eval03_HypothesisComparison
         Console.ResetColor();
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>Why a pair of snapshots gets no hypothesis verdict: a short form for the panel, a full one above it.</summary>
+    internal sealed record NoVerdict(string Short, string Long);
+
+    /// <summary>Eval 1 vs Eval 2: the same model, and both sides' structure / tool / policy checks recorded as passed.</summary>
+    internal static NoVerdict? ForSingleRuns(EvalSnapshot agent, EvalSnapshot workflow, bool showModel) =>
+        NoVerdictReason("Eval 1", agent.ModelIdentity, "Eval 2", workflow.ModelIdentity, erroredRuns: 0, showModel,
+                        leftChecksPassed: agent.StructurePassed, rightChecksPassed: workflow.StructurePassed);
+
+    /// <summary>
+    /// Eval 4 vs Eval 5: the same model, every run measured, and every measured run scored — a spread over fewer runs
+    /// than were attempted is not the spread it claims (a workflow run with no output used to drop out of it).
+    /// </summary>
+    internal static NoVerdict? ForStochastic(StochasticSnapshot agent, StochasticSnapshot workflow, bool showModel) =>
+        NoVerdictReason("Eval 4", agent.ModelIdentity, "Eval 5", workflow.ModelIdentity,
+                        erroredRuns: agent.ErroredRuns + workflow.ErroredRuns, showModel,
+                        unscoredRuns: agent.UnscoredRuns is { } a && workflow.UnscoredRuns is { } w ? a + w : null);
+
+    /// <summary>
+    /// Null when architecture is the only recorded difference between the two snapshots and both are sound; otherwise
+    /// why not. Pure, so the self-test can check it, and it names the models only when <paramref name="showModel"/>.
+    /// </summary>
+    /// <param name="leftEval">The left snapshot's eval, for the message ("Eval 1").</param>
+    /// <param name="leftIdentity">Its <c>model@provider</c>, or null when not recorded.</param>
+    /// <param name="rightEval">The right snapshot's eval.</param>
+    /// <param name="rightIdentity">Its <c>model@provider</c>, or null when not recorded.</param>
+    /// <param name="erroredRuns">Runs not measured across both snapshots.</param>
+    /// <param name="showModel">Whether the message may name the models.</param>
+    /// <param name="leftChecksPassed">The left run's structure / tool / policy checks; false = failed, null = not recorded.</param>
+    /// <param name="rightChecksPassed">The same for the right run.</param>
+    /// <param name="unscoredRuns">Measured runs with no judge score across both snapshots; null = not recorded.</param>
+    internal static NoVerdict? NoVerdictReason(string leftEval, string? leftIdentity, string rightEval, string? rightIdentity,
+                                               int erroredRuns, bool showModel,
+                                               bool? leftChecksPassed = true, bool? rightChecksPassed = true, int? unscoredRuns = 0)
+    {
+        switch (Provenance.Compare(leftIdentity, rightIdentity))
+        {
+            case ProvenanceMatch.Different:
+                return new NoVerdict(
+                    "the two snapshots come from different models",
+                    showModel
+                        ? $"{leftEval} ran on {leftIdentity} and {rightEval} on {rightIdentity}: the comparison is between models " +
+                          "and judges as much as architectures. Re-run both on one model for a verdict."
+                        : $"{leftEval} and {rightEval} ran on different models (--show-model names them): the comparison is between " +
+                          "models and judges as much as architectures. Re-run both on one model for a verdict.");
+            case ProvenanceMatch.Unknown:
+                var unrecorded = (leftIdentity, rightIdentity) switch
+                {
+                    (null, null) => $"The {leftEval} and {rightEval} snapshots were",
+                    (null, _)    => $"The {leftEval} snapshot was",
+                    _            => $"The {rightEval} snapshot was",
+                };
+                return new NoVerdict(
+                    "a snapshot does not record its model",
+                    $"{unrecorded} saved before snapshots recorded their model, so nobody knows whether only the " +
+                    "architecture differs. Re-run for a verdict.");
+        }
+        // A side that FAILED its deterministic checks did not do the job: no score comparison may stand in for that.
+        var failed = new[] { (leftEval, leftChecksPassed), (rightEval, rightChecksPassed) }.Where(s => s.Item2 == false).Select(s => s.Item1).ToList();
+        if (failed.Count > 0)
+        {
+            var who = string.Join(" and ", failed);
+            return new NoVerdict(
+                $"{who} FAILED structure / tool / policy checks",
+                $"{who} FAILED {(failed.Count > 1 ? "their" : "its")} structure / tool / policy checks (RESULT: FAIL): " +
+                "comparing quality scores would hide that. Fix the failure and re-run for a verdict.");
+        }
+        var unrecordedChecks = new[] { (leftEval, leftChecksPassed), (rightEval, rightChecksPassed) }.Where(s => s.Item2 is null).Select(s => s.Item1).ToList();
+        if (unrecordedChecks.Count > 0)
+        {
+            var who = string.Join(" and ", unrecordedChecks);
+            return new NoVerdict(
+                "a snapshot does not record its structure checks",
+                $"The {who} snapshot{(unrecordedChecks.Count > 1 ? "s were" : " was")} saved before snapshots recorded the structure / tool / " +
+                "policy checks, so nobody knows whether the run passed them. Re-run for a verdict.");
+        }
+        if (erroredRuns > 0)
+        {
+            return new NoVerdict(
+                "some runs were not measured",
+                $"{erroredRuns} run(s) across {leftEval} and {rightEval} failed on the model call or the judge and were not " +
+                "measured: the spreads cover fewer runs than they claim. Re-run for a verdict.");
+        }
+        if (unscoredRuns is null)
+        {
+            return new NoVerdict(
+                "a snapshot does not record its unscored runs",
+                $"The {leftEval} or {rightEval} snapshot was saved before snapshots recorded runs with no judge score, so " +
+                "nobody knows whether the spreads cover every run. Re-run for a verdict.");
+        }
+        if (unscoredRuns > 0)
+        {
+            return new NoVerdict(
+                "some runs have no judge score",
+                $"{unscoredRuns} run(s) across {leftEval} and {rightEval} produced no judge score (no output, or a failed " +
+                "structure the judge gave no verdict on). They count as FAILED in the pass rates, but the spreads cover " +
+                "fewer runs than were attempted. Re-run for a verdict.");
+        }
+        return null;
+    }
+
+    private static void PrintProvenanceWarning(NoVerdict? noVerdict)
+    {
+        if (noVerdict is null) return;
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"  ⚠️  No hypothesis verdict: {noVerdict.Long}\n");
+        Console.ResetColor();
     }
 
     private static void PrintCriteriaDiff(

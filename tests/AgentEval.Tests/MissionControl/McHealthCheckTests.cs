@@ -15,6 +15,8 @@ namespace AgentEval.Tests.MissionControl;
 /// replaces the curl-based Docker HEALTHCHECK. Covers loopback URL/port resolution and the
 /// status→exit-code mapping (the network GET itself needs a running server and is not unit-tested here).
 /// </summary>
+// RunAsync changes process-wide ASPNETCORE_URLS; isolate it from concurrent web-host startup.
+[Collection("EnvVarTests")]
 public class McHealthCheckTests
 {
     [Fact]

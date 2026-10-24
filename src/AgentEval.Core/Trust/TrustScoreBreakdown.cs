@@ -33,7 +33,7 @@ public enum TrustBand
 /// <param name="Weight">Its weight.</param>
 /// <param name="WeightedContribution">Points it added to the 0-100 composite (0 when excluded).</param>
 /// <param name="Included">Whether it contributed to the composite.</param>
-/// <param name="ExclusionReason">Why it was excluded (skipped / error / non-positive weight), or null when included.</param>
+/// <param name="ExclusionReason">Why it was excluded (skipped / error / inapplicable / non-positive weight), or null when included.</param>
 public sealed record TrustSignalContribution(
     string Name,
     double Score,
@@ -71,13 +71,13 @@ public static class TrustScoreBreakdownCalculator
         var result = TrustScoreCalculator.Compute(signals);
 
         var weightSum = signals
-            .Where(s => s.Label is not ("skipped" or "error") && s.Weight > 0)
+            .Where(s => !TrustScoreCalculator.IsNotMeasured(s.Label) && s.Weight > 0)
             .Sum(s => s.Weight);
 
         var contributions = new List<TrustSignalContribution>(signals.Count);
         foreach (var signal in signals)
         {
-            if (signal.Label is "skipped" or "error")
+            if (TrustScoreCalculator.IsNotMeasured(signal.Label))
             {
                 contributions.Add(new(signal.Name, signal.Score, signal.Weight, 0.0, Included: false, signal.Label));
                 continue;

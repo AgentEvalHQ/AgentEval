@@ -12,6 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Reuse the same internal sample outcome implementation without widening its visibility. -->
+    <Compile Include="../AgentEval.Samples/SampleOutcome.cs" Link="SampleOutcome.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The demo under evaluation. Reusing its runner, tools, MCP boundary, gates, recorded-trajectory types
          and deterministic oracle means the eval measures exactly what the demo does — no second implementation
          of the scenario to drift. The ProjectReference also lands the demo's binary next to this one so the

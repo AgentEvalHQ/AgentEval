@@ -38,12 +38,14 @@ public static class WorkflowEvaluationReal
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
         Console.WriteLine("📝 Step 1: Building real MAF Workflow with WorkflowBuilder...\n");
 
-        var (workflow, executorIds) = CreateWorkflow();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = CreateWorkflow(timing);
 
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
@@ -109,6 +111,7 @@ public static class WorkflowEvaluationReal
                 Console.WriteLine("   ⏱️ Workflow exceeded 5-minute hard timeout — moving on.");
                 Console.ResetColor();
                 Console.WriteLine("   💡 This can happen with slow LLM backends or long content-generation chains.");
+                SampleOutcome.Fail("the workflow did not finish within the 5-minute hard timeout");
                 return;
             }
 
@@ -121,11 +124,14 @@ public static class WorkflowEvaluationReal
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("   💡 Tip: Ensure your model deployment supports the request and has enough quota.");
+            SampleOutcome.Error($"the workflow run threw: {ex.Message}");
             return;
         }
 
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
+
+        RecordHarnessVerdict(testResult);
 
         if (testResult.ExecutionResult != null)
         {
@@ -149,8 +155,7 @@ public static class WorkflowEvaluationReal
 
                 if (!string.IsNullOrEmpty(step.Output))
                 {
-                    var snippet = step.Output.Length > 120 ? step.Output[..117] + "..." : step.Output;
-                    Console.WriteLine($"         → \"{snippet}\"");
+                    Console.WriteLine($"         → \"{Snippet(step.Output, 120)}\"");
                 }
                 Console.WriteLine();
             }
@@ -158,62 +163,54 @@ public static class WorkflowEvaluationReal
 
         Console.WriteLine("📝 Step 6: Workflow assertions...\n");
 
-        if (testResult.ExecutionResult != null)
+        if (testResult.ExecutionResult is { } executed)
+        {
+            // Three independent blocks, each its own try: one failed block (the total time, on a slow model) used to
+            // skip the per-executor and graph checks after it, so they were never reported.
+            Check("Basic workflow structure", () => executed.Should()
+                .HaveStepCount(4, because: "pipeline has 4 distinct stages")
+                .HaveExecutedInOrder("Planner", "Researcher", "Writer", "Editor")
+                .HaveCompletedWithin(TimeSpan.FromMinutes(3), because: "reasonable time for content generation")
+                .HaveNoErrors(because: "clean execution is required")
+                .HaveNonEmptyOutput()
+                .Validate());
+
+            Check("Per-executor", () => executed.Should()
+                .ForExecutor("Planner")
+                    .HaveNonEmptyOutput()
+                    .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "planning should be reasonably fast")
+                    .And()
+                .ForExecutor("Researcher")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .ForExecutor("Writer")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .ForExecutor("Editor")
+                    .HaveNonEmptyOutput()
+                    .And()
+                .Validate());
+
+            Check("Graph structure and routing", () => executed.Should()
+                .HaveGraphStructure()
+                .HaveNodes("Planner", "Researcher", "Writer", "Editor")
+                .HaveEntryPoint("Planner", because: "planning is the starting point")
+                .HaveTraversedEdge("Researcher", "Writer")
+                .HaveUsedEdgeType(EdgeType.Sequential)
+                .HaveExecutionPath("Planner", "Researcher", "Writer", "Editor")
+                .Validate());
+        }
+
+        static void Check(string block, Action validate)
         {
             try
             {
-                var result = testResult.ExecutionResult;
-
-                // Basic workflow structure assertions
-                result.Should()
-                    .HaveStepCount(4, because: "pipeline has 4 distinct stages")
-                    .HaveExecutedInOrder("Planner", "Researcher", "Writer", "Editor")
-                    .HaveCompletedWithin(TimeSpan.FromMinutes(3), because: "reasonable time for content generation")
-                    .HaveNoErrors(because: "clean execution is required")
-                    .HaveNonEmptyOutput()
-                    .Validate();
-
-                Console.WriteLine("   ✅ Basic workflow structure assertions PASSED!\n");
-
-                // Per-executor assertions
-                result.Should()
-                    .ForExecutor("Planner")
-                        .HaveNonEmptyOutput()
-                        .HaveCompletedWithin(TimeSpan.FromSeconds(60), because: "planning should be reasonably fast")
-                        .And()
-                    .ForExecutor("Researcher")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .ForExecutor("Writer")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .ForExecutor("Editor")
-                        .HaveNonEmptyOutput()
-                        .And()
-                    .Validate();
-
-                Console.WriteLine("   ✅ Per-executor assertions PASSED!\n");
-
-                // Graph structure assertions
-                result.Should()
-                    .HaveGraphStructure()
-                    .HaveNodes("Planner", "Researcher", "Writer", "Editor")
-                    .HaveEntryPoint("Planner", because: "planning is the starting point")
-                    .HaveTraversedEdge("Researcher", "Writer")
-                    .HaveUsedEdgeType(EdgeType.Sequential)
-                    .HaveExecutionPath("Planner", "Researcher", "Writer", "Editor")
-                    .Validate();
-
-                Console.WriteLine("   ✅ Graph structure and routing assertions PASSED!\n");
+                validate();
+                Console.WriteLine($"   ✅ {block} assertions PASSED!\n");
             }
             catch (WorkflowAssertionException ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Workflow assertion failed: {ex.Message}");
-                if (ex.Data.Contains("Suggestions"))
-                    Console.WriteLine($"   💡 Suggestion: {ex.Data["Suggestions"]}");
-                Console.ResetColor();
-                Console.WriteLine();
+                PrintAssertionFailure(ex);
             }
         }
 
@@ -246,10 +243,67 @@ public static class WorkflowEvaluationReal
     }
 
     /// <summary>
+    /// One line of at most <paramref name="max"/> characters: line breaks become spaces, and a cut never splits an
+    /// emoji's surrogate pair (which printed as a replacement glyph).
+    /// </summary>
+    internal static string Snippet(string text, int max)
+    {
+        var line = text.ReplaceLineEndings(" ");
+        if (line.Length <= max)
+            return line;
+
+        var cut = max - 3;
+        if (char.IsHighSurrogate(line[cut - 1]))
+            cut--;
+        return line[..cut] + "...";
+    }
+
+    /// <summary>
+    /// The harness's own verdict on the test case (executor order, expected output, duration), recorded for the
+    /// runner. Shared with C3, which runs the same harness over its TripPlanner pipeline.
+    /// </summary>
+    internal static void RecordHarnessVerdict(WorkflowTestResult testResult)
+    {
+        if (testResult.ExecutionResult is null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   ❌ The workflow produced no execution result: {testResult.Error?.Message ?? "no error recorded"}");
+            Console.ResetColor();
+            SampleOutcome.Error($"the workflow produced no execution result: {testResult.Error?.Message ?? "no error recorded"}");
+            return;
+        }
+
+        if (!testResult.Passed)
+        {
+            var why = testResult.FailureMessages is { Count: > 0 } messages ? string.Join("; ", messages) : "no failure message";
+            SampleOutcome.Fail($"'{testResult.TestName}' failed the harness checks: {why}");
+        }
+    }
+
+    /// <summary>
+    /// Prints a failed assertion chain as its list of failures and records it. The exception's
+    /// <see cref="Exception.Message"/> also carries the whole execution result as context, which renders as a
+    /// raw record dump (<c>Steps = System.Collections.Generic.List…</c>); the failures say what went wrong.
+    /// </summary>
+    internal static void PrintAssertionFailure(WorkflowAssertionException ex)
+    {
+        var failures = ex.Failures.Count > 0 ? ex.Failures : [ex.Message.Split('\n')[0]];
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"   ❌ Workflow assertion failed ({failures.Count} issue(s)):");
+        foreach (var failure in failures)
+            Console.WriteLine($"      • {failure}");
+        Console.ResetColor();
+        foreach (var suggestion in ex.Suggestions ?? [])
+            Console.WriteLine($"   💡 Suggestion: {suggestion}");
+        Console.WriteLine();
+        SampleOutcome.Fail($"workflow assertion failed: {string.Join("; ", failures)}");
+    }
+
+    /// <summary>
     /// Builds a real MAF Workflow using WorkflowBuilder with 4 ChatClientAgent executors.
     /// Planner → Researcher → Writer → Editor (sequential prompt-chaining pipeline).
     /// </summary>
-    private static (Workflow workflow, string[] executorIds) CreateWorkflow()
+    private static (Workflow workflow, string[] executorIds) CreateWorkflow(MAFWorkflowInstrumentation timing)
     {
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -334,14 +388,14 @@ public static class WorkflowEvaluationReal
 
         // ── Build the sequential workflow: Planner → Researcher → Writer → Editor ──
 
-        var workflow = new WorkflowBuilder(plannerBinding)
+        var workflowBuilder = new WorkflowBuilder(plannerBinding)
             .AddEdge(plannerBinding, researcherBinding)
             .AddEdge(researcherBinding, writerBinding)
             .AddEdge(writerBinding, editorBinding)
             .WithOutputFrom(editorBinding)
             .WithName("ContentPipeline")
-            .WithDescription("Sequential content creation pipeline: plan → research → write → edit")
-            .Build();
+            .WithDescription("Sequential content creation pipeline: plan → research → write → edit");
+        var workflow = timing.Build(workflowBuilder);
 
         return (workflow, ["Planner", "Researcher", "Writer", "Editor"]);
     }

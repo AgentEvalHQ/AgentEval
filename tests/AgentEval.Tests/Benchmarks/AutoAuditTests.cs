@@ -91,6 +91,7 @@ public class AutoAuditTests
 
         // Assert — three endpoints, the clean one wins, the PII-leaking one has a gate block
         Assert.Equal(3, report.Results.Count);
+        Assert.All(report.Results, result => Assert.True(result.TokensReported));
         Assert.Equal(AutoAuditDemo.CleanEndpoint, report.Winner!.Endpoint);
         Assert.Equal(1.0, report.Winner.FidelityScore, 6);
 

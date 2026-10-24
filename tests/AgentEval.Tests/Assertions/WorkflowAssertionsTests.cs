@@ -675,6 +675,59 @@ public class WorkflowAssertionsTests
         Assert.Null(exception);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FAILURE CONTEXT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Validate_FailureContext_SummarisesTheRun_NotTheRecordDump()
+    {
+        // Regression: the context was the record's ToString(), which printed
+        // "Steps = System.Collections.Generic.List`1[AgentEval.Models.ExecutorStep]" instead of the steps.
+        var result = CreateTestResult(("Planner", "plan"), ("Researcher", "notes")) with
+        {
+            TotalDuration = TimeSpan.FromSeconds(12.5),
+            Errors = [new WorkflowError { ExecutorId = "Writer", Message = "model quota exceeded\nretry later" }]
+        };
+
+        var exception = Assert.Throws<WorkflowAssertionException>(() =>
+            result.Should().HaveStepCount(4).Validate());
+
+        Assert.Equal(
+            "Executors: Planner → Researcher\n" +
+            $"Steps: 2, total duration: {12.5:F1}s\n" +
+            "Errors: 1: Writer: model quota exceeded retry later",
+            exception.Context);
+        Assert.Contains("Context:\n  Executors: Planner → Researcher", exception.Message.ReplaceLineEndings("\n"));
+        Assert.DoesNotContain("System.Collections.Generic", exception.Message);
+    }
+
+    [Fact]
+    public void Validate_FailureContext_StaysShort_HoweverLongTheRun()
+    {
+        var steps = Enumerable.Range(1, 50).Select(i => ($"agent{i}", new string('x', 500))).ToArray();
+        var result = CreateTestResult(steps) with
+        {
+            FinalOutput = new string('y', 20_000),
+            OriginalPrompt = new string('z', 20_000),
+            Errors = Enumerable.Range(1, 10)
+                .Select(i => new WorkflowError { ExecutorId = $"agent{i}", Message = new string('e', 1_000) })
+                .ToList()
+        };
+
+        var exception = Assert.Throws<WorkflowAssertionException>(() =>
+            result.Should().HaveStepCount(1).Validate());
+
+        Assert.True(exception.Context!.Length < 1_200, $"Context is {exception.Context.Length} chars long.");
+        Assert.StartsWith("Executors: agent1 → agent2 → ", exception.Context);
+        Assert.Contains("agent12 → ... (+38 more)", exception.Context);
+        Assert.Contains("Steps: 50,", exception.Context);
+        Assert.Contains("Errors: 10: agent1: eee", exception.Context);
+        Assert.EndsWith("; ... (+7 more)", exception.Context);
+        Assert.DoesNotContain("yyyy", exception.Message);
+        Assert.DoesNotContain("zzzz", exception.Message);
+    }
+
     [Fact]
     public void ForStep_InvalidIndex_ThrowsException()
     {

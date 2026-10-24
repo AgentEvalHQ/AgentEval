@@ -177,16 +177,21 @@ public class StochasticRunner : IStochasticRunner
             }
         }
         
-        // Calculate statistics
-        var scores = results.Select(r => r.Score).ToList();
-        var passResults = results.Select(r => r.Passed).ToList();
-        
+        // Calculate statistics over the measured runs only. A run that threw, or whose judge produced no verdict, carries a
+        // Score of 0 and Passed of false as placeholders (the harness sets them): not a sample. IndividualResults keep every
+        // run, and StochasticResult.NotMeasuredCount counts the rest.
+        var measured = results.Where(StochasticResult.IsMeasured).ToList();
+        var scores = measured.Select(r => r.Score).ToList();
+        var passResults = measured.Select(r => r.Passed).ToList();
+
         var statistics = options.EnableStatisticalAnalysis
             ? _statisticsCalculator.CreateStatistics(scores, passResults, options.ConfidenceLevel)
             : CreateMinimalStatistics(scores, passResults);
-        
-        bool passed = statistics.PassRate >= options.SuccessRateThreshold;
-        
+        // Over every planned run, not the measured ones: 1 pass and 4 errored runs is not a 100% pass rate.
+        var verdict = StochasticResult.DecideVerdict(
+            results.Count(r => r.Passed), results.Count - measured.Count, results.Count, options.SuccessRateThreshold);
+        bool passed = verdict == StochasticVerdict.Passed;
+
         return new StochasticResult(
             TestCase: testCase,
             IndividualResults: results.AsReadOnly(),
@@ -233,22 +238,23 @@ public class StochasticRunner : IStochasticRunner
         }
     }
     
-    private StochasticStatistics CreateMinimalStatistics(
+    private StochasticStatistics? CreateMinimalStatistics(
         IReadOnlyList<int> scores,
         IReadOnlyList<bool> passResults)
     {
+        if (scores.Count == 0) return null;
         var doubleScores = scores.Select(s => (double)s).ToList();
         
         return new StochasticStatistics(
-            PassRate: _statisticsCalculator.CalculatePassRate(passResults),
-            MeanScore: _statisticsCalculator.Mean(doubleScores),
-            MedianScore: _statisticsCalculator.Median(doubleScores),
-            StandardDeviation: 0,
-            MinScore: scores.Count > 0 ? scores.Min() : 0,
-            MaxScore: scores.Count > 0 ? scores.Max() : 0,
-            Percentile25: 0,
-            Percentile75: 0,
-            Percentile95: 0,
+            PassRate: _statisticsCalculator.CalculatePassRate(passResults)!.Value,
+            MeanScore: _statisticsCalculator.Mean(doubleScores)!.Value,
+            MedianScore: _statisticsCalculator.Median(doubleScores)!.Value,
+            StandardDeviation: null,
+            MinScore: scores.Min(),
+            MaxScore: scores.Max(),
+            Percentile25: null,
+            Percentile75: null,
+            Percentile95: null,
             ConfidenceInterval: null,
             SampleSize: scores.Count);
     }

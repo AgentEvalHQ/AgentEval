@@ -3,25 +3,6 @@
 
 namespace AgentEval.PartnerDeskDemo.Evals;
 
-/// <summary>A measured proportion — <paramref name="Successes"/> out of <paramref name="Total"/> runs.</summary>
-public readonly record struct Proportion(int Successes, int Total)
-{
-    /// <summary>The point estimate, or 0 when nothing was measured.</summary>
-    public double Rate => Total == 0 ? 0d : (double)Successes / Total;
-
-    /// <summary>The 95% Wilson score interval for this proportion.</summary>
-    public (double Low, double High) Wilson95 => WilsonInterval.Compute(Successes, Total, WilsonInterval.Z95);
-
-    /// <summary>Renders as <c>rate% [low, high]  (k/n)</c>.</summary>
-    public string Format()
-    {
-        var (low, high) = Wilson95;
-        return Total == 0
-            ? "   n/a"
-            : $"{Rate * 100,5:0.#}% [{low * 100,4:0}, {high * 100,3:0}]  ({Successes}/{Total})";
-    }
-}
-
 /// <summary>
 /// The Wilson score interval for a binomial proportion.
 /// </summary>

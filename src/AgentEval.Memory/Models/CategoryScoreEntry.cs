@@ -19,10 +19,20 @@ public class CategoryScoreEntry
     /// <summary>Whether this category was skipped.</summary>
     public required bool Skipped { get; init; }
 
+    /// <summary>Whether execution failed or produced no measurement, distinct from an unsupported category.</summary>
+    public bool Errored { get; init; }
+
+    /// <summary>Questions left out of the observed category score because no score was produced.</summary>
+    public int UnmeasuredQueries { get; init; }
+
+    /// <summary>Reason for an unsupported, errored or wholly unmeasured category.</summary>
+    public string? SkipReason { get; init; }
+
     /// <summary>
     /// Number of items behind this score. External-benchmark baselines set it to the category's
-    /// question count. The native memory benchmark's <c>ToBaseline</c> does not set it, so native
-    /// baselines carry the default of 1 whatever the preset ran.
+    /// scored question count, the score's denominator; a selected question that errored or got no
+    /// verdict is not behind the score. The native memory benchmark's <c>ToBaseline</c> does not set it,
+    /// so native baselines carry the default of 1 whatever the preset ran.
     /// </summary>
     public int ScenarioCount { get; init; } = 1;
 

@@ -45,59 +45,79 @@ public class ConversationCompletenessMetric
     /// <summary>
     /// Evaluates a conversation result.
     /// </summary>
+    /// <remarks>
+    /// A dimension the test case does not ask for (no user turns, no expected tools, no maximum duration) is not
+    /// applicable: it is left out of <see cref="ConversationMetricResult.SubScores"/> and the overall score is the
+    /// weighted average over the dimensions that apply, never a perfect score for something that was not checked.
+    /// </remarks>
     public ConversationMetricResult Evaluate(ConversationResult result)
     {
         var scores = new Dictionary<string, double>();
         var details = new Dictionary<string, object?>();
+        var weightedSum = 0.0;
+        var totalWeight = 0.0;
 
         // 1. Response Rate: Did every user turn get a response?
-        var userTurns = result.TestCase.Turns.Count(t => 
+        var userTurns = result.TestCase.Turns.Count(t =>
             t.Role.Equals("user", StringComparison.OrdinalIgnoreCase));
-        var assistantTurns = result.ActualTurns.Count(t => 
+        var assistantTurns = result.ActualTurns.Count(t =>
             t.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase));
-        
-        var responseRate = userTurns > 0 ? Math.Min(1.0, (double)assistantTurns / userTurns) : 1.0;
-        scores["ResponseRate"] = responseRate;
+
+        if (userTurns > 0)
+        {
+            var responseRate = Math.Min(1.0, (double)assistantTurns / userTurns);
+            scores["ResponseRate"] = responseRate;
+            weightedSum += responseRate * 0.4;
+            totalWeight += 0.4;
+        }
         details["UserTurns"] = userTurns;
         details["AssistantTurns"] = assistantTurns;
 
         // 2. Tool Usage: Were expected tools called?
-        double toolScore = 1.0;
         if (result.TestCase.ExpectedTools != null && result.TestCase.ExpectedTools.Count > 0)
         {
             var expectedSet = new HashSet<string>(result.TestCase.ExpectedTools, StringComparer.OrdinalIgnoreCase);
             var calledSet = new HashSet<string>(result.ToolsCalled, StringComparer.OrdinalIgnoreCase);
             var intersection = expectedSet.Intersect(calledSet).Count();
-            toolScore = (double)intersection / expectedSet.Count;
-            
+            var toolScore = (double)intersection / expectedSet.Count;
+            scores["ToolUsage"] = toolScore;
+            weightedSum += toolScore * 0.3;
+            totalWeight += 0.3;
+
             details["ExpectedTools"] = result.TestCase.ExpectedTools;
             details["CalledTools"] = result.ToolsCalled;
             details["ToolsMatched"] = intersection;
         }
-        scores["ToolUsage"] = toolScore;
 
         // 3. Duration Compliance
-        double durationScore = 1.0;
-        if (result.TestCase.MaxDuration.HasValue && result.Duration > result.TestCase.MaxDuration.Value)
+        if (result.TestCase.MaxDuration.HasValue)
         {
-            // Penalize based on how much over the limit
-            var overageRatio = result.Duration.TotalMilliseconds / result.TestCase.MaxDuration.Value.TotalMilliseconds;
-            durationScore = Math.Max(0, 1.0 - (overageRatio - 1.0)); // 0 if 2x over, etc.
+            double durationScore = 1.0;
+            if (result.Duration > result.TestCase.MaxDuration.Value)
+            {
+                // Penalize based on how much over the limit
+                var overageRatio = result.Duration.TotalMilliseconds / result.TestCase.MaxDuration.Value.TotalMilliseconds;
+                durationScore = Math.Max(0, 1.0 - (overageRatio - 1.0)); // 0 if 2x over, etc.
+            }
+            scores["DurationCompliance"] = durationScore;
+            weightedSum += durationScore * 0.15;
+            totalWeight += 0.15;
         }
-        scores["DurationCompliance"] = durationScore;
         details["Duration"] = result.Duration;
         details["MaxDuration"] = result.TestCase.MaxDuration;
 
-        // 4. Error-free execution
+        // 4. Error-free execution (always applies)
         double errorScore = result.Error == null ? 1.0 : 0.0;
         scores["ErrorFree"] = errorScore;
+        weightedSum += errorScore * 0.15;
+        totalWeight += 0.15;
         if (result.Error != null)
         {
             details["Error"] = result.Error;
         }
 
-        // Calculate overall score (weighted average)
-        var overallScore = (responseRate * 0.4) + (toolScore * 0.3) + (durationScore * 0.15) + (errorScore * 0.15);
+        // Calculate overall score (weighted average over the applicable dimensions)
+        var overallScore = weightedSum / totalWeight;
 
         return new ConversationMetricResult
         {
@@ -129,14 +149,19 @@ public class ConversationCompletenessMetric
         }
 
         var metrics = resultList.Select(Evaluate).ToList();
-        
+        // Each sub-score over the conversations it applied to; a conversation that did not ask for it is not a 1.0.
+        var responseRates = metrics.Where(m => m.SubScores.ContainsKey("ResponseRate")).Select(m => m.SubScores["ResponseRate"]).ToList();
+        var toolUsages = metrics.Where(m => m.SubScores.ContainsKey("ToolUsage")).Select(m => m.SubScores["ToolUsage"]).ToList();
+
         return new ConversationAggregateStats
         {
             TotalConversations = resultList.Count,
             SuccessfulConversations = resultList.Count(r => r.Success),
             AverageScore = metrics.Average(m => m.Score),
-            AverageResponseRate = metrics.Average(m => m.SubScores.GetValueOrDefault("ResponseRate", 1.0)),
-            AverageToolUsage = metrics.Average(m => m.SubScores.GetValueOrDefault("ToolUsage", 1.0)),
+            AverageResponseRate = responseRates.Count > 0 ? responseRates.Average() : 0,
+            ResponseRateMeasuredCount = responseRates.Count,
+            AverageToolUsage = toolUsages.Count > 0 ? toolUsages.Average() : 0,
+            ToolUsageMeasuredCount = toolUsages.Count,
             AverageDuration = TimeSpan.FromMilliseconds(resultList.Average(r => r.Duration.TotalMilliseconds)),
             ErrorCount = resultList.Count(r => r.Error != null)
         };
@@ -162,11 +187,23 @@ public record ConversationAggregateStats
     /// <summary>Average overall score.</summary>
     public double AverageScore { get; init; }
     
-    /// <summary>Average response rate.</summary>
+    /// <summary>
+    /// Average response rate over the conversations that had user turns. Not measured (0) when
+    /// <see cref="ResponseRateMeasuredCount"/> is 0.
+    /// </summary>
     public double AverageResponseRate { get; init; }
-    
-    /// <summary>Average tool usage score.</summary>
+
+    /// <summary>Conversations <see cref="AverageResponseRate"/> is averaged over.</summary>
+    public int ResponseRateMeasuredCount { get; init; }
+
+    /// <summary>
+    /// Average tool usage score over the conversations that expected tools. Not measured (0) when
+    /// <see cref="ToolUsageMeasuredCount"/> is 0.
+    /// </summary>
     public double AverageToolUsage { get; init; }
+
+    /// <summary>Conversations <see cref="AverageToolUsage"/> is averaged over.</summary>
+    public int ToolUsageMeasuredCount { get; init; }
     
     /// <summary>Average conversation duration.</summary>
     public TimeSpan AverageDuration { get; init; }

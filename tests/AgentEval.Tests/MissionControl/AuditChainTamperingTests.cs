@@ -45,17 +45,12 @@ public class AuditChainTamperingTests
         var reader = new TamperedReader(subject, manifest, evidence);
         var service = new ComplianceMatrixService(reader);
 
-        var matrix = await service.BuildMatrixAsync("test-reg", CancellationToken.None);
-
-        Assert.False(
-            matrix.AllChainsValid,
-            "Audit chain must be flagged invalid when the manifest's ContentHash drifts from the evidence's recorded SourceRun.ManifestHash.");
-        Assert.NotEmpty(matrix.Subjects);
-        Assert.NotEmpty(matrix.Cells);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.BuildMatrixAsync("test-reg", CancellationToken.None));
+        Assert.Contains("source hash", error.Message);
     }
 
     [Fact]
-    public async Task ComplianceMatrix_HashesMatch_AllChainsValidIsTrue()
+    public async Task ComplianceMatrix_LegacyHashesMatch_RetainsImportedCustodyWarning()
     {
         // Companion test: same shape but with hashes aligned. Locks down the
         // happy path so a future regression in the chain-check (e.g. inverted
@@ -71,7 +66,8 @@ public class AuditChainTamperingTests
 
         var matrix = await service.BuildMatrixAsync("test-reg", CancellationToken.None);
 
-        Assert.True(matrix.AllChainsValid);
+        Assert.False(matrix.AllChainsValid);
+        Assert.All(matrix.Cells, cell => Assert.Equal("imported-not-sealed-when-run", cell.ChainBreakReason));
         Assert.NotEmpty(matrix.Subjects);
         Assert.NotEmpty(matrix.Cells);
     }
@@ -86,11 +82,8 @@ public class AuditChainTamperingTests
         var (subject, manifest, evidence) = BuildFixture(manifestHash: sharedHash, evidenceHash: sharedHash);
 
         var service = new ComplianceMatrixService(new TamperedReader(subject, manifest, evidence, evidenceUnreadable: true));
-        var matrix = await service.BuildMatrixAsync("test-reg", CancellationToken.None);
-
-        Assert.False(matrix.AllChainsValid);
-        // Counted, so the page shows a broken chain rather than a neutral "no evidence".
-        Assert.Equal(1, matrix.UnreadableEvidence);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.BuildMatrixAsync("test-reg", CancellationToken.None));
+        Assert.Contains("unavailable", error.Message);
     }
 
     [Fact]
@@ -140,7 +133,7 @@ public class AuditChainTamperingTests
                 SchemaVersion: "1.0",
                 RunId: manifest.Run.RunId,
                 Verdict: "PASS",
-                Stats: new RunStats(1, 1, 0, 0),
+                Stats: new RunStats(0, 0, 0, 0),
                 Metrics: new Dictionary<string, double>()));
 
             var sealedManifest = await store.GetRunManifestAsync(manifest.Run.RunId);
@@ -167,8 +160,9 @@ public class AuditChainTamperingTests
             // Sanity: chain valid before tampering.
             var serviceBefore = new ComplianceMatrixService(store);
             var matrixBefore = await serviceBefore.BuildMatrixAsync("audit-fs", CancellationToken.None);
-            Assert.True(matrixBefore.AllChainsValid,
-                "Pre-tamper matrix should validate cleanly — sanity check on the seed.");
+            Assert.False(matrixBefore.AllChainsValid);
+            Assert.NotEmpty(matrixBefore.Cells);
+            Assert.All(matrixBefore.Cells, cell => Assert.Equal("imported-not-sealed-when-run", cell.ChainBreakReason));
 
             // Tamper: rewrite manifest.json's contentHash to a deliberately
             // bogus value. The chain check at ComplianceMatrixService.cs:113
@@ -192,12 +186,8 @@ public class AuditChainTamperingTests
             Assert.Equal("TAMPERED_AFTER_WRITE", rereadManifest!.ContentHash);
 
             var serviceAfter = new ComplianceMatrixService(store);
-            var matrixAfter = await serviceAfter.BuildMatrixAsync("audit-fs", CancellationToken.None);
-
-            Assert.False(matrixAfter.AllChainsValid,
-                "Filesystem tampering of manifest.json contentHash must flip AllChainsValid to false " +
-                "— the production read path was bypassed if this passes.");
-            Assert.NotEmpty(matrixAfter.Cells);
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => serviceAfter.BuildMatrixAsync("audit-fs", CancellationToken.None));
+            Assert.Contains("source hash", error.Message);
         }
         finally
         {
@@ -219,7 +209,7 @@ public class AuditChainTamperingTests
                 RunId: "test-run",
                 Timestamp: DateTimeOffset.UtcNow,
                 Duration: TimeSpan.FromSeconds(1),
-                ScenarioCount: 1,
+                ScenarioCount: 0,
                 Verdict: "PASS",
                 Kind: "eval",
                 EvalProject: null,
@@ -276,7 +266,7 @@ public class AuditChainTamperingTests
         }
 
         public bool IsAvailable => true;
-        public string? WorkspaceRoot => "/stub";
+        public string? WorkspaceRoot => null;
 
         public Task<SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default) =>
             Task.FromResult(new SolutionInfo(_manifest.Solution.Id, _manifest.Solution.Name, "/stub"));
@@ -302,8 +292,11 @@ public class AuditChainTamperingTests
         public Task<AgentTrace?> GetTraceAsync(string runId, CancellationToken ct = default) =>
             Task.FromResult<AgentTrace?>(null);
 
-        public IAsyncEnumerable<RunManifest> ListRunsAsync(SubjectIdentity subject, CancellationToken ct = default) =>
-            EmptyAsync<RunManifest>();
+        public async IAsyncEnumerable<RunManifest> ListRunsAsync(SubjectIdentity subject, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            yield return _manifest;
+            await Task.CompletedTask;
+        }
 
         public IAsyncEnumerable<RunPointer> GetRecentRunsAsync(int count = 50, CancellationToken ct = default) =>
             EmptyAsync<RunPointer>();

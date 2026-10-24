@@ -186,6 +186,9 @@ public static class EvalWithChanceFloor
         Console.ForegroundColor = scored.Score.Passed ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine($"      {(scored.Score.Passed ? "✅" : "❌")} {scored.Details.Summary}");
         Console.ResetColor();
+        // The model is scripted to look the asked city up, so a failed eval is the join or the eval breaking.
+        if (!scored.Score.Passed)
+            SampleOutcome.Fail($"the scripted run did not pass its eval: {scored.Details.Summary}");
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.WriteLine();

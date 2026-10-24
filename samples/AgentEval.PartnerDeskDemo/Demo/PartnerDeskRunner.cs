@@ -21,8 +21,9 @@ public readonly record struct PhaseRunContext(DemoPhase Phase, bool IsRetryAfter
 /// phase's gate level, asks the question, and returns the recorded <see cref="PhaseOutcome"/>.
 /// </summary>
 /// <remarks>
-/// The chat client is supplied by the caller. The console demo supplies a live Azure OpenAI client; the tests
-/// supply a scripted one, so the same phase code paths are exercised deterministically in CI without a model.
+/// The chat client is supplied by the caller. The console demo supplies a live client for the provider
+/// <see cref="ModelSelection"/> resolved; the tests supply a scripted one, so the same phase code paths are
+/// exercised deterministically in CI without a model.
 /// </remarks>
 public sealed class PartnerDeskRunner : IAsyncDisposable
 {
@@ -34,7 +35,7 @@ public sealed class PartnerDeskRunner : IAsyncDisposable
     private bool _partnerIntelEvil;
 
     /// <summary>Creates a runner over a chat-client factory, a console sink, and a local outbox path.</summary>
-    /// <param name="chatClientFactory">Supplies the provider for each run: live Azure OpenAI, or scripted.</param>
+    /// <param name="chatClientFactory">Supplies the provider per run: live (<see cref="ModelSelection"/>) or scripted.</param>
     /// <param name="output">Where the stage-legible narration goes.</param>
     /// <param name="outboxPath">The local file the faked email tool appends to.</param>
     /// <param name="register">The loaded register; loaded from disk when omitted.</param>

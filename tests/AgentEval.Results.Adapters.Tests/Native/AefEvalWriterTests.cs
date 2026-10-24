@@ -20,6 +20,79 @@ public sealed class AefEvalWriterTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData(AgentEval.Core.NotMeasuredCause.MissingInput, AefState.NotMeasured, "Required input was not supplied.")]
+    [InlineData(AgentEval.Core.NotMeasuredCause.JudgeReplyUnreadable, AefState.Error, "The judge reply did not provide a readable measurement.")]
+    [InlineData(AgentEval.Core.NotMeasuredCause.JudgeCallFailed, AefState.Error, "The judge call failed.")]
+    [InlineData(AgentEval.Core.NotMeasuredCause.CheckTimedOut, AefState.Error, "The check timed out.")]
+    [InlineData(AgentEval.Core.NotMeasuredCause.NotApplicable, AefState.NotApplicable, "There was nothing applicable to check.")]
+    public void Session_TypedMetricAbsence_CaptureOffPreservesCauseStateAndSafeReason(
+        AgentEval.Core.NotMeasuredCause cause, AefState state, string reason)
+    {
+        var result = new TestResult
+        {
+            TestName = "case", Passed = true, Score = 100,
+            MetricResults = [AgentEval.Core.MetricResult.NotMeasured("llm_absent", cause, "secret source input")],
+        };
+        using var session = AefEvalWriter.Start(_out, Options() with { ContentCapture = AefContentCapture.Off }, Start);
+        session.Add(result, "case");
+        var (directory, _) = session.Complete(Start.AddSeconds(1));
+        var lines = AefTestRuns.Results(directory);
+        var child = Assert.Single(lines, line => ((string?)line["path"])?.StartsWith("case/metrics/", StringComparison.Ordinal) == true);
+        Assert.Equal(AefNames.Of(state), (string?)child["state"]);
+        Assert.Equal(reason, (string?)child["reason"]);
+        var metadata = Assert.IsType<JsonObject>(child["ext"]?["agenteval.metric"]);
+        Assert.Equal(System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(cause.ToString()), (string?)metadata["notMeasuredCause"]);
+        Assert.Null(child["scores"]);
+        Assert.Null(child["annotator"]);
+        Assert.Null(child["evidence"]);
+        var root = Assert.Single(lines, line => line["parentResultId"] is null);
+        Assert.Equal(1, (int)root["aggregation"]!["unmeasured"]![AefNames.Of(state)]!);
+        var mapped = AefEvalWriter.MapCase(result, "case");
+        Assert.Equal(state, Assert.Single(mapped.Children).State);
+        Assert.Equal(reason, Assert.Single(mapped.Children).Reason);
+        Assert.Equal(1, mapped.Root.Aggregation!.Unmeasured!.Total);
+        Assert.DoesNotContain("secret source input", string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+    }
+
+    [Fact]
+    public void Session_MixedAbsencesThenMeasuredMetric_PreservesEachCounterAndCapturedExplanation()
+    {
+        var metrics = Enum.GetValues<AgentEval.Core.NotMeasuredCause>().Select((cause, index) =>
+            AgentEval.Core.MetricResult.NotMeasured("code_" + index, cause, "secret explanation " + cause)).ToList();
+        metrics.Add(AgentEval.Core.MetricResult.Pass("code_measured", 90, "secret measured explanation"));
+        using var session = AefEvalWriter.Start(_out, Options() with { ContentCapture = AefContentCapture.On }, Start);
+        session.Add(new TestResult { TestName = "case", Passed = true, Score = 100, MetricResults = metrics }, "case");
+        var (directory, _) = session.Complete(Start.AddSeconds(1));
+        var lines = AefTestRuns.Results(directory);
+        var root = Assert.Single(lines, line => line["parentResultId"] is null);
+        Assert.Equal(1, (int)root["aggregation"]!["measured"]!);
+        Assert.Equal(6, (int)root["aggregation"]!["total"]!);
+        Assert.Equal(3, (int)root["aggregation"]!["unmeasured"]!["error"]!);
+        Assert.Equal(1, (int)root["aggregation"]!["unmeasured"]!["not_measured"]!);
+        Assert.Equal(1, (int)root["aggregation"]!["unmeasured"]!["not_applicable"]!);
+        Assert.All(lines.Where(line => line["parentResultId"] is not null), line => Assert.NotNull(line["evidence"]));
+        Assert.Contains("secret explanation", string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+    }
+
+    [Fact]
+    public void MapCase_UnrecordedMetricCause_RemainsUnknownWithoutCopyingExplanation()
+    {
+        var mapped = AefEvalWriter.MapCase(new TestResult
+        {
+            TestName = "case", Passed = true, Score = 100,
+            MetricResults = [AgentEval.Core.MetricResult.NotMeasured("code_legacy", "secret explanation")],
+        }, "case");
+        var child = Assert.Single(mapped.Children);
+        Assert.Equal(AefState.NotMeasured, child.State);
+        Assert.Equal("The metric was not measured; its cause was not recorded.", child.Reason);
+        Assert.Null(child.Ext);
+        Assert.Null(child.Scores);
+        Assert.Null(child.Annotator);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Write_ObservedUsage_ReplacesLegacyRoleWithoutDoubleCounting(bool unknown)

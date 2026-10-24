@@ -276,7 +276,7 @@ rule computes through a field it adds to a run, only through a new rule kind or 
 See [GOVERNANCE.md](../GOVERNANCE.md): the editors, the proposal process, and how changes are versioned.
 
 **What licence is AEF under?**
-Today everything is Apache-2.0 ([LICENSE](../LICENSE), [NOTICE](../NOTICE)). For the 1.0 release, the plan (pending
-counsel) is the Community Specification License 1.0 for the specification text, so that anyone who implements AEF
-from the text has a royalty-free patent commitment, limited to [what the specification requires](../SCOPE.md); the
-schemas, corpus and tools stay Apache-2.0. See [GOVERNANCE.md](../GOVERNANCE.md#licence-and-patents).
+Apache-2.0, all of it: the text, the schemas, the corpus and the tools ([LICENSE](../LICENSE), [NOTICE](../NOTICE)).
+One licence that implementers' legal teams already know, and no second contribution agreement. Its patent licence
+comes from each contributor for their contributions; AEF makes no separate patent commitment to implementations
+written from the text alone. See [GOVERNANCE.md](../GOVERNANCE.md#licence-and-patents).

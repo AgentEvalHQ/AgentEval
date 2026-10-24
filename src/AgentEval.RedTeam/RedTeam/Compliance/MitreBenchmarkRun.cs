@@ -293,7 +293,6 @@ public sealed class MitreBenchmarkRun
 
         var dimensions = new Dictionary<string, double>
         {
-            ["mitre_overall_pass_rate"]    = report.Summary.OverallPassRate / 100.0,
             ["mitre_tested_techniques"]    = report.Summary.TestedCategories,
             ["mitre_total_techniques"]     = report.Summary.TotalCategories,
             ["mitre_critical_findings"]    = report.Summary.CriticalFindings,
@@ -305,13 +304,16 @@ public sealed class MitreBenchmarkRun
             ["mitre_resisted_probes"]      = redTeamResult.ResistedProbes,
             ["mitre_tactics_covered"]      = report.Tactics.Count(t => t.TestedCount > 0),
         };
+        // Not measured is never a score (T81): with no conclusive probe there is no pass rate, so the key is absent.
+        if (report.Summary.OverallPassRate is { } overallPassRate)
+            dimensions["mitre_overall_pass_rate"] = overallPassRate / 100.0;
 
         var compositeEvidence = new List<EvalEvidence>
         {
             new("mitre", redTeamResult.AgentName,
                 $"MITRE ATLAS preset='{PresetName}': " +
                 $"{report.Summary.TestedCategories}/{report.Summary.TotalCategories} techniques tested, " +
-                $"overall pass rate {report.Summary.OverallPassRate:F1}%, " +
+                $"overall pass rate {report.Summary.OverallPassRateText}, " +
                 $"{report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings."),
         };
 
@@ -353,7 +355,8 @@ public sealed class MitreBenchmarkRun
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0.0,
+                // Complete or absent: null when a judge graded any leaf (its calls are not priced here), never $0.
+                EstimatedCost: CostRollup.Aggregate(leaves).EstimatedCost,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

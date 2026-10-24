@@ -84,30 +84,33 @@ public async Task Agent_ShouldHaveHighSuccessRate()
 
 ### Accessing Full Statistics
 
+`Statistics` is null when no run was measured. Sample standard deviation and confidence intervals require at least two measured runs. Disabling `EnableStatisticalAnalysis` leaves standard deviation, percentiles and confidence intervals null; mean, median, min, max and measured pass rate remain available. An empty distribution/calculator input returns null. A measured zero remains zero.
+
+Use the stochastic assertions (`result.Should().HaveMeanScoreAtLeast(...)`, for example) for gates: they reject missing measurements. Directly inspecting a statistic describes only the runs that produced scores.
+
 ```csharp
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase, options);
 
-var stats = result.Statistics;
+if (result.Statistics is not { } stats)
+{
+    Console.WriteLine("Score: not measured (no run produced a verdict).");
+    return;
+}
 
-// Central tendency
+static string Reading(double? value, string format = "F1") =>
+    value?.ToString(format) ?? "n/a";
+
 Console.WriteLine($"Mean Score: {stats.MeanScore:F1}");
 Console.WriteLine($"Median Score: {stats.MedianScore:F1}");
-
-// Variability
-Console.WriteLine($"Std Dev: {stats.StandardDeviation:F2}");
-Console.WriteLine($"Min: {stats.MinScore:F1}");
-Console.WriteLine($"Max: {stats.MaxScore:F1}");
-
-// Percentiles
-Console.WriteLine($"25th Percentile: {stats.Percentile25:F1}");
-Console.WriteLine($"75th Percentile: {stats.Percentile75:F1}");
-Console.WriteLine($"95th Percentile: {stats.Percentile95:F1}");
-
-// Success tracking
-Console.WriteLine($"Success Rate: {stats.SuccessRate:P0}");
-Console.WriteLine($"Runs: {stats.TotalRuns}");
-Console.WriteLine($"Successes: {stats.SuccessCount}");
+Console.WriteLine($"Std Dev: {Reading(stats.StandardDeviation, "F2")}");
+Console.WriteLine($"Min: {stats.MinScore}; Max: {stats.MaxScore}");
+Console.WriteLine($"25th Percentile: {Reading(stats.Percentile25)}");
+Console.WriteLine($"75th Percentile: {Reading(stats.Percentile75)}");
+Console.WriteLine($"95th Percentile: {Reading(stats.Percentile95)}");
+Console.WriteLine($"Measured runs: {stats.SampleSize}");
+Console.WriteLine($"Pass rate over all runs: {Reading(result.PassRateOverAllRuns, "P0")}");
+Console.WriteLine($"Confidence interval: {stats.ConfidenceInterval?.ToString() ?? "n/a"}");
 ```
 
 ---

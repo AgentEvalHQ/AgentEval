@@ -11,14 +11,33 @@ using Xunit;
 namespace AgentEval.Tests.MAF;
 
 /// <summary>
-/// ADR-030 Slice 0.2 (defect D-b). A judge that failed to produce a verdict returns the
-/// conventional fallback <c>OverallScore = 50</c> with <c>EvaluationFailed = true</c>
-/// (<c>ChatClientEvaluator.ParseEvaluationResponse</c>). <c>MAFEvaluationHarness</c> compared that
-/// fallback against <c>PassingScore</c> and never read <c>EvaluationFailed</c>, so any test case
-/// with <c>PassingScore &lt;= 50</c> passed on a judge parse failure. Non-optional, no opt-out.
+/// Failed or absent judge verdicts never pass, including legacy producers that still assign a fallback 50.
+/// Both harness paths must report a judge failure without blaming the agent for an unmeasured score.
 /// </summary>
 public class MAFEvaluationHarnessJudgeFailureTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task JudgeWithoutScore_BothPaths_ReportJudgeFailure(bool streaming)
+    {
+        var harness = new MAFEvaluationHarness(new MissingScoreJudge(), NullAgentEvalLogger.Instance);
+        var result = streaming
+            ? await harness.RunEvaluationStreamingAsync(new TextAgent("Four."), Case(0))
+            : await harness.RunEvaluationAsync(new TextAgent("Four."), Case(0));
+        Assert.False(result.Passed);
+        Assert.True(result.JudgeFailed);
+        Assert.Contains("no verdict", result.Failure!.WhyItFailed);
+        Assert.Contains(result.Failure.Reasons, reason => reason.Category == "Judge");
+        Assert.DoesNotContain(result.Failure.Reasons, reason => reason.Category == "Score");
+    }
+
+    private sealed class MissingScoreJudge : IEvaluator
+    {
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria,
+            CancellationToken cancellationToken = default) => Task.FromResult(new EvaluationResult());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -35,7 +54,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
         Assert.Equal(expected.RubricDigest, result.JudgeRubricDigest);
     }
 
-    /// <summary>The exact shape <c>ChatClientEvaluator</c> returns when the judge does not speak.</summary>
+    /// <summary>A legacy producer that supplies a numeric placeholder with its failure flag.</summary>
     private sealed class ParseFailingJudge : IEvaluator
     {
         public int Calls { get; private set; }
@@ -45,7 +64,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
             Calls++;
             return Task.FromResult(new EvaluationResult
             {
-                OverallScore = EvaluationDefaults.DefaultFailureScore,
+                OverallScore = 50, // Legacy producer placeholder.
                 Summary = "Failed to parse evaluation - no JSON found",
                 EvaluationFailed = true,
             });
@@ -97,7 +116,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
         Assert.Equal(1, judge.Calls);
         Assert.False(result.Passed, $"a judge that produced no verdict must not pass at PassingScore={passingScore}");
         Assert.True(result.JudgeFailed, "the result must say the judge produced no verdict, so a recorder reports it as not measured");
-        Assert.NotEqual(EvaluationDefaults.DefaultFailureScore, result.Score);
+        Assert.False(AgentEval.Comparison.StochasticResult.IsMeasured(result));
         Assert.Contains("no verdict", result.Details, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Failed to parse evaluation", result.Details, StringComparison.Ordinal);
         Assert.NotNull(result.Failure);
@@ -119,7 +138,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
         Assert.Equal(1, judge.Calls);
         Assert.False(result.Passed);
         Assert.True(result.JudgeFailed);
-        Assert.NotEqual(EvaluationDefaults.DefaultFailureScore, result.Score);
+        Assert.False(AgentEval.Comparison.StochasticResult.IsMeasured(result));
         Assert.Contains("no verdict", result.Details, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(result.Failure);
         Assert.Contains(result.Failure!.Reasons, r => r.Category == "Judge");

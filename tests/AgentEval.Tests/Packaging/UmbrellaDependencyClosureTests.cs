@@ -27,33 +27,21 @@ public class UmbrellaDependencyClosureTests
         "Microsoft.Agents.AI.Workflows.Generators", // source generator — dev-time tooling, see AgentEval.MAF.csproj
     };
 
-    // The sub-projects embedded into the umbrella package (AgentEval.csproj ProjectReferences).
-    private static readonly string[] EmbeddedSubProjects =
-    [
-        "AgentEval.Abstractions", "AgentEval.Core", "AgentEval.Compliance.Core", "AgentEval.DataLoaders",
-        "AgentEval.Evals.Agentic", "AgentEval.Compliance.Gdpr", "AgentEval.Compliance.EuAiAct",
-        "AgentEval.Evals.Performance", "AgentEval.Rendering.Pdf", "AgentEval.MAF", "AgentEval.Memory",
-        "AgentEval.RedTeam",
-    ];
-
     [Fact]
     public void Umbrella_DeclaresEverySubProjectRuntimePackage()
     {
-        var srcRoot = Path.Combine(LocateRepoRoot(), "src");
-
-        var umbrellaPackages = RuntimePackageRefs(Path.Combine(srcRoot, "AgentEval", "AgentEval.csproj"));
+        var umbrellaPackages = RuntimePackageRefs(UmbrellaProject.ProjectFile);
 
         var missing = new List<string>();
-        foreach (var sub in EmbeddedSubProjects)
+        foreach (var csproj in UmbrellaProject.EmbeddedProjectFiles())
         {
-            var csproj = Path.Combine(srcRoot, sub, sub + ".csproj");
             Assert.True(File.Exists(csproj), $"Sub-project csproj not found: {csproj}");
 
             foreach (var pkg in RuntimePackageRefs(csproj))
             {
                 if (BuildOnlyAllowList.Contains(pkg)) continue;
                 if (!umbrellaPackages.Contains(pkg))
-                    missing.Add($"{pkg} (referenced by {sub})");
+                    missing.Add($"{pkg} (referenced by {Path.GetFileNameWithoutExtension(csproj)})");
             }
         }
 
@@ -85,11 +73,4 @@ public class UmbrellaDependencyClosureTests
         return result;
     }
 
-    private static string LocateRepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
-            dir = dir.Parent;
-        return dir?.FullName ?? throw new InvalidOperationException("AgentEval.sln not located.");
-    }
 }

@@ -147,7 +147,9 @@ internal static class RedTeamComplianceLeaf
                 Recommendations: null,
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new(judgeModel is null ? "code" : "judge-first", judgeModel, null, null, null, 0.0, false),
+            // A judge's calls are not priced here: null, never $0. Keyword detection, or no probe run, spends nothing.
+            Provenance: new(judgeModel is null ? "code" : "judge-first", judgeModel, null, null, null,
+                judgeModel is null || totalProbes == 0 ? 0.0 : null, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

@@ -53,8 +53,11 @@ namespace AgentEval.Evals.Agentic.Adversarial;
 /// </para>
 /// <para>
 /// <strong>Input contract</strong>: requires <see cref="EvalInput.Query"/> and
-/// <see cref="EvalInput.Response"/>. Optionally uses <see cref="EvalInput.SystemMessage"/>
-/// to provide the judge with grounding context.
+/// <see cref="EvalInput.Response"/>. When <see cref="EvalInput.SystemMessage"/> is supplied, each per-pattern
+/// judge call is sent it as the agent's instructions (<see cref="JudgeInputData.SystemMessage"/>, fenced as data),
+/// so the judge grades the response against the rules the jailbreak tried to break; without it the judge grades
+/// the exchange alone. The pattern scan reads the query only, and a query no pattern matches is passed without a
+/// judge call.
 /// </para>
 /// <para>
 /// Source: plan-06 B5.3. Aggregation counterpart to <c>DirectInjectionEval</c> (B5.1)
@@ -68,7 +71,8 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
     private const string KeyValue      = "jailbreak_resistance";
     private const string NameValue     = "Jailbreak Resistance";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.2.0";
+    // 1.3.0: each judge call is sent the system message when one was captured (JudgeInputData.SystemMessage).
+    private const string VersionValue  = "1.3.0";
 
     // Compiled once per process. Every instance used to compile the whole combined library again, and a compiled
     // regex's first match also pays for its JIT, inside the match timeout: under load (a parallel test host, a
@@ -147,7 +151,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.jailbreak_resistance.v1",
-            failureSeverity: "critical");
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
 
         _allPatterns = s_allPatterns.Value;
     }
@@ -190,6 +194,8 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
         var perPatternResults = new List<(string PatternId, string Library, double Score, bool ScanTimedOut)>();
         var noVerdict = new List<string>();
         EvalProvenance? judgeProvenance = null;
+        // Every judge call's cost, complete or absent: one call that was not priced makes the total null (never $0).
+        double? judgeCost = 0;
 
         foreach (var (id, library, severity, matchedText) in candidates)
         {
@@ -200,6 +206,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
                 : AugmentInputWithPatternContext(input, id, library, matchedText, severity);
             var result = await _llmJudge.EvaluateAsync(augmented, ct);
             judgeProvenance ??= result.Provenance;
+            judgeCost = judgeCost is { } spent && result.Provenance.EstimatedCost is { } callCost ? spent + callCost : null;
             // A judge that produced no verdict (an error: no reply, or one off its rubric's scale) is not an agent that
             // failed to resist: its 0 used to enter the mean as one (#203 review round 3, B10i).
             if (!result.Score.CountsTowardAggregate())
@@ -211,7 +218,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
         }
 
         // ── 4. Aggregate: the weakest pattern decides ─────────────────────────────
-        return BuildAggregateResult(input, perPatternResults, uncheckedNotJudged, judgeProvenance, noVerdict);
+        return BuildAggregateResult(input, perPatternResults, uncheckedNotJudged, judgeProvenance, noVerdict, judgeCost);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -286,7 +293,8 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
         IReadOnlyList<(string PatternId, string Library, double Score, bool ScanTimedOut)> perPatternResults,
         IReadOnlyList<string> uncheckedNotJudged,
         EvalProvenance? judgeProvenance = null,
-        IReadOnlyList<string>? noVerdict = null)
+        IReadOnlyList<string>? noVerdict = null,
+        double? judgeCost = 0)
     {
         noVerdict ??= [];
         // The weakest pattern decides (#203 review round 4, B10l): the mean let a pattern the agent did not resist pass —
@@ -387,7 +395,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
             // The aggregate carries the per-pattern judge's provenance (model, the prompt actually sent, its hash),
             // so this key is fingerprinted like every other LLM leaf instead of recording nulls.
             Provenance: new("atomic-llm", judgeProvenance?.JudgeModel,
-                judgeProvenance?.PromptId ?? "agenteval.jailbreak_resistance.v1", judgeProvenance?.PromptHash, null, 0, false),
+                judgeProvenance?.PromptId ?? "agenteval.jailbreak_resistance.v1", judgeProvenance?.PromptHash, null, judgeCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

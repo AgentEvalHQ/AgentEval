@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using Azure.AI.OpenAI;
 using AgentEval.Core;
 using AgentEval.Memory.Evaluators;
 using AgentEval.Memory.Extensions;
@@ -15,15 +14,25 @@ namespace AgentEval.Samples;
 /// <summary>
 /// Sample G9: Run a Single Memory Benchmark
 ///
-/// Interactive sample that lets you pick a benchmark preset (Quick/Standard/Full),
-/// runs it once with the memory-optimized prompt, saves the baseline, and opens the report.
+/// Pick a benchmark preset (Quick/Standard/Full), run it once with the memory-optimized prompt, save the baseline,
+/// and open the report. From the menu it asks which preset; run non-interactively (<c>dotnet run -- &lt;n&gt;</c>,
+/// <c>AGENTEVAL_SAMPLES_NONINTERACTIVE=1</c>, redirected input) it runs Quick, or the preset
+/// <c>--preset quick|standard|full</c> names, and prints the report path instead of serving it.
 ///
-/// Each run saves with a 2-hour offset so consecutive runs appear distinct on the timeline.
+/// Each baseline's name carries the run's time, so consecutive runs are separate points on the timeline.
 ///
 /// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// </summary>
+/// <remarks>
+/// Non-interactive runs default to Quick rather than skipping: the sample exists to run one preset and save its
+/// baseline, Quick is the cheapest preset and the one every preset-driven sample runs by default, and a skip would
+/// leave a sweep or CI job never measuring anything here. Until 2026-10 it printed the menu, read nothing, ran nothing
+/// and exited 0.
+/// </remarks>
 public static class RunSingleBenchmark
 {
+    private const string AgentName = "MemoryAgent";
+
     public static async Task RunAsync()
     {
         PrintHeader();
@@ -32,6 +41,7 @@ public static class RunSingleBenchmark
         {
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -39,22 +49,29 @@ public static class RunSingleBenchmark
         //  Step 1: Pick a benchmark preset
         // ──────────────────────────────────────────────────────────
 
-        var benchmark = PromptForBenchmark();
-        if (benchmark == null) return;
+        var benchmark = MemoryBenchmarkSampleSupport.ResolveBenchmark();
+        if (benchmark == null)
+        {
+            Console.WriteLine("\n   Cancelled: nothing ran.\n");
+            SampleOutcome.Skip("cancelled at the preset menu: no benchmark ran");
+            return;
+        }
 
         // ──────────────────────────────────────────────────────────
         //  Step 2: Set up runner + agent
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine($"\nRunning {benchmark.Name} benchmark ({benchmark.Categories.Count} categories)...\n");
+        Console.WriteLine($"\nRunning {benchmark.Name} benchmark ({benchmark.Categories.Count} categories) on {AIConfig.ModelDeployment}...\n");
 
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        var judgeModel = AIConfig.JudgeModelDeployment;
+        Console.WriteLine($"   Judge: {SampleJudgeModel.DescribeFor(AIConfig.ModelDeployment, judgeModel)}");
 
-        var benchmarkRunner = MemoryBenchmarkRunner.Create(chatClient);
+        var benchmarkRunner = MemoryBenchmarkRunner.Create(AIConfig.CreateChatClient(judgeModel));
         var store = new JsonFileBaselineStore();
 
         var agent = chatClient.AsEvaluableAgent(
-            name: "MemoryAgent",
+            name: AgentName,
             systemPrompt: """
                 You are a helpful assistant with excellent memory.
                 IMPORTANT: Remember ALL facts the user tells you. When asked about something
@@ -84,91 +101,54 @@ public static class RunSingleBenchmark
         Console.WriteLine();
 
         PrintResult(result, sw.Elapsed);
+        MemoryBenchmarkSampleSupport.RecordVerdict(AIConfig.ModelDeployment, result);
 
         // ──────────────────────────────────────────────────────────
-        //  Step 4: Save baseline with 2h offset for timeline spread
+        //  Step 4: Save the baseline, named with the run's time
         // ──────────────────────────────────────────────────────────
 
         var config = new AgentBenchmarkConfig
         {
-            AgentName = "MemoryAgent",
+            AgentName = AgentName,
             ModelId = AIConfig.ModelDeployment,
             ReducerStrategy = "None (memory-optimized prompt)",
-            MemoryProvider = "InMemoryChatHistory"
+            MemoryProvider = "InMemoryChatHistory",
+            CustomConfig = SampleJudgeModel.BaselineConfiguration(judgeModel, AIConfig.ProviderTag)
         };
 
         // Name includes timestamp so each run gets a unique baseline file
         var baselineName = $"{benchmark.Name} — {DateTimeOffset.UtcNow:MMM dd HH:mm}";
-        var baseline = result.ToBaseline(baselineName, config, tags: [benchmark.Name.ToLowerInvariant()]);
+        var baseline = result.ToBaseline(baselineName, config,
+            description: $"Judge: {SampleJudgeModel.DescribeFor(AIConfig.ModelDeployment, judgeModel)}",
+            tags: [benchmark.Name.ToLowerInvariant()]);
 
         await store.SaveAsync(baseline);
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"\n   Baseline saved: {baseline.Name}");
-        Console.WriteLine($"   Directory: .agenteval/benchmarks/memoryagent/baselines/");
+        Console.WriteLine($"   Directory: {Path.Combine(store.GetReportDirectory(AgentName), "baselines")}");
         Console.ResetColor();
 
         // ──────────────────────────────────────────────────────────
         //  Step 5: Serve the report
         // ──────────────────────────────────────────────────────────
 
-        Console.WriteLine("\nOpening HTML report...\n");
-        var serverProcess = store.OpenReport("MemoryAgent");
-
-        if (serverProcess != null)
-        {
-            Console.WriteLine("   Press Enter to stop the server and exit...");
-            Console.ReadLine();
-            serverProcess.Kill();
-            serverProcess.Dispose();
-        }
-    }
-
-    private static MemoryBenchmark? PromptForBenchmark()
-    {
-        Console.WriteLine("Select a benchmark preset:\n");
-        Console.WriteLine("   [1] Quick      3 categories   ~3 min    Basic Retention, Temporal, Noise");
-        Console.WriteLine("   [2] Standard   8 categories   ~10 min   + Reach-Back, FactUpdate, MultiTopic, Abstention, Preference");
-        Console.WriteLine("   [3] Full      12 categories   ~25 min   + CrossSession, Reducer, Conflict, MultiSession, Preference");
-        // [4] Overflow disabled — requires agent with reducer/memory system to be meaningful.
-        // See hardening plan Part 14 for details. Re-enable when ISessionResettableAgent reducers are available.
-        Console.WriteLine("   [Q] Cancel\n");
-        Console.Write("   Choice: ");
-
-        var key = Console.ReadLine()?.Trim().ToUpperInvariant();
-        return key switch
-        {
-            "1" => MemoryBenchmark.Quick,
-            "2" => MemoryBenchmark.Standard,
-            "3" => MemoryBenchmark.Full,
-            _ => null
-        };
+        Console.WriteLine("\nHTML report...\n");
+        MemoryBenchmarkSampleSupport.ServeOrPrintReport(store, AgentName);
     }
 
     private static void PrintResult(MemoryBenchmarkResult result, TimeSpan elapsed)
     {
         Console.WriteLine();
         Console.Write("   Result: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green :
+        Console.ForegroundColor = !result.IsComplete ? ConsoleColor.DarkYellow : result.OverallScore >= 80 ? ConsoleColor.Green :
                                   result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.Write(MemoryBenchmarkSampleSupport.FormatSummary(result));
         Console.ResetColor();
-        Console.WriteLine($"  Grade: {result.Grade}  {new string('*', result.Stars)}{new string('o', 5 - result.Stars)}  ({elapsed.TotalMinutes:F1} min)");
+        Console.WriteLine($"  ({elapsed.TotalMinutes:F1} min)");
         Console.WriteLine();
 
-        foreach (var cat in result.CategoryResults)
-        {
-            var status = cat.Skipped ? "SKIP" : $"{cat.Score:F1}%";
-            Console.ForegroundColor = cat.Skipped ? ConsoleColor.DarkGray :
-                                      cat.Score >= 80 ? ConsoleColor.Green :
-                                      cat.Score >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-            Console.Write($"     {cat.CategoryName,-24} {status,7}");
-            Console.ResetColor();
-
-            if (cat.Skipped && cat.SkipReason != null)
-                Console.Write($"  ({cat.SkipReason})");
-            Console.WriteLine();
-        }
+        MemoryBenchmarkSampleSupport.PrintCategories(result);
 
         if (result.Recommendations.Count > 0)
         {
@@ -186,7 +166,7 @@ public static class RunSingleBenchmark
         Console.WriteLine("===================================================================");
         Console.WriteLine("AgentEval Memory — Sample G9: Run Single Benchmark");
         Console.WriteLine("===================================================================");
-        Console.WriteLine("Pick a preset, run it, save the baseline, view the report.");
+        Console.WriteLine("Pick a preset (Quick when non-interactive), run it, save the baseline, view the report.");
         Console.WriteLine();
     }
 }

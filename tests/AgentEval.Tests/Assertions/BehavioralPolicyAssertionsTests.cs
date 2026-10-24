@@ -234,7 +234,7 @@ public class BehavioralPolicyAssertionsTests
     {
         // Arrange
         var report = new ToolUsageReport();
-        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1 });
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 });
         
         // Act
@@ -268,7 +268,7 @@ public class BehavioralPolicyAssertionsTests
         // Arrange
         var report = new ToolUsageReport();
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-1", Order = 1 });
-        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-2", Order = 2 }); // Too late!
+        report.AddCall(new ToolCallRecord { Name = "Confirm", WasExecuted = true, CallId = "call-2", Order = 2 }); // Too late!
         
         // Act
         var exception = Assert.Throws<BehavioralPolicyViolationException>(() => 
@@ -283,7 +283,7 @@ public class BehavioralPolicyAssertionsTests
     {
         // Arrange
         var report = new ToolUsageReport();
-        report.AddCall(new ToolCallRecord { Name = "RequestUserApproval", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "RequestUserApproval", WasExecuted = true, CallId = "call-1", Order = 1 });
         report.AddCall(new ToolCallRecord { Name = "DeleteRecord", CallId = "call-2", Order = 2 });
         
         // Act
@@ -306,7 +306,7 @@ public class BehavioralPolicyAssertionsTests
         foreach (var confirmTool in confirmTools)
         {
             var report = new ToolUsageReport();
-            report.AddCall(new ToolCallRecord { Name = confirmTool, CallId = "call-1", Order = 1 });
+            report.AddCall(new ToolCallRecord { Name = confirmTool, WasExecuted = true, CallId = "call-1", Order = 1 });
             report.AddCall(new ToolCallRecord { Name = "DangerousAction", CallId = "call-2", Order = 2 });
             
             // Act
@@ -323,7 +323,7 @@ public class BehavioralPolicyAssertionsTests
     {
         // Arrange - tool called twice, but only one confirmation before first call
         var report = new ToolUsageReport();
-        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1 });
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 }); // OK
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-3", Order = 3 }); // Also OK (confirmation still precedes)
         
@@ -344,7 +344,7 @@ public class BehavioralPolicyAssertionsTests
         var report = new ToolUsageReport();
         report.AddCall(new ToolCallRecord
         {
-            Name = "Confirm", CallId = "call-1", Order = 1,
+            Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1,
             Exception = new InvalidOperationException("user dismissed the dialog")
         });
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 });
@@ -360,7 +360,7 @@ public class BehavioralPolicyAssertionsTests
     {
         // A confirmation exists earlier, but an unrelated tool ran between it and the risky call.
         var report = new ToolUsageReport();
-        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1 });
         report.AddCall(new ToolCallRecord { Name = "FetchBalance", CallId = "call-2", Order = 2 });
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-3", Order = 3 });
 
@@ -379,7 +379,7 @@ public class BehavioralPolicyAssertionsTests
     public void MustConfirmBefore_RequireImmediatePrecedence_AcceptsAdjacentConfirmation()
     {
         var report = new ToolUsageReport();
-        report.AddCall(new ToolCallRecord { Name = "Confirm", CallId = "call-1", Order = 1 });
+        report.AddCall(new ToolCallRecord { Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1 });
         report.AddCall(new ToolCallRecord { Name = "TransferFunds", CallId = "call-2", Order = 2 });
 
         Assert.Null(Record.Exception(() =>
@@ -395,7 +395,7 @@ public class BehavioralPolicyAssertionsTests
         var report = new ToolUsageReport();
         report.AddCall(new ToolCallRecord
         {
-            Name = "Confirm", CallId = "call-1", Order = 1,
+            Name = "Confirm", WasExecuted = true, CallId = "call-1", Order = 1,
             Arguments = new Dictionary<string, object?> { ["target"] = "AccountB" }
         });
         report.AddCall(new ToolCallRecord
@@ -467,7 +467,7 @@ public class BehavioralPolicyAssertionsTests
         var report = new ToolUsageReport();
         report.AddCall(new ToolCallRecord 
         { 
-            Name = "Confirm", 
+            Name = "Confirm", WasExecuted = true,
             CallId = "call-1", 
             Order = 1 
         });

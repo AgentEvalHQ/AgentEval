@@ -37,6 +37,13 @@ public static class AssertInterop
         var live = Environment.GetCommandLineArgs().Contains("--live", StringComparer.Ordinal);
         Console.WriteLine("\n══ P1 · AgentEval with Microsoft's ASSERT (assert-ai 0.3) ══\n");
 
+        if (live && !AIConfig.IsConfigured)
+        {
+            AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("--live serves a real model, and no chat provider is configured");
+            return;
+        }
+
         Console.WriteLine("1 · A MAF agent as ASSERT's HTTP endpoint target" + (live ? " (live model)" : " (scripted model, offline)"));
         var model = live
             ? AIConfig.CreateChatClient()

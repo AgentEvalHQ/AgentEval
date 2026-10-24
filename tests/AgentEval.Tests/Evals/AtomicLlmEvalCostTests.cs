@@ -10,7 +10,8 @@ namespace AgentEval.Tests.Evals;
 /// <summary>
 /// v1.1 task 1.7 / 6-plan F-002: <see cref="AtomicLlmEval"/> must populate
 /// <see cref="EvalProvenance.EstimatedCost"/> from real judge token usage. Pre-1.7 the field
-/// hard-coded 0, making composite cost rollups meaningless.
+/// hard-coded 0, making composite cost rollups meaningless. Not priced is null, never $0 and never
+/// a made-up rate (T07): an unknown or null judge model, no usage, or one count missing.
 /// </summary>
 public class AtomicLlmEvalCostTests
 {
@@ -51,6 +52,12 @@ public class AtomicLlmEvalCostTests
 
     private static EvalInput MakeInput() => new(Query: "q", Response: "r");
 
+    private static double Priced(EvalResult result)
+    {
+        Assert.NotNull(result.Provenance.EstimatedCost);
+        return result.Provenance.EstimatedCost!.Value;
+    }
+
     // ── Tests ────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -66,49 +73,77 @@ public class AtomicLlmEvalCostTests
 
         // (1000 / 1000) * 0.00015 + (500 / 1000) * 0.00060 = 0.00015 + 0.00030 = 0.00045
         Assert.True(result.Provenance.EstimatedCost > 0, "EstimatedCost must be > 0 when tokens are reported.");
-        Assert.Equal(0.00045, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Equal(0.00045, Priced(result), precision: 8);
         Assert.Equal(1500, result.Provenance.TokensUsed);
     }
 
-    [Fact]
-    public async Task EvaluateAsync_WithTokenUsage_UnknownModel_FallsBackToDefaultRate()
+    [Theory]
+    [InlineData("llama3.1:8b")]          // an Ollama judge: no row in the table
+    [InlineData("unicorn-model-9000")]
+    public async Task EvaluateAsync_WithTokenUsage_UnknownModel_IsNotPriced(string judgeModel)
     {
-        const long inputTokens = 1000;
-        const long outputTokens = 1000;
-        var evaluator = new TokenReportingEvaluator(85, inputTokens, outputTokens);
-        var sut = MakeSut(evaluator, judgeModel: "unicorn-model-9000");
+        // Before T07 the cost came out at the gpt-4o-mini fallback rate: 0.00075 for 1000 + 1000 tokens, a price
+        // nobody had set for this model, which then flowed into composite totals, AEF usage and reports.
+        var evaluator = new TokenReportingEvaluator(85, inputTokens: 1000, outputTokens: 1000);
+        var sut = MakeSut(evaluator, judgeModel: judgeModel);
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        // Defaults: 0.00015 in + 0.00060 out per 1K → 0.00015 + 0.00060 = 0.00075
-        var expected = JudgeCostMap.DefaultInputRatePer1K + JudgeCostMap.DefaultOutputRatePer1K;
-        Assert.Equal(expected, result.Provenance.EstimatedCost, precision: 8);
-        Assert.False(JudgeCostMap.IsRegistered("unicorn-model-9000"));
+        Assert.Null(result.Provenance.EstimatedCost);
+        Assert.Equal(2000, result.Provenance.TokensUsed); // the tokens are still reported; only the price is unknown
     }
 
     [Fact]
-    public async Task EvaluateAsync_WithTokenUsage_NullJudgeModel_UsesDefaultRate()
+    public async Task EvaluateAsync_WithTokenUsage_NullJudgeModel_IsNotPriced()
     {
+        // judgeModel defaults to null (the ctor default, used by most constructions in src): no model, no rate.
         var evaluator = new TokenReportingEvaluator(85, inputTokens: 2000, outputTokens: 0);
         var sut = MakeSut(evaluator, judgeModel: null);
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        // 2 * defaultInputRate
-        Assert.Equal(2 * JudgeCostMap.DefaultInputRatePer1K, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Null(result.Provenance.EstimatedCost);
+        Assert.Equal(2000, result.Provenance.TokensUsed);
     }
 
     [Fact]
-    public async Task EvaluateAsync_NoTokenUsage_EstimatedCostStaysZero()
+    public async Task EvaluateAsync_NoTokenUsage_IsNotPriced()
     {
-        // Mirrors test-fake / non-chat IEvaluator implementations.
+        // Mirrors test-fake / non-chat IEvaluator implementations: a judge ran, and what it cost is unknown.
+        // It used to read 0 (free), which a rollup could not tell from a measured zero.
         var evaluator = new TokenReportingEvaluator(85, inputTokens: null, outputTokens: null);
         var sut = MakeSut(evaluator, judgeModel: "gpt-4o-mini");
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        Assert.Equal(0, result.Provenance.EstimatedCost);
+        Assert.Null(result.Provenance.EstimatedCost);
         Assert.Null(result.Provenance.TokensUsed);
+    }
+
+    [Theory]
+    [InlineData(1000L, null)]
+    [InlineData(null, 1000L)]
+    public async Task EvaluateAsync_OneTokenCountMissing_IsNotPriced(long? inputTokens, long? outputTokens)
+    {
+        // A missing count is not a zero count: pricing it as 0 under-priced the call and read as complete.
+        var evaluator = new TokenReportingEvaluator(85, inputTokens, outputTokens);
+        var sut = MakeSut(evaluator, judgeModel: "gpt-4o-mini");
+
+        var result = await sut.EvaluateAsync(MakeInput());
+
+        Assert.Null(result.Provenance.EstimatedCost);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ReportedZeroTokens_IsAMeasuredZero()
+    {
+        // Guard: both counts reported as 0 is a real result (nothing spent), not "not priced".
+        var evaluator = new TokenReportingEvaluator(85, inputTokens: 0, outputTokens: 0);
+        var sut = MakeSut(evaluator, judgeModel: "gpt-4o-mini");
+
+        var result = await sut.EvaluateAsync(MakeInput());
+
+        Assert.Equal(0.0, Priced(result));
     }
 
     [Fact]
@@ -121,7 +156,8 @@ public class AtomicLlmEvalCostTests
         var result = await sut.EvaluateAsync(MakeInput());
 
         // 0.00015 + 0.00060 = 0.00075
-        Assert.Equal(0.00075, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Equal(0.00075, Priced(result), precision: 8);
+        Assert.False(JudgeCostMap.IsRegistered("gpt-4o-mini-2024-07-18")); // exact-key only: priced, yet not a key
     }
 
     [Fact]
@@ -146,7 +182,7 @@ public class AtomicLlmEvalCostTests
         var result = await sut.EvaluateAsync(MakeInput());
 
         // Tenant rate: 0.00100 + 0.00200 = 0.00300 (NOT the static map's 0.00075)
-        Assert.Equal(0.00300, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Equal(0.00300, Priced(result), precision: 8);
     }
 
     [Fact]
@@ -158,7 +194,7 @@ public class AtomicLlmEvalCostTests
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        Assert.Equal(0.00075, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Equal(0.00075, Priced(result), precision: 8);
     }
 
     [Fact]
@@ -173,7 +209,7 @@ public class AtomicLlmEvalCostTests
         var result = await sut.EvaluateAsync(MakeInput());
 
         // 0.00200 + 0.00800 = 0.01000 (not 0.09000 from legacy gpt-4 rates).
-        Assert.Equal(0.01000, result.Provenance.EstimatedCost, precision: 8);
+        Assert.Equal(0.01000, Priced(result), precision: 8);
         Assert.NotEqual(0.09000, result.Provenance.EstimatedCost);
     }
 
@@ -202,13 +238,15 @@ public class AtomicLlmEvalCostTests
         var result = await composite.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
 
         Assert.NotNull(result.Details.SubResults);
-        var leafCosts = result.Details.SubResults!.Select(r => r.Provenance.EstimatedCost).ToList();
+        var leafCosts = result.Details.SubResults!.Select(Priced).ToList();
         var leafSum = leafCosts.Sum();
         Assert.True(leafSum > 0, "Leaf costs must be non-zero when judge tokens are reported.");
 
-        // CostRollup.Aggregate over the leaves equals the manual sum.
-        var (rolled, _) = CostRollup.Aggregate(result.Details.SubResults!);
-        Assert.Equal(leafSum, rolled, precision: 8);
+        // CostRollup.Aggregate over the leaves equals the manual sum, and so does the composite's own cost.
+        var (rolled, _, unpriced) = CostRollup.Aggregate(result.Details.SubResults!);
+        Assert.Empty(unpriced);
+        Assert.Equal(leafSum, rolled!.Value, precision: 8);
+        Assert.Equal(leafSum, Priced(result), precision: 8);
 
         // Sanity-check the leaf-by-leaf math too:
         // (1000/1000)*0.00015 + (500/1000)*0.00060 = 0.00045

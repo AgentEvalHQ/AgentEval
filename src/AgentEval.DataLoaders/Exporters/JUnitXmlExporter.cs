@@ -57,11 +57,19 @@ public class JUnitXmlExporter : IResultExporter
         await writer.WriteStartElementAsync(null, "testsuites", null);
         await writer.WriteAttributeStringAsync(null, "name", null, report.Name ?? "AgentEval");
         await writer.WriteAttributeStringAsync(null, "tests", null, report.TotalTests.ToString());
+        // A test that produced no verdict (the judge failed, the run errored) is a JUnit error, not a skip: CI systems
+        // read a skip as not run and stay green. The report counts it among SkippedTests, so it moves from there.
+        var notMeasured = report.TestResults.Count(t => t.NotMeasured);
         await writer.WriteAttributeStringAsync(null, "failures", null, report.FailedTests.ToString());
-        await writer.WriteAttributeStringAsync(null, "errors", null, "0");
-        await writer.WriteAttributeStringAsync(null, "skipped", null, report.SkippedTests.ToString());
-        await writer.WriteAttributeStringAsync(null, "time", null, 
-            report.Duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture));
+        await writer.WriteAttributeStringAsync(null, "errors", null, notMeasured.ToString());
+        await writer.WriteAttributeStringAsync(null, "skipped", null, Math.Max(0, report.SkippedTests - notMeasured).ToString());
+        // A time that was not recorded is left out, never written as 0.000: here, on each suite (the sum of its timed
+        // tests) and on each test case.
+        if (report.Duration is { } duration)
+        {
+            await writer.WriteAttributeStringAsync(null, "time", null,
+                duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture));
+        }
         
         // Group tests by category
         var testsByCategory = report.TestResults
@@ -71,26 +79,32 @@ public class JUnitXmlExporter : IResultExporter
         foreach (var categoryGroup in testsByCategory)
         {
             var categoryTests = categoryGroup.ToList();
-            var categoryFailed = categoryTests.Count(t => !t.Passed && !t.Skipped);
-            var categorySkipped = categoryTests.Count(t => t.Skipped);
-            var categoryDuration = categoryTests.Sum(t => t.DurationMs) / 1000.0;
+            var categoryFailed = categoryTests.Count(t => !t.Passed && !t.Skipped && !t.NotMeasured);
+            var categoryErrors = categoryTests.Count(t => t.NotMeasured);
+            var categorySkipped = categoryTests.Count(t => t.Skipped && !t.NotMeasured);
+            var timedTests = categoryTests.Where(t => t.DurationMs is not null).ToList();
             
             // <testsuite>
             await writer.WriteStartElementAsync(null, "testsuite", null);
             await writer.WriteAttributeStringAsync(null, "name", null, $"AgentEval.{categoryGroup.Key}");
             await writer.WriteAttributeStringAsync(null, "tests", null, categoryTests.Count.ToString());
             await writer.WriteAttributeStringAsync(null, "failures", null, categoryFailed.ToString());
-            await writer.WriteAttributeStringAsync(null, "errors", null, "0");
+            await writer.WriteAttributeStringAsync(null, "errors", null, categoryErrors.ToString());
             await writer.WriteAttributeStringAsync(null, "skipped", null, categorySkipped.ToString());
-            await writer.WriteAttributeStringAsync(null, "time", null,
-                categoryDuration.ToString("F3", CultureInfo.InvariantCulture));
+            if (timedTests.Count > 0)
+            {
+                var categoryDuration = timedTests.Sum(t => t.DurationMs!.Value) / 1000.0;
+                await writer.WriteAttributeStringAsync(null, "time", null,
+                    categoryDuration.ToString("F3", CultureInfo.InvariantCulture));
+            }
             await writer.WriteAttributeStringAsync(null, "timestamp", null,
                 report.StartTime.ToString("O", CultureInfo.InvariantCulture));
             
             // <properties>
             await writer.WriteStartElementAsync(null, "properties", null);
             await WritePropertyAsync(writer, "runId", report.RunId);
-            await WritePropertyAsync(writer, "overallScore", report.OverallScore.ToString("F1", CultureInfo.InvariantCulture));
+            await WritePropertyAsync(writer, "overallScore",
+                report.OverallScore is { } overallScore ? overallScore.ToString("F1", CultureInfo.InvariantCulture) : "n/a");
             if (report.Agent?.Model != null)
             {
                 await WritePropertyAsync(writer, "model", report.Agent.Model);
@@ -103,10 +117,25 @@ public class JUnitXmlExporter : IResultExporter
                 await writer.WriteStartElementAsync(null, "testcase", null);
                 await writer.WriteAttributeStringAsync(null, "name", null, test.Name);
                 await writer.WriteAttributeStringAsync(null, "classname", null, $"AgentEval.{categoryGroup.Key}");
-                await writer.WriteAttributeStringAsync(null, "time", null,
-                    (test.DurationMs / 1000.0).ToString("F3", CultureInfo.InvariantCulture));
+                if (test.DurationMs is { } durationMs)
+                {
+                    await writer.WriteAttributeStringAsync(null, "time", null,
+                        (durationMs / 1000.0).ToString("F3", CultureInfo.InvariantCulture));
+                }
                 
-                if (test.Skipped)
+                if (test.NotMeasured)
+                {
+                    // No verdict: an error, so the CI run stays red. Its placeholder score is not reported as one.
+                    await writer.WriteStartElementAsync(null, "error", null);
+                    await writer.WriteAttributeStringAsync(null, "message", null, test.Error ?? "Not measured: the test produced no verdict.");
+                    await writer.WriteAttributeStringAsync(null, "type", null, "NotMeasured");
+                    if (!string.IsNullOrEmpty(test.StackTrace))
+                    {
+                        await writer.WriteStringAsync(test.StackTrace);
+                    }
+                    await writer.WriteEndElementAsync(); // </error>
+                }
+                else if (test.Skipped)
                 {
                     await writer.WriteStartElementAsync(null, "skipped", null);
                     if (test.Error != null)
@@ -118,12 +147,14 @@ public class JUnitXmlExporter : IResultExporter
                 else if (!test.Passed)
                 {
                     await writer.WriteStartElementAsync(null, "failure", null);
-                    await writer.WriteAttributeStringAsync(null, "message", null, 
-                        test.Error ?? string.Create(CultureInfo.InvariantCulture, $"Score {test.Score:F1} below threshold"));
+                    await writer.WriteAttributeStringAsync(null, "message", null,
+                        test.Error ?? (test.Score is { } failedScore
+                            ? string.Create(CultureInfo.InvariantCulture, $"Score {failedScore:F1} below threshold")
+                            : "Failed (no score)"));
                     await writer.WriteAttributeStringAsync(null, "type", null, "AssertionError");
-                    
+
                     var failureContent = new StringBuilder();
-                    failureContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Score: {test.Score:F1}/100"));
+                    failureContent.AppendLine(FormatScore(test.Score));
                     if (!string.IsNullOrEmpty(test.Error))
                     {
                         failureContent.AppendLine(test.Error);
@@ -141,7 +172,7 @@ public class JUnitXmlExporter : IResultExporter
                 {
                     await writer.WriteStartElementAsync(null, "system-out", null);
                     var outputContent = new StringBuilder();
-                    outputContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"Score: {test.Score:F1}/100"));
+                    outputContent.AppendLine(test.NotMeasured ? "Score: n/a (not measured)" : FormatScore(test.Score));
                     foreach (var (metric, score) in test.MetricScores)
                     {
                         outputContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{metric}: {score:F1}"));
@@ -169,6 +200,11 @@ public class JUnitXmlExporter : IResultExporter
         await writer.WriteEndDocumentAsync();
         await writer.FlushAsync();
     }
+
+    // A test with no score reads n/a: never "0.0/100".
+    private static string FormatScore(double? score) => score is { } value
+        ? string.Create(CultureInfo.InvariantCulture, $"Score: {value:F1}/100")
+        : "Score: n/a (no score)";
 
     private static async Task WritePropertyAsync(XmlWriter writer, string name, string value)
     {

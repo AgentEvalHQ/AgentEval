@@ -83,7 +83,7 @@ public static class GatekeeperHttpWireBoundary
         try
         {
             await client.GetAsync("https://api.example.com/orders", cancellation.Token);
-            throw new InvalidOperationException("HTTP wire sample failed: caller cancellation was ignored.");
+            throw new SampleCheckFailedException("HTTP wire sample failed: caller cancellation was ignored.");
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -134,14 +134,14 @@ public static class GatekeeperHttpWireBoundary
             return exception;
         }
 
-        throw new InvalidOperationException("HTTP wire sample failed: expected a fail-closed egress refusal.");
+        throw new SampleCheckFailedException("HTTP wire sample failed: expected a fail-closed egress refusal.");
     }
 
     private static void Require(bool condition, string message)
     {
         if (!condition)
         {
-            throw new InvalidOperationException("HTTP wire sample failed: " + message + ".");
+            throw new SampleCheckFailedException("HTTP wire sample failed: " + message + ".");
         }
     }
 

@@ -24,9 +24,9 @@ not built: both shipped as CSS grid / flexbox views, which keeps a single chart 
 
 | Component | Where it appears | How it is drawn |
 |---|---|---|
-| `TimelineChart` (`components/charts/TimelineChart.tsx`) | Subject detail page ("Score over time", dashed threshold line fixed at 0.7) and evaluator detail page ("Score over recent runs", threshold line at the card's `defaultThreshold`) | Recharts `LineChart`, y-axis fixed to 0–1 |
-| `Sparkline` (`components/charts/Sparkline.tsx`) | `SubjectCard` on the dashboard, latest 30 runs | Recharts `LineChart` with no axes, tooltip or legend |
-| `HistogramChart` (`components/charts/HistogramChart.tsx`) | Subject detail page ("Score distribution") | Recharts `BarChart`; scores binned into 10 buckets of width 0.1 |
+| `TimelineChart` (`components/charts/TimelineChart.tsx`) | Evaluator occurrences with one established comparable context, a declared 0–1 scale and any recorded threshold | Recharts `LineChart`, y-axis fixed to 0–1 |
+| `Sparkline` (`components/charts/Sparkline.tsx`) | Reusable normalized-series component; current dashboard subject cards have no established comparable score history | Recharts `LineChart` with no axes, tooltip or legend |
+| `HistogramChart` (`components/charts/HistogramChart.tsx`) | Retained normalized-series component; not used for raw subject history | Recharts `BarChart`; normalized scores binned into 10 buckets of width 0.1 |
 | `CostTierBreakdownChart` (`components/charts/CostTierBreakdownChart.tsx`) | Run detail page ("Cost by tier"), only when the run's total cost is above 0 | Recharts horizontal stacked `BarChart`: one segment per cost tier (trivial, low, medium, high) plus `unknown` |
 | `TraceWaterfallPage` (`pages/TraceWaterfallPage.tsx`) | `/runs/:runId/trace` | Recharts horizontal `BarChart` with two stacked bars per event: a transparent one for the offset from the first event, and a visible one whose length is the gap to the next event. A trace event carries a single timestamp and no span, so the gap is the only duration available |
 | `ComplianceMatrix` (`components/ComplianceMatrix.tsx`) | `/compliance/:regulation` | CSS grid of subjects × controls; each cell is a button coloured pass / warn / fail / no-data. A cell whose audit-chain check failed gets an amber ring, a striped overlay and a ⚠ glyph |
@@ -39,13 +39,16 @@ not built: both shipped as CSS grid / flexbox views, which keeps a single chart 
 ## How `recommendedVisualization` is used
 
 `EvaluatorCard.recommendedVisualization` is a free-text hint. The `EvaluatorCard` XML doc lists `radar`,
-`timeline`, `histogram`, `heatmap`, `sparkline`, `sankey`, `stackedBar` and `none` as intended values; the 60
-cards under `src/AgentEval.Evals.Agentic/EvaluatorCards/` use four of them: `histogram`, `radar`,
-`timeline` and `stackedBar`.
+`timeline`, `histogram`, `heatmap`, `sparkline`, `sankey`, `stackedBar` and `none` as intended values. Shipped
+cards under `src/AgentEval.Evals.Agentic/EvaluatorCards/` use `histogram`, `radar`, `timeline`, `stackedBar`,
+`none` and `heatmap` (the `tool_error_pattern` card).
 
 The SPA reads the hint in one place, the evaluator detail page. It prints the hint, and passes it to
-`GenericEvaluatorRenderer` together with the evaluator's recent-run timeline (one entry per run, with
-`runId`, `timestamp` and `score`) as the payload. The renderer matches the hint case-insensitively:
+`GenericEvaluatorRenderer` together with the evaluator's recorded occurrences as the payload. Chart previews
+require the same comparable-context decision as the timeline: one declared normalized metric, subject,
+evaluator version, case/path and threshold, measured scores/times, and no trial observations. Otherwise the
+page explains why a preview is unavailable and shows raw JSON; the occurrence table and exact source links
+remain available. For eligible observations, the renderer matches the hint case-insensitively:
 
 | Hint | Preview |
 |---|---|
@@ -55,9 +58,10 @@ The SPA reads the hint in one place, the evaluator detail page. It prints the hi
 | `table` | Key / value table |
 | anything else | The payload as pretty-printed JSON |
 
-None of the four values the shipped cards use is in that list, so for every shipped evaluator the preview
-is the JSON view. The same page always draws the score-over-time `TimelineChart` below it, whatever the
-hint says. No component renders a `sankey`, and nothing draws a radar chart from a card's hint.
+The shipped `heatmap` hint can draw a chart when the context guard passes; the other currently shipped hints
+fall back to JSON. The `TimelineChart` below the preview also requires a comparable context and otherwise
+shows recorded values without a combined chart. No component renders a `sankey`, and nothing draws a radar
+chart from a card's hint.
 
 ---
 

@@ -44,16 +44,26 @@ public class MarkdownExporter : IResultExporter
     {
         var sb = new StringBuilder();
         
-        // Header
-        var statusEmoji = report.FailedTests == 0 ? "✅" : "❌";
-        var statusText = report.FailedTests == 0 ? "PASSED" : "FAILED";
-        
+        // Header. A skipped test (from ToEvaluationReport, one that produced no verdict: the judge failed, the run
+        // errored) is not a failure, but a report with one is not a clean PASS either; nor is a report with no tests.
+        var (statusEmoji, statusText) = report.FailedTests > 0 ? ("❌", "FAILED")
+            : report.SkippedTests > 0 ? ("⚠️", $"INCOMPLETE ({report.SkippedTests} not measured)")
+            : report.TotalTests == 0 ? ("⚠️", "NO TESTS")
+            : ("✅", "PASSED");
+
         sb.AppendLine("## 🤖 AgentEval Results");
         sb.AppendLine();
         sb.AppendLine($"**Status:** {statusEmoji} {statusText}");
-        sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Score:** {report.OverallScore:F1}/100"));
-        sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**Tests:** {report.PassedTests}/{report.TotalTests} passed ({report.PassRate:F0}%)"));
-        sb.AppendLine($"**Duration:** {FormatDuration(report.Duration)}");
+        // What was not recorded says so: no score, no pass rate for an empty report, no duration when untimed.
+        sb.AppendLine(report.OverallScore is { } overallScore && !(report.SkippedTests > 0 && report.SkippedTests >= report.TotalTests)
+            ? string.Create(CultureInfo.InvariantCulture, $"**Score:** {overallScore:F1}/100")
+            : "**Score:** n/a (nothing measured)");
+        sb.AppendLine(report.PassRate is { } passRate
+            ? string.Create(CultureInfo.InvariantCulture, $"**Tests:** {report.PassedTests}/{report.TotalTests} passed ({passRate:F0}%)")
+            : string.Create(CultureInfo.InvariantCulture, $"**Tests:** {report.PassedTests}/{report.TotalTests} passed"));
+        sb.AppendLine(report.Duration is { } duration
+            ? $"**Duration:** {FormatDuration(duration)}"
+            : "**Duration:** not recorded");
         
         if (report.Agent?.Model != null)
         {
@@ -74,10 +84,13 @@ public class MarkdownExporter : IResultExporter
         
         foreach (var test in orderedResults)
         {
-            var status = test.Skipped ? "⏭️" : (test.Passed ? "✅" : "❌");
-            var time = FormatDuration(TimeSpan.FromMilliseconds(test.DurationMs));
-            
-            sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"| {EscapeMarkdown(test.Name)} | {test.Score:F1} | {status} | {time} |"));
+            var status = test.NotMeasured ? "⚠️ not measured" : test.Skipped ? "⏭️" : (test.Passed ? "✅" : "❌");
+            var time = test.DurationMs is { } durationMs ? FormatDuration(TimeSpan.FromMilliseconds(durationMs)) : "n/a";
+            var score = !test.NotMeasured && test.Score is { } testScore
+                ? testScore.ToString("F1", CultureInfo.InvariantCulture)
+                : "n/a";
+
+            sb.AppendLine($"| {EscapeMarkdown(test.Name)} | {score} | {status} | {time} |");
         }
         
         // Failures section
@@ -90,7 +103,9 @@ public class MarkdownExporter : IResultExporter
             
             foreach (var failure in failures)
             {
-                sb.AppendLine(string.Create(CultureInfo.InvariantCulture, $"**{EscapeMarkdown(failure.Name)}** (Score: {failure.Score:F1}/100)"));
+                sb.AppendLine(failure.Score is { } failedScore
+                    ? string.Create(CultureInfo.InvariantCulture, $"**{EscapeMarkdown(failure.Name)}** (Score: {failedScore:F1}/100)")
+                    : $"**{EscapeMarkdown(failure.Name)}** (Score: n/a)");
                 if (!string.IsNullOrEmpty(failure.Error))
                 {
                     sb.AppendLine($"- {EscapeMarkdown(failure.Error)}");

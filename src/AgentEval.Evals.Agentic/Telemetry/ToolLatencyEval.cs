@@ -14,8 +14,8 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 ///   <item>0.0 if max tool latency &gt; 2 × <c>perToolBudgetMs</c></item>
 ///   <item>Linear interpolation between budget and 2× budget.</item>
 /// </list>
-/// If <see cref="AgenticTelemetry.ToolLatencyMs"/> is empty, the evaluator returns score 1.0
-/// (no per-tool data — no violation).
+/// A null <see cref="AgenticTelemetry.ToolLatencyMs"/> skips the check; an empty map records
+/// no tool calls and is not applicable. Any negative or non-finite latency produces an error.
 /// </para>
 /// <para>
 /// <b>Severity</b>: <c>low</c> — tool latency issues degrade user experience but are usually
@@ -95,24 +95,19 @@ public sealed class ToolLatencyEval : IEvalConfigurationSource
                 $"ToolLatencyEval requires telemetry data via EvalInput.Metadata[\"{LatencyEval.MetadataKey}\"] or constructor parameter."));
         }
 
+        if (telemetry.ToolLatencyMs is null)
+            return Task.FromResult(EvalResult.Skipped(this,
+                "ToolLatencyMs was not tracked; per-tool latency was not measured."));
+
         if (telemetry.ToolLatencyMs.Count == 0)
+            return Task.FromResult(TelemetryHelper.NotApplicable(this,
+                "The run recorded no tool calls (an empty ToolLatencyMs map); per-tool latency is not applicable."));
+
+        foreach (var (name, latency) in telemetry.ToolLatencyMs)
         {
-            // No per-tool data — no violation.
-            return Task.FromResult(new EvalResult(
-                Metric: new(KeyValue, NameValue, CategoryValue, VersionValue),
-                Score: new(1.0, null, "pass", true, null, "none", null),
-                Details: new(
-                    Dimensions: new Dictionary<string, double> { ["tool_count"] = 0 },
-                    Evidence:
-                    [
-                        new EvalEvidence("telemetry", "tool_latency",
-                            "No per-tool latency data available — score defaulted to 1.0."),
-                    ],
-                    Recommendations: null,
-                    SubResults: null,
-                    AggregationStrategy: null),
-                Provenance: new("atomic-code", null, null, null, null, 0, false),
-                EvaluatedAt: DateTimeOffset.UtcNow));
+            if (TelemetryHelper.Reading(latency) is null)
+                return Task.FromResult(TelemetryHelper.InvalidReading(this, PassThreshold,
+                    $"ToolLatencyMs for '{name}' must be finite and non-negative; per-tool latency was not measured."));
         }
 
         // Find the worst (highest-latency) tool.

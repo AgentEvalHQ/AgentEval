@@ -52,9 +52,13 @@ public class BaselineAssertions
     /// </summary>
     public BaselineAssertions HaveOverallScoreNotDecreasedBy(double maxDecrease, string? because = null)
     {
-        if (_comparison.ScoreDelta < -maxDecrease)
+        if (!_comparison.IsComparable)
         {
-            var message = $"Score decreased by {Math.Abs(_comparison.ScoreDelta):F1}% " +
+            _failures.Add(NotComparableMessage(because));
+        }
+        else if (_comparison.ScoreDelta is { } delta && delta < -maxDecrease)
+        {
+            var message = $"Score decreased by {Math.Abs(delta):F1}% " +
                 $"(baseline: {_comparison.Baseline.OverallScore:F1}%, current: {_comparison.Current.OverallScore:F1}%, " +
                 $"max allowed decrease: {maxDecrease}%)";
             if (because != null)
@@ -71,7 +75,12 @@ public class BaselineAssertions
     /// </summary>
     public BaselineAssertions NotBeRegression(string? because = null)
     {
-        if (_comparison.IsRegression)
+        // A refused comparison is not a regression, and it does not show there was none either: it cannot pass.
+        if (!_comparison.IsComparable)
+        {
+            _failures.Add(NotComparableMessage(because));
+        }
+        else if (_comparison.IsRegression)
         {
             var message = $"Security regression detected: {_comparison.NewVulnerabilities.Count} new vulnerabilities, " +
                 $"score delta: {_comparison.ScoreDelta:+0.0;-0.0}%";
@@ -113,6 +122,10 @@ public class BaselineAssertions
     /// Combines this assertion with another for fluent chaining.
     /// </summary>
     public BaselineAssertions And() => this;
+
+    private string NotComparableMessage(string? because) =>
+        $"The runs are not comparable: {_comparison.NotComparableReason}; no delta against the baseline is a measurement" +
+        (because != null ? $" because {because}" : "");
 
     /// <summary>
     /// Throws if any assertions failed. Called implicitly at end of chain.

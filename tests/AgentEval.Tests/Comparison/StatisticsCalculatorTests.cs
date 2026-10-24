@@ -10,10 +10,10 @@ namespace AgentEval.Tests.Comparison;
 public class StatisticsCalculatorTests
 {
     [Fact]
-    public void Mean_EmptyList_ReturnsZero()
+    public void Mean_EmptyList_ReturnsNull()
     {
         var result = StatisticsCalculator.Mean(new List<double>());
-        Assert.Equal(0, result);
+        Assert.Null(result);
     }
     
     [Fact]
@@ -45,17 +45,17 @@ public class StatisticsCalculatorTests
     }
     
     [Fact]
-    public void Median_EmptyList_ReturnsZero()
+    public void Median_EmptyList_ReturnsNull()
     {
         var result = StatisticsCalculator.Median(new List<double>());
-        Assert.Equal(0, result);
+        Assert.Null(result);
     }
     
     [Fact]
-    public void StandardDeviation_SingleValue_ReturnsZero()
+    public void StandardDeviation_SingleValue_ReturnsNull()
     {
         var result = StatisticsCalculator.StandardDeviation(new List<double> { 42 });
-        Assert.Equal(0, result);
+        Assert.Null(result);
     }
     
     [Fact]
@@ -138,6 +138,7 @@ public class StatisticsCalculatorTests
         var values = new List<double> { 80, 85, 90, 82, 88 };
         var result = StatisticsCalculator.CalculateConfidenceInterval(values, 0.95);
         
+        Assert.NotNull(result);
         Assert.True(result.Lower < result.Upper);
         Assert.Equal(0.95, result.Level);
         Assert.True(result.Lower < StatisticsCalculator.Mean(values));
@@ -152,6 +153,7 @@ public class StatisticsCalculatorTests
         
         var stats = StatisticsCalculator.CreateStatistics(scores, passResults);
         
+        Assert.NotNull(stats);
         Assert.Equal(0.8, stats.PassRate);
         Assert.Equal(80, stats.MeanScore);
         Assert.Equal(80, stats.MedianScore);

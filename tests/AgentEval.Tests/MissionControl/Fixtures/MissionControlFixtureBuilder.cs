@@ -232,7 +232,7 @@ public static class MissionControlFixtureBuilder
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sc, ct);
             totalScore += score;
             passed++;
-            totalCost += sc.EstimatedCost;
+            totalCost += sc.EstimatedCost ?? 0; // the fixture prices every flat scenario
         }
 
         // Recursive composite tree as the 5th scenario.
@@ -242,7 +242,7 @@ public static class MissionControlFixtureBuilder
         await store.WriteScenarioResultAsync(manifest.Run.RunId, compositeScenario, ct);
         totalScore += tree.Score.Value;
         passed += tree.Score.Passed ? 1 : 0;
-        totalCost += compositeScenario.EstimatedCost;
+        totalCost += compositeScenario.EstimatedCost ?? 0; // the fixture tree's leaves are all priced
 
         await store.AppendTraceAsync(manifest.Run.RunId, new AgentTrace(
             RunId: manifest.Run.RunId,

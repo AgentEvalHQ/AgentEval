@@ -572,31 +572,8 @@ public class ComparabilityFactsTests
 
     // ── the FIRST CONSUMER, because a field with no producer is dead data ───────────────────
 
-    [Fact]
-    public void TheCompositeRunners_DeclareTheSubjectModel()
-    {
-        // ADR-031 finding V7 cuts a field that "gates nothing and cannot go stale detectably".
-        // SubjectRelation would be exactly that if no runner ever supplied a subject model, so the
-        // three composite runners were wired to thread `EvalInput.SubjectModel` through. This
-        // asserts the wiring by source and — the lesson of 8f3e11c7 — asserts its own INPUT too: a
-        // scan that found no files and a scan that found no offenders are indistinguishable.
-        string root = RepositoryRoot();
-        string[] runners =
-        [
-            Path.Combine(root, "src", "AgentEval.Compliance.Gdpr", "Articles", "GdprBenchmarkRunner.cs"),
-            Path.Combine(root, "src", "AgentEval.Compliance.EuAiAct", "Articles", "EuAiActBenchmarkRunner.cs"),
-            Path.Combine(root, "src", "AgentEval.Evals.Agentic", "Composition", "AgenticBenchmarkRunner.cs"),
-        ];
+    // Runner observations are verified through real persistence in ComparisonObservationTests.
 
-        foreach (string runner in runners)
-        {
-            Assert.True(File.Exists(runner), $"{runner} is not where this test expects it — the scan is asserting nothing.");
-
-            string body = File.ReadAllText(runner);
-            Assert.Contains("ToScenarioResult(", body, StringComparison.Ordinal);
-            Assert.Contains("subjectModel: input.SubjectModel", body, StringComparison.Ordinal);
-        }
-    }
 
     [Fact]
     public void SubjectModel_IsNullByDefaultOnEveryExistingInput()
@@ -606,17 +583,7 @@ public class ComparabilityFactsTests
         Assert.Equal("gpt-5.5", new EvalInput("q") { SubjectModel = "gpt-5.5" }.SubjectModel);
     }
 
-    private static string RepositoryRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null)
-        {
-            if (dir.GetFiles("AgentEval.sln").Length > 0) return dir.FullName;
-            dir = dir.Parent;
-        }
 
-        throw new DirectoryNotFoundException($"AgentEval.sln was not found above {AppContext.BaseDirectory}.");
-    }
 
     // ── fixtures ────────────────────────────────────────────────────────────────────────────
 

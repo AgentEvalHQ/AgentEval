@@ -36,12 +36,14 @@ public static class WorkflowWithTools
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
         Console.WriteLine("📝 Step 1: Building TripPlanner MAF Workflow with tools...\n");
 
-        var (workflow, executorIds) = CreateTripPlannerWorkflow();
+        using var timing = new MAFWorkflowInstrumentation();
+        var (workflow, executorIds) = CreateTripPlannerWorkflow(timing);
 
         Console.WriteLine($"   Workflow name : {workflow.Name}");
         Console.WriteLine($"   Start executor: {workflow.StartExecutorId}");
@@ -104,11 +106,14 @@ public static class WorkflowWithTools
             Console.ResetColor();
             Console.WriteLine();
             Console.WriteLine("   💡 Tip: Ensure your model supports tool calling.");
+            SampleOutcome.Error($"the workflow run threw: {ex.Message}");
             return;
         }
 
         Console.WriteLine("\n📊 DETAILED WORKFLOW RESULTS:");
         Console.WriteLine(new string('═', 80));
+
+        WorkflowEvaluationReal.RecordHarnessVerdict(testResult);
 
         if (testResult.ExecutionResult != null)
         {
@@ -123,15 +128,11 @@ public static class WorkflowWithTools
             Console.WriteLine("   📈 EXECUTION TIMELINE:");
             foreach (var step in result.Steps)
             {
-                var startMs = step.StartOffset.TotalMilliseconds;
-                var durMs = step.Duration.TotalMilliseconds;
-
-                Console.WriteLine($"      {step.StepIndex + 1}. [{startMs:F0}ms] {step.ExecutorId} ({durMs:F0}ms)");
+                WorkflowWithToolsReport.WriteStep(Console.Out, step);
 
                 if (!string.IsNullOrEmpty(step.Output))
                 {
-                    var snippet = step.Output.Length > 120 ? step.Output[..117] + "..." : step.Output;
-                    Console.WriteLine($"         → \"{snippet}\"");
+                    Console.WriteLine($"         → \"{WorkflowEvaluationReal.Snippet(step.Output, 120)}\"");
                 }
                 Console.WriteLine();
             }
@@ -146,10 +147,7 @@ public static class WorkflowWithTools
 
             if (result.ToolUsage != null)
             {
-                Console.WriteLine($"   📊 ToolUsage report: {result.ToolUsage.Count} total tool calls");
-                Console.WriteLine($"   🔧 Unique tools: {string.Join(", ", result.ToolUsage.UniqueToolNames)}");
-                Console.WriteLine($"   ⏱️ Total tool time: {result.ToolUsage.TotalToolTime.TotalMilliseconds:F0}ms");
-                Console.WriteLine($"   ❌ Has errors: {result.ToolUsage.HasErrors}\n");
+                WorkflowWithToolsReport.WriteToolSummary(Console.Out, result.ToolUsage);
 
                 // Per-executor breakdown
                 foreach (var step in result.Steps.Where(s => s.HasToolCalls))
@@ -157,10 +155,8 @@ public static class WorkflowWithTools
                     Console.WriteLine($"   📌 {step.ExecutorId}: {step.ToolCalls!.Count} tool call(s)");
                     foreach (var tc in step.ToolCalls!)
                     {
-                        var duration = tc.Duration?.TotalMilliseconds ?? 0;
-                        var resultSnippet = tc.Result?.ToString() ?? "(no result)";
-                        if (resultSnippet.Length > 80) resultSnippet = resultSnippet[..77] + "...";
-                        Console.WriteLine($"      🔧 {tc.Name} ({duration:F0}ms) → {resultSnippet}");
+                        var resultSnippet = tc.Result?.ToString() is { } text ? WorkflowEvaluationReal.Snippet(text, 80) : "(no result)";
+                        WorkflowWithToolsReport.WriteToolCall(Console.Out, tc, resultSnippet);
                     }
                 }
 
@@ -178,10 +174,7 @@ public static class WorkflowWithTools
             // Timeline display
             if (result.Timeline != null)
             {
-                Console.WriteLine($"\n   📈 TOOL TIMELINE:");
-                Console.WriteLine($"      Total: {result.Timeline.TotalToolCalls} calls, {result.Timeline.TotalDuration.TotalMilliseconds:F0}ms total");
-                Console.WriteLine($"      Tool time: {result.Timeline.TotalToolTime.TotalMilliseconds:F0}ms ({result.Timeline.ToolTimePercentage:F1}%)");
-                Console.WriteLine(result.Timeline.ToAsciiDiagram(80));
+                WorkflowWithToolsReport.WriteTimeline(Console.Out, result.Timeline);
             }
         }
 
@@ -255,9 +248,11 @@ public static class WorkflowWithTools
                 }
                 else
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("   ⚠️ Tool-level assertions SKIPPED (no tool events captured).\n");
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("   ❌ Tool-level assertions could not run: no tool call was captured.\n");
                     Console.ResetColor();
+                    SampleOutcome.Fail(
+                        $"no tool call was captured; the test expects {string.Join(", ", testCase.ExpectedTools!)}");
                 }
 
                 // Graph structure assertions
@@ -276,12 +271,7 @@ public static class WorkflowWithTools
             }
             catch (WorkflowAssertionException ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Workflow assertion failed: {ex.Message}");
-                if (ex.Data.Contains("Suggestions"))
-                    Console.WriteLine($"   💡 Suggestion: {ex.Data["Suggestions"]}");
-                Console.ResetColor();
-                Console.WriteLine();
+                WorkflowEvaluationReal.PrintAssertionFailure(ex);
             }
         }
 
@@ -313,7 +303,7 @@ public static class WorkflowWithTools
     /// Builds the TripPlanner MAF Workflow:
     /// TripPlanner → FlightReservation → HotelReservation → Presenter
     /// </summary>
-    private static (Workflow workflow, string[] executorIds) CreateTripPlannerWorkflow()
+    private static (Workflow workflow, string[] executorIds) CreateTripPlannerWorkflow(MAFWorkflowInstrumentation timing)
     {
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -416,14 +406,14 @@ public static class WorkflowWithTools
         var presenterBinding = presenter.BindAsExecutor(emitEvents: true);
 
         // ── Build sequential workflow ──
-        var workflow = new WorkflowBuilder(tripPlannerBinding)
+        var workflowBuilder = new WorkflowBuilder(tripPlannerBinding)
             .AddEdge(tripPlannerBinding, flightBinding)
             .AddEdge(flightBinding, hotelBinding)
             .AddEdge(hotelBinding, presenterBinding)
             .WithOutputFrom(presenterBinding)
             .WithName("TripPlanner")
-            .WithDescription("Trip planning pipeline: plan → flights → hotels → present")
-            .Build();
+            .WithDescription("Trip planning pipeline: plan → flights → hotels → present");
+        var workflow = timing.Build(workflowBuilder);
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

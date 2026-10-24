@@ -130,7 +130,7 @@
     },
     "state": {
       "$ref": "common.schema.json#/$defs/state",
-      "description": "The node's state. passed is the only pass; failed and warn (a soft failure) are measured failures; inconclusive is measured, undecided; not_measured, not_applicable, skipped, error and pending are typed absences (RES-1)."
+      "description": "The node's state. passed is the only pass; failed and warn (a soft failure) are measured failures; inconclusive is measured, undecided; scored is measured with no pass/fail rule applied; not_measured, not_applicable, skipped, error and pending are typed absences (RES-1)."
     },
     "reason": {
       "description": "Why the line is in a typed absence: required for not_measured, not_applicable, skipped, error and pending (RES-2). Optional otherwise.",

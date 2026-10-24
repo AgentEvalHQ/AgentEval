@@ -21,8 +21,11 @@ public class ChatTraceRecorderToolCallTests
     private sealed class ToolCallingAgent : IEvaluableAgent
     {
         private readonly string _toolName;
+        private readonly bool _toolRuns;
+        private readonly Exception? _toolError;
 
-        public ToolCallingAgent(string toolName) => _toolName = toolName;
+        public ToolCallingAgent(string toolName, bool toolRuns = true, Exception? toolError = null) =>
+            (_toolName, _toolRuns, _toolError) = (toolName, toolRuns, toolError);
 
         public string Name => "ToolCallingAgent";
 
@@ -37,14 +40,54 @@ public class ChatTraceRecorderToolCallTests
                     new FunctionCallContent(callId, _toolName,
                         new Dictionary<string, object?> { ["city"] = "Berlin" })
                 }),
-                new ChatMessage(Microsoft.Extensions.AI.ChatRole.Tool, new List<AIContent>
-                {
-                    new FunctionResultContent(callId, "sunny")
-                })
             };
+            if (_toolRuns)
+            {
+                rawMessages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Tool, new List<AIContent>
+                {
+                    new FunctionResultContent(callId, "sunny") { Exception = _toolError }
+                }));
+            }
 
             return Task.FromResult(new AgentResponse { Text = "It is sunny.", RawMessages = rawMessages });
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ToAgentTrace_RecordedExecution_RetainsIdentityAndOutcomeAfterSerialization(bool executed)
+    {
+        await using var recorder = new ChatTraceRecorder(new ToolCallingAgent("get_weather", toolRuns: executed), "execution");
+        await recorder.AddUserTurnAsync("Weather in Berlin?");
+
+        var json = await TraceSerializer.SerializeToStringAsync(recorder.ToAgentTrace());
+        var restored = await TraceSerializer.DeserializeFromStringAsync(json);
+        var call = Assert.Single(restored.Entries.Single(entry => entry.Type == TraceEntryType.Response).ToolCalls!);
+
+        Assert.Equal(executed, call.WasExecuted);
+        Assert.Equal("call-get_weather", call.CallId);
+        Assert.Equal(executed, call.Succeeded);
+        Assert.False(call.Failed); // Intent without execution has no failed outcome.
+        Assert.Null(call.Error);
+    }
+
+    [Fact]
+    public async Task ToAgentTrace_ExecutedToolError_RetainsErrorAfterSerialization()
+    {
+        await using var recorder = new ChatTraceRecorder(
+            new ToolCallingAgent("get_weather", toolError: new TimeoutException("weather offline")), "failure");
+        await recorder.AddUserTurnAsync("Weather in Berlin?");
+
+        var json = await TraceSerializer.SerializeToStringAsync(recorder.ToAgentTrace());
+        var restored = await TraceSerializer.DeserializeFromStringAsync(json);
+        var call = Assert.Single(restored.Entries.Single(entry => entry.Type == TraceEntryType.Response).ToolCalls!);
+
+        Assert.Equal("weather offline", call.Error);
+        Assert.True(call.WasExecuted);
+        Assert.Equal("call-get_weather", call.CallId);
+        Assert.False(call.Succeeded);
+        Assert.True(call.Failed);
     }
 
     [Fact]
@@ -66,6 +109,38 @@ public class ChatTraceRecorderToolCallTests
         Assert.NotNull(agentTurn.ToolCalls);
         Assert.Equal("get_weather", agentTurn.ToolCalls!.Single().Name);
         Assert.Equal("sunny", agentTurn.ToolCalls.Single().Result);
+    }
+
+    [Fact]
+    public async Task TheCombinedReport_KeepsWhetherEachCallRan_SoToolSuccessCountsIt()
+    {
+        // T58 made code_tool_success count only executed calls; the recorder's copy into the combined report dropped
+        // WasExecuted, so a call that ran and returned "sunny" read as one that never ran: tool success 0, FAIL.
+        await using var recorder = new ChatTraceRecorder(new ToolCallingAgent("get_weather"), "tools-executed");
+
+        await recorder.AddUserTurnAsync("Weather in Berlin?");
+        var usage = recorder.GetResult().CombinedToolUsage!;
+
+        Assert.True(Assert.Single(usage.Calls).WasExecuted);
+        var success = await new AgentEval.Metrics.Agentic.ToolSuccessMetric().EvaluateAsync(
+            new EvaluationContext { Input = "Weather in Berlin?", Output = "It is sunny.", ToolUsage = usage });
+        Assert.True(success.Passed);
+        Assert.Equal(100, success.Score);
+    }
+
+    [Fact]
+    public async Task TheTrace_DoesNotMarkACallThatNeverRanAsSucceeded()
+    {
+        // The trace wrote Succeeded = !HasError, so a call the agent emitted but that never ran (no result) read as a
+        // success in the trace, the same defect class as tool success counting emitted calls (T58).
+        await using var ran = new ChatTraceRecorder(new ToolCallingAgent("get_weather"), "tool-ran");
+        await using var notRun = new ChatTraceRecorder(new ToolCallingAgent("get_weather", toolRuns: false), "tool-not-run");
+
+        await ran.AddUserTurnAsync("Weather in Berlin?");
+        await notRun.AddUserTurnAsync("Weather in Berlin?");
+
+        Assert.True(ran.GetResult().Turns.Single(t => t.IsAgentTurn).ToolCalls!.Single().Succeeded);
+        Assert.False(notRun.GetResult().Turns.Single(t => t.IsAgentTurn).ToolCalls!.Single().Succeeded);
     }
 
     [Fact]

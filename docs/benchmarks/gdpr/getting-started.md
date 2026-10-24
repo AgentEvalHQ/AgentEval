@@ -115,8 +115,10 @@ The standard `ComplianceEvidence` document written by `SaveComplianceEvidenceAsy
 
 The GDPR-specific wrapper. Contains:
 - `compositeTree` — the full recursive `EvalResult` tree, one node per article and per pillar.
-- `pillarSummary` — per-pillar score, pass/fail, and article count.
-- `overallVerdict` — `PASS`, `WARN`, or `FAIL`.
+- `summary.perPillar` and `summary.perArticle` — scores and statuses for the measured parts.
+- `summary.overallStatus` — `PASS`, `WARN`, `FAIL`, `ERROR`, or `SKIPPED`.
+- `summary.overallScore` — the measured overall score, or explicit `null` when the root is not measured
+  (including a withheld `WARN`). Markdown, PDF and CLI output display `n/a — not measured`; a measured zero remains zero.
 - `criticalFindings` — list of articles that scored below threshold at `high` or `critical` severity.
 - `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this structured shape and the legacy `string[]` shape written by v0.8.1-beta, via `anyOf` at the `items` level, so older files still validate. The schema also accepts an optional `metadata: { string: string }` object on each entry; the built-in recommendation extractor does not write it.
 - `disclaimer` — the verbatim disclaimer text from this document's Scope section.
@@ -300,3 +302,7 @@ The following are not validated by this benchmark:
 - [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for a formal GDPR audit, DPIA, or legal opinion. Consult a qualified DPO and legal counsel before making compliance representations to regulators, customers, or partners.
+
+### Missing scores in reports
+
+Nested summary scores and compliance evidence `controls[].passRate` are explicit `null` when no score was measured. A measured zero remains numeric `0`. Markdown, PDF and Mission Control show missing values as `n/a`; partial agentic categories retain the average of their measured evaluators. Consumers must handle nullable scores and rates, including the GraphQL matrix field. Legacy numeric documents still deserialize and validate; this change does not reinterpret historical numeric placeholders without their original measurement evidence.

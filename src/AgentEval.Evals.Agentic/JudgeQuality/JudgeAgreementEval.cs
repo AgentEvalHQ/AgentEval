@@ -26,6 +26,8 @@ namespace AgentEval.Evals.Agentic.JudgeQuality;
 /// <b>Score semantics</b>: kappa value in [0, 1] (negative kappas clamped to 0).
 /// Passes when kappa &gt;= <c>passThreshold</c>. Severity: <c>low</c>
 /// (this is a meta-metric, not a real-world output evaluator).
+/// A judge result that gave no verdict (<c>error</c>, <c>skipped</c>, <c>inapplicable</c>, no label) is left out;
+/// with fewer than two verdicts left the eval is skipped, not scored.
 /// </para>
 /// </summary>
 public sealed class JudgeAgreementEval : IEvalConfigurationSource
@@ -70,13 +72,17 @@ public sealed class JudgeAgreementEval : IEvalConfigurationSource
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var labels = ExtractLabels(input);
+        // Only a judge that gave a verdict can agree or disagree (T13). Two judges that both errored were one
+        // ("error","error") pair: kappa undefined, read as perfect agreement below, so the panel PASSED at 1.0; one that
+        // passed next to one that errored was a measured FAIL at kappa 0.
+        var (labels, withoutVerdict) = ExtractLabels(input);
 
         if (labels.Count < 2)
         {
             // Cannot compute agreement with fewer than 2 judges — return skipped.
             return Task.FromResult(EvalResult.Skipped(this,
-                "JudgeAgreementEval requires at least 2 judge results in EvalInput.Metadata[\"judge_results\"]."));
+                "JudgeAgreementEval requires at least 2 judge results with a verdict in EvalInput.Metadata[\"judge_results\"]" +
+                (withoutVerdict > 0 ? $"; {withoutVerdict} gave none (error, skipped, inapplicable or no label)." : ".")));
         }
 
         // Build all pairwise (rater-i, rater-j) label pairs and compute kappa
@@ -114,23 +120,34 @@ public sealed class JudgeAgreementEval : IEvalConfigurationSource
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Extracts a list of label strings from input metadata.
+    /// Extracts the verdict labels from input metadata, and counts the judge results that gave no verdict.
     /// Accepts: <see cref="IEnumerable{EvalResult}"/> or a JSON array string of objects
     /// with a <c>label</c> property.
     /// </summary>
-    private static IReadOnlyList<string> ExtractLabels(EvalInput input)
+    private static (IReadOnlyList<string> Labels, int WithoutVerdict) ExtractLabels(EvalInput input)
     {
         if (input.Metadata is null || !input.Metadata.TryGetValue("judge_results", out var raw))
-            return Array.Empty<string>();
+            return (Array.Empty<string>(), 0);
 
-        return raw switch
+        // A result counts by the one predicate every aggregate uses; a bare label has only its text to go by.
+        IReadOnlyList<string> all = raw switch
         {
-            IEnumerable<EvalResult> results => results.Select(r => r.Score.Label).ToList(),
+            IEnumerable<EvalResult> results => results.Select(r => r.Score.CountsTowardAggregate() ? r.Score.Label : "skipped").ToList(),
             IEnumerable<string> labels => labels.ToList(),
             string json => ParseJsonLabels(json),
             _ => Array.Empty<string>()
         };
+        var verdicts = all.Where(IsVerdictLabel).ToList();
+        return (verdicts, all.Count - verdicts.Count);
     }
+
+    /// <summary>
+    /// Whether a judge's label is a verdict: anything but <c>error</c>, <c>skipped</c>, <c>inapplicable</c> or a missing
+    /// label (<c>unknown</c>), ignoring case. Shared with <see cref="CalibrationAccuracyEval"/>.
+    /// </summary>
+    internal static bool IsVerdictLabel(string? label) =>
+        !string.IsNullOrWhiteSpace(label)
+        && label.Trim().ToLowerInvariant() is not ("error" or "skipped" or "inapplicable" or "unknown");
 
     private static IReadOnlyList<string> ParseJsonLabels(string json)
     {

@@ -127,7 +127,7 @@ public static class GatekeeperSameBatchRace
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Same-batch sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Same-batch sample failed: " + message + ".");
         }
     }
 

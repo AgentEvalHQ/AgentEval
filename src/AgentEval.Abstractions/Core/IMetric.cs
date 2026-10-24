@@ -207,6 +207,10 @@ public class EvaluationContext
 /// </summary>
 public class MetricResult
 {
+    // Preserve the original provider failure for in-process retry classification, never result serialization.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Exception? CallFailure { get; init; }
+
     /// <summary>Whether this result used model grading; null when the producer did not report it.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? ModelGraded { get; init; }
@@ -231,19 +235,40 @@ public class MetricResult
     public IDictionary<string, object>? Details { get; init; }
 
     /// <summary>
-    /// False when the metric could not be measured because an input it needs — a reference answer, a retrieved
-    /// context — was not supplied. Such a result is neither a pass nor a fail: <see cref="Passed"/> is false, the
-    /// <see cref="Score"/> is a placeholder 0 that no aggregate counts. MAF has no item state between pass and fail, so
-    /// the MEAI bridge reports it with no value, rated inconclusive and failed (fail-closed), its reason saying "not
-    /// measured" (#203 review round 15, B12i: a missing input failed the metric at 0; round 16, B12k).
+    /// False when the metric could not be measured: an input it needs — a reference answer, a retrieved context — was
+    /// not supplied, or the instrument gave no reading (the judge's reply could not be read, the judge or embedding
+    /// call failed, a check timed out). <see cref="NotMeasuredCause"/> says which. Such a result is neither a pass nor
+    /// a fail: <see cref="Passed"/> is false, the <see cref="Score"/> is a placeholder 0 that no aggregate counts. MAF
+    /// has no item state between pass and fail, so the MEAI bridge reports it with no value, rated inconclusive and
+    /// failed (fail-closed), its reason saying "not measured" (#203 review round 15, B12i: a missing input failed the
+    /// metric at 0; round 16, B12k).
     /// </summary>
     public bool Measured { get; init; } = true;
 
     /// <summary>
-    /// Create a not-measured result: an input the metric needs was not supplied (see <see cref="Measured"/>).
+    /// Why the metric was not measured; null when it was measured, or when its producer did not say (a result made with
+    /// the <see cref="NotMeasured(string, string, IDictionary{string, object})"/> overload).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public NotMeasuredCause? NotMeasuredCause { get; init; }
+
+    /// <summary>
+    /// Create a not-measured result (see <see cref="Measured"/>) without a typed cause. Prefer the overload that takes a
+    /// <see cref="AgentEval.Core.NotMeasuredCause"/>.
     /// </summary>
     public static MetricResult NotMeasured(string metricName, string reason, IDictionary<string, object>? details = null) =>
         new() { MetricName = metricName, Score = 0, Passed = false, Measured = false, Explanation = reason, Details = details };
+
+    /// <summary>
+    /// Create a not-measured result (see <see cref="Measured"/>) that says why: <paramref name="cause"/> is the kind,
+    /// <paramref name="reason"/> the words.
+    /// </summary>
+    public static MetricResult NotMeasured(string metricName, NotMeasuredCause cause, string reason, IDictionary<string, object>? details = null) =>
+        new()
+        {
+            MetricName = metricName, Score = 0, Passed = false, Measured = false, NotMeasuredCause = cause,
+            Explanation = reason, Details = details,
+        };
     
     /// <summary>
     /// Create a passing metric result.
@@ -256,4 +281,35 @@ public class MetricResult
     /// </summary>
     public static MetricResult Fail(string metricName, string explanation, double score = 0, IDictionary<string, object>? details = null) =>
         new() { MetricName = metricName, Score = score, Passed = false, Explanation = explanation, Details = details };
+}
+
+/// <summary>
+/// Why a metric was not measured (<see cref="MetricResult.NotMeasuredCause"/>). An input the caller did not supply is
+/// the case's gap; the other causes are the instrument's: it was asked and gave no reading.
+/// </summary>
+public enum NotMeasuredCause
+{
+    /// <summary>An input the metric needs (a retrieved context, a reference answer) was not supplied.</summary>
+    MissingInput,
+
+    /// <summary>
+    /// The model that grades answered, but its answer could not be read as a measurement: a judge reply with no JSON,
+    /// no score or a score off the 0-100 scale; an evaluator that returned no value; an embedding vector that is empty,
+    /// zero or not finite.
+    /// </summary>
+    JudgeReplyUnreadable,
+
+    /// <summary>The call to the model that grades (a judge, an evaluator, an embedding model) failed: a provider error,
+    /// a timeout, retries that ran out.</summary>
+    JudgeCallFailed,
+
+    /// <summary>A check could not finish in time (a toxicity pattern scan that timed out).</summary>
+    CheckTimedOut,
+
+    /// <summary>
+    /// The run gave the check nothing to check: no tool calls to grade the arguments of, no skill to grade the
+    /// disclosure of. Neither a pass nor a failure; unlike the other causes it is not a gap that keeps a gate from
+    /// passing, so gates and averages leave it out.
+    /// </summary>
+    NotApplicable,
 }

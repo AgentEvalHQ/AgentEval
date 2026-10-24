@@ -39,17 +39,39 @@ internal static class ConsoleReporter
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  ─────────────────────────────────");
+        // The score averages the measured tests only; a test with no verdict is counted apart, never as a 0.
+        var score = summary.AverageScore is not { } average ? "n/a (nothing measured)"
+            : summary.NotMeasuredCount > 0 ? $"{average:F1} (over {summary.MeasuredCount} measured)"
+            : $"{average:F1}";
         Console.Error.WriteLine($"  Results: {summary.PassedCount}/{summary.TotalCount} passed" +
-            $"  Score: {summary.AverageScore:F1}");
+            $"  Score: {score}");
 
-        if (summary.TotalDuration > TimeSpan.Zero)
-            Console.Error.WriteLine($"  Duration: {summary.TotalDuration.TotalSeconds:F1}s" +
-                $"  Cost: ${summary.TotalCost:F4}");
+        // Duration over the timed tests; the cost only when every test was priced. The priced tests alone printed as
+        // "Cost: $x", and a timed run with no price as "Cost: $0.0000" (T82).
+        if (summary.TotalDuration is { } duration)
+        {
+            var timed = summary.Results.Count(r => r.Performance != null);
+            var durationText = timed < summary.TotalCount
+                ? $"{duration.TotalSeconds:F1}s (over {timed} timed)"
+                : $"{duration.TotalSeconds:F1}s";
+            var costText = summary.TotalCost is { } cost
+                ? $"${cost:F4}"
+                : $"not priced ({summary.UnpricedTests.Count} of {summary.TotalCount} tests have no price)";
+            Console.Error.WriteLine($"  Duration: {durationText}  Cost: {costText}");
+            Console.Error.WriteLine($"  {ModelPricing.BaselineNotice}");
+        }
 
         if (summary.AllPassed)
             Console.Error.WriteLine("  All tests passed.");
+        else if (summary.TotalCount == 0)
+            Console.Error.WriteLine("  No tests ran.");
         else
-            Console.Error.WriteLine($"  {summary.FailedCount} test(s) failed.");
+        {
+            if (summary.FailedCount > 0)
+                Console.Error.WriteLine($"  {summary.FailedCount} test(s) failed.");
+            if (summary.NotMeasuredCount > 0)
+                Console.Error.WriteLine($"  {summary.NotMeasuredCount} test(s) not measured (the judge produced no verdict, or the run errored).");
+        }
 
         Console.Error.WriteLine();
     }

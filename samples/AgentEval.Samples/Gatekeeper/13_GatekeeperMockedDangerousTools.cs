@@ -97,7 +97,7 @@ public static class GatekeeperMockedDangerousTools
         Console.WriteLine($"   Mock executions observed: {component.ExecutionCount}");
         if (allowed != 4 || blocked != 5 || component.ExecutionCount != 4)
         {
-            throw new InvalidOperationException("The mocked contract fixture produced an unexpected verdict count.");
+            throw new SampleCheckFailedException("The mocked contract fixture produced an unexpected verdict count.");
         }
 
         Console.WriteLine(

@@ -224,7 +224,9 @@ public static class SkillUsageAssertions
     /// Metric-backed assertion: run <see cref="Metrics.Agentic.SkillDisclosureEfficiencyMetric"/> over this
     /// report and assert its score meets <paramref name="minScore"/>. The metric is <c>CodeBased</c> (no
     /// LLM call, fully deterministic), so this can run synchronously inside the fluent chain. Design catalog §10.4,
-    /// item 3 (precedent: RedTeam's <c>HaveMinimumScore</c>).
+    /// item 3 (precedent: RedTeam's <c>HaveMinimumScore</c>). When the metric could not measure (no skill tool was
+    /// called), the assertion is inconclusive inside a collecting scope and fails when thrown: a minimum that was never
+    /// shown met is not met.
     /// </summary>
     /// <param name="a">The tool-usage assertions instance.</param>
     /// <param name="minScore">Minimum acceptable score (0-100).</param>
@@ -240,6 +242,28 @@ public static class SkillUsageAssertions
         // The metric is purely CodeBased (Task.FromResult all the way down, no real async work) — blocking
         // here is safe and keeps this assertion synchronous like every other fluent assertion in this class.
         var result = metric.EvaluateAsync(context).GetAwaiter().GetResult();
+
+        // Not measured (no skill tool called and no expected skills) is not a score: its placeholder 0 used to read as a
+        // low one. Collecting, the assertion is undecidable; thrown, it fails closed, since the minimum was not shown met.
+        if (!result.Measured)
+        {
+            if (probe.IsActive)
+            {
+                probe.MarkInconclusive($"Skill disclosure efficiency was not measured: {result.Explanation}");
+            }
+            else
+            {
+                AgentEvalScope.FailWith(
+                    ToolAssertionException.Create(
+                        $"Expected skill disclosure efficiency score >= {minScore:F0}, but it was not measured. {result.Explanation}",
+                        calledTools: report.UniqueToolNames.ToList(),
+                        expected: $"code_skill_disclosure_efficiency >= {minScore:F0}",
+                        actual: "code_skill_disclosure_efficiency not measured",
+                        because: because));
+            }
+
+            return probe.Complete(a);
+        }
 
         if (result.Score < minScore)
         {

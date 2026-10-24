@@ -39,9 +39,11 @@ namespace AgentEval.Samples.Benchmarks;
 /// Preset mapping (all against the real ~500-question dataset):
 /// <list type="bullet">
 ///   <item><see cref="SamplePreset.Smoke"/> → <c>Subset(chatClient)</c> with override MaxQuestions=10 (~5–10 min)</item>
-///   <item><see cref="SamplePreset.Standard"/> → <c>Subset(chatClient)</c> with baked SubsetOptions (default 50 questions)</item>
+///   <item><see cref="SamplePreset.Standard"/> → <c>Subset(chatClient)</c>, the preset's 50 questions</item>
 ///   <item><see cref="SamplePreset.AuditGrade"/> → <c>Full(chatClient)</c> all ~500 questions (requires <c>LONGMEMEVAL_DATASET_PATH</c>, ~30–60 min)</item>
 /// </list>
+/// Every selected question is accounted for (scored, judge-inconclusive or an agent error), the per-type table shows
+/// what each accuracy is over, and the answer prompts are measured on their way to the provider, as in G8.
 /// </summary>
 /// <remarks>
 /// Requires a model provider (see AIConfig). Skips gracefully when missing.
@@ -88,6 +90,7 @@ public static class LongMemEvalBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H9 — LongMemEval");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -110,13 +113,17 @@ public static class LongMemEvalBenchmarkSample
             Console.WriteLine("   For development / CI use --preset smoke (10Q) or --preset standard (50Q) —");
             Console.WriteLine("   both pick up the canonical local dataset automatically.");
             Console.ResetColor();
+            SampleOutcome.Skip($"the audit-grade preset needs {LongMemEvalDataLoader.DatasetPathEnvVar}, which is not set");
             return;
         }
 
         // ── Build the agent (history-injectable; same shape Group-G uses).
-        var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        // The answer model's client is metered: each prompt's size as sent, and as the provider counted it. The judge
+        // gets its own client so only answer prompts are measured.
+        var answerClient = new PromptSizeMeter(AIConfig.CreateChatClient(AIConfig.ModelDeployment));
+        var judgeClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
-        var agent = chatClient.AsEvaluableAgent(
+        var agent = answerClient.AsEvaluableAgent(
             name: "LongMemEvalSampleAgent",
             systemPrompt: "You are a helpful assistant. Answer questions based on our conversation history.",
             includeHistory: true);
@@ -126,13 +133,29 @@ public static class LongMemEvalBenchmarkSample
             AgentName = "LongMemEvalSampleAgent",
             ModelId = AIConfig.ModelDeployment,
             ReducerStrategy = "None",
-            MemoryProvider = "InMemoryChatHistory (history injection)"
+            // The options below leave HistoryInjectionMode at its default, TextBlob. This used to say
+            // "InMemoryChatHistory (history injection)", which is not how the history reached the model.
+            MemoryProvider = "TextBlob (every session in the user message)"
         };
 
         // ── Resolve runner + options for the chosen preset.
         // v0.10.1-beta: all presets use the real ~500Q dataset on disk.
-        // Smoke caps to 10 questions. Standard uses the baked SubsetOptions (default 50).
-        // AuditGrade switches to Full() which mandates LONGMEMEVAL_DATASET_PATH.
+        // Smoke caps to 10 questions. Standard runs the Subset preset's 50. AuditGrade switches to Full(), which
+        // mandates LONGMEMEVAL_DATASET_PATH. Each preset's options are the ones LongMemEvalBenchmark.SubsetOptions /
+        // FullOptions build, plus a judge output budget a reasoning judge can answer in
+        // (LongMemEvalSampleSupport.JudgeMaxOutputTokens); ExternalBenchmarkOptions is a class, so they cannot be
+        // copied with `with`.
+        static ExternalBenchmarkOptions PresetOptions(int? maxQuestions, string datasetMode) => new()
+        {
+            MaxQuestions = maxQuestions,
+            StratifiedSampling = true,
+            RandomSeed = 42,
+            PreserveSessionBoundaries = true,
+            IncludeTimestamps = true,
+            DatasetMode = datasetMode,
+            JudgeMaxOutputTokens = LongMemEvalSampleSupport.JudgeMaxOutputTokens,
+        };
+
         AgentEval.Memory.External.LongMemEval.LongMemEvalBenchmarkRunner runner;
         ExternalBenchmarkOptions options;
         string presetName;
@@ -141,26 +164,18 @@ public static class LongMemEvalBenchmarkSample
             switch (preset)
             {
                 case SamplePreset.AuditGrade:
-                    runner = LongMemEvalBenchmark.Full(chatClient);
-                    options = LongMemEvalBenchmark.FullOptions;
+                    runner = LongMemEvalBenchmark.Full(judgeClient);
+                    options = PresetOptions(maxQuestions: null, "Full");
                     presetName = "audit-grade";
                     break;
                 case SamplePreset.Standard:
-                    runner = LongMemEvalBenchmark.Subset(chatClient);
-                    options = LongMemEvalBenchmark.SubsetOptions;
+                    runner = LongMemEvalBenchmark.Subset(judgeClient);
+                    options = PresetOptions(LongMemEvalBenchmark.SubsetMaxQuestions, "Subset");
                     presetName = "standard";
                     break;
                 default: // Smoke
-                    runner = LongMemEvalBenchmark.Subset(chatClient);
-                    options = new ExternalBenchmarkOptions
-                    {
-                        MaxQuestions = 10,
-                        StratifiedSampling = true,
-                        RandomSeed = 42,
-                        PreserveSessionBoundaries = true,
-                        IncludeTimestamps = true,
-                        DatasetMode = "Subset"
-                    };
+                    runner = LongMemEvalBenchmark.Subset(judgeClient);
+                    options = PresetOptions(maxQuestions: 10, "Subset");
                     presetName = "smoke";
                     break;
             }
@@ -173,14 +188,16 @@ public static class LongMemEvalBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   LongMemEval preset selection failed: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Skip($"LongMemEval preset selection failed: {ex.Message}");
             return;
         }
 
         Console.WriteLine();
-        Console.WriteLine($"   Model:               {AIConfig.ModelDeployment}");
-        Console.WriteLine($"   History injection:   {(agent is IHistoryInjectableAgent ? "structured (IHistoryInjectableAgent)" : "text blob fallback")}");
+        Console.WriteLine($"   Model:               {AIConfig.ModelDeployment} — it also judges its own answers");
+        Console.WriteLine($"   History injection:   {options.HistoryInjectionMode} — every session, with its date, in the user message");
         Console.WriteLine($"   Max questions:       {(options.MaxQuestions?.ToString() ?? "all in dataset")}");
         Console.WriteLine($"   Stratified sampling: {options.StratifiedSampling}");
+        Console.WriteLine($"   Judge budget:        {options.JudgeMaxOutputTokens} output tokens (a reasoning judge's thinking included)");
         Console.WriteLine($"   Scoring:             binary (0/1) — official LongMemEval methodology");
         Console.WriteLine();
         Console.WriteLine($"   Running LongMemEval ({presetName})... judge retries can increase call count.");
@@ -195,6 +212,7 @@ public static class LongMemEvalBenchmarkSample
         catch (LongMemEvalDatasetNotFoundException ex)
         {
             PrintDatasetMissingBox(ex);
+            SampleOutcome.Skip("the LongMemEval dataset was not found");
             return;
         }
         catch (FileNotFoundException ex) when (ex.Message.Contains("LongMemEval", StringComparison.OrdinalIgnoreCase))
@@ -203,6 +221,7 @@ public static class LongMemEvalBenchmarkSample
             // typed exception (e.g. from a custom DatasetPath override pointing at a
             // missing file) — still render the friendly box rather than the menu crash.
             PrintDatasetMissingBox(ex);
+            SampleOutcome.Skip("the LongMemEval dataset was not found");
             return;
         }
         catch (Exception ex)
@@ -210,29 +229,25 @@ public static class LongMemEvalBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   LongMemEval run failed: {ex.GetType().Name}: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Error($"the LongMemEval run threw {ex.GetType().Name}: {ex.Message}");
             return;
         }
 
-        // ── Per-type breakdown (mirrors Group-G G8 output).
+        // ── Every selected question accounted for, and the per-type table over scored questions (as G8 prints them).
         Console.WriteLine($"   Completed in {result.Duration.TotalSeconds:F1}s ({result.TotalLlmCalls} LLM calls)");
         Console.WriteLine();
         Console.Write("   Overall accuracy:      ");
-        PrintScore(result.OverallAccuracy);
-        Console.WriteLine($"   ({result.QuestionResults.Count(q => q.Correct is true)}/{result.QuestionResults.Count(q => q.Correct.HasValue)} scored correct)");
+        LongMemEvalSampleSupport.PrintScore(result.OverallAccuracy);
+        Console.WriteLine($" ({result.CorrectQuestions}/{result.ScoredQuestions} scored correct)");
+        LongMemEvalSampleSupport.PrintAccounting(result);
         Console.Write("   Task-averaged accuracy: ");
-        PrintScore(result.TaskAveragedAccuracy);
-        Console.WriteLine("   (macro-average across question types)");
+        LongMemEvalSampleSupport.PrintScore(result.TaskAveragedAccuracy);
+        Console.WriteLine(" (macro-average of per-type accuracies)");
         Console.WriteLine();
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        Console.WriteLine("   | Question Type                    | Count  | Accuracy |");
-        Console.WriteLine("   +----------------------------------+--------+----------+");
-        foreach (var (typeName, typeResult) in result.PerTypeResults.OrderBy(kv => kv.Key))
-        {
-            Console.Write($"   | {typeName,-32} | {typeResult.TotalQuestions,6} | ");
-            PrintScore(typeResult.Accuracy);
-            Console.WriteLine(" |");
-        }
-        Console.WriteLine("   +----------------------------------+--------+----------+");
+        LongMemEvalSampleSupport.PrintPerTypeTable(result);
+
+        // Did the haystack reach the model? Measured on the answer calls, not assumed from the dataset.
+        var truncated = LongMemEvalSampleSupport.PrintHaystackDelivery(answerClient.Calls);
 
         // ── Synthesise an EvalResult tree from the Shape-B result so we get
         // canonical .agenteval/ persistence + sidecar JSON / HTML / PDF for free.
@@ -278,6 +293,10 @@ public static class LongMemEvalBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
+        // The tree's root reads the scored questions against the 50% mark; the accounting records what it leaves out:
+        // a truncated haystack, every answer call failing, or questions with no verdict.
+        SampleOutcome.RecordVerdict("LongMemEval benchmark", evalTree);
+        LongMemEvalSampleSupport.RecordVerdict(result, truncated);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
@@ -287,7 +306,8 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   - Default reports contain status/count diagnostics but no raw question, answer,");
         Console.WriteLine("     response, judge-explanation, or evidence content.");
         Console.WriteLine($"   - Set {WriteNativeReportEnvVar}=true only for access-controlled native diagnostics.");
-        Console.WriteLine("   - Reference (paper, S mode): GPT-4o = 57.7%; small samples are high variance.");
+        Console.WriteLine("   - Reference (paper Fig. 3b, full-history S, no Chain-of-Note): GPT-4o = 60.6%; small samples are high variance.");
+        Console.WriteLine("     https://arxiv.org/html/2410.10813v2#S3.F3");
         Console.WriteLine("   - v0.10.1+: Smoke=10Q, Standard=50Q, AuditGrade=~500Q — all real dataset.");
     }
 
@@ -318,22 +338,6 @@ public static class LongMemEvalBenchmarkSample
         Console.WriteLine("   |                                                                            |");
         Console.WriteLine("   |  Returning to the menu — no run executed.                                  |");
         Console.WriteLine("   +----------------------------------------------------------------------------+");
-        Console.ResetColor();
-    }
-
-
-    private static void PrintScore(double? scorePercent)
-    {
-        if (scorePercent is not { } score)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Write("  n/a ");
-            Console.ResetColor();
-            return;
-        }
-        Console.ForegroundColor = score >= 70 ? ConsoleColor.Green :
-                                  score >= 40 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{score,5:F1}%");
         Console.ResetColor();
     }
 }

@@ -49,7 +49,7 @@ public class TestSummaryExtensionsTests
         var report = summary.ToEvaluationReport();
 
         // Assert
-        Assert.Equal(75.0, report.OverallScore, precision: 1);
+        Assert.Equal(75.0, report.OverallScore!.Value, precision: 1);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class TestSummaryExtensionsTests
     }
 
     [Fact]
-    public void ToEvaluationReport_NoPerformance_DurationIsZero()
+    public void ToEvaluationReport_NoPerformance_DurationIsNull()
     {
         // Arrange
         var summary = CreateSummary("Suite", CreateResult("Test", passed: true, score: 80));
@@ -175,7 +175,7 @@ public class TestSummaryExtensionsTests
         var report = summary.ToEvaluationReport();
 
         // Assert
-        Assert.Equal(0, report.TestResults[0].DurationMs);
+        Assert.Null(report.TestResults[0].DurationMs);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -331,13 +331,13 @@ public class TestSummaryExtensionsTests
     [Fact]
     public void ToEvaluationReport_Metadata_EmptyWhenNoPerformance()
     {
-        // Arrange: No performance data → TotalDuration = 0, TotalCost = 0
+        // Arrange: No performance data → TotalDuration and TotalCost are null (not recorded)
         var summary = CreateSummary("Suite", CreateResult("T", passed: true, score: 90));
 
         // Act
         var report = summary.ToEvaluationReport();
 
-        // Assert: Neither key should be present (values are zero)
+        // Assert: Neither key should be present (not recorded)
         Assert.False(report.Metadata.ContainsKey("TotalDuration"));
         Assert.False(report.Metadata.ContainsKey("TotalCost"));
     }
@@ -493,7 +493,7 @@ public class TestSummaryExtensionsTests
         Assert.Equal(0, report.TotalTests);
         Assert.Equal(0, report.PassedTests);
         Assert.Equal(0, report.FailedTests);
-        Assert.Equal(0, report.OverallScore);
+        Assert.Null(report.OverallScore);
         Assert.Empty(report.TestResults);
     }
 
@@ -535,7 +535,7 @@ public class TestSummaryExtensionsTests
         var report = summary.ToEvaluationReport();
 
         // Assert: 3 out of 4 = 75%
-        Assert.Equal(75.0, report.PassRate, precision: 1);
+        Assert.Equal(75.0, report.PassRate!.Value, precision: 1);
     }
 
     // ═══════════════════════════════════════════════════════════════════

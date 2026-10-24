@@ -27,6 +27,45 @@ public sealed class LegacyIndexTests : IDisposable
     private EvidenceIndexSource Read(LegacyIndexReadLimits? limits = null) => new LegacyIndexSourceReader(limits).Read("legacy", "run", _root);
 
     [Fact]
+    public void Import_PreviousProjection_ReplacesCachedPlaceholderWithoutSourceChanges()
+    {
+        Fixture();
+        Write("scenarios/case.json", new { id = "case", passed = false, score = 0, measurement = "not_measured", metrics = new { } });
+        var current = Read();
+        var previous = current with
+        {
+            Results = [.. current.Results.Select(r => r.CaseId == "case" ? r with { Outcome = "FAIL" } : r)],
+            Metrics = [.. current.Metrics, new("legacy:scenario:case", "legacy:scenario-score", int.MaxValue, 0, null, false, "legacy-scenario-score")],
+        };
+        using var writer = new SqliteEvidenceIndexWriter(new() { DatabasePath = Path.Combine(_root, "derived.sqlite") }, new SqliteEvidenceIndexSchema());
+        Assert.True(writer.Upsert(previous).Changed);
+        Assert.True(writer.Upsert(Read()).Changed);
+        Assert.False(writer.Upsert(Read()).Changed);
+    }
+
+    [Theory]
+    [InlineData("not_measured")]
+    [InlineData("not_applicable")]
+    [InlineData("null")]
+    [InlineData("missing")]
+    public void Read_ScenarioWithNoMeasurement_HasNoScoreAndNoFail(string shape)
+    {
+        Fixture();
+        var scenario = new System.Text.Json.Nodes.JsonObject
+        {
+            ["id"] = "case", ["passed"] = false, ["score"] = 0, ["metrics"] = new System.Text.Json.Nodes.JsonObject(),
+        };
+        if (shape == "missing") scenario.Remove("score");
+        else if (shape == "null") scenario["score"] = null;
+        else scenario["measurement"] = shape;
+        File.WriteAllText(Path.Combine(_root, "scenarios/case.json"), scenario.ToJsonString());
+        var source = Read();
+        Assert.Equal(shape == "not_applicable" ? "NOT_APPLICABLE" : "NOT_MEASURED",
+            source.Results.Single(r => r.CaseId == "case").Outcome);
+        Assert.DoesNotContain(source.Metrics, m => m.Provenance == "legacy-scenario-score");
+    }
+
+    [Fact]
     public void Import_ChangedInvalidAndMissingSources_PreservesRowsUntilCompletePruning()
     {
         Fixture();

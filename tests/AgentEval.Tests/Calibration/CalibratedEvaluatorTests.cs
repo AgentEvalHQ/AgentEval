@@ -695,7 +695,7 @@ public class CalibratedEvaluatorTests
             string input, string output, IEnumerable<string> criteria, CancellationToken ct = default) =>
             Task.FromResult(new EvaluationResult
             {
-                OverallScore = AgentEval.Core.EvaluationDefaults.DefaultFailureScore,
+                OverallScore = 50, // Legacy producer placeholder: the failure flag suppresses it.
                 Summary = "Failed to parse evaluation - no JSON found",
                 EvaluationFailed = true,
             });

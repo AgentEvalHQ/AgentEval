@@ -3,12 +3,14 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Output;
 
+using MEAIQuality = Microsoft.Extensions.AI.Evaluation.Quality;
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
 using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
@@ -27,13 +29,28 @@ namespace AgentEval.MAF.Evaluators;
 /// (weighted aggregation + thresholds + a real verdict tree) behind the MEAI interface MAF consumes.
 /// </para>
 /// <para>
-/// The composite's sub-evaluators (e.g. the AgenticBenchmark tool sub-evals) are LLM-judged: they
-/// grade the query + response text, so they work over MAF's evaluation feature even when only the
-/// final response is forwarded. A reference answer and retrieved context reach the composite as
-/// <c>EvalInput.GroundTruth</c> / <c>EvalInput.Context</c> — from <see cref="AgentEvalGroundTruthContext"/> /
-/// <see cref="AgentEvalRAGContext"/> on a direct MEAI call, and from <c>EvalItem.ExpectedOutput</c> /
-/// <c>EvalItem.Context</c> when run through <see cref="AgentEvalAgentEvaluator"/> (MAF's own adapter forwards neither). (To also let <i>code-based</i> tool metrics see the calls, run this
-/// through <see cref="AgentEvalAgentEvaluator"/>, which forwards the full conversation.)
+/// <b>What the composite is given.</b> Each item becomes one <see cref="EvalInput"/>:
+/// <list type="bullet">
+///   <item><c>Query</c> / <c>Response</c>: the last user message and the response text.</item>
+///   <item><c>GroundTruth</c> / <c>Context</c>: from <see cref="AgentEvalGroundTruthContext"/> /
+///   <see cref="AgentEvalRAGContext"/> on a direct MEAI call, and from <c>EvalItem.ExpectedOutput</c> /
+///   <c>EvalItem.Context</c> when run through <see cref="AgentEvalAgentEvaluator"/>.</item>
+///   <item><c>ToolCalls</c>: the calls in the item's last turn (the messages after the last user prompt, plus the
+///   response), read by <see cref="ConversationExtractor"/>, approval-gated calls included. Through
+///   <see cref="AgentEvalAgentEvaluator"/>, which forwards the item's whole conversation, a turn with no call is a
+///   measured none (an empty list). On a direct MEAI call, MAF's own MEAI adapter included, the messages may be only
+///   the query half, so a turn with no call is <see langword="null"/>: nothing recorded the calls.</item>
+///   <item><c>ToolDefinitions</c>: the tools M.E.AI's tool contexts carry (<c>ToolCallAccuracyEvaluatorContext</c>,
+///   <c>TaskAdherenceEvaluatorContext</c>, <c>IntentResolutionEvaluatorContext</c>), which
+///   <see cref="AgentEvalAgentEvaluator"/> fills from <c>EvalItem.Tools</c>.</item>
+///   <item><c>ExpectedActions</c>: one per tool named by <see cref="AgentEvalExpectedToolsContext"/>, which
+///   <see cref="AgentEvalAgentEvaluator"/> fills from <c>EvalItem.ExpectedToolCalls</c>.</item>
+///   <item><c>SystemMessage</c>: the text of the conversation's system messages, which
+///   <see cref="AgentEvalAgentEvaluator"/> fills from its <see cref="AgentEvalAgentEvaluator.AgentInstructions"/>.</item>
+/// </list>
+/// Before, the composite was given the query, the response, the reference and the context only, so its tool checks
+/// graded the reply text and judged tool use they were never shown. A field nothing supplied stays
+/// <see langword="null"/>: never an empty list standing in for a record nobody made.
 /// </para>
 /// <para>
 /// The rich <see cref="EvalResult"/> tree the composite produces is captured in
@@ -155,25 +172,45 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     public IReadOnlyCollection<string> EvaluationMetricNames => [$"{_composite.Name} (overall)"];
 
     /// <inheritdoc/>
-    public async ValueTask<MEAIEvaluationResult> EvaluateAsync(
+    public ValueTask<MEAIEvaluationResult> EvaluateAsync(
         IEnumerable<ChatMessage> messages,
         ChatResponse response,
         ChatConfiguration? chatConfiguration = null,
         IEnumerable<MEAIEvaluationContext>? additionalContext = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        EvaluateItemAsync(messages, response, additionalContext, wholeConversation: false, cancellationToken);
+
+    /// <summary>
+    /// Runs the composite over one item. <paramref name="wholeConversation"/> says the messages are the item's whole
+    /// conversation, as <see cref="AgentEvalAgentEvaluator"/> forwards it, so a turn with no tool call is a measured
+    /// none; on a direct MEAI call the messages may be only the query half, and the same turn says nothing.
+    /// </summary>
+    internal async ValueTask<MEAIEvaluationResult> EvaluateItemAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatResponse response,
+        IEnumerable<MEAIEvaluationContext>? additionalContext,
+        bool wholeConversation,
+        CancellationToken cancellationToken)
     {
-        var query = ConversationExtractor.ExtractLastUserMessage(messages);
+        IReadOnlyList<ChatMessage> conversation = messages is null ? [] : messages as IReadOnlyList<ChatMessage> ?? [.. messages];
+        var query = ConversationExtractor.ExtractLastUserMessage(conversation);
         var output = response.Text ?? string.Empty;
 
         // The reference answer and the retrieved context the caller passes as MEAI additional context
         // (AgentEvalGroundTruthContext / AgentEvalRAGContext), as AgentEvalEvaluator reads them: they were dropped, so
         // through MAF similarity and F1 read "none was supplied" and groundedness was graded without its context (#203
-        // review round 14, B12e).
+        // review round 14, B12e). The tool calls, the tools, the expected tools and the agent's instructions were
+        // dropped the same way, so every tool check graded the reply text alone.
         var input = new EvalInput(
             Query: query,
             Response: output,
             Context: AdditionalContextHelper.ExtractRAGContext(additionalContext),
-            GroundTruth: AdditionalContextHelper.ExtractGroundTruth(additionalContext));
+            GroundTruth: AdditionalContextHelper.ExtractGroundTruth(additionalContext),
+            ToolCalls: ToolCallsOf(ConversationExtractor.ExtractToolUsage(conversation, response, wholeConversation)),
+            ToolDefinitions: ToolDefinitionsOf(additionalContext),
+            ExpectedActions: AdditionalContextHelper.ExtractExpectedTools(additionalContext)?
+                .Select(tool => new ExpectedAction(tool, [tool])).ToList(),
+            SystemMessage: SystemMessageOf(conversation));
         EvalResult tree = await _composite.EvaluateAsync(input, cancellationToken).ConfigureAwait(false);
         _captured.Add(tree);
 
@@ -286,5 +323,65 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         foreach (var child in subs)
             foreach (var leaf in EnumerateAtomicLeaves(child))
                 yield return leaf;
+    }
+
+    /// <summary>
+    /// The turn's calls as the composite's checks read them, in call order, each with the outcome the conversation
+    /// records: <c>Succeeded</c> only for a call whose result was seen, <c>Error</c> when it threw. <see langword="null"/>
+    /// when the calls are unknown, and when the extraction saw approval-gated calls it could not record: a partial list
+    /// is not a record of the turn, and an empty one would be a measured zero nobody measured.
+    /// </summary>
+    private static IReadOnlyList<ToolCall>? ToolCallsOf(AgentEval.Models.ToolUsageReport? usage)
+    {
+        if (usage is null || usage.DroppedApprovalRequestCount > 0)
+            return null;
+
+        return usage.Calls
+            .OrderBy(c => c.Order)
+            .Select(c => TestRunEvalProjection.ToToolCall(c) with
+            {
+                Succeeded = c.WasExecuted ? c.Exception is null : null,
+                Error = c.Exception?.Message,
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// The tools the agent was offered, from M.E.AI's tool contexts (the first that carries any). A function keeps its
+    /// parameter schema; any other tool is named and described only.
+    /// </summary>
+    private static IReadOnlyList<ToolDefinition>? ToolDefinitionsOf(IEnumerable<MEAIEvaluationContext>? additionalContext)
+    {
+        // M.E.AI marks these contexts experimental (AIEVAL001). They are where its own tool evaluators read the tools,
+        // and where AgentEvalAgentEvaluator puts EvalItem.Tools.
+#pragma warning disable AIEVAL001
+        var tools = additionalContext?
+            .Select(c => c switch
+            {
+                MEAIQuality.ToolCallAccuracyEvaluatorContext t => (IEnumerable<AITool>?)t.ToolDefinitions,
+                MEAIQuality.TaskAdherenceEvaluatorContext t => (IEnumerable<AITool>?)t.ToolDefinitions,
+                MEAIQuality.IntentResolutionEvaluatorContext t => (IEnumerable<AITool>?)t.ToolDefinitions,
+                _ => (IEnumerable<AITool>?)null,
+            })
+            .FirstOrDefault(t => t is not null);
+#pragma warning restore AIEVAL001
+
+        return tools?.Select(ToToolDefinition).ToList();
+    }
+
+    private static ToolDefinition ToToolDefinition(AITool tool) =>
+        tool is AIFunction function && function.JsonSchema.ValueKind == JsonValueKind.Object
+            ? new ToolDefinition(function.Name, function.Description,
+                JsonSerializer.Deserialize<Dictionary<string, object>>(function.JsonSchema.GetRawText()))
+            : new ToolDefinition(tool.Name, tool.Description, null);
+
+    /// <summary>The text of the conversation's system messages, or <see langword="null"/> when it has none.</summary>
+    private static string? SystemMessageOf(IReadOnlyList<ChatMessage> conversation)
+    {
+        var text = string.Join("\n", conversation
+            .Where(m => m.Role == ChatRole.System)
+            .Select(m => m.Text)
+            .Where(t => !string.IsNullOrWhiteSpace(t)));
+        return text.Length == 0 ? null : text;
     }
 }

@@ -180,11 +180,11 @@ public static class BenchOwaspCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        FileSystemOutputStore? store = null;
+        IOutputStore? store = null;
         if (!isMock)
         {
-            store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
         }
@@ -192,9 +192,10 @@ public static class BenchOwaspCommand
         Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running OWASP benchmark ({preset}) for subject '{subject}'...");
 
         var evidenceFinalized = false;
+        var comparisonName = $"OWASP LLM Top 10 — {preset}";
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -221,7 +222,7 @@ public static class BenchOwaspCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -233,7 +234,7 @@ public static class BenchOwaspCommand
             {
                 if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
-                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition))
+                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                     return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench owasp",
                     $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
@@ -279,24 +280,25 @@ public static class BenchOwaspCommand
                 var scenarioResult = EvalResultPersistence.ToScenarioResult(
                     compositeEval,
                     scenarioId: $"owasp-{preset.ToLowerInvariant()}",
-                    scenarioName: $"OWASP LLM Top 10 — {preset}",
+                    scenarioName: comparisonName,
                     subjectModel: agentModel);
                 await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
                 var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
                 var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+                // Not measured is never a score (T13, T81): a composite that measured nothing writes no overallScore, and a
+                // scan with no conclusive probe no overallPassRate — the verdict above already says PENDING or WARN.
+                var metrics = new Dictionary<string, double>();
+                if (compositeEval.Score.MeasuredValue() is { } overallScore) metrics["overallScore"] = overallScore;
+                if (report.Summary.OverallPassRate is { } overallPassRate) metrics["overallPassRate"] = overallPassRate / 100.0;
                 var summary = new RunSummary(
                     SchemaVersion: "1.0",
                     RunId: runId,
                     Verdict: verdict,
                     Stats: runStats,
-                    Metrics: new Dictionary<string, double>
-                    {
-                        ["overallScore"] = compositeEval.Score.Value,
-                        ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
-                    });
+                    Metrics: metrics);
                 await store!.CompleteRunAsync(manifest, summary, ct);
-                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+                Console.WriteLine(store.WorkspaceRoot is null ? $"Prepared transient report source {runId}" : $"Persisted run {runId} to {agentEvalDir}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -310,6 +312,8 @@ public static class BenchOwaspCommand
                 var reporter = new OWASPComplianceReporter();
                 var complianceEvidence = await reporter.SaveReportWithEvidenceAsync(store!, subjectIdentity, runId, redTeamResult,
                     new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+                if (store!.WorkspaceRoot is null)
+                    await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, complianceEvidence, ct);
                 complianceArtifacts = () => ComplianceAef.Scan(agentEvalDir, complianceEvidence, redTeamResult);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
@@ -364,12 +368,12 @@ public static class BenchOwaspCommand
             // The scan's probes as sealed evidence, lane owasp; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts, definition: suiteDefinition))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, complianceArtifacts: complianceArtifacts, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
             evidenceFinalized = true;
-            Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+            Console.WriteLine($"Overall result: pass rate {(report.Summary.OverallPassRate is { } passRate ? $"{passRate:F1}%" : "not measured (no probe reached a verdict)")} " +
                 $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
                 $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
@@ -393,7 +397,7 @@ public static class BenchOwaspCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts, definition: suiteDefinition))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, complianceArtifacts: complianceArtifacts, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

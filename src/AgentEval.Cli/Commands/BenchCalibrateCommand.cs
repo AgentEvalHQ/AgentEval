@@ -50,7 +50,8 @@ public static class BenchCalibrateCommand
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>0 on success, <see cref="ExitCodes.GateFailed"/> (9) if thresholds not met, 1 on internal error.</returns>
+    /// <returns>0 on success, <see cref="ExitCodes.GateFailed"/> (9) if thresholds not met,
+    /// <see cref="ExitCodes.GateIndeterminate"/> (11) if nothing was scored in a pillar and none failed, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
@@ -186,7 +187,7 @@ public static class BenchCalibrateCommand
         // real bad calibration result. Surface the failure count and emit a separate
         // INFRA-FAIL status so operators can distinguish infrastructure breakage
         // from genuine model regression.
-        bool allPass = true;
+        var statuses = new List<string>();
         foreach (var (pillar, pillarReport) in report.PerPillar)
         {
             var (accThr, kapThr) = s_pillarOverrides.TryGetValue(pillar, out var ov)
@@ -194,21 +195,26 @@ public static class BenchCalibrateCommand
                 : (AccuracyThreshold, KappaThreshold);
             var accOk = pillarReport.Accuracy >= accThr;
             var kappaOk = pillarReport.CohensKappa >= kapThr;
-            var status = PillarGateStatus(pillarReport.EvaluationFailures, pillarReport.NotMeasured, accOk, kappaOk);
+            var status = PillarGateStatus(pillarReport.EvaluationFailures, pillarReport.NotMeasured, accOk, kappaOk, pillarReport.EntryCount);
+            statuses.Add(status);
             var thrSuffix = s_pillarOverrides.ContainsKey(pillar)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
+            var scored = pillarReport.EntryCount > 0;   // nothing scored: no accuracy or kappa to show
             Console.WriteLine(
-                $"  [{status}] {pillar}: accuracy={pillarReport.Accuracy:P1}, " +
-                $"kappa={FormatKappa(pillarReport.CohensKappa)}, entries={pillarReport.EntryCount}, " +
+                $"  [{status}] {pillar}: accuracy={(scored ? pillarReport.Accuracy.ToString("P1") : "n/a")}, " +
+                $"kappa={(scored ? FormatKappa(pillarReport.CohensKappa) : "n/a")}, entries={pillarReport.EntryCount}, " +
                 $"failures={pillarReport.EvaluationFailures}, not_measured={pillarReport.NotMeasured}, " +
                 $"inapplicable={pillarReport.NotApplicable}{thrSuffix}");
-            if (status != "PASS") allPass = false;
         }
 
-        Console.WriteLine(allPass
-            ? "Calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
-            : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, or was INCOMPLETE (a record not measured).");
+        var gateExitCode = GateExitCode(statuses);
+        Console.WriteLine(gateExitCode switch
+        {
+            ExitCodes.Success => "Calibration gate PASSED — all pillars meet thresholds with zero evaluation failures.",
+            ExitCodes.GateIndeterminate => "Calibration gate NOT MEASURED — nothing was scored in one or more pillars and none failed: no conclusive verdict.",
+            _ => $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, or was INCOMPLETE (a record not measured).",
+        });
 
         if (limitPerPillar is not null)
         {
@@ -220,18 +226,36 @@ public static class BenchCalibrateCommand
             return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
         }
 
-        return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
+        return gateExitCode;
+    }
+
+    /// <summary>
+    /// The calibration gate's exit code over its pillars' (or categories') statuses: 0 when every one is PASS; 9
+    /// (<see cref="ExitCodes.GateFailed"/>) when one is FAIL, INFRA-FAIL or INCOMPLETE; else 11
+    /// (<see cref="ExitCodes.GateIndeterminate"/>) when the rest are NOT MEASURED: nothing was scored there, which is no
+    /// conclusive verdict rather than a failed calibration. Shared by the GDPR, EU AI Act and agentic calibrate commands.
+    /// </summary>
+    internal static int GateExitCode(IEnumerable<string> statuses)
+    {
+        var notPassed = statuses.Where(s => s != "PASS").ToList();
+        if (notPassed.Count == 0)
+            return ExitCodes.Success;
+        return notPassed.All(s => s == "NOT MEASURED") ? ExitCodes.GateIndeterminate : ExitCodes.GateFailed;
     }
 
     /// <summary>
     /// A compliance pillar's calibration gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a record reached no
     /// verdict without erroring (a withheld pass), so the scored sample would be the one the judge's own verdicts
     /// selected — the agentic rule (B6c-7), which excludes by key, never by outcome; a pillar is one key (#203 review
-    /// round 3, B10j). Only PASS meets the gate. Shared by the GDPR and EU AI Act calibrate commands.
+    /// round 3, B10j). NOT MEASURED: no record was scored (every one inapplicable), so accuracy and kappa are the 0 of an
+    /// empty set, not a measured FAIL (T13-13); <paramref name="scoredCount"/> is the pillar's scored entries, and
+    /// <see langword="null"/> skips that check. Only PASS meets the gate. Shared by the GDPR and EU AI Act calibrate
+    /// commands.
     /// </summary>
-    internal static string PillarGateStatus(int evaluationFailures, int notMeasured, bool accuracyOk, bool kappaOk) =>
+    internal static string PillarGateStatus(int evaluationFailures, int notMeasured, bool accuracyOk, bool kappaOk, int? scoredCount = null) =>
         evaluationFailures > 0 ? "INFRA-FAIL"
         : notMeasured > 0 ? "INCOMPLETE"
+        : scoredCount == 0 ? "NOT MEASURED"
         : accuracyOk && kappaOk ? "PASS" : "FAIL";
 
     // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset
@@ -262,7 +286,7 @@ public static class BenchCalibrateCommand
             var noInfraFail = pr.EvaluationFailures == 0;
             // The gate's own status (B10o): the report read INFRA-FAIL / PASS / FAIL and showed [PASS] for a pillar the
             // gate calls INCOMPLETE.
-            var badge = PillarGateStatus(pr.EvaluationFailures, pr.NotMeasured, accOk, kappaOk);
+            var badge = PillarGateStatus(pr.EvaluationFailures, pr.NotMeasured, accOk, kappaOk, pr.EntryCount);
             var thrTag = s_pillarOverrides.ContainsKey(pillar) ? " (relaxed per-pillar override)" : string.Empty;
 
             sb.AppendLine($"## {pillar} [{badge}]{thrTag}");
@@ -274,10 +298,12 @@ public static class BenchCalibrateCommand
             // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
             sb.AppendLine($"| Not measured (not scored) | {pr.NotMeasured} | == 0 | {(pr.NotMeasured == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Inapplicable (not scored) | {pr.NotApplicable} | — | info |");
-            sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
-            sb.AppendLine($"| Cohen's kappa | {FormatKappa(pr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
+            // Nothing scored: accuracy, kappa and the mean delta are the 0 of an empty set, so they read n/a.
+            var scored = pr.EntryCount > 0;
+            sb.AppendLine($"| Accuracy | {(scored ? pr.Accuracy.ToString("P1") : "n/a")} | >= {accThr:P0} | {(!scored ? "NOT MEASURED" : accOk ? "OK" : "BELOW")} |");
+            sb.AppendLine($"| Cohen's kappa | {(scored ? FormatKappa(pr.CohensKappa) : "n/a")} | >= {kapThr:F2} | {(!scored ? "NOT MEASURED" : kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {pr.WithinScoreRange} / {pr.EntryCount} | — | — |");
-            sb.AppendLine($"| Mean score delta | {pr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
+            sb.AppendLine($"| Mean score delta | {(scored ? pr.MeanScoreDelta.ToString("+0.000;-0.000;0.000") : "n/a")} | — | — |");
             sb.AppendLine();
         }
 

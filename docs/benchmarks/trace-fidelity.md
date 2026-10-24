@@ -30,6 +30,8 @@ Each class produces a child score in `[0,1]`: `childValue = 1 − min(severityPe
 
 **Worked example** (pinned by a divergence test): one hidden retry (High) → child `0.50`, root `1 − 0.20×0.50 = 0.90`.
 
+**Not measured.** When no chat-boundary response reports its token usage, the tokens actually consumed are unknown, so `token_under_reporting` is not measured (`TraceFidelityDiscrepancy.Measured` is false): its sub-result is `skipped`, and the root is computed over the five other classes, their weights scaled up to the full weight (the worked example becomes `1 − 0.20×0.50 / 0.90 ≈ 0.889`). A root that would pass withholds its pass: it reads `warn`, not measured, and the command exits `10`. Before, the unknown count read as 0, met any agent account, and the class scored clean.
+
 The runner emits an `EvalResult` tree — one sub-result per class (`trace_fidelity.<class>`), each scored 0–1 with the 0–100 figure in `Details.Dimensions["score100"]` — so the existing audit chain, output store, and Mission Control render it with no bespoke wiring.
 
 ## CLI

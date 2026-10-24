@@ -66,12 +66,24 @@ public class MemoryBenchmarkResult
     public int UnmeasuredQueries => CategoryResults.Sum(c => c.UnmeasuredQueries);
 
     /// <summary>
-    /// True when every category ran and every question was scored. Otherwise the scores are partial: a crashed or
+    /// True when at least one category produced a score: neither skipped (the agent does not support it) nor crashed
+    /// (a crashed category is marked skipped too). False for a run that measured nothing, whose
+    /// <see cref="OverallScore"/> is then a placeholder 0, not a reading.
+    /// </summary>
+    public bool HasMeasuredCategory => CategoryResults.Any(c => !c.Skipped);
+
+    /// <summary>
+    /// True when at least one category was measured, every category that ran did so without crashing, and every
+    /// question was scored. Otherwise the scores are partial: a crashed or
     /// wholly unmeasured category counts as 0 in <see cref="OverallScore"/> (a lower bound) and is left out of
     /// <see cref="CapabilityScore"/>, and an unscored question is left out of its category. Report an incomplete run
     /// as such, never as a pass or a fail.
     /// </summary>
-    public bool IsComplete => !CategoryResults.Any(c => c.Errored) && UnmeasuredQueries == 0;
+    /// <remarks>
+    /// A run in which every category was skipped (or the benchmark had none) was complete, so it read as a FAIL at
+    /// 0 with grade F (T13). It measured nothing, so it is not complete.
+    /// </remarks>
+    public bool IsComplete => HasMeasuredCategory && !CategoryResults.Any(c => c.Errored) && UnmeasuredQueries == 0;
 
     /// <summary>
     /// Categories whose run threw, or in which nothing was measured. Each counts as 0 in <see cref="OverallScore"/>.
@@ -155,6 +167,9 @@ public class MemoryBenchmarkResult
     {
         var recommendations = new List<string>();
 
+        if (!IsComplete)
+            recommendations.Add($"Incomplete run: {UnmeasuredQueries} unscored question(s); observed scores do not establish a full-run grade or verdict.");
+
         // Crashed categories first: they are a run failure to fix, and they count as 0 in the score.
         foreach (var cat in CategoryResults.Where(c => c.Errored))
         {
@@ -201,7 +216,7 @@ public class MemoryBenchmarkResult
             });
         }
 
-        if (weakCategories.Count == 0)
+        if (weakCategories.Count == 0 && IsComplete)
             recommendations.Add("All categories performing well! Consider running the Full benchmark for deeper analysis.");
 
         return recommendations;

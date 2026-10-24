@@ -62,6 +62,72 @@ public class EvalResultSchemaTests
         Assert.Equal(valid, Evaluate(node.ToJsonString()).IsValid);
     }
 
+    // ── Not priced (T63 / T13-9) ──────────────────────────────────────────────
+
+    [Fact]
+    public void Provenance_EstimatedCostNull_NotPriced_IsValid()
+    {
+        // The v1 schema required a number, so "not priced" could only be written as 0: free.
+        var node = JsonNode.Parse(PassResultJson)!;
+        node["provenance"]!["estimatedCost"] = null;
+
+        var result = Evaluate(node.ToJsonString());
+
+        Assert.True(result.IsValid, FormatErrors(result));
+    }
+
+    [Fact]
+    public void Provenance_EstimatedCostMissingOrNegative_StaysInvalid()
+    {
+        var missing = JsonNode.Parse(PassResultJson)!;
+        missing["provenance"]!.AsObject().Remove("estimatedCost");
+        var negative = JsonNode.Parse(PassResultJson)!;
+        negative["provenance"]!["estimatedCost"] = -0.01;
+
+        Assert.False(Evaluate(missing.ToJsonString()).IsValid, "estimatedCost stays required: null says not priced, absence says nothing.");
+        Assert.False(Evaluate(negative.ToJsonString()).IsValid);
+    }
+
+    [Fact]
+    public void UnpricedResult_IsPersistedWithAnExplicitNull_AndValidates()
+    {
+        // The persistence serializer omits nulls; EstimatedCost is written anyway, so the required key is present.
+        var result = new EvalResult(
+            Metric: new("judged", "Judged", "quality", "1.0.0"),
+            Score: new(0.9, null, "pass", true, 0.7, "none", null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", "llama3.1:8b", null, null, 2000, null, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var scenario = EvalResultPersistence.ToScenarioResult(result, "judged", "Judged");
+
+        Assert.Null(scenario.EstimatedCost); // not priced stays null, never $0
+        var provenance = JsonNode.Parse(scenario.Output)!["provenance"]!.AsObject();
+        Assert.True(provenance.ContainsKey("estimatedCost"));
+        Assert.Null(provenance["estimatedCost"]);
+        var validation = Evaluate(scenario.Output);
+        Assert.True(validation.IsValid, FormatErrors(validation));
+        Assert.Null(EvalResultPersistence.FromScenarioResult(scenario)!.Provenance.EstimatedCost); // round-trips
+    }
+
+    [Fact]
+    public void PricedResult_JsonIsAsBefore()
+    {
+        var result = new EvalResult(
+            Metric: new("judged", "Judged", "quality", "1.0.0"),
+            Score: new(0.9, null, "pass", true, 0.7, "none", null),
+            Details: new(null, null, null, null, null),
+            Provenance: new("atomic-llm", "gpt-4o", null, null, 2000, 0.0015, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var scenario = EvalResultPersistence.ToScenarioResult(result, "judged", "Judged");
+
+        var provenance = JsonNode.Parse(scenario.Output)!["provenance"]!.AsObject();
+        Assert.Equal(new[] { "type", "judgeModel", "tokensUsed", "estimatedCost", "cacheHit" }, provenance.Select(p => p.Key));
+        Assert.Equal(0.0015, provenance["estimatedCost"]!.GetValue<double>());
+        Assert.Equal(0.0015, scenario.EstimatedCost);
+    }
+
     private const string PassResultJson = """
         {
           "metric": {

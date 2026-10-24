@@ -72,8 +72,8 @@ public sealed record ComparabilityAxis(
 public sealed record ScenarioComparison(
     string ScenarioId,
     IReadOnlyList<ComparabilityAxis> Axes,
-    double BaselineScore,
-    double CandidateScore,
+    double? BaselineScore,
+    double? CandidateScore,
     bool BaselinePassed,
     bool CandidatePassed,
     bool BaselineHasUsableFloor,
@@ -88,8 +88,22 @@ public sealed record ScenarioComparison(
     public IReadOnlyList<ComparabilityAxis> Unpinned =>
         [.. Axes.Where(a => a.State is ComparabilityAxisState.Unpinned)];
 
-    /// <summary>Candidate minus baseline. Meaningful only when the comparison is COMPARABLE.</summary>
-    public double ScoreDelta => CandidateScore - BaselineScore;
+    /// <summary>
+    /// Whether the baseline's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>). An errored,
+    /// skipped or unjudged scenario's score is null.
+    /// </summary>
+    public bool BaselineMeasured => BaselineScore is not null;
+
+    /// <summary>Whether the candidate's score is a measurement (<see cref="ScenarioMeasurement.IsMeasured"/>).</summary>
+    public bool CandidateMeasured => CandidateScore is not null;
+
+    /// <summary>True when both runs measured this scenario, so <see cref="ScoreDelta"/> is a difference of two scores.</summary>
+    public bool BothMeasured => BaselineMeasured && CandidateMeasured;
+
+    /// <summary>
+    /// Candidate minus baseline. Meaningful only when the comparison is COMPARABLE and <see cref="BothMeasured"/>.
+    /// </summary>
+    public double? ScoreDelta => CandidateScore - BaselineScore;
 
     /// <summary>True when both runs recorded a floor a delta can be read against.</summary>
     public bool DeltaHasAFloor => BaselineHasUsableFloor && CandidateHasUsableFloor;
@@ -152,7 +166,7 @@ public sealed record RunComparison(
 {
     /// <summary>The axes this comparison gates on, in render order.</summary>
     public static IReadOnlyList<string> GatingAxes { get; } =
-        ["evalKey", "evalVersion", "effectiveBar", "judge", "judge.modelId", "judge.rubricDigest", "stimulus"];
+        ["evalKey", "evalVersion", "effectiveBar", "evaluationPolicyDigest", "judge", "judge.modelId", "judge.rubricDigest", "stimulus"];
 
     /// <summary>Scenarios carrying at least one blocking axis.</summary>
     public IReadOnlyList<ScenarioComparison> Blocked =>
@@ -233,12 +247,27 @@ public sealed record RunComparison(
     }
 
     /// <summary>
-    /// The mean of every matched scenario's score delta. ⚠ Read it only when
-    /// <see cref="Verdict"/> is <see cref="ComparisonVerdict.Comparable"/>; the renderer prints
-    /// nothing derived from it otherwise.
+    /// The mean score delta over the matched scenarios both runs measured; <see langword="null"/> when there is none. ⚠ Read it
+    /// only when <see cref="Verdict"/> is <see cref="ComparisonVerdict.Comparable"/>; the renderer prints nothing
+    /// derived from it otherwise. A scenario either run did not measure is left out and listed in
+    /// <see cref="NotMeasuredScenarios"/>: its placeholder 0 would report a score change nobody measured.
     /// </summary>
-    public double MeanScoreDelta =>
-        Scenarios.Count == 0 ? double.NaN : Scenarios.Average(s => s.ScoreDelta);
+    public double? MeanScoreDelta
+    {
+        get
+        {
+            var measured = Scenarios.Where(s => s.BothMeasured).ToList();
+            return measured.Count == 0 ? null : measured.Average(s => s.ScoreDelta);
+        }
+    }
+
+    /// <summary>
+    /// Matched scenario ids that either run did not measure (errored, skipped, or no judge verdict). They are not in
+    /// <see cref="MeanScoreDelta"/>. <see cref="Regressed"/> still counts one that passed in the baseline and not in the
+    /// candidate, as "failed, errored or not run".
+    /// </summary>
+    public IReadOnlyList<string> NotMeasuredScenarios =>
+        [.. Scenarios.Where(s => !s.BothMeasured).Select(s => s.ScenarioId)];
 
     /// <summary>Matched scenarios the candidate passed and the baseline did not.</summary>
     public int Recovered => Scenarios.Count(s => s is { BaselinePassed: false, CandidatePassed: true });
@@ -327,14 +356,20 @@ public sealed record RunComparison(
                 "the two runs applied different pass bars, so their pass/fail verdicts are not the same measurement",
                 "neither run recorded the bar it applied, so nothing shows the two used the same one"));
 
-            axes.Add(Presence("judge", fa.Judge is not null, fb.Judge is not null,
-                "one run was judged by a model and the other was deterministic",
-                "neither run used a judge"));
+            axes.Add(Text("evaluationPolicyDigest", fa.EvaluationPolicyDigest, fb.EvaluationPolicyDigest,
+                "the runs used different evaluation configurations; their scores may use different rules or measurement protocols",
+                "neither run recorded its evaluation configuration, so equivalence of scoring rules and measurement protocols is unpinned",
+                comparison: StringComparison.Ordinal));
+
+            axes.Add(Text("judge", InstrumentName(fa), InstrumentName(fb),
+                "the runs used different kinds of evaluation instrument",
+                "neither run established its evaluation instrument; missing model identity does not establish deterministic evaluation"));
 
             axes.Add(Text("judge.modelId", fa.Judge?.ModelId, fb.Judge?.ModelId,
                 "two different judges graded these runs",
-                "neither run used a judge, so there is no judge to differ"));
-            axes.Add(Text("judge.rubricDigest", fa.Judge?.RubricDigest, fb.Judge?.RubricDigest,
+                fa.EffectiveInstrumentKind == EvaluationInstrumentKind.Deterministic && fb.EffectiveInstrumentKind == EvaluationInstrumentKind.Deterministic
+                    ? "neither run used a judge, so there is no judge to differ" : "neither run recorded a common judge model identity"));
+            axes.Add(Text("judge.rubricDigest", fa.EffectiveRubricDigest, fb.EffectiveRubricDigest,
                 "the judge was given different rubrics; the same model against a different rubric is a different instrument",
                 "neither run recorded a rubric digest, so nothing shows the judge was given the same rubric"));
 
@@ -360,7 +395,8 @@ public sealed record RunComparison(
     // ── Axis constructors. Each encodes the same three-state rule, once. ─────────────────────
 
     private static ComparabilityAxis Text(
-        string name, string? a, string? b, string mismatchDetail, string? unpinnedDetail = null)
+        string name, string? a, string? b, string mismatchDetail, string? unpinnedDetail = null,
+        StringComparison comparison = StringComparison.OrdinalIgnoreCase)
     {
         bool hasA = !string.IsNullOrWhiteSpace(a);
         bool hasB = !string.IsNullOrWhiteSpace(b);
@@ -377,7 +413,7 @@ public sealed record RunComparison(
                 $"only one run recorded {name} — an asymmetry is a difference, not a gap");
         }
 
-        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
+        return string.Equals(a, b, comparison)
             ? new ComparabilityAxis(name, ComparabilityAxisState.Match, a, b, "identical")
             : new ComparabilityAxis(name, ComparabilityAxisState.Mismatch, a, b, mismatchDetail);
     }
@@ -404,21 +440,12 @@ public sealed record RunComparison(
             : new ComparabilityAxis(name, ComparabilityAxisState.Mismatch, ra, rb, mismatchDetail);
     }
 
-    private static ComparabilityAxis Presence(
-        string name, bool a, bool b, string mismatchDetail, string bothAbsentDetail)
+    private static string? InstrumentName(ComparabilityFacts facts) => facts.EffectiveInstrumentKind switch
     {
-        if (a == b)
-        {
-            // Both-absent is a MATCH here, not unpinned: a null judge is a declared fact — "this
-            // eval used no judge" — not a missing record. ComparabilityFacts says so explicitly.
-            return new ComparabilityAxis(name, ComparabilityAxisState.Match,
-                a ? "present" : "none", b ? "present" : "none",
-                a ? "both runs were judged" : bothAbsentDetail);
-        }
-
-        return new ComparabilityAxis(name, ComparabilityAxisState.Mismatch,
-            a ? "present" : "none", b ? "present" : "none", mismatchDetail);
-    }
+        EvaluationInstrumentKind.Deterministic => "none",
+        EvaluationInstrumentKind.Model => "present",
+        _ => null,
+    };
 
     private static ComparabilityAxis Stimulus(string? a, string? b)
     {

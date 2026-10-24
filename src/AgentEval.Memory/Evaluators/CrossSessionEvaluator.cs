@@ -49,7 +49,7 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
             {
                 ScenarioName = "CrossSession",
                 Passed = false,
-                OverallScore = 0,
+                OverallScore = null,
                 FactResults = [],
                 SessionResetSupported = false,
                 ErrorMessage = "Agent does not implement ISessionResettableAgent. Cross-session testing requires session reset capability.",
@@ -100,14 +100,14 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
 
             // Over the measured facts only: a fact the judge produced no score for is counted, not failed.
             var measuredFacts = factResults.Count(r => r.Measured);
-            var passRate = measuredFacts > 0
+            double? passRate = measuredFacts > 0
                 ? factResults.Count(r => r.Recalled) / (double)measuredFacts
-                : 0;
+                : null;
 
             var result = new CrossSessionResult
             {
                 ScenarioName = "CrossSession",
-                Passed = passRate >= successThreshold,
+                Passed = passRate is { } measuredRate && measuredRate >= successThreshold,
                 OverallScore = passRate * 100,
                 FactResults = factResults,
                 SessionResetSupported = true,
@@ -116,7 +116,7 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
             };
 
             _logger.LogInformation("Cross-session evaluation complete: {Retained}/{Total} facts survived ({Score:F1}% retention)",
-                result.RetainedCount, facts.Count, result.OverallScore);
+                result.RetainedCount, facts.Count, result.OverallScore?.ToString("F1") ?? "n/a (not measured)");
 
             return result;
         }
@@ -129,7 +129,7 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
             {
                 ScenarioName = "CrossSession",
                 Passed = false,
-                OverallScore = 0,
+                OverallScore = null,
                 FactResults = [],
                 SessionResetSupported = true,
                 ErrorMessage = $"Error during cross-session evaluation: {ex.Message}",

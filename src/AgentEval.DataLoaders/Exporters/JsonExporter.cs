@@ -40,7 +40,8 @@ public class JsonExporter : IResultExporter
             Name = report.Name,
             StartTime = report.StartTime,
             EndTime = report.EndTime,
-            DurationMs = (long)report.Duration.TotalMilliseconds,
+            // Not recorded is written as null, never as 0: the duration, the score, the pass rate, a test's score and time.
+            DurationMs = report.Duration is { } duration ? (long)duration.TotalMilliseconds : null,
             Stats = new JsonStats
             {
                 Total = report.TotalTests,
@@ -63,6 +64,7 @@ public class JsonExporter : IResultExporter
                 Score = r.Score,
                 Passed = r.Passed,
                 Skipped = r.Skipped,
+                NotMeasured = r.NotMeasured,
                 DurationMs = r.DurationMs,
                 Error = r.Error,
                 MetricScores = r.MetricScores.Count > 0 ? r.MetricScores : null,
@@ -87,16 +89,19 @@ public class JsonExporter : IResultExporter
     }
 }
 
-// Internal JSON serialization models
+// Internal JSON serialization models. A value that can be not recorded is written as an explicit null (the options
+// otherwise drop nulls), so the field is always there and never reads as 0.
 internal class JsonEvaluationReport
 {
     public string RunId { get; set; } = "";
     public string? Name { get; set; }
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset EndTime { get; set; }
-    public long DurationMs { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public long? DurationMs { get; set; }
     public JsonStats Stats { get; set; } = new();
-    public double OverallScore { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? OverallScore { get; set; }
     public JsonAgentInfo? Agent { get; set; }
     public List<JsonTestResult> Results { get; set; } = new();
     public Dictionary<string, string>? Metadata { get; set; }
@@ -108,7 +113,8 @@ internal class JsonStats
     public int Passed { get; set; }
     public int Failed { get; set; }
     public int Skipped { get; set; }
-    public double PassRate { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? PassRate { get; set; }
 }
 
 internal class JsonAgentInfo
@@ -122,10 +128,13 @@ internal class JsonTestResult
 {
     public string Name { get; set; } = "";
     public string? Category { get; set; }
-    public double Score { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? Score { get; set; }
     public bool Passed { get; set; }
     public bool Skipped { get; set; }
-    public long DurationMs { get; set; }
+    public bool NotMeasured { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public long? DurationMs { get; set; }
     public string? Error { get; set; }
     public Dictionary<string, double>? MetricScores { get; set; }
     public Dictionary<string, string>? MetricsNotMeasured { get; set; }

@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Models;
 
 namespace AgentEval.Benchmarks;
@@ -350,10 +351,12 @@ public class PerformanceBenchmark
         var results = new List<(string Prompt, AgentResponse Response)>();
         var totalInputTokens = 0;
         var totalOutputTokens = 0;
+        var responsesWithoutUsage = 0;
         var errors = new List<Exception>();
 
         foreach (var prompt in prompts)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var response = await _agent.InvokeAsync(prompt, cancellationToken);
@@ -364,8 +367,12 @@ public class PerformanceBenchmark
                     totalInputTokens += response.TokenUsage.InputTokens;
                     totalOutputTokens += response.TokenUsage.OutputTokens;
                 }
+                else
+                {
+                    responsesWithoutUsage++;
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 errors.Add(ex);
             }
@@ -403,8 +410,16 @@ public class PerformanceBenchmark
                 "Check PerformanceBenchmarkEvaluateOptions.CostModelName for a typo (e.g. 'gpt-4o', not 'gpt4o'), " +
                 "pass a known model id, or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
         }
+        else if (responsesWithoutUsage > 0)
+        {
+            LogWarning(
+                $"[perf-cost] WARNING: {responsesWithoutUsage} of {results.Count} responses reported no token usage. " +
+                "Cost is not measured: their tokens are unknown, not zero, so no cost is reported and the cost check is skipped.");
+        }
 
-        var estimatedCost = pricing != null
+        // Not measured is null, never $0: no price for the model, no prompt that returned (nothing to price), or a
+        // response that reported no usage, or a failed dispatched call whose usage is unknown.
+        var estimatedCost = pricing != null && results.Count > 0 && responsesWithoutUsage == 0 && errors.Count == 0
             ? (totalInputTokens / 1_000_000m * pricing.Value.InputPricePerMillion) +
               (totalOutputTokens / 1_000_000m * pricing.Value.OutputPricePerMillion)
             : (decimal?)null;
@@ -419,6 +434,7 @@ public class PerformanceBenchmark
             TotalInputTokens = totalInputTokens,
             TotalOutputTokens = totalOutputTokens,
             TotalTokens = totalInputTokens + totalOutputTokens,
+            ResponsesWithoutUsage = responsesWithoutUsage,
             EstimatedCostUSD = estimatedCost,
             AverageInputTokensPerPrompt = results.Count > 0
                 ? (double)totalInputTokens / results.Count
@@ -455,15 +471,18 @@ public class PerformanceBenchmark
     ///   <item><b>Latency</b> — P99 vs <c>LatencyOptions.P99ThresholdMs</c> (default 5000 ms).
     ///         score = 1 − (p99ms / threshold), clamped to [0, 1]. Lower latency → higher score.</item>
     ///   <item><b>Throughput</b> — RequestsPerSecond vs <c>ThroughputOptions.MinRps</c> (default 0.5 RPS).
-    ///         score = min(rps / minRps, 1.0). Higher throughput → higher score.</item>
+    ///         score = min(rps / minRps, 1.0). Higher throughput → higher score.
+    ///         When every request failed there is no throughput: the leaf is an error, not measured.</item>
     ///   <item><b>Cost</b> — EstimatedCostUSD vs <c>CostOptions.MaxCostUSD</c> (default 0.10 USD).
     ///         score = 1 − (cost / maxCost), clamped to [0, 1]. Lower cost → higher score.
-    ///         When cost is unknown (no pricing data), score defaults to 1.0 (pass with low severity).</item>
+    ///         When total cost is unknown (no pricing, missing usage, or failed prompts), the leaf cannot pass.
+    ///         A priced observed subtotal above the budget still proves failure; otherwise the leaf is skipped.</item>
     /// </list>
     /// </para>
     /// <para>
     /// <b>Aggregation</b>: <c>CapByWorst</c> — a critical/high-severity failure in any single leaf
-    /// caps the composite. Use <see cref="PerformanceBenchmarkOptions.EvaluateOptions"/> to tune thresholds
+    /// caps the composite. With no leaf measured the composite has no verdict: <c>error</c> when a leaf errored, else
+    /// <c>skipped</c>. Use <see cref="PerformanceBenchmarkOptions.EvaluateOptions"/> to tune thresholds
     /// before calling this method.
     /// </para>
     /// </remarks>
@@ -515,7 +534,7 @@ public class PerformanceBenchmark
         // ── Build the three leaf EvalResults ─────────────────────────────────
         var latencyLeaf  = BuildLatencyLeaf(latencyResult,    opts);
         var throughputLeaf = BuildThroughputLeaf(throughputResult, opts);
-        var costLeaf     = BuildCostLeaf(costResult,          opts);
+        var costLeaf     = BuildCostLeaf(costResult,          opts, plan.Pricing);
 
         var leaves = new[] { latencyLeaf, throughputLeaf, costLeaf };
         // CapByWorst over three equally weighted leaves. Weights only: aggregation reads
@@ -523,25 +542,51 @@ public class PerformanceBenchmark
         // satisfy the EvalComponent constructor are gone.
         var (compositeScore, compositeSeverity) =
             CapByWorstAggregation.AggregateWeights(leaves, [1.0, 1.0, 1.0]);
-        bool passed = compositeScore >= opts.CompositePassThreshold
+        // No leaf measured anything (every call failed, say): no verdict, by CompositeEval's rule — error when a leaf
+        // errored, else skipped (T13). The empty roll-up's (0, "none") read as a measured WARN, or a PASS at a pass
+        // threshold of 0. (A latency leaf that withheld its pass cannot be the only one: it needs a call that returned,
+        // and then the throughput leaf is measured too.)
+        var nothingMeasured = !leaves.Any(l => l.Score.CountsTowardAggregate());
+        bool passed = !nothingMeasured
+            && compositeScore >= opts.CompositePassThreshold
             && leaves.All(l => l.Score.Label != "fail");
-        string label = passed ? "pass"
+        // Other stages cannot certify latency or cost budgets for failed dispatched operations.
+        // An unpriced model still uses the existing optional-cost policy; failed cost-stage calls are different.
+        var verdictWithheld = passed && (latencyLeaf.Score.Measurement == MeasurementState.NotMeasured
+            || costResult.Errors.Count > 0 && costLeaf.Score.Measurement == MeasurementState.NotMeasured);
+        if (verdictWithheld)
+        {
+            passed = false;
+        }
+        string label = nothingMeasured
+            ? (leaves.Any(l => l.Score.Label == "error") ? "error" : "skipped")
+            : passed ? "pass"
+            : verdictWithheld ? "warn"
             : leaves.Any(l => l.Score.Severity is "critical" or "high") ? "fail"
             : "warn";
 
-        var dimensions = new Dictionary<string, double>
+        // A P99 of no returned call is a placeholder 0, not a latency.
+        var dimensions = new Dictionary<string, double>();
+        if (latencyResult.SuccessfulIterations > 0)
         {
-            ["p99_ms"]    = latencyResult.P99Latency.TotalMilliseconds,
-            ["rps"]       = throughputResult.RequestsPerSecond,
-        };
-        if (costResult.EstimatedCostUSD is { } measuredCost)
+            dimensions["p99_ms"] = latencyResult.P99Latency.TotalMilliseconds;
+        }
+        // Nor is the 0 RPS of requests that all failed a throughput.
+        if (!ThroughputNotMeasured(throughputResult))
+        {
+            dimensions["rps"] = throughputResult.RequestsPerSecond;
+        }
+        if (costResult.EstimatedCostUSD is { } measuredCost && costResult.SuccessfulPrompts > 0)
         {
             dimensions["cost_usd"] = (double)measuredCost;
         }
 
         return new EvalResult(
             Metric: new("perf_benchmark", "Performance Benchmark", "performance", "1.0.0"),
-            Score: new(compositeScore, null, label, passed, opts.CompositePassThreshold, compositeSeverity, null),
+            Score: new(compositeScore, null, label, passed, opts.CompositePassThreshold, compositeSeverity, null)
+            {
+                Measurement = verdictWithheld ? MeasurementState.NotMeasured : MeasurementState.Measured,
+            },
             Details: new(
                 Dimensions: dimensions,
                 Evidence: null,
@@ -549,7 +594,18 @@ public class PerformanceBenchmark
                 SubResults: leaves,
                 AggregationStrategy: "CapByWorst"),
             Provenance: new("composite", null, null, null, null, 0.0, false),
-            EvaluatedAt: DateTimeOffset.UtcNow);
+            EvaluatedAt: DateTimeOffset.UtcNow)
+        {
+            // The resolved workload overrides Query. A multi-prompt run has no single observed query; recording
+            // that absence prevents output writers from borrowing an outer placeholder as the stimulus.
+            Observation = new(prompts.Count == 1 ? prompts[0] : null, null),
+            ComparisonObservation = new AgentEval.Output.ComparabilityFacts("perf_benchmark", "1.0.0")
+            {
+                EffectiveBar = opts.CompositePassThreshold,
+                EvaluationPolicyDigest = plan.ComparisonPolicyDigest,
+                InstrumentKind = AgentEval.Output.EvaluationInstrumentKind.Deterministic,
+            },
+        };
     }
 
     // ── Adapter helpers ───────────────────────────────────────────────────────
@@ -581,8 +637,31 @@ public class PerformanceBenchmark
 
     private static EvalResult BuildLatencyLeaf(LatencyBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
     {
-        var p99Ms = r.P99Latency.TotalMilliseconds;
         var threshold = opts.P99LatencyThresholdMs;
+
+        if (r.SuccessfulIterations == 0)
+        {
+            // No call returned, so there is no latency: the P99 of nothing is a placeholder 0, which scored a perfect
+            // pass. An error, not measured, with the failed calls counted.
+            var reason = $"Latency not measured: none of {r.Iterations} iterations returned ({r.Errors.Count} errors).";
+            return new EvalResult(
+                Metric: new("perf_latency", "P99 Latency", "performance", "1.0.0"),
+                Score: new(0.0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
+                Details: new(
+                    Dimensions: new Dictionary<string, double>
+                    {
+                        ["errors"] = r.Errors.Count,
+                        ["successful"] = 0,
+                    },
+                    Evidence: [new EvalEvidence("latency", r.AgentName, reason)],
+                    Recommendations: [reason],
+                    SubResults: null,
+                    AggregationStrategy: null),
+                Provenance: new("code", null, null, null, null, 0.0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+        }
+
+        var p99Ms = r.P99Latency.TotalMilliseconds;
 
         // score: 1 − (p99 / threshold), clamped [0, 1]. Lower latency → higher score.
         var rawScore = threshold > 0 ? 1.0 - (p99Ms / threshold) : 1.0;
@@ -596,29 +675,80 @@ public class PerformanceBenchmark
             >= 0.1 => ("fail", "high"),
             _      => ("fail", "critical"),
         };
+
+        // A P99 over only the calls that returned does not show the budget held for the ones that failed: the pass is
+        // withheld (warn, not measured), as a composite withholds one when a required part did not run.
+        var partial = r.Errors.Count > 0 && label == "pass";
+        if (partial)
+        {
+            label = "warn";
+        }
         bool passed = label == "pass";
+
+        var evidence = $"P99={p99Ms:F0}ms vs threshold={threshold:F0}ms" +
+                       (r.Errors.Count > 0 ? $"; {r.Errors.Count} of {r.Iterations} iterations failed and are not in it" : "");
+        IReadOnlyList<string>? recommendations = partial
+            ? [$"P99 latency {p99Ms:F0}ms is within {threshold:F0}ms over {r.SuccessfulIterations} of {r.Iterations} iterations; {r.Errors.Count} failed, so the budget is not shown to hold. Fix the failing calls and re-run."]
+            : passed ? null : [$"P99 latency {p99Ms:F0}ms exceeds threshold {threshold:F0}ms. Consider caching, reducing prompt length, or upgrading the model tier."];
+
+        var dimensions = new Dictionary<string, double>
+        {
+            ["p50_ms"] = r.P50Latency.TotalMilliseconds,
+            ["p90_ms"] = r.P90Latency.TotalMilliseconds,
+            ["p99_ms"] = p99Ms,
+            ["mean_ms"] = r.MeanLatency.TotalMilliseconds,
+        };
+        if (r.Errors.Count > 0)
+        {
+            dimensions["errors"] = r.Errors.Count;
+            dimensions["successful"] = r.SuccessfulIterations;
+        }
 
         return new EvalResult(
             Metric: new("perf_latency", "P99 Latency", "performance", "1.0.0"),
-            Score: new(score, null, label, passed, null, severity, null),
+            Score: new(score, null, label, passed, null, severity, null)
+            {
+                Measurement = partial ? MeasurementState.NotMeasured : MeasurementState.Measured,
+            },
             Details: new(
-                Dimensions: new Dictionary<string, double>
-                {
-                    ["p50_ms"] = r.P50Latency.TotalMilliseconds,
-                    ["p90_ms"] = r.P90Latency.TotalMilliseconds,
-                    ["p99_ms"] = p99Ms,
-                    ["mean_ms"] = r.MeanLatency.TotalMilliseconds,
-                },
-                Evidence: [new EvalEvidence("latency", r.AgentName, $"P99={p99Ms:F0}ms vs threshold={threshold:F0}ms")],
-                Recommendations: passed ? null : [$"P99 latency {p99Ms:F0}ms exceeds threshold {threshold:F0}ms. Consider caching, reducing prompt length, or upgrading the model tier."],
+                Dimensions: dimensions,
+                Evidence: [new EvalEvidence("latency", r.AgentName, evidence)],
+                Recommendations: recommendations,
                 SubResults: null,
                 AggregationStrategy: null),
             Provenance: new("code", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
+    // Every request in the window failed: there is no throughput to read. A window in which nothing completed and
+    // nothing failed (a call that outlasts it) is a measured 0.
+    private static bool ThroughputNotMeasured(ThroughputBenchmarkResult r) => r.CompletedRequests == 0 && r.ErrorCount > 0;
+
     private static EvalResult BuildThroughputLeaf(ThroughputBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
     {
+        if (ThroughputNotMeasured(r))
+        {
+            // No request completed because every one failed: 0 RPS of nothing scored a critical fail, a measured FAIL of
+            // the whole benchmark beside two leaves that measured nothing (T13). An error, not measured, with the failed
+            // requests counted.
+            var reason = $"Throughput not measured: none of {r.ErrorCount} requests completed (every one failed).";
+            return new EvalResult(
+                Metric: new("perf_throughput", "Throughput", "performance", "1.0.0"),
+                Score: new(0.0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
+                Details: new(
+                    Dimensions: new Dictionary<string, double>
+                    {
+                        ["completed"] = 0,
+                        ["errors"] = r.ErrorCount,
+                    },
+                    Evidence: [new EvalEvidence("throughput", r.AgentName, reason)],
+                    Recommendations: [reason],
+                    SubResults: null,
+                    AggregationStrategy: null),
+                Provenance: new("code", null, null, null, null, 0.0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
+        }
+
         var rps = r.RequestsPerSecond;
         var minRps = opts.MinThroughputRps;
 
@@ -653,29 +783,59 @@ public class PerformanceBenchmark
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private static EvalResult BuildCostLeaf(CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
+    private static EvalResult BuildCostLeaf(
+        CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts, ModelPricingSnapshot pricingSnapshot)
     {
-        if (r.EstimatedCostUSD is null)
+        if (r.EstimatedCostUSD is null || r.SuccessfulPrompts == 0)
         {
-            // No price for the model: the cost was not measured. Skipped, so it neither passes nor counts toward the
-            // composite, and no $0 is reported. The token counts were measured and are kept.
-            var reason = $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
-                         "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
+            // Keep observations without calling a subtotal the total. A priced lower bound can still prove failure.
+            var price = pricingSnapshot.GetPricing(r.ModelName);
+            decimal? observedCost = price is { } rate && r.SuccessfulPrompts > 0
+                ? r.TotalInputTokens / 1_000_000m * rate.InputPricePerMillion
+                  + r.TotalOutputTokens / 1_000_000m * rate.OutputPricePerMillion
+                : null;
+            var knownViolation = opts.MaxCostUSD > 0
+                && observedCost is { } observed && (double)observed > opts.MaxCostUSD;
+            var reason = r.SuccessfulPrompts == 0
+                ? $"Cost not measured: none of {r.TotalPrompts} prompts returned ({r.Errors.Count} errors), so there is " +
+                  "no usage to price."
+                : r.Errors.Count > 0
+                ? $"Cost not measured: {r.Errors.Count} of {r.TotalPrompts} dispatched prompts failed; their usage is unknown. " +
+                  "Retained tokens are an observed subtotal, not the workload total. " +
+                  (knownViolation ? "" : "The budget is not shown to hold.")
+                : r.ResponsesWithoutUsage > 0
+                ? $"Cost not measured: {r.ResponsesWithoutUsage} of {r.SuccessfulPrompts} responses reported no token " +
+                  "usage, so their tokens are unknown (not zero). Use an agent whose provider reports usage."
+                : $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
+                  "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
+            if (knownViolation)
+                reason += $" The observed priced lower bound ${observedCost:F6} already exceeds budget ${opts.MaxCostUSD:F6}.";
+            var dimensions = new Dictionary<string, double>
+            {
+                ["total_tokens"] = r.TotalTokens,
+                ["input_tokens"] = r.TotalInputTokens,
+                ["output_tokens"] = r.TotalOutputTokens,
+            };
+            if (r.Errors.Count > 0)
+            {
+                dimensions["errors"] = r.Errors.Count;
+                dimensions["successful"] = r.SuccessfulPrompts;
+            }
+            if (observedCost is { } lowerBound)
+                dimensions["observed_cost_usd"] = (double)lowerBound;
             return new EvalResult(
                 Metric: new("perf_cost", "Cost", "performance", "1.0.0"),
-                Score: new(0.0, null, "skipped", false, null, "none", null),
+                Score: new(0.0, null, knownViolation ? "fail" : "skipped", false, null, knownViolation ? "critical" : "none", null)
+                {
+                    Measurement = knownViolation ? MeasurementState.Measured : MeasurementState.NotMeasured,
+                },
                 Details: new(
-                    Dimensions: new Dictionary<string, double>
-                    {
-                        ["total_tokens"] = r.TotalTokens,
-                        ["input_tokens"] = r.TotalInputTokens,
-                        ["output_tokens"] = r.TotalOutputTokens,
-                    },
+                    Dimensions: dimensions,
                     Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", reason)],
                     Recommendations: [reason],
                     SubResults: null,
                     AggregationStrategy: null),
-                Provenance: new("skipped", null, null, null, null, 0.0, false),
+                Provenance: new(knownViolation ? "code" : "skipped", null, null, null, null, 0.0, false),
                 EvaluatedAt: DateTimeOffset.UtcNow);
         }
 
@@ -890,6 +1050,14 @@ public class CostBenchmarkResult
     public int TotalInputTokens { get; init; }
     public int TotalOutputTokens { get; init; }
     public int TotalTokens { get; init; }
+
+    /// <summary>Successful responses that reported no token usage. Any makes the cost not measured.</summary>
+    public int ResponsesWithoutUsage { get; init; }
+
+    /// <summary>
+    /// Estimated cost in USD, or <see langword="null"/> when not measured: no price for the model, no prompt
+    /// returned, a dispatched prompt failed, or a response reported no usage. Never $0 for "not measured".
+    /// </summary>
     public decimal? EstimatedCostUSD { get; init; }
     
     public double AverageInputTokensPerPrompt { get; init; }
@@ -898,7 +1066,7 @@ public class CostBenchmarkResult
     public override string ToString() =>
         $"Cost Benchmark: {AgentName} ({ModelName})\n" +
         $"  Prompts: {SuccessfulPrompts}/{TotalPrompts}\n" +
-        $"  Tokens: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens} total\n" +
-        $"  Avg per prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
-        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: Unknown pricing");
+        $"  {(Errors.Count > 0 || ResponsesWithoutUsage > 0 ? "Observed tokens (subtotal)" : "Tokens")}: {TotalInputTokens} input + {TotalOutputTokens} output = {TotalTokens}\n" +
+        $"  Avg observed per successful prompt: {AverageInputTokensPerPrompt:F0} in / {AverageOutputTokensPerPrompt:F0} out\n" +
+        (EstimatedCostUSD.HasValue ? $"  Estimated Cost: ${EstimatedCostUSD:F6}" : "  Estimated Cost: not measured (no price, missing usage, failed prompt, or no prompt returned)");
 }

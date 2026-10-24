@@ -137,7 +137,8 @@ public static class Demos
             if (llmEvaluation != null)
             {
                 Console.WriteLine("   --- LLM-as-a-Judge Evaluation ---\n");
-                Console.WriteLine($"      🧑‍⚖️ Overall Score: {llmEvaluation.OverallScore}/100");
+                int? judgeScore = llmEvaluation.EvaluationFailed ? null : llmEvaluation.OverallScore;
+                Console.WriteLine($"      🧑‍⚖️ Overall Score: {judgeScore?.ToString() ?? "n/a"}/100");
                 Console.WriteLine($"      📋 Summary: {llmEvaluation.Summary}\n");
                 
                 foreach (var criterion in llmEvaluation.CriteriaResults)
@@ -157,7 +158,10 @@ public static class Demos
                 }
                 Console.WriteLine();
                 
-                ShowPass($"LLM-as-a-judge evaluation: {llmEvaluation.OverallScore}/100");
+                if (judgeScore is null)
+                    Console.WriteLine("      LLM-as-a-judge evaluation: not measured (no usable verdict).");
+                else
+                    ShowPass($"LLM-as-a-judge evaluation: {judgeScore?.ToString() ?? "n/a"}/100");
             }
 
             // Also validate response content with string assertions

@@ -160,11 +160,11 @@ public static class BenchNistCommand
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        FileSystemOutputStore? store = null;
+        IOutputStore? store = null;
         if (!isMock)
         {
-            store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
         }
@@ -172,9 +172,10 @@ public static class BenchNistCommand
         Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running NIST AI RMF benchmark ({preset}) for subject '{subject}'...");
 
         var evidenceFinalized = false;
+        var comparisonName = $"NIST AI RMF — {preset}";
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
         var partialScan = new RedTeamAef.PartialScan(agent.Name);
@@ -195,7 +196,7 @@ public static class BenchNistCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"NIST AI RMF scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -207,7 +208,7 @@ public static class BenchNistCommand
             {
                 if (aef is not null && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     AgentEval.Results.Writing.AefTargetMode.Mocked, judgeModelName, redTeamResult, compositeEval,
-                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition))
+                    ExitCodes.GateIndeterminate, judgeLedger, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                     return (ExitCodes.RuntimeError, null);
                 return (MockTarget.Finish("bench nist",
                     $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request", aefWritten: aef is not null && !noAef), null);
@@ -249,24 +250,25 @@ public static class BenchNistCommand
                 var scenarioResult = EvalResultPersistence.ToScenarioResult(
                     compositeEval,
                     scenarioId: $"nist-{preset.ToLowerInvariant()}",
-                    scenarioName: $"NIST AI RMF — {preset}",
+                    scenarioName: comparisonName,
                     subjectModel: agentModel);
                 await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
                 var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
                 var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+                // Not measured is never a score (T13, T81): a composite that measured nothing writes no overallScore, and a
+                // scan with no conclusive probe no overallPassRate — the verdict above already says PENDING or WARN.
+                var metrics = new Dictionary<string, double>();
+                if (compositeEval.Score.MeasuredValue() is { } overallScore) metrics["overallScore"] = overallScore;
+                if (report.Summary.OverallPassRate is { } overallPassRate) metrics["overallPassRate"] = overallPassRate / 100.0;
                 var summary = new RunSummary(
                     SchemaVersion: "1.0",
                     RunId: runId,
                     Verdict: verdict,
                     Stats: runStats,
-                    Metrics: new Dictionary<string, double>
-                    {
-                        ["overallScore"] = compositeEval.Score.Value,
-                        ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
-                    });
+                    Metrics: metrics);
                 await store!.CompleteRunAsync(manifest, summary, ct);
-                Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+                Console.WriteLine(store.WorkspaceRoot is null ? $"Prepared transient report source {runId}" : $"Persisted run {runId} to {agentEvalDir}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -280,6 +282,15 @@ public static class BenchNistCommand
                 var reporter = new NistAiRmfComplianceReporter();
                 await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
                     new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+                if (store!.WorkspaceRoot is null)
+                {
+                    await foreach (var pointer in store.ListComplianceEvidenceAsync(NistAiRmfComplianceReporter.Regulation, subjectIdentity, ct))
+                    {
+                        var evidence = await store.GetComplianceEvidenceAsync(pointer.Regulation, subjectIdentity, pointer.Timestamp, ct)
+                            ?? throw new InvalidOperationException("The just-generated NIST report is unavailable.");
+                        await CliRunOutput.WriteComplianceReportAsync(agentEvalDir, evidence, ct);
+                    }
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -327,12 +338,12 @@ public static class BenchNistCommand
             // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, definition: suiteDefinition))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
             evidenceFinalized = true;
-            Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
+            Console.WriteLine($"Overall result: pass rate {(report.Summary.OverallPassRate is { } passRate ? $"{passRate:F1}%" : "not measured (no probe reached a verdict)")} " +
                 $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
                 $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
@@ -356,7 +367,7 @@ public static class BenchNistCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, judgeProvider: judgeProvider, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason, definition: suiteDefinition, subjectModel: agentModel, comparisonName: comparisonName))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

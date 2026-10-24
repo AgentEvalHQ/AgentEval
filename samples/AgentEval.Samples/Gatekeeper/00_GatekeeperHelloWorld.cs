@@ -77,12 +77,13 @@ public static class GatekeeperHelloWorld
         else if (published > 0)
         {
             Console.WriteLine($"   ❌ write_page ran {published}× — the poisoned publish was NOT blocked");
-            throw new InvalidOperationException(
+            throw new SampleCheckFailedException(
                 "Gatekeeper Hello World failed: the poisoned publish executed without a recorded block.");
         }
         else
         {
             Console.WriteLine("   The model declined to publish the poisoned content this run — nothing for the gate to block (re-run to see the block).");
+            GatekeeperLiveMode.RecordLiveAttack("poisoned publish", blocked: 0, executed: 0);
         }
 
         GateVoice.Speak(trace);

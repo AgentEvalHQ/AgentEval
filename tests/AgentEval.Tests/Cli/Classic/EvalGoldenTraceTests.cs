@@ -118,6 +118,22 @@ public sealed class EvalGoldenTraceTests : IDisposable
     }
 
     [Fact]
+    public async Task AgainstTheGolden_ACaseTheGoldenRunDidNotMeasure_ExitsInconclusive_NotZero()
+    {
+        // The golden run had no verdict for the case (its judge produced none). Its placeholder fail against this pass
+        // read as "improved" and the run exited 0.
+        var golden = GoldenPath();
+        await new GoldenTrace(GoldenTrace.CurrentSchemaVersion, DateTimeOffset.UnixEpoch, "fake-model",
+            [new GoldenTraceCase("greeting", false, 0, null, null) { NotMeasured = true }]).SaveAsync(golden.FullName);
+
+        var (exit, stderr, _) = await RunAsync(Options(Dataset("Hi"), golden: golden));
+
+        Assert.Equal(ExitCodes.GateIndeterminate, exit);
+        Assert.Contains("NOT MEASURED", stderr, StringComparison.Ordinal);   // printed even with --quiet
+        Assert.DoesNotContain("REGRESSED", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FailOnToolChange_FailsWhenTheGoldenRecordsOtherToolCalls()
     {
         // The golden trace says the test called a tool; this run calls none.

@@ -235,7 +235,8 @@ public record WorkflowGraphSnapshot
         e.EdgeType == EdgeType.Conditional || e.EdgeType == EdgeType.Switch);
 
     /// <summary>
-    /// Whether this workflow has parallel execution paths.
+    /// Whether the declared topology has parallel paths. For observed execution, use
+    /// <see cref="WorkflowExecutionResult.HasParallelExecution"/> instead.
     /// </summary>
     public bool HasParallelExecution => Edges.Any(e => 
         e.EdgeType == EdgeType.ParallelFanOut || e.EdgeType == EdgeType.ParallelFanIn);

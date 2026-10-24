@@ -82,6 +82,8 @@ public static class AgentWithOneTool
         Console.WriteLine(new string('─', 60));
         
         PrintPassFail(result.Passed);
+        if (!result.Passed)
+            SampleOutcome.Fail($"'{result.TestName}' failed: {result.Details}");
         Console.WriteLine($"   Score: {result.Score}/100{AIConfig.MockLabel}");
         
         if (result.ToolUsage != null && result.ToolUsage.Count > 0)
@@ -133,6 +135,7 @@ public static class AgentWithOneTool
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
+                SampleOutcome.Fail($"tool assertion failed: {ex.Message}");
             }
         }
         else
@@ -140,6 +143,7 @@ public static class AgentWithOneTool
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠️ No tool usage recorded (tool may not have been called)");
             Console.ResetColor();
+            SampleOutcome.Fail("no tool usage recorded: the CalculatorTool assertions could not run");
         }
 
         Console.WriteLine(new string('─', 60));

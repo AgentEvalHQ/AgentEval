@@ -144,10 +144,18 @@ failure codes; provider messages and secrets are not copied into result fields.
 
 `JudgeTemperature` defaults to `null`, which uses the provider/model default.
 Set an explicit value only when the deployment supports it; some reasoning
-deployments reject explicit temperature. `JudgeMaxOutputTokens` defaults to 256
+deployments reject explicit temperature. `JudgeMaxOutputTokens` defaults to 1024
 and includes reasoning tokens on reasoning models. A very small budget can
 produce empty or truncated judgments even when the visible answer should be only
 `yes` or `no`.
+
+This is the **initial** requested budget. Each logical retry doubles it up to
+4096 tokens; the default single retry requests 2048. A schema/JSON/plain-format
+fallback keeps its current attempt's budget and is still counted as a provider
+call, not as a new logical retry. Set `MaxJudgeRetries = 0` for a fixed
+single-attempt allocation. Existing `judgeMaxOutputTokens` / `judge_max_output_tokens`
+report fields record the configured initial value, not the largest request or
+actual tokens emitted. Requested budgets do not guarantee a conclusive judgment.
 
 Configure retained judge information separately:
 
@@ -199,7 +207,7 @@ var options = new ExternalBenchmarkOptions
     JudgeFailurePolicy = JudgeFailurePolicy.RetryThenInconclusive,
     MaxJudgeRetries = 1,
     JudgeTemperature = null,       // provider default; widest model compatibility
-    JudgeMaxOutputTokens = 256,    // includes reasoning tokens
+    JudgeMaxOutputTokens = 1024,   // initial budget, includes reasoning tokens; retry doubles/caps at 4096
     JudgeEvidenceMode = JudgeEvidenceMode.Outcome,
     EvidenceCaptureMode = EvidenceCaptureMode.References,
 };

@@ -124,4 +124,34 @@ public class AgentEvalEvaluatorTests
     {
         Assert.Throws<ArgumentNullException>(() => new AgentEvalEvaluator(null!));
     }
+
+    // Sample A5's path on the 2026-10 Bitdeer sweep: the conversation carries the tool call and its result, the Safety
+    // bundle's misinformation judge was sent neither, and failed the agent for repeating what the tool returned.
+    [Fact]
+    public async Task SafetyBundle_SendsTheConversationsToolResultsToTheMisinformationJudge()
+    {
+        var judge = new AgentEval.Testing.FakeChatClient(
+            """{"score": 0, "reasoning": "toxicity"}""",
+            """{"score": 0, "reasoning": "bias"}""",
+            """{"score": 95, "potentialFabrications": [], "reasoning": "repeats the tool result"}""");
+        var evaluator = AgentEvalEvaluators.Safety(judge);
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Find flights from Seattle to Paris for next Friday"),
+            new(ChatRole.Assistant, [new FunctionCallContent("call-1", "SearchFlights",
+                new Dictionary<string, object?> { ["origin"] = "Seattle", ["destination"] = "Paris" })]),
+            new(ChatRole.Tool, [new FunctionResultContent("call-1",
+                "Found 3 flights: AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h)")]),
+        };
+        var response = new ChatResponse([new ChatMessage(ChatRole.Assistant,
+            "AA101 at $450 (10h) is the best value of the three flights I found.")]);
+
+        await evaluator.EvaluateAsync(messages, response);
+
+        var misinformationPrompt = judge.ReceivedMessages
+            .Select(m => string.Join("\n", m.Select(x => x.Text)))
+            .Single(p => p.Contains("misinformation risk evaluator", StringComparison.Ordinal));
+        Assert.Contains("TOOL RESULTS THE AI RECEIVED", misinformationPrompt);
+        Assert.Contains("AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h)", misinformationPrompt);
+    }
 }

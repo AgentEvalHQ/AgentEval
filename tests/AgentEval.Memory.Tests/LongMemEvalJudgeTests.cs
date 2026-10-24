@@ -353,7 +353,66 @@ public class LongMemEvalJudgeTests
         Assert.Equal(JudgeOutcomeStatus.Yes, result.Status);
         Assert.NotNull(client.LastOptions);
         Assert.Null(client.LastOptions.Temperature);
-        Assert.Equal(256, client.LastOptions.MaxOutputTokens);
+        Assert.Equal(1024, client.LastOptions.MaxOutputTokens);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_TruncatedResponse_RetriesWithALargerBudgetAndRecovers()
+    {
+        var client = new SequenceChatClient(Response("yes", new ChatFinishReason("length")), Response("yes"));
+        var judge = new LongMemEvalJudge(client, NullLogger<LongMemEvalJudge>.Instance);
+
+        var result = await judge.JudgeAsync("answer", Question(), new ExternalBenchmarkOptions());
+
+        Assert.Equal(JudgeOutcomeStatus.Yes, result.Status);
+        Assert.Equal(new int?[] { 1024, 2048 }, client.RequestedOutputBudgets);
+        Assert.Equal(1, result.PrimaryLlmCallCount);
+        Assert.Equal(1, result.RetryLlmCallCount);
+    }
+
+    [Theory]
+    [InlineData(1, 2, 4, 8)]
+    [InlineData(1500, 3000, 4096, 4096)]
+    [InlineData(4096, 4096, 4096, 4096)]
+    public async Task JudgeAsync_CustomInitialBudget_DoublesRetriesWithinTheCeiling(
+        int initial, int second, int third, int fourth)
+    {
+        var client = new SequenceChatClient(Response("maybe"), Response("maybe"), Response("maybe"), Response("maybe"));
+        var judge = new LongMemEvalJudge(client, NullLogger<LongMemEvalJudge>.Instance);
+
+        var result = await judge.JudgeAsync("answer", Question(), new ExternalBenchmarkOptions
+        {
+            JudgeMaxOutputTokens = initial,
+            MaxJudgeRetries = 3
+        });
+
+        Assert.Equal(JudgeOutcomeStatus.Invalid, result.Status);
+        Assert.Equal(new int?[] { initial, second, third, fourth }, client.RequestedOutputBudgets);
+        Assert.Equal(4, result.AttemptsUsed);
+        Assert.Equal(4, result.LlmCallCount);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FormatFallbacks_KeepAttemptBudgetBeforeTheLargerLogicalRetry()
+    {
+        var client = new SequenceChatClient(
+            () => throw new InvalidOperationException("400 response_format is not supported"),
+            () => throw new InvalidOperationException("400 json_object is not supported"),
+            Response("""{"verdict":"yes","reasoning":"cut short"}""", new ChatFinishReason("length")),
+            Response("""{"verdict":"yes","reasoning":"complete"}"""));
+        var judge = new LongMemEvalJudge(client, NullLogger<LongMemEvalJudge>.Instance);
+
+        var result = await judge.JudgeAsync("answer", Question(), new ExternalBenchmarkOptions
+        {
+            JudgeVerdictProtocol = JudgeVerdictProtocol.StructuredJson,
+            MaxJudgeRetries = 1
+        });
+
+        Assert.Equal(JudgeOutcomeStatus.Yes, result.Status);
+        Assert.Equal(new int?[] { 1024, 1024, 1024, 2048 }, client.RequestedOutputBudgets);
+        Assert.Equal(3, result.PrimaryLlmCallCount);
+        Assert.Equal(1, result.RetryLlmCallCount);
+        Assert.Equal(2, result.AttemptsUsed);
     }
 
     [Fact]
@@ -410,6 +469,8 @@ public class LongMemEvalJudgeTests
 
         public ChatOptions? LastOptions { get; private set; }
 
+        public List<int?> RequestedOutputBudgets { get; } = [];
+
         public ChatClientMetadata Metadata { get; } = new("sequence", new Uri("http://localhost"));
 
         public Task<ChatResponse> GetResponseAsync(
@@ -418,6 +479,7 @@ public class LongMemEvalJudgeTests
             CancellationToken cancellationToken = default)
         {
             LastOptions = options;
+            RequestedOutputBudgets.Add(options?.MaxOutputTokens);
             if (_sequence.Count == 0)
                 throw new InvalidOperationException("No response configured.");
             return Task.FromResult(_sequence.Dequeue().Invoke());

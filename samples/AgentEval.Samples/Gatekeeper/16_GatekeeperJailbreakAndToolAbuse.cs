@@ -549,7 +549,7 @@ public static class GatekeeperJailbreakAndToolAbuse
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Jailbreak sample invariant failed: " + message + ".");
+            throw new SampleCheckFailedException("Jailbreak sample invariant failed: " + message + ".");
         }
     }
 

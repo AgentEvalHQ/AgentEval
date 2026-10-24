@@ -29,10 +29,10 @@ namespace AgentEval.Samples.Providers;
 /// STAGES. Dry run first (<c>--dry-run</c>: prints every prompt, sends nothing), then one real
 /// call, then the remaining cases. That is the order for anything that spends money.
 ///
-/// PRICING. Bitdeer's list price for this model was not verifiable from their public pages on
-/// 2026-09-20. The sample prices a run only when BITDEER_PRICE_INPUT_PER_1M and
-/// BITDEER_PRICE_OUTPUT_PER_1M are set; otherwise it prints tokens and the words "not priced"
-/// rather than a number from a default table that does not know this model.
+/// PRICING. BITDEER_PRICE_INPUT_PER_1M and BITDEER_PRICE_OUTPUT_PER_1M price the run when both are
+/// set; otherwise the model's row in ModelPricing does (the prices bitdeer.ai/en/pricing/ai-models
+/// charged on 2026-10-21; until then the page's price was not verifiable and no row existed). A
+/// model with neither prints tokens and the words "not priced", never a number from a default rate.
 ///
 /// Prerequisites: BITDEER_API_KEY (see ProviderConfig).
 /// </summary>
@@ -75,8 +75,8 @@ public static class GlmBitdeerProviderDemo
         Console.WriteLine($"   🏷️  Identity : {agentName}   (model@provider — never just the model)");
         var price = ProviderConfig.BitdeerPricePer1K;
         Console.WriteLine(price is { } p
-            ? $"   💲 Priced   : ${p.InputPer1K * 1000:F3}/M in, ${p.OutputPer1K * 1000:F3}/M out (from BITDEER_PRICE_*_PER_1M)"
-            : "   💲 Priced   : NO — set BITDEER_PRICE_INPUT_PER_1M / BITDEER_PRICE_OUTPUT_PER_1M to price this run");
+            ? $"   💲 Priced   : ${p.InputPer1K * 1000:F3}/M in, ${p.OutputPer1K * 1000:F3}/M out (from {ProviderConfig.BitdeerPriceSource})"
+            : $"   💲 Priced   : NO — {model} has no row in ModelPricing; set BITDEER_PRICE_INPUT_PER_1M / BITDEER_PRICE_OUTPUT_PER_1M to price this run");
         Console.WriteLine();
         if (dryRun)
         {
@@ -92,7 +92,7 @@ public static class GlmBitdeerProviderDemo
         // ── Step 1: the client — the same construction the CLI's --endpoint path uses ────────
         Console.WriteLine("📝 Step 1: Build the IChatClient (OpenAI client, Bitdeer base URL)\n");
         var chat = ProviderConfig.CreateBitdeerChatClient();
-        Console.WriteLine("   ✓ new OpenAIClient(key, new() { Endpoint = <bitdeer> }).GetChatClient(model).AsIChatClient()");
+        Console.WriteLine("   ✓ new OpenAIClient(key, new() { Endpoint = <bitdeer> }).GetChatClient(model).AsIChatClient().WithMinimalReasoning()");
         Console.WriteLine("   ✓ identical to: agenteval eval --endpoint <bitdeer> --model <model> --api-key <key>\n");
 
         // ── Step 2: one smoke call — the \"one real item\" stage ─────────────────────────────
@@ -120,14 +120,14 @@ public static class GlmBitdeerProviderDemo
             name: agentName,
             systemPrompt: "You answer questions using ONLY the ledger extract in the user message. Be brief.");
 
-        // When the run is not priced, the in-memory results carry EstimatedCost = 0, which EvalProvenance
-        // cannot distinguish from "free". This sample persists nothing, prints "not priced" instead of
-        // a dollar figure, and says so here; a run that must be persisted should set the price variables.
-        Func<string?, JudgeCostMap.ModelRate> rate = price is { } pr
+        // When the run is not priced, no rate resolver is passed and the judge leaf's EstimatedCost is null (not
+        // priced) unless JudgeCostMap has a row for the model: EvalProvenance says "not priced", never $0. This
+        // sample prints "not priced" instead of a dollar figure.
+        Func<string?, JudgeCostMap.ModelRate>? rate = price is { } pr
             ? _ => new JudgeCostMap.ModelRate(pr.InputPer1K, pr.OutputPer1K)
-            : _ => new JudgeCostMap.ModelRate(0, 0);
+            : null;
         if (price is null)
-            Console.WriteLine("   ⚠ Unpriced run: EstimatedCost in the in-memory results is 0 because no rate is known, not because the calls were free. Nothing is persisted.\n");
+            Console.WriteLine("   ⚠ Unpriced run: the judge's EstimatedCost is null (not priced) because no rate is known; it is not $0.\n");
 
         // One judge leaf for every case: AtomicLlmEval passes EvalInput.Context to its judge, so the ledger
         // reaches it from the input rather than from a per-case wrapper. (It did not always: this sample used
@@ -161,11 +161,12 @@ public static class GlmBitdeerProviderDemo
             }
             Console.WriteLine();
             PrintTakeaways(dryRun: true);
+            SampleOutcome.Skip("--dry-run: every payload was rendered and nothing was sent, so nothing was measured");
             return;
         }
 
         var totalTokens = 0L;
-        var totalCost = 0.0;
+        double? totalCost = 0.0; // complete or absent: one unpriced leaf makes it null
         for (var i = 0; i < Cases.Length; i++)
         {
             var c = Cases[i];
@@ -202,6 +203,7 @@ public static class GlmBitdeerProviderDemo
             Console.WriteLine($"     subject said : \"{Trim(reply.Text, 90)}\"   ({subjectMs:N0} ms, {reply.TokenUsage?.PromptTokens ?? 0}+{reply.TokenUsage?.CompletionTokens ?? 0} tok)");
             PrintTree(result, indent: "     ", price is not null);
             Console.WriteLine($"     composite    : {result.Score.Value:F3} {result.Score.Label.ToUpperInvariant()}   (judge round-trip {judgeMs:N0} ms)");
+            SampleOutcome.RecordVerdict($"ledger answer {c.Id}", result.Score);
             Console.WriteLine();
 
             // The composite's own provenance carries no tokens; the judge's live on the atomic-llm leaf. Summing the
@@ -209,11 +211,11 @@ public static class GlmBitdeerProviderDemo
             foreach (var leaf in result.Details.SubResults ?? [])
             {
                 totalTokens += leaf.Provenance.TokensUsed ?? 0;
-                totalCost += leaf.Provenance.EstimatedCost;
+                totalCost = totalCost is { } sum && leaf.Provenance.EstimatedCost is { } leafCost ? sum + leafCost : null;
             }
         }
 
-        Console.WriteLine($"   Σ judge tokens: {totalTokens:N0}   Σ judge cost: {(price is null ? "not priced" : $"${totalCost:F6}")}\n");
+        Console.WriteLine($"   Σ judge tokens: {totalTokens:N0}   Σ judge cost: {(totalCost is { } tc ? $"${tc:F6}" : "not priced")}\n");
         PrintTakeaways(dryRun: false);
     }
 
@@ -237,7 +239,7 @@ public static class GlmBitdeerProviderDemo
     {
         foreach (var leaf in result.Details.SubResults ?? [])
         {
-            var cost = priced ? $"  ${leaf.Provenance.EstimatedCost:F6}" : "";
+            var cost = leaf.Provenance.EstimatedCost is { } c ? (priced ? $"  ${c:F6}" : "") : "  not priced";
             var tokens = leaf.Provenance.TokensUsed is { } t ? $"  {t} tok" : "";
             var judge = leaf.Provenance.JudgeModel is { } j ? $"  judge={j}" : "";
             Console.WriteLine($"{indent}├─ {leaf.Metric.Key,-24} {leaf.Score.Value:F3} {leaf.Score.Label,-5} [{leaf.Provenance.Type}]{judge}{tokens}{cost}");

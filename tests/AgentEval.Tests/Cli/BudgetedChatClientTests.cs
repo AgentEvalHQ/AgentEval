@@ -16,6 +16,23 @@ public sealed class BudgetedChatClientTests
         new(inner, "priced-model", 4096, 100, calls, 1m, 2m);
 
     [Fact]
+    public async Task GetResponseAsync_FrozenReasoning_IsCopiedAndConflictingOverrideRefusedBeforeIo()
+    {
+        var inner = new ProbeClient();
+        using var client = new BudgetedChatClient(inner, "priced-model", 4096, 100, 2, 1m, 2m,
+            freezeReasoning: true, reasoningEffort: ReasoningEffort.Low);
+        var options = new ChatOptions();
+        await client.GetResponseAsync("hello", options);
+        Assert.Null(options.Reasoning);
+        Assert.Equal(ReasoningEffort.Low, inner.Options!.Reasoning!.Effort);
+        Assert.Equal(ReasoningEffort.Low, client.LastReasoningEffort);
+        await Assert.ThrowsAsync<AefInputException>(() => client.GetResponseAsync("changed",
+            new ChatOptions { Reasoning = new() { Effort = ReasoningEffort.High } }));
+        Assert.Equal(1, client.Calls);
+        Assert.Equal(1, inner.Calls);
+    }
+
+    [Fact]
     public async Task GetResponseAsync_CompleteUsage_ChargesActualAndClampsCopiedOptions()
     {
         var inner = new ProbeClient();

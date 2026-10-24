@@ -39,6 +39,9 @@ public static class BaselineExtensions
                 Score = cat.Score,
                 Grade = ComputeGrade(cat.Score),
                 Skipped = cat.Skipped,
+                Errored = cat.Errored,
+                UnmeasuredQueries = cat.UnmeasuredQueries,
+                SkipReason = cat.SkipReason,
                 Recommendation = FindRecommendation(result.Recommendations, cat.ScenarioType)
             };
         }
@@ -61,6 +64,8 @@ public static class BaselineExtensions
             OverallScore = result.OverallScore,
             Grade = result.Grade,
             Stars = result.Stars,
+            IsComplete = result.IsComplete,
+            HasMeasuredScore = result.HasMeasuredCategory,
             CategoryResults = categoryResults,
             DimensionScores = dimensionScores,
             Recommendations = result.Recommendations.ToList(),

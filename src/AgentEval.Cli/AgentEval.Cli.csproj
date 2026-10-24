@@ -29,6 +29,9 @@
     <!-- Release notes are intentionally version-agnostic — the per-version detail lives in
          CHANGELOG.md so this string never drifts out of date as PackageVersion is bumped on CI. -->
     <PackageReleaseNotes>Install: dotnet tool install --global AgentEval.Cli --prerelease. Per-version release notes: https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <!-- The tool carries the AEF schemas (contracts/aef/, Apache-2.0), embedded in AgentEval.Results, beside
+         AgentEval's own MIT code. AEF's LICENSE and NOTICE are packed below; AefLicencePackagingTests checks both. -->
+    <PackageLicenseExpression>MIT AND Apache-2.0</PackageLicenseExpression>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <!-- snupkg symbol package for parity with the umbrella package. SourceLink lets users
@@ -51,6 +54,9 @@
          of its terms, and BSD-3-Clause / Apache-2.0 packages whose notices must travel with binaries).
          The repo-root notices file, with those licence texts, goes to the package root. -->
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
+    <!-- Apache-2.0 section 4: whoever redistributes the AEF schemas gives recipients the licence and AEF's NOTICE. -->
+    <None Include="..\..\contracts\aef\LICENSE" Pack="true" PackagePath="licenses\aef\" Visible="false" />
+    <None Include="..\..\contracts\aef\NOTICE" Pack="true" PackagePath="licenses\aef\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

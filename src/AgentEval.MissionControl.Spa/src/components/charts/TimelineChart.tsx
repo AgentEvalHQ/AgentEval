@@ -18,7 +18,7 @@ export interface TimelinePoint {
   timestamp: string; // ISO 8601
   score: number; // 0..1
   runId?: string;
-  verdict?: "PASS" | "WARN" | "FAIL" | "PENDING";
+  verdict?: string | null;
 }
 
 interface TimelineChartProps {

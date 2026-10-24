@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Core;
+using AgentEval.Embeddings;
 using AgentEval.Metrics.Agentic;
 using AgentEval.Metrics.RAG;
 using AgentEval.Metrics.ResponsibleAI;
@@ -20,7 +21,7 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <b>v1 scope, deliberately:</b> only metrics that (a) implement the plain <see cref="IMetric"/> contract
-/// and (b) can be constructed from nothing but an optional evaluator <see cref="IChatClient"/> — no
+/// and (b) can be constructed from an optional evaluator or embedding generator — no
 /// per-invocation configuration the CLI has no generic source for. Excluded, and why:
 /// <list type="bullet">
 ///   <item><c>code_tool_selection</c>/<c>code_tool_arguments</c> — require an explicit expected-tools/
@@ -56,15 +57,25 @@ internal static class MetricCatalog
             ["llm_fluency"] = c => new FluencyMetric(c),
             ["llm_bias"] = c => new BiasMetric(c),
             ["llm_misinformation"] = c => new MisinformationMetric(c),
+            ["llm_toxicity"] = c => new ToxicityMetric(c),   // pattern scan, then an LLM judge for what it does not match
             ["llm_task_completion"] = c => new TaskCompletionMetric(c),
         };
 
-    /// <summary>Every resolvable metric name, sorted, for error messages and <c>agenteval list --type metrics</c>-style introspection.</summary>
+    /// <summary>Embedding metrics use the shared embedding instrument, independently of an LLM judge.</summary>
+    private static readonly IReadOnlyDictionary<string, Func<IAgentEvalEmbeddings, IMetric>> EmbeddingBased =
+        new Dictionary<string, Func<IAgentEvalEmbeddings, IMetric>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["embed_answer_similarity"] = e => new AnswerSimilarityMetric(e),
+            ["embed_response_context"] = e => new ResponseContextSimilarityMetric(e),
+            ["embed_query_context"] = e => new QueryContextSimilarityMetric(e),
+        };
+
+    /// <summary>Every resolvable metric name, sorted, for error messages and introspection.</summary>
     public static IReadOnlyList<string> AvailableNames { get; } =
-        CodeBased.Keys.Concat(LlmBased.Keys).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        CodeBased.Keys.Concat(LlmBased.Keys).Concat(EmbeddingBased.Keys).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
     /// <summary>True if <paramref name="name"/> is a name this catalog can resolve (case-insensitive) — a pure lookup, no <see cref="IChatClient"/> needed.</summary>
-    public static bool IsKnown(string name) => CodeBased.ContainsKey(name) || LlmBased.ContainsKey(name);
+    public static bool IsKnown(string name) => CodeBased.ContainsKey(name) || LlmBased.ContainsKey(name) || EmbeddingBased.ContainsKey(name);
 
     /// <summary>
     /// Resolves <paramref name="name"/> to a fresh <see cref="IMetric"/> instance.
@@ -74,11 +85,12 @@ internal static class MetricCatalog
     /// The chat client to construct an LLM-based metric with. Required only when <paramref name="name"/>
     /// names an LLM-based metric; ignored for code-based ones.
     /// </param>
+    /// <param name="embeddings">Required for embedding metrics; ignored by code/LLM metrics.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is not a known metric name.</exception>
     /// <exception cref="InvalidOperationException">
-    /// <paramref name="name"/> names an LLM-based metric but <paramref name="evaluatorClient"/> is <see langword="null"/>.
+    /// The requested metric's evaluator client or embedding generator is missing.
     /// </exception>
-    public static IMetric Resolve(string name, IChatClient? evaluatorClient)
+    public static IMetric Resolve(string name, IChatClient? evaluatorClient, IAgentEvalEmbeddings? embeddings = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -98,6 +110,10 @@ internal static class MetricCatalog
 
             return llmFactory(evaluatorClient);
         }
+
+        if (EmbeddingBased.TryGetValue(name, out var embeddingFactory))
+            return embeddingFactory(embeddings ?? throw new InvalidOperationException(
+                $"Metric '{name}' requires an embedding generator. Configure AI_INFERENCE_PROVIDER and its embedding model variable."));
 
         throw new ArgumentException(
             $"Unknown metric name: '{name}'. Available: {string.Join(", ", AvailableNames)}.", nameof(name));

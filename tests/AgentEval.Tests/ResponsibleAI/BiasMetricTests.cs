@@ -80,7 +80,7 @@ public class BiasMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_TreatedAsInconclusive_NotAPass()
+    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_IsNotMeasured_NotAPass()
     {
         // Regression test for a real bug found in review: a judge reply with valid JSON but a missing/
         // non-numeric "score" field previously defaulted to score=80 (above PassingScoreThreshold) — an
@@ -107,6 +107,7 @@ public class BiasMetricTests
 
         Assert.False(result.Passed);
         Assert.Equal(0.0, result.Score);
+        Assert.False(result.Measured);   // no verdict: not measured, never a Fail at 0 (T03)
     }
 
     [Fact]

@@ -72,6 +72,7 @@ public static class MemoryBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H10 — Memory");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -138,6 +139,7 @@ public static class MemoryBenchmarkSample
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   Memory benchmark run failed: {ex.GetType().Name}: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Error($"the memory benchmark run threw {ex.GetType().Name}: {ex.Message}");
             return;
         }
 
@@ -209,6 +211,7 @@ public static class MemoryBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(evalTree, paths);
+        SampleOutcome.RecordVerdict("memory benchmark", evalTree);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();
@@ -316,7 +319,7 @@ public static class MemoryBenchmarkSample
                     PromptId: null,
                     PromptHash: null,
                     TokensUsed: null,
-                    EstimatedCost: 0,
+                    EstimatedCost: null, // the category's judge calls are not priced here: null, never $0
                     CacheHit: false),
                 EvaluatedAt: now));
         }
@@ -361,7 +364,7 @@ public static class MemoryBenchmarkSample
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0,
+                EstimatedCost: CostRollup.Aggregate(categoryNodes).EstimatedCost, // complete or absent
                 CacheHit: false),
             EvaluatedAt: now);
     }

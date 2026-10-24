@@ -1,6 +1,7 @@
 import { Gavel, Users, AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   type EvalResultNodeShape,
+  capturedScore,
   dimensionsToRecord,
   isAdjudicatedNode,
 } from "@/lib/eval-tree";
@@ -28,7 +29,7 @@ interface Props {
 }
 
 // Phase-7 Task 7.11: labelToVerdict lifted to @/lib/verdict.
-import { labelToVerdict } from "@/lib/verdict";
+import { scoreVerdict } from "@/lib/verdict";
 
 export function AdjudicationFlow({ node }: Props) {
   const adjudicated = isAdjudicatedNode(node);
@@ -71,7 +72,7 @@ export function AdjudicationFlow({ node }: Props) {
           <div className="flex items-center gap-2 pt-2">
             <AlertTriangle size={14} className="text-amber-600" />
             <span className="text-xs font-medium text-amber-700">
-              Panel disagreed — adjudicator override
+              Panel disagreed — adjudicator result
             </span>
             <span className="text-slate-300">→</span>
           </div>
@@ -84,7 +85,7 @@ export function AdjudicationFlow({ node }: Props) {
                 </span>
               </div>
               <VerdictBadge
-                verdict={labelToVerdict(adjudicator.score.label)}
+                verdict={scoreVerdict(adjudicator.score)}
                 size="sm"
               />
             </div>
@@ -92,7 +93,7 @@ export function AdjudicationFlow({ node }: Props) {
               <span>
                 Score:{" "}
                 <span className="font-mono">
-                  {formatScore(adjudicator.score.value)}
+                  {formatScore(capturedScore(adjudicator))}
                 </span>
               </span>
               {adjudicator.provenance.judgeModel && (
@@ -107,7 +108,7 @@ export function AdjudicationFlow({ node }: Props) {
                   panel DISAGREEMENT. Matches EvalResultNode.tsx's rendering. */}
               <PromptHashPill promptHash={adjudicator.provenance.promptHash} />
               <span className="text-slate-500">
-                {formatCost(adjudicator.provenance.estimatedCost)}
+                {adjudicator.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(adjudicator.provenance.estimatedCost)}
               </span>
             </div>
           </div>
@@ -125,12 +126,12 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
           {judge.metric.name}
         </span>
         <VerdictBadge
-          verdict={labelToVerdict(judge.score.label)}
+          verdict={scoreVerdict(judge.score)}
           size="sm"
         />
       </div>
       <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-600">
-        <span className="font-mono">{formatScore(judge.score.value)}</span>
+        <span className="font-mono">{formatScore(capturedScore(judge))}</span>
         {judge.provenance.judgeModel && (
           <ModelBadge
             model={judge.provenance.judgeModel}
@@ -141,9 +142,9 @@ function JudgeCard({ judge }: { judge: EvalResultNodeShape }) {
             cards were the one place promptHash still didn't render
             (EvalResultNode.tsx and ScenarioTreePage.tsx already show it). */}
         <PromptHashPill promptHash={judge.provenance.promptHash} />
-        {judge.provenance.estimatedCost > 0 && (
+        {(
           <span className="text-slate-500">
-            {formatCost(judge.provenance.estimatedCost)}
+            {judge.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(judge.provenance.estimatedCost)}
           </span>
         )}
       </div>

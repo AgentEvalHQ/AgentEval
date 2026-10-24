@@ -106,7 +106,7 @@ public sealed class MultiJudgeWrapper : IEval
         // Use CostRollup so cost + cache-hit semantics match CompositeEval —
         // previously every panel run reported `CacheHit: false` even when
         // every judge was a cache hit.
-        var (cost, allCacheHits) = CostRollup.Aggregate(subs);
+        var (cost, allCacheHits, _) = CostRollup.Aggregate(subs);
 
         // Nothing measured is no verdict — CompositeEval's ADR-030 rule, which this wrapper lacked. The aggregation
         // returns (0, "none") when every judge errored or skipped, and both verdict paths below read that as a pass, so
@@ -229,7 +229,7 @@ public sealed class MultiJudgeWrapper : IEval
 
     // No judge produced a measurement: "error" when any errored, else "skipped" — and NotApplicable, which never blocks
     // a parent, only when every judge said the case cannot test this.
-    private EvalResult NoVerdict(EvalResult[] subs, double cost, bool allCacheHits)
+    private EvalResult NoVerdict(EvalResult[] subs, double? cost, bool allCacheHits)
     {
         var errored = subs.Count(s => s.Score.Label == "error");
         var allInapplicable = subs.All(s => s.Score.CensusBucket() == MeasurementState.NotApplicable);

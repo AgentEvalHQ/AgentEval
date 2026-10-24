@@ -5,6 +5,31 @@
 AEF 1.0 is settled but not yet tagged. These are changes to 1.0 itself, made before the `aef-1.0` tag: what critic
 round 11 found, and what AgentEval needs to write AEF natively. None is an erratum.
 
+- **Prospective DCO enforcement** (2026-10-24): the lead editor confirmed certification and directed that
+  historical commit messages remain unchanged. Governance records the two exact pre-policy unsigned IDs;
+  CI continues to reject every new unsigned AEF commit, regardless of its date, and fails on an invalid Git range.
+  No history, format rule, schema or licence changes.
+- **Release text and Inspect null entries** (2026-10-24): RUN-4 explicitly permits sealing, attestation, overlays
+  and authorized withholding after close; governance follows the normative compatibility/errata rules. Overlay
+  truncation requires an externally retained or anchored latest head, rather than a deletable local signature.
+  Interop summaries distinguish optional artifact binding and lossy native EvalPort identity projection. The result
+  field description includes `scored`. Inspect null entries in object lists are skipped as absent in both
+  implementations; the existing informative Inspect fixture now includes them with unchanged mapped output.
+- **Licence: Apache-2.0 alone** (GOVERNANCE.md, "Licence and patents"). The lead editor decided on 2026-10-20 that
+  AEF 1.0 is released under Apache-2.0 for everything in `contracts/aef/`: the text, schemas, corpus and tools. The
+  plan to put the specification text under the Community Specification License 1.0 is dropped, and `SCOPE.md`, which
+  defined that licence's patent scope, is removed. Why: one licence that implementers' legal teams already know; the
+  Community Specification would add its own contributor agreement and governance policy beside the DCO and this
+  governance, for a specification with one implementing project so far. What it leaves: Apache-2.0's patent licence
+  comes from each contributor for their contributions, and AEF makes no separate patent commitment to implementations
+  written from the text alone. A later change to these terms follows the proposal process.
+- **The artifact-evidence statement is a profile, outside 1.0** (GOVERNANCE.md, "Profiles"). The statement that binds
+  an evaluated artifact, by digest, to a sealed run was defined only in an interop page and in AgentEval's code, yet
+  its predicate type sat under `/aef/1/`, which names what AEF 1.0 itself defines. It moves to
+  `profiles/artifact-evidence/` with the predicate type `https://agenteval.dev/attestation/artifact-evidence/v1`;
+  `interop/artifact-companion.md` points there. Nothing in the 1.0 text, schemas or corpus changes, and no released
+  AgentEval version wrote the old type. A later minor may bring the binding into AEF.
+
 - **Native suites with many rubrics** ([RUN-9], [SEAL-5]): run and seal judge lists accept up to 4096 entries,
   raised from 64. Standard GDPR evaluation exceeds the old limit when every observed rubric is retained.
   Writer and derived reader schemas change together; the run-plan limit remains 16. This is a pre-release

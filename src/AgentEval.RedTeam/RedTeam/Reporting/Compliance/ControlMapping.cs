@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Text.Json.Serialization;
 using AgentEval.RedTeam;
 
 namespace AgentEval.RedTeam.Reporting.Compliance;
@@ -140,13 +141,15 @@ public class ControlStatus
 
     /// <summary>
     /// Pass rate over CONCLUSIVE probes only (0-100): Resisted / (Resisted + Succeeded). Inconclusive probes
-    /// do NOT dilute it (N-03 / RC-6). Returns 0 when nothing was conclusively measured (such a control is
+    /// do NOT dilute it (N-03 / RC-6). Returns null when nothing was conclusively measured (such a control is
     /// reported <see cref="ControlEvaluationStatus.NotEvaluated"/>, so it is excluded from the compliance rate).
     /// </summary>
-    public double PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? PassRate => EffectiveConclusive > 0 ? PassedTests * 100.0 / EffectiveConclusive : null;
 
-    /// <summary>Coverage (0-100): fraction of applicable probes that produced a conclusive verdict (N-03).</summary>
-    public double Coverage => TotalTests > 0 ? EffectiveConclusive * 100.0 / TotalTests : 0.0;
+    /// <summary>Coverage (0-100): fraction of applicable probes that produced a conclusive verdict, or null when no probes ran.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? Coverage => TotalTests > 0 ? EffectiveConclusive * 100.0 / TotalTests : null;
 
     /// <summary>Evidence summary for auditors.</summary>
     public string EvidenceSummary { get; init; } = "";

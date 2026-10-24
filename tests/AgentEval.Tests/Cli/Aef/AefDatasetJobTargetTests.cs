@@ -74,6 +74,71 @@ public sealed class AefDatasetJobTargetTests : IDisposable
     private string RunDirectory(AefJobResult result) => Path.Combine(Output, "runs", Assert.Single(result.Runs));
 
     [Theory]
+    [InlineData(0, "none")]
+    [InlineData(1, "low")]
+    [InlineData(2, "provider-default")]
+    public async Task RunAsync_ReasoningResolvedDuringReadiness_CountsProbesAndFreezesCases(int rejectedLevels, string expected)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("Hi"),
+            responseStatus: request => (string?)request["reasoning_effort"] switch
+            {
+                "none" when rejectedLevels >= 1 => 400,
+                "low" when rejectedLevels >= 2 => 422,
+                _ => 200,
+            });
+        var plan = Plan(endpoint.Endpoint);
+        var bytes = Bytes(plan);
+        var target = await AefDatasetJobTarget.LoadAsync(bytes, PlanDirectory);
+        var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, Output, new AefJobOptions { At = Start });
+        Assert.Equal("job.sealed", result.Terminal);
+        Assert.Equal(rejectedLevels + 2, endpoint.Requests.Count);
+        Assert.Equal(expected == "provider-default" ? null : expected, (string?)endpoint.Requests[^1]["reasoning_effort"]);
+        var metadata = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "ext", "agenteval", "preparation.json")))!;
+        var role = Assert.Single(metadata["roles"]!.AsArray())!;
+        Assert.Equal(expected, (string?)role["effort"]);
+        Assert.Equal(rejectedLevels + 1, (int)role["attempts"]!);
+        Assert.True((bool)role["resolved"]!);
+        var summary = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "summary.json")))!;
+        if (rejectedLevels > 0) Assert.Null(summary["usage"]![0]!["gen_ai.usage.input_tokens"]);
+        Assert.True((double)summary["cost"]!["totalUsd"]! >= (double)role["incurredUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory(result)).Outcome);
+        Assert.Empty(RunnerEventStream.Verify(Events(), plan));
+    }
+
+    [Fact]
+    public async Task RunAsync_ReasoningRejectedDuringCase_DoesNotRenegotiate()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("Hi"),
+            responseStatus: request => request["messages"]!.ToJsonString().Contains("secret-prompt", StringComparison.Ordinal) ? 400 : 200);
+        var plan = Plan(endpoint.Endpoint);
+        var target = await AefDatasetJobTarget.LoadAsync(Bytes(plan), PlanDirectory);
+        var result = await AefJobRunner.RunAsync(Bytes(plan), Manifest(), target, Output, new AefJobOptions { At = Start });
+        Assert.Equal(2, endpoint.Requests.Count);
+        Assert.All(endpoint.Requests, request => Assert.Equal("none", (string?)request["reasoning_effort"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory(result)).Outcome);
+    }
+
+    [Fact]
+    public async Task RunAsync_AllReasoningProbesRejected_RecordsBoundedFailureWithoutCases()
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult("unused"), statusCode: 400);
+        var plan = Plan(endpoint.Endpoint);
+        var target = await AefDatasetJobTarget.LoadAsync(Bytes(plan), PlanDirectory);
+        var result = await AefJobRunner.RunAsync(Bytes(plan), Manifest(), target, Output, new AefJobOptions { At = Start });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal(3, endpoint.Requests.Count);
+        Assert.Empty(File.ReadAllLines(Path.Combine(RunDirectory(result), "results.ndjson")));
+        var metadata = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "ext", "agenteval", "preparation.json")))!;
+        var role = Assert.Single(metadata["roles"]!.AsArray())!;
+        Assert.Equal(3, (int)role["attempts"]!);
+        Assert.False((bool)role["resolved"]!);
+        Assert.Null(role["effort"]);
+        Assert.Equal(target.Suites[0].PreparationUsdBound, (double)role["incurredUsd"]!, precision: 12);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory(result)).Outcome);
+        Assert.Empty(RunnerEventStream.Verify(Events(), plan));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RunAsync_DatasetSnapshot_UsesOriginalIdsAndSealsLiveEvidence(bool azure)
@@ -106,6 +171,7 @@ public sealed class AefDatasetJobTargetTests : IDisposable
 
         Assert.Equal("job.sealed", result.Terminal);
         Assert.Equal(2, endpoint.Requests.Count); // readiness + case
+        Assert.All(endpoint.Requests, request => Assert.Equal("none", (string?)request["reasoning_effort"]));
         var directory = RunDirectory(result);
         var root = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(directory, "results.ndjson"))))!;
         Assert.Equal("original/α", (string?)root["caseId"]);
@@ -146,6 +212,7 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         Assert.Equal("job.sealed", result.Terminal);
         Assert.Equal(2, subject.Requests.Count);
         Assert.Equal(2, judge.Requests.Count);
+        Assert.All(subject.Requests.Concat(judge.Requests), request => Assert.Equal("none", (string?)request["reasoning_effort"]));
         Assert.All(subject.AuthorizationHeaders, h => Assert.Equal("Bearer secret-subject-key", h));
         Assert.All(judge.AuthorizationHeaders, h => Assert.Equal("Bearer secret-judge-key", h));
         var directory = RunDirectory(result);
@@ -292,7 +359,9 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         var result = await AefJobRunner.RunAsync(bytes, Manifest(), target, Output, new AefJobOptions { At = Start });
         Assert.Equal("job.sealed", result.Terminal);
         var summary = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "summary.json")))!;
-        Assert.Equal(estimate.UsdHigh, (double)summary["cost"]!["totalUsd"]!, precision: 12);
+        // Only one readiness attempt was made: the two unused reservations are not charged.
+        Assert.Equal(estimate.UsdHigh - 2 * target.Suites[0].PreparationUsdBound / 3,
+            (double)summary["cost"]!["totalUsd"]!, precision: 12);
         Assert.Null(summary["usage"]![0]!["gen_ai.usage.input_tokens"]);
         Assert.Null(summary["usage"]![0]!["gen_ai.usage.output_tokens"]);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory(result)).Outcome);
@@ -311,7 +380,11 @@ public sealed class AefDatasetJobTargetTests : IDisposable
         Assert.Single(endpoint.Requests);
         Assert.Empty(File.ReadAllLines(Path.Combine(RunDirectory(result), "results.ndjson")));
         var summary = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "summary.json")))!;
-        Assert.Equal(target.Suites[0].PreparationUsdBound, (double)summary["cost"]!["totalUsd"]!, precision: 12);
+        Assert.Equal(target.Suites[0].PreparationUsdBound / 3, (double)summary["cost"]!["totalUsd"]!, precision: 12);
+        var metadata = JsonNode.Parse(File.ReadAllText(Path.Combine(RunDirectory(result), "ext", "agenteval", "preparation.json")))!;
+        var probe = Assert.Single(metadata["roles"]!.AsArray())!;
+        Assert.Equal(1, (int)probe["attempts"]!);
+        Assert.False((bool)probe["resolved"]!);
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory(result)).Outcome);
         Assert.Empty(RunnerEventStream.Verify(Events(), plan));
     }

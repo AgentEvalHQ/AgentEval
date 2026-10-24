@@ -104,7 +104,7 @@ differently.
 | `agenteval aef seal <run-dir>` | Seals a closed run. `--key` also signs it (PKCS#8 PEM, ECDSA P-256). `--sealed-by producer\|ingest`. | the run cannot be sealed |
 | `agenteval aef view <run-dir>` | Shows the run as its overlays leave it: overrides, reviews, waivers in force at `--at`, withheld blobs. | (never) |
 | `agenteval aef checkpoint <file> --runs <dir>` | Checks a checkpoint: its manifest, its runs, each lane's recomputed result, its decision and its signature. | any problem |
-| `agenteval aef export <store-dir> <out-dir>` | Converts a run of AgentEval's `.agenteval/` store into an AEF run (an *imported* run, sealed by the exporter). | the converted run does not verify |
+| `agenteval aef import store-v1 <store-dir> <out-dir>` | Converts a legacy `.agenteval/` run into imported AEF. `aef export` remains a compatibility spelling for the same converter. | the converted run does not verify |
 | `agenteval aef import assert-ai <dir> <out-dir>` | Converts an [ASSERT](assert-interop.md) run into an AEF run, with ASSERT's harm and over-refusal rates. | the converted run does not verify |
 
 Every command takes `--json` and then prints one JSON value instead of a report. Exit code 2 is a usage or input
@@ -126,6 +126,13 @@ This runner uses process isolation and an endpoint that is already running. The 
 signing identity; a signed job records its public `signingKeyId` in its options and events.
 
 Run a plan with `agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json`.
+Before dataset cases start, readiness resolves each subject/judge endpoint's minimal reasoning setting using the
+same policy as `eval`: `none`, then `low`, then an omitted setting (the provider default). Every rejected probe
+counts as an attempt and retains its cost reservation when usage is unavailable. Dry-run estimates reserve up
+to three readiness attempts per role and suite; unused attempts are not charged. Case requests keep the resolved
+setting and make no reasoning fallback or SDK transport retry. Sealed `ext/agenteval/preparation.json` records
+per-role attempts, incurred preparation cost and the resolved setting, including with content capture off.
+Failed preparation records unresolved roles honestly and starts no cases.
 The root must exist; when omitted it is discovered from the current directory, falling back to that directory.
 The job writes `.agenteval/aef/jobs/<jobId>/` with exact `plan.json` bytes, `runner.json`, `events.ndjson`, and
 `runs/<runId>/`. Existing job directories are refused. `--json` prints a terminal report containing the job ID,
@@ -259,7 +266,29 @@ it using the CLI and independent Python run, checkpoint, lane and signature veri
 changing the checkpoint invalidates its signature. Prompts, responses and private keys stay outside the
 retained evidence. This verifies the local evidence flow; it makes no claim about a deployed model's quality.
 
-### Export a run, check it, sign it
+### Import a legacy run, check it, sign it
+
+Legacy conversion uses one implementation: `StoreV1Exporter` in `AgentEval.Results.Adapters`.
+Both `aef import store-v1` and the existing `aef export` command use it. Library callers can use
+`StoreV1Exporter.ExportAsync(IOutputStoreReader, runId, outputDirectory, options)` to convert a stored run,
+or `Export(StoreV1Run, outputDirectory, options)` for an already-read run. Conversion writes a new AEF folder;
+it does not alter the original store. `AefLocalRunImporter` stages existing AEF files and is not a legacy converter.
+
+The output is **imported: not sealed when it ran**. `run.json` names the original store in `imported.from`
+and lists converter-supplied fields in `imported.asserted`. A new seal uses `sealedBy: ingest`: it protects
+the converted evidence from import onward, not the original execution's earlier history. Interrupted
+legacy runs retain their observed results and are marked aborted. Legacy store compatibility remains for 1.x.
+
+Nested evaluator results are converted into canonical AEF child nodes even with content capture off.
+Their parent links and ordinal paths preserve repeated evaluator names; scenario roots and comparison
+units keep their existing identities. Narrative summaries and raw legacy result JSON still require
+capture on. Recognized malformed or oversized trees are refused instead of being flattened. Parent
+costs may include child costs; do not sum both when calculating a run total.
+
+
+Pass a run folder inside its original `.agenteval/subjects/<kind>/<name>/runs/<run-id>/` workspace,
+or pass the `.agenteval` workspace with `--run`. Keep the workspace structure when moving legacy evidence.
+The destination must be absent or empty; subsequent readers can use the resulting AEF folder.
 
 Export warns on stderr when a native header in the workspace’s `.agenteval/aef/runs/` links
 the same store run or trial. Prefer that native evidence: conversion is a separate imported projection.
@@ -268,7 +297,7 @@ The notice does not certify integrity—use `aef verify` for that.
 
 ```bash
 # Convert one run of the .agenteval store (store v1 records no target mode: say so if it ran live)
-agenteval aef export .agenteval --run 2026-10-08T120000Z-a1b2 ./aef-run --target-mode live --no-seal
+agenteval aef import store-v1 .agenteval --run 2026-10-08T120000Z-a1b2 ./aef-run --target-mode live --no-seal
 
 # Seal and sign it (the key is yours; keep it out of the run)
 agenteval aef seal ./aef-run --key ./signing-key.pem --sealed-by ingest
@@ -292,7 +321,41 @@ An exported store run is marked as imported, and lists what the exporter *suppli
 exported run is never passed off as live evidence unless you say it was. The full mapping is in the specification,
 §7.5.
 
+Legacy trace-fidelity and workflow-trace-fidelity runs can record their evaluator tree in
+`report-native.json` without scenario files. Conversion projects that recorded tree into cases;
+inputs, input hashes and per-case durations remain absent when the report did not record them.
+With content capture on, the original report bytes are also retained as `E-report-native-json`.
+Other benchmark families' native reports are preserved as opaque evidence, without inferring cases
+from a different report schema. Content capture off omits the original report blob.
+
+LongMemEval and TypedMemEval historically record question counts in the manifest/summary and a
+report-only `ExternalBenchmarkResult` DTO, with no scenario files. For these known producers, conversion
+checks the report's benchmark identity and recorded question count, preserving the original summary
+and count metadata while leaving canonical evaluator results empty. Those counts describe questions;
+they do not claim missing scenario files or establish per-question comparison facts. Malformed or
+contradictory reports still refuse, as do ordinary scenario runs whose recorded counts disagree with
+their files. Category-memory scenarios retain their recorded values and unrecorded comparison facts.
+Report-only conversion requires the original filesystem report: a semantic store reader that exposes
+only manifests, summaries and scenarios cannot establish these report facts from counts alone.
+
+A generic scenario's recorded finite score can have an unbounded scale. Conversion declares it
+normalized only when its recorded metric contract supports that interpretation; it does not clamp
+the score into 0–1. Known normalized trace results and projected descendant metrics still require
+values in that domain.
+
 ## Runs from eval, redteam and bench
+
+With `--aef-content on`, memory, LongMemEval, TypedMemEval, trace-fidelity and workflow-trace-fidelity
+also retain their exact producer-native JSON report as `E-report-native-json` document evidence.
+The original report is separate from the canonical evaluator rows; its schema and unrecorded source identity
+are not inferred. Capture off omits the document. A partial evaluation without a returned report does not
+invent a complete one; a returned report can remain available if later persistence or reporting fails.
+Verified artifact reads use the captured bytes without recovering a sibling legacy file.
+
+`bench agentic --aef-content on` retains the original agentic report as document evidence. The recorded report
+identity names its generation time and original source references; those references are not an execution seal.
+`render --benchmark agentic` reads the verified document, or converts an old report folder, and uses the existing
+Markdown/PDF renderers. Missing native capture stays unavailable, including when a legacy copy remains nearby.
 
 `bench autoaudit --subject-version <version>` records that exact version for each audited subject, including
 interrupted runs. Run separate audits when subjects have different versions. Without the flag, the version stays unknown.
@@ -428,6 +491,30 @@ preflight/help side effects and verifies signed identity and unsealed evidence w
 | `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
 
+OWASP, MITRE and NIST retain their historical whole-benchmark comparison unit separately from the probe
+results. `summary.ext["agenteval.bench"]` holds the producer's original `label` and nullable `score`;
+its optional `comparison` profile (version 1) records the original `measurement`, `passed` flag and an
+`observation` with `caseId`, evaluator identity and `agenteval.comparison` facts. The observation names the
+declared normalized `score` metric; it does not duplicate the summary's numeric score. Comparison reads this
+unit only for probe-only evidence, preserving the benchmark scenario identity, evaluation policy, instrument,
+threshold and known subject/judge relationship. It never substitutes a resistance rate for the benchmark score.
+Unmeasured scores stay absent. Capture off omits the stimulus hash and chance-floor derivation text; it retains
+the recorded numeric and instrument facts. Partial scans without a returned benchmark evaluation publish no
+aggregate comparison profile. A malformed profile or contradictory identity, metric or measurement is refused
+even when the containing run has a valid seal. Ordinary evaluation trees retain their existing selection rules.
+
+Native composite comparison observations retain the recorded evaluator display name for their original leaf
+identities, including with capture off. Older evidence without that name keeps its ID fallback; converted legacy
+scenarios retain their original names. Alternate benchmark/preset observations retain an explicitly supplied
+original scenario label, including with capture off; a missing label keeps the ID fallback. The ID alone does not
+establish a display name. A present comparison name with a non-string value is refused.
+
+Mission Control scenario lists retain recognized recorded v1 names while keeping canonical case IDs unchanged.
+Missing names and unfamiliar metadata versions keep the ID fallback. The workspace catalog also includes
+recorded child runs from `.agenteval/aef/jobs/<jobId>/runs/`, using the same bounded discovery and per-run
+verification as ordinary runs. A job's own seal is not a child-run seal, and a child run does not establish parent
+job completion or integrity. Incomplete or unsafe job-folder discovery refuses a partial catalog.
+
 `bench gdpr --runs N` and `bench eu-ai-act --runs N` preserve each trial's tree and a corresponding
 majority-vote rollup tree. Ties choose the more severe label; a pass supported by only some requested trials
 becomes a warning. Error and skipped trials contribute no vote.
@@ -436,6 +523,14 @@ Composite benchmark summaries retain `score@case` as the arithmetic mean. A sepa
 entry records the preset's own aggregate value and verdict, with an `agenteval.*` aggregate method. It is
 `not_measured` when the preset withholds its score. These are distinct metrics because AEF allows only one
 summary entry per lane, metric and path.
+
+Native composite results retain `EvalResult.ObservedDuration` as `durationMs` when the producer recorded
+that boundary's elapsed interval. The optional observation is excluded from legacy result JSON; null
+stays unknown and zero stays an observed zero. Category-memory uses its reported benchmark/category
+intervals, independently of CLI persistence time. Synthetic trial rollups do not borrow a trial's duration.
+Memory category DTOs do not identify their grading instrument, so configuration alone does not establish
+a model or code annotator. For memory questions, recorded judge calls establish model grading only for
+measured outcomes; an unrecorded model identity stays absent. Missing instrument evidence stays unknown.
 
 Gates record the command's final decision: eval's golden-trace comparison, redteam's `--fail-on` policy,
 and each verdict-bearing benchmark's exit code. TypedMemEval and autoaudit publish scores without a gate.
@@ -479,7 +574,18 @@ TypedMemEval exposes the same progress method and retains typed outcomes on inte
 the aggregate score and gate; a missing typed vector never substitutes the compatibility accuracy field. Returned
 full results remain available after persistence or report failure.
 
-Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
+CLI commands use AEF as their default run record. They do not write legacy manifests, scenarios or history by default.
+`eval --output-dir` selects an AEF destination; it cannot conflict with `--no-aef` or a different `--aef` directory.
+Single-file exports and standalone benchmark reports remain supported. Perf, memory and trace-family reports live under
+`.agenteval/reports/<family>/<subject>/<source-id>`; compliance and agentic reports retain their existing report locations.
+Standalone exports keep their report content. Copies of their original JSON inside AEF follow the configured AEF capture policy.
+Existing report builders can assemble a transient in-memory source manifest. Its ID/hash identifies that assembly input,
+not a persisted legacy folder or an independently verifiable execution. When present, `config.reportSourceManifestStorage`
+discloses `transient-in-memory` or `store-v1`. No StoreV1 link is written for a transient source.
+The CLI's compatibility writer is private RC feedback support, outside the 1.0 promise, scheduled for removal at 1.0.0
+if feedback finds nothing. Legacy reading/conversion remains supported throughout 1.x; library output-store APIs are unchanged.
+
+When the compatibility writer is enabled, perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
 in `run.json` under `ext.agenteval.store-v1.runId`. The AEF run keeps its own identity. No directory path is stored;
 an interrupted run may link an incomplete manifest, while a run stopped before manifest creation has no link.
 Agentic benchmarks also link their created store manifests, including interrupted runs.
@@ -497,6 +603,12 @@ Eval uses `config.thresholds.case` when every dataset case has the same passing 
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
 come from the evaluation definition, so they remain distinct from the producer package version.
+Named metric absences retain their existing typed cause in `ext.agenteval.metric.notMeasuredCause` and a safe
+reason even with content capture off. Missing input is `not_measured`; an unreadable judge reply, failed judge
+call or timed-out check is `error`; nothing applicable to check is `not_applicable`. Their aggregation counts
+remain separate. Older results without a typed cause say that it was not recorded. Free-form explanations may
+contain case content and continue to be captured only when content capture is on; an absent reading never gains
+a placeholder score or grading instrument.
 Without a captured definition, probe and composite suite digests identify only their observed or legacy
 case/component-key roster, including the sole key for a single-case benchmark. Dataset adapter calls
 without a definition retain dataset-byte identity. These compatibility scopes do not establish full

@@ -63,22 +63,32 @@ public class TrxExporter : IResultExporter
         await writer.WriteAttributeStringAsync(null, "finish", null, report.EndTime.ToString("O"));
         await writer.WriteEndElementAsync();
         
+        // A test that produced no verdict (the judge failed, the run errored) is an Error, not NotExecuted: CI systems
+        // read NotExecuted as not run and stay green. It ran, so it is executed; the report counts it among SkippedTests.
+        var notMeasured = report.TestResults.Count(t => t.NotMeasured);
+        var notExecuted = Math.Max(0, report.SkippedTests - notMeasured);
+        var executed = report.TotalTests - notExecuted;
+
         // <ResultSummary>
+        // A run in which no test executed (no tests at all, or every one skipped) proved nothing, so its outcome is
+        // Inconclusive, never Passed: CI reads a Passed run as green (owner decision D-31).
+        var runOutcome = report.FailedTests > 0 || notMeasured > 0 ? "Failed"
+            : executed <= 0 ? "Inconclusive"
+            : "Passed";
         await writer.WriteStartElementAsync(null, "ResultSummary", null);
-        await writer.WriteAttributeStringAsync(null, "outcome", null, 
-            report.FailedTests == 0 ? "Passed" : "Failed");
-        
+        await writer.WriteAttributeStringAsync(null, "outcome", null, runOutcome);
+
         await writer.WriteStartElementAsync(null, "Counters", null);
         await writer.WriteAttributeStringAsync(null, "total", null, report.TotalTests.ToString());
-        await writer.WriteAttributeStringAsync(null, "executed", null, (report.TotalTests - report.SkippedTests).ToString());
+        await writer.WriteAttributeStringAsync(null, "executed", null, executed.ToString());
         await writer.WriteAttributeStringAsync(null, "passed", null, report.PassedTests.ToString());
         await writer.WriteAttributeStringAsync(null, "failed", null, report.FailedTests.ToString());
-        await writer.WriteAttributeStringAsync(null, "error", null, "0");
+        await writer.WriteAttributeStringAsync(null, "error", null, notMeasured.ToString());
         await writer.WriteAttributeStringAsync(null, "timeout", null, "0");
         await writer.WriteAttributeStringAsync(null, "aborted", null, "0");
         await writer.WriteAttributeStringAsync(null, "inconclusive", null, "0");
         await writer.WriteAttributeStringAsync(null, "notRunnable", null, "0");
-        await writer.WriteAttributeStringAsync(null, "notExecuted", null, report.SkippedTests.ToString());
+        await writer.WriteAttributeStringAsync(null, "notExecuted", null, notExecuted.ToString());
         await writer.WriteEndElementAsync(); // </Counters>
         await writer.WriteEndElementAsync(); // </ResultSummary>
         
@@ -137,18 +147,25 @@ public class TrxExporter : IResultExporter
             var testId = CreateDeterministicGuid(test.Name);
             var executionId = CreateDeterministicGuid($"{test.Name}_exec");
             
-            var outcome = test.Skipped ? "NotExecuted" : (test.Passed ? "Passed" : "Failed");
+            var outcome = test.NotMeasured ? "Error" : test.Skipped ? "NotExecuted" : (test.Passed ? "Passed" : "Failed");
             
             await writer.WriteStartElementAsync(null, "UnitTestResult", null);
             await writer.WriteAttributeStringAsync(null, "testId", null, testId.ToString());
             await writer.WriteAttributeStringAsync(null, "executionId", null, executionId.ToString());
             await writer.WriteAttributeStringAsync(null, "testName", null, test.Name);
             await writer.WriteAttributeStringAsync(null, "computerName", null, Environment.MachineName);
-            await writer.WriteAttributeStringAsync(null, "duration", null, 
-                TimeSpan.FromMilliseconds(test.DurationMs).ToString(@"hh\:mm\:ss\.fffffff"));
+            // A test with no recorded timing has no duration and no end time (both optional in TRX), never 00:00:00.
+            if (test.DurationMs is { } durationMs)
+            {
+                await writer.WriteAttributeStringAsync(null, "duration", null,
+                    TimeSpan.FromMilliseconds(durationMs).ToString(@"hh\:mm\:ss\.fffffff"));
+            }
             await writer.WriteAttributeStringAsync(null, "startTime", null, report.StartTime.ToString("O"));
-            await writer.WriteAttributeStringAsync(null, "endTime", null, 
-                report.StartTime.AddMilliseconds(test.DurationMs).ToString("O"));
+            if (test.DurationMs is { } elapsedMs)
+            {
+                await writer.WriteAttributeStringAsync(null, "endTime", null,
+                    report.StartTime.AddMilliseconds(elapsedMs).ToString("O"));
+            }
             await writer.WriteAttributeStringAsync(null, "outcome", null, outcome);
             await writer.WriteAttributeStringAsync(null, "testListId", null, testListId.ToString());
             
@@ -160,10 +177,12 @@ public class TrxExporter : IResultExporter
             {
                 await writer.WriteStartElementAsync(null, "StdOut", null);
                 var stdout = new StringBuilder();
-                stdout.AppendLine($"Score: {test.Score:F1}/100");
+                stdout.AppendLine(test.NotMeasured ? "Score: n/a (not measured)"
+                    : test.Score is { } testScore ? string.Create(CultureInfo.InvariantCulture, $"Score: {testScore:F1}/100")
+                    : "Score: n/a (no score)");
                 foreach (var (metric, score) in test.MetricScores)
                 {
-                    stdout.AppendLine($"{metric}: {score:F1}");
+                    stdout.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{metric}: {score:F1}"));
                 }
                 foreach (var (metric, reason) in test.MetricsNotMeasured)
                 {
@@ -177,12 +196,14 @@ public class TrxExporter : IResultExporter
                 await writer.WriteEndElementAsync();
             }
             
-            // ErrorInfo for failures
-            if (!test.Passed && !test.Skipped)
+            // ErrorInfo for failures and for tests that produced no verdict
+            if (test.NotMeasured || (!test.Passed && !test.Skipped))
             {
                 await writer.WriteStartElementAsync(null, "ErrorInfo", null);
-                await writer.WriteElementStringAsync(null, "Message", null, 
-                    test.Error ?? $"Score {test.Score:F1} below threshold");
+                await writer.WriteElementStringAsync(null, "Message", null,
+                    test.Error ?? (test.NotMeasured ? "Not measured: the test produced no verdict."
+                        : test.Score is { } failedScore ? string.Create(CultureInfo.InvariantCulture, $"Score {failedScore:F1} below threshold")
+                        : "Failed (no score)"));
                 if (!string.IsNullOrEmpty(test.StackTrace))
                 {
                     await writer.WriteElementStringAsync(null, "StackTrace", null, test.StackTrace);

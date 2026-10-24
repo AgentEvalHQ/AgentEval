@@ -11,10 +11,10 @@ const ids = JSON.parse(process.argv[3]);
 const pages = [
   { path: '/', expect: [ids.subjectName] },
   { path: '/subjects', expect: [ids.subjectName] },
-  // The heading renders with 0 runs too: the count must be at least 1.
-  { path: `/subjects/${ids.subjectKind}/${ids.subjectName}`, expect: [ids.subjectName], patterns: [/Score over time \([1-9][0-9]* runs?\)/] },
+  // Whole-run scalars do not establish a shared metric/scale. Raw history must still link to the fixture run.
+  { path: `/subjects/${ids.subjectKind}/${ids.subjectName}`, expect: [ids.subjectName, 'Score charts unavailable', 'Recent runs'], links: [`/runs/${ids.runId}`] },
   { path: '/runs', expect: [ids.subjectName], links: [`/runs/${ids.runId}`] },
-  { path: `/runs/${ids.runId}`, expect: ['Not measured', ids.runId], links: ['/scenarios/'], followScenario: true },
+  { path: `/runs/${ids.runId}`, expect: [ids.runId], links: ['/scenarios/'], measuredScenario: true, followScenario: true },
   { path: `/runs/${ids.runId}/trace`, expect: ['search-flights'] },
   // The empty state names a regulation too ("agenteval bench gdpr"): the list must link to the regulation's matrix.
   { path: '/compliance', expect: [ids.regulation], links: [`/compliance/${ids.regulation}`] },
@@ -70,6 +70,13 @@ async function visit(path, page_) {
   }
   for (const link of page_.links ?? []) {
     if ((await page.locator(`main a[href*="${link}"]`).count()) === 0) problems.push(`no link to ${link}`);
+  }
+  if (page_.measuredScenario) {
+    // SeedNormalRunAsync records s-1 as measured 0.87/PASS; keep the score tied to that actual row.
+    const row = page.locator('main tbody tr').filter({ hasText: 'Plan trip 1' });
+    const cells = await row.locator('td').allTextContents();
+    if (cells[1]?.trim() !== 's-1' || cells[2]?.trim() !== '0.87' || cells[4]?.trim() !== 'PASS')
+      problems.push('fixture scenario s-1 must show measured score 0.87 and PASS');
   }
   if (page_.cells) {
     const glyphs = await page.locator('button[aria-label*=", status "]').evaluateAll(bs => bs.map(b => b.innerText.trim()));

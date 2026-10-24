@@ -65,7 +65,7 @@ public class AgenticSummaryBuilderTests
         Assert.DoesNotContain("agentic-process", summary.PerEvaluator.Keys);
 
         // Evaluator scores are carried through verbatim.
-        Assert.Equal(0.60, summary.PerEvaluator["task_completion"].Score, 6);
+        Assert.Equal(0.60, summary.PerEvaluator["task_completion"].Score!.Value, 6);
     }
 
     [Fact]
@@ -89,8 +89,8 @@ public class AgenticSummaryBuilderTests
         // system-outcome holds {0.60, 0.90, 0.30, 0.50, 0.70} → true mean 0.60.
         // The old pairwise re-average ((((0.6+0.9)/2+0.3)/2+0.5)/2+0.7)/2 ≈ 0.55 and
         // overwrite-collapse (0.70, last writer) would both be wrong.
-        Assert.Equal(0.60, summary.PerCategory["system-outcome"].Score, 6);
-        Assert.Equal(0.80, summary.PerCategory["agentic-process"].Score, 6);
+        Assert.Equal(0.60, summary.PerCategory["system-outcome"].Score!.Value, 6);
+        Assert.Equal(0.80, summary.PerCategory["agentic-process"].Score!.Value, 6);
     }
 
     // ── BUG-27: synthetic-category roll-up must be order-independent ───────────
@@ -121,8 +121,8 @@ public class AgenticSummaryBuilderTests
         var asc = new AgenticSummaryBuilder().Build(ascending).PerCategory["system-outcome"].Score;
         var desc = new AgenticSummaryBuilder().Build(descending).PerCategory["system-outcome"].Score;
 
-        Assert.Equal(0.60, asc, 6);
-        Assert.Equal(asc, desc, 6); // identical regardless of order
+        Assert.Equal(0.60, asc!.Value, 6);
+        Assert.Equal(asc!.Value, desc!.Value, 6); // identical regardless of order
     }
 
     // ── Genuine category layer (L1 node keyed by a known category) still works ─
@@ -143,7 +143,7 @@ public class AgenticSummaryBuilderTests
 
         // The grouping node defines the category; its child evaluators populate perEvaluator.
         Assert.Single(summary.PerCategory);
-        Assert.Equal(0.65, summary.PerCategory["system-outcome"].Score, 6);
+        Assert.Equal(0.65, summary.PerCategory["system-outcome"].Score!.Value, 6);
         Assert.Equal(2, summary.PerEvaluator.Count);
         Assert.Contains("task_completion", summary.PerEvaluator.Keys);
         Assert.DoesNotContain("system-outcome", summary.PerEvaluator.Keys);

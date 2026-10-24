@@ -3,8 +3,8 @@
   "key": "cost",
   "name": "Telemetry: Cost",
   "category": "operational",
-  "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget.",
+  "version": "1.1.0",
+  "description": "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget. A cost that was not tracked (EstimatedCostUsd null) is not measured: the result is skipped, never scored as $0. Negative or non-finite costs return an error without a measurement; measured zero remains valid.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.8,
@@ -13,7 +13,7 @@
       "kind": "metadata",
       "key": "agentic_telemetry",
       "required": true,
-      "description": "AgenticTelemetry record with EstimatedCost."
+      "description": "AgenticTelemetry record with EstimatedCostUsd (null when the cost was not tracked)."
     }
   ],
   "recommendedVisualization": "stackedBar",

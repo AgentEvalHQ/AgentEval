@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -18,10 +17,11 @@ public static class TripPlannerWorkflow
     /// <summary>
     /// Builds the workflow and returns it together with the ordered executor IDs.
     /// </summary>
-    public static (Workflow Workflow, string[] ExecutorIds) Create()
+    /// <param name="build">Optional builder used by evaluation hosts to attach owned instrumentation.</param>
+    public static (Workflow Workflow, string[] ExecutorIds) Create(Func<WorkflowBuilder, Workflow>? build = null)
     {
-        var azureClient = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var chatClient  = azureClient.GetChatClient(Config.Model).AsIChatClient();
+        // One chat client on the configured provider, shared by all four agents.
+        var chatClient = Config.CreateChatClient();
 
         // ── Create agents ────────────────────────────────────────────────────
         var tripPlanner       = TripPlannerAgentFactory.Create(chatClient);
@@ -36,14 +36,14 @@ public static class TripPlannerWorkflow
         var presenterExecutor         = presenter.BindAsExecutor(emitEvents: true);
 
         // ── Wire sequential pipeline ─────────────────────────────────────────
-        var workflow = new WorkflowBuilder(tripPlannerExecutor)
+        var workflowBuilder = new WorkflowBuilder(tripPlannerExecutor)
             .AddEdge(tripPlannerExecutor, flightReservationExecutor)
             .AddEdge(flightReservationExecutor, hotelReservationExecutor)
             .AddEdge(hotelReservationExecutor, presenterExecutor)
             .WithOutputFrom(presenterExecutor)
             .WithName("TripPlanner")
-            .WithDescription("Trip planning pipeline: plan → flights → hotels → present")
-            .Build();
+            .WithDescription("Trip planning pipeline: plan → flights → hotels → present");
+        var workflow = build is null ? workflowBuilder.Build() : build(workflowBuilder);
 
         return (workflow, ["TripPlanner", "FlightReservation", "HotelReservation", "Presenter"]);
     }

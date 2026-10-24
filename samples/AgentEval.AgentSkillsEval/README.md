@@ -3,7 +3,7 @@
 A live sample for evaluating **MAF Agent Skills** (GA'd 2026-07-07) with AgentEval — Phase 1 of the
 Agent Skills evaluation work described in [`docs/agent-skills.md`](../../docs/agent-skills.md).
 
-Runs a **real** `ChatClientAgent` against Azure OpenAI, wrapped with a **real**
+Runs a **real** `ChatClientAgent` against the configured chat provider, wrapped with a **real**
 `Microsoft.Agents.AI.AgentSkillsProvider` over a real file-based skill fixture
 (`skills/expense-report/`), and asserts on the **real** tool-call trace — no scripted fakes, no
 fabricated success. Demonstrates:
@@ -16,9 +16,9 @@ fabricated success. Demonstrates:
 
 ## Scope
 
-**Phase 1 only** — assertions + metric + this sample. The design doc's Phase 2 (skill-compliance
-scanner) and Phase 3 (skill-description-injection red-team + `run_skill_script` governance gates)
-are not implemented yet; see the design doc for that roadmap.
+The seven runs cover assertions and disclosure efficiency, compliance scanning, skill-description
+injection with an advisory shadow judge, script execution gates, and the health/security index with
+manifest drift detection. See [`docs/agent-skills.md`](../../docs/agent-skills.md) for their scope and limits.
 
 ## The skill fixture
 
@@ -37,16 +37,42 @@ the $150 dinner cap).
 
 ## Run it
 
-Requires Azure OpenAI credentials — this sample runs a **real** agent and will not fake a run:
+Requires a configured chat provider — this sample runs a **real** agent and will not fake a run.
+It uses the main samples' `AI_INFERENCE_PROVIDER` selector. An explicit missing or invalid selection
+does not fall back to another provider. With no selector, auto-detection tries Azure, Bitdeer,
+OpenAI, Foundry, then OpenAI-compatible.
 
-```bash
+| Selector | Variables |
+| --- | --- |
+| `azure` | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` |
+| `bitdeer` | `BITDEER_API_KEY`; optional `BITDEER_ENDPOINT`, `BITDEER_MODEL` |
+| `openai` | `OPENAI_API_KEY`; optional `OPENAI_BASE_URL`, `OPENAI_MODEL` |
+| `foundry` | `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL` (Azure OpenAI protocol) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT`, `OPENAI_COMPATIBLE_MODEL`; optional `OPENAI_COMPATIBLE_API_KEY` |
+
+For example, in PowerShell:
+
+```powershell
+$env:AI_INFERENCE_PROVIDER = 'bitdeer'
+$env:BITDEER_API_KEY = '<your-key>'
+dotnet run --project samples/AgentEval.AgentSkillsEval
+```
+
+Azure configurations continue to work (Windows Command Prompt):
+
+```bat
+set AI_INFERENCE_PROVIDER=azure
 set AZURE_OPENAI_ENDPOINT=https://<your>.openai.azure.com/
 set AZURE_OPENAI_API_KEY=<your-key>
 set AZURE_OPENAI_DEPLOYMENT=gpt-4o
 dotnet run --project samples/AgentEval.AgentSkillsEval
 ```
 
-It prints three runs, each a different real assertion/output combination:
+Use models that support tool calls. The banner identifies the selected provider/model; model capability
+and live behavior still depend on that provider. Missing configuration exits **11** (not measured),
+and a missing required skill fixture exits **3** (runtime error).
+
+The first three runs show different real assertion/output combinations:
 
 1. **Read-only policy lookup** — expects `load_skill` → `read_skill_resource`, no script.
 2. **Script-computed overage** — expects `load_skill` → `run_skill_script` (a real `run_skill_script` call).
@@ -54,8 +80,9 @@ It prints three runs, each a different real assertion/output combination:
    pass (no skill tools called ⇒ nothing to measure) **and** a deliberately-asserted `HaveLoadedSkill`
    check that is expected to FAIL — printed in full, never swallowed, never a false pass.
 
-Every run prints the real captured tool-call trace before any assertion runs, so the trace is always
-the ground truth for what's reported — never an assumption.
+Runs 4–7 add the compliance scan, injection probe, script gate, and security index/drift check.
+The agent runs print their captured tool-call traces; the static checks report the fixture evidence
+they inspect. The injection judge is advisory, as the console explains.
 
 ## Verified against the live MAF 1.13.0 assembly (this session)
 

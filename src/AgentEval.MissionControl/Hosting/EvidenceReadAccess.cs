@@ -32,8 +32,7 @@ internal static class EvidenceReadAccess
         if (options is null) return;
         app.Use(async (context, next) =>
         {
-            if (!context.Request.Path.StartsWithSegments("/graphql") &&
-                !context.Request.Path.StartsWithSegments("/api/v1/evidence")) { await next(context); return; }
+            if (!IsEvidenceRead(context.Request.Path)) { await next(context); return; }
             context.Response.Headers.CacheControl = "no-store";
             if (Status(context, options) is { } status)
             {
@@ -44,6 +43,14 @@ internal static class EvidenceReadAccess
             await next(context);
         });
     }
+
+    private static bool IsEvidenceRead(PathString path) =>
+        path.StartsWithSegments("/graphql") || path.StartsWithSegments("/api/v1/evidence") ||
+        path.StartsWithSegments("/api/v1/runs") ||
+        (path.StartsWithSegments("/api/v1/compliance") &&
+            path.Value!.TrimEnd('/').EndsWith("/report.pdf", StringComparison.OrdinalIgnoreCase)) ||
+        (path.StartsWithSegments("/api/v1/subjects") &&
+            path.Value!.TrimEnd('/').EndsWith("/history", StringComparison.OrdinalIgnoreCase));
 
     private static int? Status(HttpContext context, EvidenceReadAccessOptions options)
     {

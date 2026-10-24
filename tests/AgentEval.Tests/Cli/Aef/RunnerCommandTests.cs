@@ -113,6 +113,22 @@ public sealed class RunnerCommandTests : IDisposable
         foreach (var run in report["runs"]!.AsArray())
             Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(Path.Combine(job, "runs", (string)run!)).Outcome);
         Assert.DoesNotContain("private-input", string.Concat(Directory.GetFiles(job, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+#if NET10_0_OR_GREATER
+        if (scenario == "sealed")
+        {
+            var source = new AgentEval.MissionControl.Services.WorkspaceRunSource(
+                new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")),
+                new AgentEval.Results.Adapters.Reading.AefWorkspaceEvidenceReader());
+            var catalog = await source.ReadAsync(default);
+            foreach (var saved in report["runs"]!.AsArray())
+            {
+                var directory = Path.Combine(job, "runs", (string)saved!);
+                await MissionControlProducerAssertions.ReadAsync(directory);
+                var read = new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(directory);
+                Assert.Contains(catalog, run => run.Evidence.Info.RunId == read.Info.RunId);
+            }
+        }
+#endif
     }
 
     private JsonObject CreatePlan(string endpoint)
@@ -147,7 +163,7 @@ public sealed class RunnerCommandTests : IDisposable
         if (expectedExit == 0)
         {
             Assert.Equal(1, (int)report["cases"]!);
-            Assert.Equal(2, (int)report["calls"]!["target"]!);
+            Assert.Equal(4, (int)report["calls"]!["target"]!);
             Assert.Equal(0, (int)report["calls"]!["judge"]!);
             Assert.Equal(65, (int)report["durationRange"]!["high"]!);
             Assert.True((double)report["costRange"]!["high"]! > 0);
@@ -201,8 +217,8 @@ public sealed class RunnerCommandTests : IDisposable
             environment: _ => null, home: _root, dryRun: true));
         var report = JsonNode.Parse(stdout.ToString())!;
         Assert.Equal(2, (int)report["cases"]!);
-        Assert.Equal(8, (int)report["calls"]!["target"]!);
-        Assert.Equal(10, (int)report["calls"]!["judge"]!);
+        Assert.Equal(12, (int)report["calls"]!["target"]!);
+        Assert.Equal(14, (int)report["calls"]!["judge"]!);
         Assert.Equal(130, (int)report["durationRange"]!["high"]!);
         Assert.Equal(2, report["models"]!.AsArray().Count);
         Assert.Equal(2, report["suites"]!.AsArray().Count);

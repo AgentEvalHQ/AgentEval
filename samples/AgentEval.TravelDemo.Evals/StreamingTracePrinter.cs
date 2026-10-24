@@ -45,7 +45,8 @@ public static class StreamingTracePrinter
     /// wired to console output. Pass to
     /// <c>MAFEvaluationHarness.RunEvaluationStreamingAsync(agent, testCase, streamingOptions: …)</c>.
     /// </summary>
-    public static StreamingOptions Create()
+    /// <param name="onText">Also receives each text chunk — Eval 01 keeps the answer, which the harness drops when the judge call throws.</param>
+    public static StreamingOptions Create(Action<string>? onText = null)
     {
         var lastMetricsUpdateAt = DateTimeOffset.UtcNow;
 
@@ -62,6 +63,7 @@ public static class StreamingTracePrinter
 
             OnTextChunk = chunk =>
             {
+                onText?.Invoke(chunk);
                 // Streaming response text — dimmed grey so tool events stand out.
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write(chunk);
@@ -88,7 +90,8 @@ public static class StreamingTracePrinter
                 var duration = tool.Duration is { } d
                     ? $"{d.TotalMilliseconds:F0} ms"
                     : "—";
-                Console.WriteLine($"     {status} {tool.Name} → {duration}{(tool.Exception is null ? "" : $" — {tool.Exception.Message}")}");
+                // A tool exception is printed like every other one: through Config.Redact (inner exceptions included).
+                Console.WriteLine($"     {status} {tool.Name} → {duration}{(tool.Exception is null ? "" : $" — {EvalPrinter.OneLine(Config.Redact(tool.Exception))}")}");
                 Console.ResetColor();
             },
 

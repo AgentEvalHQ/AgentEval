@@ -41,6 +41,7 @@ public static class CopilotStudioWalkthrough
         if (string.IsNullOrWhiteSpace(configPath) || !understood)
         {
             PrintMissingSetupWarning();
+            SampleOutcome.Skip("no live Copilot Studio agent: set COPILOTSTUDIO_CONFIG_PATH and COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true");
             return;
         }
 
@@ -52,6 +53,7 @@ public static class CopilotStudioWalkthrough
         catch (InvalidOperationException ex)
         {
             Console.WriteLine($"   ❌ Config error: {ex.Message}");
+            SampleOutcome.Error($"the Copilot Studio config could not be loaded: {ex.Message}");
             return;
         }
 
@@ -81,11 +83,20 @@ public static class CopilotStudioWalkthrough
         {
             await scene();
         }
+        catch (AgentEvalAssertionException ex)
+        {
+            // An assertion the scene makes did not hold: that is the check failing, not the scene being skipped.
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"   ❌ assertion failed — {ex.Message.Split('\n')[0]}");
+            Console.ResetColor();
+            SampleOutcome.Fail($"assertion failed: {ex.Message.Split('\n')[0]}");
+        }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine($"   (scene skipped — {ex.GetType().Name}: {ex.Message})");
             Console.ResetColor();
+            SampleOutcome.Error($"a scene threw {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -140,6 +151,7 @@ public static class CopilotStudioWalkthrough
         if (string.IsNullOrEmpty(firstConversationId))
         {
             Console.WriteLine("   (no conversation id observed on turn 1 — skipping the continuity assertion this run)");
+            SampleOutcome.Skip("no conversation id on turn 1, so conversation continuity was not measured");
             return;
         }
 
@@ -170,11 +182,25 @@ public static class CopilotStudioWalkthrough
             wrapChatClient: c => c.AsBuilder().UseEvalGate(post: [new RegexPiiGate()], policy: EvalGatePolicy.Redact).Build());
 
         var response = await gatedAgent.InvokeAsync("Repeat this card number back to me exactly: 4111 1111 1111 1111");
-        var masked = response.Text.Contains('█') || !response.Text.Contains("4111 1111", StringComparison.Ordinal);
+        // Three outcomes, not two: the number got through (the gate failed), the gate masked it, or the agent never
+        // echoed it (nothing for the gate to do — not a pass).
+        var leaked = response.Text.Contains("4111 1111", StringComparison.Ordinal);
+        var masked = response.Text.Contains('█');
         Console.WriteLine($"   Reply: \"{Trunc(response.Text)}\"");
-        Console.WriteLine(masked
-            ? "   ✅ card number masked/withheld — the SAME Gatekeeper gate every other IChatClient uses, unmodified for CS"
-            : "   the agent didn't echo the number this run — nothing for the gate to redact");
+        if (leaked)
+        {
+            Console.WriteLine("   ❌ the card number reached the reply unmasked");
+            SampleOutcome.Fail("Gatekeeper over Copilot Studio: the card number reached the reply unmasked");
+        }
+        else if (masked)
+        {
+            Console.WriteLine("   ✅ card number masked — the SAME Gatekeeper gate every other IChatClient uses, unmodified for CS");
+        }
+        else
+        {
+            Console.WriteLine("   the agent didn't echo the number this run — nothing for the gate to redact");
+            SampleOutcome.Skip("the agent did not echo the card number, so the redaction gate was not exercised");
+        }
     }
 
     // ── 5. Honest fidelity disclosure ──

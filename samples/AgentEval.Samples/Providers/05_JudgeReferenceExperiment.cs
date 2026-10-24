@@ -292,6 +292,7 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         if (goldenDir is null)
         {
             Warn($"Golden directory not found. Run from the repository (looked for {GoldenRelativePath}) or pass --golden DIR.");
+            SampleOutcome.Skip($"the golden directory {GoldenRelativePath} was not found");
             return;
         }
 
@@ -299,6 +300,7 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         if (!File.Exists(path))
         {
             Warn($"No golden file for '{opts.File}'. Expected {path}.");
+            SampleOutcome.Skip($"no golden file for '{opts.File}'");
             return;
         }
 
@@ -307,7 +309,7 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         {
             var loaded = await loader.LoadAsync(opts.File, stream);
             var entries = opts.Limit is { } n ? loaded.Entries.Take(n).ToList() : loaded.Entries;
-            if (entries.Count == 0) { Warn("The golden file has no entries."); return; }
+            if (entries.Count == 0) { Warn("The golden file has no entries."); SampleOutcome.Skip($"the golden file for '{opts.File}' has no entries"); return; }
             Dataset = new CalibrationDataset(opts.File, entries);
         }
 
@@ -325,13 +327,18 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         {
             Warn($"No reference text is defined for '{opts.File}'. Only the control and the baseline can run.\n" +
                  $"      Add an entry to {nameof(References)} in this file to test a new category.");
-            if (!opts.DryRun) return;
+            if (!opts.DryRun)
+            {
+                SampleOutcome.Skip($"no reference text is defined for '{opts.File}', so the reference arms cannot run");
+                return;
+            }
         }
 
         var (jevOptions, jevDiagnostic) = ResolveJev();
         if (jevOptions is null)
         {
             Warn($"No decision-model key: {jevDiagnostic}\n      Set TYPESAFE_API_KEY (or OPENROUTER_API_KEY). There is no mock path — a canned probability would measure nothing.");
+            SampleOutcome.Skip($"no decision-model key: {jevDiagnostic}");
             return;
         }
 
@@ -349,6 +356,7 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         if (opts.DryRun)
         {
             DryRun(arms, cases, jevOptions);
+            SampleOutcome.Skip("--dry-run: every payload was rendered and nothing was sent, so nothing was measured");
             return;
         }
 

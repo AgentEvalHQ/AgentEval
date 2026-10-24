@@ -140,8 +140,8 @@ public record ExecutorStep
     
     // Output and timing
     public required string Output { get; init; }         // Agent's response
-    public required TimeSpan StartOffset { get; init; }  // When step started
-    public required TimeSpan Duration { get; init; }     // Step execution time
+    public required TimeSpan StartOffset { get; init; }  // When MAF started running the step (from workflow start)
+    public required TimeSpan Duration { get; init; }     // How long MAF ran it (see "Step timing" below)
     
     // Tool usage (if agent used tools)
     public IReadOnlyList<ToolCallRecord>? ToolCalls { get; init; }
@@ -165,14 +165,83 @@ AgentEval captures these MAF workflow events:
 | MAF Event | Purpose |
 |-----------|----------|
 | `SuperStepStartedEvent` | Workflow superstep begins |
-| `ExecutorInvokedEvent` | Agent begins processing |
+| `ExecutorInvokedEvent` | A message is delivered to an executor |
 | `AgentResponseUpdateEvent` | Streaming token from LLM |
-| `ExecutorCompletedEvent` | Agent finishes processing |
+| `ExecutorCompletedEvent` | The executor finished handling that message |
 | `SuperStepCompletedEvent` | Workflow superstep ends |
 
 Events are processed by `MAFWorkflowEventBridge` into AgentEval's evaluation model.
 
+MAF raises `ExecutorInvokedEvent` once per delivered message. The bridge groups a chat executor's incoming messages with the turn that processes them, and records a second turn separately even within the same superstep. Function deliveries to one executor in a superstep form one activation. Each parallel executor owns its own text, tool calls, response usage and timing. Completed activations are displayed in the `executorIds` order supplied to `FromMAFWorkflow`, with ordinal name order for any remaining executors; actual timestamps retain the execution order and overlap.
+
+**Step timing.** Use a disposable `MAFWorkflowInstrumentation` owner to build the root and each declared child workflow. Keep it alive until all evaluations finish. It gives each built workflow a dedicated telemetry source; the bridge also assigns each evaluation its own MAF session identity. A plain `.WithOpenTelemetry()` enables observability but does not establish enough ownership for AgentEval to certify executor timing. The existing adapter entry points still execute those workflows and retain output and structural evidence, with an explicit timing-unavailable reason.
+
+```csharp
+using var timing = new MAFWorkflowInstrumentation();
+var workflow = timing.Build(new WorkflowBuilder(start).WithOutputFrom(start));
+var agent = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "Example", ["Start"]);
+var result = await agent.ExecuteWorkflowAsync("input");
+```
+
+`Build` explicitly replaces that builder's telemetry configuration; sensitive payload capture stays disabled. It builds once, preserving the workflow's normal state semantics. The bridge captures monotonic producer start/end timestamps. A step spans its first delivery through its final completion, including waits between accumulated chat input and the turn token, or a request and its response. Declared nested hosts include their child intervals. Parallel siblings retain their own intervals regardless of display order or event-queue delays.
+
+**Execution boundary and partial evidence.** Work triggered by the evaluated workflow belongs to that execution, including external and nested operations. Membership does not make a child's duration interchangeable with its parent's. The parent's elapsed time includes awaited child work; parallel durations need not sum to whole-run elapsed time. Whole-workflow elapsed time remains measured even if individual step or tool timing is unavailable. Retain observed output, call/result identity and known completion independently of timing. Missing or ambiguous timing is not zero and cannot satisfy a duration assertion; both workflow tool-assertion builders fail validation with an explanation. The general tool-usage assertion API retains its existing inconclusive behavior. Queued event arrival timestamps alone are not producer execution durations.
+
+The adapter preserves the caller's telemetry configuration. Unregistered telemetry sources, missing producer evidence or an unfinished span produce `TimingNotMeasuredReason`; executor budgets cannot pass on that missing evidence. MAF's convenience agent-workflow builders return workflows without these spans enabled, so their executor timing is unavailable. Event arrival timestamps cannot establish executor runtime: the producer can finish while its consumer is paused. Custom AgentEval event sources retain their existing explicit or arrival timing contract.
+
+Parallel steps are timed to each executor's own completion. Recorded fan-out branches carry their actual executor IDs and timing; siblings do not create an edge between each other merely because their events arrived consecutively. `HaveParallelExecution` requires at least two distinct branch IDs on recorded steps; `HaveParallelBranchCount` counts those IDs, including after trace replay. Declaring a fan-out or selecting only one target does not satisfy the parallel-execution assertion. Incoming edges use reflected topology and observed deliveries. At a join, matching message IDs or an unambiguous return value identify the sender. Collection payloads retain their whole-message identity as well as member matching, so older array-valued barrier inputs keep their source activation. If equal payloads could come from several conditional sources, the bridge leaves the incoming traversal unrecorded rather than guessing which condition passed. A senderless turn token also cannot identify one of several incoming edges.
+
+MAF's fan-in barrier releases individual messages; it does not aggregate them into an array. With agent chat protocols, it can leave message accumulation waiting for another token. The recorder preserves each observed turn and any remaining accumulation separately; the latter does not erase the last produced output. Use ordinary incoming edges when each upstream agent should trigger its own turn. The barrier's message-routing behavior is controlled by MAF.
+
+An unequal-depth barrier can retain source messages across supersteps, including messages from several activations of the same source. Matching payload evidence keeps every identifiable contributing activation attached to the eventual join; consumed evidence is not reused for a later barrier cycle. Repeated turns or trailing accumulation on one selected fan-out target retain that target's branch identity for the same source activation.
+
+A step whose invocation, completion or agent turn was not observed carries `TimingNotMeasuredReason`. `ForExecutor(...).HaveCompletedWithin(...)` fails with "time not measured" and the reason, regardless of the numeric duration placeholder. Measured zero durations remain valid. Trace recording/replay and JSON exports retain the reason; per-executor trace totals omit any executor with unmeasured activations. Custom sources without an explicit missing-timing reason keep arrival timing.
+
+**Tool evidence and replay.** A requested tool is retained even when no result arrives. Only an observed result sets `WasExecuted`, including a legitimate null result. Workflow trace JSON retains that execution marker and the call ID; replay preserves unknown completion timing. Legacy traces without the marker keep execution unconfirmed. Workflow JSON exports also include `WasExecuted`. The queued MAF bridge sets `ExecutorToolCallEvent.HasTiming` to false even for paired results: executor spans do not measure individual tools. With timing unavailable, general `ToolUsage.Should()` duration assertions are inconclusive, while workflow-wide and executor-scoped tool-duration validation fails; exports omit tool durations. Custom sources with actual tool-boundary measurements retain `HasTiming = true` (the compatibility default).
+
+Timeline invocations carry `OutcomeNotMeasuredReason` and `TimingNotMeasuredReason`. Unknown outcomes are excluded from success/failure counts; unknown durations are excluded from timing statistics. Numeric duration aggregates summarize only the measured subset, so check `UnmeasuredDurationCount` before treating them as complete. The text timeline and Microsoft logging name unavailable values and their reasons. When a timeline supplies a `TestResult`'s evaluation input, an explicit unknown outcome retains the `__tool_not_executed__:` marker and reason rather than becoming a tool error. **Upgrade:** `ToolStatistics.SuccessRate` is now `double?`, calculated over observed outcomes; it is null when every recorded outcome is unmeasured. Check for null when formatting or comparing it. Existing directly constructed timeline entries without missing-measurement markers retain their prior interpretation.
+
+Workflow trace JSON stores observed traversals separately from declared topology, including edge IDs, source/target activation indices, routing evidence and exact traversal time. Recording and replay preserve traversal assertions through loops. Old traces without observed traversals leave that collection absent; legacy step edges without activation indices replay with index `-1`, rather than inventing an association with step zero.
+
+### Agent-builder recording contracts
+
+The offline test suite executes the real MAF builders using scripted chat clients. Orchestration executors remain visible as steps:
+
+| Builder | Recorded infrastructure | Agent-turn contract |
+|---|---|---|
+| Sequential | `OutputMessages` | One turn per agent in chain order; terminal output contains the produced messages. |
+| Concurrent | `Start`, `Batcher/<agent>`, `ConcurrentEnd` | Each selected agent owns its turn and branch; batchers feed the fan-in. Display order follows configured names, while terminal message order may follow arrival order. |
+| Handoff | `HandoffStart`, `HandoffEnd` | The actual handoff tool request selects the next agent. MAF exposes selector edges as fan-outs in reflected topology; one selected successor does not count as parallel execution. Tool-only messages can contribute empty lines to rendered terminal output. |
+| Group chat | `GroupChatHost` between participant turns | The manager chooses the speaker and termination. Actual agent turns stay separate, including a participant speaking again. |
+
+MAF registers `GroupChatHost` through a factory typed as the base `Executor`, hiding its chat-protocol type from static binding reflection. Its message and turn-token deliveries may therefore appear as adjacent orchestration activations when scheduling puts them in separate supersteps. Its recorded duration describes those deliveries, not the whole group conversation; use participant step budgets for agent work and the workflow timeout for the conversation. The tests allow this infrastructure scheduling variation while checking exact participant turns, outputs, observed edges, edge-to-step indexes and measured agent timing.
+
+The shape suite also covers direct function/agent chains and loops, fan-out, ordinary and barrier fan-in, nested workflows and request/response ports. The explicit routing and nested-host limits described here are tested; unsupported or unmeasured behavior is not certified as a successful measurement.
+
+### Nested workflows and external answers
+
+Nested executor steps use paths such as `Sub/A` and `Sub/B`. Supply those paths in `executorIds` to choose display names and ordering. The host starts with its input and runs through its observed children; its queueing call alone is not its duration. Nested results are buffered until the stream finishes so a host can precede its children while retaining the full interval. Incomplete children or an interrupted stream leave the host's timing not measured. Nested agent inputs receive the chat protocol's turn token, and forwarded agent events are attributed using their agent ID so child text, tool calls and usage stay with the child.
+
+MAF flattens child events without their parent scope. Raw executor IDs must therefore be unique across the workflow tree; duplicate IDs are rejected before execution. Nested agent output must identify one bound agent within its host. MAF also cannot forward input through a host whose entry is directly another catch-all host; add an entry executor with an explicit input type inside that workflow. Multi-level nesting with concrete entry executors is supported.
+
+Use the responder overload to answer a request during execution:
+
+```csharp
+var adapter = MAFWorkflowAdapter.FromMAFWorkflow(
+    workflow, "approval workflow", ["Approval", "Processor"], workflowType: null,
+    requestResponder: (request, cancellationToken) =>
+        ValueTask.FromResult<ExternalResponse?>(request.CreateResponse("approved")));
+```
+
+The callback receives the original request and run cancellation token. Return `null` to decline; a declined, failed or mismatched response fails the run with the request and port identity. The original four-argument overload remains available. The answer completes the existing port activation, including time spent waiting, and its payload becomes the port's output; it does not create a self-loop. Subsequent genuine requests are separate activations.
+
+For a request inside a subworkflow, MAF forwards an `ExternalRequest` message from its host. Configure an outer request port to receive that wrapped message and route its `ExternalResponse` back to the host. Use type-filtering predicates (`request => request is not null`, `response => response is not null`) so normal host output is not routed as another request. The callback sees the outer port's request. A nested request with no relay fails promptly with the child port name and setup guidance.
+
 ### Timeout Handling
+
+An executor yielding a workflow output does not complete the run. AgentEval continues recording until the MAF event stream ends, preserving later steps, repeated yields and errors. For MAF's sequential and concurrent agent builders, chat-list output is rendered as message text separated by newlines; the original input message is excluded by identity, so a new reply with identical text is retained.
+
+If the event stream ends on cancellation, the adapter propagates cancellation. The harness reports its own timeout as a failed test and propagates caller cancellation. An unanswered request port returns a workflow error naming its port and request ID; the request envelope is not an executor answer.
 
 MAF workflows may not honor cancellation tokens during active LLM calls. AgentEval implements a **hard timeout pattern** in critical samples:
 

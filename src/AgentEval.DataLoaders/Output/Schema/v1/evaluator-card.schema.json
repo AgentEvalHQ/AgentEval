@@ -81,7 +81,7 @@
         "properties": {
           "kind": {
             "type": "string",
-            "enum": ["metadata", "query", "response", "context", "toolCalls", "systemMessage", "groundTruth"]
+            "enum": ["metadata", "query", "response", "context", "toolCalls", "systemMessage", "groundTruth", "expectedActions"]
           },
           "key": {
             "type": "string"

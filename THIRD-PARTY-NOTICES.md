@@ -2,6 +2,8 @@
 
 AgentEval is licensed under the MIT License (see [LICENSE](LICENSE)). The published packages depend on, or redistribute, the third-party packages listed below. Each is used under its own licence.
 
+One part of AgentEval itself has a different licence: the AEF evidence format in `contracts/aef/` is under the Apache License 2.0 (see `contracts/aef/LICENSE` and `contracts/aef/NOTICE`). `AgentEval.Cli` embeds the AEF schemas, so its package is licensed `MIT AND Apache-2.0` and carries both files in `licenses/aef/`. The `AgentEval` library package does not contain AEF and stays MIT.
+
 This file is packed at the root of both published NuGet packages, `AgentEval` and `AgentEval.Cli`, so it travels with the binaries. The licence texts that must accompany redistributed copies are reproduced in [Licence texts](#licence-texts) at the end.
 
 How this list was made: the package lists come from each packable project's `PackageReference` items, the project references it builds on, and the dependency graph NuGet restores for it (`obj/project.assets.json`), for the versions pinned in `Directory.Packages.props`. Each licence was read from that package version's `.nuspec` in the local NuGet cache (the `<license>` element, or `<licenseUrl>` where there is no `<license>`). Last checked: 2026-10-02.

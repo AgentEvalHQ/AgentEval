@@ -12,18 +12,11 @@ public class DistributionStatisticsFactoryTests
     #region Create(IReadOnlyList<double>)
 
     [Fact]
-    public void Create_EmptyDoubleList_ReturnsZeroDistribution()
+    public void Create_EmptyDoubleList_ReturnsNull()
     {
         var result = DistributionStatisticsFactory.Create(Array.Empty<double>());
 
-        Assert.Equal(0, result.Min);
-        Assert.Equal(0, result.Max);
-        Assert.Equal(0, result.Mean);
-        Assert.Equal(0, result.Median);
-        Assert.Equal(0, result.Percentile25);
-        Assert.Equal(0, result.Percentile75);
-        Assert.Equal(0, result.Percentile95);
-        Assert.Equal(0, result.SampleSize);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -31,6 +24,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 42.0 });
 
+        Assert.NotNull(result);
         Assert.Equal(42.0, result.Min);
         Assert.Equal(42.0, result.Max);
         Assert.Equal(42.0, result.Mean);
@@ -47,6 +41,7 @@ public class DistributionStatisticsFactoryTests
         // Deliberately unsorted; sorted = [1,2,3,4,5], n=5.
         var result = DistributionStatisticsFactory.Create(new[] { 3.0, 1.0, 4.0, 5.0, 2.0 });
 
+        Assert.NotNull(result);
         Assert.Equal(1.0, result.Min);
         Assert.Equal(5.0, result.Max);
         Assert.Equal(3.0, result.Mean);
@@ -61,6 +56,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 1.0, 2.0, 3.0, 4.0 });
 
+        Assert.NotNull(result);
         Assert.Equal(2.5, result.Median);
         Assert.Equal(1.0, result.Min);
         Assert.Equal(4.0, result.Max);
@@ -73,6 +69,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 1.0, 2.0, 3.0, 4.0, 5.0 });
 
+        Assert.NotNull(result);
         Assert.Equal(3.0, result.Median);
         Assert.Equal(1.0, result.Min);
         Assert.Equal(5.0, result.Max);
@@ -85,6 +82,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 5.0, 1.0, 3.0, 2.0, 4.0 });
 
+        Assert.NotNull(result);
         Assert.Equal(1.0, result.Min);
         Assert.Equal(5.0, result.Max);
         Assert.Equal(3.0, result.Mean);
@@ -98,6 +96,7 @@ public class DistributionStatisticsFactoryTests
         var values = Enumerable.Range(1, 10).Select(i => (double)(i * 10)).ToList();
         var result = DistributionStatisticsFactory.Create(values);
 
+        Assert.NotNull(result);
         Assert.Equal(10.0, result.Min);
         Assert.Equal(100.0, result.Max);
         Assert.Equal(55.0, result.Mean);
@@ -124,6 +123,7 @@ public class DistributionStatisticsFactoryTests
 
         var result = DistributionStatisticsFactory.Create(values);
 
+        Assert.NotNull(result);
         Assert.Equal(100.0, result.Min);
         Assert.Equal(300.0, result.Max);
         Assert.Equal(200.0, result.Mean);
@@ -131,12 +131,11 @@ public class DistributionStatisticsFactoryTests
     }
 
     [Fact]
-    public void Create_EmptyTimeSpanList_ReturnsZeroDistribution()
+    public void Create_EmptyTimeSpanList_ReturnsNull()
     {
         var result = DistributionStatisticsFactory.Create(Array.Empty<TimeSpan>());
 
-        Assert.Equal(0, result.SampleSize);
-        Assert.Equal(0, result.Mean);
+        Assert.Null(result);
     }
 
     #endregion
@@ -148,6 +147,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 10, 20, 30 });
 
+        Assert.NotNull(result);
         Assert.Equal(10.0, result.Min);
         Assert.Equal(30.0, result.Max);
         Assert.Equal(20.0, result.Mean);
@@ -155,11 +155,11 @@ public class DistributionStatisticsFactoryTests
     }
 
     [Fact]
-    public void Create_EmptyIntList_ReturnsZeroDistribution()
+    public void Create_EmptyIntList_ReturnsNull()
     {
         var result = DistributionStatisticsFactory.Create(Array.Empty<int>());
 
-        Assert.Equal(0, result.SampleSize);
+        Assert.Null(result);
     }
 
     #endregion
@@ -171,6 +171,7 @@ public class DistributionStatisticsFactoryTests
     {
         var result = DistributionStatisticsFactory.Create(new[] { 1.5m, 2.5m, 3.5m });
 
+        Assert.NotNull(result);
         Assert.Equal(1.5, result.Min);
         Assert.Equal(3.5, result.Max);
         Assert.Equal(2.5, result.Mean);
@@ -178,11 +179,11 @@ public class DistributionStatisticsFactoryTests
     }
 
     [Fact]
-    public void Create_EmptyDecimalList_ReturnsZeroDistribution()
+    public void Create_EmptyDecimalList_ReturnsNull()
     {
         var result = DistributionStatisticsFactory.Create(Array.Empty<decimal>());
 
-        Assert.Equal(0, result.SampleSize);
+        Assert.Null(result);
     }
 
     #endregion
@@ -197,6 +198,8 @@ public class DistributionStatisticsFactoryTests
         var factoryResult = DistributionStatisticsFactory.Create(values);
         var calcResult = StatisticsCalculator.CreateDistribution(values);
 
+        Assert.NotNull(calcResult);
+        Assert.NotNull(factoryResult);
         Assert.Equal(calcResult.Min, factoryResult.Min);
         Assert.Equal(calcResult.Max, factoryResult.Max);
         Assert.Equal(calcResult.Mean, factoryResult.Mean);

@@ -34,14 +34,20 @@ public class MemoryBaseline
     /// <summary>Benchmark execution metadata.</summary>
     public required BenchmarkExecutionInfo Benchmark { get; init; }
 
-    /// <summary>Overall score (0-100).</summary>
+    /// <summary>Stored overall score (0-100). Consult IsComplete and HasMeasuredScore before treating it as a full-run result.</summary>
     public required double OverallScore { get; init; }
 
-    /// <summary>Letter grade (A/B/C/D/F).</summary>
+    /// <summary>Grade computed from the stored score for compatibility. A run grade is established only when IsComplete is true.</summary>
     public required string Grade { get; init; }
 
-    /// <summary>Star rating (1-5).</summary>
+    /// <summary>Stars computed from the stored score for compatibility. A run rating is established only when IsComplete is true.</summary>
     public required int Stars { get; init; }
+
+    /// <summary>Whether the run measured its applicable workload completely. Null means older or other producers did not record completeness.</summary>
+    public bool? IsComplete { get; init; }
+
+    /// <summary>Whether OverallScore contains an observation rather than an empty-run placeholder. Null means availability was not recorded.</summary>
+    public bool? HasMeasuredScore { get; init; }
 
     /// <summary>Per-category results keyed by category name (e.g., "Basic Retention").</summary>
     public required Dictionary<string, CategoryScoreEntry> CategoryResults { get; init; }

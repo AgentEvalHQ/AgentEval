@@ -99,6 +99,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         var sw = Stopwatch.StartNew();
         var chunks = new List<TraceStreamChunk>();
         var updates = new List<ChatResponseUpdate>();
+        long? inputTokens = 0, outputTokens = 0;
         var idx = 0;
         var errorRecorded = false;
         var completedNaturally = false;
@@ -128,6 +129,15 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
                 }
 
                 updates.Add(cur);
+                // Validate each additive contribution before ToChatResponse can fold invalid counts
+                // into a plausible total. Missing chunk components may arrive in later chunks.
+                foreach (var usage in cur.Contents.OfType<UsageContent>())
+                {
+                    if (usage.Details.InputTokenCount is { } input)
+                        inputTokens = Core.TokenUsageMapping.Add(inputTokens, input);
+                    if (usage.Details.OutputTokenCount is { } output)
+                        outputTokens = Core.TokenUsageMapping.Add(outputTokens, output);
+                }
                 if (!string.IsNullOrEmpty(cur.Text))
                 {
                     chunks.Add(new TraceStreamChunk { Index = idx++, Text = cur.Text });
@@ -155,7 +165,8 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
                 _trace.ModelId ??= resp.ModelId;
                 var responseEntry = TraceEntry.ForChatResponse(
                     i, corr, resp.Text, sw.ElapsedMilliseconds,
-                    MapUsage(resp.Usage), MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
+                    completedNaturally && inputTokens is not null && outputTokens is not null ? MapUsage(resp.Usage) : null,
+                    MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
                 responseEntry.IsStreaming = true;
                 responseEntry.StreamingChunks = chunks;
                 _trace.AddEntry(responseEntry);
@@ -172,8 +183,8 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         _trace.Performance = new TracePerformance
         {
             TotalDurationMs = responses.Sum(r => r.DurationMs ?? 0),
-            TotalPromptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0),
-            TotalCompletionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0),
+            TotalPromptTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.PromptTokens ?? 0)),
+            TotalCompletionTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.CompletionTokens ?? 0)),
             CallCount = responses.Count,
             ToolCallCount = responses.Sum(r => r.ToolCalls?.Count ?? 0),
         };

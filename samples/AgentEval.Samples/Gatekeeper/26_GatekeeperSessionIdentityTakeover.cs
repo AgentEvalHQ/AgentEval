@@ -154,7 +154,7 @@ public static class GatekeeperSessionIdentityTakeover
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Session-identity sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Session-identity sample failed: " + message + ".");
         }
     }
 }

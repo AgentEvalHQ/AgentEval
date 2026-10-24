@@ -34,6 +34,7 @@ const MATRIX_QUERY = /* GraphQL */ `
       controls { id title }
       cells {
         subjectName
+        subjectKind
         controlId
         status
         passRate
@@ -122,7 +123,7 @@ export function ComplianceMatrixPage() {
                 subjects={m.subjects}
                 controls={m.controls}
                 cells={m.cells}
-                onCellClick={(subjectName, controlId) => {
+                onCellClick={(subjectName, controlId, kind) => {
                   // Drill into the evidence record that backs THIS specific
                   // cell — finding by both subjectName + controlId ensures we
                   // navigate to the evidence the user actually clicked, not
@@ -130,10 +131,10 @@ export function ComplianceMatrixPage() {
                   // for the same subject may live in distinct evidence files
                   // with distinct timestamps.
                   const cell = m.cells.find(
-                    (c) => c.subjectName === subjectName && c.controlId === controlId,
+                    (c) => c.subjectName === subjectName && c.controlId === controlId && (kind == null || c.subjectKind === kind),
                   );
                   if (!cell) return;
-                  const subject = m.subjects.find((s) => s.name === subjectName);
+                  const subject = m.subjects.find((s) => s.name === subjectName && (kind == null || s.kind === kind));
                   if (!subject) return;
                   // The cell carries the raw on-disk timestamp directory name
                   // ("yyyy-MM-dd_HH-mm-ss") from the resolver — no conversion.
@@ -160,12 +161,12 @@ function AuditChainBadge({ valid }: { valid: boolean }) {
       }`}
       title={
         valid
-          ? "Every loaded evidence's recorded manifestHash equals its source run's stored contentHash. Note: this verifies the stored hash field — it does not recompute the manifest's content hash against its body or hash the evidence document itself."
-          : "At least one piece of evidence does not match its source run — possible tampering."
+          ? "Every displayed report is captured in an intact native AEF container. Signature trust has not been checked."
+          : "At least one report has an import, missing-source or unsealed-evidence warning. Inspect its details."
       }
     >
       {valid ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
-      Source-run hash {valid ? "verified" : "mismatch"}
+      Evidence {valid ? "integrity checked" : "custody warning"}
     </span>
   );
 }

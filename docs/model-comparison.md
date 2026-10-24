@@ -53,13 +53,15 @@ Illustrative output (two models, nothing priced the runs):
    Test: "Can I return an opened item after 20 days?"
 
 Rankings:
-   🥇 GPT-4o - Score: 80.0 (Quality: 100.0, Speed: 0.0, Cost: 100.0, Reliability: 100.0)
-   🥈 GPT-4o Mini - Score: 60.0 (Quality: 0.0, Speed: 100.0, Cost: 100.0, Reliability: 100.0)
+   🥇 GPT-4o - Score: 75.0 (Quality: 100.0, Speed: 0.0, Cost: n/a, Reliability: 100.0)
+   🥈 GPT-4o Mini - Score: 50.0 (Quality: 0.0, Speed: 100.0, Cost: n/a, Reliability: 100.0)
+
+Cost: not measured — no cost was recorded for GPT-4o, GPT-4o Mini (no price for the model), so no model is ranked on cost; the composite weighs quality, speed and reliability, their weights scaled up to the full weight.
 
 Recommendation: Use GPT-4o
 ```
 
-Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And both models score 100 on cost because no run was priced ([Cost is priced from one model name](#what-the-ranking-does-not-tell-you)).
+Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And cost is `n/a` because no run was priced ([How a run is priced](#what-the-ranking-does-not-tell-you)): a model with no cost is not ranked as the cheapest, and the composite leaves cost out.
 
 ---
 
@@ -78,7 +80,7 @@ IEvaluableAgent CreateAgent(string deployment) =>
         systemPrompt: "You are a customer support assistant for an online store.");
 ```
 
-For a Microsoft Agent Framework `AIAgent`, return `new MAFAgentAdapter(aiAgent)` instead (see [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)). Implement `IAgentFactory` yourself when a factory needs its own state. `ModelComparer` does not read `IAgentFactory.Configuration`.
+For a Microsoft Agent Framework `AIAgent`, return `new MAFIdentifiableAgentAdapter(aiAgent, modelId, displayName)` instead: it names the model, so each model's runs are priced at its own rate (see [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)). Implement `IAgentFactory` yourself when a factory needs its own state. `ModelComparer` does not read `IAgentFactory.Configuration`.
 
 ### Step 2: Define Test Cases
 
@@ -141,20 +143,23 @@ public record ModelResult(
     string ModelId,
     string ModelName,
     StochasticResult StochasticResult,         // every run, and their statistics
-    TimeSpan AverageLatency,
-    decimal? AverageCost,                      // null when no run carried a cost estimate
-    decimal? TotalCost);                       // plus PassRate, MeanScore, StandardDeviation
+    TimeSpan? AverageLatency,                  // null when no run returned (none recorded a latency)
+    decimal? AverageCost,                      // mean over PricedRunCount; null when none was priced
+    decimal? TotalCost);                       // complete or absent; TotalCostNotPricedReason explains null
+// Also: PricedRunCount, PassRate, MeanScore?, StandardDeviation? (null when no run was measured)
 
 public record ModelRanking(
     string ModelId,
     string ModelName,
     double CompositeScore,
     double QualityScore,
-    double SpeedScore,
-    double CostScore,
+    double? SpeedScore,                        // null when speed was not measured (see below)
+    double? CostScore,                         // null when cost was not measured (see below)
     double ReliabilityScore,
     int Rank);                                 // 1 = best
 ```
+
+`ModelComparisonResult.SpeedNotMeasuredReason` and `CostNotMeasuredReason` are `null` when every model was ranked on that dimension, and otherwise say why none was.
 
 ### Accessing Detailed Results
 
@@ -162,15 +167,18 @@ public record ModelRanking(
 foreach (var model in result.ModelResults)
 {
     var cost = model.AverageCost is { } c ? $"${c:F4}" : "not measured";
-    Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, mean score {model.MeanScore:F1} " +
-                      $"(SD {model.StandardDeviation:F1}), latency {model.AverageLatency.TotalSeconds:F2}s, cost/run {cost}");
+    var latency = model.AverageLatency is { } l ? $"{l.TotalSeconds:F2}s" : "not measured";
+    // MeanScore and StandardDeviation are null when none of the model's runs was measured (every run errored, or
+    // the judge produced no verdict): no score, not 0.
+    var quality = model.MeanScore is { } mean ? $"mean score {mean:F1} (SD {model.StandardDeviation:F1})" : "not measured";
+    Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, {quality}, latency {latency}, cost/run {cost}");
 }
 
 foreach (var ranking in result.Ranking)
 {
     Console.WriteLine($"#{ranking.Rank} {ranking.ModelName}: composite {ranking.CompositeScore:F1} " +
-                      $"(quality {ranking.QualityScore:F1}, speed {ranking.SpeedScore:F1}, " +
-                      $"cost {ranking.CostScore:F1}, reliability {ranking.ReliabilityScore:F1})");
+                      $"(quality {ranking.QualityScore:F1}, speed {ranking.SpeedScore?.ToString("F1") ?? "n/a"}, " +
+                      $"cost {ranking.CostScore?.ToString("F1") ?? "n/a"}, reliability {ranking.ReliabilityScore:F1})");
 }
 
 Console.WriteLine($"Winner: {result.Winner.ModelName}");
@@ -180,20 +188,25 @@ Console.WriteLine($"Winner: {result.Winner.ModelName}");
 
 ## How the Scores Are Computed
 
+`Statistics` is null when no run was measured. Standard deviation and confidence intervals are null with fewer than two measured runs, and spread/percentiles are null when statistical analysis is disabled. `ModelResult.PassRate` is null when there are no runs; otherwise it counts every run in the denominator, including errors.
+
+A total cost is available only when every run carries a price. Missing prices or crashed runs leave `TotalCost` null, with `TotalCostNotPricedReason` explaining why. `AverageCost` remains the mean over `PricedRunCount` priced runs; the detailed table labels that sample size when it is partial. A recorded zero cost remains zero.
+
 1. Each model runs `RunsPerModel` times through the stochastic runner. `ModelResult.StochasticResult` keeps every run (`IndividualResults`) and their statistics.
-2. Each model gets four raw numbers: mean score (quality), average latency (speed), average estimated cost per run (cost) and pass rate (reliability).
+2. Each model gets four raw numbers: mean score over its measured runs (quality), average latency (speed), average estimated cost per run (cost) and pass rate over every run (reliability, `ModelResult.PassRate`). A run that errored or got no verdict from the judge is not measured: it is not a sample of quality, and it did not pass, so it counts against reliability. A model none of whose runs was measured is not ranked: it stays in `ModelResults`, `UnrankedReason` names it, and when no model was measured the comparison throws `InvalidOperationException`.
 3. Each raw number is rescaled to 0–100 across the models **in this comparison**: the best model gets 100 and the worst 0, with lower latency and lower cost counting as better. With one model, or when every model has the same value, every model gets 100.
 4. `CompositeScore` = Quality × `ScoringWeights.Quality` + Speed × `Speed` + Cost × `Cost` + Reliability × `Reliability`, with default weights 0.4 / 0.2 / 0.2 / 0.2. `Ranking` sorts by composite score, highest first; on a tie the factory listed first ranks first. `Winner` is `Ranking[0]`.
+5. **Speed and cost count only when every model has them.** Quality counts the measured runs and reliability every run, failed ones included. Latency and cost come from the runs that recorded performance data: a model none of whose runs did (performance not tracked, or, with the non-streaming harness, no run returned) has no latency, and a model with no price (or a run with `EnableCostAnalysis` off) has no cost. Neither is "0 ms" or "$0". When any model lacks one, no model is scored on that dimension, its `SpeedScore` or `CostScore` is `null` for every model, and the composite weighs the dimensions that were measured, their weights scaled up to the full weight (default weights without cost become 0.5 / 0.25 / 0.25). Scoring only the models that have a dimension would rank the models on different dimensions. `SpeedNotMeasuredReason` and `CostNotMeasuredReason` say which models lacked it. Weights that fall only on unmeasured dimensions leave nothing to rank on, and the comparison throws `InvalidOperationException`.
 
 What follows from this:
 
 - **The scores are relative.** A speed score of 0 means "slowest of these models", not "slow". Adding or removing a model changes every model's scores.
-- **Small differences use the whole scale.** Two models with mean scores of 91.0 and 90.5 get quality scores of 100 and 0. Check `ModelResults` and the confidence interval in `StochasticResult.Statistics.ConfidenceInterval` before treating a rank as a real difference.
+- **Small differences use the whole scale.** Two models with mean scores of 91.0 and 90.5 get quality scores of 100 and 0. Check `ModelResults` and the confidence interval in `StochasticResult.Statistics?.ConfidenceInterval` before treating a rank as a real difference.
 
 ### What the Ranking Does Not Tell You
 
-- **Cost is priced from one model name.** The harness estimates a run's cost from its token counts and the price of `EvaluationOptions.ModelName` in `ModelPricing`. `StochasticRunner` passes the same `EvaluationOptions` for every model, so every model is priced at that one model's rate, and the cost dimension then compares token usage, not prices. With no `ModelName` (as in the examples above), or a name missing from the price table, no run is priced: `AverageCost` is `null` for every model and every model gets the same cost score, 100. To compare prices, price each model's tokens at its own rate ([Cost-Quality Tradeoffs](#cost-quality-tradeoffs)), or set the cost weight to 0.
-- **Missing data scores as best.** A run records latency and cost only when the agent call returns. A model whose every run throws has an average latency of zero and no cost, which the ranking treats as fastest and cheapest. Its quality and reliability scores will be 0, but check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before trusting its rank.
+- **How a run is priced.** The harness estimates a run's cost from its token counts and a model's price in `ModelPricing`: the model `EvaluationOptions.ModelName` names, or, when that is not set, the model the agent names itself (`IModelIdentifiable.ModelId`; `MAFIdentifiableAgentAdapter` for a MAF `AIAgent`). `StochasticRunner` passes the same `EvaluationOptions` for every model, so a `ModelName` there prices every model at that one model's rate, and the cost dimension then compares token usage, not prices: leave it unset and let each agent name its model. `AsEvaluableAgent` identifies its model from explicit `ChatOptions.ModelId`, otherwise `ChatClientMetadata.DefaultModelId`; its display name is not a pricing hint. An agent that names no model (`MAFAgentAdapter`, or a chat client with missing/blank model identity), or a model missing from the price table, leaves its runs unpriced: when any model has no cost, cost is not measured for the comparison (step 5). Add a missing price with `ModelPricing.SetPricing`, or set the cost weight to 0.
+- **Latency and cost cover only the runs that returned.** A model whose every run throws has neither, and no measured run either, so it is not ranked (step 2). A model with only some failed runs is timed and priced on the runs that returned: check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before reading its speed.
 - **Weights are not checked.** `ModelComparer` does not call `ScoringWeights.Validate()`. Weights that do not sum to 1 change the scale of `CompositeScore`, which is then no longer 0–100. Call `Validate()` on your weights yourself.
 - **Tokens may be estimated.** When the provider returns no token usage, the harness estimates tokens from the text (`PerformanceMetrics.TokensAreEstimated`), and a cost built on them is an estimate of an estimate.
 
@@ -235,7 +248,7 @@ Presets: `ModelComparisonOptions.Quick` (3 runs per model), `ModelComparisonOpti
 Your own weights:
 
 ```csharp
-// Cost weight 0: the runs are not priced per model, so cost would not discriminate anyway
+// Cost weight 0: rank on quality, speed and reliability only
 var weights = new ScoringWeights(Quality: 0.5, Speed: 0.3, Cost: 0.0, Reliability: 0.2);
 weights.Validate();   // throws unless every weight is non-negative and they sum to 1.0
 
@@ -304,7 +317,7 @@ foreach (var r in results)
 
     foreach (var model in r.ModelResults)
     {
-        Console.WriteLine($"  {model.ModelName}: mean score {model.MeanScore:F1}, pass rate {model.PassRate:P0}");
+        Console.WriteLine($"  {model.ModelName}: mean score {model.MeanScore?.ToString("F1") ?? "n/a"}, pass rate {model.PassRate:P0}");
     }
 }
 ```
@@ -324,7 +337,27 @@ Console.WriteLine("Complex flows:\n" + complexComparison.ToMarkdown(MarkdownExpo
 
 ## Cost-Quality Tradeoffs
 
-The built-in cost dimension prices every model at one rate ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price, price each model's own token usage at its own rate with `ModelPricing.EstimateCost`:
+### Bundled rates are historical estimates
+
+`ModelPricing.TableName` identifies the bundled table version (`agenteval-model-pricing-2026-10-21`),
+not a live quote or proof that a recorded amount used those rates. Text cost reports show this identity
+through `ModelPricing.BaselineNotice`. AEF records the baseline identity in `costPolicy.priceTable`;
+runtime overrides are not fingerprinted by that name. Provider-reported costs and custom rates may differ.
+
+The [Bitdeer rates](https://www.bitdeer.ai/en/pricing/ai-models) were observed on **2026-10-21**.
+Discounted rows retain their then-listed full prices in source comments; no sale end date was supplied.
+The OpenAI rows retain their separate **2026-10-07** source-check date and any last-known-value caveats.
+A table-version date does not mean every provider/model was verified on that day.
+
+Maintainers should re-check provider sources **at least monthly and before a release**. Verify each
+supported row's units, list/sale prices and any promotion end date; retain the actual observation date
+and source. If rates change, update both `ModelPricing` and `JudgeCostMap` where they overlap, their
+comments and the table identity, then run the pricing consistency tests. If a source cannot be verified,
+keep its historical date/caveat rather than calling it current. Packages do not refresh rates automatically.
+For a deployment-specific price or discount, use `ModelPricing.SetPricing`; configure judge rates
+separately with `JudgeCostMap.Register`. Reports remain estimates, not invoices or spending caps.
+
+The built-in cost dimension prices each model at its own rate when each agent names its model ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price yourself, for agents that name no model, price each model's token usage at its own rate with `ModelPricing.EstimateCost`:
 
 ```csharp
 using AgentEval.Models;
@@ -342,7 +375,7 @@ var priced = result.ModelResults
 
 foreach (var (model, costPerRun) in priced)
 {
-    Console.WriteLine($"{model.ModelName}: mean score {model.MeanScore:F1}, " +
+    Console.WriteLine($"{model.ModelName}: mean score {model.MeanScore?.ToString("F1") ?? "n/a"}, " +
                       $"cost/run {(costPerRun is { } cost ? $"${cost:F4}" : "not measured")}");
 }
 ```
@@ -503,10 +536,14 @@ foreach (var r in results)
     var after = r.ModelResults.Single(m => m.ModelId == "gpt-4o");
 
     Console.WriteLine($"{r.TestCase.Name}:");
-    Console.WriteLine($"  Mean score: {before.MeanScore:F1} -> {after.MeanScore:F1}");
+    Console.WriteLine($"  Mean score: {Score(before.MeanScore)} -> {Score(after.MeanScore)}");
     Console.WriteLine($"  Pass rate:  {before.PassRate:P0} -> {after.PassRate:P0}");
-    Console.WriteLine($"  Latency:    {before.AverageLatency.TotalSeconds:F2}s -> {after.AverageLatency.TotalSeconds:F2}s");
+    Console.WriteLine($"  Latency:    {Seconds(before.AverageLatency)} -> {Seconds(after.AverageLatency)}");
 }
+
+// MeanScore is null when no run was measured, AverageLatency when no run recorded one: print n/a, not "" or "s".
+static string Score(double? mean) => mean is { } m ? $"{m:F1}" : "n/a";
+static string Seconds(TimeSpan? latency) => latency is { } t ? $"{t.TotalSeconds:F2}s" : "n/a";
 ```
 
 ### Scenario 2: Cost Reduction
@@ -521,7 +558,10 @@ var result = await comparer.CompareModelsAsync(
 var expensive = result.ModelResults.Single(m => m.ModelId == "gpt-4o");
 var cheap = result.ModelResults.Single(m => m.ModelId == "gpt-4o-mini");
 
-Console.WriteLine($"Mean score drop: {expensive.MeanScore - cheap.MeanScore:F1} points");
+// A model none of whose runs was measured has no MeanScore (null), so there is no drop to report.
+Console.WriteLine(expensive.MeanScore is { } high && cheap.MeanScore is { } low
+    ? $"Mean score drop: {high - low:F1} points"
+    : "Mean score drop: n/a (a model has no measured run)");
 Console.WriteLine($"Pass rate:       {expensive.PassRate:P0} -> {cheap.PassRate:P0}");
 // For the price side, price each model's tokens at its own rate (see Cost-Quality Tradeoffs)
 ```
@@ -606,7 +646,7 @@ weights.Validate();
 | Which model ranked first? | `result.Winner` |
 | How did each model score on each dimension? | `result.Ranking` |
 | What were the raw numbers? | `result.ModelResults`: pass rate, mean score, SD, latency, cost |
-| Is a difference real or noise? | `model.StochasticResult.Statistics.ConfidenceInterval`, and enough runs |
+| Is a difference real or noise? | `model.StochasticResult.Statistics?.ConfidenceInterval`, and enough runs |
 | Which model won across a suite? | `results.ToMarkdown()`: wins and average scores |
 | What does each model cost? | Its own tokens at its own rate: `ModelPricing.EstimateCost` |
 

@@ -19,18 +19,17 @@ public sealed record ScoreLine(int FalseAlarms, int MissedHits, int CorrectConcl
 /// <summary>Aggregate of N runs of one grader (N&gt;1 only for non-deterministic, real-judge graders).</summary>
 public sealed record GraderRunStats(
     string Name, string Short, int Runs,
-    double MeanDirectional, double StdDevDirectional, ConfidenceInterval Ci,
+    double MeanDirectional, double? StdDevDirectional, ConfidenceInterval? Ci,
     double MeanFalseAlarms, double MeanMissed, double MeanInconclusive, double MeanCorrect,
     ScoreLine Sample)
 {
     public static GraderRunStats From(string name, string shortName, IReadOnlyList<ScoreLine> perRun)
     {
+        if (perRun.Count == 0) throw new ArgumentException("At least one grader run is required.", nameof(perRun));
         var dir = perRun.Select(s => (double)s.DirectionalFabrications).ToList();
-        double mean = StatisticsCalculator.Mean(dir);
-        double sd = StatisticsCalculator.StandardDeviation(dir);
-        ConfidenceInterval ci = perRun.Count >= 2
-            ? StatisticsCalculator.CalculateConfidenceInterval(dir)
-            : new ConfidenceInterval(mean, mean, 0.95);
+        double mean = StatisticsCalculator.Mean(dir)!.Value;
+        double? sd = StatisticsCalculator.StandardDeviation(dir);
+        ConfidenceInterval? ci = StatisticsCalculator.CalculateConfidenceInterval(dir);
         return new GraderRunStats(name, shortName, perRun.Count, mean, sd, ci,
             perRun.Average(s => (double)s.FalseAlarms),
             perRun.Average(s => (double)s.MissedHits),
@@ -114,8 +113,8 @@ public static class Scorecard
             string dir = delta > 0 ? $"{delta:0.0} FEWER for {b.Short.Trim()}"
                        : delta < 0 ? $"{-delta:0.0} MORE for {b.Short.Trim()} (worse)"
                        : "no difference";
-            string sig = (a.Runs >= 2 && b.Runs >= 2)
-                ? (!(b.Ci.Upper < a.Ci.Lower || a.Ci.Upper < b.Ci.Lower) ? "CIs overlap (n.s.)" : "CIs disjoint (significant)")
+            string sig = (a.Ci is { } aCi && b.Ci is { } bCi)
+                ? (!(bCi.Upper < aCi.Lower || aCi.Upper < bCi.Lower) ? "CIs overlap (n.s.)" : "CIs disjoint (significant)")
                 : "single run, no CI";
             Console.WriteLine($"  {label}: {a.MeanDirectional:0.0} vs {b.MeanDirectional:0.0}  ({dir}; {sig})");
         }

@@ -24,6 +24,34 @@ permissions:
   actions: read
 
 jobs:
+  memory-report-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+    - name: Setup Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+    - name: Install existing browser-test dependency
+      run: npm ci --prefix scripts/mc-browser-smoke
+    - name: Install Chromium
+      run: node scripts/mc-browser-smoke/node_modules/playwright/cli.js install --with-deps chromium
+    - name: Untrusted Memory report fields stay data
+      run: node scripts/mc-browser-smoke/memory-report-security.test.mjs
+      env:
+        MEMORY_REPORT_SECURITY_COVERAGE: ${{ runner.temp }}/memory-report-security-coverage.json
+    - name: Retain browser security observations
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: memory-report-security-observations
+        path: ${{ runner.temp }}/memory-report-security-coverage.json
+        if-no-files-found: warn
+
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 15

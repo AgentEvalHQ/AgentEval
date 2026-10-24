@@ -43,6 +43,7 @@ public static class MemoryAIContextProvider
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Cross-session evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -111,10 +112,14 @@ public static class MemoryAIContextProvider
         Console.WriteLine(new string('═', 70));
 
         Console.Write("   Score: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.ForegroundColor = result.OverallScore is >= 80 ? ConsoleColor.Green : ConsoleColor.Yellow;
+        Console.Write($"{MemorySampleReading.Percent(result.OverallScore)}");
         Console.ResetColor();
         Console.WriteLine($"  Passed: {(result.Passed ? "✅" : "❌")}  Session resets: {result.SessionResetCount}");
+        if (!result.SessionResetSupported)
+            SampleOutcome.Skip("the agent does not support session reset, so cross-session recall was not measured");
+        else if (!result.Passed)
+            SampleOutcome.Fail($"AIContextProvider memory lost facts across resets ({result.RetainedCount}/{result.FactResults.Count} retained)");
         Console.WriteLine($"   Retained: {result.RetainedCount}/{result.FactResults.Count} facts");
         Console.WriteLine($"   Duration: {result.Duration.TotalMilliseconds:F0}ms\n");
 

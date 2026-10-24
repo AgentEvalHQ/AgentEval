@@ -26,7 +26,7 @@ var results = await comparer.CompareModelsAsync(
 Console.WriteLine(results.ToMarkdown());
 ```
 
-`ToMarkdown()` on the list of results writes how many test cases each model won, each model's average composite, quality, speed, cost and reliability scores, and a rankings table for every test case. The scores run from 0 to 100 *relative to the models compared*: the best model on a dimension gets 100 and the worst 0. Cost needs care: the harness prices every model at the rate of one model name, `EvaluationOptions.ModelName`, and with none set (as here) it prices nothing, so every model gets the same cost score. See [How the Scores Are Computed](../model-comparison.md#how-the-scores-are-computed).
+`ToMarkdown()` on the list of results writes how many test cases each model won, each model's average composite, quality, speed, cost and reliability scores, and a rankings table for every test case. The scores run from 0 to 100 *relative to the models compared*: the best model on a dimension gets 100 and the worst 0. Cost needs care: the harness prices a run at the model `EvaluationOptions.ModelName` names (one name prices every model at one rate) or, with none set, at the model the agent names itself (`MAFIdentifiableAgentAdapter`); an agent that names no model, or a model without a price, leaves its runs unpriced, so cost is not measured: the cost scores read `n/a` and each composite weighs quality, speed and reliability. See [How the Scores Are Computed](../model-comparison.md#how-the-scores-are-computed).
 
 ---
 

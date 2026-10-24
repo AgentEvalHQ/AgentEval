@@ -321,7 +321,10 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   0.8500000000000001 agree. `scored_samples` and `unscored_samples` are not checked.
 
 **Member types** (IN-6 to IN-10, settled 2026-10-10). Every member the converter reads has the JSON type Inspect writes
-for it; a member of another type refuses the log, naming the rule of its row. `null` counts as absent, wherever it is.
+for it; a member of another type refuses the log, naming the rule of its row. Optional `null` members count as absent.
+Null entries in object lists (`eval.scorers`, `samples`, `reductions`, a reduction's `samples`, and `results.scores`)
+are skipped; they do not create observations or change the non-null entries' order. Lists of strings still require
+each entry to be a string.
 Members the converter keeps as data, unread (`eval.run_id`, `eval.eval_set_id`, `eval.dataset`, `results.headline`,
 `Score.answer`, `Score.metadata`, and a metric beside the mean, under `summary.json`'s `ext`), may hold any JSON value,
 and members it does not read (`version`, `plan`, `eval.metadata`, a sample's `metadata` and `working_time`, an

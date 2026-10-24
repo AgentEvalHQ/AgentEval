@@ -25,6 +25,7 @@ namespace AgentEval.Cli.Runner;
 /// <summary>Resolves dataset snapshots and executes text-only endpoint evaluations through bounded clients.</summary>
 internal sealed class AefDatasetJobTarget : IAefJobTarget
 {
+    private const int ReadinessAttempts = 3;
     private Role? _subject, _judge;
     private AefJobCredentials? _credentials;
     private bool _captureContent;
@@ -53,14 +54,14 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         return new JsonObject
         {
             ["cases"] = estimate.Cases,
-            ["calls"] = new JsonObject { ["target"] = checked(runs + estimate.Cases * _subject!.MaxCalls),
-                ["judge"] = _judge is null ? 0 : checked(runs + estimate.Cases * _judge.MaxCalls) },
+            ["calls"] = new JsonObject { ["target"] = checked(runs * ReadinessAttempts + estimate.Cases * _subject!.MaxCalls),
+                ["judge"] = _judge is null ? 0 : checked(runs * ReadinessAttempts + estimate.Cases * _judge.MaxCalls) },
             ["models"] = new JsonArray(Roles().Select(r => r.Model).Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(m => (JsonNode?)JsonValue.Create(m)).ToArray()),
             ["costRange"] = new JsonObject { ["low"] = estimate.UsdLow, ["high"] = estimate.UsdHigh,
                 ["currency"] = "USD", ["priceTable"] = estimate.PriceTable },
             ["durationRange"] = new JsonObject { ["low"] = 0, ["high"] = seconds, ["unit"] = "seconds" },
-            ["warnings"] = new JsonArray("Calls are upper bounds and include readiness and judge retries.",
+            ["warnings"] = new JsonArray("Calls are upper bounds and include up to three reasoning/readiness attempts per role and suite, plus judge retries.",
                 "Cost and duration lower bounds are unknown and reported as zero; missing usage is charged at its reserved bound.",
                 "The price table identifies a captured software price snapshot, not a provider quote or a pricing date."),
         };
@@ -177,6 +178,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
             var definition = DatasetSuiteDefinition.Create(reference, version, bytes, cases.Select(c => c.Id!), new JsonObject
             {
                 ["pipeline"] = "dataset-job", ["trialsPerCase"] = 1,
+                ["reasoningPolicy"] = "minimal-before-cases-v1", ["readinessMaxAttempts"] = ReadinessAttempts,
                 ["caseSeconds"] = _caseSeconds,
                 ["subjectLimits"] = new JsonObject { ["inputCap"] = _subject!.InputCap, ["outputCap"] = _subject.OutputCap, ["maxCalls"] = _subject.MaxCalls },
                 ["judge"] = _judge is null ? null : new JsonObject
@@ -218,7 +220,7 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         return role;
     }
 
-    private BudgetedChatClient Open(Role role, bool readiness)
+    private BudgetedChatClient Open(Role role, bool readiness, ReasoningEffort? reasoningEffort = null)
     {
         if (_credentials is null) throw new InvalidOperationException("Runner credentials must be delivered before opening a client.");
         var key = _credentials.ForPurpose(role.Purpose).Values.SingleOrDefault();
@@ -227,7 +229,8 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         {
             return new BudgetedChatClient(CliChatClientDiagnostics.Wrap(endpoint, role.Purpose, role.Deployment), role.Deployment,
                 role.InputCap, readiness ? Math.Min(16, role.OutputCap) : role.OutputCap,
-                readiness ? 1 : role.MaxCalls, role.InputPrice, role.OutputPrice);
+                readiness ? ReadinessAttempts : role.MaxCalls, role.InputPrice, role.OutputPrice,
+                freezeReasoning: !readiness, reasoningEffort: reasoningEffort);
         }
         catch { endpoint.Dispose(); throw; }
     }
@@ -237,13 +240,14 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
     {
         public string Provider => Azure ? "azure" : "openai-compatible";
         public decimal Bound => checked(MaxCalls * (InputCap * InputPrice + OutputCap * OutputPrice) / 1_000_000m);
-        public decimal ReadinessBound => (InputCap * InputPrice + Math.Min(16, OutputCap) * OutputPrice) / 1_000_000m;
+        public decimal ReadinessBound => ReadinessAttempts * (InputCap * InputPrice + Math.Min(16, OutputCap) * OutputPrice) / 1_000_000m;
     }
 
     private sealed class Suite : IAefJobSuite
     {
         private readonly AefDatasetJobTarget _owner;
         private readonly List<(Role Role, BudgetedChatClient Client, bool Readiness)> _clients = [];
+        private readonly Dictionary<Role, ReasoningEffort?> _reasoning = [];
         private bool _prepared, _closed;
         public Suite(AefDatasetJobTarget owner, SuiteDefinitionManifest definition, IReadOnlyList<DatasetTestCase> cases)
         {
@@ -267,6 +271,25 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
         public double PreparationUsdBound => (double)_owner.Roles().Sum(r => r.ReadinessBound);
         public long PreparationSecondsBound => _owner._preparationSeconds;
         public double PreparationIncurredUsd => (double)_clients.Where(c => c.Readiness).Sum(c => c.Client.IncurredUsd);
+        public JsonObject PreparationMetadata => new()
+        {
+            ["version"] = 1, ["reasoningPolicy"] = "minimal-before-cases-v1",
+            ["roles"] = new JsonArray(_owner.Roles().Select(role =>
+            {
+                var probe = _clients.SingleOrDefault(c => c.Readiness && c.Role == role).Client;
+                var resolved = _reasoning.TryGetValue(role, out var effort);
+                return (JsonNode)new JsonObject
+                {
+                    ["purpose"] = role.Purpose, ["model"] = role.Model,
+                    ["maxAttempts"] = ReadinessAttempts, ["attempts"] = probe?.Calls ?? 0,
+                    ["resolved"] = resolved, ["effort"] = resolved ? EffortName(effort) : null,
+                    ["lastRequestedEffort"] = probe is { Calls: > 0 } ? EffortName(probe.LastReasoningEffort) : null,
+                    ["incurredUsd"] = (double)(probe?.IncurredUsd ?? 0),
+                };
+            }).ToArray()),
+        };
+
+        private static string EffortName(ReasoningEffort? effort) => effort?.ToString().ToLowerInvariant() ?? "provider-default";
 
         public async ValueTask<AefJobPreparationResult> PrepareAsync(CancellationToken ct)
         {
@@ -275,15 +298,18 @@ internal sealed class AefDatasetJobTarget : IAefJobTarget
             foreach (var role in _owner.Roles())
             {
                 var client = Create(role, true);
-                var response = await client.GetResponseAsync("Reply with OK.", cancellationToken: ct).ConfigureAwait(false);
+                // Every fallback passes through accounting; case clients are subsequently fixed, not wrapped.
+                var minimal = new MinimalReasoningChatClient(client);
+                var response = await minimal.GetResponseAsync("Reply with OK.", cancellationToken: ct).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(response.Text)) return new(false, PreparationIncurredUsd, 0);
+                _reasoning.Add(role, client.LastReasoningEffort);
             }
             return new(true, PreparationIncurredUsd, 0);
         }
 
         private BudgetedChatClient Create(Role role, bool readiness)
         {
-            var client = _owner.Open(role, readiness);
+            var client = _owner.Open(role, readiness, readiness ? null : _reasoning[role]);
             _clients.Add((role, client, readiness));
             return client;
         }

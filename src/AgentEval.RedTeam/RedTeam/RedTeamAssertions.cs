@@ -71,12 +71,12 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        if (_result.InconclusiveRate > maxInconclusiveFraction)
+        if (_result.InconclusiveRate is { } rate && rate > maxInconclusiveFraction)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                $"Scan returned Pass, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({_result.InconclusiveRate:P1}) — too untrustworthy to accept as a Pass.",
+                $"Scan returned Pass, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({_result.InconclusiveRate?.ToString("P1") ?? "n/a"}) — too untrustworthy to accept as a Pass.",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0}",
-                actual: $"Inconclusive {_result.InconclusiveRate:P1}, coverage {_result.Coverage:F1}%",
+                actual: $"Inconclusive {_result.InconclusiveRate?.ToString("P1") ?? "n/a"}, coverage {RedTeamResult.Percent(_result.Coverage)}",
                 suggestions:
                 [
                     "Increase TimeoutPerProbe or fix transport errors, then re-run",
@@ -97,15 +97,27 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveMinimumScore(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        if (_result.OverallScore < minimumScore)
+        // A scan that ran nothing, or whose verdict is inconclusive, has no score to hold against the minimum; nor does one
+        // whose probes all came back inconclusive (its OverallScore is null, T81).
+        if (_result.TotalProbes == 0 || _result.Verdict == Verdict.Inconclusive || _result.OverallScore is not { } score)
+        {
+            Undecided(probe,
+                $"Expected overall score to be at least {minimumScore:F1}%, but the scan was inconclusive ({InconclusiveWhy()}): the score was not measured.",
+                expected: $"Score >= {minimumScore:F1}% from a conclusive scan",
+                actual: $"Verdict.{_result.Verdict}, {_result.ConclusiveProbes}/{_result.TotalProbes} probes conclusive",
+                because: because);
+            return probe.Complete(this);
+        }
+
+        if (score < minimumScore)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                $"Expected overall score to be at least {minimumScore:F1}%, but it was {_result.OverallScore:F1}%.",
+                $"Expected overall score to be at least {minimumScore:F1}%, but it was {score:F1}%.",
                 expected: $"Score >= {minimumScore:F1}%",
-                actual: $"Score = {_result.OverallScore:F1}%",
+                actual: $"Score = {score:F1}%",
                 suggestions:
                 [
-                    $"Agent needs to improve resistance by {minimumScore - _result.OverallScore:F1} percentage points",
+                    $"Agent needs to improve resistance by {minimumScore - score:F1} percentage points",
                     "Focus on the attacks with lowest scores first",
                     $"Currently resisting {_result.ResistedProbes}/{_result.TotalProbes} probes"
                 ],
@@ -124,7 +136,18 @@ public sealed class RedTeamAssertions
     public RedTeamAssertions HaveASRBelow(double threshold, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        var asr = _result.ConclusiveAttackSuccessRate;
+        // With no conclusive probe there is no ASR (null, T81): nothing to hold against the threshold.
+        if (_result.ConclusiveAttackSuccessRate is not { } asr)
+        {
+            Undecided(probe,
+                $"Expected Attack Success Rate to be below {threshold:P1}, but no probe reached a verdict " +
+                $"({_result.InconclusiveProbes}/{_result.TotalProbes} inconclusive): the ASR was not measured.",
+                expected: $"ASR < {threshold:P1} over at least one conclusive probe",
+                actual: $"0 conclusive probes of {_result.TotalProbes}",
+                because: because);
+            return probe.Complete(this);
+        }
+
         if (asr > threshold)
         {
             var suggestions = new List<string>
@@ -314,7 +337,16 @@ public sealed class RedTeamAssertions
             return probe.Complete(this);
         }
 
-        var asr = attack.ConclusiveAttackSuccessRate;
+        if (attack.ConclusiveAttackSuccessRate is not { } asr)
+        {
+            Undecided(probe,
+                $"Expected ASR for '{attackName}' to be below {threshold:P1}, but none of its probes reached a verdict: " +
+                "the ASR was not measured.",
+                expected: $"ASR < {threshold:P1} for {attackName} over at least one conclusive probe",
+                actual: $"0 conclusive probes of {attack.TotalCount}",
+                because: because);
+            return probe.Complete(this);
+        }
 
         if (asr > threshold)
         {
@@ -326,6 +358,20 @@ public sealed class RedTeamAssertions
         }
 
         return probe.Complete(this);
+    }
+
+    // A check with nothing measured to decide on (T13-10): undecided inside a scope that records outcomes. Outside one
+    // nothing can record an undecided result, so the check fails: a security gate fails closed, never a silent pass.
+    [StackTraceHidden]
+    private static void Undecided(AssertionProbe probe, string message, string expected, string actual, string? because)
+    {
+        if (probe.IsActive)
+        {
+            probe.MarkInconclusive(message);
+            return;
+        }
+
+        AgentEvalScope.FailWith(RedTeamAssertionException.Create(message, expected: expected, actual: actual, because: because));
     }
 
     // Every reason the scan is inconclusive (B10ax, B10ba): an attack that measured nothing, a scan that stopped early, most
@@ -353,7 +399,7 @@ public sealed class RedTeamAssertions
     {
         using var probe = AgentEvalScope.BeginAssertion();
         var inconclusiveRate = _result.InconclusiveRate;
-        if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
+        if (_result.Verdict == Verdict.Inconclusive || (inconclusiveRate is { } fraction && fraction > maxInconclusiveFraction))
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
                 _result.Verdict == Verdict.Inconclusive   // every reason, at any inconclusive fraction (B10bc)
@@ -361,10 +407,10 @@ public sealed class RedTeamAssertions
                     // "no probe ran; 0.0% of probes inconclusive").
                     ? $"Expected a conclusive scan, but it was inconclusive ({InconclusiveWhy()}"
                       + (_result.InconclusiveProbes > 0 && _result.InconclusiveProbes <= _result.ResistedProbes
-                          ? $"; {inconclusiveRate:P1} of probes inconclusive" : "") + ")."
-                    : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
+                          ? $"; {inconclusiveRate?.ToString("P1") ?? "n/a"} of probes inconclusive" : "") + ")."
+                    : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate?.ToString("P1") ?? "n/a"}).",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0} and a definitive verdict",
-                actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate:P1}, coverage {_result.Coverage:F1}%",
+                actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate?.ToString("P1") ?? "n/a"}, coverage {RedTeamResult.Percent(_result.Coverage)}",
                 suggestions:
                 [
                     "Increase TimeoutPerProbe or check agent/transport health — timeouts produce inconclusive probes",

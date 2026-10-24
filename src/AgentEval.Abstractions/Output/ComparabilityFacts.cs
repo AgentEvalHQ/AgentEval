@@ -7,6 +7,17 @@ namespace AgentEval.Output;
 using System.Globalization;
 using AgentEval.Evals.Meta;
 
+/// <summary>How a result was graded, independently of whether its judge's model name was reported.</summary>
+public enum EvaluationInstrumentKind
+{
+    /// <summary>The instrument is absent, mixed, or cannot be established from the record.</summary>
+    Unknown,
+    /// <summary>A deterministic evaluator produced the result.</summary>
+    Deterministic,
+    /// <summary>A model graded the result; its identity may still be unknown.</summary>
+    Model,
+}
+
 /// <summary>
 /// The facts a run must carry for two run directories to be shown comparable without any third
 /// artefact. ADR-031 finding <b>V1</b>.
@@ -70,16 +81,57 @@ public sealed record ComparabilityFacts(string EvalKey, string EvalVersion)
     /// </summary>
     public double? EffectiveBar { get; init; }
 
+    private readonly string? _evaluationPolicyDigest;
+
+    /// <summary>
+    /// Digest of the applied evaluation configuration: scoring rules and measurement protocol, excluding subject
+    /// identity, observed results and stimulus content. Null means the policy was not recorded, never an assumed match.
+    /// Producers version the hashed representation. Digests are opaque and compared case-sensitively.
+    /// This is independent of a model judge's rubric.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? EvaluationPolicyDigest
+    {
+        get => _evaluationPolicyDigest;
+        init => _evaluationPolicyDigest = JudgeFingerprint.EnsureNoEndpoint(value, nameof(EvaluationPolicyDigest));
+    }
+
     /// <summary>
     /// What an arm that understands nothing would have scored, as the run recorded it.
-    /// <see langword="null"/> means nobody derived a floor at all — which is a different fact from
+    /// Null means no common floor is known (none recorded, or differing trial evidence), which differs from
     /// <see cref="FloorState.NotDerivable"/>, where somebody tried and said why not.
     /// </summary>
     public RecordedChanceFloor? ChanceFloor { get; init; }
 
     /// <summary>
+    /// Explicit instrument evidence. Null retains the historical facts contract: a null Judge declared deterministic
+    /// evaluation. New producers always set this, including Unknown, so missing model identity is never read as code.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvaluationInstrumentKind? InstrumentKind { get; init; }
+
+    private readonly string? _rubricDigest;
+
+    /// <summary>A known rubric when no judge model identity is available. Never an endpoint.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest
+    {
+        get => _rubricDigest;
+        init => _rubricDigest = JudgeFingerprint.EnsureNoEndpoint(value, nameof(RubricDigest));
+    }
+
+    /// <summary>The explicit instrument, or the declaration made by the legacy facts contract.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public EvaluationInstrumentKind EffectiveInstrumentKind => InstrumentKind
+        ?? (Judge is null ? EvaluationInstrumentKind.Deterministic : EvaluationInstrumentKind.Model);
+
+    /// <summary>The recorded rubric independently of model identity.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? EffectiveRubricDigest => Judge?.RubricDigest ?? RubricDigest;
+
+    /// <summary>
     /// Which judge produced the verdict, and whether it is the subject's own model.
-    /// <see langword="null"/> for an eval with no judge — a deterministic eval, not an unknown one.
+    /// Null means no named model. Read InstrumentKind to distinguish deterministic evaluation from an unnamed judge.
     /// </summary>
     public JudgeFingerprint? Judge { get; init; }
 

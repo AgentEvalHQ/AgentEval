@@ -123,7 +123,7 @@ public class TokenUsage
 {
     public int PromptTokens { get; init; }
     public int CompletionTokens { get; init; }
-    public int TotalTokens => PromptTokens + CompletionTokens;
+    public int TotalTokens => (int)Math.Min((long)PromptTokens + CompletionTokens, int.MaxValue);
     
     /// <summary>Alias for PromptTokens for consistency.</summary>
     public int InputTokens => PromptTokens;

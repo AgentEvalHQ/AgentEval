@@ -34,6 +34,7 @@ public static class AgentSkillsSecurityIndex
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

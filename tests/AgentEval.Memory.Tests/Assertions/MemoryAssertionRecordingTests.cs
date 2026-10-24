@@ -62,7 +62,32 @@ public class MemoryAssertionRecordingTests
         Assert.Throws<MemoryAssertionException>(() => result.Should().HaveOverallScoreAtLeast(90));
     }
 
-    private static MemoryEvaluationResult CreateResult(double overallScore)
+    [Fact]
+    public void CostNotPriced_InACollectingScope_IsInconclusive()
+    {
+        // T63: an unpriced cost cannot show the budget was kept. It used to be a flat-rate guess, so this passed.
+        var result = CreateResult(overallScore: 90, estimatedCost: null);
+
+        var scope = AgentEvalScope.Collecting();
+        result.Should().HaveCostLessThan(1.0m);
+        scope.Dispose();
+
+        var row = Assert.Single(scope.Results);
+        Assert.Equal("HaveCostLessThan", row.Assertion);
+        Assert.Equal(AssertionOutcome.Inconclusive, row.Outcome);
+    }
+
+    [Fact]
+    public void CostNotPriced_WithNoScope_Fails()
+    {
+        // Nothing can record an undecided result outside a scope, so the check fails rather than passing silently.
+        var result = CreateResult(overallScore: 90, estimatedCost: null);
+
+        var ex = Assert.Throws<MemoryAssertionException>(() => result.Should().HaveCostLessThan(1.0m));
+        Assert.Contains("not priced", ex.Message);
+    }
+
+    private static MemoryEvaluationResult CreateResult(double overallScore, decimal? estimatedCost = 0.01m)
     {
         var foundFacts = new List<MemoryFact> { MemoryFact.Create("Found fact 0") };
 
@@ -90,7 +115,7 @@ public class MemoryAssertionRecordingTests
             ForbiddenFound = [],
             Duration = TimeSpan.FromSeconds(1),
             TokensUsed = 100,
-            EstimatedCost = 0.01m,
+            EstimatedCost = estimatedCost,
             ScenarioName = "Test Scenario"
         };
     }

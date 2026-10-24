@@ -34,8 +34,8 @@ public sealed class ModelPricingConsistencyTests
     [Fact]
     public void Gpt55_IsPricedAsItself_NotAsTheGpt5Substring()
     {
-        Assert.Equal(0.005, JudgeCostMap.GetRate("gpt-5.5").InputRatePer1K);
-        Assert.Equal(0.030, JudgeCostMap.GetRate("gpt-5.5-2026-08-01").OutputRatePer1K);
-        Assert.Equal(0.00125, JudgeCostMap.GetRate("gpt-5").InputRatePer1K);
+        Assert.Equal(0.005, JudgeCostMap.GetRate("gpt-5.5")!.Value.InputRatePer1K);
+        Assert.Equal(0.030, JudgeCostMap.GetRate("gpt-5.5-2026-08-01")!.Value.OutputRatePer1K);
+        Assert.Equal(0.00125, JudgeCostMap.GetRate("gpt-5")!.Value.InputRatePer1K);
     }
 }

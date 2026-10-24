@@ -122,7 +122,8 @@ public static class UnifiedEvalReport
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(v.Value, null, v.Label, v.Passed, 0.70, v.Severity, null) { Measurement = v.Measurement },
             Details: new EvalDetails(null, null, null, subs, "mean"),
-            Provenance: new EvalProvenance(provenanceType, null, null, null, null, 0, false),
+            // Complete or absent: null when any part was not priced.
+            Provenance: new EvalProvenance(provenanceType, null, null, null, null, CostRollup.Aggregate(subs).EstimatedCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -131,7 +132,8 @@ public static class UnifiedEvalReport
         Metric: new EvalMetadata(key, name, "agentic", "1.0.0"),
         Score: new EvalScore(0.0, null, label, false, 0.70, "none", null),
         Details: new EvalDetails(null, new[] { new EvalEvidence(name, label, reason) }, null, null, null),
-        Provenance: new EvalProvenance(label, null, null, null, null, 0, false),
+        // A skipped branch spent nothing; what an errored one spent is unknown (null, never $0).
+        Provenance: new EvalProvenance(label, null, null, null, null, label == "skipped" ? 0 : null, false),
         EvaluatedAt: DateTimeOffset.UtcNow);
 
     private static string Sanitize(string s) =>

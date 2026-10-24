@@ -30,6 +30,7 @@ public static class StreamingVsAsyncPerformance
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -168,6 +169,7 @@ public static class StreamingVsAsyncPerformance
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("   Performance:   NULL ⚠️ (TrackPerformance not enabled?)");
             Console.ResetColor();
+            SampleOutcome.Skip($"no performance data recorded for the {mode} run");
         }
         Console.WriteLine();
     }

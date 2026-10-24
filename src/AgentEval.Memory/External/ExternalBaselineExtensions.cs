@@ -50,7 +50,10 @@ public static class ExternalBaselineExtensions
                 Score = kvp.Value.Accuracy!.Value,
                 Grade = ComputeGrade(kvp.Value.Accuracy.Value),
                 Skipped = false,
-                ScenarioCount = kvp.Value.TotalQuestions
+                // The score's denominator, not the questions selected: an errored or inconclusive question is not
+                // behind the score, and counting it here made a 1-of-3 category read as measured on 3.
+                ScenarioCount = kvp.Value.ScoredQuestions,
+                UnmeasuredQueries = Math.Max(0, kvp.Value.TotalQuestions - kvp.Value.ScoredQuestions),
             });
 
         var dimensionScores = pentagonMapperFull?.Invoke(result.PerTypeResults, result.QuestionResults)
@@ -78,6 +81,9 @@ public static class ExternalBaselineExtensions
             OverallScore = overallScore,
             Grade = ComputeGrade(overallScore),
             Stars = ComputeStars(overallScore),
+            // Completeness follows the configured scoring denominator, including its existing judge-failure policy.
+            IsComplete = result.SelectedQuestions > 0 ? result.ScoredQuestions == result.SelectedQuestions : null,
+            HasMeasuredScore = true,
             CategoryResults = categoryResults,
             DimensionScores = dimensionScores,
             Recommendations = BuildRecommendations(result),
@@ -88,6 +94,21 @@ public static class ExternalBaselineExtensions
     private static List<string> BuildRecommendations(ExternalBenchmarkResult result)
     {
         var recs = new List<string>();
+
+        // First, what the score is NOT over. The baseline keeps only scores, so without this line a run that lost
+        // questions to agent errors or an inconclusive judge is stored as if every selected question were scored.
+        // An agent error is never scored; under JudgeFailurePolicy.RetryThenIncorrect an inconclusive judge is scored
+        // as incorrect, so the inconclusive questions left out are the rest of the gap, not InconclusiveQuestions. The rest
+        // is not only judge-inconclusive: a benchmark can leave a question unrun (TypedMemEval's unrun_requires_timestamps
+        // is not an agent error), so it is named for both.
+        var unscored = result.SelectedQuestions - result.ScoredQuestions;
+        if (unscored > 0)
+        {
+            recs.Add(
+                $"{unscored} of {result.SelectedQuestions} selected questions are not in the score " +
+                $"({result.AgentFailureQuestions} agent error(s), {unscored - result.AgentFailureQuestions} not run or without a judge verdict): " +
+                $"accuracy is over the {result.ScoredQuestions} scored.");
+        }
 
         foreach (var (typeName, typeResult) in result.PerTypeResults)
         {

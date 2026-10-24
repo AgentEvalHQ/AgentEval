@@ -8,6 +8,24 @@ namespace AgentEval.Tests.MAF.Evaluators;
 
 public class ConversationExtractorTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExtractLastUserMessage_NewPromptAfterApproval_UsesNewPrompt(bool mixed)
+    {
+        var request = new ToolApprovalRequestContent("req-1", new FunctionCallContent("call-1", "PlaceOrder"));
+        var approval = request.CreateResponse(approved: true, reason: "reviewed");
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Original prompt"),
+            new(ChatRole.Assistant, [request]),
+            new(ChatRole.User, [approval]),
+            mixed ? new(ChatRole.User, [approval, new TextContent("New prompt")]) : new(ChatRole.User, "New prompt"),
+        };
+
+        Assert.Equal("New prompt", ConversationExtractor.ExtractLastUserMessage(messages));
+    }
+
     [Fact]
     public void ExtractLastUserMessage_WithMultipleMessages_ReturnsLastUserMessage()
     {

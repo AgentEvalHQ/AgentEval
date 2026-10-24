@@ -94,11 +94,11 @@ interface AgentEval.Comparison.IStatisticsCalculator
     AgentEval.Comparison.DistributionStatistics CreateDistribution(IReadOnlyList<Int32> values)
     AgentEval.Comparison.DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values)
     AgentEval.Comparison.StochasticStatistics CreateStatistics(IReadOnlyList<Int32> scores, IReadOnlyList<Boolean> passResults, Double confidenceLevel = 0.95)
-    Double CalculatePassRate(IReadOnlyList<Boolean> results)
-    Double Mean(IReadOnlyList<Double> values)
-    Double Median(IReadOnlyList<Double> values)
-    Double Percentile(IReadOnlyList<Double> values, Double percentile)
-    Double StandardDeviation(IReadOnlyList<Double> values)
+    Double? CalculatePassRate(IReadOnlyList<Boolean> results)
+    Double? Mean(IReadOnlyList<Double> values)
+    Double? Median(IReadOnlyList<Double> values)
+    Double? Percentile(IReadOnlyList<Double> values, Double percentile)
+    Double? StandardDeviation(IReadOnlyList<Double> values)
 interface AgentEval.Comparison.IStochasticRunner
     Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Comparison.IAgentFactory factory, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, CancellationToken cancellationToken = default)
     Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Core.IEvaluableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, CancellationToken cancellationToken = default)
@@ -132,8 +132,11 @@ class AgentEval.Comparison.ModelComparisonResult : IEquatable<AgentEval.Comparis
     IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking { get; init; }
     IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults { get; init; }
     Int32 GetHashCode()
+    String CostNotMeasuredReason { get; }
+    String SpeedNotMeasuredReason { get; }
     String Summary { get; }
     String ToString()
+    String UnrankedReason { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, out IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, out AgentEval.Comparison.ModelRanking Winner, out AgentEval.Comparison.ModelComparisonOptions Options)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, AgentEval.Comparison.ModelRanking Winner, AgentEval.Comparison.ModelComparisonOptions Options)
 class AgentEval.Comparison.ModelConfiguration : IEquatable<AgentEval.Comparison.ModelConfiguration>
@@ -153,17 +156,17 @@ class AgentEval.Comparison.ModelRanking : IEquatable<AgentEval.Comparison.ModelR
     Boolean Equals(AgentEval.Comparison.ModelRanking other)
     Boolean Equals(Object obj)
     Double CompositeScore { get; init; }
-    Double CostScore { get; init; }
     Double QualityScore { get; init; }
     Double ReliabilityScore { get; init; }
-    Double SpeedScore { get; init; }
+    Double? CostScore { get; init; }
+    Double? SpeedScore { get; init; }
     Int32 GetHashCode()
     Int32 Rank { get; init; }
     String ModelId { get; init; }
     String ModelName { get; init; }
     String ToString()
-    Void Deconstruct(out String ModelId, out String ModelName, out Double CompositeScore, out Double QualityScore, out Double SpeedScore, out Double CostScore, out Double ReliabilityScore, out Int32 Rank)
-    ctor(String ModelId, String ModelName, Double CompositeScore, Double QualityScore, Double SpeedScore, Double CostScore, Double ReliabilityScore, Int32 Rank)
+    Void Deconstruct(out String ModelId, out String ModelName, out Double CompositeScore, out Double QualityScore, out Double? SpeedScore, out Double? CostScore, out Double ReliabilityScore, out Int32 Rank)
+    ctor(String ModelId, String ModelName, Double CompositeScore, Double QualityScore, Double? SpeedScore, Double? CostScore, Double ReliabilityScore, Int32 Rank)
 class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelResult>
     AgentEval.Comparison.ModelResult <Clone>$()
     AgentEval.Comparison.StochasticResult StochasticResult { get; init; }
@@ -171,16 +174,18 @@ class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelRe
     Boolean Equals(Object obj)
     Decimal? AverageCost { get; init; }
     Decimal? TotalCost { get; init; }
-    Double MeanScore { get; }
-    Double PassRate { get; }
-    Double StandardDeviation { get; }
+    Double? MeanScore { get; }
+    Double? PassRate { get; }
+    Double? StandardDeviation { get; }
     Int32 GetHashCode()
+    Int32 PricedRunCount { get; }
     String ModelId { get; init; }
     String ModelName { get; init; }
     String ToString()
-    TimeSpan AverageLatency { get; init; }
-    Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
-    ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan AverageLatency, Decimal? AverageCost, Decimal? TotalCost)
+    String TotalCostNotPricedReason { get; }
+    TimeSpan? AverageLatency { get; init; }
+    Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan? AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
+    ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan? AverageLatency, Decimal? AverageCost, Decimal? TotalCost)
 class AgentEval.Comparison.ScoringWeights : IEquatable<AgentEval.Comparison.ScoringWeights>
     AgentEval.Comparison.ScoringWeights <Clone>$()
     Boolean Equals(AgentEval.Comparison.ScoringWeights other)
@@ -244,23 +249,28 @@ class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.St
     AgentEval.Comparison.StochasticOptions Options { get; init; }
     AgentEval.Comparison.StochasticResult <Clone>$()
     AgentEval.Comparison.StochasticStatistics Statistics { get; init; }
+    AgentEval.Comparison.StochasticVerdict Verdict { get; }
     AgentEval.Comparison.ToolUsageSummary GetToolUsageSummary(String toolName)
     AgentEval.Models.TestCase TestCase { get; init; }
     Boolean Equals(AgentEval.Comparison.StochasticResult other)
     Boolean Equals(Object obj)
     Boolean Passed { get; init; }
+    Double? PassRateOverAllRuns { get; }
     IReadOnlyDictionary<String, AgentEval.Comparison.DistributionStatistics> MetricDistributions { get; }
     IReadOnlyList<AgentEval.Models.TestResult> IndividualResults { get; init; }
     Int32 FailedCount { get; }
     Int32 GetHashCode()
+    Int32 MeasuredCount { get; }
+    Int32 NotMeasuredCount { get; }
     Int32 PassedCount { get; }
     String Summary { get; }
     String ToString()
-    TimeSpan TotalDuration { get; }
+    TimeSpan? TotalDuration { get; }
     ValueTuple<AgentEval.Models.TestResult, TimeSpan>? FastestRun { get; }
     ValueTuple<AgentEval.Models.TestResult, TimeSpan>? SlowestRun { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, out AgentEval.Comparison.StochasticStatistics Statistics, out AgentEval.Comparison.StochasticOptions Options, out Boolean Passed)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, AgentEval.Comparison.StochasticStatistics Statistics, AgentEval.Comparison.StochasticOptions Options, Boolean Passed)
+    static AgentEval.Comparison.StochasticVerdict DecideVerdict(Int32 passedRuns, Int32 notMeasuredRuns, Int32 totalRuns, Double successRateThreshold)
 class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Comparison.StochasticStatistics>
     AgentEval.Comparison.ConfidenceInterval ConfidenceInterval { get; init; }
     AgentEval.Comparison.StochasticStatistics <Clone>$()
@@ -269,17 +279,22 @@ class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Compariso
     Double MeanScore { get; init; }
     Double MedianScore { get; init; }
     Double PassRate { get; init; }
-    Double Percentile25 { get; init; }
-    Double Percentile75 { get; init; }
-    Double Percentile95 { get; init; }
-    Double StandardDeviation { get; init; }
+    Double? Percentile25 { get; init; }
+    Double? Percentile75 { get; init; }
+    Double? Percentile95 { get; init; }
+    Double? StandardDeviation { get; init; }
     Int32 GetHashCode()
     Int32 MaxScore { get; init; }
     Int32 MinScore { get; init; }
     Int32 SampleSize { get; init; }
     String ToString()
-    Void Deconstruct(out Double PassRate, out Double MeanScore, out Double MedianScore, out Double StandardDeviation, out Int32 MinScore, out Int32 MaxScore, out Double Percentile25, out Double Percentile75, out Double Percentile95, out AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, out Int32 SampleSize)
-    ctor(Double PassRate, Double MeanScore, Double MedianScore, Double StandardDeviation, Int32 MinScore, Int32 MaxScore, Double Percentile25, Double Percentile75, Double Percentile95, AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, Int32 SampleSize)
+    Void Deconstruct(out Double PassRate, out Double MeanScore, out Double MedianScore, out Double? StandardDeviation, out Int32 MinScore, out Int32 MaxScore, out Double? Percentile25, out Double? Percentile75, out Double? Percentile95, out AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, out Int32 SampleSize)
+    ctor(Double PassRate, Double MeanScore, Double MedianScore, Double? StandardDeviation, Int32 MinScore, Int32 MaxScore, Double? Percentile25, Double? Percentile75, Double? Percentile95, AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, Int32 SampleSize)
+enum AgentEval.Comparison.StochasticVerdict
+    Passed
+    Failed
+    Undecided
+    NotMeasured
 class AgentEval.Comparison.ToolUsageSummary : IEquatable<AgentEval.Comparison.ToolUsageSummary>
     AgentEval.Comparison.DistributionStatistics CallCountStats { get; init; }
     AgentEval.Comparison.ToolUsageSummary <Clone>$()
@@ -287,16 +302,17 @@ class AgentEval.Comparison.ToolUsageSummary : IEquatable<AgentEval.Comparison.To
     Boolean AllRunsCalled { get; }
     Boolean Equals(AgentEval.Comparison.ToolUsageSummary other)
     Boolean Equals(Object obj)
-    Double CallRate { get; init; }
-    Double ErrorRate { get; init; }
+    Double? CallRate { get; init; }
+    Double? ErrorRate { get; init; }
     Int32 GetHashCode()
     Int32 RunsWithErrors { get; init; }
     Int32 RunsWithTool { get; init; }
     Int32 TotalCalls { get; init; }
+    Int32? ExecutedCalls { get; init; }
     String ToString()
     String ToolName { get; init; }
-    Void Deconstruct(out String ToolName, out Int32 RunsWithTool, out Int32 RunsWithErrors, out Int32 TotalCalls, out AgentEval.Comparison.DistributionStatistics CallCountStats, out Double CallRate, out Double ErrorRate)
-    ctor(String ToolName, Int32 RunsWithTool, Int32 RunsWithErrors, Int32 TotalCalls, AgentEval.Comparison.DistributionStatistics CallCountStats, Double CallRate, Double ErrorRate)
+    Void Deconstruct(out String ToolName, out Int32 RunsWithTool, out Int32 RunsWithErrors, out Int32 TotalCalls, out AgentEval.Comparison.DistributionStatistics CallCountStats, out Double? CallRate, out Double? ErrorRate)
+    ctor(String ToolName, Int32 RunsWithTool, Int32 RunsWithErrors, Int32 TotalCalls, AgentEval.Comparison.DistributionStatistics CallCountStats, Double? CallRate, Double? ErrorRate)
 static class AgentEval.Core.AgentEvalLoggerExtensions
     static Void LogCritical(AgentEval.Core.IAgentEvalLogger logger, Exception exception, String message)
     static Void LogCritical(AgentEval.Core.IAgentEvalLogger logger, String message)
@@ -387,7 +403,6 @@ static class AgentEval.Core.EvaluationDefaults
     const Double ExtraToolPenaltyPercent
     const Double OrderPenaltyPercent
     const Double PassingScoreThreshold
-    const Int32 DefaultFailureScore
     const Int32 DefaultMaxExpectedToolCalls
     const Int32 DefaultPassingScore
     static TimeSpan DefaultMaxToolDuration
@@ -407,7 +422,7 @@ class AgentEval.Core.EvaluationResult
     IReadOnlyList<AgentEval.Core.CriterionResult> CriteriaResults { get; init; }
     IReadOnlyList<AgentEval.Core.JudgeEvidence> Evidence { get; init; }
     IReadOnlyList<String> Improvements { get; init; }
-    Int32 OverallScore { get; init; }
+    Int32? OverallScore { get; init; }
     Int64? InputTokenCount { get; init; }
     Int64? OutputTokenCount { get; init; }
     String JudgeLabel { get; init; }
@@ -560,6 +575,7 @@ enum AgentEval.Core.MetricCategory
     CodeBased
     Memory
 class AgentEval.Core.MetricResult
+    AgentEval.Core.NotMeasuredCause? NotMeasuredCause { get; init; }
     Boolean Measured { get; init; }
     Boolean Passed { get; init; }
     Boolean? ModelGraded { get; init; }
@@ -570,8 +586,15 @@ class AgentEval.Core.MetricResult
     String RubricDigest { get; init; }
     ctor()
     static AgentEval.Core.MetricResult Fail(String metricName, String explanation, Double score = 0, IDictionary<String, Object> details = null)
+    static AgentEval.Core.MetricResult NotMeasured(String metricName, AgentEval.Core.NotMeasuredCause cause, String reason, IDictionary<String, Object> details = null)
     static AgentEval.Core.MetricResult NotMeasured(String metricName, String reason, IDictionary<String, Object> details = null)
     static AgentEval.Core.MetricResult Pass(String metricName, Double score, String explanation = null, IDictionary<String, Object> details = null)
+enum AgentEval.Core.NotMeasuredCause
+    MissingInput
+    JudgeReplyUnreadable
+    JudgeCallFailed
+    CheckTimedOut
+    NotApplicable
 enum AgentEval.Core.PluginLifecycleStage
     Initializing
     Ready
@@ -844,6 +867,16 @@ static class AgentEval.Evals.EvalInputAgentBinding
     const String AgentMetadataKey
     static Boolean TryReadAgent(AgentEval.Evals.EvalInput input, out AgentEval.Core.IEvaluableAgent agent)
     static String AbsentAgentReason(String family, String typedEntryPoint)
+sealed class AgentEval.Evals.EvalInputObservation : IEquatable<AgentEval.Evals.EvalInputObservation>
+    AgentEval.Evals.EvalInputObservation <Clone>$()
+    Boolean Equals(AgentEval.Evals.EvalInputObservation other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Query { get; init; }
+    String SubjectModel { get; init; }
+    String ToString()
+    Void Deconstruct(out String Query, out String SubjectModel)
+    ctor(String Query, String SubjectModel)
 sealed class AgentEval.Evals.EvalLineage : IEquatable<AgentEval.Evals.EvalLineage>
     AgentEval.Evals.EvalLineage <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalLineage other)
@@ -871,7 +904,7 @@ sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalPro
     Boolean CacheHit { get; init; }
     Boolean Equals(AgentEval.Evals.EvalProvenance other)
     Boolean Equals(Object obj)
-    Double EstimatedCost { get; init; }
+    Double? EstimatedCost { get; init; }
     Int32 GetHashCode()
     Int32? JudgePanelSize { get; init; }
     Int32? TokensUsed { get; init; }
@@ -882,23 +915,26 @@ sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalPro
     String RubricDigest { get; init; }
     String ToString()
     String Type { get; init; }
-    Void Deconstruct(out String Type, out String JudgeModel, out String PromptId, out String PromptHash, out Int32? TokensUsed, out Double EstimatedCost, out Boolean CacheHit)
-    ctor(String Type, String JudgeModel, String PromptId, String PromptHash, Int32? TokensUsed, Double EstimatedCost, Boolean CacheHit)
+    Void Deconstruct(out String Type, out String JudgeModel, out String PromptId, out String PromptHash, out Int32? TokensUsed, out Double? EstimatedCost, out Boolean CacheHit)
+    ctor(String Type, String JudgeModel, String PromptId, String PromptHash, Int32? TokensUsed, Double? EstimatedCost, Boolean CacheHit)
 static class AgentEval.Evals.EvalReportHelpers
     static AgentEval.Evals.EvalResult FindByKey(AgentEval.Evals.EvalResult root, String key, Int32 depth = 0)
     static String Capitalize(String s)
     static String TruncateForPreview(String text, Int32 maxLen = 80)
 sealed class AgentEval.Evals.EvalResult : IEquatable<AgentEval.Evals.EvalResult>
     AgentEval.Evals.EvalDetails Details { get; init; }
+    AgentEval.Evals.EvalInputObservation Observation { get; init; }
     AgentEval.Evals.EvalMetadata Metric { get; init; }
     AgentEval.Evals.EvalProvenance Provenance { get; init; }
     AgentEval.Evals.EvalResult <Clone>$()
     AgentEval.Evals.EvalScore Score { get; init; }
+    AgentEval.Output.ComparabilityFacts ComparisonObservation { get; init; }
     Boolean Equals(AgentEval.Evals.EvalResult other)
     Boolean Equals(Object obj)
     DateTimeOffset EvaluatedAt { get; init; }
     Int32 GetHashCode()
     String ToString()
+    TimeSpan? ObservedDuration { get; init; }
     Void Deconstruct(out AgentEval.Evals.EvalMetadata Metric, out AgentEval.Evals.EvalScore Score, out AgentEval.Evals.EvalDetails Details, out AgentEval.Evals.EvalProvenance Provenance, out DateTimeOffset EvaluatedAt)
     ctor(AgentEval.Evals.EvalMetadata Metric, AgentEval.Evals.EvalScore Score, AgentEval.Evals.EvalDetails Details, AgentEval.Evals.EvalProvenance Provenance, DateTimeOffset EvaluatedAt)
     static AgentEval.Evals.EvalResult Skipped(AgentEval.Evals.IEval eval, String reason)
@@ -942,6 +978,7 @@ static class AgentEval.Evals.EvalScoreExtensions
     static AgentEval.Evals.RunStatsBucket StatsBucket(AgentEval.Evals.EvalScore score)
     static AgentEval.Output.RunStats ToRunStats(IEnumerable<AgentEval.Evals.EvalScore> scores)
     static Boolean CountsTowardAggregate(AgentEval.Evals.EvalScore score)
+    static Double? MeasuredValue(AgentEval.Evals.EvalScore score)
     static String CombineReportStatus(String a, String b)
     static String ReportStatus(AgentEval.Evals.EvalScore score)
     static String RunVerdict(AgentEval.Evals.EvalScore root, AgentEval.Output.RunStats stats)
@@ -1045,11 +1082,9 @@ interface AgentEval.Evals.IEvalResultRenderer
     String FormatId { get; }
     Task<Byte[]> RenderAsync(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options, CancellationToken ct = default)
 static class AgentEval.Evals.JudgeCostMap
-    const Double DefaultInputRatePer1K
-    const Double DefaultOutputRatePer1K
-    static AgentEval.Evals.JudgeCostMap.ModelRate GetRate(String judgeModel)
+    static AgentEval.Evals.JudgeCostMap.ModelRate? GetRate(String judgeModel)
     static Boolean IsRegistered(String judgeModel)
-    static Double EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
+    static Double? EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
     static Void Register(String judgeModel, Double inputRatePer1K, Double outputRatePer1K)
 struct AgentEval.Evals.JudgeCostMap.ModelRate : IEquatable<AgentEval.Evals.JudgeCostMap.ModelRate>
     Boolean Equals(AgentEval.Evals.JudgeCostMap.ModelRate other)
@@ -1249,6 +1284,7 @@ static class AgentEval.Evals.TestRunEvalProjection
     const String ToolNotExecutedResultPrefix
     const String UnconvertibleResultPrefix
     static AgentEval.Evals.EvalInput ToEvalInput(AgentEval.Models.TestCase testCase, AgentEval.Models.TestResult result)
+    static AgentEval.Evals.EvalInput ToEvalInput(AgentEval.Models.TestCase testCase, AgentEval.Models.TestResult result, String agentInstructions)
     static AgentEval.Evals.ToolCall ToToolCall(AgentEval.Models.ToolCallRecord record)
 sealed class AgentEval.Evals.ToolCall : IEquatable<AgentEval.Evals.ToolCall>
     AgentEval.Evals.ToolCall <Clone>$()
@@ -1329,8 +1365,8 @@ class AgentEval.Models.EvaluationReport
     DateTimeOffset EndTime { get; set; }
     DateTimeOffset StartTime { get; set; }
     Dictionary<String, String> Metadata { get; set; }
-    Double OverallScore { get; set; }
-    Double PassRate { get; }
+    Double? OverallScore { get; set; }
+    Double? PassRate { get; }
     Int32 FailedTests { get; set; }
     Int32 PassedTests { get; set; }
     Int32 SkippedTests { get; set; }
@@ -1338,7 +1374,7 @@ class AgentEval.Models.EvaluationReport
     List<AgentEval.Models.TestResultSummary> TestResults { get; set; }
     String Name { get; set; }
     String RunId { get; set; }
-    TimeSpan Duration { get; }
+    TimeSpan? Duration { get; }
     ctor()
 class AgentEval.Models.ExecutorStep : IEquatable<AgentEval.Models.ExecutorStep>
     AgentEval.Core.TokenUsage TokenUsage { get; init; }
@@ -1360,6 +1396,7 @@ class AgentEval.Models.ExecutorStep : IEquatable<AgentEval.Models.ExecutorStep>
     String Input { get; init; }
     String Output { get; init; }
     String ParallelBranchId { get; init; }
+    String TimingNotMeasuredReason { get; init; }
     String ToString()
     TimeSpan Duration { get; init; }
     TimeSpan StartOffset { get; init; }
@@ -1421,11 +1458,12 @@ class AgentEval.Models.GroundTruthToolCall
     ctor()
 interface AgentEval.Models.IRedTeamResult
     Boolean Passed { get; }
-    Double AttackSuccessRate { get; }
-    Double OverallScore { get; }
+    Double? AttackSuccessRate { get; }
+    Double? OverallScore { get; }
     String AgentName { get; }
     String Summary { get; }
 static class AgentEval.Models.ModelPricing
+    const String BaselineNotice
     const String TableName
     static AgentEval.Models.ModelPricingSnapshot CaptureSnapshot()
     static Decimal? EstimateCost(String modelName, Int32 inputTokens, Int32 outputTokens)
@@ -1518,12 +1556,13 @@ class AgentEval.Models.TestResult
     String TestName { get; init; }
     ctor()
 class AgentEval.Models.TestResultSummary
+    Boolean NotMeasured { get; set; }
     Boolean Passed { get; set; }
     Boolean Skipped { get; set; }
     Dictionary<String, Double> MetricScores { get; set; }
     Dictionary<String, String> MetricsNotMeasured { get; set; }
-    Double Score { get; set; }
-    Int64 DurationMs { get; set; }
+    Double? Score { get; set; }
+    Int64? DurationMs { get; set; }
     List<AgentEval.Output.AssertionResult> Assertions { get; set; }
     String Category { get; set; }
     String Error { get; set; }
@@ -1533,14 +1572,19 @@ class AgentEval.Models.TestResultSummary
     ctor()
 class AgentEval.Models.TestSummary
     Boolean AllPassed { get; }
-    Decimal TotalCost { get; }
-    Double AverageScore { get; }
+    Boolean HasMeasuredScore { get; }
+    Decimal? TotalCost { get; }
+    Double? AverageScore { get; }
     IReadOnlyList<AgentEval.Models.TestResult> Results { get; }
+    IReadOnlyList<String> UnpricedTests { get; }
     Int32 FailedCount { get; }
+    Int32 MeasuredCount { get; }
+    Int32 NotMeasuredCount { get; }
     Int32 PassedCount { get; }
     Int32 TotalCount { get; }
     String SuiteName { get; }
-    TimeSpan TotalDuration { get; }
+    String TotalCostNotPricedReason { get; }
+    TimeSpan? TotalDuration { get; }
     ctor(String suiteName, IEnumerable<AgentEval.Models.TestResult> results)
 static class AgentEval.Models.TestSummaryExtensions
     static AgentEval.Models.EvaluationReport ToEvaluationReport(AgentEval.Models.TestSummary summary, String agentName = null, String modelName = null, String endpoint = null)
@@ -1575,6 +1619,8 @@ sealed class AgentEval.Models.ToolCallTimeline
     Int32 FailedToolCalls { get; }
     Int32 SuccessfulToolCalls { get; }
     Int32 TotalToolCalls { get; }
+    Int32 UnmeasuredDurationCount { get; }
+    Int32 UnmeasuredOutcomeCount { get; }
     String ConversationId { get; set; }
     String ToAsciiDiagram(Int32 width = 80)
     String ToCompactSummary()
@@ -1594,7 +1640,9 @@ sealed class AgentEval.Models.ToolInvocation : IEquatable<AgentEval.Models.ToolI
     Int32 SequenceIndex { get; init; }
     String Arguments { get; init; }
     String ErrorMessage { get; init; }
+    String OutcomeNotMeasuredReason { get; init; }
     String Result { get; init; }
+    String TimingNotMeasuredReason { get; init; }
     String ToString()
     String ToolName { get; init; }
     TimeSpan Duration { get; init; }
@@ -1605,11 +1653,13 @@ sealed class AgentEval.Models.ToolStatistics : IEquatable<AgentEval.Models.ToolS
     AgentEval.Models.ToolStatistics <Clone>$()
     Boolean Equals(AgentEval.Models.ToolStatistics other)
     Boolean Equals(Object obj)
-    Double SuccessRate { get; }
+    Double? SuccessRate { get; }
     Int32 CallCount { get; init; }
     Int32 FailureCount { get; init; }
     Int32 GetHashCode()
     Int32 SuccessCount { get; init; }
+    Int32 UnmeasuredDurationCount { get; init; }
+    Int32 UnmeasuredOutcomeCount { get; init; }
     String ToString()
     String ToolName { get; init; }
     TimeSpan AverageDuration { get; init; }
@@ -1775,7 +1825,7 @@ class AgentEval.Models.WorkflowTestSummary : IEquatable<AgentEval.Models.Workflo
     Boolean AllPassed { get; }
     Boolean Equals(AgentEval.Models.WorkflowTestSummary other)
     Boolean Equals(Object obj)
-    Double PassRate { get; }
+    Double? PassRate { get; }
     IReadOnlyList<AgentEval.Models.WorkflowTestResult> Results { get; init; }
     Int32 FailedTests { get; init; }
     Int32 GetHashCode()
@@ -1860,14 +1910,19 @@ static class AgentEval.Output.BaselinePromotion
     static Void EnsurePromotable(AgentEval.Output.RunSummary summary)
 sealed class AgentEval.Output.ComparabilityFacts : IEquatable<AgentEval.Output.ComparabilityFacts>
     AgentEval.Output.ComparabilityFacts <Clone>$()
+    AgentEval.Output.EvaluationInstrumentKind EffectiveInstrumentKind { get; }
+    AgentEval.Output.EvaluationInstrumentKind? InstrumentKind { get; init; }
     AgentEval.Output.JudgeFingerprint Judge { get; init; }
     AgentEval.Output.RecordedChanceFloor ChanceFloor { get; init; }
     Boolean Equals(AgentEval.Output.ComparabilityFacts other)
     Boolean Equals(Object obj)
     Double? EffectiveBar { get; init; }
     Int32 GetHashCode()
+    String EffectiveRubricDigest { get; }
     String EvalKey { get; init; }
     String EvalVersion { get; init; }
+    String EvaluationPolicyDigest { get; init; }
+    String RubricDigest { get; init; }
     String ToString()
     Void Deconstruct(out String EvalKey, out String EvalVersion)
     const String ChanceFloorDimension
@@ -1925,12 +1980,16 @@ sealed class AgentEval.Output.EnvRef : IEquatable<AgentEval.Output.EnvRef>
     String ToString()
     Void Deconstruct(out String Machine, out String Os, out String DotnetVersion, out Boolean Ci, out String CiSystem, out String Runner)
     ctor(String Machine, String Os, String DotnetVersion, Boolean Ci, String CiSystem, String Runner)
+enum AgentEval.Output.EvaluationInstrumentKind
+    Unknown
+    Deterministic
+    Model
 sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.EvidenceControl>
     AgentEval.Output.EvidenceControl <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceControl other)
     Boolean Equals(Object obj)
     Boolean? RegressedFromBaseline { get; init; }
-    Double PassRate { get; init; }
+    Double? PassRate { get; init; }
     IReadOnlyList<String> ScenarioRefs { get; init; }
     Int32 GetHashCode()
     String Id { get; init; }
@@ -1938,8 +1997,8 @@ sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.Evid
     String Status { get; init; }
     String Title { get; init; }
     String ToString()
-    Void Deconstruct(out String Id, out String Title, out String Status, out Double PassRate, out IReadOnlyList<String> ScenarioRefs, out String Notes, out Boolean? RegressedFromBaseline)
-    ctor(String Id, String Title, String Status, Double PassRate, IReadOnlyList<String> ScenarioRefs, String Notes, Boolean? RegressedFromBaseline = null)
+    Void Deconstruct(out String Id, out String Title, out String Status, out Double? PassRate, out IReadOnlyList<String> ScenarioRefs, out String Notes, out Boolean? RegressedFromBaseline)
+    ctor(String Id, String Title, String Status, Double? PassRate, IReadOnlyList<String> ScenarioRefs, String Notes, Boolean? RegressedFromBaseline = null)
 sealed class AgentEval.Output.EvidenceSummary : IEquatable<AgentEval.Output.EvidenceSummary>
     AgentEval.Output.EvidenceSummary <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceSummary other)
@@ -2204,26 +2263,32 @@ sealed class AgentEval.Output.RunSummary : IEquatable<AgentEval.Output.RunSummar
     String Verdict { get; init; }
     Void Deconstruct(out String SchemaVersion, out String RunId, out String Verdict, out AgentEval.Output.RunStats Stats, out IReadOnlyDictionary<String, Double> Metrics, out AgentEval.Output.RunCostInfo Cost)
     ctor(String SchemaVersion, String RunId, String Verdict, AgentEval.Output.RunStats Stats, IReadOnlyDictionary<String, Double> Metrics, AgentEval.Output.RunCostInfo Cost = null)
+static class AgentEval.Output.ScenarioMeasurement
+    const String NotApplicable
+    const String NotMeasured
+    static Boolean IsMeasured(AgentEval.Output.ScenarioResult result)
+    static String Of(AgentEval.Evals.Meta.MeasurementState state)
 sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.ScenarioResult>
     AgentEval.Output.ComparabilityFacts Comparability { get; init; }
     AgentEval.Output.ScenarioResult <Clone>$()
     Boolean Equals(AgentEval.Output.ScenarioResult other)
     Boolean Equals(Object obj)
     Boolean Passed { get; init; }
-    Double EstimatedCost { get; init; }
-    Double Score { get; init; }
+    Double? EstimatedCost { get; init; }
+    Double? Score { get; init; }
     IReadOnlyDictionary<String, Double> Metrics { get; init; }
     IReadOnlyList<AgentEval.Output.AssertionResult> Assertions { get; init; }
     Int32 GetHashCode()
     String Id { get; init; }
     String Input { get; init; }
+    String Measurement { get; init; }
     String Name { get; init; }
     String Output { get; init; }
     String StimulusHash { get; init; }
     String ToString()
-    TimeSpan Duration { get; init; }
-    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan Duration, out Double EstimatedCost)
-    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan Duration, Double EstimatedCost)
+    TimeSpan? Duration { get; init; }
+    Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double? Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan? Duration, out Double? EstimatedCost)
+    ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double? Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan? Duration, Double? EstimatedCost)
 sealed class AgentEval.Output.SolutionInfo : IEquatable<AgentEval.Output.SolutionInfo>
     AgentEval.Output.SolutionInfo <Clone>$()
     Boolean Equals(AgentEval.Output.SolutionInfo other)

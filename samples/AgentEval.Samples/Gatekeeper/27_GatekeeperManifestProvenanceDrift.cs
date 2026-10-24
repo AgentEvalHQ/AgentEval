@@ -158,14 +158,14 @@ public static class GatekeeperManifestProvenanceDrift
             return;
         }
 
-        throw new InvalidOperationException("Manifest-drift sample failed: " + message + ".");
+        throw new SampleCheckFailedException("Manifest-drift sample failed: " + message + ".");
     }
 
     private static void Require(bool condition, string message)
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Manifest-drift sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Manifest-drift sample failed: " + message + ".");
         }
     }
 }

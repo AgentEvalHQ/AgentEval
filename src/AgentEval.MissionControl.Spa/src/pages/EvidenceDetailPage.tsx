@@ -5,7 +5,7 @@ import { gqlRequest } from "@/lib/graphql-client";
 import { restUrls } from "@/lib/rest-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatPercentage } from "@/lib/format";
 
 // Plan-08 Wave 7 (MC1.6.8): per-evidence detail page reachable from the
 // compliance matrix. Renders the full evidence (controls + summary +
@@ -17,11 +17,13 @@ import { formatDate, formatDateTime } from "@/lib/format";
 // the per-doc audit chain is broken (source-run-not-found or hash-mismatch).
 
 type CellStatus = "pass" | "warn" | "fail";
-type ChainBreakReason = "source-run-not-found" | "hash-mismatch";
+type ChainBreakReason = "source-run-not-found" | "hash-mismatch" | "imported-not-sealed-when-run" | "unsealed-evidence";
 
 interface EvidenceDetailResponse {
   complianceEvidence: {
     chainValid: boolean;
+    sourceId: string | null;
+    containerRunId: string | null;
     chainBreakReason: ChainBreakReason | null;
     evidence: {
       schemaVersion: string;
@@ -46,7 +48,7 @@ interface EvidenceDetailResponse {
         id: string;
         title: string;
         status: CellStatus;
-        passRate: number;
+        passRate: number | null;
         notes: string | null;
         regressedFromBaseline: boolean | null;
       }[];
@@ -65,6 +67,8 @@ const EVIDENCE_QUERY = /* GraphQL */ `
     complianceEvidence(regulation: $regulation, subjectKind: $kind, subjectName: $name, timestamp: $ts) {
       chainValid
       chainBreakReason
+      sourceId
+      containerRunId
       evidence {
         schemaVersion
         regulation
@@ -87,6 +91,10 @@ const EVIDENCE_QUERY = /* GraphQL */ `
 `;
 
 const CHAIN_BREAK_MESSAGE: Record<ChainBreakReason, string> = {
+  "imported-not-sealed-when-run":
+    "Imported: not sealed when it ran. The ingest seal protects this captured report from conversion onward; original execution custody is not established.",
+  "unsealed-evidence":
+    "This report is captured in unsealed AEF evidence. Original execution integrity is not established.",
   "source-run-not-found":
     "The source run referenced by this evidence is missing from the workspace. The evidence may be orphaned or the run was deleted after attestation.",
   "hash-mismatch":
@@ -165,7 +173,7 @@ export function EvidenceDetailPage() {
                 <ShieldAlert className="text-red-600 shrink-0 mt-0.5" size={20} aria-hidden="true" />
                 <div>
                   <h3 className="text-sm font-semibold text-red-900">
-                    Audit chain broken ({wrapper.chainBreakReason})
+                    Evidence custody warning ({wrapper.chainBreakReason})
                   </h3>
                   <p className="text-sm text-red-800 mt-1">
                     {CHAIN_BREAK_MESSAGE[wrapper.chainBreakReason]}
@@ -193,19 +201,19 @@ export function EvidenceDetailPage() {
                   Overall: {ev.summary.overallStatus}
                 </span>
                 <a
-                  href={restUrls.compliancePdf(regulation, name, ts)}
+                  href={restUrls.compliancePdf(regulation, name, ts, ev.subject.kind, wrapper.sourceId)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
                 >
                   Source PDF <ExternalLink size={12} />
                 </a>
-                <Link
-                  to={`/runs/${encodeURIComponent(ev.sourceRun.runId)}`}
+                {wrapper.containerRunId && wrapper.sourceId && <Link
+                  to={`/runs/${encodeURIComponent(wrapper.containerRunId)}?sourceId=${encodeURIComponent(wrapper.sourceId)}`}
                   className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
                 >
-                  Source run
-                </Link>
+                  Captured run
+                </Link>}
               </div>
             </header>
 
@@ -246,7 +254,7 @@ export function EvidenceDetailPage() {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right font-mono">
-                        {(c.passRate * 100).toFixed(0)}%
+                        {formatPercentage(c.passRate)}
                       </td>
                       <td className="px-4 py-2 text-xs text-slate-700">
                         {c.notes ?? "—"}

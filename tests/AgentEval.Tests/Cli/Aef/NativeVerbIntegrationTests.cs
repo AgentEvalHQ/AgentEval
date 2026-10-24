@@ -9,6 +9,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Results.Integrity;
+using AgentEval.Results.Writing;
 using AgentEval.Tests.TestHelpers;
 using Xunit;
 
@@ -19,12 +20,21 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "aef-native-" + Guid.NewGuid().ToString("N"));
 
-    private static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke)
+    internal static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke, bool legacy = false)
     {
         var command = new Command("test");
         command.Options.Add(new Option<DirectoryInfo?>("--aef"));
         var controls = new AefCliOptions(command);
-        return controls.InvokeAsync(command.Parse(["--aef-content", enabled ? "on" : "off"]), invoke);
+        return controls.InvokeAsync(command.Parse(legacy
+            ? ["--aef-content", enabled ? "on" : "off", "--legacy-output"]
+            : ["--aef-content", enabled ? "on" : "off"]), invoke);
+    }
+
+    internal static async Task<T> WithLegacyOutput<T>(Func<Task<T>> invoke)
+    {
+        T result = default!;
+        await WithCapture(false, async () => { result = await invoke(); return 0; }, legacy: true);
+        return result;
     }
 
     private static List<JsonNode> ArtifactLines(string directory) => File.Exists(Path.Combine(directory, "evidence.ndjson"))
@@ -144,6 +154,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (runs > 1) Assert.Null(config["metrics"]);
         else Assert.Equal("code_toxicity", (string?)Assert.Single(config["metrics"]!.AsArray()));
         Assert.DoesNotContain("secret-one", File.ReadAllText(Path.Combine(dir, "run.json")));
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(dir);
+#endif
     }
 
     [Theory]
@@ -269,6 +282,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             AssertIntact(run);
             Assert.Equal("mocked", (string?)Document(run, "run.json")["execution"]!["targetMode"]);
             AssertAutoAuditDefinition(run, scripted: true);
+#if NET10_0_OR_GREATER
+            await MissionControlProducerAssertions.ReadAsync(run);
+#endif
             var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
             Assert.Equal("inconclusive", (string?)gate["outcome"]);
             Assert.Equal(11, (int)gate["exitCode"]!);
@@ -627,20 +643,31 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
-    [Fact]
-    public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate()
+    [Theory]
+    [InlineData("code_toxicity", "passed", null, 0)]
+    [InlineData("llm_faithfulness", "not_measured", "missingInput", 11)]
+    [InlineData("llm_relevance", "error", "judgeReplyUnreadable", 11)]
+    public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate(string name, string state, string? cause, int exit)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync();
-        var options = Options(endpoint.Endpoint, metrics: "code_toxicity");
-        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
-        Assert.Single(endpoint.Requests);
+        var options = Options(endpoint.Endpoint, metrics: name);
+        Assert.Equal(exit, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        if (name != "llm_relevance") Assert.Single(endpoint.Requests); // Missing context spends no judge call.
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal("passed", (string?)lines[0]["state"]);
-        var metric = Assert.Single(lines, l => (string?)l["path"] == "case/metrics/code_toxicity");
+        var metric = Assert.Single(lines, l => (string?)l["path"] == "case/metrics/" + name);
         Assert.Equal((string?)lines[0]["resultId"], (string?)metric["parentResultId"]);
-        Assert.Equal("code_toxicity", (string?)metric["scores"]![0]!["metric"]);
+        Assert.Equal(state, (string?)metric["state"]);
+        if (cause is null) Assert.Equal(name, (string?)metric["scores"]![0]!["metric"]);
+        else
+        {
+            Assert.Equal(cause, (string?)metric["ext"]!["agenteval.metric"]!["notMeasuredCause"]);
+            Assert.NotNull(metric["reason"]);
+            Assert.Null(metric["scores"]);
+            Assert.Null(metric["annotator"]);
+        }
         Assert.DoesNotContain("secret-prompt", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
@@ -834,9 +861,33 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(2, usage.Count);
         Assert.Equal(endpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
         Assert.Equal(judgeEndpoint.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories));
         AssertStoreLink(RunDirectory(aef.FullName));
+#if NET10_0_OR_GREATER
+        if (family == "owasp" && !fromEnvironment) await MissionControlProducerAssertions.ReadAsync(RunDirectory(aef.FullName));
+#endif
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
+        // Default publication above has no legacy run. Exercise the temporary fallback separately for conversion parity.
+        var fallbackAef = new DirectoryInfo(Path.Combine(_root, "fallback-aef"));
+        Assert.Equal(written, await WithCapture(false, () => Run(fallbackAef, false), legacy: true));
+        // The historical comparison unit is the entire benchmark, not one of its probe resistance readings.
+        var workspace = Path.Combine(_root, ".agenteval");
+        var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+        var convertedPath = Path.Combine(_root, "converted-scan");
+        AgentEval.Results.Adapters.StoreV1.StoreV1Exporter.ExportWorkspaceRun(workspace, legacy, convertedPath,
+            new() { ContentCapture = AefCliOptions.ContentCapture });
+        var comparisonReader = new AgentEval.Results.Adapters.Comparison.AefComparisonReader();
+        var converted = comparisonReader.Read(convertedPath);
+        Assert.Equal(family + "-smoke", Assert.Single(converted.Scenarios).Id);
+        Assert.Equal(AgentEval.Output.ComparisonVerdict.Comparable, converted.CompareTo(converted).Verdict);
+        var originalScenario = JsonNode.Parse(File.ReadAllBytes(Assert.Single(
+            Directory.GetFiles(Path.Combine(legacy, "scenarios"), "*.json"))))!;
+        Assert.Equal((string?)originalScenario["name"], Assert.Single(converted.Scenarios).Name);
+        var native = comparisonReader.Read(RunDirectory(fallbackAef.FullName));
+        Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)),
+            converted.Scenarios.Select(s => (s.Id, s.Name, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)));
+        Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
         var notWritten = new DirectoryInfo(Path.Combine(_root, "disabled-aef"));
         var disabled = await Run(notWritten, true);
 
@@ -1281,7 +1332,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("definition", (string?)Document(dir, "run.json")["ext"]!["agenteval.suiteIdentity"]!["scope"]);
         var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
             dir, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
-        Assert.Equal(new[] { "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
+        Assert.Equal(new[] { "perf_benchmark", "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
         Assert.Equal(definition.Digest, (string?)Document(dir, "run.json")["suite"]!["digest"]);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
@@ -1444,12 +1495,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (afterReport) Console.SetOut(output);
-            var exit = await BenchMemoryCommand.RunAsync("quick", "memory-subject", _root, client, cancel.Token,
+            var exit = await WithCapture(true, () => BenchMemoryCommand.RunAsync("quick", "memory-subject", _root, client, cancel.Token,
                 aef, noAef, onCategoryCompleted: category =>
                 {
                     completed++;
                     if (!afterReport) cancel.Cancel();
-                });
+                }));
             Assert.Equal(invalidOutput ? 3 : 1, exit);
         }
         finally { Console.SetOut(original); }
@@ -1469,13 +1520,22 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(completed, lines.Count(l => ((string?)l["path"])?.StartsWith("case/", StringComparison.Ordinal) == true));
+        if (afterReport)
+        {
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval"), "report-native.json", SearchOption.AllDirectories)))!;
+            NativeReportAssertions.MatchesProducer(dir, source, capture: true);
+        }
+        else Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         AssertMemoryRecipe(dir);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    public async Task Memory_CompletedOrCancelledBeforeCalls_SealsSameDeclaredRecipe(bool cancelBeforeCalls, bool capture, bool legacyOutput = false)
     {
         Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
         await InitCommand.RunAsync("memory-definition", _root);
@@ -1488,15 +1548,38 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeCalls) Console.SetOut(output);
-            exit = await BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination);
+            exit = await WithCapture(capture, () => BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination), legacy: legacyOutput);
         }
         finally { Console.SetOut(original); }
         Assert.Equal(cancelBeforeCalls ? 1 : 0, exit);
         var directory = RunDirectory(destination.FullName);
         AssertIntact(directory);
         AssertMemoryRecipe(directory);
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
         if (cancelBeforeCalls) Assert.Empty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
-        else Assert.NotEmpty(File.ReadAllLines(Path.Combine(directory, "results.ndjson")));
+        else
+        {
+            var workspace = Path.Combine(_root, ".agenteval");
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "report-native.json", SearchOption.AllDirectories)))!;
+            var report = legacyOutput ? LegacyMemoryReportAssertions.Import(workspace, source, "BenchMemoryCommand", reportOnly: false)
+                : JsonNode.Parse(File.ReadAllBytes(Path.Combine(source, "report-native.json")))!.AsObject();
+            NativeReportAssertions.MatchesProducer(directory, source, capture);
+            var native = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+            Assert.Single(native, r => r["parentResultId"] is null);
+            var categories = report["CategoryResults"]!.AsArray();
+            Assert.Equal(categories.Count, native.Count(r => r["parentResultId"] is not null));
+            foreach (var category in categories)
+            {
+                var key = "memory." + ((string)category!["CategoryName"]!).ToLowerInvariant().Replace(' ', '-');
+                var observed = Assert.Single(native, r => (string?)r["evaluator"]!["id"] == key);
+                Assert.Equal((double)category["Weight"]!, (double)observed["component"]!["weight"]!);
+                Assert.Equal((double)category["Score"]! / 100, (double)observed["scores"]![0]!["value"]!);
+                Assert.Equal(TimeSpan.Parse((string)category["Duration"]!, System.Globalization.CultureInfo.InvariantCulture).TotalMilliseconds,
+                    (double?)observed["durationMs"]);
+            }
+        }
     }
 
     private static void AssertMemoryRecipe(string directory)
@@ -1513,13 +1596,22 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Episodic", false)]
-    [InlineData("Episodic", true)]
-    [InlineData("WorkingMemory", false)]
-    [InlineData("WorkingMemory", true)]
-    [InlineData("Forgetting", false)]
-    [InlineData("Forgetting", true)]
-    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions)
+    [InlineData("Episodic", false, false)]
+    [InlineData("Episodic", false, true)]
+    [InlineData("Episodic", true, false)]
+    [InlineData("WorkingMemory", false, false)]
+    [InlineData("WorkingMemory", false, true)]
+    [InlineData("WorkingMemory", true, false)]
+    [InlineData("Forgetting", false, false)]
+    [InlineData("Forgetting", false, true)]
+    [InlineData("Forgetting", true, false)]
+    [InlineData("Episodic", false, true, true)]
+    [InlineData("Episodic", false, false, true)]
+    [InlineData("WorkingMemory", false, true, true)]
+    [InlineData("WorkingMemory", false, false, true)]
+    [InlineData("Forgetting", false, true, true)]
+    [InlineData("Forgetting", false, false, true)]
+    public async Task TypedMemory_CompleteOrCancelledBeforeQuestions_SealsPlannedDefinition(string vertical, bool cancelBeforeQuestions, bool capture, bool legacyOutput = false)
     {
         await InitCommand.RunAsync("typed-definition", _root);
         var descriptor = AgentEval.Memory.External.TypedMemEval.TypedMemEvalVerticals.For(
@@ -1535,7 +1627,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeQuestions) Console.SetOut(output);
-            exit = await BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination);
+            exit = await WithCapture(capture, () => BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination), legacy: legacyOutput);
         }
         finally { Console.SetOut(previous); }
         Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
@@ -1556,6 +1648,18 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(cancelBeforeQuestions ? 0 : descriptor.QuestionCount, (int)diagnostics["observedQuestions"]!);
         Assert.False((bool)diagnostics["gating"]!);
         Assert.False(File.Exists(Path.Combine(directory, "gates.ndjson")));
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
+        if (!cancelBeforeQuestions)
+        {
+            var workspace = Path.Combine(_root, ".agenteval");
+            var source = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "report-native.json", SearchOption.AllDirectories)))!;
+            var report = legacyOutput ? LegacyMemoryReportAssertions.Import(workspace, source, "BenchTypedMemEvalCommand", reportOnly: true)
+                : JsonNode.Parse(File.ReadAllBytes(Path.Combine(source, "report-native.json")))!.AsObject();
+            LegacyMemoryReportAssertions.NativeQuestions(directory, report);
+            NativeReportAssertions.MatchesProducer(directory, source, capture);
+        }
         if (vertical == "WorkingMemory")
         {
             var buckets = diagnostics["byDistanceSessions"]!.AsObject();
@@ -1596,13 +1700,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var aef = new DirectoryInfo(Path.Combine(_root, "typed-aef"));
         if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
         string? observed = null;
-        var exit = await BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token,
+        var exit = await WithCapture(true, () => BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token,
             aef, noAef, onQuestionCompleted: question =>
             {
                 observed = question.QuestionId;
                 if (fail) throw new InvalidOperationException("test failure after typed question");
                 cancel.Cancel();
-            });
+            }));
         Assert.Equal(invalidOutput ? 3 : 1, exit);
         Assert.NotNull(observed);
         if (noAef || invalidOutput)
@@ -1614,6 +1718,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
@@ -1636,6 +1741,37 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    [InlineData(false, 1, true)]
+    [InlineData(false, 2, true)]
+    [InlineData(true, 1, true)]
+    [InlineData(true, 2, true)]
+    public async Task Composite_Completed_ConversionPreservesAtomicComparison(bool euAiAct, int runs, bool legacyOutput = false)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        await new AgentEval.Output.FileSystemOutputStore(workspace).InitializeSolutionAsync("composite-parity");
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var exit = await WithCapture(true, () => euAiAct
+            ? BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef)
+            : BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                responseText: "answer", runs: runs, aef: aef), legacy: legacyOutput);
+        Assert.Equal(0, exit);
+        var directory = RunDirectory(aef.FullName);
+        AssertIntact(directory);
+        Assert.Equal("completed", (string?)Document(directory, "run.json")["status"]);
+        if (runs == 1) AssertStoreLink(directory);
+        else AssertCompositeStoreLinks(directory, runs);
+        if (legacyOutput) await CompositeComparisonAssertions.MatchesFinalAsync(workspace, directory, capture: true);
+#if NET10_0_OR_GREATER
+        await MissionControlProducerAssertions.ReadAsync(directory);
+#endif
+    }
+
+    [Theory]
     [InlineData(false, 1, false, false)]
     [InlineData(true, 1, false, false)]
     [InlineData(false, 2, false, false)]
@@ -1644,7 +1780,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(true, 2, true, false)]
     [InlineData(false, 2, false, true)]
     [InlineData(true, 2, false, true)]
-    public async Task Composite_ReportFailure_RetainsEvidenceAndPersistedLinks(bool euAiAct, int runs, bool noAef, bool invalidDestination)
+    [InlineData(false, 1, false, false, true)]
+    [InlineData(false, 2, false, false, true)]
+    [InlineData(true, 1, false, false, true)]
+    [InlineData(true, 2, false, false, true)]
+    public async Task Composite_ReportFailure_RetainsEvidenceAndPersistedLinks(bool euAiAct, int runs, bool noAef, bool invalidDestination, bool legacyOutput = false)
     {
         var workspace = Path.Combine(_root, ".agenteval");
         Directory.CreateDirectory(workspace);
@@ -1654,11 +1794,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         File.WriteAllText(Path.Combine(workspace, "compliance"), "occupied");
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
         if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
-        var exit = euAiAct
+        var exit = await WithCapture(false, async () => euAiAct
             ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
                 responseText: "answer", runs: runs, aef: aef, noAef: noAef)
             : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                responseText: "answer", runs: runs, aef: aef, noAef: noAef);
+                responseText: "answer", runs: runs, aef: aef, noAef: noAef), legacy: legacyOutput);
         Assert.Equal(invalidDestination ? 3 : 1, exit);
         if (noAef || invalidDestination)
         {
@@ -1672,6 +1812,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        if (legacyOutput) await CompositeComparisonAssertions.MatchesFinalAsync(workspace, dir, capture: false, workspaceEnrichment: false);
     }
 
     [Theory]
@@ -1688,11 +1829,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         using var cancellation = new CancellationTokenSource();
         var judge = new CancellingEvaluator(cancellation);
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
-        var exit = euAiAct
+        var exit = await WithCapture(false, async () => euAiAct
             ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
                 responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token)
             : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
-                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token);
+                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token), legacy: true);
         Assert.Equal(1, exit);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
@@ -1927,7 +2068,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData("report-error", true, false)]
     [InlineData("report-error", false, true)]
     [InlineData("cancel", false, false)]
-    public async Task Agentic_StoreAndInterruption_RetainsObservedEvidence(string failure, bool noAef, bool invalidDestination)
+    [InlineData("success", false, false, true)]
+    [InlineData("report-error", false, false, true)]
+    public async Task Agentic_StoreAndInterruption_RetainsObservedEvidence(string failure, bool noAef, bool invalidDestination, bool legacyOutput = false)
     {
         var workspace = Path.Combine(_root, ".agenteval");
         Directory.CreateDirectory(workspace);
@@ -1938,10 +2081,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AgentEval.Core.IEvaluator judge = failure == "cancel" ? new CancellingEvaluator(cancellation) : new PassingEvaluator();
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
         if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
-        var exit = await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", failure == "mock" ? null : "answer", judge,
+        var exit = await WithCapture(false, () => BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", failure == "mock" ? null : "answer", judge,
             mock: failure == "mock", budgetTier: "HIGH",
-            aef: aef, noAef: noAef, ct: cancellation.Token);
-        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 10 : failure == "mock" ? 11 : 1, exit);
+            aef: aef, noAef: noAef, ct: cancellation.Token), legacy: legacyOutput);
+        // "success" withholds its pass (no trace, so the required tool checks were not measured): no conclusive verdict,
+        // 11 (D-17, D-21). It was 10, a warning CI may treat as non-blocking.
+        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 11 : failure == "mock" ? 11 : 1, exit);
         if (noAef || invalidDestination)
         {
             Assert.False(Directory.Exists(aef.FullName));
@@ -1958,6 +2103,78 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (failure is "success" or "mock")
             Assert.Equal(exit, (int)JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!["exitCode"]!);
         if (failure != "cancel") Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        if (legacyOutput && failure is "success" or "report-error")
+        {
+            // Compare recorded evaluation facts, not custody/status: report failure can abort the command
+            // after the legacy evaluation completed. Select that exact manifest rather than rediscovering by ID.
+            var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
+            var convertedPath = Path.Combine(_root, "converted");
+            AgentEval.Results.Adapters.StoreV1.StoreV1Exporter.ExportWorkspaceRun(workspace, legacy, convertedPath,
+                new() { ContentCapture = AefCliOptions.ContentCapture });
+            var reader = new AgentEval.Results.Adapters.Comparison.AefComparisonReader();
+            var native = reader.Read(dir);
+            var converted = reader.Read(convertedPath);
+            Assert.Equal(native.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal),
+                converted.Scenarios.Select(s => (s.Id, s.Score, s.Passed, s.Measurement, s.StimulusHash, s.Comparability)).OrderBy(s => s.Id, StringComparer.Ordinal));
+            Assert.Equal(native.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal), converted.Metrics.OrderBy(p => p.Key, StringComparer.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(true, "dual")]
+    [InlineData(true, "legacy-only")]
+    [InlineData(true, "tamper")]
+    [InlineData(true, "descriptor")]
+    [InlineData(true, "subject")]
+    [InlineData(true, "invalid-report")]
+    [InlineData(true, "alias-conflict")]
+    public async Task Agentic_Render_UsesVerifiedCapturedReportWithoutLegacyFallback(bool capture, string? mode = null)
+    {
+        await InitCommand.RunAsync("agentic-render", _root);
+        var exit = await WithCapture(capture, () => BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root,
+            "question", "answer", new PassingEvaluator(), budgetTier: "HIGH"));
+        Assert.Equal(11, exit); // Required tool evidence is absent, not a measured pass.
+        var reportRoot = Path.Combine(_root, ".agenteval", "benchmarks", "agentic", "subject");
+        var report = Assert.Single(Directory.GetFiles(reportRoot, "agentic-result.json", SearchOption.AllDirectories));
+        var directory = Path.GetDirectoryName(report)!;
+        var timestamp = Path.GetFileName(directory);
+        var markdown = File.ReadAllText(Path.Combine(directory, "report.md"));
+        var workspace = Path.Combine(_root, ".agenteval");
+        var native = RunDirectory(Path.Combine(workspace, "aef"));
+        if (capture && mode is null) Directory.Delete(reportRoot, recursive: true);
+        if (mode is "legacy-only" or "subject" or "invalid-report")
+            Directory.Delete(Path.Combine(workspace, "aef"), recursive: true);
+        if (mode == "legacy-only" && Directory.Exists(Path.Combine(workspace, "subjects")))
+            Directory.Delete(Path.Combine(workspace, "subjects"), recursive: true);
+        if (mode == "tamper") File.AppendAllText(Path.Combine(native, "run.json"), " ");
+        if (mode == "descriptor")
+        {
+            var header = Document(native, "run.json");
+            header["ext"]!["agenteval.report"]!["sourceRunId"] = "different-source";
+            File.WriteAllText(Path.Combine(native, "run.json"), header.ToJsonString());
+            File.Delete(Path.Combine(native, "seal.json"));
+            AefSealer.Seal(native);
+            AssertIntact(native); // Semantic identity conflicts still refuse with an intact seal.
+        }
+        if (mode is "subject" or "invalid-report" or "alias-conflict")
+        {
+            var document = JsonNode.Parse(File.ReadAllText(report))!;
+            if (mode == "subject") document["subject"]!["name"] = "other-subject";
+            else if (mode == "invalid-report") document["compositeTree"]!["score"]!.AsObject().Remove("passed");
+            else document["disclaimer"] = "different report bytes";
+            File.WriteAllText(report, document.ToJsonString());
+        }
+
+        var succeeds = capture && mode is null or "dual" or "legacy-only";
+        Assert.Equal(succeeds ? 0 : 1, await RenderCommand.RunAsync("agentic", "subject", timestamp, _root));
+        if (succeeds)
+        {
+            Assert.Equal(markdown, File.ReadAllText(Path.Combine(directory, "report.md")));
+            using var pdf = UglyToad.PdfPig.PdfDocument.Open(File.ReadAllBytes(Path.Combine(directory, "report.pdf")));
+            Assert.Contains("subject", string.Join(" ", pdf.GetPages().Select(p => p.Text)));
+        }
     }
 
     [Theory]
@@ -1986,7 +2203,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             Console.SetOut(output);
-            var result = family switch
+            var result = await WithCapture(false, async () => (family switch
             {
                 "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
                     judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
@@ -1994,8 +2211,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                     judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
                 _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
                     judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
-            };
-            Assert.Equal(invalidDestination ? 3 : 1, result.ExitCode);
+            }).ExitCode, legacy: true);
+            Assert.Equal(invalidDestination ? 3 : 1, result);
         }
         finally { Console.SetOut(original); (agent as IDisposable)?.Dispose(); }
         if (noAef || invalidDestination)
@@ -2016,7 +2233,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     {
         var manifests = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories)
             .Select(path => JsonNode.Parse(File.ReadAllText(path))!).ToList();
-        var link = Document(directory, "run.json")["ext"]!["agenteval.store-v1"]!;
+        var link = Document(directory, "run.json")["ext"]?["agenteval.store-v1"];
+        if (manifests.Count == 0)
+        {
+            Assert.Null(link);
+            return;
+        }
+        Assert.NotNull(link);
         var trialIds = link["trialRunIds"]!.AsArray().Select(id => (string)id!).ToArray();
         Assert.Equal(trials, trialIds.Length);
         Assert.Equal(trials, trialIds.Distinct().Count());
@@ -2159,7 +2382,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     {
         public override void WriteLine(string? value)
         {
-            if (value?.StartsWith("Persisted run ", StringComparison.Ordinal) == true)
+            if (value?.StartsWith("Persisted run ", StringComparison.Ordinal) == true ||
+                value?.StartsWith("Prepared transient report source ", StringComparison.Ordinal) == true)
                 throw new IOException("Test persistence failure after measurement");
             base.WriteLine(value);
         }
@@ -2180,7 +2404,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         public override void WriteLine(string? value)
         {
             base.WriteLine(value);
-            if (value?.StartsWith(prefix, StringComparison.Ordinal) is true)
+            if (value?.StartsWith(prefix, StringComparison.Ordinal) is true ||
+                (prefix == "Persisted run " && value?.StartsWith("Prepared transient report source ", StringComparison.Ordinal) is true))
                 cancel.Cancel();
         }
     }

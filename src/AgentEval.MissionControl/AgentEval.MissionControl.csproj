@@ -17,6 +17,7 @@
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="..\AgentEval.Results\AgentEval.Results.csproj" />
+    <ProjectReference Include="..\AgentEval.Results.Adapters\AgentEval.Results.Adapters.csproj" />
     <ProjectReference Include="..\AgentEval.MissionControl.Core\AgentEval.MissionControl.Core.csproj" />
     <ProjectReference Include="..\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />

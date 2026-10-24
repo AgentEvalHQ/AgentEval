@@ -178,6 +178,7 @@ public static class AgentWithMultipleTools
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
+                SampleOutcome.Fail($"tool order assertion failed: {ex.Message}");
             }
         }
         else
@@ -186,6 +187,8 @@ public static class AgentWithMultipleTools
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠️ Fewer than two tool calls recorded, so the order assertions are shown, not run:");
             Console.ResetColor();
+            SampleOutcome.Fail(
+                $"the agent made {result.ToolUsage?.Count ?? 0} tool call(s); the test expects SearchTool before SummarizeTool");
             Console.WriteLine(@"
    AVAILABLE ASSERTIONS:
    ┌─────────────────────────────────────────────────────────────┐

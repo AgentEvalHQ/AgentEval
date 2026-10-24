@@ -76,6 +76,9 @@ public record WorkflowExecutionResult
                     Arguments = call.Arguments,
                     Result = call.Result,
                     Exception = call.Exception,
+                    // Kept from the step's record: code_tool_success counts only executed calls (T58).
+                    WasExecuted = call.WasExecuted,
+                    ApprovalState = call.ApprovalState,
                     Order = globalOrder++,
                     ExecutorId = call.ExecutorId,
                     StartTime = call.StartTime,
@@ -112,7 +115,9 @@ public record WorkflowExecutionResult
                         // to the right whenever per-tool timing was present (BUG-42).
                         StartTime = step.StartOffset,
                         Duration = tc.Duration ?? TimeSpan.Zero,
-                        Succeeded = !tc.HasError,
+                        Succeeded = tc.WasExecuted && !tc.HasError,
+                        OutcomeNotMeasuredReason = !tc.WasExecuted && !tc.HasError ? "Tool execution was not observed." : null,
+                        TimingNotMeasuredReason = !tc.HasTiming ? "Tool completion timing was not observed." : null,
                         ErrorMessage = tc.Exception?.Message,
                         Arguments = tc.GetArgumentsAsJson(),
                         Result = tc.Result?.ToString()
@@ -129,9 +134,13 @@ public record WorkflowExecutionResult
     public bool HasConditionalRouting => Graph?.HasConditionalRouting ?? false;
 
     /// <summary>
-    /// Whether this workflow had parallel execution.
+    /// Whether execution recorded more than one distinct parallel branch on its activations.
+    /// Declared fan-out topology alone is not evidence that its branches ran.
     /// </summary>
-    public bool HasParallelExecution => Graph?.HasParallelExecution ?? false;
+    public bool HasParallelExecution => RecordedParallelBranchCount > 1;
+
+    internal int RecordedParallelBranchCount => Steps.Where(step => step.IsParallelBranch)
+        .Select(step => step.ParallelBranchId!).Distinct(StringComparer.Ordinal).Count();
 
     /// <summary>
     /// Gets the actual execution path through the graph.
@@ -177,9 +186,16 @@ public record ExecutorStep
     public TimeSpan StartOffset { get; init; }
 
     /// <summary>
-    /// How long this step took.
+    /// How long this step took. Do not interpret this value as a measurement when
+    /// <see cref="TimingNotMeasuredReason"/> is set.
     /// </summary>
     public TimeSpan Duration { get; init; }
+
+    /// <summary>
+    /// Why this activation's duration could not be measured. Null means timing is available,
+    /// including a measured zero duration. A non-null reason prevents time-limit assertions from passing.
+    /// </summary>
+    public string? TimingNotMeasuredReason { get; init; }
 
     /// <summary>
     /// Tool calls made by this executor during the step.

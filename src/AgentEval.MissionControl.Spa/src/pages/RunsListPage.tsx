@@ -12,11 +12,12 @@ import { formatDateTime, formatScore, formatCost } from "@/lib/format";
 
 interface RecentRunsResponse {
   recentRuns: {
+    sourceId: string;
     runId: string;
     subjectName: string;
-    verdict: Verdict;
-    timestamp: string;
-    kind: "AGENT" | "WORKFLOW" | null;
+    verdict: Verdict | null;
+    timestamp: string | null;
+    kind: string | null;
     score: number | null;
     durationMs: number | null;
     estimatedCost: number | null;
@@ -26,6 +27,7 @@ interface RecentRunsResponse {
 const RECENT_RUNS_QUERY = /* GraphQL */ `
   query AllRecentRuns($count: Int!) {
     recentRuns(count: $count) {
+      sourceId
       runId
       subjectName
       verdict
@@ -80,7 +82,7 @@ export function RunsListPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {d.recentRuns.map((r) => (
-                  <RunRow key={r.runId} run={r} />
+                  <RunRow key={r.sourceId} run={r} />
                 ))}
               </tbody>
             </table>
@@ -121,7 +123,7 @@ function RunRow({ run }: RunRowProps) {
       </td>
       <td className="px-3 py-2">
         <Link
-          to={`/runs/${encodeURIComponent(run.runId)}`}
+          to={`/runs/${encodeURIComponent(run.runId)}?sourceId=${encodeURIComponent(run.sourceId)}`}
           className="font-mono text-xs text-accent-700 hover:text-accent-500"
         >
           {run.runId.slice(0, 24)}

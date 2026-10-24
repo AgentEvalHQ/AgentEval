@@ -4,11 +4,24 @@ name: Gatekeeper offline samples
 # so their ~150 deterministic Require/oracle invariants actually run in CI instead of only when a
 # human clicks through the launcher. The samples throw on any invariant failure; the suite runner
 # exits non-zero if any sample fails. Sample 11A is excluded (requires a consented live endpoint).
+#
+# Then the offline check of the WHOLE samples catalogue: every sample in its own process, no provider,
+# non-interactive, stdin closed, each exit code compared with samples/AgentEval.Samples/offline-check-expected.txt
+# (11 for a sample that needs a model, its real verdict for one that runs offline). It fails on a crash, a hang,
+# an unexpected code, or a menu sample with no row. No secrets: the check also strips any provider variable.
 on:
   pull_request:
     paths:
       - 'samples/AgentEval.Samples/**'
+      - 'samples/AgentEval.TravelDemo/**'
+      - 'samples/AgentEval.TravelDemo.Evals/**'
+      # inputs the samples build from or read: a project reference, copied skills, datasets, interop fixtures
+      - 'samples/AgentEval.HealthcareSafetyPack/**'
+      - 'samples/AgentEval.AgentSkillsEval/skills/**'
+      - 'samples/datasets/**'
+      - 'samples/interop/**'
       - 'src/**'
+      - 'global.json'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'AgentEval.sln'
@@ -17,7 +30,15 @@ on:
     branches: [ main ]
     paths:
       - 'samples/AgentEval.Samples/**'
+      - 'samples/AgentEval.TravelDemo/**'
+      - 'samples/AgentEval.TravelDemo.Evals/**'
+      # inputs the samples build from or read: a project reference, copied skills, datasets, interop fixtures
+      - 'samples/AgentEval.HealthcareSafetyPack/**'
+      - 'samples/AgentEval.AgentSkillsEval/skills/**'
+      - 'samples/datasets/**'
+      - 'samples/interop/**'
       - 'src/**'
+      - 'global.json'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'AgentEval.sln'
@@ -58,5 +79,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
+      - name: Run the TravelDemo offline self-test
+        run: dotnet run --project samples/AgentEval.TravelDemo.Evals --configuration Release -- --selftest
+
       - name: Run the Gatekeeper offline sample suite
         run: dotnet run --project samples/AgentEval.Samples --configuration Release -- --gatekeeper-offline-suite
+
+      - name: Run the offline check of every sample
+        # Runs even when the Gatekeeper suite failed, so one run reports both.
+        if: ${{ !cancelled() }}
+        run: >-
+          dotnet run --project samples/AgentEval.Samples --configuration Release --no-build --
+          --offline-check --timeout 180 --logs "${{ runner.temp }}/offline-check"
+
+      - name: Upload the offline check's per-sample logs
+        # also when the job was cancelled or hit its time limit: a hang is exactly when the logs are needed
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: offline-sample-check-logs
+          path: ${{ runner.temp }}/offline-check/*.log
+          if-no-files-found: ignore
+          retention-days: 7

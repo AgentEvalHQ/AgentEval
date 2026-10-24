@@ -82,7 +82,7 @@ dotnet run --project samples/AgentEval.Samples -- 1 --mock   # Hello World (A1) 
 dotnet run --project samples/AgentEval.Samples -- --mock     # the interactive menu, same flag
 ```
 
-`--mock` covers the Getting Started samples A1–A5. They run the same assertions on canned replies; nothing in a mock run measures a model. In mock mode A5 does not run its LLM-judged demo (Quality/Safety); it lists the bundles instead. A6 Session Lifecycle and A7 Advanced MAF Features need a provider.
+`--mock` covers the Getting Started samples A1–A5. They run the same assertions on canned replies; nothing in a mock run measures a model, so it exits 11 (not measured). In mock mode A5 does not run its LLM-judged demo (Quality/Safety); it lists the bundles instead. A6 Session Lifecycle and A7 Advanced MAF Features need a provider.
 
 ## Installation
 

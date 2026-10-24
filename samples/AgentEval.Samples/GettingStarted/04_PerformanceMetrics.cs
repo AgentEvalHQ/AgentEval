@@ -122,7 +122,13 @@ public static class PerformanceMetrics
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"   \u274c Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
+                SampleOutcome.Fail($"performance assertion failed: {ex.Message}");
             }
+        }
+        else
+        {
+            Console.WriteLine("   \u26a0\ufe0f No performance data recorded, so the assertions could not run.");
+            SampleOutcome.Skip("no performance data recorded: the latency and token assertions did not run");
         }
     }
 

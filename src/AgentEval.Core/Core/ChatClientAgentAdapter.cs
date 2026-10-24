@@ -4,6 +4,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Text;
+using AgentEval.Comparison;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Core;
@@ -14,7 +15,7 @@ namespace AgentEval.Core;
 /// </summary>
 public class ChatClientAgentAdapter
     : IStreamableAgent, ISessionResettableAgent, IHistoryInjectableAgent,
-      ITimestampedHistoryInjectableAgent, IAnswerSamplingConfigurableAgent
+      ITimestampedHistoryInjectableAgent, IAnswerSamplingConfigurableAgent, IModelIdentifiable
 {
     /// <summary>How an injected timestamp is rendered into a message: <c>[2026/03/03 09:12] </c>.</summary>
     public const string TimestampFormat = "yyyy/MM/dd HH:mm";
@@ -54,6 +55,22 @@ public class ChatClientAgentAdapter
     /// <inheritdoc />
     public string Name { get; }
 
+    /// <summary>
+    /// Configured request model, otherwise the client's default model metadata. Empty when unknown;
+    /// the agent's display name is never used to infer a model or a price.
+    /// </summary>
+    public string ModelId
+    {
+        get
+        {
+            var modelId = _chatOptions?.ModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
+            return string.IsNullOrWhiteSpace(modelId) ? string.Empty : modelId;
+        }
+    }
+
+    /// <summary>The agent's existing report label, separate from its pricing identity.</summary>
+    public string ModelDisplayName => Name;
+
     /// <inheritdoc />
     public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
     {
@@ -88,7 +105,7 @@ public class ChatClientAgentAdapter
     {
         var messages = BuildMessages(prompt);
         var textBuilder = new StringBuilder();
-        TokenUsage? capturedUsage = null;
+        var usageAccumulator = new StreamingUsageAccumulator();
 
         await foreach (var update in _chatClient.GetStreamingResponseAsync(messages, EffectiveChatOptions(), cancellationToken))
         {
@@ -110,11 +127,7 @@ public class ChatClientAgentAdapter
                 {
                     if (content is UsageContent usage)
                     {
-                        capturedUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.Details.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.Details.OutputTokenCount ?? 0)
-                        };
+                        usageAccumulator.Add(usage.Details);
                     }
                     else if (content is FunctionCallContent call)
                     {
@@ -154,7 +167,7 @@ public class ChatClientAgentAdapter
         yield return new AgentResponseChunk
         {
             IsComplete = true,
-            Usage = capturedUsage
+            Usage = usageAccumulator.ToTokenUsage()
         };
     }
 
@@ -298,15 +311,6 @@ public class ChatClientAgentAdapter
         return messages;
     }
 
-    private static TokenUsage? ConvertTokenUsage(UsageDetails? usage)
-    {
-        if (usage == null)
-            return null;
-
-        return new TokenUsage
-        {
-            PromptTokens = (int)(usage.InputTokenCount ?? 0),
-            CompletionTokens = (int)(usage.OutputTokenCount ?? 0)
-        };
-    }
+    // Null unless both counts were reported: a missing count is not 0 (TokenUsageMapping).
+    private static TokenUsage? ConvertTokenUsage(UsageDetails? usage) => TokenUsageMapping.FromUsage(usage);
 }

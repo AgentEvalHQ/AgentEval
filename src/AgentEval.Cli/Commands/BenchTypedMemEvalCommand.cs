@@ -167,8 +167,8 @@ public static class BenchTypedMemEvalCommand
             includeHistory: true);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -190,11 +190,12 @@ public static class BenchTypedMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult? result = null;
+        byte[]? nativeReportJson = null;
         AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string? storeRunId = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null)
         {
             if (noAef) return false;
@@ -208,7 +209,7 @@ public static class BenchTypedMemEvalCommand
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
                 emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition,
                 summaryExt: AgentEval.Cli.Infrastructure.TypedMemoryDiagnostics.Create(result?.QuestionResults ?? completed,
-                    verticalName, complete: reason is null && result?.TypedOutcomes is not null));
+                    verticalName, complete: reason is null && result?.TypedOutcomes is not null), nativeReportJson: nativeReportJson);
         }
         try
         {
@@ -261,6 +262,7 @@ public static class BenchTypedMemEvalCommand
         string runDir;
         try
         {
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -339,10 +341,10 @@ public static class BenchTypedMemEvalCommand
 
             // Resolve via the store so the report path matches the manifest exactly; hand-building
             // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
-            runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "typedmemeval");
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                nativeReportJson);
             PrintTypedReport(descriptor, result, typed, runId, runDir);
             ct.ThrowIfCancellationRequested();
         }
@@ -451,7 +453,7 @@ public static class BenchTypedMemEvalCommand
         Console.WriteLine("              indeterminate (WARN) rather than PASS or FAIL.");
         Console.WriteLine($"   Corpus:    {typed.CorpusId} (sha256 {typed.CorpusSha256[..12]}…)");
         Console.WriteLine($"   Run ID:    {runId}");
-        Console.WriteLine($"   Canonical: {runDir}");
+        Console.WriteLine($"   Reports:   {runDir}");
         Console.WriteLine($"   Native:    {Path.Combine(runDir, "report-native.json")}");
         Console.WriteLine();
         Console.WriteLine($"Cite as \"{descriptor.DisplayName} {descriptor.Revision} (AgentEval)\" — not comparable with LongMemEval.");

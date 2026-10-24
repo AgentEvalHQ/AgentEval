@@ -48,7 +48,7 @@ public sealed class SummaryBuilder
         if (root.Details.SubResults is not { Count: > 0 } l1Children)
         {
             return new GdprSummary(
-                OverallScore: root.Score.Value,
+                OverallScore: root.Score.MeasuredValue(),
                 OverallStatus: root.Score.ReportStatus(),
                 PerPillar: perPillar,
                 PerArticle: perArticle);
@@ -79,7 +79,7 @@ public sealed class SummaryBuilder
                             criticalFails.Add(articleKey);
 
                         perArticle[articleKey] = new GdprArticleSummary(
-                            Score: article.Score.Value,
+                            Score: article.Score.MeasuredValue(),
                             Status: status,
                             ScenarioCount: scenarios.Count,
                             ScenariosFailed: failedCount,
@@ -88,7 +88,7 @@ public sealed class SummaryBuilder
                 }
 
                 perPillar[pillarKey] = new GdprPillarSummary(
-                    Score: pillar.Score.Value,
+                    Score: pillar.Score.MeasuredValue(),
                     Status: pillar.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
@@ -105,7 +105,7 @@ public sealed class SummaryBuilder
                 var status = article.Score.ReportStatus();
 
                 perArticle[articleKey] = new GdprArticleSummary(
-                    Score: article.Score.Value,
+                    Score: article.Score.MeasuredValue(),
                     Status: status,
                     ScenarioCount: scenarios.Count,
                     ScenariosFailed: failedCount,
@@ -115,7 +115,7 @@ public sealed class SummaryBuilder
         }
 
         return new GdprSummary(
-            OverallScore: root.Score.Value,
+            OverallScore: root.Score.MeasuredValue(),
             OverallStatus: root.Score.ReportStatus(),
             PerPillar: perPillar,
             PerArticle: perArticle);

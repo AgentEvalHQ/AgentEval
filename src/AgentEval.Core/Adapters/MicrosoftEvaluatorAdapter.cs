@@ -234,12 +234,14 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     {
         var judgeModel = JudgeModel ?? meter.ObservedModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
 
+        // Not priced is null, never $0: a judge call that reported no usage, or only one of the two counts, leaves the
+        // total incomplete, and a judge model with no rate has no price. The token total is complete or absent the same
+        // way: summed over the counts that were reported, it read as the whole spend (T82).
         int? tokensUsed = null;
-        double estimatedCost = 0;
-        if (meter.HasUsage)
+        double? estimatedCost = null;
+        if (meter.UsageComplete)
         {
-            var total = meter.InputTokens + meter.OutputTokens;
-            tokensUsed = total > int.MaxValue ? int.MaxValue : (int)total;
+            tokensUsed = TokenUsageMapping.SaturatingTotal(meter.InputTokens, meter.OutputTokens);
             estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
         }
 
@@ -292,41 +294,93 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     {
         private readonly object _gate = new();
 
+        private int _calls;
+        private int _callsWithBothCounts;
+        private bool _invalidUsage;
+
         public long InputTokens { get; private set; }
         public long OutputTokens { get; private set; }
-        public bool HasUsage { get; private set; }
         public string? ObservedModelId { get; private set; }
+
+        /// <summary>True when every judge call reported both its input and its output token count.</summary>
+        public bool UsageComplete
+        {
+            get { lock (_gate) return !_invalidUsage && _calls > 0 && _callsWithBothCounts == _calls; }
+        }
 
         public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            var response = await inner.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
-            Record(response.Usage, response.ModelId);
-            return response;
+            bool sawInput = false, sawOutput = false;
+            try
+            {
+                var response = await inner.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
+                (sawInput, sawOutput) = Record(response.Usage, response.ModelId);
+                return response;
+            }
+            finally
+            {
+                // A failed request may have consumed tokens without reporting them.
+                EndCall(sawInput, sawOutput);
+            }
         }
 
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            await foreach (var update in inner.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
+            bool sawInput = false, sawOutput = false, completed = false;
+            try
             {
-                foreach (var content in update.Contents)
+                await foreach (var update in inner.GetStreamingResponseAsync(messages, options, cancellationToken).ConfigureAwait(false))
                 {
-                    if (content is UsageContent usage)
-                        Record(usage.Details, update.ModelId);
+                    foreach (var content in update.Contents)
+                    {
+                        if (content is UsageContent usage)
+                        {
+                            var (i, o) = Record(usage.Details, update.ModelId);
+                            sawInput |= i;
+                            sawOutput |= o;
+                        }
+                    }
+                    if (update.ModelId is not null)
+                        Record(null, update.ModelId);
+                    yield return update;
                 }
-                if (update.ModelId is not null)
-                    Record(null, update.ModelId);
-                yield return update;
+                completed = true;
+            }
+            finally
+            {
+                // Usage can precede a failure or early disposal; only natural EOF completes the account.
+                EndCall(completed && sawInput, completed && sawOutput);
             }
         }
 
-        private void Record(UsageDetails? usage, string? modelId)
+        private (bool SawInput, bool SawOutput) Record(UsageDetails? usage, string? modelId)
         {
             lock (_gate)
             {
                 if (modelId is not null) ObservedModelId ??= modelId;
-                if (usage is null) return;
-                if (usage.InputTokenCount is { } i) { InputTokens += i; HasUsage = true; }
-                if (usage.OutputTokenCount is { } o) { OutputTokens += o; HasUsage = true; }
+                if (usage is null) return (false, false);
+                // Streaming chunks may split the two components; only supplied contributions are added.
+                // An invalid contribution or overflow invalidates the whole account permanently.
+                if (usage.InputTokenCount is { } i)
+                {
+                    if (TokenUsageMapping.Add(InputTokens, i) is { } input) InputTokens = input;
+                    else _invalidUsage = true;
+                }
+                if (usage.OutputTokenCount is { } o)
+                {
+                    if (TokenUsageMapping.Add(OutputTokens, o) is { } output) OutputTokens = output;
+                    else _invalidUsage = true;
+                }
+                return (usage.InputTokenCount is not null, usage.OutputTokenCount is not null);
+            }
+        }
+
+        private void EndCall(bool sawInput, bool sawOutput)
+        {
+            lock (_gate)
+            {
+                _calls++;
+                if (sawInput && sawOutput) _callsWithBothCounts++;
             }
         }
 
@@ -345,14 +399,16 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     /// <inheritdoc />
     /// <remarks>
     /// Compatibility path. Prefer <see cref="EvaluateAsync(EvalInput, CancellationToken)"/>, which
-    /// carries provenance, cost and an honest <c>"error"</c> label for an indeterminate verdict.
+    /// carries provenance and cost. An evaluator that gives no reading (no metric, no value, a metric type this
+    /// adapter cannot read) or fails is not measured, as the <see cref="IEval"/> path reports it as an error: it
+    /// was a Fail at score 0. The caller's cancellation propagates.
     /// </remarks>
     public async Task<MetricResult> EvaluateAsync(
         Core.EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
         if (NotSupplied(context.Context, context.GroundTruth) is { } notMeasured)
-            return MetricResult.NotMeasured(Name, notMeasured);
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput, notMeasured);
 
         try
         {
@@ -376,7 +432,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             var metrics = result.Metrics;
             if (metrics.Count == 0)
             {
-                return MetricResult.Fail(Name, "Evaluator returned no metrics.");
+                return NoReading("Evaluator returned no metrics.", metricKey: null);
             }
 
             // Get the first (usually only) metric
@@ -393,16 +449,10 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                     // The evaluator produced NO numeric score (unparseable judge output, content
                     // filter, or evaluator error). Coercing null → 1.0 (lowest 1/5) reported a
                     // genuinely indeterminate result as a confident low-quality Fail, corrupting
-                    // pass/fail aggregation (BUG-26). Surface it explicitly instead.
-                    return MetricResult.Fail(
-                        Name,
+                    // pass/fail aggregation (BUG-26); then it was a Fail at 0. Not measured.
+                    return NoReading(
                         "Evaluator produced no numeric score (indeterminate: unparseable output, content filter, or evaluator error).",
-                        score: 0,
-                        new Dictionary<string, object>
-                        {
-                            ["microsoftMetricName"] = firstMetric.Key,
-                            ["indeterminate"] = true,
-                        });
+                        firstMetric.Key);
                 }
 
                 // Microsoft uses a 1-5 scale; convert to 0-100.
@@ -411,12 +461,18 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             }
             else if (metricValue is BooleanMetric boolMetric)
             {
-                score = boolMetric.Value == true ? 100 : 0;
+                // A null verdict read as false: a Fail at 0 for a judge that gave none.
+                if (boolMetric.Value is not { } verdict)
+                {
+                    return NoReading("Evaluator produced no boolean verdict (indeterminate).", firstMetric.Key);
+                }
+
+                score = verdict ? 100 : 0;
                 reasoning = boolMetric.Interpretation?.ToString();
             }
             else
             {
-                return MetricResult.Fail(Name, $"Unsupported metric type: {metricValue?.GetType().Name}");
+                return NoReading($"Unsupported metric type: {metricValue?.GetType().Name}.", firstMetric.Key);
             }
 
             var metadata = new Dictionary<string, object>
@@ -440,13 +496,20 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                 return MetricResult.Fail(Name, reasoning ?? $"Score below threshold: {score:F0}/100", score, metadata);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (JudgeReplyEvidence.IsCallFailure(ex, cancellationToken))
         {
-            return MetricResult.Fail(
-                Name,
-                $"Microsoft evaluator failed: {ex.Message}",
-                details: new Dictionary<string, object> { ["error"] = ex.Message });
+            return JudgeReplyEvidence.CallFailed(Name, Name, ex, "the Microsoft evaluator",
+                new Dictionary<string, object> { ["error"] = ex.Message });
         }
+    }
+
+    // The evaluator answered with nothing this adapter can read as a score: not measured, still flagged indeterminate.
+    private MetricResult NoReading(string why, string? metricKey)
+    {
+        var details = new Dictionary<string, object> { ["indeterminate"] = true };
+        if (metricKey is not null)
+            details["microsoftMetricName"] = metricKey;
+        return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable, $"{Name} not measured: {why}", details);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

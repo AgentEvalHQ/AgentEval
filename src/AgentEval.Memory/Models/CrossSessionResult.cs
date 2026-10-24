@@ -19,9 +19,16 @@ public class CrossSessionResult
     public required bool Passed { get; init; }
 
     /// <summary>
-    /// Overall score (0-100) based on the proportion of facts that survived.
+    /// Overall score (0-100), or null when the evaluation failed or no fact was measured.
     /// </summary>
-    public required double OverallScore { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public required double? OverallScore
+    {
+        get => IsMeasured ? _overallScore : null;
+        init => _overallScore = value;
+    }
+
+    private readonly double? _overallScore;
 
     /// <summary>
     /// Individual results for each fact tested across sessions.
@@ -58,7 +65,7 @@ public class CrossSessionResult
 
     /// <summary>
     /// True when the run produced a score at all: no error, and at least one fact measured. An errored or wholly
-    /// unmeasured run's <see cref="OverallScore"/> is a placeholder 0, not a measurement.
+    /// unmeasured run's <see cref="OverallScore"/> is null.
     /// </summary>
     public bool IsMeasured => ErrorMessage is null && FactResults.Any(f => f.Measured);
 

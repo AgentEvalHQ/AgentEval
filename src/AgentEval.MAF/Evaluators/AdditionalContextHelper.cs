@@ -98,6 +98,23 @@ public class AgentEvalGroundTruthContext : MEAIEvaluationContext
 }
 
 /// <summary>
+/// Says that the messages an evaluator is given are the item's whole conversation, so a turn with no tool call is a
+/// recorded none rather than "nothing recorded". <see cref="AgentEvalAgentEvaluator"/> adds it; MAF's own evaluation
+/// path passes only part of the conversation and never does.
+/// </summary>
+internal sealed class AgentEvalWholeConversationContext : MEAIEvaluationContext
+{
+    internal AgentEvalWholeConversationContext()
+        : base("AgentEvalWholeConversation", "The messages are the item's whole conversation.")
+    {
+    }
+
+    /// <summary>Whether <paramref name="additionalContext"/> says the messages are the whole conversation.</summary>
+    internal static bool In(IEnumerable<MEAIEvaluationContext>? additionalContext) =>
+        additionalContext?.OfType<AgentEvalWholeConversationContext>().Any() == true;
+}
+
+/// <summary>
 /// Carries expected tool call names through MEAI's <c>additionalContext</c> parameter.
 /// </summary>
 public class AgentEvalExpectedToolsContext : MEAIEvaluationContext

@@ -188,7 +188,8 @@ public sealed class ViolenceEval : IEvalInstrumentSource
                     : new[] { "Review response for violent, threatening, or harmful content." },
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new("atomic-classifier", null, "agenteval.violence.v1", null, null, 0, false),
+            // The content-safety service's charge is not priced here: null (not priced), never $0.
+            Provenance: new("atomic-classifier", null, "agenteval.violence.v1", null, null, null, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }

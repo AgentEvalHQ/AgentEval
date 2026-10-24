@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 //
-// AgentEval × MAF Agent Skills — Phase 1 live sample: real Azure OpenAI agent, real file-based skill
+// AgentEval × MAF Agent Skills — Phase 1 live sample: real configured chat agent, real file-based skill
 // (skills/expense-report), real tool-call trace. Demonstrates the five skill assertions
 // (AgentEval.Assertions.SkillUsageAssertions) and the progressive-disclosure efficiency metric
 // (AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric) across three runs that each exercise a
@@ -44,9 +44,9 @@ using AgentEval.Metrics.Agentic;
 using AgentEval.Models;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
+using AgentEval.Samples;
 using AgentEval.Skills;
 using AgentEval.Tracing;
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
@@ -59,14 +59,14 @@ public static class Program
     private const string PolicyResourceName = "resources/policy.md";
     private const string SummarizeScriptName = "scripts/summarize.csx";
 
-    public static async Task Main()
+    public static async Task<int> Main()
     {
         PrintHeader();
 
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
-            return;
+            return SampleOutcome.NotMeasured;
         }
 
         var skillPath = Path.Combine(AppContext.BaseDirectory, "skills", SkillName);
@@ -74,13 +74,11 @@ public static class Program
         {
             Console.WriteLine($"Skill fixture not found at '{skillPath}'.");
             Console.WriteLine("Build the project so 'skills/**' is copied to the output directory, then re-run.");
-            return;
+            return SampleOutcome.RuntimeError;
         }
 
-        var chatClient = new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential)
-            .GetChatClient(AIConfig.ModelDeployment)
-            .AsIChatClient();
-        Console.WriteLine($"Model: {AIConfig.ModelDeployment}");
+        using var chatClient = AIConfig.CreateChatClient();
+        Console.WriteLine($"Model: {AIConfig.ModelDeployment} · {AIConfig.Settings.DisplayName}");
         Console.WriteLine($"Skill fixture: {skillPath}\n");
 
         await Run1_ReadOnlyPolicyLookup(chatClient, skillPath);
@@ -92,6 +90,7 @@ public static class Program
         await Run7_HealthAndSecurityIndex(skillPath, run5Resisted);
 
         Console.WriteLine("\n=== Agent Skills Eval — Phase 1 + Phase 2 + Phase 3 + Phase 4a/4b sample complete ===");
+        return SampleOutcome.Completed;
     }
 
     // ------------------------------------------------------------------------------------------
@@ -103,8 +102,9 @@ public static class Program
     {
         PrintScene("Run 7 (Phase 4a/4b)", "Skill Health & Security Index + hash-pin drift detection (deterministic, no LLM call)");
 
+        using var scanClient = AIConfig.CreateChatClient();
         var scanAgent = new ChatClientAgent(
-            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            scanClient,
             new ChatClientAgentOptions { Name = "ScannerAgent" });
 
         using var source = new AgentFileSkillsSource(skillPath);
@@ -258,8 +258,9 @@ public static class Program
 
         // ScanFileSkillsAsync needs an AIAgent only to build the AgentSkillsSourceContext MAF's
         // GetSkillsAsync requires; no model call is made by the scan itself. A minimal agent is enough.
+        using var scanClient = AIConfig.CreateChatClient();
         var scanAgent = new ChatClientAgent(
-            new AzureOpenAIClient(AIConfig.Endpoint, AIConfig.KeyCredential).GetChatClient(AIConfig.ModelDeployment).AsIChatClient(),
+            scanClient,
             new ChatClientAgentOptions { Name = "ScannerAgent" });
 
         // skillPath is the SAME single-skill directory Run 1-3's AgentSkillsProvider(skillPath, ...) already

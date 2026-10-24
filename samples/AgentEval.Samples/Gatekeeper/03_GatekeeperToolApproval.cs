@@ -63,6 +63,8 @@ public static class GatekeeperToolApproval
         var routine = await BuildAgent().RunAsync("Please refund my $20 order.");
         Console.WriteLine($"   Agent: \"{Truncate(routine.Text)}\"");
         Console.WriteLine($"   Refunds issued: {refundsIssued.Count}  {(refundsIssued.Contains(20) ? "→ auto-approved, no human needed ✅" : "(model chose not to refund)")}");
+        if (!refundsIssued.Contains(20))
+            SampleOutcome.Skip("the model did not refund the routine $20 order, so the auto-approve path was not exercised");
 
         // ── A large refund pauses for a human ──
         Section("A large $5000 refund — pauses for human approval");
@@ -76,6 +78,11 @@ public static class GatekeeperToolApproval
             Console.WriteLine("   ⚠️ Expected the $5000 refund to pause for approval, but no request surfaced.");
             Console.WriteLine($"      (The model may not have called issue_refund; it said: {Truncate(paused.Text)})");
             Console.ResetColor();
+            // A large refund that ran with no pause is the gate failing; no call at all is a run that measured nothing.
+            if (refundsIssued.Any(amount => amount >= 1000))
+                SampleOutcome.Fail("the $5000 refund ran without an approval request");
+            else
+                SampleOutcome.Skip("the model did not call issue_refund for the $5000 refund, so the approval pause was not exercised");
             return;
         }
 

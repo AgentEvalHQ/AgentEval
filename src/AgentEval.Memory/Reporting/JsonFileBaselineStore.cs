@@ -84,6 +84,17 @@ public partial class JsonFileBaselineStore : IBaselineStore
 
         if (_outputStore is { IsAvailable: true })
         {
+            // Historical snapshots may be partial. The stronger current/pinned reference contract must not
+            // promote an incomplete snapshot or infer completeness for an older document that did not record it.
+            if (baseline.IsComplete != true || baseline.HasMeasuredScore == false)
+            {
+                var reason = baseline.IsComplete is null ? "completeness was not recorded" : "the run is incomplete or unmeasured";
+                if (_logger is not null)
+                    _logger.LogWarning("Memory snapshot {BaselineId} saved; canonical promotion withheld because {Reason}", baseline.Id, reason);
+                else
+                    System.Diagnostics.Trace.TraceWarning($"Memory snapshot {baseline.Id} saved; canonical promotion withheld because {reason}.");
+                return;
+            }
             try
             {
                 var subject = _subject ?? new SubjectIdentity(SubjectKind.Agent, baseline.AgentConfig.AgentName);
@@ -284,6 +295,8 @@ public partial class JsonFileBaselineStore : IBaselineStore
                     Timestamp = e.baseline.Timestamp,
                     OverallScore = e.baseline.OverallScore,
                     Grade = e.baseline.Grade,
+                    IsComplete = e.baseline.IsComplete,
+                    HasMeasuredScore = e.baseline.HasMeasuredScore,
                     Tags = e.baseline.Tags
                 }).ToList()
             }).ToList();

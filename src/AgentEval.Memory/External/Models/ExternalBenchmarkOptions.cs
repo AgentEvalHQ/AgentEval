@@ -11,6 +11,8 @@ public class ExternalBenchmarkOptions
     /// <summary>Maximum supported judge retries.</summary>
     public const int MaximumJudgeRetries = 3;
 
+    internal const int MaximumJudgeOutputTokens = 4096;
+
     /// <summary>Maximum number of questions to run (null = all, runs every question in the dataset). Default: null.</summary>
     public int? MaxQuestions { get; init; } = null;
 
@@ -234,10 +236,12 @@ public class ExternalBenchmarkOptions
     public double? JudgeTemperature { get; init; }
 
     /// <summary>
-    /// Maximum judge output-token budget. Includes reasoning tokens on reasoning models.
-    /// Valid range: 1-4096. Default: 256.
+    /// Initial judge output-token budget, including reasoning tokens on reasoning models.
+    /// Valid range: 1-4096. Default: 1024. LongMemEval logical retries double this budget,
+    /// capped at 4096; response-format fallbacks keep the current attempt's budget.
+    /// Set <see cref="MaxJudgeRetries"/> to zero for a fixed single-attempt allocation.
     /// </summary>
-    public int JudgeMaxOutputTokens { get; init; } = 256;
+    public int JudgeMaxOutputTokens { get; init; } = 1024;
 
     /// <summary>Controls diagnostic evidence retained from judge responses.</summary>
     public JudgeEvidenceMode JudgeEvidenceMode { get; init; } = JudgeEvidenceMode.Outcome;
@@ -389,7 +393,7 @@ public class ExternalBenchmarkOptions
                 nameof(AnswerTemperature), AnswerTemperature,
                 "AnswerTemperature must be null or a finite value between 0 and 2.");
         }
-        if (JudgeMaxOutputTokens is < 1 or > 4096)
+        if (JudgeMaxOutputTokens is < 1 or > MaximumJudgeOutputTokens)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(JudgeMaxOutputTokens), JudgeMaxOutputTokens,

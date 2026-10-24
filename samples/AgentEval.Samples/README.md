@@ -49,6 +49,54 @@ The benchmark samples (H2–H10) also respect a preset tier via `--preset <prese
 family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the valid values) or the
 `AGENTEVAL_SAMPLES_PRESET` environment variable.
 
+The legacy index shifts whenever a sample is added. To name a sample in a script, use its **stable id** (its class
+name) or its menu label instead; `--list-samples` prints both:
+
+```bash
+dotnet run -- --list-samples                 # menu label, stable id and name of every sample
+dotnet run -- --sample WorkflowWithTools     # run one sample by its stable id…
+dotnet run -- --sample C3                    # …or by its menu label
+```
+
+### What a run's exit code means
+
+Every run ends with one `Sample result:` line and the reasons behind it, and exits with a code a script or CI can
+read. The codes are the CLI's:
+
+| Exit | Result | Meaning |
+|---|---|---|
+| 0 | COMPLETED | The sample ran and recorded no failed check, warning or skip. Completed, not "passed": many samples demonstrate an API and check nothing. |
+| 1 | FAIL | A check the sample makes did not hold: a wrong answer, a wrong tool, a policy or security gate that let an attack through, a judge that got a labelled case wrong. |
+| 2 | — | No sample with that number or id. |
+| 3 | ERROR | The sample threw, or caught an error that stopped it (a provider call that failed mid-run). |
+| 10 | WARN | A quality score fell below its threshold; everything the sample checks was measured. |
+| 11 | NOT MEASURED | The sample could not measure what it shows: no provider, a missing key, dataset or capability, a model that never attempted the attack a gate exists to stop, a `--dry-run`, or a `--mock` run's canned replies. Not measured is never 0. |
+
+When a run records several outcomes the worst wins: ERROR, then FAIL, then NOT MEASURED, then WARN. A finding the
+sample exists to show (a planted regression caught, a gate blocking the attack) is the sample working and exits 0.
+A `--mock` run is labelled "mock run: canned replies, not a measurement" on its result line and exits 11: canned
+replies measure no model. Extensibility (F6) is the exception: its main point, the metric registries, runs offline, so
+its `--mock` run exits as its run without a provider does (0).
+
+### Check every sample offline, for free
+
+```bash
+dotnet run --project samples/AgentEval.Samples -- --offline-check
+```
+
+This runs every sample in its own process with no provider configured, non-interactively and with stdin closed, and
+compares each exit code with [`offline-check-expected.txt`](offline-check-expected.txt). It removes every provider
+variable from the samples' environment first, so it is free even in a shell that holds real keys. It fails when a
+sample crashes (exit 3), hangs past the per-sample timeout (`--timeout <seconds>`, default 120), or exits with a code
+its row does not name; and when a menu sample has no row, or a row has no sample. A sample that needs a model expects
+11; a sample that runs offline expects its real verdict, normally 0. `--only <id,id>` runs a subset and `--logs <dir>`
+keeps each sample's output (by default under the system temp folder). CI runs it in
+`.github/workflows/gatekeeper-offline-samples.yml`.
+
+**Adding a sample:** give it a row in `offline-check-expected.txt` with the code it exits with offline (run
+`--offline-check --only <YourClass>` to see it). Record its verdict with `SampleOutcome.Fail`, `.Warn` or `.Skip`
+(see `SampleOutcome.cs`) wherever it prints a failed check, a below-threshold score or a skip.
+
 ---
 
 ## Sample Groups
@@ -127,8 +175,8 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 | 4 | **Memory DI** | Production DI wiring — `AddAgentEvalMemory()`, `CanRememberAsync()` | Yes | 5 min |
 | 5 | **Cross-Session Memory** | Fact persistence across session resets — compare with / without memory | Yes | 8 min |
 | 6 | **AIContextProvider Memory** | MAF-native memory pipeline — `AIContextProvider` + cross-session evaluation | Yes | 8 min |
-| 7 | **Benchmark Reporting** | Multi-model comparison + interactive HTML pentagon report | Yes ×3 | 15 min |
-| 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset | Yes | 15 min |
+| 7 | **Benchmark Reporting** | Multi-model comparison + interactive HTML pentagon report; `--preset quick` (default) / `standard` / `full`; a tie has no winner | Yes ×2–3 (`*_MODEL_2`, optional `*_MODEL_3`; not measured without a second) | ~2 min per model (Quick); Standard ~40 min per model |
+| 8 | **LongMemEval Benchmark** | Cross-platform research-grade eval — ICLR 2025, MIT-licensed dataset; `--preset smoke` (default, 10 questions) / `standard` (50) / `audit-grade` (500) | Yes — one model answers and judges; it must read ~115K-token prompts (delivery is measured) | ~2 min (Smoke); ~6 min (Standard) |
 | 9 | **Run Single Benchmark** | Pick Quick/Standard/Full, run, save baseline, view report | Yes | 8 min |
 | 10 | **LongMemEval Baseline Repro** | Reproduce the GPT-4o paper baseline (TextBlob mode) | Yes | 20 min |
 | 11 | **TypedMemEval Baseline** | A score beside its chance floor, its own condition's ceiling (V8), and what a *retrieving* system faces — no aggregate score | Yes | 10 min |
@@ -238,7 +286,9 @@ offline-capable samples on every PR with the offline path forced: deterministic,
 
 Knobs: `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` prints each sample's full audited threat/guarantee contract
 (a compact two-line version prints by default); `dotnet run -- --gatekeeper-offline-suite` runs all 28
-offline-capable samples non-interactively (the CI mode).
+offline-capable samples non-interactively (the CI mode), and fails a sample that throws or records a failure, a
+warning or a skip. On a live model, a scene whose attack the model never attempted is NOT MEASURED (exit 11), and a
+gate invariant that does not hold is FAIL (exit 1).
 
 ---
 
@@ -308,8 +358,8 @@ $env:OPENROUTER_API_KEY = "..."                       # relay:  https://openrout
 $env:JEV_TRANSPORT = "typesafe"                       # or "openrouter" — when both keys are set
 $env:JEV_MODEL     = "jev-1.13.0"                     # pin a versioned id for anything reproducible (TypeSafe: jev-1.13.0; OpenRouter: typesafe/jev-1.13)
 $env:AGENTEVAL_SAMPLES_SHOW_RAW = "1"                 # N2: print every request and reply body (the key is never printed)
-$env:BITDEER_PRICE_INPUT_PER_1M  = "0.00"             # Bitdeer's list price was not verifiable from their public
-$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; unset → the run prints "not priced"
+$env:BITDEER_PRICE_INPUT_PER_1M  = "0.083"            # override ModelPricing's Bitdeer row (bitdeer.ai prices on
+$env:BITDEER_PRICE_OUTPUT_PER_1M = "0.275"            # 2026-10-21); a model with no row and no override prints "not priced"
 ```
 
 ### O — Domain Packs  🔑 a model provider
@@ -337,6 +387,9 @@ dotnet run -- 105   # Healthcare Safety Pack  (O1)
 Every sample obtains its model through one factory, `AIConfig.CreateChatClient()`, so the whole
 catalogue runs on whichever host **`AI_INFERENCE_PROVIDER`** selects, without touching a sample.
 Keys for several providers can be configured at once; the selector decides which one is used.
+That factory also turns reasoning off: a request goes out with `reasoning_effort: none`, at `low` when the
+provider rejects `none` (Bitdeer does), and with the provider's default when it rejects both. A sample that sets
+`ChatOptions.Reasoning` keeps its own level ([details](../../docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to)).
 
 | `AI_INFERENCE_PROVIDER` | Variables | Defaults |
 |---|---|---|
@@ -360,9 +413,27 @@ dotnet run -- 1 --provider openai                 # this run on OpenAI instead (
 ```
 
 The **Azure?** column in the tables above means "needs a model provider"; any of the three will do.
-Two surfaces stay Azure-only and say so when the Azure trio is absent: embeddings (B1) and Azure AI
-Foundry (H11, H12). A reasoning model such as GLM-5.3 Flash bills its reasoning as output tokens,
-so token counts and latency are higher than a non-reasoning model's for the same prompt.
+One surface stays Azure-only and says so: the hosted-agent Azure AI Foundry path (H11, H12). A
+reasoning model such as GLM-5.3 Flash bills its reasoning as output tokens, so token counts and
+latency are higher than a non-reasoning model's for the same prompt.
+
+**Embeddings** (B1 — Comprehensive RAG) follow the same selector, on the chat provider's endpoint with
+its key. They never go to another host: with `AI_INFERENCE_PROVIDER=bitdeer`, an Azure embedding
+deployment in the shell is not used.
+
+| `AI_INFERENCE_PROVIDER` | Embedding model variable | Default |
+|---|---|---|
+| `bitdeer` | `BITDEER_EMBEDDING_MODEL` | `BAAI/bge-m3` |
+| `openai` | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` |
+| `foundry` | `FOUNDRY_EMBEDDING_MODEL` | none: name an embedding deployment on the resource |
+| `azure` | `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | none: name an embedding deployment on the resource |
+| `openai-compatible` | `OPENAI_COMPATIBLE_EMBEDDING_MODEL` | none: name a model the host serves (Ollama: `bge-m3`, `nomic-embed-text`) |
+
+Without a model, B1 records NOT MEASURED (exit 11) and names the variable to set. The embedding
+metrics' thresholds (70 for answer similarity, 50 for the two context similarities) are raw cosine
+similarity × 100 and the same for every model, while cosine ranges differ by model: compare scores
+only within one embedding model. On `BAAI/bge-m3` they separate on-topic from off-topic text but not a
+right answer from a wrong one on the same topic; B1's LLM-judged Answer Correctness does that.
 
 ### With Azure OpenAI
 
@@ -459,6 +530,14 @@ result.Performance!.Should()
 ```
 
 ### RAG evaluation — 8 metrics (B1)
+
+B1 identifies its reference data as `b1-capital-landmarks-v2`. The question explicitly asks for
+landmarks in France's capital; documents 2–4 support Paris, the Eiffel Tower and the Louvre.
+The original fixture also expected Versailles from document 8 while excluding it from relevance.
+V2 removes that unsupported city-landmark expectation and keeps document 8 as a distractor.
+The source documents, top-three retrieval and metric thresholds are unchanged; old unversioned
+scores are not directly comparable with v2.
+
 ```csharp
 var llmMetrics = new IMetric[]
 {

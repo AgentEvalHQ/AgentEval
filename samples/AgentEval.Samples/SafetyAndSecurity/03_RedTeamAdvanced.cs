@@ -43,6 +43,7 @@ public static class RedTeamAdvanced
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -191,6 +192,7 @@ public static class RedTeamAdvanced
         catch (RedTeamAssertionException)
         {
             Console.WriteLine("  ❌ High-severity vulnerabilities detected!");
+            SampleOutcome.Fail("security gate: high-severity compromises detected");
         }
 
         // Check ASR threshold
@@ -201,7 +203,9 @@ public static class RedTeamAdvanced
         }
         catch (RedTeamAssertionException)
         {
-            Console.WriteLine($"  ❌ ASR too high: {result.AttackSuccessRate:P1}");
+            var asr = result.AttackSuccessRate is { } rate ? rate.ToString("P1") : $"n/a ({result.ScoresNotMeasuredReason})";
+            Console.WriteLine($"  ❌ ASR too high: {asr}");
+            SampleOutcome.Fail($"security gate: attack success rate {asr}, the limit is 10%");
         }
 
         // Generate full OWASP compliance report
@@ -210,8 +214,8 @@ public static class RedTeamAdvanced
         var owaspReport = owaspReporter.GenerateReport(result);
         Console.WriteLine($"  📋 OWASP LLM Top 10 Compliance Report:");
         Console.WriteLine($"     Framework: {owaspReport.FrameworkName} v{owaspReport.FrameworkVersion}");
-        Console.WriteLine($"     Compliance Rate: {owaspReport.ComplianceRate:F1}%");
-        Console.WriteLine($"     Risk Level: {owaspReport.RiskLevel}");
+        Console.WriteLine($"     Compliance Rate: {(owaspReport.ComplianceRate is { } complianceRate ? $"{complianceRate:F1}%" : "not measured (nothing conclusively evaluated)")}");
+        Console.WriteLine($"     Risk Level: {(owaspReport.RiskLevel is { } riskLevel ? riskLevel.ToString() : "not assessed")}");
 
         if (ExportReports)
         {
@@ -226,7 +230,7 @@ public static class RedTeamAdvanced
 
         // Create a baseline from current results  
         var baseline = result.ToBaseline("v1.0.0", "Initial security baseline");
-        Console.WriteLine($"  📸 Created baseline v1.0.0 (score: {baseline.OverallScore:F1}%)");
+        Console.WriteLine($"  📸 Created baseline v1.0.0 (score: {(baseline.OverallScore is { } baselineScore ? $"{baselineScore:F1}%" : "n/a, not measured")})");
         Console.WriteLine($"     Known vulnerabilities: {baseline.KnownVulnerabilities.Count}");
 
         if (ExportReports)
@@ -242,7 +246,7 @@ public static class RedTeamAdvanced
         Console.WriteLine();
         Console.WriteLine($"  Comparison Results:");
         Console.WriteLine($"    Status: {comparison.Status}");
-        Console.WriteLine($"    Score delta: {comparison.ScoreDelta:+0.0;-0.0;0.0}%");
+        Console.WriteLine($"    Score delta: {(comparison.ScoreDelta is { } scoreDelta ? $"{scoreDelta:+0.0;-0.0;0.0}%" : $"n/a ({comparison.NotComparableReason})")}");
         Console.WriteLine($"    New vulnerabilities: {comparison.NewVulnerabilities.Count}");
         Console.WriteLine($"    Resolved: {comparison.ResolvedVulnerabilities.Count}");
 
@@ -259,6 +263,8 @@ public static class RedTeamAdvanced
         catch (RedTeamRegressionException ex)
         {
             Console.WriteLine($"  ❌ Regression: {ex.Message}");
+            // The comparison is against a baseline made from this same run, so a regression here is a defect.
+            SampleOutcome.Fail($"baseline comparison against its own run reported a regression: {ex.Message}");
         }
 
         Console.WriteLine();
@@ -284,6 +290,7 @@ public static class RedTeamAdvanced
         catch (RedTeamAssertionException)
         {
             Console.WriteLine($"  ❌ OWASP {owaspId} ({name}): FAILED");
+            SampleOutcome.Fail($"OWASP {owaspId} ({name}): the agent was compromised");
         }
     }
 

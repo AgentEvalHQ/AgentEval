@@ -135,8 +135,8 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
         // Track token usage
         if (response.TokenUsage != null)
         {
-            _totalPromptTokens += response.TokenUsage.PromptTokens;
-            _totalCompletionTokens += response.TokenUsage.CompletionTokens;
+            _totalPromptTokens = TokenUsageMapping.SaturatingTotal(_totalPromptTokens, response.TokenUsage.PromptTokens);
+            _totalCompletionTokens = TokenUsageMapping.SaturatingTotal(_totalCompletionTokens, response.TokenUsage.CompletionTokens);
         }
 
         // Capture tool calls from the response (honoring TrackToolCalls) into both this turn and
@@ -187,15 +187,22 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
                 Arguments = call.Arguments,
                 Result = call.Result,
                 Exception = call.Exception,
+                // Whether the call ran, as the extractor paired it: code_tool_success counts only executed calls (T58),
+                // so a copy that dropped these read every call here as one that never ran.
+                WasExecuted = call.WasExecuted,
+                ApprovalState = call.ApprovalState,
                 Order = _combinedToolUsage.Count + 1
             });
 
             traceToolCalls.Add(new TraceToolCall
             {
                 Name = call.Name,
+                CallId = call.CallId,
+                WasExecuted = call.WasExecuted,
                 Arguments = call.Arguments is { Count: > 0 } ? call.GetArgumentsAsJson() : null,
                 Result = call.Result?.ToString(),
-                Succeeded = !call.HasError
+                Error = call.Exception?.Message,
+                Succeeded = call.WasExecuted && !call.HasError   // a call that never ran did not succeed (T58)
             });
         }
 

@@ -442,7 +442,7 @@ internal static class AssertAiCommand
                     unlabelled += label is null ? 1 : 0;
                     transcripts.Add(AssertAiTranscript.FromEvalInput(
                         entry.ScenarioId,
-                        new Evals.EvalInput(entry.Input, Response: entry.AgentResponse, ToolCalls: entry.ToolCalls),
+                        entry.ToEvalInput(),   // one mapping from entry to input: the system message travels too (T73)
                         label,
                         entry.ConversationHistory?.Select(t => (t.Role, t.Content))));
                 }

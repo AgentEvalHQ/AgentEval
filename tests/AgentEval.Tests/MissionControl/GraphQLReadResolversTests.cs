@@ -232,8 +232,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
 
         Assert.Equal("PASS", summary.GetProperty("verdict").GetString());
         var stats = summary.GetProperty("stats");
-        Assert.Equal(2, stats.GetProperty("total").GetInt32());
-        Assert.Equal(2, stats.GetProperty("passed").GetInt32());
+        Assert.Equal(3, stats.GetProperty("total").GetInt32());
+        Assert.Equal(3, stats.GetProperty("passed").GetInt32());
         Assert.Equal(0, stats.GetProperty("failed").GetInt32());
         // The run page's "Not measured" tile reads this; a field missing from the schema fails the whole query.
         Assert.Equal(0, stats.GetProperty("skipped").GetInt32());
@@ -356,8 +356,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.Equal("warn", art17Cell.GetProperty("status").GetString());
         Assert.Equal(0.75, art17Cell.GetProperty("passRate").GetDouble());
 
-        // Audit chain valid because the seeded evidence references the seeded run's hash.
-        Assert.True(matrix.GetProperty("allChainsValid").GetBoolean());
+        // Conversion checks the legacy hash but does not establish original execution custody.
+        Assert.False(matrix.GetProperty("allChainsValid").GetBoolean());
     }
 
     [Fact]
@@ -701,6 +701,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
                   evaluatorTimeline(evaluatorKey: "composite-root", count: 5) {
                     score
                     passed
+                    scores { metricId value }
+                    metrics { id scale }
                   }
                 }
                 """
@@ -713,7 +715,11 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
 
         Assert.Equal(JsonValueKind.Array, points.ValueKind);
         Assert.True(points.GetArrayLength() >= 1);
-        Assert.Equal(0.885, points[0].GetProperty("score").GetDouble(), 3);
+        // Other generic scenarios make the shared root score metric unbounded. Keep its value without calling it normalized.
+        Assert.Equal(JsonValueKind.Null, points[0].GetProperty("score").ValueKind);
+        var rawScore = Assert.Single(points[0].GetProperty("scores").EnumerateArray(), p => p.GetProperty("metricId").GetString() == "score");
+        Assert.Equal(0.885, rawScore.GetProperty("value").GetDouble(), 3);
+        Assert.Equal("unbounded", Assert.Single(points[0].GetProperty("metrics").EnumerateArray(), m => m.GetProperty("id").GetString() == "score").GetProperty("scale").GetString());
     }
 
     [Fact]
@@ -912,7 +918,7 @@ public sealed class SeededMissionControlFactory : WebApplicationFactory<Query>
             SchemaVersion: "1.0",
             RunId: manifest.Run.RunId,
             Verdict: "PASS",
-            Stats: new RunStats(Total: 2, Passed: 2, Failed: 0, Warnings: 0),
+            Stats: new RunStats(Total: 3, Passed: 3, Failed: 0, Warnings: 0),
             Metrics: new Dictionary<string, double> { ["score"] = 0.92 });
 
         await store.CompleteRunAsync(manifest, summary);

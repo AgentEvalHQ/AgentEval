@@ -150,6 +150,11 @@ public class CalibratedJudge : ICalibratedJudge
                 var metric = metricFactory(judge.Name);
                 var result = await metric.EvaluateAsync(context, cts.Token);
 
+                // A judge whose call failed or whose reply could not be read gave no reading: a judge failure, as when the metric
+                // threw (the metrics catch both since T03/T59), not an input the case lacked.
+                if (result.NotMeasuredCause is NotMeasuredCause.JudgeCallFailed or NotMeasuredCause.JudgeReplyUnreadable)
+                    throw new InvalidOperationException(result.Explanation ?? $"{result.MetricName}: the judge gave no reading.");
+
                 // A not-measured result's Score is a placeholder 0; voting it in would drag the aggregate down
                 // and, with every judge not measured, report 0 with 100% agreement and consensus.
                 if (!result.Measured)

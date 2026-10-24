@@ -4,7 +4,9 @@
 
 #if NET10_0_OR_GREATER
 
+using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using AgentEval.Cli.Commands;
 using AgentEval.MissionControl.GraphQL;
@@ -14,6 +16,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace AgentEval.Tests.MissionControl;
 
@@ -33,8 +36,27 @@ namespace AgentEval.Tests.MissionControl;
 public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
 {
     private readonly EndToEndFixture _fixture;
+    private readonly ITestOutputHelper _output;
 
-    public MissionControlEndToEndTests(EndToEndFixture fixture) => _fixture = fixture;
+    public MissionControlEndToEndTests(EndToEndFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+    }
+
+    private async Task<string> PostGraphQlWithDiagnosticsAsync(HttpClient client, string query)
+    {
+        var timer = Stopwatch.StartNew();
+        using var response = await client.PostAsJsonAsync("/graphql", new { query });
+        var body = await response.Content.ReadAsStringAsync();
+        timer.Stop();
+        var diagnostic = $"GraphQL status={(int)response.StatusCode} {response.StatusCode}; " +
+            $"elapsedMs={timer.Elapsed.TotalMilliseconds:F1}; framework={RuntimeInformation.FrameworkDescription}; " +
+            $"processId={Environment.ProcessId}; processors={Environment.ProcessorCount}\nQuery: {query}\nBody: {body}";
+        _output.WriteLine(diagnostic);
+        Assert.True(response.IsSuccessStatusCode, diagnostic);
+        return body;
+    }
 
     // Manual-only: materialises the fixture to a stable path for human
     // inspection. Skipped by default so it doesn't pollute the test runner,
@@ -196,7 +218,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
     // ─── compliance matrix ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task ComplianceMatrix_Gdpr_HasCellsAndChainsValid()
+    public async Task ComplianceMatrix_Gdpr_HasCellsWithImportedCustodyWarning()
     {
         using var client = _fixture.CreateClient();
         var resp = await client.PostAsJsonAsync("/graphql", new
@@ -215,8 +237,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
 
-        Assert.True(m.GetProperty("allChainsValid").GetBoolean(),
-            "Audit chain must validate clean against the fixture's sealed manifests.");
+        Assert.False(m.GetProperty("allChainsValid").GetBoolean(),
+            "Legacy imports cannot establish original execution custody.");
         // Fixture seeds GDPR evidence for 2 subjects × 2 dates (T1, T2).
         // ComplianceMatrixService picks LATEST-evidence-per-subject → uses
         // T2 for both subjects. T2 evidence has 4 controls each.
@@ -243,7 +265,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
-        Assert.True(m.GetProperty("allChainsValid").GetBoolean());
+        Assert.False(m.GetProperty("allChainsValid").GetBoolean());
         // Fixture seeds EU AI Act evidence for TripPlanner only at T2, with
         // 3 controls. So exactly 1 subject × 3 controls = 3 cells.
         Assert.Equal(3, m.GetProperty("cells").GetArrayLength());
@@ -275,12 +297,9 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         // The fixture seeds exactly 2 memory-eval runs (TravelAgent at T1
         // and T2), each with one `mem_recall_accuracy` scenario.
         using var client = _fixture.CreateClient();
-        var resp = await client.PostAsJsonAsync("/graphql", new
-        {
-            query = "{ evaluatorTimeline(evaluatorKey: \"mem_recall_accuracy\", count: 50) { runId score } }"
-        });
-        resp.EnsureSuccessStatusCode();
-        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var body = await PostGraphQlWithDiagnosticsAsync(client,
+            "{ evaluatorTimeline(evaluatorKey: \"mem_recall_accuracy\", count: 50) { runId score } }");
+        using var doc = JsonDocument.Parse(body);
         var pts = doc.RootElement.GetProperty("data").GetProperty("evaluatorTimeline");
 
         Assert.Equal(2, pts.GetArrayLength());
@@ -400,9 +419,7 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             MissionControlFixtureBuilder.T2, FixtureRunKind.Eval);
 
         using var client = _fixture.CreateClient();
-        var resp = await client.PostAsJsonAsync("/graphql", new
-        {
-            query = $$"""
+        var body = await PostGraphQlWithDiagnosticsAsync(client, $$"""
                 {
                   run(runId: "{{runId}}") {
                     run { runId verdict kind }
@@ -410,10 +427,8 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
                     contentHash
                   }
                 }
-                """
-        });
-        resp.EnsureSuccessStatusCode();
-        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+                """);
+        using var doc = JsonDocument.Parse(body);
         var r = doc.RootElement.GetProperty("data").GetProperty("run");
         Assert.Equal(runId, r.GetProperty("run").GetProperty("runId").GetString());
         Assert.Equal("PASS", r.GetProperty("run").GetProperty("verdict").GetString());
@@ -614,12 +629,9 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
         var wrapper = doc.RootElement.GetProperty("data").GetProperty("complianceEvidence");
         Assert.NotEqual(JsonValueKind.Null, wrapper.ValueKind);
-        // The seeded fixture should produce a valid audit chain (no tamper applied).
-        Assert.True(wrapper.GetProperty("chainValid").GetBoolean(),
-            "Seeded fixture must produce a valid audit chain — chainBreakReason: "
-            + (wrapper.GetProperty("chainBreakReason").ValueKind == JsonValueKind.Null
-                ? "null"
-                : wrapper.GetProperty("chainBreakReason").GetString()));
+        // The legacy checksum was checked during conversion; original execution custody remains unestablished.
+        Assert.False(wrapper.GetProperty("chainValid").GetBoolean());
+        Assert.Equal("imported-not-sealed-when-run", wrapper.GetProperty("chainBreakReason").GetString());
         var e = wrapper.GetProperty("evidence");
         Assert.Equal(ev.Regulation, e.GetProperty("regulation").GetString());
         Assert.Equal(ev.SourceRunId, e.GetProperty("sourceRun").GetProperty("runId").GetString());
@@ -709,11 +721,10 @@ public class MissionControlEndToEndTests : IClassFixture<EndToEndFixture>
             resp.EnsureSuccessStatusCode();
             var body = await resp.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(body);
-            var m = doc.RootElement.GetProperty("data").GetProperty("complianceMatrix");
+            Assert.True(doc.RootElement.TryGetProperty("errors", out _), body);
+            Assert.True(doc.RootElement.GetProperty("data").ValueKind == JsonValueKind.Null
+                || doc.RootElement.GetProperty("data").GetProperty("complianceMatrix").ValueKind == JsonValueKind.Null);
 
-            Assert.False(m.GetProperty("allChainsValid").GetBoolean(),
-                $"Tampering with manifest.contentHash must flip allChainsValid to false. Tampered runId={runId}. Matrix response: {body}");
-            Assert.NotEmpty(m.GetProperty("cells").EnumerateArray().ToArray());
         }
         finally
         {

@@ -37,7 +37,7 @@ public class JsonReportExporterTests
         var doc = JsonDocument.Parse(json);
 
         var schemaVersion = doc.RootElement.GetProperty("schema_version").GetString();
-        Assert.Equal("0.3.0", schemaVersion);   // 0.3.0: over_refusal (always) + benign_controls + fold turn/node counts; 0.2.0: coverage/truncation (5d)
+        Assert.Equal("0.4.0", schemaVersion);   // 0.4.0: null scores when nothing was conclusive (T81); 0.3.0: over_refusal (always) + benign_controls + fold turn/node counts; 0.2.0: coverage/truncation (5d)
     }
 
     [Fact]

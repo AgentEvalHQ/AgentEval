@@ -10,6 +10,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Swords } from "lucide-react";
+import { Link } from "react-router";
 import { gqlRequest } from "@/lib/graphql-client";
 import { queryKeys } from "@/lib/keys";
 import { DataState } from "@/components/DataState";
@@ -53,12 +54,9 @@ export function RedTeamCampaigns() {
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Red-team campaigns</h2>
         <p className="text-sm text-slate-600">
-          Adversarial-attack campaigns stored under{" "}
-          <code className="bg-slate-100 px-1 rounded">
-            .agenteval/red-team/
-          </code>
-          . Each campaign captures the target subjects, attack mode, and a
-          findings document (when complete).
+          Registered campaigns declare intended targets and attack mode. See{" "}
+          <Link to="/runs" className="underline">Runs</Link>{" "}
+          for verified execution evidence.
         </p>
       </header>
 
@@ -72,11 +70,8 @@ export function RedTeamCampaigns() {
         errorPrefix="Failed to load red-team campaigns"
         emptyMessage={
           <div>
-            No red-team campaigns registered yet. Run{" "}
-            <code className="bg-slate-100 px-1 rounded">
-              agenteval red-team --target ...
-            </code>{" "}
-            to start one.
+            No campaign registrations are available. Red-team execution results appear in{" "}
+            <Link to="/runs" className="underline">Runs</Link>.
           </div>
         }
       >
@@ -88,8 +83,8 @@ export function RedTeamCampaigns() {
                   <th className="px-4 py-2 text-left">Campaign</th>
                   <th className="px-4 py-2 text-left">Targets</th>
                   <th className="px-4 py-2 text-left">Mode</th>
-                  <th className="px-4 py-2 text-left">Started</th>
-                  <th className="px-4 py-2 text-center">Status</th>
+                  <th className="px-4 py-2 text-left">Registered</th>
+                  <th className="px-4 py-2 text-center">Completion declaration</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -146,11 +141,11 @@ export function RedTeamCampaigns() {
                         <td className="px-4 py-2 text-center">
                           {c.completedAt ? (
                             <span className="text-xs font-medium text-green-700">
-                              COMPLETED
+                              Completion recorded
                             </span>
                           ) : (
-                            <span className="text-xs font-medium text-amber-700">
-                              IN PROGRESS
+                            <span className="text-xs font-medium text-slate-500">
+                              Completion not recorded
                             </span>
                           )}
                         </td>

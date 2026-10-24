@@ -375,6 +375,55 @@ public class EvalCommandTests
     }
 
     [Fact]
+    public void SingleRunExitCode_AMetricNotMeasuredOnSomeCase_IsInconclusive_NeverZero()
+    {
+        // `eval --metrics …` exited 0 when a requested metric measured nothing (a failed judge call, an unreadable reply).
+        TestResult Case(params MetricResult[] metrics) => new() { TestName = "t", Passed = true, Score = 90, MetricResults = metrics };
+        var measured = Case(MetricResult.Pass("llm_relevance", 90));
+        var unmeasured = Case(MetricResult.NotMeasured("llm_relevance", NotMeasuredCause.JudgeCallFailed, "llm_relevance not measured: 503."));
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate,
+            EvalCommand.SingleRunExitCode(passed: true, [measured, unmeasured], metricsRequested: true));
+        // A failure still wins, and with every metric measured, or none requested, a pass is 0 as before.
+        Assert.Equal(AgentEval.Cli.ExitCodes.TestFailure,
+            EvalCommand.SingleRunExitCode(passed: false, [measured, unmeasured], metricsRequested: true));
+        Assert.Equal(AgentEval.Cli.ExitCodes.Success,
+            EvalCommand.SingleRunExitCode(passed: true, [measured, measured], metricsRequested: true));
+        Assert.Equal(AgentEval.Cli.ExitCodes.Success,
+            EvalCommand.SingleRunExitCode(passed: true, [new TestResult { TestName = "t", Passed = true }], metricsRequested: false));
+        // Against a golden trace, a case with no verdict on either side leaves the comparison open: 11, never 0.
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate,
+            EvalCommand.SingleRunExitCode(passed: true, [measured], metricsRequested: false, goldenNotMeasured: true));
+    }
+
+    [Fact]
+    public void SingleRunExitCode_ACaseWithNoVerdict_IsInconclusive_LikeTheOtherPaths()
+    {
+        // A single-run eval exited 1 when a case's judge gave no verdict or its run threw, while --runs, --metrics and
+        // --golden exited 11 for the same situation. No measured failure means no 1.
+        var passing = new TestResult { TestName = "a", Passed = true, Score = 90 };
+        var judgeFailed = new TestResult { TestName = "b", Passed = false, Score = 0, JudgeFailed = true };
+        var threw = new TestResult { TestName = "c", Passed = false, Score = 0, Error = new HttpRequestException("429") };
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate,
+            EvalCommand.SingleRunExitCode(passed: true, [passing, judgeFailed], metricsRequested: false));
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate,
+            EvalCommand.SingleRunExitCode(passed: true, [passing, threw], metricsRequested: false));
+        Assert.Equal(0, new TestSummary("s", [passing, judgeFailed, threw]).FailedCount);   // what `passed` is built from
+    }
+
+    [Fact]
+    public void InconclusiveGate_RecordsTheExitCodeTheCommandReturns()
+    {
+        // The writer's default gate reads the case states alone, so it recorded exit 0 (or 1) for a run that exits 11.
+        var gate = EvalCommand.InconclusiveGate("all-cases-pass");
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, gate.ExitCode);
+        Assert.Equal(AgentEval.Results.Writing.AefGateOutcome.Inconclusive, gate.Outcome);
+        Assert.Equal("gate:eval", gate.GateId);
+    }
+
+    [Fact]
     public void ToMetricsContext_NullActualOutput_BecomesEmptyStringNotNull()
     {
         var testCase = new DatasetTestCase { Id = "t1", Input = "hi" };

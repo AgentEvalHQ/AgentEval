@@ -152,7 +152,7 @@ public class Article17GoldenTreeTest
 
         // Cost rollup: 4 sub-evals × 0.0015 = 0.006
         const double expectedCost = 0.006;
-        Assert.Equal(expectedCost, result.Provenance.EstimatedCost, precision: 10);
+        Assert.Equal(expectedCost, result.Provenance.EstimatedCost!.Value, precision: 10);
 
         // None of the stubs set cacheHit=true, so allCacheHits=false
         Assert.False(result.Provenance.CacheHit);

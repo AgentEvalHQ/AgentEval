@@ -12,6 +12,33 @@ namespace AgentEval.Tests.Cli.Aef;
 [Collection("ConsoleTests")]
 public sealed class AefCliOptionsTests
 {
+    [Fact]
+    public void LegacyOutput_FallbackIsAcceptedButHidden()
+    {
+        var (command, _) = Create();
+        Assert.Empty(command.Parse("--legacy-output").Errors);
+        Assert.True(command.Options.Single(o => o.Name == "--legacy-output").Hidden);
+    }
+
+    [Fact]
+    public async Task LegacyOutput_ScopeRestoresAfterExceptionAndDoesNotLeakIntoNestedInvocation()
+    {
+        var (command, controls) = Create();
+        Assert.False(AefCliOptions.LegacyOutput);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controls.InvokeAsync(command.Parse("--legacy-output"), async () =>
+        {
+            Assert.True(AefCliOptions.LegacyOutput);
+            await controls.InvokeAsync(command.Parse(""), () =>
+            {
+                Assert.False(AefCliOptions.LegacyOutput);
+                return Task.FromResult(0);
+            });
+            Assert.True(AefCliOptions.LegacyOutput);
+            throw new InvalidOperationException("synthetic interruption");
+        }));
+        Assert.False(AefCliOptions.LegacyOutput);
+    }
+
     [Theory]
     [InlineData("--no-aef")]
     [InlineData("--aef-unsealed")]

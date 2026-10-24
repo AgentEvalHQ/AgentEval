@@ -12,6 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Keep the console's process outcome contract shared with the other samples. -->
+    <Compile Include="../AgentEval.Samples/SampleOutcome.cs" Link="SampleOutcome.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Gatekeeper (UseGatekeeper, ToolUsageContractGate, result gates, containment) plus the tracing and
          scripted-provider surfaces the offline pass oracle uses. -->
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />

@@ -3,7 +3,7 @@
   "key": "tool_input_accuracy",
   "name": "Tool Input Accuracy",
   "category": "agentic-process",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Hybrid deterministic + LLM judge: schema-checks tool arguments against the tool declared input schema, then LLM judges semantic correctness for fields the schema cannot validate.",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -13,7 +13,7 @@
       "kind": "toolCalls",
       "key": "",
       "required": true,
-      "description": "Tool calls with arguments to verify."
+      "description": "Tool calls with arguments to verify. When no tool-call data was captured neither the schema check nor the judge runs (not measured)."
     }
   ],
   "recommendedVisualization": "histogram",

@@ -143,7 +143,7 @@ public class SkillDisclosureEfficiencyMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_NoSkillToolsCalled_Returns100_NoFabricatedAdvertiseCount()
+    public async Task EvaluateAsync_NoSkillToolsCalled_IsNotMeasured_NoFabricatedAdvertiseCount()
     {
         var metric = new SkillDisclosureEfficiencyMetric();
         var toolUsage = new ToolUsageReport();
@@ -151,14 +151,15 @@ public class SkillDisclosureEfficiencyMetricTests
 
         var result = await metric.EvaluateAsync(Context(toolUsage));
 
-        Assert.Equal(100, result.Score);
-        Assert.True(result.Passed);
+        // No skill call and no expected_skills: no funnel to score (T58; it read PASS 100).
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
         Assert.DoesNotContain("advertise", result.Details!.Keys);
         Assert.Equal("L→R→S", result.Details["funnel"]);
     }
 
     [Fact]
-    public async Task EvaluateAsync_NullToolUsage_Returns100()
+    public async Task EvaluateAsync_NullToolUsage_IsNotMeasured()
     {
         var metric = new SkillDisclosureEfficiencyMetric();
 
@@ -169,8 +170,9 @@ public class SkillDisclosureEfficiencyMetricTests
             ToolUsage = null,
         });
 
-        Assert.Equal(100, result.Score);
-        Assert.True(result.Passed);
+        // Nothing recorded the tool calls (T58; it read PASS 100).
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
     }
 
     [Fact]

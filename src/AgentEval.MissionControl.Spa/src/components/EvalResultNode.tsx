@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Sigma } from "lucide-react";
 import {
   type EvalResultNodeShape,
+  capturedScore,
   dimensionsToRecord,
   isAdjudicatedNode,
   isPanelNode,
@@ -36,7 +37,7 @@ interface Props {
 }
 
 // Phase-7 Task 7.11: labelToVerdict lifted to @/lib/verdict.
-import { labelToVerdict } from "@/lib/verdict";
+import { scoreVerdict } from "@/lib/verdict";
 
 export function EvalResultNode({
   node,
@@ -65,7 +66,7 @@ export function EvalResultNode({
     node.score.confidence !== null ||
     !!node.details.aggregationStrategy ||
     !!node.provenance.judgeModel ||
-    node.provenance.estimatedCost > 0;
+    (node.provenance.estimatedCost ?? 0) > 0;
   // Headers act as a disclosure widget only when there is a body to disclose.
   // Pure leaves (atomic-code evals with no dimensions, no recommendations, no
   // sub-results, and no extended meta) render a static row instead.
@@ -102,9 +103,10 @@ export function EvalResultNode({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="font-mono text-sm text-slate-700">
-            {formatScore(node.score.value)}
+            {formatScore(capturedScore(node))}
           </span>
-          <VerdictBadge verdict={labelToVerdict(node.score.label)} size="sm" />
+          <VerdictBadge verdict={scoreVerdict(node.score)} size="sm" />
+          <span className="text-xs text-slate-500">{node.provenance.estimatedCost == null ? 'cost not recorded' : formatCost(node.provenance.estimatedCost)}</span>
         </div>
       </Header>
 
@@ -138,11 +140,6 @@ export function EvalResultNode({
                 no promptHash). */}
             <PromptHashPill promptHash={node.provenance.promptHash} />
             <JudgeModePill mode={deriveJudgeMode(node.provenance, node.details)} />
-            {node.provenance.estimatedCost > 0 && (
-              <span className="text-slate-500">
-                {formatCost(node.provenance.estimatedCost)}
-              </span>
-            )}
             {node.details.aggregationStrategy && (
               <span className="inline-flex items-center gap-1 text-slate-600">
                 <Sigma size={11} />

@@ -95,7 +95,8 @@ public sealed class DecisionEval : AtomicEval
     /// </param>
     /// <param name="rateResolver">
     /// Optional per-instance cost-rate resolver, used only when the provider does not report a cost
-    /// itself. When <see langword="null"/>, falls back to <see cref="JudgeCostMap.GetRate(string?)"/>.
+    /// itself. When <see langword="null"/>, falls back to <see cref="JudgeCostMap.GetRate(string?)"/>; a model that
+    /// table has no rate for leaves the cost not priced (<see cref="EvalProvenance.EstimatedCost"/> null).
     /// </param>
     /// <param name="reference">
     /// Optional reference block: a description of what is being judged and what is not, sent ahead of the state
@@ -185,8 +186,9 @@ public sealed class DecisionEval : AtomicEval
             ? "none"
             : (_failureSeverity is null ? scoreSeverity : SeverityRollup.Max([scoreSeverity, _failureSeverity]));
 
+        // Not priced is null, never $0: no usage reported, or no provider cost and no rate for the model.
         int? tokensUsed = null;
-        double estimatedCost = 0;
+        double? estimatedCost = null;
         if (response.Usage is { } usage)
         {
             // Saturating add: both counts are non-negative (DecisionUsage guards them), so the only way
@@ -229,7 +231,7 @@ public sealed class DecisionEval : AtomicEval
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private double EstimateCost(string model, DecisionUsage usage)
+    private double? EstimateCost(string model, DecisionUsage usage)
     {
         if (_rateResolver is null)
             return JudgeCostMap.EstimateCost(model, usage.InputTokens, usage.OutputTokens);

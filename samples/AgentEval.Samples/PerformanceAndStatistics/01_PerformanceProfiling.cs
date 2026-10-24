@@ -34,6 +34,7 @@ public static class PerformanceProfiling
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -140,6 +141,8 @@ public static class PerformanceProfiling
 
             var icon = allFound ? "✅" : "⚠️";
             Console.WriteLine($"      {icon} {name}: expected [{string.Join(", ", expectedTools)}] → got [{string.Join(", ", actualTools)}]");
+            if (!allFound)
+                SampleOutcome.Fail($"tool accuracy, '{name}': expected [{string.Join(", ", expectedTools)}], got [{string.Join(", ", actualTools)}]");
         }
 
         var accuracy = totalExpected > 0 ? (double)totalMatched / totalExpected * 100 : 0;

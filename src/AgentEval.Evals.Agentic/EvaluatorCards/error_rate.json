@@ -4,7 +4,7 @@
   "name": "Telemetry: Error Rate",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator computing the fraction of failed agent invocations from AgenticTelemetry. The rate is better lower; the score is its inverse, so a higher score is better.",
+  "description": "Computes 1 - ErrorCount/TotalCalls. Counts refer to call attempts including retries. Missing counts skip; recorded zero calls and zero errors are not applicable. Negative counts or errors above TotalCalls return an error.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.95,
@@ -13,7 +13,7 @@
       "kind": "metadata",
       "key": "agentic_telemetry",
       "required": true,
-      "description": "AgenticTelemetry record with TotalCalls + ErrorCount."
+      "description": "AgenticTelemetry with nullable ErrorCount and TotalCalls; both readings are required."
     }
   ],
   "recommendedVisualization": "histogram",

@@ -365,14 +365,14 @@ public class ModelComparisonExtensionsTests
         
         var stochasticResult1 = new StochasticResult(
             TestCase: testCase,
-            IndividualResults: CreateSampleTestResults(10),
+            IndividualResults: CreateSampleTestResults(10, 0.0025m),
             Statistics: stats1,
             Options: new StochasticOptions(Runs: 10),
             Passed: true);
         
         var stochasticResult2 = new StochasticResult(
             TestCase: testCase,
-            IndividualResults: CreateSampleTestResults(10),
+            IndividualResults: CreateSampleTestResults(10, 0.0005m),
             Statistics: stats2,
             Options: new StochasticOptions(Runs: 10),
             Passed: true);
@@ -432,7 +432,7 @@ public class ModelComparisonExtensionsTests
             Options: options);
     }
     
-    private static IReadOnlyList<TestResult> CreateSampleTestResults(int count)
+    private static IReadOnlyList<TestResult> CreateSampleTestResults(int count, decimal? cost = null)
     {
         var results = new List<TestResult>();
         for (int i = 0; i < count; i++)
@@ -442,6 +442,7 @@ public class ModelComparisonExtensionsTests
                 StartTime = DateTimeOffset.UtcNow,
                 PromptTokens = 50,
                 CompletionTokens = 10,
+                EstimatedCost = cost,
                 ModelUsed = "gpt-4o"
             };
             perf.EndTime = perf.StartTime + TimeSpan.FromMilliseconds(200 + i * 10);

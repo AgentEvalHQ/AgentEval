@@ -6,6 +6,7 @@ using AgentEval.Core;
 using AgentEval.Memory.Extensions;
 using AgentEval.Memory.Metrics;
 using AgentEval.Memory.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -38,6 +39,48 @@ public sealed class MemoryMetricsNotMeasuredTests
         Assert.False(result.Measured);
         Assert.False(result.Passed);
         Assert.Contains("not found", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(NotMeasuredCause.MissingInput, result.NotMeasuredCause);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllMetrics))]
+    public async Task AnErrorWhileScoring_IsNotMeasured_WithTheError_NotAFailAtZero(string metric)
+    {
+        // The Debug write is the one call inside every metric's try that a test can fault; any other fault in the
+        // read lands in the same catch.
+        IMetric faulting = metric switch
+        {
+            "retention" => new MemoryRetentionMetric(new FaultingLogger<MemoryRetentionMetric>()),
+            "reach_back" => new MemoryReachBackMetric(new FaultingLogger<MemoryReachBackMetric>()),
+            "noise_resilience" => new MemoryNoiseResilienceMetric(new FaultingLogger<MemoryNoiseResilienceMetric>()),
+            "temporal" => new MemoryTemporalMetric(new FaultingLogger<MemoryTemporalMetric>()),
+            "reducer_fidelity" => new MemoryReducerFidelityMetric(new FaultingLogger<MemoryReducerFidelityMetric>()),
+            _ => throw new ArgumentOutOfRangeException(nameof(metric)),
+        };
+        // Each metadata set reaches the branch that writes the Debug line.
+        var metadata = metric switch
+        {
+            "reach_back" => new Dictionary<string, object> { ["ReachBackTest"] = true, ["MaxDepth"] = 50 },
+            "noise_resilience" => new Dictionary<string, object>(),
+            "temporal" => new Dictionary<string, object> { ["TemporalEvaluation"] = true },
+            "reducer_fidelity" => new Dictionary<string, object>
+            {
+                ["ReducerFidelityTest"] = true, ["CompressionRatio"] = 1.0, ["InformationLoss"] = 10.0,
+                ["KeyFactRetention"] = 95.0,
+            },
+            _ => null,
+        };
+        var memory = Result([Query(measured: true, found: metric == "noise_resilience")],
+            scenarioName: metric == "noise_resilience" ? "buried facts" : "s", metadata: metadata);
+
+        var result = await faulting.EvaluateAsync(memory.ToEvaluationContext());
+
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Equal(NotMeasuredCause.JudgeCallFailed, result.NotMeasuredCause);
+        Assert.Equal(typeof(InvalidOperationException).FullName, result.Details!["errorType"]);
+        Assert.Equal("log sink down", result.Details["errorMessage"]);
+        Assert.Contains("not measured: InvalidOperationException: log sink down", result.Explanation);
     }
 
     [Theory]
@@ -104,26 +147,43 @@ public sealed class MemoryMetricsNotMeasuredTests
         Assert.Equal(2, result.Details["queries_not_measured"]);
     }
 
-    private static MemoryQueryResult Query(bool measured) => new()
+    private static MemoryQueryResult Query(bool measured, bool found = false) => new()
     {
-        Query = MemoryQuery.Create("q?", MemoryFact.Create("fact")),
+        Query = new() { Question = "q?", ExpectedFacts = [MemoryFact.Create("fact")], QueryTime = DateTimeOffset.UnixEpoch },
         Response = "r",
         Score = measured ? 90 : 0,
         Measured = measured,
-        FoundFacts = [],
+        FoundFacts = found ? [MemoryFact.Create("fact")] : [],
         MissingFacts = [],
         ForbiddenFound = [],
     };
 
-    private static MemoryEvaluationResult Result(MemoryQueryResult[] queries, bool temporal = false) => new()
+    private static MemoryEvaluationResult Result(
+        MemoryQueryResult[] queries,
+        bool temporal = false,
+        string scenarioName = "s",
+        Dictionary<string, object>? metadata = null) => new()
     {
         OverallScore = queries.Any(q => q.Measured) ? 90 : 0,
         QueryResults = queries,
-        FoundFacts = [],
+        FoundFacts = queries.SelectMany(query => query.FoundFacts).ToArray(),
         MissingFacts = [],
         ForbiddenFound = [],
         Duration = TimeSpan.Zero,
-        ScenarioName = "s",
-        Metadata = temporal ? new Dictionary<string, object> { ["TemporalEvaluation"] = true } : null,
+        ScenarioName = scenarioName,
+        Metadata = metadata ?? (temporal ? new Dictionary<string, object> { ["TemporalEvaluation"] = true } : null),
     };
+
+    /// <summary>Throws on a Debug write, and only there, so the metric's own catch can still log the error.</summary>
+    private sealed class FaultingLogger<T> : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == Microsoft.Extensions.Logging.LogLevel.Debug)
+                throw new InvalidOperationException("log sink down");
+        }
+    }
 }

@@ -95,25 +95,25 @@ public class ToolSuccessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoToolsCalled_Returns100()
+    public async Task EvaluateAsync_NoToolDataRecorded_IsNotMeasured()
     {
         // Arrange
         var metric = new ToolSuccessMetric();
-        
+
         var context = new EvaluationContext
         {
             Input = "Hello",
             Output = "Hi!",
             ToolUsage = null
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
-        // Assert - No tools called = 100% success rate (vacuous truth)
-        Assert.Equal(100, result.Score);
-        Assert.True(result.Passed);
-        Assert.Contains("No tools called", result.Explanation);
+
+        // Assert - nothing recorded the tool calls, so there is no success rate to report (T58; it read 100, a vacuous pass)
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Contains("not measured", result.Explanation);
     }
     
     [Fact]
@@ -212,6 +212,8 @@ public class ToolSuccessMetricTests
             {
                 Name = name,
                 CallId = Guid.NewGuid().ToString(),
+                // These records stand for calls that ran; ToolSuccess counts only executed calls (T58).
+                WasExecuted = true,
                 Order = order++
             };
             record.Exception = error;

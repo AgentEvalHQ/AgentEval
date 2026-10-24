@@ -14,8 +14,12 @@ namespace AgentEval.Tests.Cli;
 [Collection("EnvVarTests")]
 public sealed class BenchLongMemEvalCommandTests
 {
-    [Fact]
-    public async Task RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RunAsync_MixedOutcomes_UsesScoredDenominatorAndCorrectPercentRendering(bool capture, bool legacyOutput = false)
     {
         using var fixture = WorkspaceFixture.Create(
             Question("q-yes"),
@@ -29,12 +33,12 @@ public sealed class BenchLongMemEvalCommandTests
             "agent answer two", "no",
             "agent answer three", string.Empty, string.Empty);
 
-        var invocation = await CaptureConsoleAsync(() =>
+        var invocation = await CaptureConsoleAsync(() => Aef.NativeVerbIntegrationTests.WithCapture(capture, () =>
             BenchLongMemEvalCommand.RunAsync(
                 preset: "subset",
                 subject: "cli-longmemeval",
                 rootOverride: fixture.Root,
-                chatClientOverride: client));
+                chatClientOverride: client), legacy: legacyOutput));
 
         // B6c-9: 1 of 3 questions is inconclusive, so the 50% pass rests on part of them: a warn, exit 10 (it was PASS, 0).
         Assert.Equal(AgentEval.Cli.ExitCodes.GateWarning, invocation.ExitCode);
@@ -54,10 +58,14 @@ public sealed class BenchLongMemEvalCommandTests
                 .Where(line => line.Contains("Overall accuracy:", StringComparison.Ordinal)));
         Assert.DoesNotContain("5000", accuracyLine);
 
-        var runDirectory = Assert.Single(fixture.RunDirectories());
-        var summary = JsonDocument.Parse(
-            await File.ReadAllTextAsync(Path.Combine(runDirectory, "summary.json")));
-        Assert.Equal("WARN", summary.RootElement.GetProperty("verdict").GetString());
+        var runDirectory = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(
+            Path.Combine(fixture.Root, ".agenteval"), "report-native.json", SearchOption.AllDirectories)))!;
+        if (legacyOutput)
+        {
+            var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(runDirectory, "summary.json")));
+            Assert.Equal("WARN", summary.RootElement.GetProperty("verdict").GetString());
+        }
+        else Assert.Empty(fixture.RunDirectories());
 
         // The AEF run: a case per question; the unscored one is not measured, never failed; no answer is written.
         var aefRun = Assert.Single(Directory.GetFiles(Path.Combine(fixture.Root, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories));
@@ -69,16 +77,21 @@ public sealed class BenchLongMemEvalCommandTests
             .Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]).Order().ToList();
         Assert.Equal(["failed", "not_measured", "passed"], states);
         var aefText = string.Concat(Directory.GetFiles(aefDir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
-        Assert.DoesNotContain("agent answer", aefText, StringComparison.Ordinal);
-        var stats = summary.RootElement.GetProperty("stats");
-        Assert.Equal(3, stats.GetProperty("total").GetInt32());
-        Assert.Equal(1, stats.GetProperty("passed").GetInt32());
-        Assert.Equal(1, stats.GetProperty("failed").GetInt32());
-        Assert.Equal(1, stats.GetProperty("warnings").GetInt32());
-        var metrics = summary.RootElement.GetProperty("metrics");
-        Assert.Equal(256, metrics.GetProperty("judge_max_output_tokens").GetDouble());
-        Assert.Equal(0, metrics.GetProperty("judge_temperature_configured").GetDouble());
-        Assert.Equal(0, metrics.GetProperty("evidence_capture_mode").GetDouble());
+        if (!capture) Assert.DoesNotContain("agent answer", aefText, StringComparison.Ordinal);
+        Assert.DoesNotContain("agent answer", File.ReadAllText(Path.Combine(aefDir, "results.ndjson")), StringComparison.Ordinal);
+        if (legacyOutput)
+        {
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(runDirectory, "summary.json")));
+            var stats = summary.RootElement.GetProperty("stats");
+            Assert.Equal(3, stats.GetProperty("total").GetInt32());
+            Assert.Equal(1, stats.GetProperty("passed").GetInt32());
+            Assert.Equal(1, stats.GetProperty("failed").GetInt32());
+            Assert.Equal(1, stats.GetProperty("warnings").GetInt32());
+            var metrics = summary.RootElement.GetProperty("metrics");
+            Assert.Equal(1024, metrics.GetProperty("judge_max_output_tokens").GetDouble());
+            Assert.Equal(0, metrics.GetProperty("judge_temperature_configured").GetDouble());
+            Assert.Equal(0, metrics.GetProperty("evidence_capture_mode").GetDouble());
+        }
 
         var native = JsonSerializer.Deserialize<ExternalBenchmarkResult>(
             await File.ReadAllTextAsync(Path.Combine(runDirectory, "report-native.json")));
@@ -86,6 +99,11 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Equal(50, native.OverallAccuracy);
         Assert.Equal(2, native.ScoredQuestions);
         Assert.Equal(3, native.SelectedQuestions);
+        var importedReport = legacyOutput
+            ? Aef.LegacyMemoryReportAssertions.Import(Path.Combine(fixture.Root, ".agenteval"), runDirectory, "BenchLongMemEvalCommand", reportOnly: true)
+            : System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllBytes(Path.Combine(runDirectory, "report-native.json")))!.AsObject();
+        Aef.LegacyMemoryReportAssertions.NativeQuestions(aefDir, importedReport);
+        Aef.NativeReportAssertions.MatchesProducer(aefDir, runDirectory, capture);
     }
 
     [Fact]
@@ -98,12 +116,12 @@ public sealed class BenchLongMemEvalCommandTests
         var client = new SequenceChatClient(
             "agent answer", string.Empty, string.Empty);
 
-        var invocation = await CaptureConsoleAsync(() =>
+        var invocation = await CaptureConsoleAsync(() => Aef.NativeVerbIntegrationTests.WithCapture(false, () =>
             BenchLongMemEvalCommand.RunAsync(
                 preset: "subset",
                 subject: "cli-longmemeval-empty",
                 rootOverride: fixture.Root,
-                chatClientOverride: client));
+                chatClientOverride: client), legacy: true));
 
         Assert.True(
             invocation.ExitCode == ExitCodes.GateInconclusive,
@@ -120,6 +138,11 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.False(summary.RootElement.GetProperty("metrics").TryGetProperty(
             "overall_accuracy",
             out _));
+        var importedReport = Aef.LegacyMemoryReportAssertions.Import(Path.Combine(fixture.Root, ".agenteval"), runDirectory,
+            "BenchLongMemEvalCommand", reportOnly: true);
+        var aefDirectory = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(fixture.Root, ".agenteval", "aef"),
+            "run.json", SearchOption.AllDirectories)))!;
+        Aef.LegacyMemoryReportAssertions.NativeQuestions(aefDirectory, importedReport);
     }
 
     [Theory]
@@ -136,13 +159,13 @@ public sealed class BenchLongMemEvalCommandTests
         var aef = new DirectoryInfo(Path.Combine(fixture.Root, "evidence"));
         if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
         string? observed = null;
-        var invocation = await CaptureConsoleAsync(() => BenchLongMemEvalCommand.RunAsync("subset", "subject", fixture.Root,
+        var invocation = await CaptureConsoleAsync(() => Aef.NativeVerbIntegrationTests.WithCapture(true, () => BenchLongMemEvalCommand.RunAsync("subset", "subject", fixture.Root,
             client, cancel.Token, aef, noAef, onQuestionCompleted: question =>
             {
                 observed = question.QuestionId;
                 if (fail) throw new InvalidOperationException("test failure after question");
                 cancel.Cancel();
-            }));
+            })));
         Assert.Equal(invalidOutput ? 3 : 1, invocation.ExitCode);
         Assert.NotNull(observed);
         if (noAef || invalidOutput)
@@ -157,6 +180,7 @@ public sealed class BenchLongMemEvalCommandTests
         Assert.Empty(verified.Problems);
         var run = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(header))!;
         Assert.Equal("aborted", (string?)run["status"]);
+        Assert.Null(new AgentEval.Results.Adapters.Reading.AefRunEvidenceReader().Read(dir).CapturedContent("E-report-native-json"));
         Assert.Equal("mocked", (string?)run["execution"]!["targetMode"]);
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
         var line = System.Text.Json.Nodes.JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;

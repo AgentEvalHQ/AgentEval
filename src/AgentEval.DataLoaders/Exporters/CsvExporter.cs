@@ -42,16 +42,20 @@ public class CsvExporter : IResultExporter
             header += "," + string.Join(",", metricNames);
         await writer.WriteLineAsync(header);
         
-        // Write data rows
+        // Write data rows. A test with no score reads "not measured", as a metric cell does; a test with no timing has an
+        // empty DurationMs cell. Neither is written as 0.
         foreach (var result in report.TestResults)
         {
+            var score = result.Score is { } testScore
+                ? testScore.ToString("F2", CultureInfo.InvariantCulture)
+                : "not measured";
             var row = $"{EscapeCsvField(report.RunId)}," +
                      $"{EscapeCsvField(result.Name)}," +
                      $"{EscapeCsvField(result.Category ?? "")}," +
-                     $"{result.Score.ToString("F2", CultureInfo.InvariantCulture)}," +
+                     $"{score}," +
                      $"{result.Passed}," +
                      $"{result.Skipped}," +
-                     $"{result.DurationMs}," +
+                     $"{result.DurationMs?.ToString(CultureInfo.InvariantCulture)}," +
                      $"{EscapeCsvField(result.Error ?? "")}," +
                      $"{EscapeCsvField(report.Agent?.Name ?? "")}," +
                      $"{EscapeCsvField(report.Agent?.Model ?? "")}";

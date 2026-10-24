@@ -31,7 +31,7 @@ public class MultiJudgeWrapperTests
         double value,
         string severity = "none",
         string label = "pass",
-        double cost = 0.0) =>
+        double? cost = 0.0) =>
         new(
             Metric: new(key, key, "test", "1.0.0"),
             Score: new(value, null, label, label == "pass", null, severity, null),
@@ -40,7 +40,7 @@ public class MultiJudgeWrapperTests
             EvaluatedAt: DateTimeOffset.UtcNow);
 
     private static EvalComponent JudgeComp(string key, double value, string severity = "none",
-        string label = "pass", double weight = 1.0, double cost = 0.0)
+        string label = "pass", double weight = 1.0, double? cost = 0.0)
     {
         var result = MakeResult(key, value, severity, label, cost);
         return new EvalComponent(new FixedResultEval(key, result), weight);
@@ -155,7 +155,24 @@ public class MultiJudgeWrapperTests
         var result = await sut.EvaluateAsync(Input);
 
         // Assert
-        Assert.Equal(0.60, result.Provenance.EstimatedCost, precision: 10);
+        Assert.Equal(0.60, result.Provenance.EstimatedCost!.Value, precision: 10);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_OneJudgeNotPriced_PanelCostIsNotPriced()
+    {
+        // A panel's total is complete or absent: the unpriced judge used to add $0 and the panel read 0.30.
+        var judges = new[]
+        {
+            JudgeComp("j1", 0.90, "none", "pass", cost: 0.10),
+            JudgeComp("j2", 0.90, "none", "pass", cost: null),
+            JudgeComp("j3", 0.90, "none", "pass", cost: 0.20),
+        };
+        var sut = MakeWrapper(judges);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Null(result.Provenance.EstimatedCost);
     }
 
     [Fact]

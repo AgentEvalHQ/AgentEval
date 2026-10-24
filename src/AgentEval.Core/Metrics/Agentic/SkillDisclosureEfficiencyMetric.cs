@@ -44,6 +44,8 @@ public sealed class SkillDisclosureEfficiencyOptions
 ///   "100% selection accuracy") and <see cref="MetricResult.Explanation"/> says verbatim that the score
 ///   is structural-only.</item>
 /// </list>
+/// Not measured (<see cref="MetricResult.Measured"/> false) when no tool data was recorded, or when no skill tool was
+/// called and no <c>expected_skills</c> were supplied. With <c>expected_skills</c>, loading no skill is a measured miss.
 /// </summary>
 /// <remarks>
 /// The fourth conceptual progressive-disclosure stage — "advertise" (the skill inventory listed into
@@ -81,12 +83,20 @@ public sealed class SkillDisclosureEfficiencyMetric : IAgenticMetric
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var analysis = SkillDisclosureAnalyzer.Analyze(context.ToolUsage);
+        if (context.ToolUsage is null)
+            return ToolUsageNotRecorded.Result(Name);
 
-        if (analysis.LoadCount == 0 && analysis.ReadCount == 0 && analysis.RunCount == 0)
+        var analysis = SkillDisclosureAnalyzer.Analyze(context.ToolUsage);
+        var expectedSkills = context.GetProperty<IReadOnlyList<string>>("expected_skills");
+        var hasGroundTruth = expectedSkills is { Count: > 0 };
+
+        // No skill tool called. With expected_skills that is a measured miss (selection recall 0), scored below; it used
+        // to return here as PASS 100. Without them there is no funnel to score: not measured, never a pass (T58).
+        if (analysis.LoadCount == 0 && analysis.ReadCount == 0 && analysis.RunCount == 0 && !hasGroundTruth)
         {
-            return Task.FromResult(MetricResult.Pass(Name, 100,
-                "No skill tools (load_skill / read_skill_resource / run_skill_script) were called — nothing to measure.",
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.NotApplicable,
+                "No skill tools (load_skill / read_skill_resource / run_skill_script) were called and no expected_skills " +
+                "were supplied — nothing to measure.",
                 new Dictionary<string, object>
                 {
                     ["nLoad"] = 0,
@@ -115,8 +125,6 @@ public sealed class SkillDisclosureEfficiencyMetric : IAgenticMetric
         var loadPrecision = Math.Clamp(redundancyFactor * loadStormFactor, 0.0, 1.0);
 
         // 3. Optional selection F1 (only with ground truth).
-        var expectedSkills = context.GetProperty<IReadOnlyList<string>>("expected_skills");
-        var hasGroundTruth = expectedSkills is { Count: > 0 };
         double selectionFactor = 1.0;
         double? selectionPrecision = null, selectionRecall = null, selectionF1 = null;
 

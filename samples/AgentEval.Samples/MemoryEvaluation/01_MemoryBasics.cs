@@ -35,6 +35,7 @@ public static class MemoryBasics
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint) to evaluate memory.");
             Console.WriteLine("   Memory evaluation uses an LLM judge — it cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -120,6 +121,7 @@ public static class MemoryBasics
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
             Console.ResetColor();
+            SampleOutcome.Fail($"memory assertion failed: {ex.Message}");
         }
 
         Console.WriteLine();
@@ -159,10 +161,10 @@ public static class MemoryBasics
 
         // Overall score with visual indicator
         Console.Write("   Overall Score: ");
-        var scoreColor = result.OverallScore >= 80 ? ConsoleColor.Green :
-                        result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
+        var scoreColor = result.OverallScore is null ? ConsoleColor.Yellow : result.OverallScore is >= 80 ? ConsoleColor.Green :
+                        result.OverallScore is >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
         Console.ForegroundColor = scoreColor;
-        Console.WriteLine($"{result.OverallScore:F1}% {GetScoreEmoji(result.OverallScore)}");
+        Console.WriteLine($"{MemorySampleReading.Percent(result.OverallScore)} {GetScoreEmoji(result.OverallScore)}");
         Console.ResetColor();
 
         Console.WriteLine($"   Duration: {result.Duration.TotalMilliseconds:F0}ms");
@@ -199,10 +201,11 @@ public static class MemoryBasics
         }
     }
 
-    private static string GetScoreEmoji(double score)
+    private static string GetScoreEmoji(double? score)
     {
         return score switch
         {
+            null => "n/a",
             >= 90 => "🏆",
             >= 80 => "✅",
             >= 70 => "👍",

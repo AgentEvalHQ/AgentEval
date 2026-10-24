@@ -36,7 +36,7 @@ public class MemoryReachBackMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.NotMeasured(Name,
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                     "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
@@ -52,7 +52,14 @@ public class MemoryReachBackMetric : IMemoryMetric
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating memory reach-back metric");
-            return Task.FromResult(MetricResult.Fail(Name, $"Error during reach-back evaluation: {ex.Message}"));
+            // An error is no reading: not measured, never a Fail at 0 that an aggregate would count.
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeCallFailed,
+                $"Reach-back not measured: {ex.GetType().Name}: {ex.Message}",
+                new Dictionary<string, object>
+                {
+                    ["errorType"] = ex.GetType().FullName ?? ex.GetType().Name,
+                    ["errorMessage"] = ex.Message,
+                }));
         }
     }
 
@@ -63,7 +70,7 @@ public class MemoryReachBackMetric : IMemoryMetric
 
         if (queryResults.Length == 0)
         {
-            return Task.FromResult(MetricResult.NotMeasured(Name,
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                 "The scenario asked no questions, so reach-back capability was not tested: not measured."));
         }
 
@@ -100,19 +107,32 @@ public class MemoryReachBackMetric : IMemoryMetric
 
     private Task<MetricResult> EvaluateSpecificReachBack(MemoryEvaluationResult memoryResult)
     {
-        // For specific reach-back tests, use metadata to determine depth and degradation
-        var maxDepth = memoryResult.Metadata?.GetValueOrDefault("MaxDepth") as int? ?? 0;
+        // A specific score needs a measured aggregate.
+        if (!memoryResult.IsMeasured || memoryResult.OverallScore is not { } score)
+        {
+            return Task.FromResult(MetricResult.NotMeasured(Name,
+                "Not measured: the judge produced no score for any query."));
+        }
+
+        // For specific reach-back tests, use metadata to determine depth and degradation.
+        // A missing depth is not a 0: it would halve a real score.
+        if (memoryResult.Metadata?.GetValueOrDefault("MaxDepth") is not int maxDepth)
+        {
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                "Not measured: a reach-back test needs the metadata MaxDepth, and it is missing or not an integer."));
+        }
+
         var depthAnalysis = memoryResult.Metadata?.GetValueOrDefault("DepthAnalysis") as Dictionary<string, object>;
         var degradationCurve = memoryResult.Metadata?.GetValueOrDefault("DegradationCurve") as double[];
         
-        var reachBackScore = CalculateReachBackScore(memoryResult, maxDepth, degradationCurve);
+        var reachBackScore = CalculateReachBackScore(score, maxDepth, degradationCurve);
         var passed = reachBackScore >= 60; // Lower threshold for deep reach-back
         
         var details = new Dictionary<string, object>
         {
             ["max_depth"] = maxDepth,
             ["reachback_score"] = reachBackScore,
-            ["overall_score"] = memoryResult.OverallScore,
+            ["overall_score"] = score,
             ["analysis_type"] = "specific"
         };
         
@@ -138,11 +158,10 @@ public class MemoryReachBackMetric : IMemoryMetric
     }
 
     private static double CalculateReachBackScore(
-        MemoryEvaluationResult memoryResult, 
+        double baseScore,
         int maxDepth, 
         double[]? degradationCurve)
     {
-        var baseScore = memoryResult.OverallScore;
         
         // Adjust score based on conversation depth
         var depthFactor = maxDepth > 0 ? Math.Min(1.0, maxDepth / 50.0) : 0.5; // Normalize to 50 turns

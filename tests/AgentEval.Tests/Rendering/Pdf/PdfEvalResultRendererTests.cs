@@ -182,6 +182,22 @@ public class PdfEvalResultRendererTests
     }
 
     /// <summary>
+    /// T63: a leaf whose cost was not priced says so. It used to carry 0, which the PDF hid like a free check's.
+    /// </summary>
+    [Fact]
+    public async Task RenderAsync_UnpricedLeaf_SaysNotPriced()
+    {
+        var result = MakeAtomic("unpriced", 0.9, "pass", true, "none") with
+        {
+            Provenance = new("atomic-llm", "llama3.1:8b", null, null, 2000, null, false),
+        };
+
+        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(includeProvenance: true));
+
+        Assert.Contains("not priced", ExtractAllTextFromPdf(bytes));
+    }
+
+    /// <summary>
     /// Plan-13 T4.1b item 8 — when an evidence message exceeds the configured
     /// truncation length, the PDF body must carry the "(N more chars)" footer
     /// so the reader knows content was dropped.

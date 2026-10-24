@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 using AgentEval.Evals;
 using AgentEval.Output;
 
@@ -40,7 +42,7 @@ public sealed record AgenticBenchmarkResult(
 /// Roll-up summary for an agentic benchmark run, broken down by evaluation category
 /// and individual evaluator.
 /// </summary>
-/// <param name="OverallScore">Composite score in the [0, 1] range.</param>
+/// <param name="OverallScore">Composite score in the [0, 1] range, or null when the root is not measured.</param>
 /// <param name="OverallStatus">Overall verdict: <c>PASS</c>, <c>WARN</c>, or <c>FAIL</c>.</param>
 /// <param name="PerCategory">
 /// Score and status keyed by category string (e.g. "system-outcome", "agentic-process",
@@ -48,27 +50,34 @@ public sealed record AgenticBenchmarkResult(
 /// </param>
 /// <param name="PerEvaluator">Score and status keyed by evaluator metric key.</param>
 public sealed record AgenticSummary(
-    double OverallScore,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? OverallScore,
     string OverallStatus,
     IReadOnlyDictionary<string, AgenticCategorySummary> PerCategory,
-    IReadOnlyDictionary<string, AgenticEvaluatorSummary> PerEvaluator);
+    IReadOnlyDictionary<string, AgenticEvaluatorSummary> PerEvaluator)
+{
+    /// <summary>Formats the measured overall score, or explains its absence, including in legacy ERROR/SKIPPED documents.</summary>
+    public string OverallScoreText() =>
+        OverallScore is { } score && OverallStatus is not ("ERROR" or "SKIPPED")
+            ? $"{score:P0}"
+            : "n/a \u2014 not measured";
+}
 
 /// <summary>Summary for a single agentic benchmark category.</summary>
-/// <param name="Score">Category-level composite score in [0, 1].</param>
+/// <param name="Score">Category-level composite score in [0, 1], or null when none was measured.</param>
 /// <param name="Status">Category verdict: <c>PASS</c>, <c>WARN</c>, or <c>FAIL</c>.</param>
 /// <param name="CriticalFails">Evaluator keys within this category that failed at critical severity.</param>
 public sealed record AgenticCategorySummary(
-    double Score,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score,
     string Status,
     IReadOnlyList<string> CriticalFails);
 
 /// <summary>Summary for a single evaluator within the agentic benchmark.</summary>
-/// <param name="Score">Evaluator-level score in [0, 1].</param>
+/// <param name="Score">Evaluator-level score in [0, 1], or null when not measured.</param>
 /// <param name="Status">Evaluator verdict: <c>PASS</c>, <c>WARN</c>, or <c>FAIL</c>.</param>
 /// <param name="Severity">The evaluator's declared severity level (e.g. "critical", "high", "medium").</param>
 /// <param name="Confidence">Optional confidence value from LLM judge, or null when not applicable.</param>
 public sealed record AgenticEvaluatorSummary(
-    double Score,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score,
     string Status,
     string Severity,
     double? Confidence);

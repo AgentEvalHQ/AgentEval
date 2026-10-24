@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 using AgentEval.Evals;
 using AgentEval.Output;
 using AgentEval.Compliance.Core;
@@ -27,16 +29,23 @@ public sealed record EuAiActComplianceEvidence(
 /// Roll-up summary of an EU AI Act benchmark run, broken down by pillar and article.
 /// </summary>
 public sealed record EuAiActSummary(
-    double OverallScore,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? OverallScore,
     string OverallStatus,
     IReadOnlyDictionary<string, EuAiActPillarSummary> PerPillar,
-    IReadOnlyDictionary<string, EuAiActArticleSummary> PerArticle);
+    IReadOnlyDictionary<string, EuAiActArticleSummary> PerArticle)
+{
+    /// <summary>Formats the measured overall score, or explains its absence, including in legacy ERROR/SKIPPED documents.</summary>
+    public string OverallScoreText() =>
+        OverallScore is { } score && OverallStatus is not ("ERROR" or "SKIPPED")
+            ? $"{score:P0}"
+            : "n/a \u2014 not measured";
+}
 
 /// <summary>Summary for a single EU AI Act pillar.</summary>
-public sealed record EuAiActPillarSummary(double Score, string Status, IReadOnlyList<string> CriticalFails);
+public sealed record EuAiActPillarSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, IReadOnlyList<string> CriticalFails);
 
 /// <summary>Summary for a single EU AI Act article composite.</summary>
-public sealed record EuAiActArticleSummary(double Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
+public sealed record EuAiActArticleSummary([property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Score, string Status, int ScenarioCount, int ScenariosFailed, string Severity);
 
 /// <summary>Attestation block for the EU AI Act evidence wrapper.</summary>
 public sealed record EuAiActAttestation(string JudgeMode, IReadOnlyDictionary<string, string> PromptVersions);

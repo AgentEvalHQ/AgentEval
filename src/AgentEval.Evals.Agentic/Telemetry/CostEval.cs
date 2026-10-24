@@ -24,9 +24,11 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
 /// </para>
 /// <para>
-/// Cost estimation is the caller's responsibility. If <see cref="AgenticTelemetry.EstimatedCostUsd"/>
-/// is 0 and no real cost tracking is implemented, the evaluator returns score 1.0 unconditionally
-/// (cost = 0 is always within budget). Document cost-tracking gaps accordingly.
+/// Cost estimation is the caller's responsibility. A run whose cost was not tracked carries
+/// <see cref="AgenticTelemetry.EstimatedCostUsd"/> <see langword="null"/>, and the evaluator returns
+/// <see cref="EvalResult.Skipped(IEval, string)"/> (not measured) for it. It used to be 0 for "not tracked", which this
+/// evaluator scored 1.0 unconditionally: an untracked cost passed every budget (T82). A reported 0 is a measured zero
+/// and is scored. Negative or non-finite costs return an error without a measurement.
 /// </para>
 /// </summary>
 public sealed class CostEval : IEvalConfigurationSource
@@ -34,7 +36,9 @@ public sealed class CostEval : IEvalConfigurationSource
     private const string KeyValue      = "cost";
     private const string NameValue     = "Cost";
     private const string CategoryValue = "operational";
-    private const string VersionValue  = "1.0.0";
+    // 1.1.0: a cost that was not tracked (EstimatedCostUsd null) is skipped, not scored as $0 within budget (T82, D-31).
+    // Keep EvaluatorCards/cost.json and tools/gen_evaluator_cards.py on the same version.
+    private const string VersionValue  = "1.1.0";
 
     private readonly AgenticTelemetry? _data;
     private readonly double _budgetUsd;
@@ -95,7 +99,19 @@ public sealed class CostEval : IEvalConfigurationSource
                 $"CostEval requires telemetry data via EvalInput.Metadata[\"{LatencyEval.MetadataKey}\"] or constructor parameter."));
         }
 
-        var score = TelemetryHelper.LinearScore(telemetry.EstimatedCostUsd, _budgetUsd);
+        // Not tracked is not measured, never $0: a cost nobody tracked is not within budget, and not over it either.
+        if (telemetry.EstimatedCostUsd is not { } costUsd)
+        {
+            return Task.FromResult(EvalResult.Skipped(this,
+                "The run's cost was not tracked (AgenticTelemetry.EstimatedCostUsd is null), so Cost was not measured: " +
+                "an untracked cost is not $0 and is never read as within budget."));
+        }
+
+        if (TelemetryHelper.Reading(costUsd) is null)
+            return Task.FromResult(TelemetryHelper.InvalidReading(this, _passThreshold,
+                "EstimatedCostUsd must be finite and non-negative; the cost was not measured."));
+
+        var score = TelemetryHelper.LinearScore(costUsd, _budgetUsd);
         var passed = score >= _passThreshold;
         var severity = passed ? "none" : "low";
 
@@ -105,21 +121,21 @@ public sealed class CostEval : IEvalConfigurationSource
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
-                    ["cost_usd"]      = telemetry.EstimatedCostUsd,
+                    ["cost_usd"]      = costUsd,
                     ["budget_usd"]    = _budgetUsd,
-                    ["overage_ratio"] = _budgetUsd > 0 ? telemetry.EstimatedCostUsd / _budgetUsd : 0,
+                    ["overage_ratio"] = _budgetUsd > 0 ? costUsd / _budgetUsd : 0,
                 },
                 Evidence:
                 [
                     new EvalEvidence(
                         Source: "telemetry",
                         Reference: "cost",
-                        Message: $"Estimated cost: ${telemetry.EstimatedCostUsd:F4} vs budget ${_budgetUsd:F2} " +
-                                 $"({telemetry.EstimatedCostUsd / Math.Max(1e-9, _budgetUsd):P0} of budget)."),
+                        Message: $"Estimated cost: ${costUsd:F4} vs budget ${_budgetUsd:F2} " +
+                                 $"({costUsd / Math.Max(1e-9, _budgetUsd):P0} of budget)."),
                 ],
                 Recommendations: passed ? null :
                 [
-                    $"Estimated cost (${telemetry.EstimatedCostUsd:F4}) exceeds budget (${_budgetUsd:F2}). " +
+                    $"Estimated cost (${costUsd:F4}) exceeds budget (${_budgetUsd:F2}). " +
                     "Consider reducing token usage, switching to a cheaper model tier, or caching repeated prompts."
                 ],
                 SubResults: null,

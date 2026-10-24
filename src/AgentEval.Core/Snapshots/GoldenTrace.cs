@@ -32,7 +32,17 @@ public sealed record GoldenTraceCase(
     bool Passed,
     int Score,
     string? Output,
-    IReadOnlyList<GoldenToolCall>? ToolCalls);
+    IReadOnlyList<GoldenToolCall>? ToolCalls)
+{
+    /// <summary>
+    /// True when the run produced no verdict for this test case: the judge produced none, or the run errored.
+    /// <see cref="Passed"/> and <see cref="Score"/> are then placeholders, and a comparison with this case is
+    /// <see cref="TraceChange.NotMeasured"/>, neither a regression nor unchanged. Written only when true, so a file
+    /// without it (every file before this field) reads as measured.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool NotMeasured { get; init; }
+}
 
 /// <summary>
 /// A saved run to compare later runs against: for each test case, its verdict, its output and the tool calls it made.
@@ -75,7 +85,11 @@ public sealed record GoldenTrace(
                 r.Passed,
                 r.Score,
                 r.ActualOutput,
-                r.ToolUsage?.Calls.OrderBy(c => c.Order).Select(c => new GoldenToolCall(c.Name, CanonicalArguments(c.Arguments))).ToList()))
+                r.ToolUsage?.Calls.OrderBy(c => c.Order).Select(c => new GoldenToolCall(c.Name, CanonicalArguments(c.Arguments))).ToList())
+                {
+                    // No verdict: its Passed of false and Score of 0 are placeholders (TestSummary.NotMeasuredCount).
+                    NotMeasured = r.JudgeFailed || r.HasError,
+                })
                 .ToList());
     }
 
@@ -156,6 +170,13 @@ public enum TraceChange
 
     /// <summary>In the golden trace but not in this run.</summary>
     Removed = 6,
+
+    /// <summary>
+    /// The golden trace or this run produced no verdict for it (<see cref="GoldenTraceCase.NotMeasured"/>): the judge
+    /// produced none, or the run errored. Neither a regression nor an improvement; it used to read as one (a placeholder
+    /// fail against a pass).
+    /// </summary>
+    NotMeasured = 7,
 }
 
 /// <summary>One test case's comparison with its golden trace.</summary>
@@ -178,6 +199,12 @@ public sealed record GoldenTraceComparison(IReadOnlyList<TraceCaseComparison> Ca
 
     /// <summary>True when any test case called different tools, whatever its verdict.</summary>
     public bool HasToolChange => Cases.Any(c => c.ToolsChanged);
+
+    /// <summary>
+    /// True when a test case has no verdict in the golden trace or in this run (<see cref="TraceChange.NotMeasured"/>):
+    /// the comparison cannot say whether it regressed.
+    /// </summary>
+    public bool HasNotMeasured => Cases.Any(c => c.Change == TraceChange.NotMeasured);
 }
 
 /// <summary>Compares a rerun with its golden trace.</summary>
@@ -218,6 +245,8 @@ public static class GoldenTraceComparer
             var outputChanged = !string.Equals(Normalise(then.Output), Normalise(now.Output), StringComparison.Ordinal);
             var change = (then.Passed, now.Passed) switch
             {
+                // A side with no verdict has a placeholder fail: compared, it read as a regression or an improvement.
+                _ when then.NotMeasured || now.NotMeasured => TraceChange.NotMeasured,
                 (true, false) => TraceChange.Regressed,
                 (false, true) => TraceChange.Improved,
                 _ when toolsChanged => TraceChange.ToolsChanged,
@@ -256,7 +285,14 @@ public static class GoldenTraceComparer
     private static string? Describe(GoldenTraceCase then, GoldenTraceCase now, bool toolsChanged, bool outputChanged)
     {
         var parts = new List<string>();
-        if (then.Passed != now.Passed)
+        if (then.NotMeasured || now.NotMeasured)
+            parts.Add((then.NotMeasured, now.NotMeasured) switch
+            {
+                (true, true) => "not measured in the golden trace or in this run",
+                (true, false) => "not measured in the golden trace",
+                _ => "not measured in this run",
+            });
+        else if (then.Passed != now.Passed)
             parts.Add($"{(then.Passed ? "passed" : "failed")} → {(now.Passed ? "passed" : "failed")} (score {then.Score} → {now.Score})");
         if (toolsChanged)
             parts.Add($"tools {Sequence(then.ToolCalls!)} → {Sequence(now.ToolCalls!)}{(SameNames(then.ToolCalls!, now.ToolCalls!) ? " (arguments differ)" : "")}");

@@ -11,7 +11,7 @@ public class CompositeEvalTests
 {
     // ── Stub ─────────────────────────────────────────────────────────────────
 
-    private sealed class StubAtomic(string key, double value, string severity = "none", bool passed = true, double cost = 0.001, bool cacheHit = false, string? label = null)
+    private sealed class StubAtomic(string key, double value, string severity = "none", bool passed = true, double? cost = 0.001, bool cacheHit = false, string? label = null)
         : AtomicEval(key, key, "test", "1.0.0")
     {
         public override Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
@@ -150,8 +150,57 @@ public class CompositeEvalTests
 
         var result = await sut.EvaluateAsync(Input);
 
-        Assert.Equal(0.003, result.Provenance.EstimatedCost, precision: 10);
+        Assert.Equal(0.003, result.Provenance.EstimatedCost!.Value, precision: 10);
         Assert.False(result.Provenance.CacheHit);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_OnePartNotPriced_CompositeCostIsNotPriced()
+    {
+        // A total is complete or absent (T63 / T13-9): one priced leaf beside one the judge could not price used to
+        // sum to the priced leaf alone (the unpriced one counted as $0), a total that read as the composite's cost.
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("priced", 1.0, cost: 0.002)),
+            new(new StubAtomic("unpriced", 1.0, cost: null)),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Null(result.Provenance.EstimatedCost);
+        Assert.Equal(0.002, result.Details.SubResults![0].Provenance.EstimatedCost); // the priced leaf keeps its cost
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NoPartPriced_CompositeCostIsNotPriced_NotZero()
+    {
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("a", 1.0, cost: null)),
+            new(new StubAtomic("b", 1.0, cost: null)),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Null(result.Provenance.EstimatedCost);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_FreeParts_CompositeCostIsAMeasuredZero()
+    {
+        // Guard: deterministic leaves cost nothing, and 0 + 0 is a real total, not "not priced".
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("a", 1.0, cost: 0)),
+            new(new StubAtomic("b", 1.0, cost: 0)),
+        };
+        var sut = MakeComposite(components);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal(0.0, result.Provenance.EstimatedCost);
     }
 
     [Fact]

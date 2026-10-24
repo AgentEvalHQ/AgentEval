@@ -31,6 +31,9 @@ All metrics prefixed with `llm_` use an `IChatClient` as a judge. They send stru
 | `TaskCompletionMetric` | `llm_task_completion` | Agentic |
 | `MisinformationMetric` | `llm_misinformation` | Responsible AI |
 | `BiasMetric` | `llm_bias` | Responsible AI |
+| `ToxicityMetric` (built with a judge) | `llm_toxicity` | Responsible AI |
+
+`llm_misinformation` and `llm_groundedness` judge whether a claim is supported, so they are also sent what the agent's tools returned (`EvaluationContext.ToolUsage`). The MAF harness fills it, and so do the MEAI adapters when the conversation they are given carries the tool turns: `AsAgentEvaluator()` forwards them. In the pinned .NET MAF 1.24.0 built-in MEAI overload of `agent.EvaluateAsync`, the current turn is projected to query messages and the final reply, losing intermediate tool evidence; see the [verified boundary and native adapter alternative](using-agenteval-with-maf-evals.md#1-ievaluator-vs-iagentevaluator--in-plain-words). A fact the agent repeated from a tool result is evidence, not a fabrication; the judge still grades its confidence and framing. Only what a tool returned is sent: the call's arguments are the agent's own text and would let it supply its own evidence. The results sit between `<tool_results>` tags the data cannot close, are labelled as data, and are bounded (2,000 characters a value, 16,000 the section, at most 50 calls; the values share the room, so a short result is never pushed out by long ones). Groundedness still needs a retrieved context to be measured; tool results are added to it, not a substitute for it. `llm_faithfulness` is defined against the retrieved context alone and is not sent tool results, so on an agent that answers from tools rather than retrieval it reads tool facts as unsupported: grade such an agent with misinformation or groundedness. Tool results can carry personal data, and they now go to the judge's host with the rest of the prompt.
 
 ### Usage
 
@@ -170,7 +173,7 @@ public interface IEvaluator
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `OverallScore` | `int` | Score 0-100 |
+| `OverallScore` | `int?` | Score 0-100; null when absent or evaluation failed |
 | `Summary` | `string` | Evaluator's summary |
 | `Improvements` | `IReadOnlyList<string>` | Suggested improvements |
 | `CriteriaResults` | `IReadOnlyList<CriterionResult>` | Per-criterion `Met` + `Explanation` |
@@ -179,8 +182,9 @@ public interface IEvaluator
 
 `ChatClientEvaluator` sends a structured system prompt requesting JSON evaluation. It handles:
 - Criteria formatting as a numbered list
-- JSON parsing with `LlmJsonParser.ExtractJson()`
-- Graceful failure (returns `EvaluationDefaults.DefaultFailureScore` — currently 50 — on parse error)
+- JSON parsing that skips `<think>` blocks and tries every fenced block, then every JSON object in the reply (trailing commas and comments allowed); a score off 0-100 is out of contract and never clamped, and verdicts with different scores are refused, not guessed
+- One corrective retry that shows the judge the reply it could not parse
+- Graceful failure: when the retry fails too, `EvaluationFailed = true` with `OverallScore = null`; no fallback grade is assigned
 
 ```csharp
 // Create directly
@@ -221,7 +225,7 @@ The expected JSON response schema:
 In `MAFEvaluationHarness.RunEvaluationAsync()`:
 
 1. The harness calls `_evaluator.EvaluateAsync(input, output, criteria)`
-2. `result.Passed = evaluation.OverallScore >= testCase.PassingScore` (default: 70)
+2. A failed evaluation or missing score sets `JudgeFailed = true` and cannot pass. Otherwise the measured score is compared with `testCase.PassingScore` (default: 70)
 3. Each `CriterionResult.Met` is stored on the `TestResult` for inspection
 4. `EvaluateResponse = true` must be set in `EvaluationOptions`
 

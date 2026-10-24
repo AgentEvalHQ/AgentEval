@@ -71,34 +71,55 @@ public class ToolCallSuccessEvalTests
     }
 
     /// <summary>
-    /// LLM fallback path: no ToolCalls → evaluator delegates to LLM judge.
-    /// With stub score=100 the result should pass.
+    /// LLM fallback path: the calls' results carry no structured status, so the evaluator delegates to the LLM judge,
+    /// which is shown the calls. With stub score=100 the result should pass.
     /// </summary>
+    /// <remarks>
+    /// These two tests used to reach the fallback with no tool calls at all, so the judge graded a reply with nothing to
+    /// check it against (T68). Unstructured results are the fallback's real trigger.
+    /// </remarks>
     [Fact]
-    public async Task EvaluateAsync_LlmPath_EmptyToolCalls_UsesJudge_HighScore_ReportsPass()
+    public async Task EvaluateAsync_LlmPath_UnstructuredResults_UsesJudge_HighScore_ReportsPass()
     {
-        var eval = new ToolCallSuccessEval(new FixedScoreEvaluator(100));
-        var input = new EvalInput(Query: "No tool calls", Response: "I answered directly.");
-        // No ToolCalls → falls through to LLM fallback.
+        var judge = new RecordingScoreEvaluator(100);
+        var eval = new ToolCallSuccessEval(judge);
+        var input = new EvalInput(
+            Query: "Find flights to Paris",
+            Response: "There are three flights to Paris.",
+            ToolCalls: new[]
+            {
+                new ToolCall("search_flights", new Dictionary<string, object> { ["destination"] = "Paris" },
+                    "Found 3 flights: AA101, DL205, UA309"),
+            });
 
         var result = await eval.EvaluateAsync(input);
 
         Assert.True(result.Score.Passed,
             $"tool_call_success LLM fallback: expected Passed==true with stub=100, got score={result.Score.Value}");
+        Assert.Contains("search_flights", Assert.Single(judge.Inputs));
     }
 
     /// <summary>
-    /// LLM fallback path: no ToolCalls, low-score stub → result should fail.
+    /// LLM fallback path: an unstructured error result, low-score stub → result should fail.
     /// </summary>
     [Fact]
-    public async Task EvaluateAsync_LlmPath_EmptyToolCalls_LowScore_ReportsFail()
+    public async Task EvaluateAsync_LlmPath_UnstructuredResults_LowScore_ReportsFail()
     {
-        var eval = new ToolCallSuccessEval(new FixedScoreEvaluator(10));
-        var input = new EvalInput(Query: "No tool calls", Response: "Something went wrong.");
+        var judge = new RecordingScoreEvaluator(10);
+        var eval = new ToolCallSuccessEval(judge);
+        var input = new EvalInput(
+            Query: "Find flights to Paris",
+            Response: "Something went wrong.",
+            ToolCalls: new[]
+            {
+                new ToolCall("search_flights", new Dictionary<string, object> { ["destination"] = "Paris" },
+                    "HTTP 503 Service Unavailable"),
+            });
 
         var result = await eval.EvaluateAsync(input);
 
         Assert.False(result.Score.Passed,
             $"tool_call_success LLM fallback: expected Passed==false with stub=10, got score={result.Score.Value}");
+        Assert.Contains("search_flights", Assert.Single(judge.Inputs));
     }
 }

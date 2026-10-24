@@ -219,7 +219,9 @@ public static class BenchAgenticCommand
         var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference);
         if (glassBoxTrace is not null)
         {
-            evalInput = evalInput.WithTrace(glassBoxTrace);
+            // The agent's instructions as the trace recorded them: the judges whose rubric grades the response against
+            // them are shown them, and Task Adherence's rule leaves are not measured without them.
+            evalInput = evalInput.WithTrace(glassBoxTrace) with { SystemMessage = RecordedInstructions(glassBoxTrace) };
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
@@ -229,10 +231,10 @@ public static class BenchAgenticCommand
                 benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1, budgetTier: appliedBudgetTier);
         }
 
-        var store = new FileSystemOutputStore(agentEvalDir);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
         // CLI writer paths sweep; MC (read-only viewer) does not.
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
@@ -241,11 +243,12 @@ public static class BenchAgenticCommand
             AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("bench", $"agentic/{preset}"), benchmark, evalInput, 1);
 
         var evidenceFinalized = false;
+        AgentEval.Results.Adapters.Native.AefReportArtifact? reportArtifact = null;
         var startedAt = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
         string? storeRunId = null;
         AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
-            storeRunId is null ? null : new() { RunId = storeRunId };
+            storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         try
         {
             string runId;
@@ -282,6 +285,18 @@ public static class BenchAgenticCommand
             var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            var reportFile = Path.Combine(outputDir, "agentic-result.json");
+            if (store.WorkspaceRoot is null)
+                await CliRunOutput.WriteReportAsync(reportFile, result, ct);
+            if (new FileInfo(reportFile).Length > 64L << 20)
+                throw new InvalidDataException("The agentic report exceeds the 64 MiB capture limit.");
+            reportArtifact = new()
+            {
+                Type = "agentic-result", GeneratedAt = result.GeneratedAt,
+                SourceRunId = result.SourceRunId, SourceManifestHash = result.SourceManifestHash,
+                Bytes = AefCliOptions.ContentCapture == AgentEval.Results.Writing.AefContentCapture.On
+                    ? File.ReadAllBytes(reportFile) : ReadOnlyMemory<byte>.Empty,
+            };
 
             // Markdown report
             try
@@ -332,21 +347,19 @@ public static class BenchAgenticCommand
             // ── AEF ───────────────────────────────────────────────────────────────
             ct.ThrowIfCancellationRequested();
             var overall = result.Summary.OverallStatus;
-            var finalExit = BenchExitCodes.FromLabel(overall);
+            var finalExit = BenchExitCodes.FromVerdict(overall, compositeResult.Score.Measurement);
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition, report: reportArtifact))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
             evidenceFinalized = true;
-            // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
+            // ERROR / SKIPPED are not verdicts on the agent (B9b): the overall score is absent, and the exit is
             // indeterminate (11), not "gate failed" (9).
             var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
-            var scoreText = overall is "ERROR" or "SKIPPED"
-                ? $"score {result.Summary.OverallScore:P0} of the measured part only"
-                : $"score {result.Summary.OverallScore:P0}";
+            var scoreText = $"score {result.Summary.OverallScoreText()}";
             Console.WriteLine($"Overall result: {overall} ({scoreText})");
             if (errored.Count > 0)
                 Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +
@@ -363,7 +376,7 @@ public static class BenchAgenticCommand
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition))
+                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier, definition: suiteDefinition, report: reportArtifact))
                 return ExitCodes.RuntimeError;
             return 1;
         }
@@ -406,6 +419,17 @@ public static class BenchAgenticCommand
             .LastOrDefault(t => !string.IsNullOrWhiteSpace(t));
         return (query, answer);
     }
+
+    /// <summary>
+    /// The agent's instructions a trace recorded: the system prompt of its first model request (a chat-turn request) that
+    /// carries one, or <see langword="null"/> when none does. Nothing recorded is null, never an empty prompt.
+    /// </summary>
+    internal static string? RecordedInstructions(AgentEval.Tracing.AgentTrace trace) =>
+        trace.Entries
+            .Where(e => e.EffectiveScope == AgentEval.Tracing.TraceEntryScope.ChatTurn
+                        && e.Type == AgentEval.Tracing.TraceEntryType.Request)
+            .Select(e => e.SystemPrompt)
+            .FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
 
     /// <summary>
     /// Resolves a preset specification into a <see cref="CompositeEval"/>.

@@ -38,6 +38,8 @@ internal static class AgentSkillsSampleHelpers
 
         Console.WriteLine($"  Skill fixture not found at '{path}'.");
         Console.WriteLine("  Build the project so 'skills/**' is copied to the output directory, then re-run.");
+        // A fixture the build should have copied is a broken build, not a capability the environment lacks: an error.
+        SampleOutcome.Error($"the expense-report skill fixture is not in the output directory ({path})");
         return null;
     }
 
@@ -130,6 +132,7 @@ internal static class AgentSkillsSampleHelpers
             var firstLine = ex.Message.Split('\n')[0];
             Console.WriteLine($"  [FAIL] {label}");
             Console.WriteLine($"         {firstLine}");
+            SampleOutcome.Fail($"{label}: {firstLine}");
             return false;
         }
     }

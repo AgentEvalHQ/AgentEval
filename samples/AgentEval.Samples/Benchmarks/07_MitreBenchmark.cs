@@ -39,6 +39,7 @@ public static class MitreBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H7 — MITRE");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -92,6 +93,7 @@ public static class MitreBenchmarkSample
         }
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("MITRE ATLAS benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

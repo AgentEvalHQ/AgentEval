@@ -44,7 +44,7 @@ using AgentEval.Models;
 ///   <item><term><see cref="EvalInput.CaseId"/></term><description><see cref="TestCase.Id"/> and <b>nothing else</b> — see the CaseId note below.</description></item>
 ///   <item><term><see cref="EvalInput.ToolDefinitions"/></term><description>🔴 <b>NOT CARRIED.</b> See the ToolDefinitions note below — carrying it flatters a real eval.</description></item>
 ///   <item><term><see cref="EvalInput.Context"/></term><description>NOT CARRIED. Neither type records a retrieval context; there is nothing to read.</description></item>
-///   <item><term><see cref="EvalInput.SystemMessage"/></term><description>NOT CARRIED. Neither type records the system message.</description></item>
+///   <item><term><see cref="EvalInput.SystemMessage"/></term><description>Neither type records the system message, so the two-argument projection leaves it <see langword="null"/>. A caller that built the agent knows its instructions and passes them to <see cref="ToEvalInput(TestCase, TestResult, string)"/>; the judges whose rubric grades the response against the agent's instructions are shown them only then.</description></item>
 ///   <item><term><see cref="EvalInput.SubjectModel"/></term><description>NOT CARRIED. Neither type records the model the SUBJECT ran on, so <c>JudgeSubjectRelation</c> stays <c>Unknown</c> — which is the honest state, not a defect of this projection.</description></item>
 /// </list>
 /// <para>
@@ -123,7 +123,7 @@ public static class TestRunEvalProjection
 
     /// <summary>
     /// Prefix marking a call the run records as NOT KNOWN TO HAVE EXECUTED — rejected at the
-    /// approval gate, or gated with no paired result observed.
+    /// approval gate, gated with no paired result observed, or explicitly unmeasured on a timeline.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -206,6 +206,28 @@ public static class TestRunEvalProjection
     }
 
     /// <summary>
+    /// Projects one executed case into the input every <see cref="IEval"/> consumes, carrying the instructions the
+    /// agent was given as <see cref="EvalInput.SystemMessage"/>.
+    /// </summary>
+    /// <param name="testCase">The case that was run. Supplies the query, the ground truth, the expected tools and the metadata.</param>
+    /// <param name="result">What the run produced. Supplies the response and the tool calls.</param>
+    /// <param name="agentInstructions">
+    /// The agent's instructions (its system prompt), as the caller that built the agent knows them. Neither
+    /// <see cref="TestCase"/> nor <see cref="TestResult"/> records them. <see langword="null"/> or blank leaves
+    /// <see cref="EvalInput.SystemMessage"/> <see langword="null"/>: nothing recorded, never an empty prompt.
+    /// </param>
+    /// <returns>The projected input. See the type's remarks for the full field table.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="testCase"/> or <paramref name="result"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="testCase"/> carries a null <see cref="TestCase.Input"/>, so there is no query.
+    /// </exception>
+    public static EvalInput ToEvalInput(this TestCase testCase, TestResult result, string? agentInstructions) =>
+        testCase.ToEvalInput(result) with
+        {
+            SystemMessage = string.IsNullOrWhiteSpace(agentInstructions) ? null : agentInstructions,
+        };
+
+    /// <summary>
     /// Reads the run's tool calls, in the chronological order <see cref="EvalInput.ToolCalls"/>
     /// requires.
     /// </summary>
@@ -263,9 +285,9 @@ public static class TestRunEvalProjection
     /// <para>
     /// <see cref="TestResult.ToolUsage"/> wins over <see cref="TestResult.Timeline"/> because it
     /// carries structured arguments and the raw result object; the timeline carries pre-stringified
-    /// approximations of both — and only the record path can say whether a call actually EXECUTED
-    /// (see <see cref="ToolNotExecutedResultPrefix"/>); <see cref="ToolInvocation"/> has no such
-    /// field, so a timeline invocation is taken at face value.
+    /// approximations of both. An explicit <see cref="ToolInvocation.OutcomeNotMeasuredReason"/>
+    /// preserves execution uncertainty through <see cref="ToolNotExecutedResultPrefix"/>;
+    /// unmarked legacy timeline invocations retain their recorded success/failure interpretation.
     /// </para>
     /// <para>
     /// ⚠ <b>A dropping report is blind, timeline or no timeline.</b> When
@@ -366,10 +388,12 @@ public static class TestRunEvalProjection
         // recorded ABOUT a call that may never have run.
         return notExecuted is null
             ? rendered
-            : string.IsNullOrEmpty(rendered)
-                ? string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted}")
-                : string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {notExecuted} | {rendered}");
+            : NotExecuted(notExecuted, rendered);
     }
+
+    private static string NotExecuted(string reason, string? rendered) => string.IsNullOrEmpty(rendered)
+        ? string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {reason}")
+        : string.Create(CultureInfo.InvariantCulture, $"{ToolNotExecutedResultPrefix} {reason} | {rendered}");
 
     /// <summary>
     /// Why this call is not known to have executed, or <see langword="null"/> when the run does not
@@ -403,7 +427,9 @@ public static class TestRunEvalProjection
         new(
             invocation.ToolName,
             ArgumentsOf(invocation.Arguments),
-            invocation.Succeeded
+            invocation.OutcomeNotMeasuredReason is { } reason
+                ? NotExecuted(reason, invocation.ErrorMessage is { } error ? Failure(error, invocation.Result) : invocation.Result)
+                : invocation.Succeeded
                 ? invocation.Result
                 // ⚠ The result does NOT win over the failure. A failed invocation that also recorded a
                 // payload used to project as that payload alone, so `Succeeded = false` and the error

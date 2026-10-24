@@ -35,12 +35,11 @@ public class BenchPerfCommandTests
             Assert.True(exitCode is 0 or 9 or 10 or 11,
                 $"Expected exit code 0 (pass), 9 (FAIL), 10 (WARN) or 11 (indeterminate), got {exitCode}.");
 
-            // Confirm a run was persisted into .agenteval/ — runs live under
-            // .agenteval/subjects/{subject}/runs/{runId}/.
-            var subjectsDir = Path.Combine(workspace, ".agenteval", "subjects");
-            Assert.True(Directory.Exists(subjectsDir), $"subjects/ dir not created at {subjectsDir}");
-            var anyRunFile = Directory.EnumerateFiles(subjectsDir, "*.json", SearchOption.AllDirectories).Any();
-            Assert.True(anyRunFile, $"No run files written under {subjectsDir} after BenchPerfCommand.RunAsync.");
+            var aef = Path.Combine(workspace, ".agenteval", "aef");
+            var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(aef, "seal.json", SearchOption.AllDirectories)))!;
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(run).Outcome);
+            Assert.False(Directory.Exists(Path.Combine(workspace, ".agenteval", "subjects")));
+            Assert.Single(Directory.GetFiles(Path.Combine(workspace, ".agenteval", "reports"), "report.json", SearchOption.AllDirectories));
         }
         finally
         {
@@ -68,7 +67,7 @@ public class BenchPerfCommandTests
             Assert.Equal("definition", (string?)header["ext"]!["agenteval.suiteIdentity"]!["scope"]);
             var definition = new AgentEval.Results.Suites.SuiteDefinitionReader().Read(File.ReadAllBytes(Path.Combine(
                 Path.GetDirectoryName(run)!, "ext", AgentEval.Results.Suites.SuiteDefinitionManifest.ExtensionFile)));
-            Assert.Equal(3, definition.CaseIds.Count);
+            Assert.Equal(new[] { "perf_benchmark", "perf_cost", "perf_latency", "perf_throughput" }, definition.CaseIds);
             Assert.Equal(definition.Digest, (string?)header["suite"]!["digest"]);
         }
         finally
@@ -78,13 +77,10 @@ public class BenchPerfCommandTests
     }
 
     [Fact]
-    public async Task RunAsync_SubjectRequiringSanitization_ReportCoLocatesWithManifest()
+    public async Task RunAsync_SubjectRequiringSanitization_ReportUsesSafeStandalonePath()
     {
-        // BUG-17: the store writes the manifest/summary under the SANITIZED subject dir,
-        // but the command hand-built the report path from the RAW subject. For any name
-        // Sanitize rewrites (here ':' '*' '?' → '-' plus a hash suffix), the report path
-        // diverged — orphaning the report or failing the write (false exit 1). The command
-        // must resolve the run dir via the store so the report co-locates with the manifest.
+        // BUG-17: raw subject characters must not orphan a report or fail its write. Native mode
+        // keeps the original subject identity in evidence and uses a sanitized standalone report path.
         var workspace = CreateTempWorkspace();
         try
         {
@@ -101,17 +97,10 @@ public class BenchPerfCommandTests
             Assert.True(exitCode is 0 or 9 or 10 or 11,
                 $"Expected exit 0/9/10/11, got {exitCode} — a divergent report path made the run fail.");
 
-            // Exactly one run was persisted; the report must live in that same run dir.
-            var subjectsDir = Path.Combine(workspace, ".agenteval", "subjects");
-            var summaryFiles = Directory
-                .EnumerateFiles(subjectsDir, "summary.json", SearchOption.AllDirectories)
-                .ToList();
-            Assert.Single(summaryFiles);
-
-            var runDir = Path.GetDirectoryName(summaryFiles[0])!;
-            Assert.True(
-                File.Exists(Path.Combine(runDir, "report.json")),
-                $"report.json must co-locate with summary.json in the store-resolved run dir ({runDir}).");
+            var report = Assert.Single(Directory.GetFiles(Path.Combine(workspace, ".agenteval", "reports"), "report.json", SearchOption.AllDirectories));
+            var subjectDirectory = Directory.GetParent(Path.GetDirectoryName(report)!)!.Name;
+            Assert.Equal(AgentEval.Output.FileSystemLayout.Sanitize(messySubject), subjectDirectory);
+            Assert.False(Directory.Exists(Path.Combine(workspace, ".agenteval", "subjects")));
         }
         finally
         {

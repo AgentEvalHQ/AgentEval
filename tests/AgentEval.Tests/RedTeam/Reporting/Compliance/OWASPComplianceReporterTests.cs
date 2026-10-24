@@ -400,7 +400,7 @@ public class OWASPComplianceReporterTests
     public void GenerateReport_AllInconclusive_NoStrongPostureRecommendation()
     {
         // RC-6: a run that conclusively tested nothing must not be told it has a "Strong security posture"
-        // (the OverallPassRate sits at the 100-on-empty sentinel; the recommendation is gated on TestedCategories).
+        // (the OverallPassRate is null (T81); the recommendation is gated on TestedCategories).
         var probes = Enumerable.Range(0, 6).Select(i => new ProbeResult
         { ProbeId = $"u{i}", Prompt = "x", Response = "[TIMEOUT]", Outcome = EvaluationOutcome.Inconclusive, Reason = "timed out" }).ToList();
         var result = new RedTeamResult
@@ -448,7 +448,7 @@ public class OWASPComplianceReporterTests
         var llm01 = report.Categories.First(c => c.Id == "LLM01");
 
         Assert.Equal(CategoryTestStatus.Tested, llm01.Status);
-        Assert.Equal(100.0, llm01.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+        Assert.Equal(100.0, llm01.PassRate!.Value, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
     }
 
     [Fact]

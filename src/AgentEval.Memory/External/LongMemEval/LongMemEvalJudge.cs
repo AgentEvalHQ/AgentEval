@@ -225,6 +225,10 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
         while (attempts <= options.MaxJudgeRetries)
         {
             attempts++;
+            // Increase only for a logical retry, not for a response-format capability fallback.
+            // Validated options bound the shift to three and the product to 32768.
+            var maxOutputTokens = Math.Min(ExternalBenchmarkOptions.MaximumJudgeOutputTokens,
+                options.JudgeMaxOutputTokens * (1 << (attempts - 1)));
 
             JudgeOutcomeStatus status;
             string? raw = null;
@@ -234,7 +238,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
 
             try
             {
-                var response = await InvokeProviderAsync(judgePrompt, options, ct, callCount: () => providerCalls++)
+                var response = await InvokeProviderAsync(judgePrompt, options, maxOutputTokens, ct, callCount: () => providerCalls++)
                     .ConfigureAwait(false);
 
                 totalTokens += (int)(response.Usage?.TotalTokenCount ?? 0);
@@ -312,6 +316,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
     private async Task<ChatResponse> InvokeProviderAsync(
         string judgePrompt,
         ExternalBenchmarkOptions options,
+        int maxOutputTokens,
         CancellationToken ct,
         Action callCount)
     {
@@ -321,7 +326,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
         {
             callCount();
             return await _chatClient
-                .GetResponseAsync(messages, BuildChatOptions(options, null), ct)
+                .GetResponseAsync(messages, BuildChatOptions(options, maxOutputTokens, null), ct)
                 .ConfigureAwait(false);
         }
 
@@ -332,7 +337,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
                 callCount();
                 return await _chatClient.GetResponseAsync(
                     messages,
-                    BuildChatOptions(options, ChatResponseFormat.ForJsonSchema(
+                    BuildChatOptions(options, maxOutputTokens, ChatResponseFormat.ForJsonSchema(
                         LongMemEvalStructuredVerdict.Schema,
                         LongMemEvalStructuredVerdict.SchemaName,
                         "Closed-set LongMemEval judge verdict with separate reasoning.")),
@@ -352,7 +357,7 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
             {
                 callCount();
                 return await _chatClient
-                    .GetResponseAsync(messages, BuildChatOptions(options, ChatResponseFormat.Json), ct)
+                    .GetResponseAsync(messages, BuildChatOptions(options, maxOutputTokens, ChatResponseFormat.Json), ct)
                     .ConfigureAwait(false);
             }
             catch (Exception ex) when (IsResponseFormatUnsupported(ex))
@@ -365,19 +370,20 @@ public class LongMemEvalJudge : IExternalBenchmarkJudge
 
         callCount();
         return await _chatClient
-            .GetResponseAsync(messages, BuildChatOptions(options, null), ct)
+            .GetResponseAsync(messages, BuildChatOptions(options, maxOutputTokens, null), ct)
             .ConfigureAwait(false);
     }
 
     private static ChatOptions BuildChatOptions(
         ExternalBenchmarkOptions options,
+        int maxOutputTokens,
         ChatResponseFormat? responseFormat)
         => new()
         {
             // Left null by default on purpose: an explicit temperature is rejected by reasoning-model
             // deployments. Set ExternalBenchmarkOptions.JudgeTemperature = 0 for a deterministic judge.
             Temperature = (float?)options.JudgeTemperature,
-            MaxOutputTokens = options.JudgeMaxOutputTokens,
+            MaxOutputTokens = maxOutputTokens,
             ResponseFormat = responseFormat
         };
 

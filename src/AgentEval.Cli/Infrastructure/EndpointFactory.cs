@@ -15,6 +15,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.Cli.Infrastructure;
 
@@ -49,6 +50,8 @@ internal static class EndpointFactory
                 .GetChatClient(model).AsIChatClient();
         }
 
+        // The target resolves reasoning during budgeted readiness, then freezes it for cases.
+        // Keep this transport to one SDK attempt; no reasoning fallback may hide inside accounting.
         var openAIOptions = new OpenAIClientOptions { Endpoint = uri, RetryPolicy = new ClientRetryPolicy(0) };
         return new OpenAIClient(new ApiKeyCredential(apiKey ?? "no-key-needed"), openAIOptions)
             .GetChatClient(model).AsIChatClient();
@@ -76,7 +79,7 @@ internal static class EndpointFactory
         var credential = new ApiKeyCredential(ResolveOpenAIKey(apiKey));
         var options = new OpenAIClientOptions { Endpoint = new Uri(endpoint) };
         var client = new OpenAIClient(credential, options);
-        return client.GetChatClient(model).AsIChatClient();
+        return client.GetChatClient(model).AsIChatClient().WithMinimalReasoning();
     }
 
     /// <summary>M14: resolves the OpenAI-compatible key — explicit <paramref name="apiKey"/> wins, else the
@@ -109,6 +112,6 @@ internal static class EndpointFactory
             new Uri(endpoint),
             new AzureKeyCredential(resolvedKey));
 
-        return client.GetChatClient(deploymentName).AsIChatClient();
+        return client.GetChatClient(deploymentName).AsIChatClient().WithMinimalReasoning();
     }
 }

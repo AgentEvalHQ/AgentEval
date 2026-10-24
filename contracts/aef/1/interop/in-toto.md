@@ -116,9 +116,9 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 
 ## AEF → in-toto and SLSA
 
-The optional [artifact companion profile](artifact-companion.md) now specifies the
+The optional [artifact-evidence profile](../../profiles/artifact-evidence/README.md), outside AEF 1.0, specifies the
 explicit artifact-to-seal binding missing from the base format, with a Results API
-and CLI. The table below describes the base AEF 1.0 format without that companion.
+and CLI. The table below describes the base AEF 1.0 format without that profile.
 
 | AEF | in-toto / SLSA | Fidelity |
 |---|---|---|
@@ -468,7 +468,8 @@ The framework's standard parsing rules apply, with these differences and additio
 4. **Monotonic.** Events after the last batch that verifies have no effect
    ([§4.3](../spec/04-integrity.md#43-the-effective-view)). Ignoring a batch statement can only remove decisions from
    the effective view. The chain cannot show that the newest batches were removed together with their statements; a
-   signed newest batch or a copy held elsewhere can.
+   latest signed batch retained externally or an independently anchored expected chain head can. A signature
+   deleted with its batch cannot show the deletion to a first-time reader.
 5. **Versions and bytes** as for [AEF evidence](#parsing-rules), rules 4 and 5.
 
 #### Fields
@@ -558,5 +559,6 @@ manifest ([SEAL-3](../spec/04-integrity.md#41-sealing-a-run)).
 
 ## Still open
 
-- [I8](README.md#gaps-found-by-these-mappings): no attestation names the evaluated artifact by digest, so in-toto and SLSA policies
-  keyed on an artifact do not find AEF evidence; the media types above are unregistered.
+- [I8](README.md#gaps-found-by-these-mappings): AEF 1.0 core does not bind the evaluated artifact by digest. The optional
+  [artifact-evidence profile](../../profiles/artifact-evidence/README.md) supplies that producer-asserted binding;
+  the media types above remain unregistered.

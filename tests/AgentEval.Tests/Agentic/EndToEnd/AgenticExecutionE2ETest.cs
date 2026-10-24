@@ -98,8 +98,10 @@ public class AgenticExecutionE2ETest
         Assert.Equal(AgenticBenchmarkReporter.Disclaimer, reportResult.Disclaimer);
     }
 
-    [Fact]
-    public async Task AgenticExecution_SaveReport_ReturnsSummaryWithScore()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AgenticExecution_SaveReport_OnlyMeasuredRootHasScore(bool completeInput)
     {
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-AgenticAgent3");
@@ -107,7 +109,16 @@ public class AgenticExecutionE2ETest
         var benchmark = AgenticBenchmark.AgenticExecution(judge);
         var runner = new AgenticBenchmarkRunner();
 
-        var input = new EvalInput(Query: "Test", Response: "Response");
+        var input = completeInput
+            ? new EvalInput(Query: "Search for the answer.", Response: "The search returned the answer.",
+                SystemMessage: "Use search_tool to answer the user, then report the result.",
+                ToolCalls: [new ToolCall("search_tool", new Dictionary<string, object>(), "answer") { Succeeded = true }],
+                ToolDefinitions: [new ToolDefinition("search_tool", "Search", new Dictionary<string, object>
+                {
+                    ["type"] = "object", ["properties"] = new Dictionary<string, object>(),
+                })],
+                ExpectedActions: [new ExpectedAction("Search for the answer", ["search_tool"])])
+            : new EvalInput(Query: "Test", Response: "Response");
         var (runId, result) = await runner.RunAsync(store, subject, benchmark, input);
 
         var reporter = new AgenticBenchmarkReporter();
@@ -117,9 +128,18 @@ public class AgenticExecutionE2ETest
 
         Assert.NotNull(reportResult);
         Assert.NotNull(reportResult.Summary);
-        // OverallScore must be in [0, 1].
-        Assert.InRange(reportResult.Summary.OverallScore, 0.0, 1.0);
-        // OverallStatus must be one of PASS / WARN / FAIL.
-        Assert.Contains(reportResult.Summary.OverallStatus, new[] { "PASS", "WARN", "FAIL" });
+        if (completeInput)
+        {
+            Assert.NotNull(reportResult.Summary.OverallScore);
+            Assert.InRange(reportResult.Summary.OverallScore.Value, 0.0, 1.0);
+            Assert.Contains(reportResult.Summary.OverallStatus, new[] { "PASS", "WARN", "FAIL" });
+        }
+        else
+        {
+            // A passing judge cannot attest to rules and tool execution absent from the input.
+            Assert.Null(reportResult.Summary.OverallScore);
+            Assert.Equal("WARN", reportResult.Summary.OverallStatus);
+            Assert.Contains("score n/a", new AgenticMarkdownRenderer().Render(reportResult));
+        }
     }
 }

@@ -5,6 +5,7 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Models;
 using AgentEval.Core.Benchmarks;       // BenchmarkFamilyRegistry (Phase 9 supplementary section)
 using AgentEval.DataLoaders;
 using AgentEval.Evals;
@@ -47,6 +48,7 @@ public static class BenchmarkSystem
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -61,8 +63,8 @@ public static class BenchmarkSystem
         // DatasetLoaderFactory understands the industry-standard JSONL shape used
         // by BFCL, GAIA, MMLU, GSM8K, ToolBench, etc.
         Console.WriteLine("Loading benchmark prompts from JSONL...\n");
-        var prompts = await LoadPromptsFromJsonl("benchmark-tool-accuracy.jsonl");
-        Console.WriteLine($"   Loaded {prompts.Count} prompts\n");
+        var cases = await LoadCasesFromJsonl("benchmark-tool-accuracy.jsonl");
+        Console.WriteLine($"   Loaded {cases.Count} prompts\n");
 
         // ── Build the agentic Tool-Call-Accuracy preset ──────────────────────────
         // The preset factory composes 5 sub-evaluators (selection, input accuracy,
@@ -70,25 +72,43 @@ public static class BenchmarkSystem
         // canonical weights — same as the CLI's `--preset tool-call-accuracy`.
         var preset = AgenticBenchmark.ToolCallAccuracy(judge, judgeModel: AIConfig.ModelDeployment);
 
-        Console.WriteLine($"Running Tool-Call-Accuracy preset against {prompts.Count} prompts\n");
+        Console.WriteLine($"Running Tool-Call-Accuracy preset against {cases.Count} prompts\n");
 
         // ── Run the agent against each prompt, then evaluate the response ────────
         int passed = 0;
-        for (int i = 0; i < prompts.Count; i++)
+        for (int i = 0; i < cases.Count; i++)
         {
-            var prompt = prompts[i];
+            var prompt = cases[i].Input;
             var response = await agent.RunAsync(prompt);
-            var responseText = response.Text ?? string.Empty;
 
-            // EvalInput carries the user query + agent response into every sub-evaluator.
-            // For richer scenarios (multi-turn, tool traces) you would also populate
-            // EvalInput.Metadata with the structured trace data — see the CLI for examples.
-            var input = new EvalInput(Query: prompt, Response: responseText);
+            // The tool-call evaluators grade the calls the run made, so the input carries them, with the tools the agent
+            // was offered, its instructions and the dataset's expected tools. The sample used to pass the query and the
+            // reply alone: every tool leaf graded a run with no tool data (0.30 on "What is the weather in Seattle?").
+            var testCase = new TestCase { Name = cases[i].Id, Input = prompt, ExpectedTools = cases[i].ExpectedTools?.ToList() };
+            var run = new TestResult
+            {
+                TestName = testCase.Name,
+                ActualOutput = response.Text,
+                ToolUsage = ToolUsageExtractor.Extract(response.Messages.Cast<object>().ToList()),
+            };
+            var input = testCase.ToEvalInput(run) with
+            {
+                ToolDefinitions = AgentTools.OfType<AIFunction>().Select(Benchmarks.BenchmarkSampleHelpers.ToToolDefinition).ToList(),
+                SystemMessage = AgentInstructions,
+            };
+            Console.WriteLine($"   tool calls: {Benchmarks.BenchmarkSampleHelpers.DescribeToolCalls(input)} " +
+                              $"(expected: {(cases[i].ExpectedTools is { Count: > 0 } e ? string.Join(", ", e) : "none")})");
             var result = await preset.EvaluateAsync(input);
 
-            var icon = result.Score.Passed ? "PASS" : "FAIL";
-            Console.WriteLine($"   [{icon}] [{i + 1,2}/{prompts.Count}] {Truncate(prompt, 60)}  score={result.Score.Value:F2}");
+            // A score the preset could not measure is neither a pass nor a fail: label it, never count it as either.
+            var measured = result.Score.Measurement == AgentEval.Evals.Meta.MeasurementState.Measured;
+            var icon = !measured ? "N/M " : result.Score.Passed ? "PASS" : "FAIL";
+            Console.WriteLine($"   [{icon}] [{i + 1,2}/{cases.Count}] {Truncate(prompt, 60)}  score={result.Score.Value:F2}");
             if (result.Score.Passed) passed++;
+            if (!measured)
+                SampleOutcome.Skip($"prompt {i + 1}: the tool-call-accuracy preset could not measure it ({result.Score.Measurement})");
+            else if (!result.Score.Passed)
+                SampleOutcome.Fail($"prompt {i + 1}: tool-call accuracy {result.Score.Value:F2} did not pass ({Truncate(prompt, 40)})");
         }
 
         // ── Summary ─────────────────────────────────────────────────────────────
@@ -96,8 +116,8 @@ public static class BenchmarkSystem
         Console.WriteLine("   +----------------------------------------------------------+");
         Console.WriteLine("   |             TOOL-CALL-ACCURACY PRESET RESULTS            |");
         Console.WriteLine("   +----------------------------------------------------------+");
-        Console.WriteLine($"   |  Passed / Total:         {passed,4} / {prompts.Count,-24}|");
-        Console.WriteLine($"   |  Overall Accuracy:       {(double)passed / Math.Max(1, prompts.Count),27:P1}   |");
+        Console.WriteLine($"   |  Passed / Total:         {passed,4} / {cases.Count,-24}|");
+        Console.WriteLine($"   |  Overall Accuracy:       {(double)passed / Math.Max(1, cases.Count),27:P1}   |");
         Console.WriteLine("   +----------------------------------------------------------+");
 
         // ── Supplementary: enumerate registered benchmark families (Phase 9 / ADR-017 Convention 3)
@@ -188,40 +208,32 @@ public static class BenchmarkSystem
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Loads prompts from a JSONL file via <see cref="DatasetLoaderFactory"/>.
-    /// Each line's <c>input</c> field becomes a prompt string.
+    /// Loads the cases from a JSONL file via <see cref="DatasetLoaderFactory"/>: each line's <c>input</c> is a prompt,
+    /// and its <c>expected_tools</c> the calls the tool-call evaluators compare the run against.
     /// </summary>
-    private static async Task<List<string>> LoadPromptsFromJsonl(string fileName)
+    private static async Task<IReadOnlyList<DatasetTestCase>> LoadCasesFromJsonl(string fileName)
     {
-        var path = ResolveDatasetPath(fileName)
+        var path = DatasetLoaders.ResolveDatasetPath(fileName)
             ?? throw new FileNotFoundException(
                 $"Benchmark dataset not found: {fileName}. " +
                 $"Ensure the file exists in samples/datasets/. " +
                 $"See docs/benchmarks.md for JSONL format details.");
 
-        var dataset = await DatasetLoaderFactory.LoadAsync(path);
-        return dataset.Select(dc => dc.Input).ToList();
-    }
-
-    /// <summary>
-    /// Resolves a dataset file path relative to the samples/datasets directory.
-    /// </summary>
-    private static string? ResolveDatasetPath(string fileName)
-    {
-        // Try relative to the project output directory
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
-
-        // Try relative to working directory (repo root)
-        path = Path.Combine("samples", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
-
-        return null;
+        return await DatasetLoaderFactory.LoadAsync(path);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Agent + Judge Setup
     // ═══════════════════════════════════════════════════════════════════════════
+
+    private const string AgentInstructions = "You are a helpful assistant. Use the available tools when appropriate.";
+
+    // The tools the agent is offered; their definitions also go into each eval input.
+    private static readonly AITool[] AgentTools =
+    [
+        AIFunctionFactory.Create(GetWeather),
+        AIFunctionFactory.Create(Calculate)
+    ];
 
     private static AIAgent CreateAgentWithTools()
     {
@@ -229,12 +241,8 @@ public static class BenchmarkSystem
 
         return chatClient.AsAIAgent(
             name: "BenchmarkAgent",
-            instructions: "You are a helpful assistant. Use the available tools when appropriate.",
-            tools:
-            [
-                AIFunctionFactory.Create(GetWeather),
-                AIFunctionFactory.Create(Calculate)
-            ]);
+            instructions: AgentInstructions,
+            tools: AgentTools);
     }
 
     private static IEvaluator CreateJudgeEvaluator()

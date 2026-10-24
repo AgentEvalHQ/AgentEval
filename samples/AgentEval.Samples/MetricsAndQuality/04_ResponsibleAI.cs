@@ -33,6 +33,7 @@ public static class ResponsibleAI
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -92,6 +93,7 @@ public static class ResponsibleAI
         var safeResult = await llmToxicity.EvaluateAsync(safeContext);
         Console.WriteLine($"      Toxicity Score: {safeResult.Score:F1} (higher = safer)");
         Console.WriteLine($"      Status: {(safeResult.Passed ? "✅ SAFE" : "⚠️ REVIEW")}");
+        ExpectLabel("toxicity, safe content", safeResult, expected: true);
         Console.WriteLine($"      Reasoning: {safeResult.Details?["reasoning"] ?? "Pattern-based evaluation"}\n");
 
         // Evaluate potentially harmful content  
@@ -100,6 +102,7 @@ public static class ResponsibleAI
         var harmfulResult = await llmToxicity.EvaluateAsync(potentiallyHarmfulContext);
         Console.WriteLine($"      Toxicity Score: {harmfulResult.Score:F1}");
         Console.WriteLine($"      Status: {(harmfulResult.Passed ? "✅ SAFE" : "⚠️ REVIEW")}");
+        ExpectLabel("toxicity, responsible refusal", harmfulResult, expected: true);
         Console.WriteLine($"      Analysis: Responsible refusal demonstrates proper safety handling");
     }
 
@@ -134,6 +137,7 @@ public static class ResponsibleAI
         var neutralResult = await biasMetric.EvaluateAsync(neutralContext);
         Console.WriteLine($"      Bias Score: {neutralResult.Score:F1} (higher = less biased)");
         Console.WriteLine($"      Status: {(neutralResult.Passed ? "✅ UNBIASED" : "⚠️ POTENTIAL BIAS")}");
+        ExpectLabel("bias, neutral response", neutralResult, expected: true);
         
         if (neutralResult.Details?.ContainsKey("reasoning") == true)
         {
@@ -145,6 +149,7 @@ public static class ResponsibleAI
         var biasedResult = await biasMetric.EvaluateAsync(biasedContext);
         Console.WriteLine($"      Bias Score: {biasedResult.Score:F1}");
         Console.WriteLine($"      Status: {(biasedResult.Passed ? "✅ UNBIASED" : "🚫 BIAS DETECTED")}");
+        ExpectLabel("bias, planted biased response", biasedResult, expected: false);
         
         if (biasedResult.Details?.ContainsKey("problematicPhrases") == true)
         {
@@ -185,6 +190,7 @@ public static class ResponsibleAI
         var calibratedResult = await misinfoMetric.EvaluateAsync(calibratedContext);
         Console.WriteLine($"      Calibration Score: {calibratedResult.Score:F1} (higher = better calibrated)");
         Console.WriteLine($"      Status: {(calibratedResult.Passed ? "✅ WELL-CALIBRATED" : "⚠️ REVIEW CONFIDENCE")}");
+        ExpectLabel("misinformation, well-calibrated response", calibratedResult, expected: true);
         
         if (calibratedResult.Details?.ContainsKey("reasoning") == true)
         {
@@ -196,6 +202,7 @@ public static class ResponsibleAI
         var overconfidentResult = await misinfoMetric.EvaluateAsync(overconfidentContext);
         Console.WriteLine($"      Calibration Score: {overconfidentResult.Score:F1}");
         Console.WriteLine($"      Status: {(overconfidentResult.Passed ? "✅ WELL-CALIBRATED" : "🚫 OVERCONFIDENT/MISLEADING")}");
+        ExpectLabel("misinformation, planted overconfident response", overconfidentResult, expected: false);
         
         if (overconfidentResult.Details?.ContainsKey("unsupportedClaims") == true)
         {
@@ -203,6 +210,23 @@ public static class ResponsibleAI
             if (claims?.Count > 0)
                 Console.WriteLine($"      Issues: {string.Join(", ", claims)}");
         }
+    }
+
+    // Each demo case is labelled by construction (a safe reply, a planted biased one). A metric that
+    // passes the planted case or fails the clean one got the label wrong: the sample's check failed.
+    // A judge reply the metric could not parse, or a judge call that failed, is not measured: a Fail at score 0 would
+    // read as a correct flag on a planted case, and it measured nothing.
+    private static void ExpectLabel(string label, MetricResult result, bool expected)
+    {
+        if (!result.Measured)
+        {
+            Console.WriteLine($"      ⚪ {label}: NOT MEASURED — {result.Explanation ?? "no result"}");
+            SampleOutcome.Skip($"{label}: the metric did not measure it ({result.Explanation ?? "no result"})");
+            return;
+        }
+
+        if (result.Passed != expected)
+            SampleOutcome.Fail($"{label}: expected the metric to {(expected ? "pass" : "flag")} it, it {(result.Passed ? "passed" : "flagged")} it");
     }
 
     private static async Task DemoCounterfactualTesting(IChatClient chatClient)

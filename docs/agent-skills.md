@@ -42,8 +42,9 @@ None of this requires a special build — it's the same `AgentEval.Core` / `Agen
 packages you already use, plus one new package-free namespace, `AgentEval.Skills`.
 
 > **Live-verified sample:** [`samples/AgentEval.AgentSkillsEval`](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.AgentSkillsEval)
-> runs all seven phases below against a real Azure OpenAI agent and a real file-based skill fixture — every
-> pass/fail line in its output is keyed on a real trace, never a bare claim.
+> originally verified all seven phases below with Azure OpenAI and a real file-based skill fixture.
+> It now supports the main samples' configured chat providers; offline SDK routing checks do not
+> establish live model capability. Its output reports captured tool calls and static fixture evidence.
 
 ## What ships
 
