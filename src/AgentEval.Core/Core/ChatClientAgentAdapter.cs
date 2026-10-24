@@ -105,7 +105,7 @@ public class ChatClientAgentAdapter
     {
         var messages = BuildMessages(prompt);
         var textBuilder = new StringBuilder();
-        TokenUsage? capturedUsage = null;
+        var usageAccumulator = new StreamingUsageAccumulator();
 
         await foreach (var update in _chatClient.GetStreamingResponseAsync(messages, EffectiveChatOptions(), cancellationToken))
         {
@@ -127,8 +127,7 @@ public class ChatClientAgentAdapter
                 {
                     if (content is UsageContent usage)
                     {
-                        // Null unless both counts were reported: a missing count is not 0.
-                        capturedUsage = TokenUsageMapping.FromUsage(usage.Details);
+                        usageAccumulator.Add(usage.Details);
                     }
                     else if (content is FunctionCallContent call)
                     {
@@ -168,7 +167,7 @@ public class ChatClientAgentAdapter
         yield return new AgentResponseChunk
         {
             IsComplete = true,
-            Usage = capturedUsage
+            Usage = usageAccumulator.ToTokenUsage()
         };
     }
 

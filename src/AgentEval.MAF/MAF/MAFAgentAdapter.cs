@@ -91,7 +91,7 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
-        TokenUsage? capturedUsage = null;
+        var usageAccumulator = new StreamingUsageAccumulator();
         
         // Build message list: injected history + current prompt, then clear immediately —
         // ensures it is used for exactly one invocation even if streaming throws or is cancelled.
@@ -134,14 +134,13 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
                     
                     // Check for UsageContent if provider sends it in streaming
                     case UsageContent usage:
-                        // Null unless both counts were reported: a missing count is not 0.
-                        capturedUsage = TokenUsageMapping.FromUsage(usage.Details);
+                        usageAccumulator.Add(usage.Details);
                         break;
                 }
             }
         }
 
-        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ResponseModelId };
+        yield return new AgentResponseChunk { IsComplete = true, Usage = usageAccumulator.ToTokenUsage(), ModelId = ResponseModelId };
     }
     
     /// <summary>
