@@ -77,7 +77,7 @@ public static class MemoryBenchmarkReporting
 
         // One judge for every model: the comparison then varies the model under test and nothing else. Each model
         // judging its own answers would also vary the judge.
-        var judgeModel = models[0];
+        var judgeModel = AIConfig.JudgeModelDeployment;
 
         Console.WriteLine($"Step 1: Creating benchmark runner for {models.Count} models...\n");
         Console.WriteLine($"   Provider:   {AIConfig.ProviderName} ({AIConfig.Endpoint})");
@@ -85,7 +85,7 @@ public static class MemoryBenchmarkReporting
                           (benchmark.Name == MemoryBenchmark.Quick.Name ? "  — --preset standard or full for more" : ""));
         Console.WriteLine($"   Judge:      {judgeModel} (the same judge scores every model)");
         foreach (var model in models)
-            Console.WriteLine($"   Model:      {model}");
+            Console.WriteLine($"   Model:      {model}; judge: {SampleJudgeModel.DescribeFor(model, judgeModel)}");
         Console.WriteLine();
 
         var store = new JsonFileBaselineStore();
@@ -127,12 +127,13 @@ public static class MemoryBenchmarkReporting
                 AgentName = AgentName,
                 ModelId = model,
                 ReducerStrategy = "None (memory-optimized prompt)",
-                MemoryProvider = "InMemoryChatHistory"
+                MemoryProvider = "InMemoryChatHistory",
+                CustomConfig = SampleJudgeModel.BaselineConfiguration(judgeModel, AIConfig.ProviderTag)
             };
 
             var baseline = result.ToBaseline(
                 model, config,
-                description: $"{benchmark.Name} preset on {AIConfig.ProviderName}, judged by {judgeModel}",
+                description: $"{benchmark.Name} preset on {AIConfig.ProviderName}, judge: {SampleJudgeModel.DescribeFor(model, judgeModel)}",
                 tags: [model, AIConfig.ProviderTag, benchmark.Name.ToLowerInvariant()]);
             await store.SaveAsync(baseline);
             allBaselines.Add(baseline);

@@ -64,8 +64,10 @@ public static class RunSingleBenchmark
         Console.WriteLine($"\nRunning {benchmark.Name} benchmark ({benchmark.Categories.Count} categories) on {AIConfig.ModelDeployment}...\n");
 
         var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        var judgeModel = AIConfig.JudgeModelDeployment;
+        Console.WriteLine($"   Judge: {SampleJudgeModel.DescribeFor(AIConfig.ModelDeployment, judgeModel)}");
 
-        var benchmarkRunner = MemoryBenchmarkRunner.Create(chatClient);
+        var benchmarkRunner = MemoryBenchmarkRunner.Create(AIConfig.CreateChatClient(judgeModel));
         var store = new JsonFileBaselineStore();
 
         var agent = chatClient.AsEvaluableAgent(
@@ -110,12 +112,15 @@ public static class RunSingleBenchmark
             AgentName = AgentName,
             ModelId = AIConfig.ModelDeployment,
             ReducerStrategy = "None (memory-optimized prompt)",
-            MemoryProvider = "InMemoryChatHistory"
+            MemoryProvider = "InMemoryChatHistory",
+            CustomConfig = SampleJudgeModel.BaselineConfiguration(judgeModel, AIConfig.ProviderTag)
         };
 
         // Name includes timestamp so each run gets a unique baseline file
         var baselineName = $"{benchmark.Name} — {DateTimeOffset.UtcNow:MMM dd HH:mm}";
-        var baseline = result.ToBaseline(baselineName, config, tags: [benchmark.Name.ToLowerInvariant()]);
+        var baseline = result.ToBaseline(baselineName, config,
+            description: $"Judge: {SampleJudgeModel.DescribeFor(AIConfig.ModelDeployment, judgeModel)}",
+            tags: [benchmark.Name.ToLowerInvariant()]);
 
         await store.SaveAsync(baseline);
 

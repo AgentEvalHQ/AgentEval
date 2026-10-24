@@ -149,6 +149,9 @@ public static class AIConfig
     /// <summary>Secondary model for comparison samples (<c>*_MODEL_2</c> / <c>AZURE_OPENAI_DEPLOYMENT_2</c>); defaults to the primary except on Azure.</summary>
     public static string SecondaryModelDeployment => Settings.SecondaryModel ?? ModelDeployment;
 
+    /// <summary>An actually configured distinct model for sample judging, otherwise the primary (self-judged).</summary>
+    public static string JudgeModelDeployment => SampleJudgeModel.Resolve(Settings, Environment.GetEnvironmentVariable);
+
     /// <summary>Tertiary model for comparison samples (<c>*_MODEL_3</c> / <c>AZURE_OPENAI_DEPLOYMENT_3</c>); defaults to the primary except on Azure.</summary>
     public static string TertiaryModelDeployment => Settings.TertiaryModel ?? ModelDeployment;
 

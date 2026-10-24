@@ -62,10 +62,12 @@ public static class FoundryHybridBenchmarkSample
         // ── The AgentEval judge + a composite (local, multi-dimension, itself a tree) ──────────────
         // Fitted to what this path carries, the query and the reply: did the plan resolve the intent, is it a sound
         // plan, does it stay on the question, does it read well.
-        IChatClient judgeChat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        var agentModel = AIConfig.ModelDeployment;
+        var judgeModel = AIConfig.JudgeModelDeployment;
+        Console.WriteLine($"   Agent: {agentModel}; configured judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}");
+        IChatClient judgeChat = AIConfig.CreateChatClient(judgeModel);
         var chatConfig = new ChatConfiguration(judgeChat);
         var judge = new ChatClientEvaluator(judgeChat);
-        var judgeModel = AIConfig.ModelDeployment;
 
         var composite = new CompositeEval(
             key: "hybrid.trip_answer",
@@ -89,7 +91,7 @@ public static class FoundryHybridBenchmarkSample
         // Format: https://<hub>.services.ai.azure.com/api/projects/<project>
         // AIProjectClient uses DefaultAzureCredential (Azure AD) — run `az login` first.
         var foundryEndpoint = AIConfig.FoundryEndpoint;
-        var foundryModel = AIConfig.ModelDeployment;
+        var foundryModel = judgeModel;
         bool foundryOn = foundryEndpoint is not null;
 
         AIProjectClient? projectClient = foundryOn
@@ -98,8 +100,8 @@ public static class FoundryHybridBenchmarkSample
 
         // System-under-test agent: Foundry-hosted when available, else the configured chat provider as fallback.
         AIAgent agent = projectClient is not null
-            ? projectClient.AsAIAgent(model: foundryModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
-            : judgeChat.AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
+            ? projectClient.AsAIAgent(model: agentModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
+            : AIConfig.CreateChatClient(agentModel).AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
 
         // ── Put the Foundry eval INTO the composite, alongside the AgentEval-local one ─────────────
         var inners = new List<(string Source, IAgentEvaluator Evaluator, TimeSpan? Timeout)>
@@ -176,9 +178,9 @@ public static class FoundryHybridBenchmarkSample
 
         // One source-tagged report (a branch per source; the local branch keeps its full hierarchy).
         EvalResult tree = UnifiedEvalReport.Build(hybrid.CapturedPerSource, composite);
-        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: foundryModel, Framework: "MAF");
+        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: agentModel, Framework: "MAF");
         var html = await new HtmlEvalResultRenderer().RenderAsync(tree, new EvalResultRenderOptions(
-            Subject: subject, Title: "Foundry ⊕ AgentEval — hybrid eval"));
+            Subject: subject, Title: $"Foundry ⊕ AgentEval — hybrid eval; judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}"));
 
         var dir = BenchmarkSampleHelpers.EnsureRunDirectory("foundry-hybrid");
         var htmlPath = System.IO.Path.Combine(dir, "report.html");

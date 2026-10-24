@@ -39,6 +39,8 @@
     <!-- G7's winner column and "best overall" line: who leads, and when it is a tie. -->
     <Compile Include="../../samples/AgentEval.Samples/MemoryEvaluation/MemoryComparisonLeaders.cs"
              Link="Samples/MemoryComparisonLeaders.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/SampleJudgeModel.cs"
+             Link="Samples/SampleJudgeModel.cs" />
   </ItemGroup>
 
   <ItemGroup>

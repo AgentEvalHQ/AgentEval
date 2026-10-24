@@ -58,14 +58,17 @@ public static class FoundryHierarchyBenchmarkSample
             return;
         }
 
-        IChatClient judgeChat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        var agentModel = AIConfig.ModelDeployment;
+        var judgeModel = AIConfig.JudgeModelDeployment;
+        Console.WriteLine($"   Agent: {agentModel}; configured judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}");
+        IChatClient judgeChat = AIConfig.CreateChatClient(judgeModel);
         var judge = new ChatClientEvaluator(judgeChat);
 
         // Foundry leaves come from AZURE_FOUNDRY_ENDPOINT (see AIConfig.FoundryEndpoint).
         // Format: https://<hub>.services.ai.azure.com/api/projects/<project>
         // AIProjectClient uses DefaultAzureCredential (Azure AD) — run `az login` first.
         var foundryEndpoint = AIConfig.FoundryEndpoint;
-        var foundryModel = AIConfig.ModelDeployment;
+        var foundryModel = judgeModel;
         bool foundryOn = foundryEndpoint is not null;
 
         AIProjectClient? projectClient = foundryOn
@@ -79,7 +82,7 @@ public static class FoundryHierarchyBenchmarkSample
         // One FoundryEvals per evaluator → each becomes its own weighted leaf in the tree.
         var components = new List<EvalComponent>
         {
-            new(AgenticBenchmark.ToolCallAccuracy(judge, foundryModel), foundryOn ? 0.5 : 1.0),
+            new(AgenticBenchmark.ToolCallAccuracy(judge, judgeModel), foundryOn ? 0.5 : 1.0),
         };
 
         if (projectClient is not null)
@@ -114,7 +117,7 @@ public static class FoundryHierarchyBenchmarkSample
             AIFunctionFactory.Create(GetWeatherForecast, WeatherTool),
             AIFunctionFactory.Create(FindFamilyActivities, ActivitiesTool),
         ];
-        AIAgent agent = judgeChat.AsAIAgent(
+        AIAgent agent = AIConfig.CreateChatClient(agentModel).AsAIAgent(
             name: "TravelAdvisor",
             instructions: "You are a helpful travel advisor. Check the forecast and the family activities with your tools before you plan.",
             tools: tools);
@@ -178,9 +181,9 @@ public static class FoundryHierarchyBenchmarkSample
 
         RecordVerdict(result, foundryOn);
 
-        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: foundryModel, Framework: "MAF");
+        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: agentModel, Framework: "MAF");
         var html = await new HtmlEvalResultRenderer().RenderAsync(result, new EvalResultRenderOptions(
-            Subject: subject, Title: "Trip-Planner Hybrid Benchmark — AgentEval ⊕ Foundry leaves"));
+            Subject: subject, Title: $"Trip-Planner Hybrid Benchmark — AgentEval ⊕ Foundry leaves; judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}"));
 
         var dir = BenchmarkSampleHelpers.EnsureRunDirectory("foundry-hierarchy");
         var htmlPath = System.IO.Path.Combine(dir, "report.html");
