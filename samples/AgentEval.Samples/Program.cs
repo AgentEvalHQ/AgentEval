@@ -198,7 +198,7 @@ public static class Program
         [
             new("Hello World",               "★ start here — a trivial in-memory skill + ONE assertion (HaveLoadedSkill)", AgentSkillsHelloWorld.RunAsync),
             new("Disclosure Efficiency",      "Free structural metric scoring the load->read->run funnel (order, redundancy)", AgentSkillsDisclosureEfficiency.RunAsync),
-            new("Compliance Scanner",         "Static SKILL.md + governance-flag scan (MafSkillScanner) — offline, no model call", AgentSkillsComplianceScanner.RunAsync),
+            new("Compliance Scanner",         "Static scan; provider setup required, no model calls", AgentSkillsComplianceScanner.RunAsync),
             new("Skill Security Index",       "Compliance + Efficiency joined into one 0-100 score — a missing axis is never faked", AgentSkillsSecurityIndex.RunAsync),
             new("SkillGate",                  "Construction-time drift enforcement — a rug-pull fails agent construction closed", AgentSkillsSkillGate.RunAsync),
         ]),

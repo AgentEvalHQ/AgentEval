@@ -12,7 +12,7 @@ namespace AgentEval.Samples;
 /// <summary>
 /// Agent Skills — Compliance Scanner.
 ///
-/// A static, offline scan of the shared expense-report skill's <c>SKILL.md</c> authoring and governance
+/// A static scan of the shared expense-report skill's <c>SKILL.md</c> authoring and governance
 /// flags (<c>MafSkillScanner</c> + <c>SkillComplianceValidator</c>) — no model call happens during the
 /// scan itself; a minimal agent is only needed to satisfy MAF's <c>AgentSkillsSourceContext</c>. Renders
 /// the same coverage report Phase 4a's Skill Security Index consumes as its compliance axis.
@@ -63,7 +63,7 @@ public static class AgentSkillsComplianceScanner
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║   🧩 AGENT SKILLS — COMPLIANCE SCANNER                                         ║
-║   Static SKILL.md + governance-flag scan — offline, no model call              ║
+║   Static scan — provider setup required for context; no model calls            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
     }
