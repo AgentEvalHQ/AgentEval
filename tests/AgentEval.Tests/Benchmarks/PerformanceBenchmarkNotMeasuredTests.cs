@@ -188,6 +188,47 @@ public class PerformanceBenchmarkNotMeasuredTests
         Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EvaluateAsync_SuccessfulSiblingWithoutUsage_KnownBudgetFailureCannotPass(bool checkLeaf)
+    {
+        var result = await Benchmark(new PartlyReportedUsageAgent(1_000_000)).EvaluateAsync(
+            new EvalInput("ignored", Metadata: new Dictionary<string, object?> { ["prompts"] = new[] { "ok", "no-usage" } }));
+
+        var cost = result.Details.SubResults!.Single(leaf => leaf.Metric.Key == "perf_cost");
+        Assert.False(cost.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
+        if (checkLeaf)
+        {
+            Assert.Equal("fail", cost.Score.Label);
+            Assert.True(cost.Score.CountsTowardAggregate());
+            Assert.True(cost.Details.Dimensions["observed_cost_usd"] > 1.0);
+            Assert.Contains("lower bound", cost.Details.Recommendations![0]);
+        }
+        else
+        {
+            Assert.False(result.Score.Passed);
+            Assert.Equal("fail", result.Score.Label);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task EvaluateAsync_SuccessfulSiblingWithoutUsage_BelowBudgetKeepsUnknownTotal(int tokens)
+    {
+        var result = await Benchmark(new PartlyReportedUsageAgent(tokens)).EvaluateAsync(
+            new EvalInput("ignored", Metadata: new Dictionary<string, object?> { ["prompts"] = new[] { "ok", "no-usage" } }));
+
+        var cost = result.Details.SubResults!.Single(leaf => leaf.Metric.Key == "perf_cost");
+        Assert.Equal("skipped", cost.Score.Label);
+        Assert.Equal(MeasurementState.NotMeasured, cost.Score.Measurement);
+        Assert.False(cost.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.Contains("reported no token usage", cost.Details.Recommendations![0]);
+    }
+
     [Fact]
     public async Task RunCostBenchmarkAsync_CompleteRecordedZero_RemainsMeasuredZero()
     {
@@ -207,6 +248,17 @@ public class PerformanceBenchmarkNotMeasuredTests
         using var source = new CancellationTokenSource();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Benchmark(new CancelingAgent(source))
             .RunCostBenchmarkAsync(["ok"], "gpt-4o", source.Token));
+    }
+
+    private sealed class PartlyReportedUsageAgent(int tokens) : IEvaluableAgent
+    {
+        public string Name => "PartlyReportedUsageAgent";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AgentResponse
+            {
+                Text = "ok", ModelId = "gpt-4o",
+                TokenUsage = prompt == "no-usage" ? null : new TokenUsage { PromptTokens = tokens, CompletionTokens = tokens },
+            });
     }
 
     private sealed class MixedCostAgent(int tokens, int failOnVisit = 1) : IEvaluableAgent

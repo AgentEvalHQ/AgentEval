@@ -794,20 +794,22 @@ public class PerformanceBenchmark
                 ? r.TotalInputTokens / 1_000_000m * rate.InputPricePerMillion
                   + r.TotalOutputTokens / 1_000_000m * rate.OutputPricePerMillion
                 : null;
-            var knownViolation = r.Errors.Count > 0 && opts.MaxCostUSD > 0
+            var knownViolation = opts.MaxCostUSD > 0
                 && observedCost is { } observed && (double)observed > opts.MaxCostUSD;
             var reason = r.SuccessfulPrompts == 0
                 ? $"Cost not measured: none of {r.TotalPrompts} prompts returned ({r.Errors.Count} errors), so there is " +
                   "no usage to price."
                 : r.Errors.Count > 0
                 ? $"Cost not measured: {r.Errors.Count} of {r.TotalPrompts} dispatched prompts failed; their usage is unknown. " +
-                  $"Retained tokens are an observed subtotal, not the workload total. " +
-                  (knownViolation ? $"The observed priced lower bound ${observedCost:F6} already exceeds budget ${opts.MaxCostUSD:F6}." : "The budget is not shown to hold.")
+                  "Retained tokens are an observed subtotal, not the workload total. " +
+                  (knownViolation ? "" : "The budget is not shown to hold.")
                 : r.ResponsesWithoutUsage > 0
                 ? $"Cost not measured: {r.ResponsesWithoutUsage} of {r.SuccessfulPrompts} responses reported no token " +
                   "usage, so their tokens are unknown (not zero). Use an agent whose provider reports usage."
                 : $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
                   "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
+            if (knownViolation)
+                reason += $" The observed priced lower bound ${observedCost:F6} already exceeds budget ${opts.MaxCostUSD:F6}.";
             var dimensions = new Dictionary<string, double>
             {
                 ["total_tokens"] = r.TotalTokens,
@@ -818,9 +820,9 @@ public class PerformanceBenchmark
             {
                 dimensions["errors"] = r.Errors.Count;
                 dimensions["successful"] = r.SuccessfulPrompts;
-                if (observedCost is { } lowerBound)
-                    dimensions["observed_cost_usd"] = (double)lowerBound;
             }
+            if (observedCost is { } lowerBound)
+                dimensions["observed_cost_usd"] = (double)lowerBound;
             return new EvalResult(
                 Metric: new("perf_cost", "Cost", "performance", "1.0.0"),
                 Score: new(0.0, null, knownViolation ? "fail" : "skipped", false, null, knownViolation ? "critical" : "none", null)
