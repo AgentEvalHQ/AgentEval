@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 
@@ -62,15 +63,30 @@ public sealed class PartnerIntelSession : IAsyncDisposable
             ShutdownTimeout = TimeSpan.FromSeconds(5),
         });
 
+        return await OpenAsync(transport, evilMode, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Use the same initialization path with an in-memory MCP peer in failure controls.
+    internal static async Task<PartnerIntelSession> OpenAsync(
+        IClientTransport transport, bool evilMode, CancellationToken cancellationToken)
+    {
+
         // Bound the initialization handshake so a wedged child cannot hang a caller that passed CancellationToken.None.
         // StdioClientTransport is a stateless factory (ConnectAsync hands process ownership to the session), so it
         // has nothing to dispose here; cleaning up a child spawned by a failed handshake is McpClient.CreateAsync's
         // responsibility.
         using var handshakeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, handshakeTimeout.Token);
-        var client = await McpClient.CreateAsync(transport, cancellationToken: linked.Token).ConfigureAwait(false);
+        McpClient? client = null;
+        var stage = "CreateAsync";
+        var stageStarted = Stopwatch.GetTimestamp();
+        TimeSpan? createElapsed = null;
         try
         {
+            client = await McpClient.CreateAsync(transport, cancellationToken: linked.Token).ConfigureAwait(false);
+            createElapsed = Stopwatch.GetElapsedTime(stageStarted);
+            stage = "ListToolsAsync";
+            stageStarted = Stopwatch.GetTimestamp();
             var tools = await client.ListToolsAsync(cancellationToken: linked.Token).ConfigureAwait(false);
             var report = tools.FirstOrDefault(tool =>
                 string.Equals(tool.Name, PartnerIntelServer.ToolName, StringComparison.Ordinal))
@@ -79,9 +95,21 @@ public sealed class PartnerIntelSession : IAsyncDisposable
 
             return new PartnerIntelSession(client, report, evilMode);
         }
-        catch
+        catch (Exception exception)
         {
-            await client.DisposeAsync().ConfigureAwait(false);
+            // Snapshot before cleanup: cancellation during disposal must not change the failure's evidence.
+            exception.Data["PartnerIntel.Stage"] = stage;
+            exception.Data["PartnerIntel.CreateElapsed"] = createElapsed ?? Stopwatch.GetElapsedTime(stageStarted);
+            if (client is not null)
+                exception.Data["PartnerIntel.ListToolsElapsed"] = Stopwatch.GetElapsedTime(stageStarted);
+            exception.Data["PartnerIntel.HandshakeBudgetCancelled"] = handshakeTimeout.IsCancellationRequested;
+            exception.Data["PartnerIntel.CallerCancelled"] = cancellationToken.IsCancellationRequested;
+            if (client is not null)
+            {
+                try { await client.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception cleanup) { exception.Data["PartnerIntel.CleanupFailure"] = cleanup; }
+            }
+            // Preserve the original exception type, stack and cancellation meaning.
             throw;
         }
     }

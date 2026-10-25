@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.PartnerDeskDemo.Tests" />
     <!-- Keep the console's process outcome contract shared with the other samples. -->
     <Compile Include="../AgentEval.Samples/SampleOutcome.cs" Link="SampleOutcome.cs" />
   </ItemGroup>
