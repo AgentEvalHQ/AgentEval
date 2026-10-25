@@ -145,6 +145,7 @@ jobs:
       run: |
         python3 - <<'PY'
         from pathlib import Path
+        import re
         from zipfile import ZipFile
         from xml.etree import ElementTree
 
@@ -155,8 +156,14 @@ jobs:
             names = package.namelist()
             print('Licence/notice entries:', [n for n in names if 'license' in n.lower() or 'notice' in n.lower()])
             for name in ('licenses/aef/LICENSE', 'licenses/aef/NOTICE'):
-                if name not in names:
-                    raise SystemExit(f'{packages[0]} is missing {name}')
+                # Linux packing can emit repeated directory separators. Match the
+                # logical path, reject ambiguous aliases, and verify the legal text.
+                matches = [entry for entry in names if re.sub('/+', '/', entry) == name]
+                if len(matches) != 1:
+                    raise SystemExit(f'{packages[0]} needs exactly one {name}; found {matches}')
+                expected = Path('contracts/aef', name.rsplit('/', 1)[1]).read_bytes()
+                if package.read(matches[0]) != expected:
+                    raise SystemExit(f'{packages[0]} has incorrect contents for {name}')
             nuspec = ElementTree.fromstring(package.read('AgentEval.Cli.nuspec'))
             license = nuspec.find('.//{*}license')
             if license is None or license.get('type') != 'expression' or license.text != 'MIT AND Apache-2.0':
