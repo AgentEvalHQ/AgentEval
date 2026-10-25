@@ -59,7 +59,9 @@ Transitive dependencies. The versions are the ones this repository restores with
 | Microsoft.Extensions.Caching.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.Extensions.FileSystemGlobbing, Microsoft.Extensions.Logging.Abstractions, Microsoft.Extensions.Primitives | 10.0.12 | MIT |
 | Microsoft.Extensions.ObjectPool | 8.0.31 / 9.0.20 / 10.0.12 (per target framework) | MIT |
 | System.Diagnostics.DiagnosticSource, System.IO.Hashing, System.IO.Pipelines, System.Text.Encodings.Web, System.Text.Json, System.Threading.Channels | 10.0.12 | MIT |
-| System.Security.Cryptography.Pkcs | 8.0.1 | MIT |
+| System.Security.Cryptography.Pkcs | 8.0.2 | MIT |
+
+PKCS version verified on 2026-10-25 against the published `AgentEval` 1.0.0-rc.1 dependency metadata and resolved consumer graph. PDFsharp requests a minimum of 8.0.1; AgentEval requires the patched 8.0.2 release for [GHSA-846f-f764-76mx](https://github.com/advisories/GHSA-846f-f764-76mx) and [GHSA-2fmv-rv2c-59x7](https://github.com/advisories/GHSA-2fmv-rv2c-59x7). This version floor does not waive advisory checks. The notices bundled in the immutable RC.1 packages list 8.0.1 in error; their actual AgentEval dependency metadata requires 8.0.2. The rest of this inventory retains the last-checked date above.
 
 ## AgentEval.Cli (.NET tool)
 
