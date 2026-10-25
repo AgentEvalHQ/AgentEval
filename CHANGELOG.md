@@ -7,6 +7,374 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.1]
+
+Release candidate for feedback before 1.0.0. See the [upgrade guide](docs/upgrading-to-1.0.md) for the source, result and CLI migrations from 0.43.0-beta.
+
+- Tool reports, stochastic summaries and successful-confirmation assertions require recorded execution without error. Summaries retain nullable execution counts; emitted and denied requests no longer read as successful. Workflow tool exceptions survive caught errors and late results into metrics and saved traces.
+- Memory fact assertions and noise diagnostics distinguish a usable numeric score from actual fact assessments. Custom judges can declare `ForbiddenFactsAssessed`; omitted or unusable assessments stay unavailable. Numeric thresholds, averaging and benchmark score-completeness policy are unchanged.
+- Interrupted streaming chat traces retain partial text without certifying prefix usage as complete accounting. Performance budgets retain known failures from already-over-budget priced lower bounds even when successful sibling responses omit usage; total cost stays unavailable.
+
+- Memory snapshots and manifests retain run completeness, score availability and category gaps. Partial observations remain saveable and visible; they cannot establish grades, winners or replace current/pinned canonical references. JUnit/TRX distinguish incomplete measurements from unsupported skips and measured failures. Older snapshots remain readable with completeness unrecorded. See [Memory reporting](docs/memory-evaluation.md).
+
+- The disclaimer and actual NuGet README now describe rc.1 as a prerelease, semver for stable APIs/CLI behavior from 1.0.0, and the existing Beta/Experimental exceptions. They preserve independent review, testing and hardening requirements and share the root maturity policy.
+- API snapshot guards now cover the remaining declared library assemblies and record Gatekeeper sealing, bases/interfaces and subclass-visible protected members through the existing shared renderer. Packaging dependency checks follow the actual embedded project declarations. Runtime APIs and existing maturity exceptions are unchanged.
+- MAF evaluation guidance now records the verified .NET 1.24.0 query/final-response projection, its loss of current-turn tool evidence even for tool-aware LLM judges, and the existing native `AsAgentEvaluator` alternative. No MAF or AgentEval runtime behavior changed.
+- Embedding guidance treats thresholds as model/task-dependent, aligns generic score labels with `ScoreNormalizer`, and preserves unmeasured results in the combined-metric example. Defaults and APIs are unchanged; similarity alone does not establish factual correctness.
+- CLI `eval --metrics` supports `embed_answer_similarity`, `embed_response_context` and `embed_query_context`. The SDK-free embedding provider settings/resolver now live in Core for CLI and sample reuse. Embeddings use the environment-selected provider; AEF records the embedding model/provider in evaluation identity and preserves observed, possibly partial usage. Missing configuration fails before requests, and unmeasured embedding metrics cannot produce exit 0.
+- PartnerDesk phase observations include the containment retry while keeping leak/disclosure evidence paired within each conversation. Unexercised retry boundaries remain unmeasured; the optional shadow judge explicitly covers the initial reply only (sample report JSON 3.1). Known gated/clean failures survive missing draws, and internal cancellation reaches the demo's runtime-error exit. Cancelled reports retain requested-arm identity and explicitly qualify retained counts; cancelled admitted checks cannot report selftest success.
+- The public StoreV1 exporter routes filesystem-backed readers through checked workspace snapshots, refusing absent or ambiguous raw facts while preserving rootless typed-reader behavior. Mission Control evaluator previews share the timeline's comparable-context guard and retain raw observations when a chart is unavailable.
+- Mission Control preserves canonical token totals, recorded zeroes and typed absence in captured-result badges. Subject histories retain raw scores and withhold charts when a shared metric and scale are not established. Legacy filesystem conversion rejects ambiguous JSON and missing required recorded facts before DTO defaults can invent values; compliance report selection shares one input/conversion budget across candidates.
+- CLI commands write AEF as their default run record, without the old StoreV1/ADR-002 result folders. `eval --output-dir` selects an AEF destination. Single-file exports and benchmark JSON/Markdown/HTML/PDF reports remain available; transient report-source manifests are disclosed and never linked as persisted legacy runs. A private compatibility switch exists only for the RC feedback window, outside the 1.0 promise, and is scheduled for removal at 1.0.0 if feedback finds no need for it. Existing legacy runs remain readable through conversion throughout 1.x.
+- TravelDemo stochastic evaluations use the library's single verdict rule: known passes can meet the threshold despite missing runs, while undecidable results remain incomplete. Missing scores remain absent from statistics and full-spread comparisons. `StochasticResult.DecideVerdict` is public for consumers with classified run counts and rejects invalid counts or thresholds.
+- TravelDemo evals propagate their displayed verdict to the process exit code: failed checks return 1, quality warnings 10, incomplete or unavailable measurements 11, and unhandled runtime errors 3. Completed comparisons remain 0 and usage errors remain 2. Interactive sessions retain the worst recorded outcome through the shared sample outcome contract.
+- Mission Control lists native AEF and converted legacy runs through verified, source-qualified snapshots. Run details preserve unknown execution facts and captured-content availability. Trace/report downloads retain the selected source, refuse ambiguous or invalid evidence, and enforce the configured evidence-read policy. Native artifacts support generic downloads; external references are never fetched. Trace charts show observed timestamp spans and inter-event gaps without inventing operation durations.
+- StoreV1 filesystem conversion captures allowlisted formatted reports inside AEF under the shared input/output budget. Exact `md` and `markdown` files stay distinct; capture-off imports retain neither report content nor its digest. Trace descriptors declare their legacy event format explicitly.
+- Workspace reads of semantic legacy stores enforce a shared input/conversion budget while enumerating records and writing output, including temporary blobs and sealing. Nested text and dictionary keys are checked before serialization allocates large buffers; failed conversions discard their partial output.
+- Added a verified AEF workspace-reading boundary for native runs and converted legacy sources. It preserves full result trees and score definitions, keeps importer-supplied timing unknown, distinguishes source identity from run ID, and applies shared source-byte limits before legacy conversion. Captured local evidence content is available from the same verified snapshot; absent or capture-off content stays absent, and external links are never fetched.
+- `compliance render` reads verified native AEF artifacts and converts legacy rich reports through the shared StoreV1 converter. It preserves import custody, refuses conflicting or malformed evidence and missing captured content, and writes PDFs outside the sealed source run.
+- StoreV1 workspace import preserves the exact selected run folder and captured rich compliance reports. ID-only requests reject duplicate run IDs; report identity and source-reference conflicts are refused before output.
+- `compare` verifies AEF inputs before calculating deltas and routes legacy results through the shared StoreV1 converter. Copied run folders and scenario-only collections remain supported, with imported custody, supplied header fields and unknown execution metadata disclosed. Tampered or malformed evidence is refused without score deltas.
+- Comparison now checks metric meaning and recorded evaluation policy alongside evaluator, instrument and stimulus facts. Performance results carry the budgets and sampling policy actually used; incompatible trials cannot form a shared comparison instrument. Native composite output preserves actual observed inputs and unknown judge identity, and performance comparisons select the whole benchmark verdict.
+- StoreV1 conversion preserves the normalized score contract of consistent recorded EvalResult collections while retaining unbounded generic legacy scores. `EvalResult.Observation` and `ComparisonObservation` are transient writer context; they are excluded from serialized EvalResult JSON.
+
+- Workflow executor timing now uses producer-side MAF spans, preventing queued events from understating duration. Build the root and declared child workflows with the disposable `MAFWorkflowInstrumentation` owner; dedicated sources and per-run session identity prevent nested operations from replacing parent timings. Unattributed or unavailable spans explicitly prevent executor timing certification. Both workflow tool-duration assertion APIs now refuse missing timing instead of silently passing. Tool completion remains separate from tool timing (`ExecutorToolCallEvent.HasTiming`); collection-valued barrier messages retain whole-payload source identity.
+
+- Buffered fan-in releases preserve every identifiable source activation, including multiple activations of one branch. Evaluation projection and Microsoft logging retain explicit unknown tool outcomes and timing instead of fabricating failures or zero-duration measurements.
+
+- Workflow trace replay preserves tool execution evidence, call identities and missing completion timing, plus observed traversals and activation indices. Timelines identify unmeasured tool outcomes and durations instead of reporting successful zero-duration calls. **Breaking:** `ToolStatistics.SuccessRate` is now nullable when every recorded outcome is unmeasured; observed outcomes form its denominator. See the upgrade notes in `docs/workflows.md`.
+
+- Unequal-depth fan-in barriers retain buffered source provenance across supersteps. Repeated turns and trailing accumulation on a selected fan-out target keep one branch identity per source activation. Shared step finalization consistently consumes timing and response-usage evidence.
+
+- Nested workflow steps now use qualified paths, retain child agent output and tool events, and measure hosts through child execution. A new `FromMAFWorkflow` responder overload answers request ports without inventing loop steps. Missing nested request relays fail promptly; ambiguous nested identities and unsupported stacked catch-all entries are rejected explicitly.
+
+- Parallel-execution assertions now require recorded branch activations, rather than declared fan-out edges. Branch counts use distinct recorded IDs and survive trace replay; a selector that executes zero or one fan-out target cannot pass a parallel-execution check.
+
+- Executor time-limit assertions now fail as not measured when invocation, completion, agent-turn or nested-host timing is unavailable. `TimingNotMeasuredReason` survives workflow trace recording/replay and JSON export; incomplete executor duration totals are omitted. A measured zero duration remains valid.
+
+- Workflow recording isolates concurrent executor activations, including text, tools, usage and measured timing. Separate agent turns in one superstep remain separate steps; display order follows configured executor order. Traversed edges and branch timing use observed activation evidence, ambiguous join sources are not guessed, and interrupted streams retain partial output and tool intent with an error.
+
+- Workflow output events no longer end recording early: later steps, loop iterations, errors, requests and cancellation remain visible. Repeated yields are preserved, paired return/output events are counted once, and agent-builder chat-list outputs render their messages without echoing the original input.
+
+- Workflows waiting on an unanswered request port now return an error identifying the port and request instead of waiting for timeout. Request envelopes are excluded from step output.
+
+- Workflow recording preserves overlapping executor names and sub-workflow error IDs, and recognizes delayed chat-forwarding tokens as one turn. Tool calls are recorded when requested; only a paired result certifies execution, including a null-valued result.
+
+- Real MAF workflows that end their event stream on cancellation now propagate cancellation instead of completing with partial results. The evaluation harness reports its own timeout as a failed test and propagates caller cancellation.
+
+- Store v1 export preserves explicitly recorded zero scenario cost. Microsoft evaluator metering includes failed judge attempts when checking completeness, so a successful call or recovered retry cannot make partial token/cost totals appear complete.
+
+- Negative or overflowing token contributions remain unavailable for pricing instead of becoming free usage. Legacy integer totals saturate safely in agent, trace, AutoAudit and Memory reporting. Capped trace counts cannot certify exact token fidelity; recorded zero and valid split streaming usage remain supported.
+
+- **Breaking:** Nested compliance/article/pillar and agentic/category/evaluator scores, evidence-control pass rates and Mission Control matrix rates are nullable when unmeasured. Red-team control rates and empty control coverage are nullable too. JSON schemas accept explicit null; Markdown, PDF and dashboard displays show `n/a`. Measured zero and measured portions of partial categories remain numbers; legacy numeric documents remain readable.
+
+- **Breaking:** renamed `JudgeToolData` to `JudgeInputData`, `AtomicLlmEval.JudgeSeesToolData` to `JudgeSeesData`, and `AtomicLlmDefinition.ToolData` to `InputData`, reflecting their instruction/action inputs as well as tools. Enum values and existing instrument hash material stay stable. `StochasticResult.IsMeasured` and `DecideVerdict` are internal implementation helpers before 1.0.
+- Built-in metric retries preserve the original provider exception for typed retry predicates without serializing it. Corrective judge retries leave incomplete token totals and cost absent. Partial chat-token evidence cannot certify clean trace fidelity or an Auto-Audit winner; a shortfall already proven by the known lower bound remains a measured violation.
+- Memory judging parses complete signed/fractional/exponent score tokens before validating the range, preserves explicit zero token usage, and declines pricing for negative token counts. Embedding caches and metrics share one vector-validity policy.
+- **Breaking:** `AgenticTelemetry.ErrorCount`, `RetryCount`, `TotalCalls`, and `ToolLatencyMs` are nullable. Missing readings skip their checks; recorded zero call attempts with a zero numerator and recorded empty tool maps are not applicable. Totals include retry attempts. Invalid counts, negative/non-finite tool latencies, and negative/non-finite costs return errors without measurements; measured zero remains valid. The Telemetry preset cannot pass with missing or invalid required readings.
+- **Breaking:** `AgenticTelemetry.TokensUsed` and `LatencyMsP50/P95/P99` are nullable. Untracked tokens or P99 skip their evaluators and make the Telemetry preset warn; measured zero remains valid. Negative counts and negative/non-finite P99 return an error. Missing or invalid supporting percentiles are omitted from latency dimensions; P99 remains the scoring input.
+
+- **Breaking:** Red-team baseline/attack rates, scan coverage and progress rates are nullable when unmeasured. Per-attack reports consistently use conclusive probes. Known vulnerabilities require an explicit resisted verdict to count as resolved; missing or inconclusive retests are unverified and make the comparison incomparable (CLI exit 13).
+
+
+- **Breaking:** Memory aggregate scores/rates, reach-back reliable depth, reducer fidelity and empty TypedMemEval guessing shares are nullable when unmeasured. Score assertions reject absence; temporal scoring no longer substitutes a general memory score for missing temporal readings.
+
+
+- **Breaking:** `EvaluationResult.OverallScore` is nullable and always null on evaluator failure; removed `EvaluationDefaults.DefaultFailureScore`. Judge consumers reject missing scores rather than voting or passing on a fallback grade.
+
+
+Everything below ships as **1.0.0-rc.1**, the release candidate for AgentEval 1.0: a prerelease for
+feedback. The 1.0 promise starts at 1.0.0. This heading becomes `[1.0.0-rc.1]`, with its date, on release.
+
+- Task Adherence calibration cases now carry the agent's instructions separately from the user query,
+  with distinct `cal-tad-*` IDs. Offline tests verify both verdict directions and delivery to every rule
+  judge. Published calibration figures remain historical and have not been re-measured.
+
+- Model comparison totals are complete or absent: `ModelResult.TotalCost` is null if any run is unpriced.
+  `PricedRunCount` and `TotalCostNotPricedReason` explain coverage; the average remains over priced runs,
+  and reports identify a partial sample instead of presenting its subtotal as the full cost.
+
+- **Breaking:** GDPR, EU AI Act and Agentic summary `OverallScore` values are nullable. An unmeasured root
+  writes explicit JSON `null` and renders `n/a — not measured` in Markdown, PDF and CLI output. Their evidence
+  schemas accept null while still requiring the key; consumers must handle it. Measured zero scores are preserved.
+
+- **Breaking:** stochastic statistics and distribution factories return null for empty samples.
+  Sample standard deviation and confidence intervals require two measured runs; disabled analysis
+  leaves spread and percentiles null. `IStatisticsCalculator` implementers must adopt nullable returns.
+  Statistics records require a positive sample size, including copies. `ModelResult.PassRate` is nullable
+  for zero runs; `StochasticResult.PassRateOverAllRuns` supplies the shared reliability denominator.
+  Assertions reject missing readings, and tables/CLI show absence instead of zero.
+
+- **Breaking:** stored scenario `Score` and `Duration` are nullable, with explicit JSON nulls. Unmeasured
+  and not-applicable legacy placeholders read back as null. Scenario comparison scores and deltas are
+  nullable, including the mean when no pair was measured. Compare JSON carries explicit absence; AEF
+  conversion and legacy indexing preserve unmeasured states. Mission Control exposes nullable GraphQL
+  fields and labels unmeasured scenarios. Recorded zero scores and durations remain values.
+
+- **What 1.0 promises** (README, "Feature Maturity"): semantic versioning for the public API of the
+  `AgentEval` library and for the CLI's documented commands, options and exit codes, except types marked
+  `[Experimental]` and the fronts labelled Beta or Experimental. Core evaluation and red team are Stable at
+  1.0, Gatekeeper v1 is Stable; compliance, Agent Skills evaluation and memory evaluation are Beta; Mission
+  Control and the Copilot Studio connector are Experimental; the AgentEval Evidence Format is a release
+  candidate.
+- **AgentEval Evidence Format:** eval, redteam and bench write sealed AEF evidence (#291, #292, #293, #296); Mission
+  Control's web views and evidence governance read it (#297). AEF's licence is settled as Apache-2.0 alone,
+  and the artifact-evidence statement is a profile outside AEF 1.0, with its own predicate type
+  (`contracts/aef/1/CHANGELOG.md`).
+
+- **Not measured is never a score (wave 1 of the 1.0 work).** Everywhere AgentEval could not measure something, it
+  now says so and why, instead of scoring 0, passing, or failing the agent for the instrument's fault.
+  - **Why a result was not measured:** new `MetricResult.NotMeasuredCause` (`MissingInput`, `JudgeReplyUnreadable`,
+    `JudgeCallFailed`, `CheckTimedOut`, `NotApplicable`) and an overload `MetricResult.NotMeasured(name, cause, reason,
+    details)`; existing calls compile unchanged. A check with nothing to check is `NotApplicable`: neither a pass
+    nor a failure.
+  - **Judge replies:** an unreadable reply is not measured, with its proof in `Details` (failure kind, length, SHA-256,
+    a 2,000-character excerpt, the judge's model; the explanation never quotes the reply). It was a Fail at 0 in
+    faithfulness, relevance, context precision and recall, answer correctness, groundedness, coherence, fluency, task
+    completion, toxicity, bias, misinformation and `MicrosoftEvaluatorAdapter`, and a bare `85` or `} x {` threw.
+    Replies are read more often: `<think>` blocks are skipped, every fenced block and JSON object is tried, trailing
+    commas and comments are allowed, and a quoted score is read in the invariant culture (on es-ES or de-DE `"85.5"`
+    read as 855). A score off 0-100 is not measured, never clamped (150 was a pass at 100); objects that disagree are
+    refused; the corrective retry shows the judge the reply it could not read. `MemoryJudge` no longer clamps either.
+  - **Failed calls:** a failed judge or embedding call (including a bad vector) is not measured with the error's type
+    and message, in the LLM and embedding metrics, `MicrosoftEvaluatorAdapter`, `EvaluateWithRetryAsync`, the MAF
+    `AgentEvalEvaluator` and `AgentEvalMetricAdapter`, the memory metrics and toxicity's timed-out pattern scan; the
+    MAF bridge labels it an error. The caller's cancellation now propagates (it became a Fail). A calibrated judge
+    whose call failed or whose reply was unreadable is a judge failure, not a 0 vote.
+  - **Toxicity with an LLM judge is `llm_toxicity`:** its verdict is recorded as a model grade; `code_toxicity` is the
+    pattern scan only. It was named `code_toxicity` and recorded an LLM verdict as a code check.
+  - **What the judge sees:** a judge is sent the agent's instructions (the system message) and the expected actions
+    where its rubric uses them, fenced as data; Task Adherence's rule, procedural, presentation and authorization
+    leaves are not measured without the instructions (they were graded against rules the judge never saw). MAF's
+    `EvaluateAsync` path (`AgentEvalCompositeEvaluator`, `AgentEvalAgentEvaluator`) now passes tool calls, tool
+    definitions, expected tool calls and the instructions (`AgentEvalAgentEvaluator.AgentInstructions`); `bench agentic
+    --trace` reads the instructions from the trace. Every LLM judge's prompt fingerprint moves once.
+  - **Tool data:** with no tool data recorded, tool selection, arguments, success, efficiency, skill disclosure, Task
+    Navigation's path edit distance and the tool evaluators are not measured; they passed at 100 (or scored 0). A
+    recorded run with no calls is a real result. Tool success counts only calls that ran; `ConversationExtractor`
+    delegates to `ToolUsageExtractor` (executed calls, reused CallIds, approval-gated calls, one turn only) and a turn
+    with no call is a recorded "none" only when the whole conversation is known. Traces no longer mark a call that
+    never ran as succeeded.
+  - **Security fails closed:** Prohibited Actions is not measured when its tool rules cannot be checked, and a gate
+    whose pass is withheld by an unmeasured required check exits 11 (it read PASS, then would have been warning 10).
+    Its forbidden-content list is now scanned deterministically (the docs promised a scan that did not exist) and sent
+    to the judge.
+  - **Repeated runs:** a run that threw or whose judge gave no verdict is no longer averaged in as 0.
+    `StochasticResult` gains `Verdict` (`StochasticVerdict`: Passed, Failed, Undecided, NotMeasured), `MeasuredCount`
+    and `NotMeasuredCount`; statistics describe measured runs. One rule everywhere, the one AEF evidence already uses:
+    PASS only when the unmeasured runs could not have changed the result, FAIL only when they could not have rescued
+    it, otherwise undecided. Score assertions on a result with unmeasured runs say "not measured". Model comparison
+    ranks quality over measured runs and still counts a crash against reliability; a model with no measured run is
+    not ranked (`UnrankedReason`).
+  - **Batches, compare and calibrate:** `TestSummary`/`EvaluationReport` averages cover measured cases
+    (`HasMeasuredScore`, counts); `agenteval compare` leaves unmeasured scenarios out of the mean delta
+    (`ScenarioResult.Measurement`, `NotMeasuredScenarios`); a calibrate category with nothing scored is NOT MEASURED,
+    not FAIL; golden traces record a case with no verdict (`TraceChange.NotMeasured`).
+  - **Absent aggregate values (breaking):** batch averages, report scores, untimed durations, empty workflow pass
+    rates and unrecorded tool-usage statistics are nullable. Exporters preserve the absence in JSON, CSV, Markdown,
+    JUnit and TRX; an empty report does not claim success. `EvalScore.MeasuredValue()` returns a score only when it
+    counts toward aggregation. Embedding caches no longer retain unusable vectors, and aggregation census tests
+    guard against silently averaging placeholder values.
+  - **Empty red-team scans (breaking):** security scores, attack success rates, compliance rates and risk levels are
+    nullable when no probe reached a verdict. Red-team JSON uses schema version `0.4.0` and explains absent scores;
+    Markdown and PDF reports show that nothing was measured. Consumers of `IRedTeamResult`, compliance reports,
+    baselines and risk summaries must handle null.
+  - **Complete cost and token totals:** `TestSummary.TotalCost` is nullable and names unpriced tests. Agentic cost
+    telemetry is nullable; cost evaluators skip untracked costs while still scoring a measured zero. Judge token
+    totals require both input and output usage. Mission Control counts each leaf cost once and labels an incomplete
+    sum as a priced part, with its unpriced count, instead of presenting it as the run's total cost.
+  - **Calibration instructions:** `CalibrationEntry.SystemMessage` carries the agent's instructions through the
+    evaluator and ASSERT export. It is an optional JSON `systemMessage` field; existing entries remain readable.
+  - **Benchmarks:** LongMemEval and TypedMemEval with nothing scored, AutoAudit with no recorded responses or usage
+    (`FidelityMeasured`, `TokensReported`), `bench performance` when calls fail, trace fidelity's token class without
+    chat-side usage, memory reducer and reach-back metrics, conversation completeness's not-asked dimensions, and the
+    memory baseline comparer and its report (`NotMeasuredBy`, `OmittedAxes`) no longer score what they could not check.
+    A red-team scan with no conclusive probe no longer scores 100 (`ConclusiveProbes`), and a comparison against a run
+    that measured nothing is refused (`IsComparable`, `RegressionStatus.Incomparable`).
+  - **Cost is never made up (breaking):** an unknown, null or blank judge model is not priced; it got gpt-4o-mini's
+    rate. `JudgeCostMap.GetRate` returns `ModelRate?`, `EstimateCost` returns `double?`, and `DefaultInputRatePer1K`/
+    `DefaultOutputRatePer1K` are removed (`GetRate(m) is not null` says whether a model is priced).
+    `EvalProvenance.EstimatedCost` and `ScenarioResult.EstimatedCost` are `double?` (written as `"estimatedCost": null`;
+    the eval-result schema accepts null, old files stay valid). A total is complete or absent: `CostRollup.Aggregate`
+    returns `(double? EstimatedCost, bool AllCacheHits, IReadOnlyList<string> Unpriced)`, so composites, judge panels,
+    `bench --runs`, the benchmark and MAF result trees, the safety classifiers and the exporters report "not priced"
+    instead of a partial or $0 total. `MemoryEvaluationResult.EstimatedCost` is `decimal?`: memory runs price judge
+    calls at the judge model's rate from reported usage, or report null (the flat $0.003/1K rate is gone), and
+    `HaveCostLessThan` on an unpriced cost is inconclusive in a collecting scope and fails outside one. Token usage
+    that lacks the input or the output count is no longer reported as 0 (chat-client and MAF adapters, the workflow
+    bridge, traces); the harness estimates it and labels it estimated, and its estimate of completion tokens now
+    counts the response (it was always 0). `bench performance`'s cost is not measured when a response reported no
+    usage (`CostBenchmarkResult.ResponsesWithoutUsage`). HTML and PDF reports print "not priced"; Mission Control's
+    cost breakdown counts unpriced leaves (`unpricedCount`).
+  - **Exit codes and exports (behaviour change):** `eval` (single run, `--runs`, `--metrics`, `--golden`), the calibrate
+    commands and the composite `bench` commands exit **11** when nothing failed but something was not measured; they
+    exited 0, 1 or 10. A refused red-team comparison exits 13. JUnit and TRX export a case with no verdict as an error
+    (it was a pass or a skip, so CI could read it as green); Markdown says INCOMPLETE.
+  - **Upgrade notes:** suites where some runs or cases errored can now turn red or exit 11; `DimensionComparison.Scores`
+    has no entry for a baseline that did not measure the dimension (use `TryGetValue`); judge prompt fingerprints and
+    evaluator versions changed, so cached judge results do not carry over.
+
+- **Reasoning is off by default:** every chat client the samples, the TravelDemo and PartnerDesk demos, the
+  other sample projects and the CLI build from the provider variables is wrapped in the new
+  `MinimalReasoningChatClient` (`chatClient.WithMinimalReasoning()`, `AgentEval.Core`). A request that sets
+  no reasoning level of its own goes out with `reasoning_effort: none`; at `low` when the provider rejects
+  that (HTTP 400 or 422); and with no reasoning field, the provider's default, when it rejects both (a model
+  with no reasoning setting). The level that worked is remembered per provider, endpoint and model for the
+  rest of the process; code that sets `ChatOptions.Reasoning` keeps its own level and is never retried.
+  Not wrapped: the AEF dataset runner (`agenteval run --plan`), whose clients make one attempt per call so
+  its call budget holds; they run at the provider's default.
+  Bitdeer rejects `none` and accepts `low`, which turns GLM-5.3-Flash's reasoning off: on an
+  article-length answer it had spent two thirds of its output tokens reasoning and taken 2.2 times as long.
+  Sample C2 (Real MAF Workflow, four agents writing an article, a 180 s limit) now passes on GLM in 62 s
+  (it failed at 195-239 s). The TravelDemo agent carries a copy (it takes no AgentEval dependency) that
+  `--selftest` checks against Core's. Results measured before this change ran at each provider's default.
+
+- **A `--mock` run exits 11 (not measured):** canned replies measure no model, so a Getting Started sample
+  (A1-A5) or Auto-Audit (I2) run with `--mock` exits 11 instead of 0. A check the mock run makes and fails
+  still exits 1. Extensibility (F6) keeps exit 0: its main point, the metric registries, runs offline.
+
+- **Bitdeer models are priced; each model in a comparison at its own rate:** `ModelPricing` and
+  `JudgeCostMap` carry the prices bitdeer.ai/en/pricing/ai-models charged on 2026-10-21 for every model
+  Bitdeer serves (GLM-5.3-Flash, GLM-5.3, DeepSeek-V4-Flash, DeepSeek-V4.1-Flash, Qwen3.8-27B,
+  Nemotron-3.5-Super, bge-m3 and the bge reranker), keyed by Bitdeer's model id. Where the page shows a
+  sale, the row holds the sale price and its comment the struck-through list price. Before, a comparison
+  on Bitdeer reported cost as not measured, and a GLM judge was charged at `JudgeCostMap`'s
+  gpt-4o-mini-grade default rate. `ModelPricing.TableName` is now `agenteval-model-pricing-2026-10-21`.
+  `MAFEvaluationHarness` prices a run at `EvaluationOptions.ModelName` and, when that is not set, at the
+  model the agent names (`IModelIdentifiable`, `MAFIdentifiableAgentAdapter`). `StochasticRunner` shares
+  one options object across every model of a comparison, so a comparison used to price every model at
+  one model's rate (comparing token counts, not prices) or price nothing; samples D3 and D4 now price each
+  model at its own rate. On Bitdeer (2026-10-21) D3 ranks GLM-5.3-Flash, DeepSeek-V4-Flash and
+  Qwen3.8-27B on cost and completes (it was not measured). Sample N1 takes `BITDEER_PRICE_*_PER_1M` as an
+  override and the table otherwise. Sample H6 no longer prints "all 10 OWASP categories covered, no
+  skipped leaves" on a Smoke run, which covers two and skips eight: it names what the run covered.
+
+- **Workflow steps are one per agent turn again:** since #129, `MAFWorkflowAdapter.FromMAFWorkflow`
+  recorded every message MAF delivers to an executor as a step. An agent bound with `BindAsExecutor`
+  receives 2-3 messages per turn (the chat messages it only collects, then the `TurnToken` that runs it),
+  so a 4-agent chain reported 11 steps, 7 of them empty, on any provider, and `HaveStepCount`,
+  `HaveExecutedInOrder`, `ForExecutor(...).HaveNonEmptyOutput()` and the harness's `StrictExecutorOrder`
+  check failed (TravelDemo Eval 2 and Eval 5, samples C2 and C3). `MAFWorkflowEventBridge` now counts
+  everything MAF delivers to one executor in one superstep as one step, and keeps an agent's messages
+  together until its turn runs. An executor invoked again in a later superstep (a self-loop) is still its
+  own step with its A→A edge. Known limits, documented in `docs/workflows.md`: two turns of one agent in
+  the same superstep (fan-in) are one step, and parallel fan-out attributes streamed text by stream
+  position (pre-existing).
+
+- **TravelDemo on any provider, model hidden on stage:** `samples/AgentEval.TravelDemo` and
+  `.TravelDemo.Evals` were Azure OpenAI only. They now follow `AI_INFERENCE_PROVIDER` with
+  `InferenceProviderEnvironment`'s rules (copied, because the demo agent takes no AgentEval dependency;
+  `.Evals` stops with exit 2 if the copy drifts from Core, and `--selftest` checks parity offline). The
+  judge is always the agent's model. The console and `--log` hide the provider, model and endpoint by
+  default, error text included; `--show-model` or `TRAVELDEMO_SHOW_MODEL=1` shows them and `--hide-model`
+  wins over both. Snapshots record the provider and model, and Eval 3 withholds its verdict across
+  different or unrecorded models. A failed model call or judge is reported as not measured, never as a
+  score of 0, a hypothesis verdict or a saved snapshot; Eval 4/5 keep errored runs out of their
+  statistics and never PASS with one. An Eval 5 run passes only when the workflow's structural checks and
+  its score both pass (it used to read the score alone), and Eval 2 prints one RESULT over structure and
+  quality. Demo 2 prints the final itinerary again, and the stochastic summary prints each eval's own
+  threshold. Verdicts never hide a failed dimension: Eval 1 labels its box as the quality gate and ends
+  with a RESULT line (a tool, order, policy or response failure is FAIL, a failed quality gate is WARN,
+  unmeasured is INCOMPLETE / NOT MEASURED) and makes no hypothesis claim when no tool was called;
+  snapshots record `StructurePassed`, `Result` and `UnscoredRuns` (older files read as not recorded); Eval
+  3 withholds its verdict when either side failed or did not record its checks or a stochastic run had no
+  judge score, and confirms on spread only when the workflow met its own pass threshold; a no-output run
+  counts as failed; a failed structure stays FAIL when the judge fails. In hidden mode a provider's HTTP
+  error shows only its status and error code. `--model` without a value exits 2. On Bitdeer
+  GLM-5.3-Flash (2026-10-20): Eval 2 PASS (4 steps) and Eval 5 5/5 PASS; Eval 1 reports FAIL when the
+  agent books without asking (GLM confirmed 2 of 5 bookings).
+
+- **PartnerDesk demo on any provider:** `samples/AgentEval.PartnerDeskDemo` and its `.Evals` project
+  were Azure OpenAI only. They now run on the provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI,
+  Bitdeer, OpenAI, Foundry, OpenAI-compatible), resolved by `InferenceProviderEnvironment`; the banner
+  names the provider and model, never the key. `--model` names the model. `--deployment` still works as
+  an alias and completes an Azure setup that has `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` but
+  no `AZURE_OPENAI_DEPLOYMENT`, when no other provider resolves; neither option stands in for a key, an
+  endpoint or another provider's selection. A set `AI_INFERENCE_PROVIDER` that does not resolve (missing
+  variables, unknown value, refused endpoint) stops both the demo and the eval with exit 2 and the
+  resolver's reason (a new exit code for the demo); `--offline` runs the scripted model on purpose. With
+  the selector unset and no provider configured, the demo still runs the scripted model and its banner
+  says so, while the eval exits 2 unless `--offline` is passed. The eval's shadow judge uses the same
+  provider and model. On Bitdeer GLM-5.3-Flash (2026-10-20), Phase 2 fired 0/3 (the model resists this
+  injection), and the 3-run eval's verdict was `RESULT: CHECK`: the Level 1 oracle needs an attempt and
+  held 1/3.
+
+- **Samples say what they found in their exit code:** a sample of `samples/AgentEval.Samples` that printed
+  ❌ FAILED, or stopped because no provider was configured, exited 0, so a sweep or a CI job read failures
+  and skips as passes. Every sample now records its verdict, and the run ends with a `Sample result:` line
+  and the CLI's codes: 0 completed (no failed check, warning or skip), 1 a check failed, 3 the sample threw,
+  10 a quality score below its threshold, 11 not measured (no provider or key, a model the provider does
+  not serve, a live attack the model never attempted). A security gate or scan that fails on the agent
+  under test is a failure; a failure a sample plants to show its detection is not. Samples can be run by
+  a stable id (`--sample WorkflowWithTools`, `--list-samples`). The new free `--offline-check` runs every
+  sample with no provider, and the Getting Started, Extensibility and Auto-Audit samples again with
+  `--mock`, and compares each exit code with `samples/AgentEval.Samples/offline-check-expected.txt`; it
+  runs in the offline samples CI job and fails on a crash, a hang, an unexpected code or a sample with no
+  row. Live Gatekeeper scenes record a failed invariant as a failure and any other exception as an error
+  (they printed "scene skipped" and exited 0); a provider content filter is not measured.
+
+- **The misinformation and groundedness judges see what the tools returned:** a fact the agent repeated
+  from a tool result, such as a flight list its search tool returned, was judged a fabrication, because
+  the judges were shown only the retrieved context. They are now sent the tool results (from
+  `EvaluationContext.ToolUsage`), between `<tool_results>` tags no value can close, labelled as data and
+  bounded (2,000 characters a value, 16,000 the section, 50 calls; values share the room, so a short
+  result is never pushed out by long ones). A call's arguments are not sent: they are the agent's own text
+  and would let it supply its own evidence. When no tool returned anything the prompt, and its digest, are
+  unchanged. Tool results now reach the judge's host with the rest of the prompt.
+
+- **Model comparison no longer ranks a dimension it did not measure (breaking):** a model without a price
+  was ranked as costing $0 (cost score 100, the "cheapest"), and a model none of whose runs returned as
+  latency 0 (the "fastest"). When any model lacks cost or latency, no model is scored on that dimension and
+  the composite scales the other weights up to the full weight. `ModelRanking.CostScore` and `SpeedScore`
+  are now `double?` and `ModelResult.AverageLatency` is `TimeSpan?` (`null` = not measured); the new
+  `CostNotMeasuredReason` and `SpeedNotMeasuredReason` name the cause (no price, no performance data, or
+  cost analysis off), reports print `n/a`, and each winner line says what its composite did not weigh. The
+  multi-test report no longer averages composites that weighed different dimensions. Weights that rest
+  only on cost with cost analysis off are refused before any run; weights left with nothing measured after
+  the runs still throw, with the measured results in the exception's `Data["ModelResults"]`.
+
+- **Workflow step timings are real:** the first step of a Microsoft Agent Framework workflow was timed
+  from its own end, so it showed about 0 ms and `ForExecutor(...).HaveCompletedWithin(...)` on it could
+  never fail. A step now runs from the delivery that started it until its last delivery finished; in a
+  sequential workflow the steps add up to nearly the whole run. Event sources can report this timing
+  through the new optional `ExecutorOutputEvent.StartOffset` and `Duration`. A workflow assertion failure
+  shows a short summary of the run instead of a raw dump of the result record.
+
+- **LongMemEval baselines count scored questions:** a baseline's per-category count is the number of scored
+  questions, not selected ones, and its recommendations say how many selected questions are not in the
+  score (agent errors, and questions not run or without a judge verdict).
+
+- **Samples on Bitdeer:** embeddings follow `AI_INFERENCE_PROVIDER` like chat (`BITDEER_EMBEDDING_MODEL`,
+  default `BAAI/bge-m3` on Bitdeer's own endpoint; `OPENAI_EMBEDDING_MODEL`; Azure, Foundry,
+  OpenAI-compatible hosts and any non-default endpoint must name the model), so B1 Comprehensive RAG runs
+  on Bitdeer. D3, D4, D6 and G7 compare models and stop as not measured, naming `BITDEER_MODEL_2` / `_3`,
+  when one model is configured; D6 names its arms by model, D3 and D4 report ties. G7 labels baselines by
+  the model that ran and defaults to the Quick preset; G8 and H9 count every question, check the history
+  reached the model and give the LongMemEval judge 1,024 output tokens (a reasoning judge ran out at the
+  default 256 and dropped preference questions); G9 runs Quick when non-interactive; G10 stops as not
+  measured when the provider does not serve the paper's gpt-4o. H3 and H12 graded tool-call accuracy on an
+  agent with no tools and now give the agent tools; H11 grades what MAF's evaluate path carries. A judge
+  reply that could not be parsed is not measured in B1, B2 and B4 (it read as a correct detection). F2
+  grades its dataset with the answer-correctness judge and the dataset's context (it matched the expected
+  sentence verbatim, passed a case with no expected answer and exported made-up metric scores), and F4
+  grades the tool calls its runs made (it graded tool-call accuracy with no tool data). G8 and G10 find
+  the LongMemEval dataset from any build folder. C2 and C3 show 4 steps; on GLM-5.3-Flash C3 passes and C2
+  fails its own 3-minute limit (195-239 s).
+
+- **`AgentEval.Cli` licence now says it carries AEF:** the tool embeds the AEF schemas (`contracts/aef/`,
+  Apache-2.0) but its package declared MIT alone and shipped neither AEF's `LICENSE` nor its `NOTICE`.
+  The package is now licensed `MIT AND Apache-2.0` and packs both files in `licenses/aef/`. No published
+  package was affected: AEF arrived after 0.43.0-beta. `AefLicencePackagingTests` fails any packable
+  project that carries AEF content without both, and the release workflow checks the packed tool. The
+  root README, the CLI README and `THIRD-PARTY-NOTICES.md` now name the AEF folder's licence.
+- **AEF's licence is Apache-2.0 alone:** `contracts/aef/GOVERNANCE.md` names it as the licence of AEF 1.0;
+  the plan for a separate specification licence is dropped and `contracts/aef/SCOPE.md` removed. AEF makes
+  no separate patent commitment to implementations written from the text alone.
+- **Artifact-evidence predicate type changed:** `ArtifactCompanion.PredicateType` is now
+  `https://agenteval.dev/attestation/artifact-evidence/v1` (was `https://agenteval.dev/aef/1/artifact-evidence`),
+  and the profile's page moved to `contracts/aef/profiles/artifact-evidence/`. No released version wrote the
+  old type.
+
 - **Probe/composite definition adapters:** callers can bind a pre-execution suite manifest, seal it
   with evidence and retain planned identity through interruption. Frozen rosters reject undeclared
   or silently omitted cases. Generated recipes remain distinct from fixed stimuli; legacy composite
@@ -23,7 +391,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scan limits and nested judges; dynamic external dependencies remain unclassified. Explicit composite mocks retain a pre-execution
   manifest through cancellation, identifying their fixed placeholder judge without claiming an LLM prompt. Interrupted snapshots expand configured wrappers to preserve
   the same planned tree shape as the evidence writer. Trace-fidelity and workflow-trace-fidelity also bind pre-reconciliation policy and planned checks,
-  excluding observed trace values from suite identity. Other composite producer capture remains in progress.
+  excluding observed trace values from suite identity. Capture availability remains producer-specific.
 
 - **Dataset suite identity:** native eval and dataset jobs capture full declared definitions before execution,
   persist their manifests in sealed evidence, and keep planned identity through interruption. Runner dry-run
@@ -532,6 +900,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Simple chat-client agents stayed unpriced even with known model metadata.** `AsEvaluableAgent` now
+  exposes the existing model-identity contract, taking a request model override before client-default metadata.
+  Missing/blank or unpriced identities remain unpriced; display names do not supply a guessed model.
+- **LongMemEval judge retries repeated an undersized output budget.** The initial default is now 1,024 tokens;
+  existing logical retries double the request up to 4,096. Response-format fallbacks keep the attempt's budget,
+  and call accounting, failure policies and TypedMemEval's separate calibrated budget remain unchanged.
+- **Text cost reports omitted the bundled pricing date.** Comparison metrics, CLI summaries and evaluation
+  performance output now show the historical table identity and distinguish it from custom/provider rates
+  and live quotes. Rates are unchanged; monthly/before-release maintenance is documented.
+- **LongMemEval references mixed different experiments.** Published full-history S references now use Figure 3b's
+  60.6% for GPT-4o and 33.4% for Llama-3.1-70B Instruct without Chain-of-Note, consistently in the library, report,
+  samples and documentation. Unsupported Mini/Claude reference entries are removed; the separately labelled
+  57.7% ChatGPT commercial-memory result remains distinct.
 - **Repeated GDPR benchmark reports referenced an unsaved run.** The voted result is now persisted before report
   generation, so `bench gdpr --runs N` can finish and write its report and AEF trial evidence.
 - **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
@@ -8629,7 +9010,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...v1.0.0-rc.1
 [0.43.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...v0.43.0-beta
 [0.42.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...v0.42.0-beta
 [0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta

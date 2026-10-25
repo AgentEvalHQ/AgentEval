@@ -95,18 +95,10 @@ public sealed class EuAiActBenchmarkRunner
         // Persist each leaf scenario result.
         foreach (var (scenarioId, leafResult) in EnumerateAtomicLeaves(result))
         {
-            // ADR-031 S2: record WHAT WAS ASKED and a digest of it. Every leaf of one composite
-            // was given the same stimulus, so the composite's own input is the right value — and
-            // it is the first real producer of a StimulusHash, which keeps the field from being
-            // the dead-data-by-construction shape ADR-031 finding V7 cuts.
-            //
-            // ADR-031 V1: the same call also records the eval key, version, effective bar, chance
-            // floor and judge fingerprint. `subjectModel` is the ONE fact it cannot read off the
-            // result — an EvalProvenance names the JUDGE's model and nothing about the subject's —
-            // so it is threaded from the input. Null there means Unknown, never DifferentModel.
+            // A scenario may replace the composite's input. Persist only the leaf's observation;
+            // a custom evaluator that reports none leaves the stimulus and subject model unknown.
             var sr = EvalResultPersistence.ToScenarioResult(
-                leafResult, scenarioId, leafResult.Metric.Name,
-                input: input.Query, subjectModel: input.SubjectModel);
+                leafResult, scenarioId, leafResult.Metric.Name);
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
 
@@ -144,11 +136,15 @@ public sealed class EuAiActBenchmarkRunner
         // A root that errored or measured nothing is not a FAIL (B9b): PENDING when nothing was measured, else WARN.
         var verdict = root.Score.RunVerdict(stats);
 
+        // The root's score only when it is a reading (T13): a root that errored or measured nothing wrote overallScore 0
+        // beside its PENDING verdict.
         return new RunSummary(
             SchemaVersion: "1.0",
             RunId: runId,
             Verdict: verdict,
             Stats: stats,
-            Metrics: new Dictionary<string, double> { ["overallScore"] = root.Score.Value });
+            Metrics: root.Score.MeasuredValue() is { } overallScore
+                ? new Dictionary<string, double> { ["overallScore"] = overallScore }
+                : new Dictionary<string, double>());
     }
 }

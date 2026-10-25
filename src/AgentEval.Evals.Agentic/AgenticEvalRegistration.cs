@@ -38,7 +38,8 @@ namespace AgentEval.Evals.Agentic;
 /// <b>Scope.</b> 45 dispatched entries across 9 categories: system (5), process (6), ux (3), adversarial (5),
 /// reasoning (3), calibration (2), memory (4), quality (6 — <c>f1_score</c> carved), safety (11). Path A' (v1.1) had
 /// carved out the multi-turn and trace-dependent evaluators because a calibration entry could not carry history or
-/// tool calls; entries now can (<c>CalibrationEntry.ConversationHistory</c>, <c>ToolCalls</c>, <c>Context</c>), so the
+/// tool calls; entries now can (<c>CalibrationEntry.ConversationHistory</c>, <c>ToolCalls</c>, <c>Context</c>,
+/// <c>SystemMessage</c>), so the
 /// five whose goldens can be graded are dispatched again. The 15-key carve-out list and its per-bucket rationale stay in
 /// <c>BenchAgenticCalibrateCommand.s_carveOutKeys</c>, which is where the calibration report reads
 /// them from.

@@ -8,7 +8,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
 
-    <!-- Pure MAF + Azure OpenAI demo (no AgentEval dependency).
+    <!-- Pure MAF demo (no AgentEval dependency). Runs on whichever model provider AI_INFERENCE_PROVIDER
+         selects: Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible endpoint (see Config.cs).
          Versions resolve from Directory.Packages.props (Central Package Management). -->
   </PropertyGroup>
 

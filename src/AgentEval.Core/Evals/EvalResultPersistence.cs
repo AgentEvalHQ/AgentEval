@@ -66,6 +66,14 @@ public static class EvalResultPersistence
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioId);
         ArgumentException.ThrowIfNullOrWhiteSpace(scenarioName);
 
+        // A nested scenario can replace the outer input. Prefer the evaluator's own observation,
+        // including explicit unknowns from mixed trials, over a caller's outer input.
+        if (result.Observation is { } observed)
+        {
+            input = observed.Query;
+            subjectModel = observed.SubjectModel;
+        }
+
         var json = JsonSerializer.Serialize(result, s_jsonOpts);
 
         // Build a Metrics dictionary that lifts queryable-from-the-flat-shape
@@ -102,13 +110,13 @@ public static class EvalResultPersistence
             Input: input ?? "",
             Output: json,
             Passed: result.Score.Passed,
-            Score: result.Score.Value,
+            Score: result.Score.MeasuredValue(),
             Metrics: metrics,
             Assertions: assertions
                 ?? AgentEval.Assertions.AgentEvalScope.Current?.Results
                 ?? Array.Empty<AssertionResult>(),
-            Duration: TimeSpan.Zero,
-            EstimatedCost: result.Provenance.EstimatedCost)
+            Duration: null,
+            EstimatedCost: result.Provenance.EstimatedCost) // null stays null: not priced, never $0
         {
             // Null when no input was supplied — and null must be read as "nobody computed one",
             // never as "the inputs match". StimulusHash.SameStimulus refuses a null on either side
@@ -119,6 +127,9 @@ public static class EvalResultPersistence
             // already holds — nothing here asks a caller for anything it does not have, which is
             // V1's whole claim: comparability data belongs on the RUN, not in a manifest.
             Comparability = ComparabilityOf(result, subjectModel),
+
+            // Preserve why the score is absent, separately from the nullable numeric reading.
+            Measurement = ScenarioMeasurement.Of(result.Score.CensusBucket()),
         };
     }
 
@@ -147,6 +158,12 @@ public static class EvalResultPersistence
     /// </remarks>
     internal static ComparabilityFacts ComparabilityOf(EvalResult result, string? subjectModel)
     {
+        if (result.ComparisonObservation is { } observed)
+        {
+            if (observed.EvalKey != result.Metric.Key || observed.EvalVersion != result.Metric.Version || observed.EffectiveBar != result.Score.Threshold)
+                throw new ArgumentException("Expected: comparison observations bound to this evaluator, version and threshold. Actual: stale aggregate attribution. Suggestions: recompute observations after changing the result definition. Because: retained facts cannot describe a different result.", nameof(result));
+            return observed;
+        }
         var evidence = result.Details.Evidence?
             .FirstOrDefault(e => string.Equals(
                 e.Source, ComparabilityFacts.ChanceFloorEvidenceSource, StringComparison.Ordinal));
@@ -193,6 +210,41 @@ public static class EvalResultPersistence
             EffectiveBar = result.Score.Threshold,
             ChanceFloor = floor,
             Judge = judge,
+            InstrumentKind = judge is not null || result.Provenance.Type is "atomic-llm" or "atomic-decision"
+                ? EvaluationInstrumentKind.Model
+                : result.Provenance.Type is "atomic-code" or "code" ? EvaluationInstrumentKind.Deterministic : EvaluationInstrumentKind.Unknown,
+            RubricDigest = judge is null && result.Provenance.Type is "atomic-llm" or "atomic-decision"
+                ? result.Provenance.RubricDigest ?? result.Provenance.PromptHash : null,
+        };
+    }
+
+    /// <summary>Retains unanimous trial instrument facts without attributing trial one's instrument to a mixed aggregate.</summary>
+    /// <param name="trials">Corresponding trial results with the same evaluator identity and effective threshold.</param>
+    /// <returns>Known common facts, with missing or differing evidence left unknown.</returns>
+    public static ComparabilityFacts AggregateComparability(IReadOnlyList<EvalResult> trials)
+    {
+        ArgumentNullException.ThrowIfNull(trials);
+        if (trials.Count == 0) throw new ArgumentException("Expected: at least one trial. Actual: none. Suggestions: record trials before aggregation. Because: no instrument can be established from no evidence.", nameof(trials));
+        var facts = trials.Select(t => ComparabilityOf(t, t.Observation?.SubjectModel)).ToList();
+        var first = facts[0];
+        if (facts.Any(f => f.EvalKey != first.EvalKey || f.EvalVersion != first.EvalVersion || f.EffectiveBar != first.EffectiveBar ||
+            !StringComparer.Ordinal.Equals(f.EvaluationPolicyDigest, first.EvaluationPolicyDigest)))
+            throw new ArgumentException("Expected: trials with the same evaluator, version, threshold and recorded evaluation policy. Actual: incompatible trial definitions. Suggestions: aggregate each definition separately. Because: taking the first trial would misstate what was evaluated.", nameof(trials));
+        var kind = facts.All(f => f.EffectiveInstrumentKind == first.EffectiveInstrumentKind)
+            ? first.EffectiveInstrumentKind : EvaluationInstrumentKind.Unknown;
+        var model = kind == EvaluationInstrumentKind.Model && facts.All(f => f.Judge?.ModelId == first.Judge?.ModelId)
+            ? first.Judge?.ModelId : null;
+        var rubric = facts.All(f => f.EffectiveRubricDigest == first.EffectiveRubricDigest) ? first.EffectiveRubricDigest : null;
+        var relation = facts.All(f => f.Judge?.SubjectRelation == first.Judge?.SubjectRelation)
+            ? first.Judge?.SubjectRelation ?? JudgeSubjectRelation.Unknown : JudgeSubjectRelation.Unknown;
+        return new(first.EvalKey, first.EvalVersion)
+        {
+            EffectiveBar = first.EffectiveBar,
+            EvaluationPolicyDigest = first.EvaluationPolicyDigest,
+            InstrumentKind = kind,
+            Judge = model is null ? null : new(model, rubric, relation),
+            RubricDigest = model is null ? rubric : null,
+            ChanceFloor = facts.All(f => f.ChanceFloor == first.ChanceFloor) ? first.ChanceFloor : null,
         };
     }
 

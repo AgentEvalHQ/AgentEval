@@ -21,10 +21,23 @@ public static class EvalPrinter
     /// <summary>
     /// Prints a rich summary for a single-agent evaluation (Eval01).
     /// </summary>
+    /// <param name="result">The harness result.</param>
+    /// <param name="expectedTools">The tools the policy check expects.</param>
+    /// <param name="label">Panel title.</param>
+    /// <param name="scoreMeasured">False when the judge produced no verdict: the score is then a placeholder and is not shown.</param>
+    /// <param name="passingScore">The test case's pass mark, shown next to the quality gate.</param>
+    /// <remarks>
+    /// The header row is the QUALITY GATE — <see cref="TestResult.Passed"/>, which <c>MAFEvaluationHarness</c> sets
+    /// from the judge's score alone (it does not enforce <c>ExpectedTools</c>). It is labelled as such: an unlabelled
+    /// "✅ PASSED" over a run that called no tool read as the run's verdict. The tools, their order and the policy are
+    /// checked after this panel, and the eval's RESULT line weighs every dimension.
+    /// </remarks>
     public static void PrintAgentResult(
         TestResult result,
         IReadOnlyList<string> expectedTools,
-        string label = "Agent Evaluation")
+        string label = "Agent Evaluation",
+        bool scoreMeasured = true,
+        int? passingScore = null)
     {
         var report = result.ToolUsage;
         var dur    = result.Performance?.TotalDuration;
@@ -34,7 +47,7 @@ public static class EvalPrinter
         TopBorder();
         TitleRow(label);
         Divider();
-        MetaRowAgent(result.Score, result.Passed, dur, result.ToolCallCount);
+        MetaRowAgent(scoreMeasured ? result.Score : null, result.Passed, passingScore, dur, result.ToolCallCount);
         Divider();
         SectionRow("TOOL CALL TIMELINE  (ordered by first invocation)");
         Divider();
@@ -240,12 +253,14 @@ public static class EvalPrinter
         }
         else
         {
-            // Grouped by executor: show each executor as a sub-section
+            // Grouped by step: each step lists ITS OWN calls (ExecutorStep.ToolCalls). Filtering the run's calls by
+            // executor id instead repeated all of an executor's calls under each of its steps. The '#n' tags keep the
+            // run-wide order, which is the order WorkflowExecutionResult.ToolUsage numbers the same calls in.
+            int globalOrder = 0;
             foreach (var step in steps)
             {
-                var stepCalls = calls
-                    .Where(c => c.ExecutorId == step.ExecutorId)
-                    .OrderBy(c => c.Order)
+                var stepCalls = (step.ToolCalls ?? [])
+                    .Select(c => (Call: c, Order: ++globalOrder))
                     .ToList();
 
                 var executorLabel = $"▸ {step.ExecutorId}  ({stepCalls.Count} call{(stepCalls.Count == 1 ? "" : "s")})";
@@ -260,14 +275,14 @@ public static class EvalPrinter
                 else
                 {
                     var grouped2 = stepCalls
-                        .GroupBy(c => c.Name)
+                        .GroupBy(c => c.Call.Name)
                         .OrderBy(g => g.Min(c => c.Order))
                         .ToList();
                     int labelW = grouped2.Max(g => g.Key.Length) + 4;
                     foreach (var nameGroup in grouped2)
                     {
                         var firstOrder = nameGroup.Min(c => c.Order);
-                        PrintTimelineRow($"   #{firstOrder}", nameGroup.Key, nameGroup.ToList(), labelW);
+                        PrintTimelineRow($"   #{firstOrder}", nameGroup.Key, [.. nameGroup.Select(c => c.Call)], labelW);
                     }
                 }
             }
@@ -412,31 +427,33 @@ public static class EvalPrinter
         Console.ResetColor();
     }
 
-    private static void MetaRowAgent(int score, bool passed, TimeSpan? duration, int toolCallCount)
+    private static void MetaRowAgent(int? score, bool passed, int? passingScore, TimeSpan? duration, int toolCallCount)
     {
-        var passIcon = passed ? "✅ PASSED" : "❌ FAILED";
-        var durStr   = duration.HasValue ? $"{duration.Value.TotalSeconds:F1}s" : "n/a";
-        var meta     = $"  Score: {score}/100   │  {passIcon}   │  Duration: {durStr}   │  Tool calls: {toolCallCount}";
-        Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.Write("║");
-        if (passed) Console.ForegroundColor = ConsoleColor.Green;
-        else        Console.ForegroundColor = ConsoleColor.Red;
-        var padded = meta.PadRight(BoxWidth - 2);
-        Console.Write(padded[..Math.Min(padded.Length, BoxWidth - 2)]);
-        Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine("║");
-        Console.ResetColor();
+        // The quality gate ONLY (judge score vs pass mark). A null score is "not measured" (the judge gave no
+        // verdict) — never shown as 0 or as FAILED.
+        var mark = passingScore is { } p ? $" {(passed ? "≥" : "<")} {p}" : "";
+        var (gate, color) = score is null ? ("⚠️ NOT MEASURED  (the judge gave no verdict)", ConsoleColor.Yellow)
+                          : passed        ? ($"✅ PASSED  (judge score {score}/100{mark})", ConsoleColor.Green)
+                          :                 ($"❌ FAILED  (judge score {score}/100{mark})", ConsoleColor.Red);
+        MetaRow($"  Quality gate: {gate}", color);
+        var durStr = duration.HasValue ? $"{duration.Value.TotalSeconds:F1}s" : "n/a";
+        MetaRow($"  Duration: {durStr}   │  Tool calls: {toolCallCount}   │  tools, order, policy: checked below", ConsoleColor.Gray);
     }
 
     private static void MetaRowWorkflow(bool passed, int stepCount, TimeSpan? duration, int toolCallCount)
     {
+        // The harness's own checks (executor order, expected tools, duration, errors) — not the quality gate.
         var passIcon = passed ? "✅ PASSED" : "❌ FAILED";
         var durStr   = duration.HasValue ? $"{duration.Value.TotalSeconds:F1}s" : "n/a";
-        var meta     = $"  {passIcon}   │  Steps: {stepCount}   │  Duration: {durStr}   │  Tool calls: {toolCallCount}";
+        MetaRow($"  Harness checks: {passIcon}   │  Steps: {stepCount}   │  Duration: {durStr}   │  Tool calls: {toolCallCount}",
+                passed ? ConsoleColor.Green : ConsoleColor.Red);
+    }
+
+    private static void MetaRow(string meta, ConsoleColor color)
+    {
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.Write("║");
-        if (passed) Console.ForegroundColor = ConsoleColor.Green;
-        else        Console.ForegroundColor = ConsoleColor.Red;
+        Console.ForegroundColor = color;
         var padded = meta.PadRight(BoxWidth - 2);
         Console.Write(padded[..Math.Min(padded.Length, BoxWidth - 2)]);
         Console.ForegroundColor = ConsoleColor.DarkCyan;
@@ -448,20 +465,22 @@ public static class EvalPrinter
 
     /// <summary>
     /// Prints a compact stochastic evaluation summary showing pass rate,
-    /// min/mean/max score, and a per-run result strip.
+    /// min/mean/max score, and a per-run result strip. Runs that were not measured
+    /// (model call or judge failed) are shown as such and kept out of every statistic.
     /// </summary>
+    /// <param name="architecture">What ran.</param>
+    /// <param name="tally">The runs, with the eval's own pass-rate threshold.</param>
+    /// <param name="passingScore">The per-run passing score, for the header.</param>
+    /// <param name="label">Panel title.</param>
     public static void PrintStochasticSummary(
         string architecture,
-        int runs,
-        IReadOnlyList<int> scores,
-        double passRate,
-        bool overallPassed,
+        StochasticTally tally,
+        int passingScore,
         string label = "Stochastic Evaluation")
     {
-        int passedCount = (int)Math.Round(passRate * runs);
-        double mean     = scores.Count > 0 ? scores.Average() : 0;
-        int minS        = scores.Count > 0 ? scores.Min() : 0;
-        int maxS        = scores.Count > 0 ? scores.Max() : 0;
+        EvalProcessOutcome.Record(tally.Verdict, $"{label}: {tally.Verdict}");
+        var scores  = tally.Scores;
+        double mean = scores.Count > 0 ? scores.Average() : 0;
 
         Console.WriteLine();
         TopBorder();
@@ -469,37 +488,72 @@ public static class EvalPrinter
         Divider();
 
         // Architecture + overall verdict
-        Console.ForegroundColor = overallPassed ? ConsoleColor.Green : ConsoleColor.Red;
-        ContentRow($"  Architecture: {architecture}   │  {(overallPassed ? "✅ PASSED" : "❌ FAILED")}");
+        var (verdictText, verdictColor) = tally.Verdict switch
+        {
+            StochasticVerdict.Passed       => ("✅ PASSED", ConsoleColor.Green),
+            StochasticVerdict.Failed       => ("❌ FAILED", ConsoleColor.Red),
+            StochasticVerdict.Undecided => ($"⚠️ INCOMPLETE — {tally.Errored} of {tally.Total} runs not measured", ConsoleColor.Yellow),
+            _                            => ("⚠️ NOT MEASURED — no run produced a verdict", ConsoleColor.Yellow),
+        };
+        // Two rows: the verdict on its own, so a long one (INCOMPLETE — k of N …) is never cut by the box.
+        ContentRow($"  Architecture: {architecture}");
+        Console.ForegroundColor = verdictColor;
+        ContentRow($"  Verdict     : {verdictText}");
+        ContentRow(tally.Total > 0
+            ? $"  Known passes: {tally.PassedCount}/{tally.Total} planned runs   threshold: {tally.Threshold * 100:F0}%"
+            : $"  Known passes: n/a (no runs)   threshold: {tally.Threshold * 100:F0}%");
         Console.ResetColor();
 
         Divider();
-        SectionRow($"  {runs} RUNS  ·  top-3 discriminating criteria  ·  threshold ≥ 60%");
+        SectionRow($"  {tally.Total} RUNS  ·  top-3 criteria  ·  pass ≥ {passingScore}/100  ·  threshold ≥ {tally.Threshold * 100:F0}%");
         Divider();
 
-        // Per-run strip
-        var strip = string.Join("  ", scores.Select((s, i) =>
+        // Per-run strip: score + verdict; "—" where there is no score.
+        var strip = string.Join("  ", tally.Runs.Select(r =>
         {
-            var icon = s >= 60 ? "✅" : "❌";
-            return $"Run {i + 1}: {s,3} {icon}";
+            var icon  = !r.Measured ? "⚠️" : r.Passed ? "✅" : "❌";
+            var score = r.Score is { } s ? $"{s,3}" : "  —";
+            return $"Run {r.Run}: {score} {icon}";
         }));
         foreach (var chunk in WrapText(strip, InnerWidth))
             ContentRow($"  {chunk}");
 
         Divider();
-        SectionRow("STATISTICS");
+        SectionRow("STATISTICS  (pass rate: measured runs · scores: judged runs)");
         Divider();
 
         Console.ForegroundColor = ConsoleColor.White;
-        ContentRow($"  Pass rate  : {passedCount}/{runs}  ({passRate * 100:F1}%)   threshold: 60%");
-        ContentRow($"  Mean score : {mean:F1}/100");
-        ContentRow($"  Min / Max  : {minS} / {maxS}");
-        ContentRow($"  Variance   : {(scores.Count > 1 ? scores.Select(s => Math.Pow(s - mean, 2)).Average() : 0):F1}");
+        // Nothing measured is "n/a", never a 0% pass rate or a 0 variance. The score lines say how many runs they
+        // cover when that is not every run: a spread over 4 of 5 runs is not a spread over 5.
+        var over = scores.Count > 0 && scores.Count < tally.Total ? $"   (over {scores.Count} of {tally.Total} runs)" : "";
+        ContentRow(tally.Measured > 0
+            ? $"  Pass rate  : {tally.PassedCount}/{tally.Measured}  ({tally.PassRate * 100:F1}%)   measured runs only"
+            : "  Pass rate  : n/a (no run measured)");
+        ContentRow($"  Mean score : {(scores.Count > 0 ? $"{mean:F1}/100{over}" : "n/a")}");
+        ContentRow($"  Min / Max  : {(scores.Count > 0 ? $"{scores.Min()} / {scores.Max()}{over}" : "n/a")}");
+        ContentRow($"  Variance   : {(scores.Count > 0 ? $"{scores.Select(s => Math.Pow(s - mean, 2)).Average():F1}{over}" : "n/a")}");
+        if (tally.Unscored > 0)
+        {
+            // A measured run with no judge score is a FAILED run — in the pass rate above — and is not in the spread.
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            ContentRow($"  Unscored   : {tally.Unscored} of {tally.Total} runs had no judge score — FAILED in the pass rate,");
+            ContentRow("               not in the spread: no consistency verdict on these runs");
+        }
+        if (tally.Errored > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            ContentRow($"  Not measured: {tally.Errored} of {tally.Total} runs (model call or judge failed)");
+            ContentRow("                absent from statistics; unknown in the verdict over all planned runs");
+        }
         Console.ResetColor();
 
         BottomBorder();
         Console.WriteLine();
     }
+
+    /// <summary>Collapses a (redacted) multi-line message onto one console line.</summary>
+    public static string OneLine(string? text) =>
+        string.Join(" ", (text ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     // ── Side-by-side hypothesis comparison ──────────────────────────────────
 
@@ -508,10 +562,18 @@ public static class EvalPrinter
     /// workflow eval snapshot to visually prove (or disprove) the hypothesis.
     /// Call this from Eval03 after loading both snapshots from disk.
     /// </summary>
+    /// <param name="agent">The single-agent snapshot.</param>
+    /// <param name="workflow">The workflow snapshot.</param>
+    /// <param name="label">Panel title.</param>
+    /// <param name="noVerdictReason">
+    /// Set when the two snapshots do not differ in architecture alone (different or unrecorded models): the table is
+    /// still shown, the hypothesis verdict is replaced by "NO VERDICT — {reason}".
+    /// </param>
     public static void PrintComparison(
         EvalSnapshot? agent,
         EvalSnapshot? workflow,
-        string label = "Hypothesis Comparison: Single Agent vs Workflow")
+        string label = "Hypothesis Comparison: Single Agent vs Workflow",
+        string? noVerdictReason = null)
     {
         Console.WriteLine();
         TopBorder();
@@ -570,10 +632,20 @@ public static class EvalPrinter
             workflow is null ? "—" : workflow.Passed ? "✅ Yes" : "❌ No",
             null, null, higherIsBetter: true);
 
+        // The quality gate is the judge's score only; these two rows carry what it does not: the deterministic checks
+        // and the run's verdict over both. A snapshot saved before they were recorded says so.
+        CompareRow("Structure / Tools / Policy", ChecksText(agent), ChecksText(workflow), null, null, higherIsBetter: true);
+        CompareRow("Run Result", ResultText(agent), ResultText(workflow), null, null, higherIsBetter: true);
+
         Divider();
 
-        // Verdict
-        if (agent is not null && workflow is not null)
+        // Verdict — only when architecture is the one variable between the two snapshots.
+        if (agent is not null && workflow is not null && noVerdictReason is not null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            ContentRow($"  ⚠️  NO VERDICT — {noVerdictReason}");
+        }
+        else if (agent is not null && workflow is not null)
         {
             bool workflowWins = workflow.LlmScore > agent.LlmScore
                              || workflow.CriteriaMetCount > agent.CriteriaMetCount;
@@ -584,11 +656,13 @@ public static class EvalPrinter
             ContentRow(verdict);
         }
 
-        // Source info
+        // Source info (the model only with --show-model: the snapshots record it either way)
         Divider();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         if (agent    is not null) ContentRow($"  Agent    snapshot  : {agent.RunAt:u}  —  {agent.Label}");
+        if (agent    is not null && Config.ShowModel) ContentRow($"                      model {agent.ModelIdentity ?? "not recorded"}");
         if (workflow is not null) ContentRow($"  Workflow snapshot  : {workflow.RunAt:u}  —  {workflow.Label}");
+        if (workflow is not null && Config.ShowModel) ContentRow($"                      model {workflow.ModelIdentity ?? "not recorded"}");
         ContentRow("  Tip: Re-run Eval 1 / Eval 2 to refresh snapshots, then re-run Eval 3");
         Console.ResetColor();
 
@@ -596,16 +670,31 @@ public static class EvalPrinter
         Console.WriteLine();
     }
 
+    private static string ChecksText(EvalSnapshot? snapshot) => snapshot is null ? "—" : snapshot.StructurePassed switch
+    {
+        true  => "✅ Passed",
+        false => "❌ Failed",
+        null  => "not recorded",
+    };
+
+    private static string ResultText(EvalSnapshot? snapshot) =>
+        snapshot is null ? "—" : snapshot.Result?.ToString().ToUpperInvariant() ?? "not recorded";
+
     // ── Stochastic spread comparison ─────────────────────────────────────────
 
     /// <summary>
     /// Prints a side-by-side comparison of stochastic snapshots from Eval04 (agent)
     /// and Eval05 (workflow), focusing on score spread as a proxy for determinism.
     /// </summary>
+    /// <param name="agent">The Eval 04 snapshot.</param>
+    /// <param name="workflow">The Eval 05 snapshot.</param>
+    /// <param name="label">Panel title.</param>
+    /// <param name="noVerdictReason">Set when the snapshots are not comparable (different or unrecorded models, unmeasured runs): no verdict.</param>
     public static void PrintStochasticComparison(
         StochasticSnapshot? agent,
         StochasticSnapshot? workflow,
-        string label = "Stochastic Comparison: Agent vs Workflow Variance")
+        string label = "Stochastic Comparison: Agent vs Workflow Variance",
+        string? noVerdictReason = null)
     {
         Console.WriteLine();
         TopBorder();
@@ -652,33 +741,57 @@ public static class EvalPrinter
             workflow?.MaxScore.ToString() ?? "—",
             agent?.MaxScore, workflow?.MaxScore, higherIsBetter: true);
 
-        // Spread: LOWER is better (tighter = more deterministic)
+        // Spread: LOWER is better (tighter = more deterministic). Over k of n runs when not every run was scored.
         CompareRow("Score Spread (max − min)",
-            agent    is null ? "—" : agent.Spread.ToString(),
-            workflow is null ? "—" : workflow.Spread.ToString(),
+            SpreadText(agent), SpreadText(workflow),
             agent?.Spread, workflow?.Spread, higherIsBetter: false);
 
-        CompareRow("Runs Passed",
-            agent    is null ? "—" : $"{agent.PassedCount}/{agent.Runs}",
-            workflow is null ? "—" : $"{workflow.PassedCount}/{workflow.Runs}",
+        CompareRow("Runs Passed (of measured)",
+            agent    is null ? "—" : $"{agent.PassedCount}/{agent.MeasuredRuns}",
+            workflow is null ? "—" : $"{workflow.PassedCount}/{workflow.MeasuredRuns}",
             agent?.PassedCount, workflow?.PassedCount, higherIsBetter: true);
+
+        CompareRow("Met Its Pass Threshold",
+            agent    is null ? "—" : agent.Passed    ? "✅ Yes" : "❌ No",
+            workflow is null ? "—" : workflow.Passed ? "✅ Yes" : "❌ No",
+            null, null, higherIsBetter: true);
+
+        CompareRow("Runs Not Measured",
+            agent?.ErroredRuns.ToString() ?? "—",
+            workflow?.ErroredRuns.ToString() ?? "—",
+            null, null, higherIsBetter: false);
+
+        CompareRow("Runs Unscored (failed)",
+            agent    is null ? "—" : agent.UnscoredRuns?.ToString()    ?? "not recorded",
+            workflow is null ? "—" : workflow.UnscoredRuns?.ToString() ?? "not recorded",
+            null, null, higherIsBetter: false);
 
         Divider();
 
-        if (agent is not null && workflow is not null)
+        if (agent is not null && workflow is not null && noVerdictReason is not null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            ContentRow($"  ⚠️  NO VERDICT — {noVerdictReason}");
+        }
+        else if (agent is not null && workflow is not null)
         {
             bool tighterSpread  = workflow.Spread   < agent.Spread;
             bool higherPassRate = workflow.PassRate  > agent.PassRate;
-            bool confirmed      = tighterSpread || higherPassRate;
+            // A tight spread of FAILING runs is not consistency: the workflow must also meet its own pass threshold
+            // (Passed — threshold met, no run errored). Before, five structure-failed runs at 80 "confirmed" it.
+            bool advantage      = tighterSpread || higherPassRate;
+            bool confirmed      = advantage && workflow.Passed;
 
             Console.ForegroundColor = confirmed ? ConsoleColor.Green : ConsoleColor.Yellow;
-            ContentRow(confirmed
-                ? "  ✅ HYPOTHESIS CONFIRMED — workflow shows greater consistency"
-                : "  ⚠️  HYPOTHESIS NOT CONFIRMED — no clear consistency advantage");
+            ContentRow(confirmed ? "  ✅ HYPOTHESIS CONFIRMED — workflow shows greater consistency"
+                     : advantage ? "  ⚠️  HYPOTHESIS NOT CONFIRMED — the workflow missed its own pass threshold"
+                     :             "  ⚠️  HYPOTHESIS NOT CONFIRMED — no clear consistency advantage");
+            if (advantage && !workflow.Passed)
+                ContentRow($"     ({workflow.PassedCount}/{workflow.MeasuredRuns} runs passed): a tight spread of failing runs is not consistency");
 
             if (tighterSpread)
             {
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.ForegroundColor = confirmed ? ConsoleColor.DarkGreen : ConsoleColor.DarkGray;
                 ContentRow($"     Spread: Agent {agent.Spread} pts  vs  Workflow {workflow.Spread} pts" +
                            $"  (Δ = {agent.Spread - workflow.Spread} pts tighter)");
             }
@@ -687,13 +800,20 @@ public static class EvalPrinter
         Divider();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         if (agent    is not null) ContentRow($"  Agent    : {agent.RunAt:u}  ·  {agent.Label}");
+        if (agent    is not null && Config.ShowModel) ContentRow($"             model {agent.ModelIdentity ?? "not recorded"}");
         if (workflow is not null) ContentRow($"  Workflow : {workflow.RunAt:u}  ·  {workflow.Label}");
+        if (workflow is not null && Config.ShowModel) ContentRow($"             model {workflow.ModelIdentity ?? "not recorded"}");
         ContentRow("  Tip: Re-run Eval 4 / Eval 5 to refresh stochastic snapshots");
         Console.ResetColor();
 
         BottomBorder();
         Console.WriteLine();
     }
+
+    private static string SpreadText(StochasticSnapshot? snapshot) =>
+        snapshot is null ? "—"
+        : snapshot.ScoredRuns < snapshot.Runs ? $"{snapshot.Spread} ({snapshot.ScoredRuns}/{snapshot.Runs} runs)"
+        : snapshot.Spread.ToString();
 
     private static void CompareRow(
         string metric,
@@ -708,20 +828,20 @@ public static class EvalPrinter
 
         if (agentNum.HasValue && workflowNum.HasValue)
         {
-            if (agentNum > workflowNum)
-            {
-                winner = higherIsBetter ? "Agent ▲" : "Agent ▼";
-                winnerColor = higherIsBetter ? ConsoleColor.Yellow : ConsoleColor.Green;
-            }
-            else if (workflowNum > agentNum)
-            {
-                winner = higherIsBetter ? "Workflow ▲" : "Workflow ▼";
-                winnerColor = ConsoleColor.Green;
-            }
-            else
+            if (agentNum == workflowNum)
             {
                 winner = "Tie";
                 winnerColor = ConsoleColor.DarkGray;
+            }
+            else
+            {
+                // The winner is the BETTER side: the lower number where lower is better (spread, criteria missed).
+                // ▲ = won by being higher, ▼ = won by being lower. The old rule named the higher side either way,
+                // so a lower-is-better row called the loser the winner.
+                bool agentWins = higherIsBetter ? agentNum > workflowNum : agentNum < workflowNum;
+                var arrow = higherIsBetter ? "▲" : "▼";
+                winner = agentWins ? $"Agent {arrow}" : $"Workflow {arrow}";
+                winnerColor = agentWins ? ConsoleColor.Yellow : ConsoleColor.Green;
             }
         }
 

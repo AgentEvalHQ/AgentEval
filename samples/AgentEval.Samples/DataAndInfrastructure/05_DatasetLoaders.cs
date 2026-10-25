@@ -28,9 +28,16 @@ namespace AgentEval.Samples;
 /// </summary>
 public static class DatasetLoaders
 {
+    private static readonly string[] SampleDatasets = ["rag-qa.yaml", "dataloader-showcase.jsonl", "dataloader-showcase.csv"];
+
     public static async Task RunAsync()
     {
         PrintHeader();
+
+        // Every step loads these files. Without them the sample still runs, but it loads nothing.
+        var missing = SampleDatasets.Where(f => ResolveDatasetPath(f) is null).ToArray();
+        if (missing.Length > 0)
+            SampleOutcome.Skip($"sample dataset(s) not found under samples/datasets: {string.Join(", ", missing)}");
 
         // ── Step 1: Multi-format loading ──────────────────────────────────────
         Console.WriteLine("📂 STEP 1: Multi-Format Dataset Loading\n");
@@ -69,7 +76,7 @@ public static class DatasetLoaders
 
     private static async Task DemoMultiFormatLoading()
     {
-        var formats = new[] { ("YAML", "rag-qa.yaml"), ("JSONL", "dataloader-showcase.jsonl"), ("CSV", "dataloader-showcase.csv") };
+        var formats = new[] { ("YAML", SampleDatasets[0]), ("JSONL", SampleDatasets[1]), ("CSV", SampleDatasets[2]) };
 
         foreach (var (name, fileName) in formats)
         {
@@ -288,9 +295,7 @@ public static class DatasetLoaders
     {
         Console.WriteLine("   DatasetLoaderFactory convenience methods auto-detect format:\n");
 
-        var files = new[] { "rag-qa.yaml", "dataloader-showcase.jsonl", "dataloader-showcase.csv" };
-
-        foreach (var fileName in files)
+        foreach (var fileName in SampleDatasets)
         {
             var path = ResolveDatasetPath(fileName);
             if (path == null) continue;
@@ -313,15 +318,21 @@ public static class DatasetLoaders
     // HELPERS
     // ═══════════════════════════════════════════════════════════════════════
 
-    private static string? ResolveDatasetPath(string fileName)
+    /// <summary>
+    /// Finds <c>samples/datasets/{fileName}</c> above the binary's folder or the working directory, so it resolves
+    /// whatever the build layout (<c>bin/</c>, a shared <c>--artifacts-path</c>) and wherever the binary runs
+    /// from. Null when the file is not there. F2 and F4 load their datasets through it too.
+    /// </summary>
+    internal static string? ResolveDatasetPath(string fileName)
     {
-        // Try relative to the project output directory
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
-
-        // Try relative to working directory
-        path = Path.Combine("samples", "datasets", fileName);
-        if (File.Exists(path)) return Path.GetFullPath(path);
+        foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+        {
+            for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
+            {
+                var path = Path.Combine(dir.FullName, "samples", "datasets", fileName);
+                if (File.Exists(path)) return path;
+            }
+        }
 
         return null;
     }

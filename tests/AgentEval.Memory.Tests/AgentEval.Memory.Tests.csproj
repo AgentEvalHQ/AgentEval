@@ -29,6 +29,21 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The LongMemEval samples' (G8, G10) accounting, haystack meter and verdict, compiled here so the tests drive the
+         sample files themselves; they record through SampleOutcome, compiled with them. Same pattern as the sample
+         files AgentEval.Tests links. -->
+    <Compile Include="../../samples/AgentEval.Samples/MemoryEvaluation/LongMemEvalSampleSupport.cs"
+             Link="Samples/LongMemEvalSampleSupport.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/SampleOutcome.cs"
+             Link="Samples/SampleOutcome.cs" />
+    <!-- G7's winner column and "best overall" line: who leads, and when it is a tie. -->
+    <Compile Include="../../samples/AgentEval.Samples/MemoryEvaluation/MemoryComparisonLeaders.cs"
+             Link="Samples/MemoryComparisonLeaders.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/SampleJudgeModel.cs"
+             Link="Samples/SampleJudgeModel.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />

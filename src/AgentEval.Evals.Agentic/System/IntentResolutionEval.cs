@@ -73,7 +73,7 @@ public sealed class IntentResolutionEval : IEvalDefinitionWrapper
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
+                    failureSeverity: "medium") { JudgeSeesData = JudgeInputData.ToolCalls },
                 Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
@@ -92,7 +92,7 @@ public sealed class IntentResolutionEval : IEvalDefinitionWrapper
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
+                    failureSeverity: "medium") { JudgeSeesData = JudgeInputData.ToolCalls },
                 Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
         };
 

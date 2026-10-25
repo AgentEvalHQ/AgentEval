@@ -193,8 +193,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             Duration = totalStopwatch.Elapsed
         };
 
-        _logger.LogInformation("Memory benchmark complete: {BenchmarkName} — Overall={Score:F1}% Grade={Grade} ({Stars} stars)",
-            benchmark.Name, result.OverallScore, result.Grade, result.Stars);
+        if (result.IsComplete)
+            _logger.LogInformation("Memory benchmark complete: {BenchmarkName} — Overall={Score:F1}% Grade={Grade} ({Stars} stars)",
+                benchmark.Name, result.OverallScore, result.Grade, result.Stars);
+        else
+            _logger.LogWarning("Memory benchmark incomplete: {BenchmarkName} — ObservedScore={Score} HasMeasuredCategory={HasMeasuredCategory} UnscoredQuestions={Unscored}; grade and verdict not established",
+                benchmark.Name, result.HasMeasuredCategory ? (double?)result.OverallScore : null, result.HasMeasuredCategory, result.UnmeasuredQueries);
 
         if (result.WeakCategories.Count > 0)
         {
@@ -230,12 +234,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
     private static void Record(List<double> scores, ReducerEvaluationResult result) =>
         Record(scores, result.IsMeasured, result.FidelityScore, result.UnmeasuredFacts);
 
-    private static void Record(List<double> scores, bool measured, double score, int unmeasured)
+    private static void Record(List<double> scores, bool measured, double? score, int unmeasured)
     {
         var tally = s_tally.Value;
         if (tally is not null) tally.UnmeasuredQueries += unmeasured;
-        if (!measured) return;
-        scores.Add(score);
+        if (!measured || score is not { } value) return;
+        scores.Add(value);
         if (tally is not null) tally.MeasuredScenarios++;
     }
 

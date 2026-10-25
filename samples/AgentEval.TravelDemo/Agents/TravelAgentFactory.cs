@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using AgentEval.TravelDemo.Tools;
@@ -16,11 +15,10 @@ namespace AgentEval.TravelDemo.Agents;
 /// </summary>
 public static class TravelAgentFactory
 {
-    /// <summary>Creates a <see cref="ChatClientAgent"/> connected to Azure OpenAI.</summary>
+    /// <summary>Creates a <see cref="ChatClientAgent"/> on the configured model provider (see <see cref="Config"/>).</summary>
     public static ChatClientAgent Create()
     {
-        var azureClient = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var chatClient  = azureClient.GetChatClient(Config.Model).AsIChatClient();
+        var chatClient = Config.CreateChatClient();
 
         return new(chatClient, new ChatClientAgentOptions
         {

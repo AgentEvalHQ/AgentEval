@@ -4,7 +4,7 @@
   "name": "Telemetry: Token Usage",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator returning prompt + completion token counts from AgenticTelemetry. Lower is better when constrained by budget.",
+  "description": "Pure-code telemetry evaluator scoring prompt + completion tokens against a budget. Null means not tracked and is skipped; a negative count is an error. A reported zero remains measured and within budget.",
   "costTier": "Trivial",
   "higherIsBetter": true,
   "defaultThreshold": 0.8,

@@ -85,6 +85,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Exercise the actual C3 sample renderer without provider calls. -->
+    <Compile Include="../../samples/AgentEval.Samples/WorkflowsAndConversations/WorkflowWithToolsReport.cs"
+             Link="Samples/WorkflowWithToolsReport.cs" />
     <!-- Compile the demo's pure aggregation helper into the test assembly. This keeps the live
          sample net10-only while exercising its statistics across every test target framework. -->
     <Compile Include="../../samples/AgentEval.Samples/PerformanceAndStatistics/ReliabilityRaceStatistics.cs"
@@ -94,6 +97,15 @@
          drift apart. Same pattern as ReliabilityRaceStatistics above. -->
     <Compile Include="../../samples/AgentEval.Samples/EvalJoin/01_EvalWithChanceFloor.cs"
              Link="Samples/01_EvalWithChanceFloor.cs" />
+    <!-- A linked sample records its verdict through SampleOutcome, so the runner's exit-code contract is compiled
+         here too and tested as shipped. OfflineSampleCheck is the CI check's table parser and verdict rule. Neither
+         depends on AIConfig or the catalogue. -->
+    <Compile Include="../../samples/AgentEval.Samples/SampleOutcome.cs"
+             Link="Samples/SampleOutcome.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/Benchmarks/BenchmarkSampleReporting.cs"
+             Link="Samples/BenchmarkSampleReporting.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/OfflineSampleCheck.cs"
+             Link="Samples/OfflineSampleCheck.cs" />
 
     <!-- 2.1: the TravelDemo deterministic eval, compiled here so its tests bind the shipped
          type rather than a copy. -->
@@ -113,6 +125,10 @@
              Link="Samples/02_AssertEvidence.cs" />
     <Compile Include="../../samples/AgentEval.Samples/Interop/03_AssertMultiturnBenchmark.cs"
              Link="Samples/03_AssertMultiturnBenchmark.cs" />
+    <Compile Include="../../samples/AgentEval.AgentSkillsEval/AIConfig.cs"
+             Link="Samples/AgentSkillsAIConfig.cs" />
+    <Compile Include="../../samples/AgentEval.Samples/MetricsAndQuality/ComprehensiveRagExampleData.cs"
+             Link="Samples/ComprehensiveRagExampleData.cs" />
   </ItemGroup>
 
 </Project>

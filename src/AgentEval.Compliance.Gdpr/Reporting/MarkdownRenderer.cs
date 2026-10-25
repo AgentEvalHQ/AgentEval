@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals;
+
 using System.Text;
 using AgentEval.Core.Reporting;
 
@@ -39,7 +41,7 @@ public sealed class MarkdownRenderer
         sb.AppendLine($"**Subject**: `{MarkdownText.EscapeInline(evidence.Base.Subject.Name)}` ({evidence.Base.Subject.Kind})");
         sb.AppendLine($"**Run**: `{MarkdownText.EscapeInline(evidence.Base.SourceRun.RunId)}`");
         sb.AppendLine($"**Generated**: {evidence.Base.GeneratedAt:O}");
-        sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScore:P0})");
+        sb.AppendLine($"**Overall**: **{evidence.Summary.OverallStatus}** (score {evidence.Summary.OverallScoreText()})");
         sb.AppendLine();
 
         // Smoke and other flat presets produce an empty PerPillar dict; suppress the section entirely
@@ -51,7 +53,7 @@ public sealed class MarkdownRenderer
             sb.AppendLine("| Pillar | Score | Status | Critical fails |");
             sb.AppendLine("|---|---:|---|---|");
             foreach (var (key, p) in evidence.Summary.PerPillar)
-                sb.AppendLine($"| {key} | {p.Score:P0} | **{p.Status}** | {(p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails))} |");
+                sb.AppendLine($"| {key} | {ScoreFormatting.Percentage(p.Score)} | **{p.Status}** | {(p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails))} |");
             sb.AppendLine();
         }
 
@@ -60,7 +62,7 @@ public sealed class MarkdownRenderer
         sb.AppendLine("| Control | Score | Status | Severity | Failed/Total |");
         sb.AppendLine("|---|---:|---|---|---:|");
         foreach (var (key, a) in evidence.Summary.PerArticle.OrderBy(kv => kv.Key, StringComparer.Ordinal))
-            sb.AppendLine($"| `{key}` | {a.Score:P0} | **{a.Status}** | {a.Severity} | {a.ScenariosFailed}/{a.ScenarioCount} |");
+            sb.AppendLine($"| `{key}` | {ScoreFormatting.Percentage(a.Score)} | **{a.Status}** | {a.Severity} | {a.ScenariosFailed}/{a.ScenarioCount} |");
         sb.AppendLine();
 
         // Phase-8 T2.5 — parity with EU AI Act renderer.
@@ -80,7 +82,7 @@ public sealed class MarkdownRenderer
             sb.AppendLine("## Critical findings");
             sb.AppendLine();
             foreach (var f in evidence.CriticalFindings)
-                sb.AppendLine($"- **{f.Metric.Key}** — score {f.Score.Value:P0}, severity `{f.Score.Severity}`");
+                sb.AppendLine($"- **{f.Metric.Key}** — score {ScoreFormatting.Percentage(f.Score.MeasuredValue())}, severity `{f.Score.Severity}`");
             sb.AppendLine();
         }
 

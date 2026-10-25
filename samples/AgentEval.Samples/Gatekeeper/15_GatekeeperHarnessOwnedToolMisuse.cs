@@ -170,10 +170,13 @@ public static class GatekeeperHarnessOwnedToolMisuse
         if (!harnessTool.Contains("todo", StringComparison.OrdinalIgnoreCase)
             || harness.GetService<TodoProvider>() is not { } todos)
         {
-            throw new InvalidOperationException(
-                $"The live run witnesses the Harness capability through the Harness's TodoProvider, and `{harnessTool}` " +
-                "is not one of its tools, so this run could not tell whether it executed. Run the scripted path " +
-                "(AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true).");
+            // Without the witness the run cannot tell whether the misuse happened: that is not measured, not a pass.
+            GatekeeperLiveMode.ReportNotMeasured(
+                "harness-owned tool misuse",
+                $"the live run witnesses the Harness capability through the Harness's TodoProvider, and `{harnessTool}` " +
+                "is not one of its tools, so it could not tell whether it executed. Run the scripted path " +
+                "(AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true)");
+            return;
         }
 
         var trace = new AgentTrace();
@@ -341,7 +344,7 @@ public static class GatekeeperHarnessOwnedToolMisuse
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Harness-owned-tool sample invariant failed: " + message + ".");
+            throw new SampleCheckFailedException("Harness-owned-tool sample invariant failed: " + message + ".");
         }
     }
 }

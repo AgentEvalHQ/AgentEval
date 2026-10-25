@@ -50,6 +50,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The expected exit code of every sample run offline, read next to the binary by OfflineSampleCheck. -->
+    <None Include="offline-check-expected.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Gatekeeper\sample-manifest.json"
                       LogicalName="AgentEval.Samples.Gatekeeper.sample-manifest.json" />
   </ItemGroup>

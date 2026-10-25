@@ -93,7 +93,7 @@ using AgentEval.RedTeam;
 var result = await agent.QuickRedTeamScanAsync();
 
 // Check results
-Console.WriteLine($"Score: {result.OverallScore}%");
+Console.WriteLine($"Score: {(result.OverallScore is { } score ? $"{score:F1}%" : $"n/a ({result.ScoresNotMeasuredReason})")}");
 Console.WriteLine($"Verdict: {result.Verdict}");
 
 // Use in tests with fluent assertions
@@ -698,7 +698,7 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 
 ```json
 {
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "report_id": "5e0c7a91d4b2f386",
   "created_utc": "2026-01-30T14:22:33.4987654Z",
   "target": {
@@ -786,7 +786,8 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 }
 ```
 
-- `schema_version` is the version of this JSON layout, not of AgentEval; the exporter writes `0.3.0`. The JSON report does not record which AgentEval version wrote it.
+- `schema_version` is the version of this JSON layout, not of AgentEval; the exporter writes `0.4.0`. The JSON report does not record which AgentEval version wrote it.
+- `overall_score`, `conclusive_score`, `attack_success_rate`, `conclusive_attack_success_rate` and each attack's `asr` are `null` when no probe reached a verdict, and `summary.scores_not_measured` says why ("no probe ran" or "none of the N probes reached a verdict"). A compliance report with nothing conclusively evaluated has `complianceRate` and `riskLevel` null and its Markdown says "not measured".
 - `report_id` is derived from the agent name, the scan start time and the probe ids, so exporting the same result twice gives the same id.
 - `attack_success_rate` and each attack's `asr` divide by every executed probe, inconclusive ones included. `conclusive_attack_success_rate` and `conclusive_score` divide by conclusive probes only (resisted plus succeeded), and `coverage` is the conclusive share as a percentage. Read a score beside its coverage.
 - `errored` counts probes that failed to run (a timeout, a transport fault or an execution fault); they are also counted in `inconclusive`.
@@ -798,8 +799,9 @@ The whole JSON report for the same example scan as the JUnit and Markdown exampl
 
 | Property | Description |
 |----------|-------------|
-| `OverallScore` | Defense success rate (0-100%) |
-| `AttackSuccessRate` | Proportion of successful attacks (ASR) |
+| `OverallScore` | Defense success rate (0-100%); `null` when no probe reached a verdict |
+| `AttackSuccessRate` | Proportion of successful attacks (ASR); `null` when no probe reached a verdict |
+| `ScoresNotMeasuredReason` | Why the scores are `null` ("no probe ran" or "none of the N probes reached a verdict"); `null` when they were measured |
 | `Verdict` | Pass/Fail/PartialPass |
 | `Passed` | True if all attacks resisted |
 | `TotalProbes` | Total probes executed |
@@ -1086,11 +1088,11 @@ agenteval redteam --endpoint $URL --model $MODEL \
 
 | Value | Exit 0 (pass) | Non-zero |
 |-------|---------------|----------|
-| `vuln` *(default)* | no vulnerabilities found | `1` any vulnerability · `4` regression vs `--baseline` |
-| `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop |
+| `vuln` *(default)* | no vulnerabilities found | `1` any vulnerability · `4` regression vs `--baseline` · `13` the baseline comparison was refused |
+| `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop · `13` the baseline comparison was refused |
 | `never` | always | — |
 
-**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, or more probes came back inconclusive than were resisted) · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
+**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, or more probes came back inconclusive than were resisted) · `3` runtime error · `4` regression vs baseline · `13` not comparable with the baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another. When the baseline or the current scan has no probe that reached a verdict, it measured nothing to compare: the comparison prints why, its status is `Incomparable` (neither a regression nor a pass) and the command exits `13`, unless under `vuln` the scan found a vulnerability (`1`).
 
 ```yaml
 # GitHub Actions: scan → upload SARIF to code-scanning + JUnit test report → baseline gate
@@ -1573,8 +1575,8 @@ public async Task Agent_DoesNotRegress()
 
 | Property | Description |
 |----------|-------------|
-| `ScoreDelta` | Change in overall score (positive = improved) |
-| `AttackSuccessRateDelta` | Change in ASR (negative = improved) |
+| `ScoreDelta` | Change in overall score (positive = improved); `null` when either run has no score |
+| `AttackSuccessRateDelta` | Change in ASR (negative = improved); `null` when either run has no rate |
 | `NewVulnerabilities` | Probe IDs that now fail but passed before |
 | `ResolvedVulnerabilities` | Probe IDs that now pass but failed before |
 | `PersistentVulnerabilities` | Probe IDs that fail in both |
@@ -1616,3 +1618,9 @@ public async Task Agent_DoesNotRegress()
 - [Export Formats](export.md) - JUnit XML / SARIF / JSON export for CI/CD pipelines
 - [02_RedTeamBasic.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/02_RedTeamBasic.cs) - Basic red team scan with assertions
 - [03_RedTeamAdvanced.cs](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/SafetyAndSecurity/03_RedTeamAdvanced.cs) - Advanced pipeline, OWASP compliance, baseline comparison
+
+### Missing baseline evidence
+
+Per-attack resistance rates use probes that reached a verdict. Empty or wholly inconclusive attacks have no rate; an attack absent from the baseline has no baseline rate or delta. Scan coverage is absent when no probe ran, and zero when probes ran but none reached a verdict.
+
+A known vulnerability is resolved only when the matching attack and probe explicitly resist in the new run. Missing or inconclusive retests appear in `UnverifiedVulnerabilities`; the comparison is refused as incomparable (CLI exit 13), so dropping a failing probe cannot produce an apparent improvement. Attacks omitted entirely remain separately listed as not re-tested. Baselines without per-attack counts can use recorded top-level conclusive/total counts; absent counts are never assumed to mean full coverage.

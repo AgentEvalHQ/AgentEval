@@ -12,18 +12,18 @@ public static class StatisticsCalculator
     /// <summary>
     /// Calculates the mean of a sequence of values.
     /// </summary>
-    public static double Mean(IReadOnlyList<double> values)
+    public static double? Mean(IReadOnlyList<double> values)
     {
-        if (values.Count == 0) return 0;
+        if (values.Count == 0) return null;
         return values.Sum() / values.Count;
     }
     
     /// <summary>
     /// Calculates the median of a sequence of values.
     /// </summary>
-    public static double Median(IReadOnlyList<double> values)
+    public static double? Median(IReadOnlyList<double> values)
     {
-        if (values.Count == 0) return 0;
+        if (values.Count == 0) return null;
         
         var sorted = values.OrderBy(v => v).ToList();
         int mid = sorted.Count / 2;
@@ -36,11 +36,11 @@ public static class StatisticsCalculator
     /// <summary>
     /// Calculates the standard deviation of a sequence of values.
     /// </summary>
-    public static double StandardDeviation(IReadOnlyList<double> values)
+    public static double? StandardDeviation(IReadOnlyList<double> values)
     {
-        if (values.Count < 2) return 0;
+        if (values.Count < 2) return null;
         
-        double mean = Mean(values);
+        double mean = Mean(values)!.Value;
         double sumSquaredDiff = values.Sum(v => (v - mean) * (v - mean));
         
         // Sample standard deviation (n-1)
@@ -52,9 +52,9 @@ public static class StatisticsCalculator
     /// </summary>
     /// <param name="values">The values to analyze.</param>
     /// <param name="percentile">The percentile to calculate (0-100).</param>
-    public static double Percentile(IReadOnlyList<double> values, double percentile)
+    public static double? Percentile(IReadOnlyList<double> values, double percentile)
     {
-        if (values.Count == 0) return 0;
+        if (values.Count == 0) return null;
         if (percentile < 0 || percentile > 100)
             throw new ArgumentOutOfRangeException(nameof(percentile), "Must be between 0 and 100.");
         
@@ -79,13 +79,13 @@ public static class StatisticsCalculator
     /// </summary>
     /// <param name="values">The values to analyze.</param>
     /// <param name="confidenceLevel">The confidence level (e.g., 0.95 for 95%).</param>
-    public static ConfidenceInterval CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95)
+    public static ConfidenceInterval? CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95)
     {
         if (values.Count < 2)
-            return new ConfidenceInterval(0, 0, confidenceLevel);
+            return null;
         
-        double mean = Mean(values);
-        double stdDev = StandardDeviation(values);
+        double mean = Mean(values)!.Value;
+        double stdDev = StandardDeviation(values)!.Value;
         double standardError = stdDev / Math.Sqrt(values.Count);
         
         // Use t-distribution critical value
@@ -170,29 +170,33 @@ public static class StatisticsCalculator
     /// <summary>
     /// Calculates pass rate from boolean results.
     /// </summary>
-    public static double CalculatePassRate(IReadOnlyList<bool> results)
+    public static double? CalculatePassRate(IReadOnlyList<bool> results)
     {
-        if (results.Count == 0) return 0;
+        if (results.Count == 0) return null;
         return (double)results.Count(r => r) / results.Count;
     }
     
     /// <summary>
     /// Creates full statistics from a list of scores and pass/fail results.
     /// </summary>
-    public static StochasticStatistics CreateStatistics(
+    public static StochasticStatistics? CreateStatistics(
         IReadOnlyList<int> scores,
         IReadOnlyList<bool> passResults,
         double confidenceLevel = 0.95)
     {
+        if (scores.Count != passResults.Count)
+            throw new ArgumentException("Scores and pass results must have the same count.", nameof(passResults));
+        if (scores.Count == 0) return null;
+
         var doubleScores = scores.Select(s => (double)s).ToList();
         
         return new StochasticStatistics(
-            PassRate: CalculatePassRate(passResults),
-            MeanScore: Mean(doubleScores),
-            MedianScore: Median(doubleScores),
+            PassRate: CalculatePassRate(passResults)!.Value,
+            MeanScore: Mean(doubleScores)!.Value,
+            MedianScore: Median(doubleScores)!.Value,
             StandardDeviation: StandardDeviation(doubleScores),
-            MinScore: scores.Count > 0 ? scores.Min() : 0,
-            MaxScore: scores.Count > 0 ? scores.Max() : 0,
+            MinScore: scores.Min(),
+            MaxScore: scores.Max(),
             Percentile25: Percentile(doubleScores, 25),
             Percentile75: Percentile(doubleScores, 75),
             Percentile95: Percentile(doubleScores, 95),
@@ -207,7 +211,7 @@ public static class StatisticsCalculator
     /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{double})"/>.
     /// Retained for backward compatibility.
     /// </remarks>
-    public static DistributionStatistics CreateDistribution(IReadOnlyList<double> values)
+    public static DistributionStatistics? CreateDistribution(IReadOnlyList<double> values)
         => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
@@ -217,7 +221,7 @@ public static class StatisticsCalculator
     /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{TimeSpan})"/>.
     /// Retained for backward compatibility.
     /// </remarks>
-    public static DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values)
+    public static DistributionStatistics? CreateDistribution(IReadOnlyList<TimeSpan> values)
         => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
@@ -227,7 +231,7 @@ public static class StatisticsCalculator
     /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{int})"/>.
     /// Retained for backward compatibility.
     /// </remarks>
-    public static DistributionStatistics CreateDistribution(IReadOnlyList<int> values)
+    public static DistributionStatistics? CreateDistribution(IReadOnlyList<int> values)
         => DistributionStatisticsFactory.Create(values);
     
     /// <summary>
@@ -237,6 +241,6 @@ public static class StatisticsCalculator
     /// Delegates to <see cref="DistributionStatisticsFactory.Create(IReadOnlyList{decimal})"/>.
     /// Retained for backward compatibility.
     /// </remarks>
-    public static DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values)
+    public static DistributionStatistics? CreateDistribution(IReadOnlyList<decimal> values)
         => DistributionStatisticsFactory.Create(values);
 }

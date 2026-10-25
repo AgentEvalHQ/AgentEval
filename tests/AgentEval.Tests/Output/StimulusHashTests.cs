@@ -250,43 +250,10 @@ public class StimulusHashTests
 
     // ── the FIRST CONSUMER, because a field with no producer is dead data ───────────────────
 
-    [Fact]
-    public void TheCompositeRunners_PassTheirInputThrough()
-    {
-        // ADR-031 finding V7 cuts a field that "gates nothing and cannot go stale detectably".
-        // StimulusHash would be exactly that if nothing wrote it, so the three composite runners
-        // that HAVE a stimulus were wired to pass it. This asserts the wiring by source, and — the
-        // lesson of 8f3e11c7 — it asserts its own INPUT too: a scan that found no files and a scan
-        // that found no offenders are indistinguishable otherwise.
-        string root = RepositoryRoot();
-        string[] runners =
-        [
-            Path.Combine(root, "src", "AgentEval.Compliance.Gdpr", "Articles", "GdprBenchmarkRunner.cs"),
-            Path.Combine(root, "src", "AgentEval.Compliance.EuAiAct", "Articles", "EuAiActBenchmarkRunner.cs"),
-            Path.Combine(root, "src", "AgentEval.Evals.Agentic", "Composition", "AgenticBenchmarkRunner.cs"),
-        ];
+    // Runner observations are verified through real persistence in ComparisonObservationTests.
 
-        foreach (string runner in runners)
-        {
-            Assert.True(File.Exists(runner), $"{runner} is not where this test expects it — the scan is asserting nothing.");
 
-            string body = File.ReadAllText(runner);
-            Assert.Contains("ToScenarioResult(", body, StringComparison.Ordinal);
-            Assert.Contains("input: input.Query", body, StringComparison.Ordinal);
-        }
-    }
 
-    private static string RepositoryRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null)
-        {
-            if (dir.GetFiles("AgentEval.sln").Length > 0) return dir.FullName;
-            dir = dir.Parent;
-        }
-
-        throw new DirectoryNotFoundException($"AgentEval.sln was not found above {AppContext.BaseDirectory}.");
-    }
 
     private static ScenarioResult Scenario(string? stimulusHash) => new(
         Id: "scen-1",

@@ -61,6 +61,7 @@ internal static class MemoryJudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   ⚠ No generative judge is configured. {AIConfig.Settings.Diagnostic}");
             Console.ResetColor();
+            SampleOutcome.Skip("no generative judge configured: Memory Judge vs Judge compares two judges and needs both");
             return;
         }
 
@@ -70,6 +71,7 @@ internal static class MemoryJudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠ LongMemEval oracle dataset not found (src/AgentEval.Memory/Data/longmemeval/longmemeval_oracle.json). Run from the repository.");
             Console.ResetColor();
+            SampleOutcome.Skip("the LongMemEval oracle dataset was not found");
             return;
         }
 
@@ -79,6 +81,7 @@ internal static class MemoryJudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"   ⚠ No questions matched{(types is { Length: > 0 } ? $" --types {string.Join(",", types)}" : "")}. Known types: knowledge-update, multi-session, single-session-assistant, single-session-preference, single-session-user, temporal-reasoning.");
             Console.ResetColor();
+            SampleOutcome.Skip("no LongMemEval question matched the selection");
             return;
         }
         Console.WriteLine($"   📁 Dataset    : {dataset}");
@@ -130,6 +133,7 @@ internal static class MemoryJudgeVsJudgeDemo
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠ The first item failed on an arm. Stopping before the rest.");
             Console.ResetColor();
+            SampleOutcome.Error("the first item failed on at least one arm");
             return;
         }
 

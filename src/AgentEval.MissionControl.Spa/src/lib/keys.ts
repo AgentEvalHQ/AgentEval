@@ -14,23 +14,23 @@ export const queryKeys = {
 
   subjects: {
     all: () => ["subjects"] as const,
-    list: (kind?: "AGENT" | "WORKFLOW") => ["subjects", "list", { kind }] as const,
-    detail: (kind: "AGENT" | "WORKFLOW", name: string) =>
-      ["subjects", "detail", kind, name] as const,
+    list: (kind?: string) => ["subjects", "list", { kind }] as const,
+    detail: (kind: string, name: string, subjectRef?: string | null) =>
+      ["subjects", "detail", kind, name, subjectRef ?? null] as const,
   },
 
   runs: {
     all: () => ["runs"] as const,
     recent: (count: number) => ["runs", "recent", { count }] as const,
-    detail: (runId: string) => ["runs", "detail", runId] as const,
+    detail: (runId: string, sourceId?: string | null) => ["runs", "detail", runId, sourceId ?? null] as const,
     summary: (runId: string) => ["runs", "summary", runId] as const,
     scenarios: (runId: string) => ["runs", "scenarios", runId] as const,
     scenario: (runId: string, scenarioId: string) =>
       ["runs", "scenario", runId, scenarioId] as const,
-    scenarioTree: (runId: string, scenarioId: string) =>
-      ["runs", "tree", runId, scenarioId] as const,
+    scenarioTree: (runId: string, scenarioId: string, sourceId?: string | null, resultId?: string | null) =>
+      ["runs", "tree", runId, scenarioId, sourceId ?? null, resultId ?? null] as const,
     // Plan-08 T2.3 (2026-05-25): trace JSON for the waterfall page.
-    trace: (runId: string) => ["runs", "trace", runId] as const,
+    trace: (runId: string, sourceId?: string | null) => ["runs", "trace", runId, sourceId ?? null] as const,
   },
 
   compliance: {

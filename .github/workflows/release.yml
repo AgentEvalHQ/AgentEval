@@ -133,6 +133,22 @@ jobs:
         fi
         echo "Mission Control UI present in $pkg"
 
+    # The CLI carries the AEF schemas (Apache-2.0): its nuspec must say so, and AEF's LICENSE and NOTICE must travel with it.
+    - name: Verify the CLI tool carries AEF's licence and notice
+      run: |
+        pkg=$(ls ./nupkgs/AgentEval.Cli.*.nupkg | grep -v '\.snupkg$' | head -1)
+        for f in licenses/aef/LICENSE licenses/aef/NOTICE; do
+          if ! unzip -l "$pkg" | grep -q " $f\$"; then
+            echo "::error::$pkg has no $f: it embeds the AEF schemas, and Apache-2.0 requires both files to travel with them."
+            exit 1
+          fi
+        done
+        if ! unzip -p "$pkg" AgentEval.Cli.nuspec | grep -q '<license type="expression">MIT AND Apache-2.0</license>'; then
+          echo "::error::$pkg does not declare the licence expression 'MIT AND Apache-2.0'."
+          exit 1
+        fi
+        echo "AEF licence and notice present in $pkg"
+
     # Present is not working: install the packed tool the way a user does, serve a workspace with stored runs, and open
     # every Mission Control page in a headless browser. A page that is blank, errors or shows no data stops the release
     # before anything is pushed, and so does a server that outlives a SIGTERM. Releases only, to keep Actions minutes

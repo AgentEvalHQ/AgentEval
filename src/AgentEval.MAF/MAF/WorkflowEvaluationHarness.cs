@@ -401,7 +401,8 @@ public class WorkflowEvaluationHarness
         foreach (var step in result.Steps)
         {
             var toolInfo = step.HasToolCalls ? $" [🔧 {step.ToolCalls!.Count} tools: {string.Join(", ", step.ToolCalls.Select(t => t.Name))}]" : "";
-            _logger.LogDebug($"     [{step.StepIndex}] {step.ExecutorId}: {step.Duration.TotalMilliseconds:F0}ms{toolInfo}");
+            var timing = step.TimingNotMeasuredReason is { } reason ? $"time not measured ({reason})" : $"{step.Duration.TotalMilliseconds:F0}ms";
+            _logger.LogDebug($"     [{step.StepIndex}] {step.ExecutorId}: {timing}{toolInfo}");
             
             if (!string.IsNullOrEmpty(step.Output) && step.Output.Length <= 100)
             {
@@ -422,7 +423,9 @@ public class WorkflowEvaluationHarness
 
         _logger.LogInformation($"   Suite: {summary.SuiteName}");
         _logger.LogInformation($"   Workflow: {summary.WorkflowName}");
-        _logger.LogInformation($"   Tests: {summary.PassedTests}/{summary.TotalTests} passed ({summary.PassRate:F0}%)");
+        _logger.LogInformation(summary.PassRate is { } passRate
+            ? $"   Tests: {summary.PassedTests}/{summary.TotalTests} passed ({passRate:F0}%)"
+            : "   Tests: none ran (no pass rate)");
         _logger.LogInformation($"   Duration: {summary.TotalDuration.TotalMilliseconds:F0}ms");
 
         foreach (var result in summary.Results)
@@ -436,6 +439,11 @@ public class WorkflowEvaluationHarness
         if (summary.AllPassed)
         {
             _logger.LogInformation("\n   🎉 All workflow tests passed!\n");
+        }
+        else if (summary.TotalTests == 0)
+        {
+            // A suite with no test case passed nothing (T13); it logged "All workflow tests passed!".
+            _logger.LogWarning("\n   ⚠️ No workflow test ran: nothing was tested.\n");
         }
         else
         {

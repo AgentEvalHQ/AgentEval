@@ -137,8 +137,9 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   and not checked further. The run's own seal is unaffected by any of these, and so is the run's verification
   outcome (§4.5): an overlay verifier reports them.
 - **What the chain cannot show:** removing the newest batches together with their seals leaves a shorter chain that
-  verifies. A reader that has seen a longer chain keeps its length; a signed newest batch, or a copy held elsewhere
-  (an anchor, §4.5), detects it.
+  verifies. A reader that has seen a longer chain keeps its length; an externally retained latest signed batch or
+  an independently anchored expected chain head (an anchor, §4.5) detects it. A signature deleted with its batch
+  cannot reveal truncation to a first-time reader.
 
 ## 4.3 The effective view
 

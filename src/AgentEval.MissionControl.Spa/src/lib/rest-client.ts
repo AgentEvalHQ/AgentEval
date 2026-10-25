@@ -65,28 +65,26 @@ export interface AgentTraceDocument {
   events: TraceEvent[];
 }
 
-/**
- * TRACE_NOT_FOUND is thrown by fetchTrace when the REST endpoint returns 404,
- * so the TraceWaterfallPage can render its empty-state message instead of
- * the generic "Failed to load" text. The REST endpoint returns 404 in three
- * cases (BinaryEndpoints.cs MC1.3.2): unknown runId, store unavailable, no
- * trace.json captured for the run — all of which collapse to the same
- * "no trace data" UX.
- */
+/** A missing run, absent captured content, or an unsupported trace viewer. */
 export class TraceNotFoundError extends Error {
   readonly notFound = true;
-  constructor(runId: string) {
-    super(`No trace data captured for run '${runId}'.`);
+  constructor(code?: string) {
+    super(code === "trace_viewer_unsupported"
+      ? "This captured transcript uses a format this viewer does not support. Download it from the run's artifacts."
+      : code === "trace_not_captured" ? "No captured trace is available for this run."
+      : code === "run_not_found" ? "The selected run source was not found."
+      : "The trace viewer is unavailable for this selected source.");
   }
 }
 
-export async function fetchTrace(runId: string): Promise<AgentTraceDocument> {
-  const response = await fetch(restUrls.trace(runId));
+export async function fetchTrace(runId: string, sourceId?: string | null): Promise<AgentTraceDocument> {
+  const response = await fetch(restUrls.trace(runId, sourceId));
   if (response.status === 404) {
-    throw new TraceNotFoundError(runId);
+    const problem = await response.json().catch(() => null) as { code?: string } | null;
+    throw new TraceNotFoundError(problem?.code);
   }
   if (!response.ok) {
-    throw new Error(`${restUrls.trace(runId)} returned ${response.status}`);
+    throw new Error(`${restUrls.trace(runId, sourceId)} returned ${response.status}`);
   }
   return (await response.json()) as AgentTraceDocument;
 }
@@ -95,12 +93,22 @@ export async function fetchTrace(runId: string): Promise<AgentTraceDocument> {
  * URL builder for REST routes. Components that render binary content (PDF
  * viewer, image embeds) take a URL string and let the browser fetch directly.
  */
+export function sourceQuery(sourceId?: string | null): string {
+  return sourceId == null ? "" : `?sourceId=${encodeURIComponent(sourceId)}`;
+}
+
 export const restUrls = {
-  trace: (runId: string) => `${REST_BASE}/runs/${encodeURIComponent(runId)}/trace`,
-  report: (runId: string, format: string) =>
-    `${REST_BASE}/runs/${encodeURIComponent(runId)}/reports/${format}`,
-  compliancePdf: (regulation: string, subjectName: string, ts: string) =>
-    `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/${encodeURIComponent(subjectName)}/${encodeURIComponent(ts)}/report.pdf`,
+  trace: (runId: string, sourceId?: string | null) => `${REST_BASE}/runs/${encodeURIComponent(runId)}/trace${sourceQuery(sourceId)}`,
+  report: (runId: string, format: string, sourceId?: string | null) =>
+    `${REST_BASE}/runs/${encodeURIComponent(runId)}/reports/${encodeURIComponent(format)}${sourceQuery(sourceId)}`,
+  artifact: (runId: string, evidenceId: string, sourceId?: string | null) =>
+    `${REST_BASE}/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(evidenceId)}${sourceQuery(sourceId)}`,
+  compliancePdf: (regulation: string, subjectName: string, ts: string, kind?: string | null, sourceId?: string | null) => {
+    const query = new URLSearchParams();
+    if (kind != null) query.set("kind", kind.toLowerCase());
+    if (sourceId != null) query.set("sourceId", sourceId);
+    return `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/${encodeURIComponent(subjectName)}/${encodeURIComponent(ts)}/report.pdf${query.size ? `?${query}` : ""}`;
+  },
   complianceSchema: (regulation: string) =>
     `${REST_BASE}/compliance/${encodeURIComponent(regulation)}/schema`,
   history: (kind: string, name: string) =>

@@ -41,6 +41,51 @@ public class StochasticBenchRunnerTests
         }
     }
 
+    // A passing leaf whose cost for each successive run is scripted; null is a run whose judge was not priced.
+    private sealed class Costed(params double?[] perRun) : IEval
+    {
+        private int _run;
+        public string Key => "leaf";
+        public string Name => "leaf";
+        public string Category => "test";
+        public string Version => "1.0.0";
+
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+            Task.FromResult(new EvalResult(
+                new(Key, Name, Category, Version),
+                new EvalScore(1.0, null, "pass", true, null, "none", null),
+                new(null, null, null, null, null),
+                new("atomic-llm", "judge", null, null, null, perRun[Math.Min(_run++, perRun.Length - 1)], false),
+                DateTimeOffset.UtcNow));
+    }
+
+    private static Task<EvalResult> RunCosted(params double?[] perRun)
+    {
+        var benchmark = new CompositeEval("gdpr.test", "Test", "compliance.gdpr", "1.0.0",
+            [new EvalComponent(new Costed(perRun), 1.0)], WeightedSumAggregation.Instance, threshold: 0.8);
+        return StochasticBenchRunner.RunNAsync(new NullOutputStore(), new SubjectIdentity(SubjectKind.Agent, "s"),
+            benchmark, new EvalInput("q", "r"), runs: perRun.Length);
+    }
+
+    [Fact]
+    public async Task Cost_EveryRunPriced_IsTheSumOfTheRuns()
+    {
+        var result = await RunCosted(0.01, 0.02, 0.03);
+
+        Assert.Equal(0.06, result.Provenance.EstimatedCost!.Value, precision: 10);
+        Assert.Equal(0.06, StochasticBenchRunner.RollupTree(result.Details.SubResults!).Provenance.EstimatedCost!.Value, precision: 10);
+    }
+
+    [Fact]
+    public async Task Cost_ARunNotPriced_MakesTheTotalNotPriced()
+    {
+        // Complete or absent: summing the priced runs read 0.02 as the cost of three runs.
+        var result = await RunCosted(0.01, null, 0.01);
+
+        Assert.Null(result.Provenance.EstimatedCost);
+        Assert.Null(StochasticBenchRunner.RollupTree(result.Details.SubResults!).Provenance.EstimatedCost);
+    }
+
     private static Task<EvalResult> Run(params string[] perRun)
     {
         var benchmark = new CompositeEval("gdpr.test", "Test", "compliance.gdpr", "1.0.0",

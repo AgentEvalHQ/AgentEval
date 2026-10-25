@@ -12,7 +12,7 @@ namespace AgentEval.Samples;
 /// <summary>
 /// Agent Skills — Compliance Scanner.
 ///
-/// A static, offline scan of the shared expense-report skill's <c>SKILL.md</c> authoring and governance
+/// A static scan of the shared expense-report skill's <c>SKILL.md</c> authoring and governance
 /// flags (<c>MafSkillScanner</c> + <c>SkillComplianceValidator</c>) — no model call happens during the
 /// scan itself; a minimal agent is only needed to satisfy MAF's <c>AgentSkillsSourceContext</c>. Renders
 /// the same coverage report Phase 4a's Skill Security Index consumes as its compliance axis.
@@ -29,6 +29,7 @@ public static class AgentSkillsComplianceScanner
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -49,6 +50,8 @@ public static class AgentSkillsComplianceScanner
         var highCount = report.Findings.Count(f => f.Severity == Severity.High);
         Console.WriteLine($"\n  [{(report.IsCompliant ? "PASS" : "FAIL")}] IsCompliant == true " +
             $"({report.Findings.Count} finding(s), {highCount} High)");
+        if (!report.IsCompliant)
+            SampleOutcome.Fail($"the expense-report skill is not compliant: {report.Findings.Count} finding(s), {highCount} High");
 
         Console.WriteLine("\n  -> Next: the Skill Security Index joins THIS report with the efficiency metric into one score.");
         Console.WriteLine("\n=== Agent Skills Compliance Scanner Complete ===");
@@ -60,7 +63,7 @@ public static class AgentSkillsComplianceScanner
         Console.WriteLine(@"
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║   🧩 AGENT SKILLS — COMPLIANCE SCANNER                                         ║
-║   Static SKILL.md + governance-flag scan — offline, no model call              ║
+║   Static scan — provider setup required for context; no model calls            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝");
         Console.ResetColor();
     }

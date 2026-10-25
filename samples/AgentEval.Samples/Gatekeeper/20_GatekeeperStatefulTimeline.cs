@@ -180,7 +180,7 @@ public static class GatekeeperStatefulTimeline
     {
         if (!condition)
         {
-            throw new InvalidOperationException("State timeline sample failed: " + message + ".");
+            throw new SampleCheckFailedException("State timeline sample failed: " + message + ".");
         }
     }
 

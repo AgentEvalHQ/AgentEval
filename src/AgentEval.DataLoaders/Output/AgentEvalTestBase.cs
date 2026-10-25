@@ -252,7 +252,7 @@ public abstract class AgentEvalTestBase : IDisposable
         }
 
         /// <summary>
-        /// Records a tool call.
+        /// Records a tool call that ran (it has a duration and, optionally, a result).
         /// </summary>
         public TestResultBuilder WithToolCall(
             string toolName,
@@ -268,6 +268,8 @@ public abstract class AgentEvalTestBase : IDisposable
                 Order = _toolUsage.Count + 1,
                 Arguments = arguments,
                 Result = result,
+                // A recorded call ran: code_tool_success counts only executed calls (T58).
+                WasExecuted = true,
                 StartTime = DateTimeOffset.UtcNow - (duration ?? TimeSpan.FromMilliseconds(50)),
                 EndTime = DateTimeOffset.UtcNow
             };

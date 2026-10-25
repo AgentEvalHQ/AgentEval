@@ -45,7 +45,9 @@ var runner = MemoryBenchmarkRunner.Create(chatClient);
 var agent = chatClient.AsEvaluableAgent(name: "MemoryAgent", includeHistory: true);
 
 var result = await runner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard);
-Console.WriteLine($"Memory score: {result.OverallScore:F1}% ({result.Grade})");
+Console.WriteLine(result.IsComplete
+    ? $"Memory score: {result.OverallScore:F1}% ({result.Grade})"
+    : result.HasMeasuredCategory ? $"Observed score: {result.OverallScore:F1}% (incomplete)" : "Memory score: not measured");
 ```
 
 Three tiers + diagnostics:
@@ -83,7 +85,8 @@ await store.SaveAsync(result.ToBaseline("GPT-4o-mini", config, tags: ["nightly"]
 // Compare every baseline saved for this agent in code...
 var baselines = await store.ListAsync(agentName: "MemoryAgent");
 var comparison = new BaselineComparer().Compare(baselines);
-Console.WriteLine($"Best: {baselines.First(b => b.Id == comparison.BestBaselineId).Name}");
+var best = baselines.FirstOrDefault(b => b.Id == comparison.BestBaselineId);
+Console.WriteLine(best is null ? "Best: not established" : $"Best among complete runs: {best.Name}");
 
 // ...or open the report. report.html fetches manifest.json, so it must be served over HTTP;
 // OpenReport starts a local server bound to 127.0.0.1 and opens the browser.
@@ -96,7 +99,11 @@ The report (`report.html`) reads `manifest.json` and the baseline files, and sho
 - **Timeline** — overall score across the saved baselines
 - **Comparer** — per-category deltas between any two baselines
 
-Baseline grades are A–F (`MemoryBenchmarkResult.ComputeGrade`). A baseline stores per-category scores and recommendations, not scenario transcripts, so the report has no per-scenario drill-down, judge explanations or response excerpts. `MemoryReportingOptions` controls the output path (`OutputPath`), whether `report.html` is copied (`AutoCopyReportTemplate`), and whether the embedded `archetypes.json` is copied (`IncludeArchetypes`, default `false` — the shipped report does not read that file).
+Baseline grades are A–F (`MemoryBenchmarkResult.ComputeGrade`). Partial snapshots remain saveable: `IsComplete` and `HasMeasuredScore` qualify the stored numeric score, grade and stars; category entries retain errors, skip reasons and unscored-question counts. A partial score is an observation, not a full-run grade or verdict. The report labels those observations and withholds grades and unsupported comparisons. An empty-run placeholder is shown as not measured. Older JSON without completeness metadata remains readable, with completeness unrecorded.
+
+`BaselineComparer` and the samples rank only baselines with recorded complete evidence; partial dimension observations remain available in `Scores` and their IDs appear in `NotRankedBy`. When a canonical output store is configured, an incomplete or unverified Memory snapshot is saved historically but automatic current/pinned promotion is withheld with a warning. An existing complete reference remains unchanged. External snapshots record completeness using the configured selected/scored denominator; their judge-failure policy is unchanged.
+
+A baseline stores category observations and recommendations, without scenario transcripts or response excerpts. `MemoryReportingOptions` controls the output path (`OutputPath`), report copying (`AutoCopyReportTemplate`) and optional `archetypes.json` copying (`IncludeArchetypes`, default `false`; the report does not read that file). The template is copied only when `report.html` is absent, preserving existing customizations. To refresh an older report, back up or rename its `report.html`, then save a baseline again; no stored JSON needs rewriting.
 
 ### 🌍 LongMemEval — First-Class .NET Re-implementation
 
@@ -113,8 +120,11 @@ var result = await runner.RunAsync(agent, config, new ExternalBenchmarkOptions
     PreserveSessionBoundaries = true,  // session markers in history
 });
 
-Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o = 57.7%)");
+Console.WriteLine($"Score: {result.OverallAccuracy:F1}% (paper: GPT-4o full-history S, no CoN = 60.6%)");
 ```
+
+The historical reference is from [Figure 3b of the LongMemEval paper](https://arxiv.org/html/2410.10813v2#S3.F3).
+Comparisons require the same history, reading method, question set and judge; a sampled run is not a reproduction of the full-paper score.
 
 What's preserved from the official benchmark:
 - **Stratified sampling** across all 6 question types (`single-session-user`, `single-session-assistant`, `single-session-preference`, `multi-session`, `temporal-reasoning`, `knowledge-update`)
@@ -299,7 +309,7 @@ This page used to quote a score range for the `Standard` preset on one model. No
 
 **What we recommend today:**
 - Use the native benchmark as a **regression gate** — track your own delta over time, not the absolute number.
-- Use **LongMemEval** (Sample G8 / G10) for **cross-platform comparable** numbers — it's calibrated to the published GPT-4o = 57.7% baseline.
+- Use **LongMemEval** (Sample G8 / G10) for **cross-platform comparisons with matched settings** — the historical GPT-4o reference is 60.6% for full-history S without Chain-of-Note ([paper, Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)); it does not calibrate a run with a different protocol.
 - Use the **Diagnostic** and **Overflow** presets to apply real context pressure.
 
 **Current limitation:** the native benchmark is better suited to regression tracking than fine-grained model differentiation, especially when stronger models can solve many scenarios through retrieval alone.

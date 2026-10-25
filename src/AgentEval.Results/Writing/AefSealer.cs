@@ -24,6 +24,7 @@ public enum AefSealedBy
 /// <summary>How <see cref="AefSealer.Seal"/> seals a run.</summary>
 public sealed class AefSealOptions
 {
+    internal AefWriteBudget? WriteBudget { get; init; }
     /// <summary>Who seals: the producer (the default), or a host taking custody (<see cref="AefSealedBy.Ingest"/>).</summary>
     public AefSealedBy SealedBy { get; init; } = AefSealedBy.Producer;
 
@@ -155,6 +156,7 @@ public static class AefSealer
         var sealBytes = AefJsonWriter.Document(seal, AefLimits.MaxSealBytes);
         var sealPath = Path.Combine(directory, SealVerifier.SealPath);
         var attestationPath = Path.Combine(directory, SealVerifier.AttestationPath);
+        options.WriteBudget?.Charge(sealBytes.Length);
         File.WriteAllBytes(sealPath, sealBytes);
         try
         {
@@ -163,6 +165,7 @@ public static class AefSealer
             if (options.Signer is { } signer)
             {
                 attestation = DsseEnvelope.Create(Dsse.InTotoPayloadType, sealBytes, signer).ToJson();
+                options.WriteBudget?.Charge(attestation.Length);
                 File.WriteAllBytes(attestationPath, attestation);
                 policy = new TrustPolicy([new TrustedKey(SignerIdentity, signer.PublicKey)]);
             }

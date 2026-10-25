@@ -31,20 +31,25 @@
 
 ## Contributions
 
-Every commit to `contracts/aef/` carries a **Developer Certificate of Origin** sign-off (`Signed-off-by: Name
+Every new commit to `contracts/aef/` carries a **Developer Certificate of Origin** sign-off (`Signed-off-by: Name
 <email>`, as `git commit -s` writes it): the contributor certifies they may contribute it under the terms below
 (<https://developercertificate.org/>). There is no separate contributor licence agreement.
 
+On 2026-10-24, the lead editor confirmed certification and chose prospective enforcement without rewriting
+historical commit messages. The two existing unsigned commits at that decision are
+`99ca442360b2be43fa7f7cf3cbe065e85b9d55c8` and `a2421fd9e6e0eb81efbe77c4f4664c992290b2df`.
+CI exempts only these exact IDs. Every other AEF commit in the checked range still needs its sign-off, including
+backdated commits and new IDs made by rewriting old commits. This fixed boundary also applies after a squash merge;
+it does not depend on retaining the old branch or fetching a historical cutoff object. Licensing terms are unchanged.
+
 ## Licence and patents
 
-- **Today:** everything in this folder is licensed under the Apache License 2.0 (`LICENSE`). Its patent grant covers
-  the contributions themselves, and so code that uses them.
-- **Planned for the 1.0 release, pending counsel:** the specification text (`1/spec/`, the primer, rationale, interop
-  pages and reference) under the **Community Specification License 1.0**, in its royalty-free patent mode, so that
-  anyone who implements AEF from the text alone has a patent commitment from every contributor. The commitment
-  covers only what is strictly needed to implement the normative specification, as `SCOPE.md` defines it, and
-  nothing else of any contributor's work. The schemas, the corpus and the tools stay under Apache-2.0, as code.
-- Until counsel confirms and this section says so, Apache-2.0 alone applies.
+- Everything in this folder (the specification text, the primer, rationale, interop and reference pages, the schemas,
+  the corpus and the tools) is licensed under the **Apache License 2.0** (`LICENSE`), with the attributions in
+  `NOTICE`. This is the licence of AEF 1.0, decided by the lead editor on 2026-10-20 and recorded in the changelog.
+- Its patent licence (section 3) comes from each contributor and covers their contributions and works based on them.
+  AEF makes no separate patent commitment to implementations written from the text alone.
+- A change to these terms is a governance change: it follows the proposal process above, and the changelog records it.
 
 ## Versions and releases
 
@@ -54,11 +59,12 @@ Every commit to `contracts/aef/` carries a **Developer Certificate of Origin** s
   `conformance/index.json`).
 - **Release criteria for 1.0:** the reference implementation passes the whole corpus, and every conformance class
   ([§9.1](1/spec/09-conformance.md#91-classes)) has a second implementation passing its vectors (AgentEval's,
-  or an independent one). A class without one is released marked **at risk** in the release notes, and may change in
-  1.1 more than a minor normally allows.
+  or an independent one). A class without one is released marked **at risk** in the release notes. Any incompatible
+  change still follows [VER-5] and requires a new major version.
 - Deprecation: [VER-7]. A deprecated field stays valid for at least one minor version and is removed only by a major.
-- Errata (a rule whose text contradicts its vectors or schema) are fixed in the next minor and listed in its
-  changelog; the corpus vector is the tie-breaker until then.
+- Errata (a rule whose text contradicts its vectors or schema) are recorded in the changelog and corrected subject
+  to [VER-5]. Until resolved, [§1.5](1/spec/01-introduction.md#15-conventions) applies: the stricter prose/schema
+  requirement governs. A contradictory corpus vector is a defect, not an override of those requirements.
 
 ## Identifiers
 
@@ -70,7 +76,8 @@ the project. If AEF moves to a neutral home, version 1 keeps its names and a lat
 
 A profile builds on AEF for a narrower use, with its own `$id` (outside `/aef/1/`) and its own versions. Profiles are
 not part of AEF 1.0 and no AEF conformance class requires one. The runtime-verdict profile (AEVP 0.1, in
-`profiles/runtime-verdict/`) is the first.
+`profiles/runtime-verdict/`) is the first. The artifact-evidence profile (in `profiles/artifact-evidence/`) binds an
+evaluated artifact, by digest, to a sealed run.
 
 ## Security flaws in the format
 

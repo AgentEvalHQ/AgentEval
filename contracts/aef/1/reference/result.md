@@ -21,7 +21,7 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `evaluator` | object | yes |  | The evaluator that produced this line. |
 | `evaluator.id` | string | yes | ≥ 1 chars; ≤ 256 chars | The evaluator's id, as the producer names it. |
 | `evaluator.version` | string |  | ≤ 64 chars | The evaluator's version, when known. |
-| `state` | [state](common.md#state) | yes |  | The node's state. passed is the only pass; failed and warn (a soft failure) are measured failures; inconclusive is measured, undecided; not_measured, not_applicable, skipped, error and pending are typed absences (RES-1). |
+| `state` | [state](common.md#state) | yes |  | The node's state. passed is the only pass; failed and warn (a soft failure) are measured failures; inconclusive is measured, undecided; scored is measured with no pass/fail rule applied; not_measured, not_applicable, skipped, error and pending are typed absences (RES-1). |
 | `reason` | string |  | ≥ 1 chars; ≤ 4096 chars | Why the line is in a typed absence: required for not_measured, not_applicable, skipped, error and pending (RES-2). Optional otherwise. |
 | `scores` | array of object |  | ≤ 256 items | The node's scores, one per metric. A line in a typed absence carries none (RES-2, RES-10). |
 | `scores[].metric` | string | yes | ≥ 1 chars; ≤ 256 chars | The metric, by its id in metrics.json (SUM-1). |

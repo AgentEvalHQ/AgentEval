@@ -9,6 +9,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.Samples;
 
@@ -33,8 +34,20 @@ namespace AgentEval.Samples;
 /// <c>--provider &lt;name&gt;</c> on the command line sets the selector for one run.
 ///
 /// The resolution itself lives in Core (<see cref="InferenceProviderEnvironment"/>) so the CLI and
-/// any host read the same variable the same way. Two surfaces stay Azure-only and say so:
-/// embeddings (<see cref="IsEmbeddingConfigured"/>) and the hosted-agent Foundry path
+/// any host read the same variable the same way.
+///
+/// Embeddings (<see cref="CreateEmbeddingGenerator"/>) follow the same selection, on the same endpoint
+/// with the same key (<see cref="EmbeddingProviderEnvironment"/>):
+///
+/// <code>
+/// bitdeer             BITDEER_EMBEDDING_MODEL              default BAAI/bge-m3
+/// openai              OPENAI_EMBEDDING_MODEL               default text-embedding-3-small
+/// foundry             FOUNDRY_EMBEDDING_MODEL              required (an embedding deployment on the resource)
+/// azure               AZURE_OPENAI_EMBEDDING_DEPLOYMENT    required (an embedding deployment on the resource)
+/// openai-compatible   OPENAI_COMPATIBLE_EMBEDDING_MODEL    required (whatever the host serves)
+/// </code>
+///
+/// One surface stays Azure-only and says so: the hosted-agent Foundry path
 /// (<see cref="IsFoundryConfigured"/>, Entra login), which is not a chat provider.
 /// </summary>
 /// <remarks>
@@ -65,14 +78,6 @@ public static class AIConfig
     /// <summary>A short tag for agent identities (<c>model@provider</c>), because the host is part of what was measured.</summary>
     public static string ProviderTag => Settings.ProviderTag;
 
-    /// <summary>
-    /// True when the Azure OpenAI trio is set AND the endpoint is one a key may be sent to (https, or
-    /// loopback http), whatever provider is selected — the Azure-only surfaces (embeddings) rely on it.
-    /// </summary>
-    public static bool IsAzureConfigured =>
-        InferenceProviderEnvironment.HasCredentials(InferenceProvider.AzureOpenAI, Environment.GetEnvironmentVariable)
-        && InferenceProviderEnvironment.TryValidateEndpoint(Env("AZURE_OPENAI_ENDPOINT"), out _, out _);
-
     /// <summary>True when <c>BITDEER_API_KEY</c> is set, whatever provider is selected.</summary>
     public static bool IsBitdeerConfigured => InferenceProviderEnvironment.HasCredentials(InferenceProvider.Bitdeer, Environment.GetEnvironmentVariable);
 
@@ -98,21 +103,40 @@ public static class AIConfig
             // Azure OpenAI and a Foundry resource's OpenAI-compatible endpoint speak the same protocol.
             return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!), new AzureOpenAIClientOptions { Transport = transport })
                 .GetChatClient(resolved)
-                .AsIChatClient();
+                .AsIChatClient().WithMinimalReasoning();
         }
 
         // Bitdeer, OpenAI and any OpenAI-compatible host: the same construction the CLI's
         // EndpointFactory.CreateOpenAICompatible uses for --endpoint --model --api-key.
         return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint, Transport = transport })
             .GetChatClient(resolved)
-            .AsIChatClient();
+            .AsIChatClient().WithMinimalReasoning();
     }
 
     /// <summary>
-    /// The raw Azure OpenAI client, for the Azure-only surfaces (embeddings). Reads the
-    /// <c>AZURE_OPENAI_*</c> trio directly, whichever provider is selected for chat.
+    /// Builds the embedding generator for the selected provider: the same host and key as
+    /// <see cref="CreateChatClient"/>, the model from <see cref="EmbeddingSettings"/>. Throws with the
+    /// reason when <see cref="IsEmbeddingConfigured"/> is false.
     /// </summary>
-    public static AzureOpenAIClient CreateAzureOpenAIClient() => new(AzureEndpoint, AzureKeyCredential);
+    public static IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator()
+    {
+        var e = EmbeddingSettings;
+        if (!e.IsConfigured)
+            throw new InvalidOperationException(e.Diagnostic ?? "No embedding model is configured.");
+
+        var transport = new HttpClientPipelineTransport(ProviderConfig.CreateWireLoggedHttpClient(e.ApiKey!));
+        if (e.UsesAzureProtocol)
+        {
+            return new AzureOpenAIClient(e.Endpoint!, new AzureKeyCredential(e.ApiKey!), new AzureOpenAIClientOptions { Transport = transport })
+                .GetEmbeddingClient(e.Model!)
+                .AsIEmbeddingGenerator();
+        }
+
+        // Bitdeer, OpenAI and any OpenAI-compatible host serve POST {endpoint}/embeddings.
+        return new OpenAIClient(new ApiKeyCredential(e.ApiKey!), new OpenAIClientOptions { Endpoint = e.Endpoint, Transport = transport })
+            .GetEmbeddingClient(e.Model!)
+            .AsIEmbeddingGenerator();
+    }
 
     // ── Endpoint / model for the selected provider ────────────────────────────
 
@@ -125,38 +149,42 @@ public static class AIConfig
     /// <summary>Secondary model for comparison samples (<c>*_MODEL_2</c> / <c>AZURE_OPENAI_DEPLOYMENT_2</c>); defaults to the primary except on Azure.</summary>
     public static string SecondaryModelDeployment => Settings.SecondaryModel ?? ModelDeployment;
 
+    /// <summary>An actually configured distinct model for sample judging, otherwise the primary (self-judged).</summary>
+    public static string JudgeModelDeployment => SampleJudgeModel.Resolve(Settings, Environment.GetEnvironmentVariable);
+
     /// <summary>Tertiary model for comparison samples (<c>*_MODEL_3</c> / <c>AZURE_OPENAI_DEPLOYMENT_3</c>); defaults to the primary except on Azure.</summary>
     public static string TertiaryModelDeployment => Settings.TertiaryModel ?? ModelDeployment;
 
     /// <summary>The primary model with the provider in the name, for agent identities and provenance.</summary>
     public static string ModelIdentity => Settings.ModelIdentity;
 
-    // ── Azure-only surfaces ───────────────────────────────────────────────────
+    // ── Embeddings: they follow the chat provider ─────────────────────────────
 
     /// <summary>
-    /// The Azure OpenAI resource endpoint, validated the same way as every provider endpoint (absolute
-    /// https, or loopback http). Throws with the reason when it is unset, malformed, or would carry the
-    /// key in cleartext — the Azure-only surfaces must not bypass the check the resolver applies.
+    /// The embedding settings for the selected provider. Read on each call, like <see cref="UseMock"/>, so
+    /// <c>--provider</c> and a test that sets a variable are both seen.
     /// </summary>
-    public static Uri AzureEndpoint =>
-        InferenceProviderEnvironment.TryValidateEndpoint(Env("AZURE_OPENAI_ENDPOINT"), out var endpoint, out var why)
-            ? endpoint!
-            : throw new InvalidOperationException($"AZURE_OPENAI_ENDPOINT='{Env("AZURE_OPENAI_ENDPOINT")}' {why}");
+    public static EmbeddingProviderSettings EmbeddingSettings =>
+        EmbeddingProviderEnvironment.Resolve(Settings, Environment.GetEnvironmentVariable);
 
-    /// <summary>The Azure OpenAI API key credential. Throws when the Azure trio is not set.</summary>
-    public static AzureKeyCredential AzureKeyCredential =>
-        new(Env("AZURE_OPENAI_API_KEY") ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY not configured"));
+    /// <summary>True when the selected provider has an embedding model, named or by default. Samples that embed check this first.</summary>
+    public static bool IsEmbeddingConfigured => EmbeddingSettings.IsConfigured;
 
-    /// <summary>Kept for the Azure-only call sites. Same as <see cref="AzureKeyCredential"/>.</summary>
-    public static AzureKeyCredential KeyCredential => AzureKeyCredential;
-
-    /// <summary>Embedding model deployment (Azure only). Reads <c>AZURE_OPENAI_EMBEDDING_DEPLOYMENT</c>, default text-embedding-ada-002.</summary>
+    /// <summary>The embedding model (on Azure and Foundry, the embedding deployment). Throws with the reason when none is configured.</summary>
     public static string EmbeddingDeployment =>
-        Env("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") ?? "text-embedding-ada-002";
+        EmbeddingSettings.Model ?? throw new InvalidOperationException(EmbeddingSettings.Diagnostic ?? "No embedding model is configured.");
 
-    /// <summary>True when the Azure trio AND an embedding deployment are set. Embeddings are Azure-only in these samples.</summary>
-    public static bool IsEmbeddingConfigured =>
-        IsAzureConfigured && Env("AZURE_OPENAI_EMBEDDING_DEPLOYMENT") is not null;
+    /// <summary>One line for banners: the embedding model, its host, and which variable named it.</summary>
+    public static string DescribeEmbeddings()
+    {
+        var e = EmbeddingSettings;
+        if (!e.IsConfigured)
+            return e.Diagnostic ?? "no embedding model configured";
+        var source = e.ModelIsDefault ? $"the {e.ProviderTag} default; {e.ModelVariable} overrides" : e.ModelVariable;
+        return $"{e.DisplayName} · {e.Model} ({source})";
+    }
+
+    // ── Azure-only surface ────────────────────────────────────────────────────
 
     /// <summary>
     /// Azure AI Foundry PROJECT endpoint for the hosted-agent samples (H11, H12). Reads
@@ -222,7 +250,11 @@ public static class AIConfig
     /// The gate at the top of a Getting Started sample. True to run: against the configured model, or against the
     /// mock when the user passed <c>--mock</c> (said loudly). False when neither, after saying how to get either.
     /// </summary>
-    public static bool StartModelSample()
+    /// <param name="recordSkip">
+    /// False when the model step is an optional last step and the sample's main point already ran offline: the
+    /// stop, or a mock run of that step, is then printed but not recorded as NOT MEASURED for the whole run.
+    /// </param>
+    public static bool StartModelSample(bool recordSkip = true)
     {
         if (UseMock)
         {
@@ -230,6 +262,10 @@ public static class AIConfig
             Console.WriteLine("   🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.");
             Console.ResetColor();
             Console.WriteLine();
+            // Canned replies measure no model, so the run is NOT MEASURED (exit 11), never exit 0 (owner, 2026-10-21).
+            // A check the mock run makes and fails still fails the run: FAIL outranks NOT MEASURED.
+            if (recordSkip)
+                SampleOutcome.Skip("mock run (--mock): canned replies, nothing here measured a model");
             return true;
         }
 
@@ -243,6 +279,8 @@ public static class AIConfig
         PrintMissingCredentialsWarning();
         Console.WriteLine("   This sample runs a real model. Configure a provider above and re-run,");
         Console.WriteLine("   or pass --mock for an offline walkthrough with canned replies.\n");
+        if (recordSkip)
+            SampleOutcome.Skip("no chat provider configured");
         return false;
     }
 

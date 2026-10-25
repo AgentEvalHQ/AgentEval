@@ -30,7 +30,9 @@ namespace AgentEval.Evals.Agentic.JudgeQuality;
 /// <para>
 /// <b>Score semantics</b>: fraction in [0, 1] where 1.0 = every judge verdict matches the
 /// expected verdict. Passes when accuracy &gt;= <c>passThreshold</c>.
-/// Severity: <c>low</c> (meta-metric).
+/// Severity: <c>low</c> (meta-metric). A pair whose judge gave no verdict (<c>error</c>, <c>skipped</c>,
+/// <c>inapplicable</c>, no label) is left out and counted in the <c>dropped_pair_count</c> dimension; with none left
+/// the eval is skipped, not scored.
 /// </para>
 /// </summary>
 public sealed class CalibrationAccuracyEval : IEvalConfigurationSource
@@ -98,6 +100,18 @@ public sealed class CalibrationAccuracyEval : IEvalConfigurationSource
                 "CalibrationAccuracyEval requires calibration pairs in EvalInput.Metadata[\"calibration_pairs\"]."));
         }
 
+        // A pair whose judge gave no verdict (error, skipped, inapplicable, no label) is not a wrong answer (T13): it
+        // counted as a mismatch, so a run in which no judge answered read as accuracy 0, a FAIL.
+        var allPairs = pairs;
+        pairs = allPairs.Where(p => JudgeAgreementEval.IsVerdictLabel(p.Actual)).ToList();
+        var droppedPairs = allPairs.Count - pairs.Count;
+        if (pairs.Count == 0)
+        {
+            return Task.FromResult(EvalResult.Skipped(this,
+                $"CalibrationAccuracyEval has no pair with a judge verdict: all {droppedPairs} gave none " +
+                "(error, skipped, inapplicable or no label)."));
+        }
+
         var accuracy = CalibrationMetrics.Accuracy(pairs);
 
         var passed = accuracy >= _passThreshold;
@@ -113,6 +127,7 @@ public sealed class CalibrationAccuracyEval : IEvalConfigurationSource
                     ["accuracy"] = accuracy,
                     ["pair_count"] = pairs.Count,
                     ["correct_count"] = Math.Round(accuracy * pairs.Count),
+                    ["dropped_pair_count"] = droppedPairs,
                 },
                 Evidence: null,
                 Recommendations: passed

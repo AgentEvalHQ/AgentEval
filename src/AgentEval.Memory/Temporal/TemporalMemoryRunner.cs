@@ -57,7 +57,7 @@ public class TemporalMemoryRunner : ITemporalMemoryRunner
         var enhancedResult = EnhanceWithTemporalMetadata(result, scenario);
         
         _logger.LogInformation("Temporal memory evaluation completed: {ScenarioName} - Score: {Score:F1}%",
-            scenario.Name, enhancedResult.OverallScore);
+            scenario.Name, enhancedResult.OverallScore?.ToString("F1") ?? "n/a (not measured)");
             
         return enhancedResult;
     }
@@ -172,14 +172,16 @@ public class TemporalMemoryRunner : ITemporalMemoryRunner
                 .Where(r => r.Query.QueryTime.HasValue && r.Measured)
                 .ToArray();
 
-            var temporalScore = temporalQueryResults.Length > 0
-                ? temporalQueryResults.Average(r => r.Score)
-                : result.OverallScore;
-
-            temporalMetadata["TemporalScore"] = temporalScore;
-            temporalMetadata["TemporalAccuracy"] = temporalQueryResults.Length > 0
-                ? temporalQueryResults.Count(r => r.Passed) / (double)temporalQueryResults.Length * 100
-                : 0;
+            if (temporalQueryResults.Length > 0)
+            {
+                temporalMetadata["TemporalScore"] = temporalQueryResults.Average(r => r.Score);
+                temporalMetadata["TemporalAccuracy"] = temporalQueryResults.Count(r => r.Passed) / (double)temporalQueryResults.Length * 100;
+            }
+            else
+            {
+                temporalMetadata.Remove("TemporalScore");
+                temporalMetadata.Remove("TemporalAccuracy");
+            }
         }
         
         return new MemoryEvaluationResult

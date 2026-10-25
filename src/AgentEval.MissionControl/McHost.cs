@@ -83,6 +83,8 @@ public static class McHost
         // ComplianceMatrixService: builds Query.complianceMatrix from evidence +
         // subjects. Scoped because it depends on IOutputStoreReader. Plan-08 MC1.4.4.
         builder.Services.AddScoped<ComplianceMatrixService>();
+        builder.Services.AddSingleton<AgentEval.Results.Adapters.Reading.IAefWorkspaceEvidenceReader, AgentEval.Results.Adapters.Reading.AefWorkspaceEvidenceReader>();
+        builder.Services.AddScoped<IWorkspaceRunSource, WorkspaceRunSource>();
 
         AgentEval.MissionControl.Hosting.EvidenceQueryHosting.Configure(builder);
         AgentEval.MissionControl.Hosting.EvidenceReadAccess.Configure(builder);

@@ -45,9 +45,11 @@
   storage are mounted, never linked) is a `path` problem of the run; and a path whose first segment is `overlays` in another case (`Overlays/x`) is a
   `path` problem at that path, whether or not the run has an `overlays` folder: on a case-insensitive file system it
   would be that folder.
-- **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
-  closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
-  file outside `overlays/`. Everything added later is an overlay (§4.2).
+- **[RUN-4] Closed evaluation files are immutable.** While `status` is `running` the producer may rewrite its files.
+  When it closes the run (`completed` or `aborted`) it writes their final form. After close, the only permitted
+  changes are adding `seal.json` (§4.1) and its `attestation.dsse.json` (§4.4), adding overlays (§4.2), and deleting
+  blobs authorized by [OVL-10]. No other evaluation file is edited, added or removed; authorized withholding does
+  not rewrite the seal.
 
 ## 3.2 `run.json`
 

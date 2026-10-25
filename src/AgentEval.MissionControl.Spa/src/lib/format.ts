@@ -22,20 +22,24 @@ const dateTime = new Intl.DateTimeFormat(undefined, {
 });
 
 /** Audit-friendly absolute date — "May 9, 2026". */
-export function formatDate(iso: string | Date): string {
+export function formatDate(iso: string | Date | null | undefined): string {
+  if (iso == null) return "not recorded";
   const d = typeof iso === "string" ? new Date(iso) : iso;
-  return dateOnly.format(d);
+  return Number.isFinite(d.getTime()) ? dateOnly.format(d) : "not recorded";
 }
 
 /** Run-detail absolute timestamp — "May 9, 2026 14:30:22 UTC". */
-export function formatDateTime(iso: string | Date): string {
+export function formatDateTime(iso: string | Date | null | undefined): string {
+  if (iso == null) return "not recorded";
   const d = typeof iso === "string" ? new Date(iso) : iso;
-  return dateTime.format(d);
+  return Number.isFinite(d.getTime()) ? dateTime.format(d) : "not recorded";
 }
 
 /** Recent-runs relative timestamp — "12 minutes ago" / "in 2 hours". */
-export function formatRelative(iso: string | Date, now = new Date()): string {
+export function formatRelative(iso: string | Date | null | undefined, now = new Date()): string {
+  if (iso == null) return "not recorded";
   const d = typeof iso === "string" ? new Date(iso) : iso;
+  if (!Number.isFinite(d.getTime())) return "not recorded";
   const diffMs = d.getTime() - now.getTime();
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
@@ -61,4 +65,9 @@ export function formatCost(cost: number | null | undefined): string {
   if (cost === 0) return "$0";
   if (cost < 0.001) return "<$0.001";
   return `$${cost.toFixed(4).replace(/\.?0+$/, "")}`;
+}
+
+/** Percentage reading; a missing value is not a measured zero. */
+export function formatPercentage(value: number | null | undefined): string {
+  return value == null ? "n/a - not measured" : `${(value * 100).toFixed(0)}%`;
 }

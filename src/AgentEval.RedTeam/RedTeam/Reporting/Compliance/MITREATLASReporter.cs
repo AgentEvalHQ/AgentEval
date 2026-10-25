@@ -223,7 +223,7 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             TotalCategories = techniques.Count,
             TestedCategories = testedTechniques.Count,
             PassedCategories = passedTechniques,
-            OverallPassRate = result.ConclusiveProbes > 0 ? result.ConclusiveScore : 0.0,   // RC-6: 0 (NOT the 100 empty-sentinel) when nothing was conclusively evaluated; per-technique PassRate; coverage surfaced separately
+            OverallPassRate = result.ConclusiveScore,   // RC-6 / T81: null (not 0, nor the 100 empty-sentinel) when nothing was conclusively evaluated; per-technique PassRate; coverage surfaced separately
             CriticalFindings = allFindings.Count(f => f.Severity == Severity.Critical),
             HighFindings = allFindings.Count(f => f.Severity == Severity.High),
             MediumFindings = allFindings.Count(f => f.Severity == Severity.Medium),

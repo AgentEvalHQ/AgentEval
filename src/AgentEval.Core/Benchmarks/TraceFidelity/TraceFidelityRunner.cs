@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Tracing;
 
 namespace AgentEval.Benchmarks;
@@ -52,7 +53,14 @@ public sealed class TraceFidelityRunner
         discrepancies.Add(TokenUnderReporting(agentTrace, chatTrace));
         discrepancies.Add(SuppressedFinishReason(agentTrace, chatTrace));
 
-        var root = 1.0 - discrepancies.Sum(d => TraceFidelityRubric.Weight(d.ClassKey) * (1.0 - d.Score));
+        // A class that could not be checked has no score to weigh: the root is over the measured classes, their weights
+        // scaled up to the full weight. With every class measured it is the root it always was.
+        var measured = discrepancies.Where(d => d.Measured).ToList();
+        var measuredWeight = measured.Sum(d => TraceFidelityRubric.Weight(d.ClassKey));
+        var penalty = measured.Sum(d => TraceFidelityRubric.Weight(d.ClassKey) * (1.0 - d.Score));
+        var root = measured.Count == discrepancies.Count ? 1.0 - penalty
+            : measuredWeight > 0 ? 1.0 - penalty / measuredWeight
+            : 1.0;
         return new TraceFidelityReport(discrepancies, Math.Clamp(root, 0.0, 1.0));
     }
 
@@ -65,11 +73,16 @@ public sealed class TraceFidelityRunner
         var report = Reconcile(agentTrace, chatTrace);
         // A chat trace with no model responses (a failed or empty capture) holds no truth to reconcile against: nothing was
         // measured (#203 review round 6, B10y). Every class scored 1.0 and the run read PASS.
-        var noTruth = !chatTrace.Entries.Any(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response);
+        var noTruth = !HasChatTruth(chatTrace);
+
+        // A class that could not be checked (token usage the chat boundary never reported) is skipped, and the root then
+        // withholds its pass: the measured classes cannot show it was clean.
+        var classNotMeasured = !noTruth && report.Discrepancies.Any(d => !d.Measured);
+        var rootPasses = report.OverallScore >= 0.99;
 
         var subResults = report.Discrepancies.Select(d => new EvalResult(
             Metric: new EvalMetadata(Key: $"trace_fidelity.{d.ClassKey}", Name: d.ClassKey, Category: "TraceFidelity", Version: "1.0"),
-            Score: noTruth
+            Score: noTruth || !d.Measured
                 ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
                 : new EvalScore(
                 Value: d.Score, Ordinal: null,
@@ -80,7 +93,7 @@ public sealed class TraceFidelityRunner
                     Severity: d.Score >= 0.99 ? "none" : d.Severity.ToLowerInvariant(), Confidence: null),
             Details: new EvalDetails(
                 // A class with nothing to reconcile carries no 0-100 figure (B10ah: it read 100 beside a skipped label).
-                Dimensions: noTruth
+                Dimensions: noTruth || !d.Measured
                     ? new Dictionary<string, double> { ["count"] = d.Count }
                     : new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),
@@ -92,13 +105,17 @@ public sealed class TraceFidelityRunner
             Metric: new EvalMetadata(Key: "trace_fidelity", Name: "Trace Fidelity", Category: "TraceFidelity", Version: "1.0"),
             Score: noTruth
                 ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
-                : new EvalScore(
+                : classNotMeasured && rootPasses
+                    // Withheld: a pass over the measured classes, with one class not checked, is a warn and not measured.
+                    ? new EvalScore(Value: report.OverallScore, Ordinal: null, Label: "warn", Passed: false, Threshold: 0.8,
+                        Severity: "low", Confidence: null) { Measurement = MeasurementState.NotMeasured }
+                    : new EvalScore(
                     Value: report.OverallScore, Ordinal: null,
                     // A warn is a soft fail (B10w): Passed only on a pass, which reports no severity; severities in the lower
                     // case every other result uses ("Low" read low even at 1.00).
-                    Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                    Passed: report.OverallScore >= 0.99, Threshold: 0.8,
-                    Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
+                    Label: rootPasses ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
+                    Passed: rootPasses, Threshold: 0.8,
+                    Severity: rootPasses ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
                     Confidence: null),
             Details: new EvalDetails(
                 Dimensions: noTruth ? null : new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
@@ -106,11 +123,22 @@ public sealed class TraceFidelityRunner
                 Recommendations: noTruth ? ["The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."] : null,
                 SubResults: subResults, AggregationStrategy: "severity-weighted")
             {
-                Summary = noTruth ? "The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict." : null,
+                Summary = noTruth ? "The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."
+                    : classNotMeasured
+                        ? $"Not measured: {string.Join(", ", report.Discrepancies.Where(d => !d.Measured).Select(d => d.ClassKey))} " +
+                          "(chat-boundary token usage is incomplete); the score is over the other classes."
+                        : null,
             },
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    /// <summary>
+    /// Whether the chat-boundary trace holds any model response to reconcile against. Without one, every class scores
+    /// 1.0 because nothing disagrees, which is not a measurement: the recorder was not wired, or the capture failed.
+    /// </summary>
+    internal static bool HasChatTruth(AgentTrace chatTrace) =>
+        chatTrace.Entries.Any(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response);
 
     // ── discrepancy detectors ──
     private static TraceFidelityDiscrepancy MissingToolCalls(
@@ -168,16 +196,34 @@ public sealed class TraceFidelityRunner
 
     private static TraceFidelityDiscrepancy TokenUnderReporting(AgentTrace agentTrace, AgentTrace chatTrace)
     {
-        var chatTokens = chatTrace.Entries
+        var chatResponses = chatTrace.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
-            .Sum(e => e.TokenUsage?.TotalTokens ?? 0);
-        var agentTokens = agentTrace.Performance?.TotalTokens
-            ?? agentTrace.Entries.Where(e => e.Type == TraceEntryType.Response).Sum(e => e.TokenUsage?.TotalTokens ?? 0);
+            .ToList();
 
-        if (chatTokens == 0 && agentTokens == 0)
+        // With no chat-boundary response reporting its usage, the tokens actually consumed are unknown: their 0 met any
+        // agent account and the class read clean. Not measured; the root leaves it out.
+        if (chatResponses.Count > 0 && chatResponses.All(e => e.TokenUsage is null))
         {
-            return Build(TraceFidelityRubric.TokenUnderReporting, 0, Array.Empty<string>());
+            return Build(TraceFidelityRubric.TokenUnderReporting, 0,
+                [$"not measured: none of the {chatResponses.Count} chat-boundary response(s) reported token usage"]) with { Measured = false };
         }
+
+        var agentResponses = agentTrace.Entries.Where(e => e.Type == TraceEntryType.Response).ToList();
+        // Legacy int components carry no saturation marker. A maximum value may have lost usage;
+        // neither boundary then supports an exact comparison, even against a smaller observed sum.
+        static bool PossiblyCapped(TraceTokenUsage? usage) =>
+            usage is { PromptTokens: int.MaxValue } or { CompletionTokens: int.MaxValue };
+        if (chatResponses.Any(e => PossiblyCapped(e.TokenUsage))
+            || (agentTrace.Performance is { } performance
+                ? performance.TotalPromptTokens == int.MaxValue || performance.TotalCompletionTokens == int.MaxValue
+                : agentResponses.Any(e => PossiblyCapped(e.TokenUsage))))
+            return Build(TraceFidelityRubric.TokenUnderReporting, 0,
+                ["not measured: token counts may be capped at the legacy integer limit"]) with { Measured = false };
+
+        var chatTokens = chatResponses.Sum(e => (long)(e.TokenUsage?.PromptTokens ?? 0) + (e.TokenUsage?.CompletionTokens ?? 0));
+        var agentTokens = agentTrace.Performance is { } measured
+            ? (long)measured.TotalPromptTokens + measured.TotalCompletionTokens
+            : agentResponses.Sum(e => (long)(e.TokenUsage?.PromptTokens ?? 0) + (e.TokenUsage?.CompletionTokens ?? 0));
 
         // Directional: the class is "token UNDER-reporting", so flag only when the agent boundary reports
         // FEWER tokens than were actually consumed at the chat boundary (chat > agent). Over-reporting
@@ -185,6 +231,10 @@ public sealed class TraceFidelityRunner
         var denom = Math.Max(chatTokens, 1);
         var shortfall = (chatTokens - agentTokens) / (double)denom;
         var count = shortfall > TraceFidelityRubric.TokenToleranceFraction ? 1 : 0;
+        var missingUsage = chatResponses.Count(e => e.TokenUsage is null);
+        if (count == 0 && missingUsage > 0)
+            return Build(TraceFidelityRubric.TokenUnderReporting, 0,
+                [$"not measured: {missingUsage} of {chatResponses.Count} chat-boundary response(s) omitted usage; the known token lower bound cannot certify complete accounting"]) with { Measured = false };
         var examples = count > 0
             ? new[] { $"agent under-reports tokens: chat={chatTokens}, agent={agentTokens} ({shortfall:P1} short, tolerance {TraceFidelityRubric.TokenToleranceFraction:P0})" }
             : Array.Empty<string>();

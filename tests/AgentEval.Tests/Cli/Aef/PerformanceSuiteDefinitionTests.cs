@@ -19,7 +19,7 @@ public sealed class PerformanceSuiteDefinitionTests
         Assert.Equal(first.Digest, same.Digest);
         Assert.NotEqual(first.Digest, changed.Digest);
         Assert.True(first.Frozen);
-        Assert.Equal(new[] { "perf_cost", "perf_latency", "perf_throughput" }, first.CaseIds);
+        Assert.Equal(new[] { "perf_benchmark", "perf_cost", "perf_latency", "perf_throughput" }, first.CaseIds);
         Assert.DoesNotContain("private workload", first.ToJson().ToJsonString());
     }
 

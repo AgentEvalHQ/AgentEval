@@ -23,8 +23,8 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
 /// </para>
 /// <para>
-/// If <see cref="AgenticTelemetry.TotalCalls"/> is zero, the evaluator returns a skipped result
-/// to avoid division by zero.
+/// Missing counts skip the check. Recorded zero calls and zero retries are not applicable.
+/// Negative counts or retries exceeding total call attempts return an error without a measurement.
 /// </para>
 /// </summary>
 public sealed class RetryRateEval : IEvalConfigurationSource
@@ -92,13 +92,12 @@ public sealed class RetryRateEval : IEvalConfigurationSource
                 $"RetryRateEval requires telemetry data via EvalInput.Metadata[\"{LatencyEval.MetadataKey}\"] or constructor parameter."));
         }
 
-        if (telemetry.TotalCalls == 0)
-        {
-            return Task.FromResult(EvalResult.Skipped(this,
-                "RetryRateEval: TotalCalls is 0 — cannot compute retry rate."));
-        }
+        var absent = TelemetryHelper.ValidateCallCounts(this, _passThreshold,
+            telemetry.RetryCount, telemetry.TotalCalls, nameof(AgenticTelemetry.RetryCount));
+        if (absent is not null)
+            return Task.FromResult(absent);
 
-        var retryRate = Math.Clamp((double)telemetry.RetryCount / telemetry.TotalCalls, 0.0, 1.0);
+        var retryRate = (double)telemetry.RetryCount!.Value / telemetry.TotalCalls!.Value;
         var score = Math.Clamp(1.0 - retryRate, 0.0, 1.0);
         var passed = score >= _passThreshold;
         var severity = passed ? "none" : "low";
@@ -109,8 +108,8 @@ public sealed class RetryRateEval : IEvalConfigurationSource
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
-                    ["retry_count"]  = telemetry.RetryCount,
-                    ["total_calls"]  = telemetry.TotalCalls,
+                    ["retry_count"]  = telemetry.RetryCount.Value,
+                    ["total_calls"]  = telemetry.TotalCalls.Value,
                     ["retry_rate"]   = retryRate,
                     ["success_rate"] = score,
                 },

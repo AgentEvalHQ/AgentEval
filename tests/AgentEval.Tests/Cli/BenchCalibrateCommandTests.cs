@@ -207,7 +207,8 @@ public class BenchCalibrateCommandTests : IDisposable
         var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands", file));
 
         Assert.Contains("PillarGateStatus(", source, StringComparison.Ordinal);
-        Assert.Contains("if (status != \"PASS\") allPass = false;", source, StringComparison.Ordinal);
+        // Both gates go through the one shared exit-code rule (D-21: NOT MEASURED alone is 11, never 0 or a FAIL).
+        Assert.Contains("GateExitCode(statuses)", source, StringComparison.Ordinal);
     }
 
     private static string RepoRoot()

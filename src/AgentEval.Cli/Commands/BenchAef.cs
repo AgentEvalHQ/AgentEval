@@ -24,16 +24,20 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null, string? comparisonName = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
             var lines = RedTeamAef.Lines(scan, AefCliOptions.ContentCapture == AefContentCapture.On);
+            var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 };
+            if (complianceArtifacts is not null)
+                settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
+                BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel) { Name = comparisonName },
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
-                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 } },
+                Config = new AefRunConfig { Settings = settings },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
                 Seal = AefCliOptions.Seal,
@@ -77,9 +81,9 @@ internal static class BenchAef
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
         string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null) =>
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null, string? comparisonName = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson, comparisonName: comparisonName);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -104,8 +108,8 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, AefReportArtifact? report = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition, report: report);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -114,8 +118,8 @@ internal static class BenchAef
     public static bool WriteTree(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, int? exitCode = null,
-        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition);
+        string? abortReason = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, byte[]? nativeReportJson = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent", null, exitCode, abortReason: abortReason, storeV1: storeV1, endpoint: endpoint, definition: definition, nativeReportJson: nativeReportJson);
 
     /// <summary>The bench command's own decision; a warning never authorizes shipping (D-6).</summary>
     internal static AefCommandGate Gate(string label, int exitCode) => new()
@@ -145,10 +149,12 @@ internal static class BenchAef
             return new EvalResult(
                 new EvalMetadata("memory." + c.CategoryName.ToLowerInvariant().Replace(' ', '-'), c.CategoryName, "memory", "1.0.0"),
                 // No severity: the benchmark grades a score, it does not say how bad a low one is.
-                new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, label == "pass" ? "none" : "", null),
+                new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, "none", null),
                 new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
-                DateTimeOffset.UtcNow);
+                // A category the benchmark's judge graded is not priced here (null, never $0); a skipped one spent nothing.
+                // The category DTO records no instrument; configured model identity cannot establish one.
+                new EvalProvenance("composite", null, null, null, null, c.Skipped ? 0 : null, false),
+                DateTimeOffset.UtcNow) { ObservedDuration = c.Duration };
         }).ToList();
         // One case, the benchmark, with its categories as weighted parts below it: the weights reach the run as each
         // part's component weight and the case's aggregation is WeightedSum, as the overall score is computed. An
@@ -161,8 +167,8 @@ internal static class BenchAef
                 Measurement = incomplete ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
             new EvalDetails(null, null, null, categories, "WeightedSum"),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
-            DateTimeOffset.UtcNow);
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(categories).EstimatedCost, false),
+            DateTimeOffset.UtcNow) { ObservedDuration = result.Duration };
         var root = new EvalResult(benchmark.Metric, benchmark.Score, new EvalDetails(null, null, null, [benchmark], null), benchmark.Provenance, DateTimeOffset.UtcNow);
         return (root, new AefComponentShape(1, true, "Averaged",
         [
@@ -183,22 +189,26 @@ internal static class BenchAef
         {
             var agentFailed = q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed;
             var label = agentFailed ? "error" : q.Correct is true ? "pass" : q.Correct is false ? "fail" : "inconclusive";
-            return new EvalResult(
+            return ObservedQuestion(
                 new EvalMetadata(q.QuestionId, q.QuestionId, q.QuestionType, "1.0.0"),
-                new EvalScore(q.Correct is true ? 1 : 0, null, label, q.Correct is true, null, label == "pass" ? "none" : "", null)
+                new EvalScore(q.Correct is true ? 1 : 0, null, label, q.Correct is true, null, "none", null)
                 {
                     // An unscored judgment is a typed absence: not measured, never a failure.
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
-                new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
-                DateTimeOffset.UtcNow);
+                q, judgeModel);
         }).ToList();
+        // No accuracy means no question was scored, and an INCONCLUSIVE verdict (nothing scored, or an interrupted run)
+        // decided nothing: the root is not measured, never a failure at 0.
+        var scored = result.OverallAccuracy is not null && verdict != "INCONCLUSIVE";
         return new EvalResult(
             new EvalMetadata($"{family}.{preset.ToLowerInvariant()}", $"{family} {preset}", family, "1.0.0"),
-            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, verdict.ToLowerInvariant(), verdict == "PASS", null, "none", null),   // a percentage
+            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, verdict.ToLowerInvariant(), scored && verdict == "PASS", null, "none", null)   // a percentage
+            {
+                Measurement = scored ? AgentEval.Evals.Meta.MeasurementState.Measured : AgentEval.Evals.Meta.MeasurementState.NotMeasured,
+            },
             new EvalDetails(null, null, null, questions, null),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(questions).EstimatedCost, false),
             DateTimeOffset.UtcNow);
     }
 
@@ -209,15 +219,22 @@ internal static class BenchAef
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null)
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null, string? comparisonName = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
             var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 };
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
+            if (report is not null || complianceArtifacts is not null)
+                settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
             var options = new AefCompositeRunOptions
             {
+                Report = report,
+                // Explicit nullable null avoids the array conversion's empty ReadOnlyMemory value.
+                NativeReportJson = nativeReportJson is null ? (ReadOnlyMemory<byte>?)null : new ReadOnlyMemory<byte>(nativeReportJson),
+                PresetComparisonId = family == "perf" ? $"perf-{preset.ToLowerInvariant()}" : null,
+                PresetComparisonName = comparisonName,
                 Definition = definition,
                 Cli = AefCliOptions.Provenance ?? new() { Verb = "bench " + family },
                 Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
@@ -270,16 +287,22 @@ internal static class BenchAef
         AgentEval.Benchmarks.AutoAuditEndpointResult result)
     {
         var label = result.Completed ? "scored" : "error";
-        EvalResult Leaf(string key, double value) => new(
+        // A chat boundary with no model response reconciles perfectly without measuring anything: the fidelity (and the
+        // root, which carries it) is not measured.
+        var fidelityMeasurement = result.Completed && !result.FidelityMeasured
+            ? AgentEval.Evals.Meta.MeasurementState.NotMeasured
+            : AgentEval.Evals.Meta.MeasurementState.Measured;
+        EvalResult Leaf(string key, double value, AgentEval.Evals.Meta.MeasurementState measurement) => new(
             new EvalMetadata(key, key, "autoaudit", "1.0.0"),
-            new EvalScore(value, null, label, false, null, "none", null),
+            new EvalScore(value, null, label, false, null, "none", null) { Measurement = measurement },
             new EvalDetails(null, null, null, null, null),
             new EvalProvenance("atomic-code", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
         var root = new EvalResult(
             new EvalMetadata("autoaudit.support-task", "Auto-audit", "autoaudit", "1.0.0"),
-            new EvalScore(result.FidelityScore, null, label, false, null, "none", null),
-            new EvalDetails(null, null, null, [Leaf("fidelity", result.FidelityScore), Leaf("safety", result.LeakedPastGate ? 0 : 1)], null),
+            new EvalScore(result.FidelityScore, null, label, false, null, "none", null) { Measurement = fidelityMeasurement },
+            new EvalDetails(null, null, null,
+                [Leaf("fidelity", result.FidelityScore, fidelityMeasurement), Leaf("safety", result.LeakedPastGate ? 0 : 1, AgentEval.Evals.Meta.MeasurementState.Measured)], null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
         var ext = new Dictionary<string, System.Text.Json.Nodes.JsonObject>(StringComparer.Ordinal);
@@ -296,6 +319,11 @@ internal static class BenchAef
                     ["latencyMs"] = result.LatencyMs,
                 },
             };
+            if (!result.TokensReported)
+            {
+                // The counts leave out a response that reported no usage: say so beside them.
+                ext["safety"]["agenteval.autoaudit"]!["tokensReported"] = false;
+            }
         }
 
         return (root, ext);
@@ -310,7 +338,8 @@ internal static class BenchAef
     /// </summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
         AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel) =>
-        TypedTree(result.QuestionResults, (result.OverallAccuracy ?? 0) / 100.0, vertical, judgeModel);
+        // No accuracy means no question was scored: the aggregate is not measured, never a measured 0.
+        TypedTree(result.QuestionResults, result.OverallAccuracy / 100.0, vertical, judgeModel);
 
     /// <summary>Maps observed questions; a null overall score withholds a partial benchmark's aggregate.</summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
@@ -351,15 +380,13 @@ internal static class BenchAef
             }
 
             var correct = outcome == AgentEval.Memory.External.Models.TypedMemEvalOutcome.Correct;
-            return new EvalResult(
+            return ObservedQuestion(
                 new EvalMetadata(q.QuestionId, q.QuestionId, q.QuestionType, "1.0.0"),
                 new EvalScore(correct ? 1 : 0, null, label, false, null, "none", null)
                 {
                     Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
                 },
-                new EvalDetails(null, null, null, null, null),
-                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
-                DateTimeOffset.UtcNow);
+                q, judgeModel);
         }).ToList();
         var root = new EvalResult(
             new EvalMetadata($"typedmemeval.{vertical}", $"TypedMemEval {vertical}", "typedmemeval", "1.0.0"),
@@ -368,8 +395,22 @@ internal static class BenchAef
                 Measurement = overallScore is null ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
             new EvalDetails(null, null, null, questions, null),
-            new EvalProvenance("composite", null, null, null, null, 0, false),
+            new EvalProvenance("composite", null, null, null, null, CostRollup.Aggregate(questions).EstimatedCost, false),
             DateTimeOffset.UtcNow);
         return (root, ext);
+    }
+
+    private static EvalResult ObservedQuestion(EvalMetadata metric, EvalScore score, AgentEval.Memory.External.Models.QuestionResult question, string? model)
+    {
+        var observedJudge = score.MeasuredValue() is not null && question.JudgeLlmCallCount > 0;
+        var result = new EvalResult(metric, score, new(null, null, null, null, null),
+            new(observedJudge ? "atomic-llm" : "atomic-decision", observedJudge ? model : null,
+                null, null, null, question.JudgeLlmCallCount > 0 ? null : 0, false), DateTimeOffset.UtcNow);
+        // The decision's observed instrument is separate from its schema-valid producer classification.
+        return observedJudge ? result : result with
+        {
+            ComparisonObservation = new AgentEval.Output.ComparabilityFacts(metric.Key, metric.Version)
+            { EffectiveBar = score.Threshold, InstrumentKind = AgentEval.Output.EvaluationInstrumentKind.Unknown },
+        };
     }
 }

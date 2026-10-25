@@ -59,14 +59,15 @@ public class MemoryJudge : IMemoryJudge
             
             var responseText = chatResponse.Text ?? "";
 
-            // Extract actual token usage from the response when available
-            var actualTokens = ExtractTokenUsage(chatResponse);
+            // Extract actual token usage from the response when available, and the model that answered (to price it)
+            var actualUsage = ExtractTokenUsage(chatResponse);
+            var judgeModel = chatResponse.ModelId ?? _chatClient.GetService<ChatClientMetadata>()?.DefaultModelId;
 
             // Parse the structured response
             var judgmentData = ParseJudgmentResponse(responseText);
 
             // Convert to our result format
-            var result = ConvertToJudgmentResult(judgmentData, query, actualTokens);
+            var result = ConvertToJudgmentResult(judgmentData, query, actualUsage, judgeModel);
             
             _logger.LogDebug("Memory judgment completed: {Score}% ({FoundCount} found, {MissingCount} missing)",
                 result.Score, result.FoundFacts.Count, result.MissingFacts.Count);
@@ -297,24 +298,27 @@ Be strict — any specific fabricated detail (a name, address, number, food item
         // Only an EXPLICIT score: `score: 85`, `"score": 85` (a JSON reply that failed to parse as a whole), or
         // `85/100`. "2 out of 3 facts" or a "100%" inside the explanation is not the judge's score; reading the first
         // such number as one turned prose into a measurement.
+        const string number = @"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?";
         var scoreMatch = System.Text.RegularExpressions.Regex.Match(
             responseText,
-            @"(?:""?score""?\s*[:=]\s*(\d{1,3})|\b(\d{1,3})\s*/\s*100\b)",
+            $@"(?:\b""?score""?\s*[:=]\s*({number})(?![\w.+-])|(?<![\w.+-])({number})(?![\w.+-])\s*/\s*100(?!\w|\.\d))",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         // No score in the reply means no score: never a default (this used to be 50, a number no judge gave).
         double? score = null;
         if (scoreMatch.Success)
         {
+            // Read as given: a score off 0-100 is not measured downstream (ConvertToJudgmentResult), never clamped.
             var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value : scoreMatch.Groups[2].Value;
-            score = Math.Min(100, Math.Max(0, int.Parse(matched)));
+            if (double.TryParse(matched, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                score = parsed;
         }
 
         return new JudgmentResponseData
         {
             FoundFacts = Array.Empty<string>(),
             MissingFacts = Array.Empty<string>(),
-            ForbiddenFound = Array.Empty<string>(),
             Score = score,
             Explanation = score is null
                 ? "Not measured: the judge's reply held no score."
@@ -323,49 +327,54 @@ Be strict — any specific fabricated detail (a name, address, number, food item
     }
 
     /// <summary>
-    /// Extracts actual token usage from the ChatResponse when available.
+    /// Extracts actual token usage from the ChatResponse when available: both counts, or null. A missing count is not 0,
+    /// so usage with only one of them (or only a total) is not reported usage.
     /// </summary>
-    private static int ExtractTokenUsage(ChatResponse response)
+    private static (int Input, int Output)? ExtractTokenUsage(ChatResponse response)
     {
-        if (response.Usage is { } usage)
-        {
-            var input = (int)(usage.InputTokenCount ?? 0);
-            var output = (int)(usage.OutputTokenCount ?? 0);
-            if (input > 0 || output > 0)
-                return input + output;
-        }
-        return 0;
+        if (response.Usage is { InputTokenCount: { } i, OutputTokenCount: { } o } && i >= 0 && o >= 0)
+            return ((int)Math.Min(i, int.MaxValue), (int)Math.Min(o, int.MaxValue));
+        return null;
     }
 
     /// <summary>
     /// Converts parsed LLM judgment data to our result format.
     /// </summary>
-    private MemoryJudgmentResult ConvertToJudgmentResult(JudgmentResponseData data, MemoryQuery query, int actualTokens)
+    private MemoryJudgmentResult ConvertToJudgmentResult(
+        JudgmentResponseData data, MemoryQuery query, (int Input, int Output)? actualUsage, string? judgeModel)
     {
         // Match fact contents to original MemoryFact objects
-        var foundFacts = MatchFactsByContent(data.FoundFacts, query.ExpectedFacts);
-        var missingFacts = MatchFactsByContent(data.MissingFacts, query.ExpectedFacts);
-        var forbiddenFound = MatchFactsByContent(data.ForbiddenFound, query.ForbiddenFacts);
+        var foundFacts = MatchFactsByContent(data.FoundFacts ?? [], query.ExpectedFacts);
+        var missingFacts = MatchFactsByContent(data.MissingFacts ?? [], query.ExpectedFacts);
+        var forbiddenFound = MatchFactsByContent(data.ForbiddenFound ?? [], query.ForbiddenFacts);
 
-        // Use actual token counts when available, fall back to estimation
-        var tokensUsed = actualTokens > 0
-            ? actualTokens
+        // Use actual token counts when available, fall back to estimation (an estimate is never priced)
+        var tokensUsed = actualUsage is { } u
+            ? (int)Math.Min((long)u.Input + u.Output, int.MaxValue)
             : EstimateTokenUsage(query, data.Explanation ?? "");
+
+        // A reply with no score, a non-finite one, or one off the documented 0-100 scale measured nothing: its reply could
+        // not be read as a measurement. An off-scale score used to be clamped (BUG-09 stopped it propagating unbounded),
+        // so a judge's 150 read as a perfect 100 and its -40 as a measured 0; the metrics' judges refuse it the same way.
+        var measured = data.Score is { } m && double.IsFinite(m) && m is >= 0 and <= 100;
+        var offScale = data.Score is { } o && double.IsFinite(o) && !measured;
 
         return new MemoryJudgmentResult
         {
-            // Clamp to the documented [0, 100] range. The structured-JSON path previously
-            // trusted the judge's number verbatim (the regex fallback already clamped), so a
-            // judge emitting e.g. 150 or -40 propagated unbounded into MemoryQueryResult.Score
-            // and silently skewed category weighting and the final OverallScore/Grade (BUG-09).
-            Score = data.Score is { } s && double.IsFinite(s) ? Math.Clamp(s, 0, 100) : 0,
-            // A reply with no score (or a non-finite one) measured nothing.
-            Measured = data.Score is { } m && double.IsFinite(m),
+            Score = measured ? data.Score!.Value : 0,
+            Measured = measured,
             FoundFacts = foundFacts,
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,
-            Explanation = data.Explanation,
-            TokensUsed = tokensUsed
+            // Explicit empty assessment is valid; omitted/null, blank or unmatched entries cannot certify absence.
+            ForbiddenFactsAssessed = data.ForbiddenFound is { } reported && reported.Count == forbiddenFound.Count,
+            Explanation = offScale
+                ? $"Not measured: the judge's score {data.Score!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)} is off the 0-100 scale."
+                : data.Explanation,
+            TokensUsed = tokensUsed,
+            InputTokens = actualUsage?.Input,
+            OutputTokens = actualUsage?.Output,
+            JudgeModel = judgeModel,
         };
     }
 
@@ -490,13 +499,13 @@ Be strict — any specific fabricated detail (a name, address, number, food item
 internal class JudgmentResponseData
 {
     [JsonPropertyName("found_facts")]
-    public IReadOnlyList<string> FoundFacts { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? FoundFacts { get; set; }
     
     [JsonPropertyName("missing_facts")]
-    public IReadOnlyList<string> MissingFacts { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? MissingFacts { get; set; }
     
     [JsonPropertyName("forbidden_found")]
-    public IReadOnlyList<string> ForbiddenFound { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string>? ForbiddenFound { get; set; }
     
     [JsonPropertyName("score")]
     public double? Score { get; set; }

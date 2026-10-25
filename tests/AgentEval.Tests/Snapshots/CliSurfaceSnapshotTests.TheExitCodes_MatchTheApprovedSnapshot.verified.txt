@@ -1,0 +1,13 @@
+﻿  0 Success
+  1 TestFailure
+  2 UsageError
+  3 RuntimeError
+  4 RegressionFailure
+  5 GateBlocked
+  6 GateInconclusive
+  7 NotCertified
+  8 BudgetExceeded
+  9 GateFailed
+ 10 GateWarning
+ 11 GateIndeterminate
+ 13 Incomparable

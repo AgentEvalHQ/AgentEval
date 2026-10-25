@@ -19,13 +19,17 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
     private readonly string _model;
     private readonly int _inputCap, _outputCap, _callCap;
     private readonly decimal _inputRate, _outputRate;
+    private readonly bool _freezeReasoning;
+    private readonly ReasoningEffort? _reasoningEffort;
+    private ReasoningEffort? _lastReasoningEffort;
     private int _calls, _reported;
     private long _inputTokens, _outputTokens;
     private decimal _usd;
     private bool _boundExceeded;
 
     internal BudgetedChatClient(IChatClient inner, string model, int inputCap, int outputCap, int callCap,
-        decimal inputUsdPerMillion, decimal outputUsdPerMillion) : base(inner)
+        decimal inputUsdPerMillion, decimal outputUsdPerMillion,
+        bool freezeReasoning = false, ReasoningEffort? reasoningEffort = null) : base(inner)
     {
         if (string.IsNullOrWhiteSpace(model) || inputCap <= 0 || outputCap <= 0 || callCap <= 0
             || inputUsdPerMillion < 0 || outputUsdPerMillion < 0)
@@ -36,6 +40,8 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
         _callCap = callCap;
         _inputRate = inputUsdPerMillion / 1_000_000m;
         _outputRate = outputUsdPerMillion / 1_000_000m;
+        _freezeReasoning = freezeReasoning;
+        _reasoningEffort = reasoningEffort;
         // Fail before execution if a configured bound cannot be represented.
         try { UsdBound = checked(CallBound * callCap); }
         catch (OverflowException) { throw new AefInputException("Runner client cost bound is too large."); }
@@ -45,6 +51,7 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
     internal decimal UsdBound { get; }
     internal decimal IncurredUsd { get { lock (_sync) return _usd; } }
     internal int Calls { get { lock (_sync) return _calls; } }
+    internal ReasoningEffort? LastReasoningEffort { get { lock (_sync) return _lastReasoningEffort; } }
     internal bool BoundExceeded { get { lock (_sync) return _boundExceeded; } }
     internal long? InputTokens { get { lock (_sync) return _calls > 0 && _reported == _calls ? _inputTokens : null; } }
     internal long? OutputTokens { get { lock (_sync) return _calls > 0 && _reported == _calls ? _outputTokens : null; } }
@@ -53,7 +60,7 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
         ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var request = Prepare(messages, options, cancellationToken);
-        Reserve(cancellationToken);
+        Reserve(request.Options.Reasoning?.Effort, cancellationToken);
         var response = await base.GetResponseAsync(request.Messages, request.Options, cancellationToken).ConfigureAwait(false);
         Complete(response.Usage);
         return response;
@@ -63,7 +70,7 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
         ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var request = Prepare(messages, options, cancellationToken);
-        Reserve(cancellationToken);
+        Reserve(request.Options.Reasoning?.Effort, cancellationToken);
         UsageDetails? usage = null;
         await foreach (var update in base.GetStreamingResponseAsync(request.Messages, request.Options, cancellationToken)
             .WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -114,6 +121,12 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
             { AuthorName = m.AuthorName }).ToArray();
         var cloned = JsonSerializer.Deserialize<ChatOptions>(
             JsonSerializer.Serialize(options, AIJsonUtilities.DefaultOptions), AIJsonUtilities.DefaultOptions)!;
+        if (_freezeReasoning)
+        {
+            if (cloned.Reasoning is not null && cloned.Reasoning.Effort != _reasoningEffort)
+                throw new AefInputException("Runner reasoning must match the setting resolved during readiness.");
+            cloned.Reasoning = _reasoningEffort is { } effort ? new ReasoningOptions { Effort = effort } : null;
+        }
         cloned.ModelId = _model;
         cloned.MaxOutputTokens = Math.Min(cloned.MaxOutputTokens ?? _outputCap, _outputCap);
         // Include all roles, instructions and structured-output schema, not only the last user message.
@@ -124,7 +137,7 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
         return (copy, cloned);
     }
 
-    private void Reserve(CancellationToken cancellationToken)
+    private void Reserve(ReasoningEffort? effort, CancellationToken cancellationToken)
     {
         lock (_sync)
         {
@@ -133,6 +146,7 @@ internal sealed class BudgetedChatClient : DelegatingChatClient
             if (_calls >= _callCap) throw new AefInputException("Runner role exceeded its per-case call cap.");
             _usd += CallBound;
             _calls++;
+            _lastReasoningEffort = effort;
         }
     }
 

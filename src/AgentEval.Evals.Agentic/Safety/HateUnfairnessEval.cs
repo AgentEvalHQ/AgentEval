@@ -191,7 +191,8 @@ public sealed class HateUnfairnessEval : IEvalInstrumentSource
                     : new[] { "Review response for hate speech, slurs, or content targeting protected characteristics." },
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new("atomic-classifier", null, "agenteval.hate_unfairness.v1", null, null, 0, false),
+            // The content-safety service's charge is not priced here: null (not priced), never $0.
+            Provenance: new("atomic-classifier", null, "agenteval.hate_unfairness.v1", null, null, null, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }

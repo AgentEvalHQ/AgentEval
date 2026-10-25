@@ -3,9 +3,7 @@
 
 using AgentEval.PartnerDeskDemo.Demo;
 using AgentEval.PartnerDeskDemo.Mcp;
-using Azure;
-using Azure.AI.OpenAI;
-using Microsoft.Extensions.AI;
+using AgentEval.Samples;
 
 namespace AgentEval.PartnerDeskDemo;
 
@@ -38,12 +36,23 @@ public static class Program
         }
 
         TrySetUtf8Console();
+        SampleOutcome.Reset();
 
         var output = DemoOutput.Console;
         var forceOffline = args.Contains("--offline", StringComparer.Ordinal);
-        var deployment = ReadOption(args, "--deployment")
-            ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-        var live = !forceOffline && AzureOpenAIIsConfigured(deployment);
+        // Scripted execution is deliberate: missing live configuration must not silently substitute a passing fake.
+        var model = ModelSelection.Resolve(args, forceOffline);
+
+        // A set AI_INFERENCE_PROVIDER asked for a live model. When it does not resolve, the scripted model is not a
+        // stand-in — every oracle would hold and --all would exit 0 on a run that measured no live model — so stop
+        // with the resolver's reason before the banner, the outbox or the MCP child.
+        if (!model.IsLive && !forceOffline)
+        {
+            Console.Error.WriteLine(model.ExplicitSelectionUnresolved
+                ? model.UnresolvedSelectionError
+                : $"No live model provider is configured. {model.Settings.Diagnostic} {ModelSelection.SetupHint}; or pass --offline.");
+            return SampleOutcome.NotMeasured;
+        }
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -51,8 +60,8 @@ public static class Program
         var outbox = Path.Combine(AppContext.BaseDirectory, "outbox.log");
         var register = Tools.PartnerRegister.Load();
         await using var runner = new PartnerDeskRunner(
-            context => live
-                ? CreateAzureClient(deployment!)
+            context => model.IsLive
+                ? model.CreateChatClient()
                 : ScriptedPartnerDeskModel.Create(context, register),
             output,
             outbox,
@@ -62,17 +71,16 @@ public static class Program
         // Start every session from an empty outbox so "here is what would have left the building" is unambiguous.
         runner.ResetOutbox();
 
-        Title(output, live, deployment, outbox);
+        Title(output, model, outbox);
         DemoContractRenderer.Print(output);
 
         var phases = ParsePhases(args);
         if (phases.Count > 0)
         {
             var totalWatch = System.Diagnostics.Stopwatch.StartNew();
-            var allHold = true;
             foreach (var phase in phases)
             {
-                allHold &= await RunAndReportAsync(runner, phase, StandardQuestion, output, cts.Token)
+                await RunAndReportAsync(runner, phase, StandardQuestion, output, cts.Token)
                     .ConfigureAwait(false);
             }
 
@@ -83,11 +91,11 @@ public static class Program
 
             output.Line(ConsoleColor.DarkGray,
                 $"  [total wall-clock for {phases.Count} phase(s): {totalWatch.Elapsed.TotalSeconds,0:0.0}s]");
-            return allHold ? 0 : 1;
+            return SampleOutcome.ExitCode;
         }
 
         await MenuLoopAsync(runner, output, cts.Token).ConfigureAwait(false);
-        return 0;
+        return SampleOutcome.ExitCode;
     }
 
     private static async Task MenuLoopAsync(PartnerDeskRunner runner, DemoOutput output, CancellationToken ct)
@@ -104,7 +112,7 @@ public static class Program
             output.Line("   3   Phase 3  LEVEL 1                supplier COMPROMISED, tool contracts");
             output.Line("   4   Phase 4  LEVEL 2                supplier COMPROMISED, + admission + containment");
             output.Line("   a   run all four in order");
-            output.Line("   r   re-run the last phase (Phase 2 is probabilistic — up-arrow lands it)");
+            output.Line("   r   re-run the last phase (each run retains its own observed outcome)");
             output.Line("   c   ask a different question against the last phase");
             output.Line("   q   quit");
             output.Line();
@@ -165,7 +173,7 @@ public static class Program
         return char.ToLowerInvariant(key.KeyChar);
     }
 
-    private static async Task<bool> RunAndReportAsync(
+    private static async Task RunAndReportAsync(
         PartnerDeskRunner runner,
         DemoPhase phase,
         string question,
@@ -178,9 +186,10 @@ public static class Program
         {
             outcome = await runner.RunAsync(phase, question, ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            return false;
+            SampleOutcome.Skip($"Phase {(int)phase} did not complete.");
+            return;
         }
         catch (Exception exception)
         {
@@ -188,7 +197,8 @@ public static class Program
             output.Line();
             output.Line(ConsoleColor.Red, $"  PHASE {(int)phase} DID NOT COMPLETE — {exception.GetType().Name}");
             output.Paragraph(exception.Message, "    ");
-            return false;
+            SampleOutcome.Error($"Phase {(int)phase} did not complete: {exception.GetType().Name}.");
+            return;
         }
         finally
         {
@@ -204,13 +214,12 @@ public static class Program
 
         var claims = PhaseOracle.Evaluate(outcome);
         output.Section($"  PHASE {(int)phase} ORACLE — asserted over the trace, the effect ledger, and the verdicts");
-        var allHold = true;
         foreach (var claim in claims)
         {
-            allHold &= claim.Holds;
+            var stamp = claim.Holds switch { true => "OK", false => "FAIL", null => "NOT MEASURED" };
             output.Line(
-                claim.Holds ? ConsoleColor.Green : ConsoleColor.Red,
-                $"    [{(claim.Holds ? "OK  " : "FAIL")}] {claim.Claim}");
+                claim.Holds switch { true => ConsoleColor.Green, false => ConsoleColor.Red, null => ConsoleColor.Yellow },
+                $"    [{stamp}] {claim.Claim}");
             output.Paragraph(claim.Detail, "           ");
         }
 
@@ -220,7 +229,11 @@ public static class Program
             output.Paragraph("note: " + observation, "    ");
         }
 
-        return allHold;
+        var verdict = PhaseOracle.Verdict(claims);
+        if (verdict == false)
+            SampleOutcome.Fail($"Phase {(int)phase} oracle failed.");
+        else if (verdict is null)
+            SampleOutcome.Skip($"Phase {(int)phase}: required boundary exercise or evidence was not measured.");
     }
 
     private static IReadOnlyList<DemoPhase> ParsePhases(string[] args)
@@ -252,11 +265,11 @@ public static class Program
         output.Line(ConsoleColor.White, "  THE TRUSTED SUPPLIER — the lesson");
         output.Rule('=');
         output.Paragraph(
-            "Level 1 saved us from the damage: the register export and the external send were refused before " +
-            "they ran — but the agent still tried, every run. Safe, and under continuous attack.");
+            "Level 1 is demonstrated when recorded register-export and external-send attempts were refused " +
+            "before execution. Without those attempts, the corresponding contract was not measured.");
         output.Paragraph(
-            "Level 2 stopped the attack: the injected instruction never reached the model, so the agent never " +
-            "formed the intent — and the compromised source was contained, so it cannot try again.");
+            "Level 2 is demonstrated by the recorded result-admission refusal, containment snapshot and " +
+            "refused retry. Zero malicious tool attempts alone do not prove that the gate worked.");
         output.Paragraph(
             "Defence in depth is not one wall. It is a wall, and then removing the attacker — and the whole thing " +
             "is a builder chain and two contracts.");
@@ -295,19 +308,14 @@ public static class Program
         return null;
     }
 
-    private static void Title(DemoOutput output, bool live, string? deployment, string outbox)
+    private static void Title(DemoOutput output, ModelSelection model, string outbox)
     {
         output.Line();
         output.Rule('=');
         output.Line(ConsoleColor.White, "  THE TRUSTED SUPPLIER");
         output.Line("  PartnerDesk — a due-diligence assistant, and the third-party MCP that turns on it");
         output.Rule('=');
-        output.Paragraph(
-            live
-                ? $"Model: live Azure OpenAI, deployment '{deployment}'. Override with --deployment <name>."
-                : "Model: SCRIPTED offline provider. The model's decisions are fixed, so this path verifies the " +
-                  "gates, not the model's susceptibility. Set AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT for " +
-                  "the live path.");
+        output.Paragraph(model.Describe());
         output.Paragraph(
             "PartnerIntel is a real MCP server started as a child process of this one; get_company_report is a " +
             "genuine tools/call over stdio.");
@@ -327,17 +335,5 @@ public static class Program
         {
             // A redirected or unusual console may refuse; the demo reads fine in ASCII either way.
         }
-    }
-
-    private static bool AzureOpenAIIsConfigured(string? deployment) =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT"))
-        && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY"))
-        && !string.IsNullOrWhiteSpace(deployment);
-
-    private static IChatClient CreateAzureClient(string deployment)
-    {
-        var endpoint = new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!);
-        var key = new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!);
-        return new AzureOpenAIClient(endpoint, key).GetChatClient(deployment).AsIChatClient();
     }
 }

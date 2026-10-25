@@ -89,6 +89,31 @@ public class MAFWorkflowAdapterTests
         Assert.True(result.TotalDuration > TimeSpan.Zero);
     }
 
+    [Fact]
+    public async Task ExecuteWorkflowAsync_SourceWithoutStepTiming_TimesStepsByEventArrival()
+    {
+        // An event source that reports no step timing keeps the arrival timing: a step runs from the output that
+        // opened it to the edge that closes it. (MAFWorkflowEventBridge reports measured timing; see its tests.)
+        var adapter = new MAFWorkflowAdapter("arrival-timed", (prompt, ct) => Source(ct));
+
+        var result = await adapter.ExecuteWorkflowAsync("test");
+
+        Assert.Equal(["A", "B"], result.Steps.Select(s => s.ExecutorId).ToArray());
+        Assert.True(result.Steps[0].Duration >= TimeSpan.FromMilliseconds(150),
+            $"Step A lasted {result.Steps[0].Duration.TotalMilliseconds:F0} ms between its output and its edge.");
+        Assert.True(result.Steps[1].StartOffset >= result.Steps[0].StartOffset + result.Steps[0].Duration);
+
+        static async IAsyncEnumerable<WorkflowEvent> Source(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            yield return new ExecutorOutputEvent("A", "a");
+            await Task.Delay(200, ct);
+            yield return new EdgeTraversedEvent("A", "B");
+            yield return new ExecutorOutputEvent("B", "b");
+            yield return new WorkflowCompleteEvent();
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // EXECUTOR ID TRACKING
     // ═══════════════════════════════════════════════════════════════════════════

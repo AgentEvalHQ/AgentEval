@@ -124,7 +124,7 @@ public class RedTeamResultTests
     [Fact]
     public void RedTeamResult_EmptyResults_IsInconclusive_NotFabricatedPass()
     {
-        // RC-6: a zero-probe scan measured nothing — it is Inconclusive, not a fabricated Pass, and Coverage is 0.
+        // RC-6: a zero-probe scan measured nothing — it is Inconclusive, not a fabricated Pass, and Coverage is absent.
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -136,9 +136,9 @@ public class RedTeamResultTests
         };
 
         Assert.Equal(Verdict.Inconclusive, result.Verdict);
-        Assert.Equal(0.0, result.Coverage);
-        Assert.Equal(0.0, result.ConclusiveRate);
-        Assert.Equal(0.0, result.AttackSuccessRate);
+        Assert.Null(result.Coverage);
+        Assert.Null(result.ConclusiveRate);
+        Assert.Null(result.AttackSuccessRate);
     }
 
     [Fact]
@@ -293,21 +293,21 @@ public class RedTeamResultTests
         };
 
         Assert.Equal(60.0, result.OverallScore);
-        Assert.Equal(75.0, result.ConclusiveScore, precision: 4);
-        Assert.Equal(80.0, result.Coverage, precision: 4);
+        Assert.Equal(75.0, result.ConclusiveScore!.Value, precision: 4);
+        Assert.Equal(80.0, result.Coverage!.Value, precision: 4);
         Assert.Equal(8, result.ConclusiveProbes);
     }
 
     [Fact]
-    public void ConclusiveScore_NoConclusiveProbes_Returns0_NotAFabricated100PercentSecureSentinel()
+    public void ConclusiveScore_NoConclusiveProbes_IsNull_NotAFabricated100PercentSecureSentinel()
     {
         // Regression test for a real bug found in review: this test originally asserted ConclusiveScore == 100
         // here, which was WRONG — a scan where every probe came back Inconclusive proved nothing was resisted,
         // so "100% secure" is a fabricated verdict for a scan that measured nothing. That fabricated 100 leaked
         // unguarded into the console banner, the Markdown report, the JSON export, and the persisted baseline
         // file, even though every compliance reporter (SOC2/OWASP/NIST/MITRE/ISO27001) had already
-        // independently learned to guard this exact trap externally. ConclusiveScore must return 0, mirroring
-        // ConclusiveAttackSuccessRate's own, already-correct "0 when no conclusive probes" convention.
+        // independently learned to guard this exact trap externally. ConclusiveScore must be null: nothing was
+        // measured (T81).
         var result = new RedTeamResult
         {
             AgentName = "TestAgent",
@@ -318,8 +318,8 @@ public class RedTeamResultTests
             InconclusiveProbes = 5
         };
 
-        Assert.Equal(0.0, result.OverallScore);
-        Assert.Equal(0.0, result.ConclusiveScore);
+        Assert.Null(result.OverallScore);
+        Assert.Null(result.ConclusiveScore);
         Assert.Equal(0.0, result.Coverage);
     }
 
@@ -352,8 +352,8 @@ public class RedTeamResultTests
             InconclusiveProbes = 92
         };
 
-        Assert.Equal(0.04, result.AttackSuccessRate, precision: 4);
-        Assert.Equal(0.5, result.ConclusiveAttackSuccessRate, precision: 4);
+        Assert.Equal(0.04, result.AttackSuccessRate!.Value, precision: 4);
+        Assert.Equal(0.5, result.ConclusiveAttackSuccessRate!.Value, precision: 4);
     }
 
     [Fact]
@@ -396,7 +396,7 @@ public class AttackResultTests
         };
 
         Assert.True(result.Passed);
-        Assert.Equal(0.0, result.AttackSuccessRate);
+        Assert.Equal(0.0, result.ConclusiveAttackSuccessRate);
     }
 
     [Fact]
@@ -420,7 +420,7 @@ public class AttackResultTests
         };
 
         Assert.False(result.Passed);
-        Assert.Equal(0.1, result.AttackSuccessRate, precision: 2);
+        Assert.Equal(0.1, result.AttackSuccessRate!.Value, precision: 2);
     }
 
     [Fact]
@@ -475,8 +475,8 @@ public class AttackResultTests
 
         var attack = new AttackResult { AttackName = "A", OwaspId = "LLM01", ProbeResults = probes, ResistedCount = 1, SucceededCount = 1, InconclusiveCount = 8 };
 
-        Assert.Equal(0.1, attack.AttackSuccessRate, precision: 4);
-        Assert.Equal(0.5, attack.ConclusiveAttackSuccessRate, precision: 4);
+        Assert.Equal(0.1, attack.AttackSuccessRate!.Value, precision: 4);
+        Assert.Equal(0.5, attack.ConclusiveAttackSuccessRate!.Value, precision: 4);
         Assert.Equal(2, attack.ConclusiveCount);
     }
 }

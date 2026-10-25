@@ -16,7 +16,8 @@ public class MemoryJudgmentResult
     public required double Score { get; init; }
 
     /// <summary>
-    /// <see langword="false"/> when the judge produced no score: the call failed, or its reply held none.
+    /// <see langword="false"/> when the judge produced no score: the call failed, or its reply held none or one off the
+    /// 0-100 scale (never clamped).
     /// <see cref="Score"/> is then 0 as a placeholder, not a measurement, and aggregates leave the question out and
     /// count it. Through 0.42 a failed call scored 0 and a reply with no score scored 50.
     /// </summary>
@@ -36,6 +37,12 @@ public class MemoryJudgmentResult
     /// Forbidden facts that were incorrectly present in the response.
     /// </summary>
     public required IReadOnlyList<MemoryFact> ForbiddenFound { get; init; }
+
+    /// <summary>
+    /// Whether the judge supplied a usable assessment of forbidden facts. An empty observed list alone does not
+    /// establish absence; score-only replies and legacy/custom judgments without this fact default to false.
+    /// </summary>
+    public bool ForbiddenFactsAssessed { get; init; }
     
     /// <summary>
     /// Detailed explanation of the scoring decision.
@@ -46,4 +53,21 @@ public class MemoryJudgmentResult
     /// Number of tokens used for this judgment.
     /// </summary>
     public int TokensUsed { get; init; }
+
+    /// <summary>
+    /// Input tokens the provider reported for the judge call; <see langword="null"/> when it did not report both counts
+    /// (<see cref="TokensUsed"/> is then an estimate, and the call is not priced).
+    /// </summary>
+    public int? InputTokens { get; init; }
+
+    /// <summary>
+    /// Output tokens the provider reported for the judge call; <see langword="null"/> when it did not report both counts.
+    /// </summary>
+    public int? OutputTokens { get; init; }
+
+    /// <summary>
+    /// The model that answered the judge call (the response's model id, else the client's default), when known. With
+    /// <see cref="InputTokens"/> and <see cref="OutputTokens"/> it prices the call.
+    /// </summary>
+    public string? JudgeModel { get; init; }
 }

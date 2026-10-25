@@ -35,8 +35,11 @@ public static class AutoAuditRunner
         var responses = chatBoundary.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
             .ToList();
-        var promptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0);
-        var completionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0);
+        var promptTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.PromptTokens ?? 0));
+        var completionTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.CompletionTokens ?? 0));
+        // A response without usage adds nothing to the counts above, so they are not the endpoint's token cost then.
+        var tokensReported = responses.Count > 0 && responses.All(r => r.TokenUsage is not null)
+            && (long)promptTokens + completionTokens < int.MaxValue;
         var latency = responses.Sum(r => r.DurationMs ?? 0);
 
         var gateBlocks = CountGateBlocks(chatBoundary);
@@ -49,7 +52,12 @@ public static class AutoAuditRunner
             .ToList();
 
         return new AutoAuditEndpointResult(
-            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate);
+            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate)
+        {
+            // A clean measured subset cannot establish complete fidelity when a class was unchecked.
+            FidelityMeasured = TraceFidelityRunner.HasChatTruth(chatBoundary) && fidelity.Discrepancies.All(d => d.Measured),
+            TokensReported = tokensReported,
+        };
     }
 
     /// <summary>Assembles a cross-endpoint <see cref="AutoAuditReport"/> from per-endpoint results.</summary>

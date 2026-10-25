@@ -7,6 +7,8 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Comparison;
+using AgentEval.Results.Adapters.StoreV1;
 
 namespace AgentEval.Cli.Commands;
 
@@ -16,9 +18,9 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>It is a pure function of two directories.</b> No manifest, no store, no workspace discovery,
-/// no network: every fact it reads is on the scenario files themselves, which is finding V1's whole
-/// claim. That is why the arguments are two paths and not a subject plus two run ids.
+/// Reads verified AEF evidence from two directories. Legacy store results pass through the shared
+/// StoreV1 converter into invocation-owned temporary AEF folders. Imported custody and missing
+/// comparison facts remain explicit; no network calls or original-source writes are needed.
 /// </para>
 /// <para>
 /// <b>The decision lives in the library</b> (<see cref="RunComparison"/>), not here, so it can be
@@ -31,14 +33,12 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class CompareCommand
 {
-    // Matches FileSystemOutputStore's write options. A reader configured differently from the
-    // writer is the "asserted against a copy of its settings" defect ADR-031 records for S2, so the
-    // round trip is covered by a test that reads a file the real store wrote.
+    // Comparison output includes explicit nulls so an absent baseline, candidate or delta remains visible.
     private static readonly JsonSerializerOptions s_json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
@@ -48,12 +48,12 @@ public static class CompareCommand
     {
         var baselineOpt = new Option<string>("--baseline")
         {
-            Description = "Path to the BASELINE run directory (the one containing scenarios/). REQUIRED.",
+            Description = "Path to the BASELINE AEF run directory or legacy store result folder. REQUIRED.",
             Required = true,
         };
         var candidateOpt = new Option<string>("--candidate")
         {
-            Description = "Path to the CANDIDATE run directory (the one containing scenarios/). REQUIRED.",
+            Description = "Path to the CANDIDATE AEF run directory or legacy store result folder. REQUIRED.",
             Required = true,
         };
         var strictOpt = new Option<bool>("--strict")
@@ -115,7 +115,7 @@ public static class CompareCommand
         RunComparison comparison;
         try
         {
-            comparison = RunComparison.Of(baseline, candidate, strict);
+            comparison = baseline.CompareTo(candidate, strict);
         }
         catch (ArgumentException ex)
         {
@@ -131,6 +131,7 @@ public static class CompareCommand
             {
                 verdict = comparison.Verdict.ToString(),
                 strict,
+                inputs = new { baseline = Provenance(baseline), candidate = Provenance(candidate) },
                 matched = comparison.Scenarios.Count,
                 baselineOnly = comparison.BaselineOnly,
                 candidateOnly = comparison.CandidateOnly,
@@ -143,13 +144,15 @@ public static class CompareCommand
                 recovered = comparable ? comparison.Recovered : (int?)null,
                 regressed = comparable ? comparison.Regressed : (int?)null,
                 regressedScenarios = comparable ? RegressedIds(comparison) : null,
+                // A scenario either run did not measure has no delta: its 0 is a placeholder.
+                notMeasuredScenarios = comparable ? comparison.NotMeasuredScenarios : null,
                 deltas = comparable
                     ? comparison.Scenarios.Select(s => new
                     {
                         scenario = s.ScenarioId,
                         baseline = s.BaselineScore,
                         candidate = s.CandidateScore,
-                        delta = s.ScoreDelta,
+                        delta = s.BothMeasured ? s.ScoreDelta : (double?)null,
                     }).ToList()
                     : null,
             }, s_json));
@@ -157,6 +160,8 @@ public static class CompareCommand
             return ExitCode(comparison, failOnRegression);
         }
 
+        WriteProvenance("baseline", baseline);
+        WriteProvenance("candidate", candidate);
         Render(comparison, baselinePath, candidatePath, strict, failOnRegression);
         return ExitCode(comparison, failOnRegression);
     }
@@ -212,11 +217,15 @@ public static class CompareCommand
         Console.WriteLine("  ------------------------------------------------------------------------");
         foreach (var s in comparison.Scenarios)
         {
+            // A side that did not measure the scenario has a placeholder score: no number, no delta.
+            string baselineCell = s.BaselineScore?.ToString("F4", CultureInfo.InvariantCulture) ?? "n/m";
+            string candidateCell = s.CandidateScore?.ToString("F4", CultureInfo.InvariantCulture) ?? "n/m";
+            string deltaCell = s.BothMeasured ? FormatDelta(s.ScoreDelta) : "n/a";
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  {Fit(s.ScenarioId, 40),-40}  {s.BaselineScore,8:F4}  {s.CandidateScore,9:F4}  {FormatDelta(s.ScoreDelta),9}"));
+                $"  {Fit(s.ScenarioId, 40),-40}  {baselineCell,8}  {candidateCell,9}  {deltaCell,9}"));
         }
 
-        int subPrecision = comparison.Scenarios.Count(s => IsBelowDisplayPrecision(s.ScoreDelta));
+        int subPrecision = comparison.Scenarios.Count(s => s.BothMeasured && IsBelowDisplayPrecision(s.ScoreDelta));
         bool meanIsSubPrecision = IsBelowDisplayPrecision(comparison.MeanScoreDelta);
         if (subPrecision > 0 || meanIsSubPrecision)
         {
@@ -244,6 +253,16 @@ public static class CompareCommand
         Console.WriteLine();
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  mean score delta: {FormatDelta(comparison.MeanScoreDelta)}  ·  recovered {comparison.Recovered}  ·  regressed {comparison.Regressed}"));
+        if (comparison.NotMeasuredScenarios.Count > 0)
+        {
+            // n/m: not measured (errored, skipped, or no judge verdict) on that side.
+            Console.WriteLine($"  ⚠ {comparison.NotMeasuredScenarios.Count} scenario(s) were not measured in one run or both " +
+                              "(errored, skipped, or no judge verdict; n/m above) and are not in the mean:");
+            foreach (string id in comparison.NotMeasuredScenarios.Take(40))
+                Console.WriteLine($"   • {id}");
+            if (comparison.NotMeasuredScenarios.Count > 40)
+                Console.WriteLine($"   • … and {comparison.NotMeasuredScenarios.Count - 40} more");
+        }
         Console.WriteLine();
 
         if (failOnRegression && comparison.Regressed > 0)
@@ -297,82 +316,58 @@ public static class CompareCommand
         }
     }
 
-    private static bool TryLoad(string path, string option, out List<ScenarioResult> results)
+    private static object Provenance(AefComparisonRun run) => new
     {
-        results = [];
+        integrity = run.Integrity, runHash = run.RunHash, status = run.Status, imported = run.Imported,
+        asserted = run.Asserted, abortReason = run.AbortReason,
+        custody = run.Imported ? "imported: not sealed when it ran" : run.Integrity == "unsealed" ? "unsealed: integrity not established" : "intact; signature not checked",
+    };
 
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            Console.Error.WriteLine($"✖ {option} is required.");
-            return false;
-        }
+    private static void WriteProvenance(string side, AefComparisonRun run)
+    {
+        Console.WriteLine($"  {side}: {run.Integrity}; status {run.Status}; " +
+            (run.Imported ? "imported: not sealed when it ran" : run.Integrity == "unsealed" ? "integrity not established" : "intact; signature not checked"));
+        if (run.Asserted.Count > 0) Console.WriteLine("    Importer-supplied fields: " + string.Join(", ", run.Asserted));
+        if (run.AbortReason is not null) Console.WriteLine("    " + run.AbortReason);
+    }
 
-        string full;
+    private static bool TryLoad(string path, string option, out AefComparisonRun results)
+    {
+        results = null!;
+        DirectoryInfo? converted = null;
         try
         {
-            full = Path.GetFullPath(path);
+            if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException($"{option} is required.");
+            var full = Path.GetFullPath(path);
+            if (!Directory.Exists(full)) throw new DirectoryNotFoundException($"No such directory: {full}");
+            // Preserve tab-completion of the scenarios directory, including recognition of an AEF parent.
+            if (Path.GetFileName(Path.TrimEndingDirectorySeparator(full)) == "scenarios")
+                full = Directory.GetParent(Path.TrimEndingDirectorySeparator(full))!.FullName;
+            // AEF markers always take precedence. A damaged AEF run must never fall back to legacy files.
+            var isAef = new[] { "run.json", "results.ndjson", "seal.json", "metrics.json" }
+                .Any(name => Path.Exists(Path.Combine(full, name)));
+            if (!isAef)
+            {
+                converted = Directory.CreateTempSubdirectory("ae-compare-import-");
+                var destination = Path.Combine(converted.FullName, "run");
+                // Bind to the chosen directory. Run IDs can be duplicated in copied workspace trees.
+                StoreV1Exporter.ExportDirectory(full, destination);
+                full = destination;
+            }
+            results = new AefComparisonReader().Read(full);
+            return true;
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException
+            or JsonException or InvalidOperationException or NotSupportedException)
         {
-            Console.Error.WriteLine($"✖ {option}: '{path}' is not a usable path ({ex.GetType().Name}).");
+            Console.Error.WriteLine($"✖ {option}: {error.Message}");
             return false;
         }
-
-        if (!Directory.Exists(full))
+        finally
         {
-            Console.Error.WriteLine($"✖ {option}: no such directory: {full}");
-            return false;
+            // Only this invocation's newly reserved temporary directory is removed.
+            if (converted is not null) Directory.Delete(converted.FullName, recursive: true);
         }
-
-        // A run directory is a directory with a scenarios/ folder in it. Accept the scenarios folder
-        // itself too, because that is what a reader who tab-completes will land on.
-        string scenarios = Directory.Exists(Path.Combine(full, "scenarios"))
-            ? Path.Combine(full, "scenarios")
-            : full;
-
-        var files = Directory.GetFiles(scenarios, "*.json").OrderBy(f => f, StringComparer.Ordinal).ToList();
-        if (files.Count == 0)
-        {
-            Console.Error.WriteLine(
-                $"✖ {option}: {full} contains no scenario files. Point it at a run directory — the one that "
-              + "holds manifest.json, summary.json and scenarios/.");
-            return false;
-        }
-
-        foreach (string file in files)
-        {
-            ScenarioResult? result;
-            try
-            {
-                result = JsonSerializer.Deserialize<ScenarioResult>(File.ReadAllText(file), s_json);
-            }
-            catch (JsonException ex)
-            {
-                Console.Error.WriteLine($"✖ {option}: {file} is not a readable scenario file — {ex.Message}");
-                return false;
-            }
-
-            if (result is null)
-            {
-                Console.Error.WriteLine($"✖ {option}: {file} deserialised to null.");
-                return false;
-            }
-
-            // A JSON file with no scenario id is not a scenario result (for example a run's manifest.json or
-            // summary.json, read because the directory has no scenarios/ folder). It used to reach the index as a
-            // null key and crash the command with "Value cannot be null".
-            if (string.IsNullOrWhiteSpace(result.Id))
-            {
-                Console.Error.WriteLine(
-                    $"✖ {option}: {file} is not a scenario result (it has no scenario id). Point at a run directory "
-                  + "with a scenarios/ folder; a run that wrote none cannot be compared per scenario.");
-                return false;
-            }
-
-            results.Add(result);
-        }
-
-        return true;
     }
 
     /// <summary>
@@ -393,23 +388,16 @@ public static class CompareCommand
     /// a zero and a number too small to show:
     /// </para>
     /// <list type="bullet">
-    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is <c>NaN</c> when there is nothing to average → <c>n/a</c>.
-    ///   ⚠ <b>DEFENSIVE ONLY — this branch has no live subject in the report.</b> See the remark below.</item>
+    ///   <item><b>absent</b> — <c>MeanScoreDelta</c> is null when there is nothing to average → <c>n/a</c>.
+    ///   Live in the report since T13-5: a comparable run whose every shared scenario was not measured on one side
+    ///   has no measured pair to average. See the remark below.</item>
     ///   <item><b>exactly zero</b> — the runs scored identically → <c>0.0000</c>, unchanged.</item>
     ///   <item><b>non-zero, below four decimal places</b> → scientific, e.g. <c>1.17e-05</c>, keeping
     ///   both the sign and the magnitude. "Smaller than the display can show" is not "zero".</item>
     /// </list>
     /// <para>
-    /// ⚠ <b>WAVE 11 CORRECTION.</b> <see cref="RunComparison.MeanScoreDelta"/> is <c>NaN</c> exactly
-    /// when <c>Scenarios.Count == 0</c>, and that same count forces
-    /// <see cref="ComparisonVerdict.Incomparable"/>, which returns from <c>Render</c> before the
-    /// scenario table, the legend and the mean line are written. <b>The report therefore never printed
-    /// <c>NaN</c> here and cannot print <c>n/a</c> either</b> — the absence case is a state of THIS
-    /// FUNCTION, not a state of the report, and MEASUREMENT_STATUS §72's claim that the report's
-    /// absence rendering "changed NaN → n/a" overstates what was reachable. The coupling that makes
-    /// it dead is asserted by
-    /// <c>TheAbsentMeanRendering_CannotBeReachedByTheReport_BecauseAnEmptyComparisonRefusesFirst</c>,
-    /// so if it is ever broken the branch goes live and that test says so.
+    /// An empty comparison refuses before rendering a table. A comparable pair with no jointly measured scenarios
+    /// can still reach the table and displays n/a for its mean; neither case invents a delta.
     /// </para>
     /// <para>
     /// The sub-precision case is decided by FORMATTING FIRST and asking whether the result reads as a
@@ -417,10 +405,11 @@ public static class CompareCommand
     /// about where <c>F4</c> rounds and could disagree with it at the boundary.
     /// </para>
     /// </remarks>
-    /// <param name="delta">The delta to render.</param>
+    /// <param name="reading">The delta to render, or null when absent.</param>
     /// <returns>The rendered delta.</returns>
-    internal static string FormatDelta(double delta)
+    internal static string FormatDelta(double? reading)
     {
+        if (reading is not { } delta) return "n/a";
         // ABSENCE. Not a small number, not a zero: there was nothing to average.
         if (double.IsNaN(delta)) return "n/a";
 
@@ -436,9 +425,9 @@ public static class CompareCommand
             : fixedPoint;
     }
 
-    /// <summary>True when <paramref name="delta"/> is real but too small for the fixed-point column.</summary>
-    private static bool IsBelowDisplayPrecision(double delta) =>
-        !double.IsNaN(delta) && delta != 0.0
+    /// <summary>True when <paramref name="reading"/> is real but too small for the fixed-point column.</summary>
+    private static bool IsBelowDisplayPrecision(double? reading) =>
+        reading is { } delta && !double.IsNaN(delta) && delta != 0.0
         && delta.ToString("F4", CultureInfo.InvariantCulture) is "0.0000" or "-0.0000";
 
     private static string Fit(string text, int width) =>

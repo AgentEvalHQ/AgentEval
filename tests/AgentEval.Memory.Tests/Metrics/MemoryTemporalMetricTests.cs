@@ -147,10 +147,21 @@ public class MemoryTemporalMetricTests
 
         Assert.NotNull(result.Details);
         Assert.True(result.Details.ContainsKey("temporal_score"));
-        Assert.True(result.Details.ContainsKey("temporal_accuracy"));
+        Assert.False(result.Details.ContainsKey("temporal_accuracy"));
+        Assert.Contains("n/a (not measured)", result.Explanation);
         Assert.True(result.Details.ContainsKey("temporal_query_count"));
         Assert.True(result.Details.ContainsKey("overall_score"));
         Assert.True(result.Details.ContainsKey("scenario_name"));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NoTemporalScore_DoesNotSubstituteGeneralScore()
+    {
+        var memory = CreateResult(score: 100, temporal: true);
+        var result = await _metric.EvaluateAsync(memory.ToEvaluationContext());
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Contains("no temporal question", result.Explanation);
     }
 
     // --- Helpers ---

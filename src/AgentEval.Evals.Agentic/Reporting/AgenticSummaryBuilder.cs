@@ -52,7 +52,7 @@ public sealed class AgenticSummaryBuilder
         if (root.Details.SubResults is not { Count: > 0 } l1Children)
         {
             return new AgenticSummary(
-                OverallScore: root.Score.Value,
+                OverallScore: root.Score.MeasuredValue(),
                 OverallStatus: root.Score.ReportStatus(),
                 PerCategory: perCategory,
                 PerEvaluator: perEvaluator);
@@ -88,7 +88,7 @@ public sealed class AgenticSummaryBuilder
                         var confidence = ExtractConfidence(evaluator);
 
                         perEvaluator[evalKey] = new AgenticEvaluatorSummary(
-                            Score: evaluator.Score.Value,
+                            Score: evaluator.Score.MeasuredValue(),
                             Status: status,
                             Severity: evaluator.Score.Severity ?? "none",
                             Confidence: confidence);
@@ -96,7 +96,7 @@ public sealed class AgenticSummaryBuilder
                 }
 
                 perCategory[categoryKey] = new AgenticCategorySummary(
-                    Score: categoryNode.Score.Value,
+                    Score: categoryNode.Score.MeasuredValue(),
                     Status: categoryNode.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
@@ -108,7 +108,7 @@ public sealed class AgenticSummaryBuilder
             // (sum / count). The previous pairwise `(existing + score) / 2` re-average
             // silently over-weighted the last evaluator added to each bucket (BUG-16).
             var catScoreSum = new Dictionary<string, double>(StringComparer.Ordinal);
-            var catCount = new Dictionary<string, int>(StringComparer.Ordinal);
+            var catMeasured = new Dictionary<string, int>(StringComparer.Ordinal);
             var catStatus = new Dictionary<string, string>(StringComparer.Ordinal);
             var catCriticals = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
@@ -120,13 +120,18 @@ public sealed class AgenticSummaryBuilder
                 var confidence = ExtractConfidence(evaluator);
 
                 perEvaluator[evalKey] = new AgenticEvaluatorSummary(
-                    Score: evaluator.Score.Value,
+                    Score: evaluator.Score.MeasuredValue(),
                     Status: status,
                     Severity: evaluator.Score.Severity ?? "none",
                     Confidence: confidence);
 
-                catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
-                catCount[categoryKey] = catCount.GetValueOrDefault(categoryKey) + 1;
+                // Only an evaluator that measured something is averaged in (T13): an errored, skipped or inapplicable one
+                // carries a placeholder 0, so [pass 1.0, error] read 0.5. Its status still reaches the category below.
+                if (evaluator.Score.CountsTowardAggregate())
+                {
+                    catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
+                    catMeasured[categoryKey] = catMeasured.GetValueOrDefault(categoryKey) + 1;
+                }
                 catStatus[categoryKey] = catStatus.TryGetValue(categoryKey, out var prior)
                     ? EvalScoreExtensions.CombineReportStatus(prior, status)
                     : status;
@@ -139,11 +144,13 @@ public sealed class AgenticSummaryBuilder
                 }
             }
 
-            foreach (var (categoryKey, count) in catCount)
+            foreach (var (categoryKey, categoryStatus) in catStatus)
             {
+                // The category has no score when no evaluator measured anything.
+                var measured = catMeasured.GetValueOrDefault(categoryKey);
                 perCategory[categoryKey] = new AgenticCategorySummary(
-                    Score: catScoreSum[categoryKey] / count,
-                    Status: catStatus[categoryKey],
+                    Score: measured > 0 ? catScoreSum[categoryKey] / measured : null,
+                    Status: categoryStatus,
                     CriticalFails: catCriticals.TryGetValue(categoryKey, out var fails)
                         ? fails
                         : (IReadOnlyList<string>)Array.Empty<string>());
@@ -151,7 +158,7 @@ public sealed class AgenticSummaryBuilder
         }
 
         return new AgenticSummary(
-            OverallScore: root.Score.Value,
+            OverallScore: root.Score.MeasuredValue(),
             OverallStatus: root.Score.ReportStatus(),
             PerCategory: perCategory,
             PerEvaluator: perEvaluator);

@@ -164,6 +164,11 @@ public static class GatekeeperExplainabilityAndTrust
 
         Console.WriteLine($"\n  Trust Score: {trust.Score:F0}/100");
         Console.WriteLine($"  {trust.Explanation}");
+        // Checked, not asserted in prose: the errored signal must be the one left out, and the score must exist.
+        if (trust.SignalsMeasured != signals.Count - 1 || trust.Score is null)
+            throw new SampleCheckFailedException(
+                $"TrustScoreCalculator counted {trust.SignalsMeasured} of {signals.Count} signals (score {trust.Score?.ToString("F0") ?? "none"}): " +
+                "the errored signal was expected to be excluded and the other two to count.");
         Console.WriteLine("    ✅ the heavily-weighted errored signal (weight 5) did NOT drag the score toward 0 — excluded, never zero-scored");
     }
 

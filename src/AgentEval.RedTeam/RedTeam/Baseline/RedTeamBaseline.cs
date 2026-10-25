@@ -20,24 +20,39 @@ public record RedTeamBaseline
     /// <summary>Name of the agent that was tested.</summary>
     public required string AgentName { get; init; }
 
-    /// <summary>Overall security score (0-100).</summary>
-    public required double OverallScore { get; init; }
+    /// <summary>
+    /// Overall security score (0-100), or <see langword="null"/> when the captured run had no probe that reached a
+    /// verdict (<see cref="RedTeamResult.OverallScore"/>, T81). Not <c>required</c>: the baseline file leaves a null out.
+    /// </summary>
+    public double? OverallScore { get; init; }
 
     /// <summary>
     /// Conclusive-only score (resisted / conclusive × 100, RC-6) at capture time — the honest score dimension the
-    /// inconclusive-diluted <see cref="OverallScore"/> can mask. Nullable: baselines captured before this field
-    /// existed deserialize to <c>null</c>, and the comparer then falls back to the <see cref="OverallScore"/> delta.
+    /// inconclusive-diluted <see cref="OverallScore"/> can mask. <c>null</c> when the captured run had no conclusive
+    /// probe, and on baselines captured before this field existed; the comparer then falls back to the
+    /// <see cref="OverallScore"/> delta.
     /// </summary>
     public double? ConclusiveScore { get; init; }
 
-    /// <summary>Attack success rate (lower is better).</summary>
-    public required double AttackSuccessRate { get; init; }
+    /// <summary>
+    /// Attack success rate (lower is better), or <see langword="null"/> when the captured run had no probe that reached a
+    /// verdict (T81). Not <c>required</c>, for the same reason as <see cref="OverallScore"/>.
+    /// </summary>
+    public double? AttackSuccessRate { get; init; }
 
     /// <summary>Total probes executed.</summary>
     public required int TotalProbes { get; init; }
 
     /// <summary>Probes that succeeded (vulnerabilities found).</summary>
     public required int SucceededProbes { get; init; }
+
+    /// <summary>
+    /// Probes that reached a verdict (resisted or succeeded) at capture time. 0 means the baseline measured nothing, so
+    /// no delta against it is a measurement (<see cref="RedTeamComparison.IsComparable"/>). Nullable: baselines
+    /// captured before this field existed deserialize to <c>null</c>, and the comparison then counts the persisted
+    /// per-attack results.
+    /// </summary>
+    public int? ConclusiveProbes { get; init; }
 
     /// <summary>Results per attack type.</summary>
     public required IReadOnlyList<AttackBaselineResult> AttackResults { get; init; }
@@ -75,6 +90,7 @@ public record RedTeamBaseline
             GradingMode = result.Options?.Mode,   // ADR-021 B.1: capture the grading mode for cross-mode comparison guard
             TotalProbes = result.TotalProbes,
             SucceededProbes = result.SucceededProbes,
+            ConclusiveProbes = result.ConclusiveProbes,
             AttackResults = result.AttackResults.Select(a =>
             {
                 var failed = a.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Succeeded).ToList();
@@ -149,7 +165,11 @@ public record AttackBaselineResult
     /// </summary>
     public IReadOnlyDictionary<string, EvidenceFidelity>? FailedProbeFidelities { get; init; }
 
-    /// <summary>Resistance rate (higher is better).</summary>
+    /// <summary>Probes that reached a verdict when the baseline was captured.</summary>
     [JsonIgnore]
-    public double Rate => TotalCount > 0 ? (double)ResistedCount / TotalCount : 1.0;
+    public int ConclusiveCount => ResistedCount + FailedProbeIds.Count;
+
+    /// <summary>Resistance rate over conclusive probes (0-1); null when none reached a verdict.</summary>
+    [JsonIgnore]
+    public double? Rate => ConclusiveCount > 0 ? (double)ResistedCount / ConclusiveCount : null;
 }

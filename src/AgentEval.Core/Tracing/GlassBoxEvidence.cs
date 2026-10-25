@@ -95,8 +95,8 @@ public sealed record GlassBoxEvidence
             SuppressedFinishTurns = chatResponses.Count(r =>
                 string.Equals(r.FinishReason, "content_filter", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(r.FinishReason, "length", StringComparison.OrdinalIgnoreCase)),
-            TotalPromptTokens = chatResponses.Sum(r => r.TokenUsage?.PromptTokens ?? 0),
-            TotalCompletionTokens = chatResponses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0),
+            TotalPromptTokens = Core.TokenUsageMapping.SaturatingSum(chatResponses.Select(r => r.TokenUsage?.PromptTokens ?? 0)),
+            TotalCompletionTokens = Core.TokenUsageMapping.SaturatingSum(chatResponses.Select(r => r.TokenUsage?.CompletionTokens ?? 0)),
         };
     }
 

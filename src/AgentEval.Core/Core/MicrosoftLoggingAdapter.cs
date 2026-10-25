@@ -112,23 +112,27 @@ public sealed class MicrosoftLoggingAdapter : IAgentEvalLogger
     public void LogTimeline(ToolCallTimeline timeline)
     {
         _logger.LogInformation(
-            "Tool call timeline: {TotalCalls} calls, {TotalDuration}ms total, TTFT {TTFT}ms, {FailedCalls} failed",
+            "Tool call timeline: {TotalCalls} calls, {TotalDuration}ms total, TTFT {TTFT}ms, {FailedCalls} failed, {UnmeasuredOutcomes} outcomes and {UnmeasuredDurations} durations not measured",
             timeline.TotalToolCalls,
             timeline.TotalDuration.TotalMilliseconds,
             timeline.TimeToFirstToken.TotalMilliseconds,
-            timeline.FailedToolCalls);
+            timeline.FailedToolCalls,
+            timeline.UnmeasuredOutcomeCount,
+            timeline.UnmeasuredDurationCount);
 
         // Log individual tool calls at debug level
         if (_logger.IsEnabled(MELogLevel.Debug))
         {
             foreach (var inv in timeline.Invocations)
             {
-                var status = inv.Succeeded ? "succeeded" : "failed";
-                _logger.LogDebug(
-                    "  Tool {ToolName} {Status} in {Duration}ms",
-                    inv.ToolName,
-                    status,
-                    inv.Duration.TotalMilliseconds);
+                var status = inv.OutcomeNotMeasuredReason is { } reason
+                    ? $"outcome not measured: {reason}" : inv.Succeeded ? "succeeded" : "failed";
+                if (inv.TimingNotMeasuredReason is { } timingReason)
+                    _logger.LogDebug("  Tool {ToolName} {Status}; duration not measured: {TimingReason}",
+                        inv.ToolName, status, timingReason);
+                else
+                    _logger.LogDebug("  Tool {ToolName} {Status} in {Duration}ms",
+                        inv.ToolName, status, inv.Duration.TotalMilliseconds);
             }
         }
     }

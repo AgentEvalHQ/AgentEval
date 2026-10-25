@@ -11,55 +11,55 @@ namespace AgentEval.Comparison;
 /// </summary>
 /// <remarks>
 /// Implementations should be stateless and thread-safe to support concurrent operations.
-/// All methods should handle empty collections gracefully by returning sensible defaults (e.g., 0).
+/// A statistic of nothing is null. Sample spread and confidence intervals need at least two values.
 /// </remarks>
 public interface IStatisticsCalculator
 {
     /// <summary>
     /// Calculates the arithmetic mean of a sequence of values.
     /// </summary>
-    /// <param name="values">The values to analyze. Empty collections return 0.</param>
-    /// <returns>The mean value, or 0 if the collection is empty.</returns>
-    double Mean(IReadOnlyList<double> values);
+    /// <param name="values">The values to analyze. Empty collections return null.</param>
+    /// <returns>The mean value, or null if the collection is empty.</returns>
+    double? Mean(IReadOnlyList<double> values);
     
     /// <summary>
     /// Calculates the median of a sequence of values.
     /// </summary>
-    /// <param name="values">The values to analyze. Empty collections return 0.</param>
-    /// <returns>The median value, or 0 if the collection is empty.</returns>
-    double Median(IReadOnlyList<double> values);
+    /// <param name="values">The values to analyze. Empty collections return null.</param>
+    /// <returns>The median value, or null if the collection is empty.</returns>
+    double? Median(IReadOnlyList<double> values);
     
     /// <summary>
     /// Calculates the standard deviation of a sequence of values.
     /// </summary>
-    /// <param name="values">The values to analyze. Collections with less than 2 items return 0.</param>
-    /// <returns>The standard deviation, or 0 if insufficient data.</returns>
-    double StandardDeviation(IReadOnlyList<double> values);
+    /// <param name="values">The values to analyze. Collections with less than 2 items return null.</param>
+    /// <returns>The standard deviation, or null if insufficient data.</returns>
+    double? StandardDeviation(IReadOnlyList<double> values);
     
     /// <summary>
     /// Calculates a percentile of a sequence of values.
     /// </summary>
     /// <param name="values">The values to analyze.</param>
     /// <param name="percentile">The percentile to calculate (0-100). Values outside this range throw ArgumentOutOfRangeException.</param>
-    /// <returns>The calculated percentile value.</returns>
+    /// <returns>The calculated percentile value, or null for an empty collection.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when percentile is not between 0 and 100.</exception>
-    double Percentile(IReadOnlyList<double> values, double percentile);
+    double? Percentile(IReadOnlyList<double> values, double percentile);
     
     /// <summary>
     /// Calculates a confidence interval for the mean using t-distribution.
     /// </summary>
-    /// <param name="values">The values to analyze. Collections with less than 2 items return (0, 0).</param>
+    /// <param name="values">The values to analyze. Collections with less than 2 items return null.</param>
     /// <param name="confidenceLevel">The confidence level (e.g., 0.95 for 95%). Must be between 0 and 1.</param>
     /// <returns>A confidence interval with lower and upper bounds.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when confidenceLevel is not between 0 and 1.</exception>
-    ConfidenceInterval CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95);
+    ConfidenceInterval? CalculateConfidenceInterval(IReadOnlyList<double> values, double confidenceLevel = 0.95);
     
     /// <summary>
     /// Calculates the pass rate (percentage of true values) from boolean results.
     /// </summary>
-    /// <param name="results">The boolean results to analyze. Empty collections return 0.</param>
-    /// <returns>The pass rate as a value between 0.0 and 1.0.</returns>
-    double CalculatePassRate(IReadOnlyList<bool> results);
+    /// <param name="results">The boolean results to analyze. Empty collections return null.</param>
+    /// <returns>The pass rate between 0.0 and 1.0, or null for an empty collection.</returns>
+    double? CalculatePassRate(IReadOnlyList<bool> results);
     
     /// <summary>
     /// Creates comprehensive statistics from test scores and pass/fail results.
@@ -69,7 +69,7 @@ public interface IStatisticsCalculator
     /// <param name="confidenceLevel">The confidence level for intervals (e.g., 0.95 for 95%).</param>
     /// <returns>Complete stochastic statistics including mean, median, distribution, and confidence intervals.</returns>
     /// <exception cref="ArgumentException">Thrown when scores and passResults have different counts.</exception>
-    StochasticStatistics CreateStatistics(
+    StochasticStatistics? CreateStatistics(
         IReadOnlyList<int> scores,
         IReadOnlyList<bool> passResults,
         double confidenceLevel = 0.95);
@@ -79,7 +79,7 @@ public interface IStatisticsCalculator
     /// </summary>
     /// <param name="values">The values to analyze.</param>
     /// <returns>Distribution statistics including min, max, mean, median, and percentiles.</returns>
-    DistributionStatistics CreateDistribution(IReadOnlyList<double> values);
+    DistributionStatistics? CreateDistribution(IReadOnlyList<double> values);
     
     /// <summary>
     /// Creates distribution statistics from a list of TimeSpan values.
@@ -87,7 +87,7 @@ public interface IStatisticsCalculator
     /// </summary>
     /// <param name="values">The time span values to analyze.</param>
     /// <returns>Distribution statistics with values in milliseconds.</returns>
-    DistributionStatistics CreateDistribution(IReadOnlyList<TimeSpan> values);
+    DistributionStatistics? CreateDistribution(IReadOnlyList<TimeSpan> values);
     
     /// <summary>
     /// Creates distribution statistics from a list of integer values.
@@ -95,7 +95,7 @@ public interface IStatisticsCalculator
     /// </summary>
     /// <param name="values">The integer values to analyze.</param>
     /// <returns>Distribution statistics.</returns>
-    DistributionStatistics CreateDistribution(IReadOnlyList<int> values);
+    DistributionStatistics? CreateDistribution(IReadOnlyList<int> values);
     
     /// <summary>
     /// Creates distribution statistics from a list of decimal values.
@@ -103,5 +103,5 @@ public interface IStatisticsCalculator
     /// </summary>
     /// <param name="values">The decimal values to analyze.</param>
     /// <returns>Distribution statistics.</returns>
-    DistributionStatistics CreateDistribution(IReadOnlyList<decimal> values);
+    DistributionStatistics? CreateDistribution(IReadOnlyList<decimal> values);
 }

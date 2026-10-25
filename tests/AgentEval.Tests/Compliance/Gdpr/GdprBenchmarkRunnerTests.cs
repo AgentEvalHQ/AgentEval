@@ -101,7 +101,7 @@ public class GdprBenchmarkRunnerTests
         {
             var restored = EvalResultPersistence.FromScenarioResult(sr);
             Assert.NotNull(restored);
-            Assert.Equal(sr.Score, restored!.Score.Value, precision: 10);
+            Assert.Equal(sr.Score, restored!.Score.MeasuredValue());
             Assert.Equal(sr.Passed, restored.Score.Passed);
         }
 

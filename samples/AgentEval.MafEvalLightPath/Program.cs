@@ -80,7 +80,7 @@ internal static class Program
         var azure = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey));
 
         // A real MAF agent (Azure-backed IChatClient -> AIAgent) + a judge IChatClient.
-        AIAgent agent = azure.GetChatClient(deployment).AsIChatClient().AsAIAgent(
+        AIAgent agent = azure.GetChatClient(deployment).AsIChatClient().WithMinimalReasoning().AsAIAgent(
             name: "TravelLightPathAgent",
             instructions: """
                 You are a travel booking assistant. When asked to find flights or hotels,
@@ -88,7 +88,7 @@ internal static class Program
                 """,
             tools: [AIFunctionFactory.Create(SearchFlights), AIFunctionFactory.Create(SearchHotels)]);
 
-        IChatClient judge = azure.GetChatClient(deployment).AsIChatClient();
+        IChatClient judge = azure.GetChatClient(deployment).AsIChatClient().WithMinimalReasoning();
         var chatConfig = new ChatConfiguration(judge);
 
         var subject = new SubjectIdentity(
@@ -110,8 +110,10 @@ internal static class Program
         Console.WriteLine("KEY TAKEAWAYS:");
         Console.WriteLine("  • Both ran via MAF's NATIVE IAgentEvaluator overload: agent.EvaluateAsync(queries, evaluator).");
         Console.WriteLine("  • [1] flat metrics and [2] a full AgenticBenchmark COMPOSITE both plug in as one evaluator.");
-        Console.WriteLine("  • The native adapter forwards EvalItem.Conversation (full, with tool calls), so even");
-        Console.WriteLine("    code-based tool metrics now see the calls (MAF's MEAI-only adapter drops them).");
+        Console.WriteLine("  • The native adapter forwards EvalItem.Conversation (full, with tool calls) and the agent's");
+        Console.WriteLine("    tools, so the flat tool metrics and the composite's tool checks see the calls the agent");
+        Console.WriteLine("    made (MAF's MEAI-only adapter drops them). The agent's instructions reach the judges only");
+        Console.WriteLine("    when AgentEvalAgentEvaluator.AgentInstructions is set: MAF does not put them on the item.");
 
         if (autoOpen)
             foreach (var p in produced)

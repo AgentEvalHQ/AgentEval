@@ -5,6 +5,7 @@ namespace AgentEval.Tests.ResponsibleAI;
 
 using AgentEval.Core;
 using AgentEval.Metrics.ResponsibleAI;
+using AgentEval.Models;
 using AgentEval.Testing;
 
 public class MisinformationMetricTests
@@ -87,7 +88,7 @@ public class MisinformationMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_TreatedAsInconclusive_NotAPass()
+    public async Task EvaluateAsync_LlmReturnsJsonWithNoScoreField_IsNotMeasured_NotAPass()
     {
         // Regression test for a real bug found in review: GetDouble's default of 70 sat EXACTLY AT
         // PassingScoreThreshold, so a judge reply with valid JSON but a missing/non-numeric "score" field
@@ -117,6 +118,7 @@ public class MisinformationMetricTests
 
         Assert.False(result.Passed);
         Assert.Equal(0.0, result.Score);
+        Assert.False(result.Measured);   // no verdict: not measured, never a Fail at 0 (T03)
     }
 
     [Fact]
@@ -287,6 +289,96 @@ public class MisinformationMetricTests
         var result = await metric.EvaluateAsync(context);
 
         Assert.NotNull(result);
+    }
+
+    // 2026-10 Bitdeer sweep, sample A5: the agent repeated the flights its search tool returned, and the judge — shown
+    // only the (absent) retrieved context — failed it for "specific numbers that seem arbitrary". The tool results were
+    // on EvaluationContext.ToolUsage all along; the judge must be sent them.
+    [Fact]
+    public async Task EvaluateAsync_ToolResults_AreSentToTheJudgeAsEvidence()
+    {
+        var fakeClient = new FakeChatClient("""{"score": 95, "potentialFabrications": []}""");
+        var metric = new MisinformationMetric(fakeClient);
+
+        await metric.EvaluateAsync(FlightSearchContext());
+
+        var prompt = fakeClient.LastPrompt!;
+        Assert.Contains("TOOL RESULTS THE AI RECEIVED", prompt);
+        Assert.Contains("SearchFlights", prompt);
+        Assert.Contains("AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h)", prompt);
+        Assert.Contains("is not a fabrication by the AI", prompt);
+        Assert.Contains("<tool_results>", prompt);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ToolResults_SentBesideTheRetrievedContext()
+    {
+        var fakeClient = new FakeChatClient("""{"score": 95}""");
+        var metric = new MisinformationMetric(fakeClient);
+        var context = FlightSearchContext(retrievedContext: "Seattle-Tacoma is the main airport for Seattle.");
+
+        await metric.EvaluateAsync(context);
+
+        var prompt = fakeClient.LastPrompt!;
+        Assert.Contains("CONTEXT AVAILABLE TO AI:", prompt);
+        Assert.Contains("Seattle-Tacoma is the main airport for Seattle.", prompt);
+        Assert.Contains("AA101 ($450, 10h)", prompt);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ToolResults_ChangeTheInstrumentDigest_NoResultLeavesItAsItWas()
+    {
+        var withoutTools = await new MisinformationMetric(new FakeChatClient("""{"score": 95}"""))
+            .EvaluateAsync(new EvaluationContext { Input = "q", Output = "a" });
+        var pendingCall = new ToolUsageReport();
+        pendingCall.AddCall(new ToolCallRecord { Name = "SearchFlights", CallId = "c1", Order = 1 });
+        var withPendingCall = await new MisinformationMetric(new FakeChatClient("""{"score": 95}"""))
+            .EvaluateAsync(new EvaluationContext { Input = "q", Output = "a", ToolUsage = pendingCall });
+        var withToolResult = await new MisinformationMetric(new FakeChatClient("""{"score": 95}"""))
+            .EvaluateAsync(FlightSearchContext());
+
+        Assert.NotNull(withoutTools.RubricDigest);
+        Assert.Equal(withoutTools.RubricDigest, withPendingCall.RubricDigest);   // a call with no result is no evidence
+        Assert.NotEqual(withoutTools.RubricDigest, withToolResult.RubricDigest); // a different instrument: it sends more
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ToolError_IsSentAsAnError()
+    {
+        var fakeClient = new FakeChatClient("""{"score": 95}""");
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        {
+            Name = "SearchFlights", CallId = "c1", Order = 1, Exception = new InvalidOperationException("upstream timeout"),
+        });
+
+        await new MisinformationMetric(fakeClient).EvaluateAsync(new EvaluationContext
+        {
+            Input = "Find flights", Output = "The flight search timed out; please try again.", ToolUsage = usage,
+        });
+
+        Assert.Contains("\"error\":\"upstream timeout\"", fakeClient.LastPrompt);
+    }
+
+    private static EvaluationContext FlightSearchContext(string? retrievedContext = null)
+    {
+        var usage = new ToolUsageReport();
+        usage.AddCall(new ToolCallRecord
+        {
+            Name = "SearchFlights",
+            CallId = "call-1",
+            Order = 1,
+            Arguments = new Dictionary<string, object?> { ["origin"] = "Seattle", ["destination"] = "Paris", ["date"] = "next Friday" },
+            Result = "Found 3 flights from Seattle to Paris on next Friday: AA101 ($450, 10h), DL205 ($520, 9h), UA309 ($480, 11h)",
+            WasExecuted = true,
+        });
+        return new EvaluationContext
+        {
+            Input = "Find flights from Seattle to Paris for next Friday",
+            Output = "I found 3 flights: AA101 at $450 (10h), DL205 at $520 (9h) and UA309 at $480 (11h). Best value: AA101.",
+            Context = retrievedContext,
+            ToolUsage = usage,
+        };
     }
 
     [Fact]

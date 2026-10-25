@@ -31,6 +31,10 @@ public class MetricCatalogTests
     [InlineData("llm_bias")]
     [InlineData("llm_misinformation")]
     [InlineData("llm_task_completion")]
+    [InlineData("llm_toxicity")]
+    [InlineData("embed_answer_similarity")]
+    [InlineData("embed_response_context")]
+    [InlineData("embed_query_context")]
     public void IsKnown_EveryDocumentedName_ReturnsTrue(string name)
     {
         Assert.True(MetricCatalog.IsKnown(name));
@@ -76,10 +80,45 @@ public class MetricCatalogTests
     }
 
     [Fact]
+    public void Resolve_LlmToxicity_IsTheToxicityMetricWithItsJudge()
+    {
+        // T67: --metrics could only name the pattern-only toxicity check; the LLM-judged one had no name to select.
+        var metric = MetricCatalog.Resolve("llm_toxicity", new ScriptedChatClient());
+
+        Assert.IsType<AgentEval.Metrics.ResponsibleAI.ToxicityMetric>(metric);
+        Assert.Equal("llm_toxicity", metric.Name);
+        Assert.Equal("code_toxicity", MetricCatalog.Resolve("code_toxicity", evaluatorClient: null).Name);
+    }
+
+    [Fact]
     public void Resolve_LlmBasedMetric_WithoutClient_ThrowsInvalidOperationException()
     {
         var ex = Assert.Throws<InvalidOperationException>(() => MetricCatalog.Resolve("llm_relevance", evaluatorClient: null));
         Assert.Contains("--judge", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("embed_answer_similarity")]
+    [InlineData("embed_response_context")]
+    [InlineData("embed_query_context")]
+    public void Resolve_EmbeddingMetric_WithoutGenerator_ReportsMissingEmbeddingConfiguration(string name)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => MetricCatalog.Resolve(name, null));
+
+        Assert.Contains("embedding", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Resolve_MixedMetricFamilies_UsesTheSuppliedInstruments()
+    {
+        var names = new[] { "code_toxicity", "llm_relevance", "embed_answer_similarity", "embed_response_context", "embed_query_context" };
+        using var judge = new ScriptedChatClient();
+        var embeddings = new FakeEmbeddings();
+
+        var metrics = names.Select(name => MetricCatalog.Resolve(name, judge, embeddings)).ToArray();
+
+        Assert.Equal(names, metrics.Select(metric => metric.Name));
+        Assert.All(metrics.Skip(2), metric => Assert.IsAssignableFrom<AgentEval.Metrics.RAG.EmbeddingBasedMetric>(metric));
     }
 
     [Fact]

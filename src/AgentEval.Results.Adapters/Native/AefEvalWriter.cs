@@ -3,11 +3,14 @@
 // Licensed under the MIT License.
 
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AgentEval.Models;
 using AgentEval.Output;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
+using NotMeasuredCause = AgentEval.Core.NotMeasuredCause;
 
 namespace AgentEval.Results.Adapters.Native;
 
@@ -409,9 +412,25 @@ public static partial class AefEvalWriter
         Id = name, Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(0, 100),
     };
 
-    private static AefResult MetricChild(string caseId, AgentEval.Core.MetricResult metric, string? judgeModel = null) =>
-        Child(caseId, $"{CasePath}/metrics/{Uri.EscapeDataString(metric.MetricName)}", "agenteval.metric",
-            metric.Measured ? metric.Passed ? AefState.Passed : AefState.Failed : AefState.NotMeasured) with
+    private static (AefState State, string? Reason) MetricOutcome(AgentEval.Core.MetricResult metric)
+    {
+        if (metric.Measured) return (metric.Passed ? AefState.Passed : AefState.Failed, null);
+        return metric.NotMeasuredCause switch
+        {
+            null => (AefState.NotMeasured, "The metric was not measured; its cause was not recorded."),
+            NotMeasuredCause.MissingInput => (AefState.NotMeasured, "Required input was not supplied."),
+            NotMeasuredCause.JudgeReplyUnreadable => (AefState.Error, "The judge reply did not provide a readable measurement."),
+            NotMeasuredCause.JudgeCallFailed => (AefState.Error, "The judge call failed."),
+            NotMeasuredCause.CheckTimedOut => (AefState.Error, "The check timed out."),
+            NotMeasuredCause.NotApplicable => (AefState.NotApplicable, "There was nothing applicable to check."),
+            _ => throw new ArgumentException("Expected: a defined not-measured cause. Actual: unsupported cause. Suggestions: use an existing NotMeasuredCause. Because: evidence must not invent an absence classification.", nameof(metric)),
+        };
+    }
+
+    private static AefResult MetricChild(string caseId, AgentEval.Core.MetricResult metric, string? judgeModel = null)
+    {
+        var outcome = MetricOutcome(metric);
+        return Child(caseId, $"{CasePath}/metrics/{Uri.EscapeDataString(metric.MetricName)}", "agenteval.metric", outcome.State) with
         {
             Annotator = !metric.Measured ? null
                 : metric.ModelGraded != false && metric.MetricName.StartsWith("llm_", StringComparison.Ordinal) && judgeModel is not null
@@ -419,13 +438,31 @@ public static partial class AefEvalWriter
                 : metric.ModelGraded == false || metric.MetricName.StartsWith("code_", StringComparison.Ordinal)
                     ? new AefAnnotator { Kind = AefAnnotatorKind.Code } : null,
             Scores = metric.Measured ? [new AefScore { Metric = metric.MetricName, Value = metric.Score }] : null,
-            Reason = metric.Measured ? null : "The metric could not be measured",
+            Reason = outcome.Reason,
+            Ext = !metric.Measured && metric.NotMeasuredCause is { } cause ? new JsonObject
+            {
+                ["agenteval.metric"] = new JsonObject
+                {
+                    ["version"] = 1, ["notMeasuredCause"] = JsonNamingPolicy.CamelCase.ConvertName(cause.ToString()),
+                },
+            } : null,
         };
+    }
 
     private static AefResult IncludeMetric(AefResult root, AgentEval.Core.MetricResult metric, int? passingScore)
     {
         var previous = root.Aggregation;
-        var absent = (previous?.Unmeasured?.NotMeasured ?? 0) + (metric.Measured ? 0 : 1);
+        var unmeasured = previous?.Unmeasured;
+        if (!metric.Measured)
+        {
+            unmeasured ??= new AefUnmeasured();
+            unmeasured = MetricOutcome(metric).State switch
+            {
+                AefState.Error => unmeasured with { Error = (unmeasured.Error ?? 0) + 1 },
+                AefState.NotApplicable => unmeasured with { NotApplicable = (unmeasured.NotApplicable ?? 0) + 1 },
+                _ => unmeasured with { NotMeasured = (unmeasured.NotMeasured ?? 0) + 1 },
+            };
+        }
         return root with
         {
             Annotator = null,
@@ -437,7 +474,7 @@ public static partial class AefEvalWriter
                 Threshold = root.State == AefState.Error ? null : passingScore,
                 Measured = (previous?.Measured ?? 0) + (metric.Measured ? 1 : 0),
                 Total = (previous?.Total ?? 0) + 1,
-                Unmeasured = absent == 0 ? null : new AefUnmeasured { NotMeasured = absent },
+                Unmeasured = unmeasured,
             },
         };
     }

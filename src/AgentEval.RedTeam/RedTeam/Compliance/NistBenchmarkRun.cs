@@ -184,7 +184,7 @@ public sealed class NistBenchmarkRun
             var partial = report.Controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective)
                 .Select(c => c.Control.Fidelity == ControlFidelity.Supporting
                     ? $"{c.Control.ControlId} (Supporting fidelity: at most partially effective)"
-                    : $"{c.Control.ControlId} ({c.PassRate:F0}% pass rate)")
+                    : $"{c.Control.ControlId} ({RedTeamResult.Percent(c.PassRate, "F0")} pass rate)")
                 .ToList();
             if (partial.Count > 0)
                 withheldNote = $"Partially effective: {string.Join(", ", partial)}; the run warns.";
@@ -208,7 +208,6 @@ public sealed class NistBenchmarkRun
 
         var dimensions = new Dictionary<string, double>
         {
-            ["nist_overall_pass_rate"]   = report.Summary.OverallPassRate / 100.0,
             ["nist_controls_evaluated"]  = report.Summary.TestedCategories,
             ["nist_total_controls"]      = report.Summary.TotalCategories,
             ["nist_needs_improvement"]   = report.Summary.CriticalFindings,
@@ -217,12 +216,15 @@ public sealed class NistBenchmarkRun
             ["nist_succeeded_probes"]    = redTeamResult.SucceededProbes,
             ["nist_resisted_probes"]     = redTeamResult.ResistedProbes,
         };
+        // Not measured is never a score (T81): with no conclusive probe there is no pass rate, so the key is absent.
+        if (report.Summary.OverallPassRate is { } overallPassRate)
+            dimensions["nist_overall_pass_rate"] = overallPassRate / 100.0;
 
         var compositeEvidence = new List<EvalEvidence>
         {
             new("nist", redTeamResult.AgentName,
                 $"NIST AI RMF preset='{PresetName}': {report.Summary.TestedCategories}/{report.Summary.TotalCategories} " +
-                $"MEASURE sub-actions evaluated, overall conclusive score {report.Summary.OverallPassRate:F1}%, " +
+                $"MEASURE sub-actions evaluated, overall conclusive score {report.Summary.OverallPassRateText}, " +
                 $"{report.Summary.CriticalFindings} needs-improvement. Governance/MAP/MANAGE controls are Not Applicable " +
                 "(a passing run is one input into an AI RMF program, not RMF conformance)."),
         };
@@ -250,7 +252,8 @@ public sealed class NistBenchmarkRun
                 Summary = withheldNote,
             },
             // The judge model only when one graded the attacks (WithJudge); never the unused IEvaluator.
-            Provenance: new("composite", judgeModel, null, null, null, 0.0, false),
+            // Complete or absent: null when a judge graded any leaf (its calls are not priced here), never $0.
+            Provenance: new("composite", judgeModel, null, null, null, CostRollup.Aggregate(leaves).EstimatedCost, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

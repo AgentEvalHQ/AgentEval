@@ -13,6 +13,7 @@ namespace AgentEval.Tests.Benchmarks;
 /// <summary>
 /// Tests for <see cref="PerformanceBenchmark"/> — latency, throughput, cost, and multi-prompt overloads.
 /// </summary>
+[Collection("ConsoleTests")]
 public class PerformanceBenchmarkTests
 {
     #region Latency Benchmark Tests

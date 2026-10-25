@@ -89,13 +89,19 @@ public class RedTeamBaselineComparer
         // (a fabricated improvement). Build the comparable baseline-vuln set from per-attack FailedProbeIds restricted
         // to the attack-name intersection (KnownVulnerabilities is flat and not attack-attributed, so it can't be filtered).
         var currentAttackNames = current.AttackResults.Select(a => a.AttackName).ToHashSet();
-        var comparableBaselineVulnIds = baseline.AttackResults
+        var comparableBaselineProbes = baseline.AttackResults
             .Where(a => currentAttackNames.Contains(a.AttackName))
-            .SelectMany(a => a.FailedProbeIds)
+            .SelectMany(a => a.FailedProbeIds.Select(id => (a.AttackName, ProbeId: id)))
             .ToHashSet();
-
-        var resolved = comparableBaselineVulnIds.Where(id => !currentVulnIds.Contains(id)).ToList();
-        var persistent = comparableBaselineVulnIds.Where(id => currentVulnIds.Contains(id)).ToList();
+        var currentFailedProbes = currentVulns.Select(v => (v.Attack.AttackName, v.Probe.ProbeId)).ToHashSet();
+        var currentResistedProbes = current.AttackResults.SelectMany(a => a.ProbeResults
+            .Where(p => p.Outcome == EvaluationOutcome.Resisted).Select(p => (a.AttackName, p.ProbeId))).ToHashSet();
+        var resolved = comparableBaselineProbes.Where(key => currentResistedProbes.Contains(key) && !currentFailedProbes.Contains(key))
+            .Select(key => key.ProbeId).Distinct().ToList();
+        var unverified = comparableBaselineProbes.Where(key => !currentResistedProbes.Contains(key) && !currentFailedProbes.Contains(key))
+            .Select(key => key.ProbeId).Distinct().ToList();
+        var persistent = comparableBaselineProbes.Where(currentFailedProbes.Contains)
+            .Select(key => key.ProbeId).Distinct().ToList();
 
         // Item 5: among PERSISTENT vulns, flag any whose evidence STRENGTHENED since the baseline (e.g. the same
         // probe went Verbal→Behavioral — described → actually executed). Skipped for baselines that did not persist
@@ -140,6 +146,7 @@ public class RedTeamBaselineComparer
             NewVulnerabilities = newVulns,
             ResolvedVulnerabilities = resolved,
             PersistentVulnerabilities = persistent,
+            UnverifiedVulnerabilities = unverified,
             AttackComparisons = attackComparisons,
             NotReTested = notReTested,
             FidelityEscalations = fidelityEscalations,
@@ -159,9 +166,9 @@ public class RedTeamBaselineComparer
                 .Select(p => p.ProbeId)
                 .ToHashSet();
 
-            var currentRate = attack.TotalCount > 0
-                ? (double)attack.ResistedCount / attack.TotalCount
-                : 1.0;
+            var currentRate = attack.ConclusiveResistanceRate;
+            var currentResisted = attack.ProbeResults.Where(p => p.Outcome == EvaluationOutcome.Resisted)
+                .Select(p => p.ProbeId).ToHashSet();
 
             if (baselineByName.TryGetValue(attack.AttackName, out var baselineAttack))
             {
@@ -178,7 +185,7 @@ public class RedTeamBaselineComparer
                         .Where(id => !baselineFailures.Contains(id))
                         .ToList(),
                     Resolved = baselineFailures
-                        .Where(id => !currentFailures.Contains(id))
+                        .Where(id => currentResisted.Contains(id) && !currentFailures.Contains(id))
                         .ToList()
                 });
             }
@@ -189,7 +196,8 @@ public class RedTeamBaselineComparer
                 {
                     AttackName = attack.AttackName,
                     AttackDisplayName = attack.AttackDisplayName,
-                    BaselineRate = 1.0, // Assume 100% resistance if not in baseline
+                    BaselineRate = null,
+                    IsNewAttack = true,
                     CurrentRate = currentRate,
                     StableBand = thresholds.AttackRateStableBand,
                     NewFailures = currentFailures.ToList(),

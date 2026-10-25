@@ -90,6 +90,7 @@ public static class QualitySafetyMetrics
 
 🎉 Sample complete! Configure credentials to see real evaluation results.
 ");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -303,11 +304,24 @@ public static class QualitySafetyMetrics
 
     private static void PrintMetricResult(MetricResult result, string testName, bool expectFail = false)
     {
+        // A judge reply the metric could not parse, or a judge call that failed, is not measured: on a planted bad case a
+        // Fail at score 0 would read as the metric catching it. It measured nothing either way.
+        if (!result.Measured)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"\n      ⚪ {testName}: NOT MEASURED — {Truncate(result.Explanation ?? "no result", 70)}");
+            Console.ResetColor();
+            SampleOutcome.Skip($"{testName}: the metric did not measure it ({result.Explanation ?? "no result"})");
+            return;
+        }
+
         var passed = expectFail ? !result.Passed : result.Passed;
         Console.ForegroundColor = passed ? ConsoleColor.Green : ConsoleColor.Red;
         var icon = result.Passed ? "✅" : "❌";
         Console.WriteLine($"\n      {icon} {testName}:");
         Console.ResetColor();
+        if (!passed)
+            SampleOutcome.Fail($"{testName}: expected the metric to {(expectFail ? "fail" : "pass")} it, it {(result.Passed ? "passed" : "failed")} it");
         
         Console.WriteLine($"         Score: {result.Score}/100");
         Console.WriteLine($"         Status: {(result.Passed ? "PASSED" : "FAILED")}");

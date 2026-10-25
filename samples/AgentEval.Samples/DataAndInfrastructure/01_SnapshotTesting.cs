@@ -37,6 +37,7 @@ public static class SnapshotTesting
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -169,6 +170,9 @@ public static class SnapshotTesting
             {
                 var icon = sr.Passed ? "✅" : "❌";
                 Console.WriteLine($"      {icon} [{sr.Path}] similarity = {sr.Similarity:P1} (threshold = {semanticOptions.SemanticThreshold:P1})");
+                // A similarity score under its threshold: a quality warning, not a structural failure.
+                if (!sr.Passed)
+                    SampleOutcome.Warn($"semantic snapshot [{sr.Path}]: similarity {sr.Similarity:P1} is below the {semanticOptions.SemanticThreshold:P1} threshold");
             }
         }
     }

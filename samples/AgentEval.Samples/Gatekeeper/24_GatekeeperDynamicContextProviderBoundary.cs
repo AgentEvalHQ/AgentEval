@@ -96,14 +96,14 @@ public static class GatekeeperDynamicContextProviderBoundary
             return;
         }
 
-        throw new InvalidOperationException("Dynamic-provider sample failed: " + message + ".");
+        throw new SampleCheckFailedException("Dynamic-provider sample failed: " + message + ".");
     }
 
     private static void Require(bool condition, string message)
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Dynamic-provider sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Dynamic-provider sample failed: " + message + ".");
         }
     }
 

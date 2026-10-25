@@ -21,7 +21,7 @@
 
   <!--
     Phase 1 (assertions + progressive-disclosure efficiency metric) needs only Microsoft.Agents.AI +
-    Azure OpenAI. Phase 2 (compliance scanner, AgentEval.MAF.Skills.MafSkillScanner) adds the
+    a configured chat provider. Phase 2 (compliance scanner, AgentEval.MAF.Skills.MafSkillScanner) adds the
     AgentEval.MAF reference above. Phase 3 (skill-injection red-team + run_skill_script governance
     gates) adds AgentEval.RedTeam / AgentEval.RedTeam.Gatekeeper. See docs/agent-skills.md.
   -->
@@ -33,6 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../AgentEval.Samples/SampleOutcome.cs" Link="SampleOutcome.cs" />
     <None Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -18,9 +18,11 @@ using AgentEval.Comparison;
 using AgentEval.Core;
 using AgentEval.DataLoaders;
 using AgentEval.Exporters;
+using AgentEval.Embeddings;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Output;
+using AgentEval.Providers;
 using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Writing;
 using AgentEval.Snapshots;
@@ -99,10 +101,10 @@ internal static class EvalCommand
 
         // Output
         var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit (alias xml) | markdown (alias md) | trx | csv. For the structured directory, use --output-dir." };
+            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit (alias xml) | markdown (alias md) | trx | csv. For AEF evidence, use --output-dir." };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
         var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
-            { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };
+            { Description = "Write sealed AEF run evidence under this directory" };
 
         // Golden trace (regression against a saved run)
         var saveGoldenOpt = new Option<FileInfo?>("--save-golden")
@@ -244,6 +246,21 @@ internal static class EvalCommand
         if (ValidateRuns(opts) is { } runsError)
         {
             Console.Error.WriteLine($"  Error: {runsError}");
+            return ExitCodes.UsageError;
+        }
+
+        if (!AefCliOptions.LegacyOutput && opts.OutputDir is not null &&
+            (opts.NoAef || (opts.Aef is not null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.Aef.FullName)).Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.OutputDir.FullName)), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
+        {
+            Console.Error.WriteLine("  Error: --output-dir writes AEF evidence; it cannot conflict with --no-aef or a different --aef directory.");
+            return ExitCodes.UsageError;
+        }
+
+        if (opts.OutputDir is null && (opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase) ||
+            opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.Error.WriteLine("  Error: directory output requires --output-dir <path>.");
             return ExitCodes.UsageError;
         }
 
@@ -398,10 +415,17 @@ internal static class EvalCommand
             && selectedMetrics?.Any(name => name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
             judgeLedger = new JudgeCallLedger(chatClient);
         IChatClient? metricsEvaluatorClient = judgeLedger ?? chatClient;
+        EmbeddingProviderSettings? embeddingSettings = null;
+        if (opts.Runs <= 1 && selectedMetrics?.Any(name => name.StartsWith("embed_", StringComparison.OrdinalIgnoreCase)) == true)
+            embeddingSettings = EmbeddingProviderEnvironment.Resolve(InferenceProviderEnvironment.Resolve(), Environment.GetEnvironmentVariable);
+        using var embeddingGenerator = embeddingSettings is null ? null : ProviderEmbeddingGeneratorFactory.Create(embeddingSettings);
+        var metricEmbeddings = embeddingGenerator is null ? null : new MEAIEmbeddingAdapter(embeddingGenerator);
+        if (embeddingSettings is not null && !opts.Quiet)
+            Console.Error.WriteLine($"  Embedding instrument: {embeddingSettings.ModelIdentity}");
         if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
-                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient))
+                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient, metricEmbeddings))
                 .ToList();
         }
 
@@ -437,7 +461,7 @@ internal static class EvalCommand
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases, datasetSnapshot,
-                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null),
+                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null, embeddingSettings),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -488,6 +512,11 @@ internal static class EvalCommand
                 agentName: resolvedName,
                 modelName: resolvedName,
                 endpoint: EndpointLabel(opts));
+            if (embeddingSettings is not null)
+            {
+                report.Metadata["EmbeddingModel"] = embeddingSettings.Model!;
+                report.Metadata["EmbeddingProvider"] = embeddingSettings.ProviderTag;
+            }
             await ExportReportAsync(opts, report, ct);
 
             // 8. Summary (unless --quiet)
@@ -511,20 +540,32 @@ internal static class EvalCommand
             }
 
             // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
-            // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
-            // that was already failing in the golden trace does not fail the run.
+            // 1 = any failure, 11 = nothing failed but a --metrics metric was not measured on some case. Against a golden
+            // trace, 1 = a regression (or a tool change with --fail-on-tool-change), 11 = no regression but a test case with
+            // no verdict on either side; a test that was already failing in the golden trace does not fail the run.
+            // Without a golden trace only a measured failure fails the run; a case whose judge gave no verdict or whose
+            // run threw has no verdict, and SingleRunExitCode reads it as 11 (D-14, D-21).
             var passed = comparison is not null
                 ? !comparison.HasRegression && !(opts.FailOnToolChange && comparison.HasToolChange)
-                : summary.AllPassed;
-            var exitCode = passed ? ExitCodes.Success : ExitCodes.TestFailure;
-            var gate = comparison is null ? null : new AefCommandGate
-            {
-                GateId = "gate:eval",
-                Rule = "golden-trace",
-                Outcome = passed ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
-                ExitCode = exitCode,
-                Comparability = AefComparability.Comparable,
-            };
+                : summary.FailedCount == 0;
+            var exitCode = SingleRunExitCode(passed, summary.Results, metricsRequested: selectedMetricInstances is not null,
+                goldenNotMeasured: comparison?.HasNotMeasured == true);
+            // The writer's own gate reads the case states alone (0 or 1); an inconclusive run records its 11 itself.
+            var gate = comparison is not null
+                ? new AefCommandGate
+                {
+                    GateId = "gate:eval",
+                    Rule = "golden-trace",
+                    Outcome = exitCode switch
+                    {
+                        ExitCodes.Success => AefGateOutcome.Ship,
+                        ExitCodes.GateIndeterminate => AefGateOutcome.Inconclusive,
+                        _ => AefGateOutcome.NoShip,
+                    },
+                    ExitCode = exitCode,
+                    Comparability = AefComparability.Comparable,
+                }
+                : exitCode == ExitCodes.GateIndeterminate ? InconclusiveGate("all-cases-pass") : null;
             var aefFailed = evidence.Complete(gate);
             return aefFailed ? ExitCodes.RuntimeError : exitCode;
         }
@@ -568,7 +609,7 @@ internal static class EvalCommand
 
     private static void WriteGoldenComparison(GoldenTraceComparison comparison, EvalOptions opts)
     {
-        // Regressions are printed even with --quiet: they decide the exit code.
+        // Regressions and cases with no verdict are printed even with --quiet: they decide the exit code.
         var w = Console.Error;
         if (!opts.Quiet)
         {
@@ -578,12 +619,13 @@ internal static class EvalCommand
                 $"  Regressed {comparison.Count(TraceChange.Regressed)}, improved {comparison.Count(TraceChange.Improved)}, " +
                 $"tools changed {comparison.Count(TraceChange.ToolsChanged)}, output changed {comparison.Count(TraceChange.OutputChanged)}, " +
                 $"unchanged {comparison.Count(TraceChange.Unchanged)}, added {comparison.Count(TraceChange.Added)}, " +
-                $"removed {comparison.Count(TraceChange.Removed)}.");
+                $"removed {comparison.Count(TraceChange.Removed)}, not measured {comparison.Count(TraceChange.NotMeasured)}.");
         }
 
         foreach (var c in comparison.Cases.OrderBy(c => c.Change))
         {
-            if (c.Change == TraceChange.Unchanged || (opts.Quiet && c.Change != TraceChange.Regressed))
+            if (c.Change == TraceChange.Unchanged
+                || (opts.Quiet && c.Change is not (TraceChange.Regressed or TraceChange.NotMeasured)))
                 continue;
             w.WriteLine($"  {Label(c.Change),-15} {c.Name}{(c.Detail is null ? "" : $": {c.Detail}")}");
         }
@@ -596,6 +638,7 @@ internal static class EvalCommand
             TraceChange.OutputChanged => "output changed",
             TraceChange.Added => "added",
             TraceChange.Removed => "removed",
+            TraceChange.NotMeasured => "NOT MEASURED",
             _ => "unchanged",
         };
     }
@@ -617,7 +660,54 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null)
+    /// <summary>
+    /// The exit code of a single-run <c>eval</c> whose verdict is <paramref name="passed"/>: 1 when something failed;
+    /// else 11 (<see cref="ExitCodes.GateIndeterminate"/>) when <c>--metrics</c> was given and a requested metric was not
+    /// measured on some case, or, against <c>--golden</c>, a test case has no verdict in the golden trace or in this run
+    /// (<paramref name="goldenNotMeasured"/>): a run that measured less than it was asked to never exits 0; else 0.
+    /// </summary>
+    internal static int SingleRunExitCode(
+        bool passed, IReadOnlyList<TestResult> results, bool metricsRequested, bool goldenNotMeasured = false)
+    {
+        if (!passed)
+            return ExitCodes.TestFailure;
+        if (goldenNotMeasured)
+            return ExitCodes.GateIndeterminate;
+        // A case whose judge gave no verdict or whose run threw: nothing failed, but the run has no verdict for it.
+        if (results.Any(r => r.JudgeFailed || r.HasError))
+            return ExitCodes.GateIndeterminate;
+        if (metricsRequested && results.Any(r => r.MetricResults is null || r.MetricResults.Any(m => !m.Measured)))
+            return ExitCodes.GateIndeterminate;
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// The exit code of an <c>eval --runs N</c> run: 1 when a test failed; else 11
+    /// (<see cref="ExitCodes.GateIndeterminate"/>, no conclusive verdict) when a test's verdict is
+    /// <see cref="StochasticVerdict.Undecided"/> or <see cref="StochasticVerdict.NotMeasured"/>; else 0. Runs that were
+    /// not measured used to make it 1, as if the agent had failed.
+    /// </summary>
+    internal static int StochasticExitCode(IReadOnlyList<StochasticResult> results)
+    {
+        static bool Inconclusive(StochasticResult r) =>
+            r.Verdict is StochasticVerdict.Undecided or StochasticVerdict.NotMeasured;
+
+        if (results.Any(r => !r.Passed && !Inconclusive(r)))
+            return ExitCodes.TestFailure;
+        return results.Any(Inconclusive) ? ExitCodes.GateIndeterminate : ExitCodes.Success;
+    }
+
+    /// <summary>The command's own gate for a run that exits 11: no conclusive verdict, under the run's usual rule.</summary>
+    internal static AefCommandGate InconclusiveGate(string rule) => new()
+    {
+        GateId = "gate:eval",
+        Rule = rule,
+        Outcome = AefGateOutcome.Inconclusive,
+        ExitCode = ExitCodes.GateIndeterminate,
+    };
+
+    internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null,
+        EmbeddingProviderSettings? embeddingSettings = null)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -630,6 +720,11 @@ internal static class EvalCommand
         if (opts.Runs == 1 && !string.IsNullOrWhiteSpace(opts.Metrics))
             settings["metrics"] = new System.Text.Json.Nodes.JsonArray(opts.Metrics.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                 .Select(name => (System.Text.Json.Nodes.JsonNode?)System.Text.Json.Nodes.JsonValue.Create(name)).ToArray());
+        if (opts.Runs == 1 && embeddingSettings is not null)
+        {
+            settings["embeddingModel"] = embeddingSettings.Model;
+            settings["embeddingProvider"] = embeddingSettings.ProviderTag;
+        }
         var scores = cases.Select(c => c.ToTestCase().PassingScore).ToArray();
         IReadOnlyDictionary<string, AefThreshold>? thresholds = null;
         if (scores.Length > 0 && scores.Distinct().Count() == 1)
@@ -656,6 +751,11 @@ internal static class EvalCommand
         {
             definitionSettings["metricJudgeModel"] = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName;
             definitionSettings["metricJudgeProvider"] = opts.JudgeEndpoint is null ? subjectProvider : "openai-compatible";
+        }
+        if (opts.Runs == 1 && embeddingSettings is not null)
+        {
+            definitionSettings["embeddingModel"] = embeddingSettings.Model;
+            definitionSettings["embeddingProvider"] = embeddingSettings.ProviderTag;
         }
         var definition = DatasetSuiteDefinition.Create(AefEvalWriter.Ref("dataset", datasetName), "eval-definition-1",
             datasetSnapshot, EvalAef.CaseIds(cases), definitionSettings);
@@ -695,7 +795,8 @@ internal static class EvalCommand
 
     /// <summary>
     /// Writes <paramref name="report"/> in the requested <c>--format</c> (to <c>-o</c>, or stdout) and, with
-    /// <c>--output-dir</c>, as the ADR-002 directory too. The single-run and the stochastic path both export here.
+    /// <c>--output-dir</c>, as the ADR-002 directory only when legacy output is enabled. Native directory publication
+    /// is owned by the AEF session. The single-run and stochastic paths both export reports here.
     /// </summary>
     private static async Task ExportReportAsync(EvalOptions opts, EvaluationReport report, CancellationToken ct)
     {
@@ -705,15 +806,14 @@ internal static class EvalCommand
 
         if (isDirectoryFormat && opts.OutputDir is null)
             throw new ArgumentException(
-                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
-                "Specify --output-dir <path> to write the directory output.",
+                "Specify --output-dir <path> to write directory output.",
                 nameof(opts.Format));
 
         if (!isDirectoryFormat)
             await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
 
         // Directory export (ADR-002) — can coexist with single-file export
-        if (opts.OutputDir is not null)
+        if (opts.OutputDir is not null && AefCliOptions.LegacyOutput)
         {
             var dirName = DirectoryExporter.GenerateDirectoryName(report);
             var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
@@ -817,7 +917,6 @@ internal static class EvalCommand
         if (!opts.Quiet)
             Console.Error.WriteLine($"  Stochastic mode: {opts.Runs} runs per test case, threshold={opts.SuccessThreshold:P0}");
 
-        var allPassed = true;
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
         var caseIds = EvalAef.CaseIds(datasetTestCases);
@@ -859,9 +958,6 @@ internal static class EvalCommand
                     result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
                     Console.Error.WriteLine($"    {result.Summary}");
                 }
-
-                if (!result.Passed)
-                    allPassed = false;
             }
 
             // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
@@ -871,7 +967,10 @@ internal static class EvalCommand
             await ExportReportAsync(opts, report, ct);
 
             // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
-            var aefFailed = evidence.Complete();
+            // The writer's own gate reads the rollups alone (0 or 1); an inconclusive run records its 11 itself.
+            var exitCode = StochasticExitCode(results);
+            var aefFailed = evidence.Complete(
+                exitCode == ExitCodes.GateIndeterminate ? InconclusiveGate("all-cases-pass-at-least") : null);
 
             // Summary
             if (!opts.Quiet)
@@ -880,12 +979,13 @@ internal static class EvalCommand
                 Console.Error.WriteLine($"  === Stochastic Summary ===");
                 Console.Error.WriteLine($"  Test cases: {datasetTestCases.Count}");
                 Console.Error.WriteLine($"  Passed: {results.Count(r => r.Passed)}/{results.Count}");
+                var inconclusive = results.Count(r => r.Verdict is StochasticVerdict.Undecided or StochasticVerdict.NotMeasured);
+                if (inconclusive > 0)
+                    Console.Error.WriteLine($"  Undecided or not measured: {inconclusive}/{results.Count}");
                 Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
             }
 
-            if (aefFailed)
-                return ExitCodes.RuntimeError;
-            return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
+            return aefFailed ? ExitCodes.RuntimeError : exitCode;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -904,7 +1004,8 @@ internal static class EvalCommand
 internal static class EvalAef
 {
     /// <summary>The AEF root a run goes to: <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>, else none.</summary>
-    public static string? Root(EvalOptions opts) => opts.NoAef ? null : Root(opts.Aef);
+    public static string? Root(EvalOptions opts) => opts.NoAef ? null :
+        Root(opts.Aef ?? (AefCliOptions.LegacyOutput ? null : opts.OutputDir));
 
     /// <summary>Where a command writes AEF runs: <paramref name="aef"/>, else a workspace's <c>.agenteval/aef</c>, else null.</summary>
     public static string? Root(DirectoryInfo? aef)

@@ -364,7 +364,7 @@ public class WorkflowEvaluationHarnessTests
 
         Assert.Equal(2, summary.PassedTests);
         Assert.Equal(1, summary.FailedTests);
-        Assert.InRange(summary.PassRate, 66.0, 67.0); // ~66.67%
+        Assert.InRange(summary.PassRate!.Value, 66.0, 67.0); // ~66.67%
     }
 
     [Fact]

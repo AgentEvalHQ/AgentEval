@@ -70,16 +70,9 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         
         var response = await _agent.RunAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false);
         
-        // Extract token usage from AgentResponse.Usage property
-        TokenUsage? tokenUsage = null;
-        if (response.Usage != null)
-        {
-            tokenUsage = new TokenUsage
-            {
-                PromptTokens = (int)(response.Usage.InputTokenCount ?? 0),
-                CompletionTokens = (int)(response.Usage.OutputTokenCount ?? 0)
-            };
-        }
+        // Extract token usage from AgentResponse.Usage property: null unless both counts were reported (a missing
+        // count is not 0), so the harness labels its own estimate instead of pricing a 0 as real.
+        var tokenUsage = TokenUsageMapping.FromUsage(response.Usage);
         
         return new AgentResponse
         {
@@ -98,7 +91,7 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _session ??= await _agent.CreateSessionAsync(cancellationToken).ConfigureAwait(false);
-        TokenUsage? capturedUsage = null;
+        var usageAccumulator = new StreamingUsageAccumulator();
         
         // Build message list: injected history + current prompt, then clear immediately —
         // ensures it is used for exactly one invocation even if streaming throws or is cancelled.
@@ -141,17 +134,13 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
                     
                     // Check for UsageContent if provider sends it in streaming
                     case UsageContent usage:
-                        capturedUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.Details.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.Details.OutputTokenCount ?? 0)
-                        };
+                        usageAccumulator.Add(usage.Details);
                         break;
                 }
             }
         }
 
-        yield return new AgentResponseChunk { IsComplete = true, Usage = capturedUsage, ModelId = ResponseModelId };
+        yield return new AgentResponseChunk { IsComplete = true, Usage = usageAccumulator.ToTokenUsage(), ModelId = ResponseModelId };
     }
     
     /// <summary>

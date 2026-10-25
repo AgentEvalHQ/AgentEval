@@ -54,6 +54,21 @@ before this variable existed.
 and the reason, never its value, because a configured URL can carry a token in its user-info, query or
 fragment and the diagnostic reaches stderr.
 
+**Reasoning is off by default.** Every chat client the CLI, the samples and the demos build from these
+variables sends a request that sets no reasoning level of its own with `reasoning_effort: none`. When the
+provider rejects that as an invalid request (HTTP 400 or 422) it sends it again at `low`, and when the
+provider rejects both (a model with no reasoning setting, such as gpt-4o) with no reasoning field, which
+is the provider's default. The level that worked is remembered per provider, endpoint and model for the rest
+of the process, so a rejected level costs one failed call per model. Code that sets `ChatOptions.Reasoning`
+keeps its own level. In your own code, `chatClient.WithMinimalReasoning()` (`AgentEval.Core`) does the same.
+The AEF dataset runner (`agenteval run --plan`) resolves the same `none` → `low` → provider-default
+sequence during readiness, with every attempt charged to its role's call and cost bounds. Cases then use the
+accepted setting for that role without renegotiating it. Each transport call makes one attempt; preparation
+reserves up to three accounted readiness attempts per role and suite.
+Why: on Bitdeer, GLM-5.3-Flash at its default reasoning spent two thirds of its output tokens thinking and
+took 2.2 times as long on an article-length answer (2026-10-21); Bitdeer rejects `none` and accepts `low`,
+which turns GLM's reasoning off. Results measured before 2026-10-21 ran at each provider's default.
+
 *Provider selection was added in v0.41.0-beta. Before that the CLI assumed Azure OpenAI.*
 
 ### `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY`, `AZURE_OPENAI_JUDGE_DEPLOYMENT`
@@ -222,8 +237,8 @@ agenteval eval --dataset <path> --endpoint <url> [--model <name>] [--azure --dep
 **What it does**
 
 Loads a YAML, JSON, JSONL, CSV, or TSV dataset, evaluates the agent, and exports results as JSON,
-JUnit/XML, Markdown, TRX, CSV, or a structured directory. It supports stochastic reruns (`--runs`),
-LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 directory export.
+JUnit/XML, Markdown, TRX or CSV, with AEF as the run record. It supports stochastic reruns (`--runs`),
+LLM-as-judge, named metrics (`--metrics`), and AEF evidence under `--output-dir`.
 
 **Key options**
 
@@ -237,13 +252,13 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. A `--system-prompt-file` that does not exist is ignored. |
 | `--temperature <value>` | Sampling temperature sent with every agent call. Omitted: nothing is sent and the provider's default applies. Given: the value is sent as given, `0` included. `0` narrows sampling; it does not guarantee identical outputs. |
 | `--max-tokens <n>` | Maximum output tokens per agent call. Omitted: nothing is sent. |
-| `--metrics <list>` | Comma-separated named metrics to score in addition to the normal pass/fail check (e.g. `llm_relevance,code_tool_success`). Each is scored against the same captured response; the agent is not called again. Omitted: no named metric is scored. An unknown name fails before any network call. Accepted names: `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. `agenteval list --type metrics` prints these and also names `--metrics` does not accept, each marked `[library only: not available via --metrics]`: `embed_answer_similarity`, `embed_response_context`, `embed_query_context`, `code_tool_selection`, `code_tool_arguments`, `code_recall_at_k`, `code_mrr` and `ConversationCompleteness`. They need input `--metrics` has no source for (expected tools, an embedding generator, a K; `ConversationCompleteness` scores a multi-turn conversation, not a single response), so construct them in code. LLM-based (`llm_*`) names need `--judge`, or on the `--endpoint`/`--azure` path fall back to the agent's own model; code-based (`code_*`) names need neither. Ignored, with a warning, when `--runs` is greater than 1. |
+| `--metrics <list>` | Comma-separated named metrics to score in addition to the normal pass/fail check (e.g. `llm_relevance,code_tool_success`). Each is scored against the same captured response; the agent is not called again. Omitted: no named metric is scored. An unknown name fails before any network call. Accepted names: `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_toxicity`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`, `embed_answer_similarity`, `embed_response_context`, `embed_query_context`. `agenteval list --type metrics` prints these and also names `--metrics` does not accept, each marked `[library only: not available via --metrics]`: `code_tool_selection`, `code_tool_arguments`, `code_recall_at_k`, `code_mrr` and `ConversationCompleteness`. They need input `--metrics` has no source for (expected tools, a K; `ConversationCompleteness` scores a multi-turn conversation, not a single response), so construct them in code. LLM-based (`llm_*`) names need `--judge`, or on the `--endpoint`/`--azure` path fall back to the agent's own model; code-based (`code_*`) names need neither. Embedding names (`embed_*`) use the environment-selected provider and its embedding model, independently of explicit subject/judge flags; see [embedding configuration and usage evidence](embedding-metrics.md#cli-and-shared-provider-settings). A requested metric that is not measured on some case (its judge call failed, its reply could not be read, the case lacked an input it needs) makes a run in which nothing failed exit `11`, never `0`. Ignored, with a warning, when `--runs` is greater than 1. |
 | `--runs <N>` | Runs per test case. Default `1`. Must be at least `1`; greater than `1` is stochastic mode (below), which needs at least 3 runs. |
 | `--success-threshold <0..1>` | Stochastic mode only: the share of a test case's runs that must pass for the test case to pass. Default `0.8`. Not used, and not checked, when `--runs` is `1`. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
 | `--format <fmt>` | Export format. Default `json`. In stochastic mode, one entry per test case (below). |
 | `-o, --output <path>` | Output file for single-file formats. Default: stdout. |
-| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+| `--output-dir <path>` | Sealed AEF evidence destination. Cannot conflict with `--no-aef` or a different `--aef` directory. |
 | `--save-golden <path>` | Save this run as a golden trace: each test case's verdict, output, and tool calls with their arguments, as JSON to commit beside the dataset (below). |
 | `--golden <path>` | Compare this run with a golden trace and exit on regressions only (below). |
 | `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
@@ -254,18 +269,20 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 **Stochastic mode (`--runs` greater than 1)**
 
 Each test case is run N times. A test case passes when the share of its runs that passed is at least
-`--success-threshold`, and the command exits `1` when any test case does not. The stochastic runner needs at
+`--success-threshold`, and the command exits `1` when any test case fails. A run that errored or got no verdict
+from the judge is not measured: when such runs could still decide whether the threshold is met (undecided), or no
+run was measured, the test case has no conclusive verdict, and the command exits `11` if no test case failed. The stochastic runner needs at
 least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative values; in this mode a
 `--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
 
 A table and a pass/fail line per test case, and a closing summary, are printed to stderr. The export (`--format`,
-`-o`, `--output-dir`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
+`-o`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
 score is the mean over the runs. Every format carries the runs as four metric columns: `stochastic_runs`,
 `stochastic_runs_passed`, `stochastic_pass_rate` (0–100) and `stochastic_score_sd`. A failed test case's message names
 its pass rate and the threshold (`3 of 5 runs passed (60.0%), below the 80% threshold.`). JUnit system-out and TRX
 stdout also list each run with its score or error and the confidence interval for the mean. The report's name ends in
 `(stochastic, N runs per test)`, and `Mode`, `RunsPerTest` and `SuccessThreshold` are recorded in the JSON export's
-`metadata` and in the directory export's `run.json`. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
+`metadata`. AEF (`--aef` or `--output-dir`) retains trials and rollups separately. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
 
 **Golden traces (`--save-golden`, `--golden`)**
 
@@ -284,14 +301,16 @@ agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --golden gol
 ```
 
 Each test case is reported on stderr as **regressed** (passed in the golden trace, fails now), **improved**, **tools
-changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**
-or **removed**. Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
+changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**,
+**removed** or **NOT MEASURED** (the golden run or this one produced no verdict for it: the judge produced none, or the
+run errored; its placeholder fail is neither a regression nor an improvement). Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
 output varies from run to run, so an output change is reported and does not fail the run. When either run recorded no
 tool data, tool calls are not compared.
 
 With `--golden` the exit code follows the comparison, not the raw verdicts: `1` when a test case regressed (or, with
-`--fail-on-tool-change`, called different tools), `0` otherwise. A test that already failed in the golden trace does
-not fail the build. Regressions are printed even with `--quiet`. Give both options to compare and then update the
+`--fail-on-tool-change`, called different tools), `11` when none did but a test case is not measured, `0` otherwise. A
+test that already failed in the golden trace does not fail the build. Regressions and test cases not measured are
+printed even with `--quiet`. Give both options to compare and then update the
 file. A golden trace records one run per test case, so neither option combines with `--runs` above 1. A
 `--golden` file that is missing or unreadable is a usage error, raised before any agent call. In code, the same is
 `GoldenTrace.FromResults(results)` and `GoldenTraceComparer.Compare(golden, current)` in `AgentEval.Snapshots`.
@@ -306,9 +325,10 @@ The target configures its own model, so `--temperature`, `--max-tokens`, `--syst
 | Code | Meaning |
 |------|---------|
 | `0` | Every test case passed. With `--golden`: no test case regressed (and, with `--fail-on-tool-change`, none changed its tool calls). |
-| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
+| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold` even counting every run that was not measured as a pass. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
 | `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, a `--runs` or `--success-threshold` value stochastic mode does not accept, a `--golden` file that is missing or not a golden trace, `--fail-on-tool-change` without `--golden`, or a golden-trace option with `--runs` above 1. |
 | `3` | Runtime or configuration error — including a missing `--endpoint`/`--azure`/`--model`, a dataset that does not exist or is empty, an unknown `--metrics` name, and an unknown `--format`, which is reported only after the evaluation has run. |
+| `11` | No conclusive verdict, and no test case failed. In stochastic mode: a test case's verdict is undecided (runs that errored or got no judge verdict could still decide it) or not measured (no run was). With `--metrics`: a requested metric was not measured on some case (a judge call that failed, a reply that could not be read, an input the case lacked), so such a run never exits `0`. With `--golden`: no test case regressed, but one has no verdict in the golden trace or in this run (`NOT MEASURED`), so the comparison cannot say whether it regressed. |
 
 ---
 
@@ -407,8 +427,12 @@ Warnings (e.g. a subject folder with a missing `subject.json`) do not affect the
 
 ### `agenteval compare`
 
-Compare two runs from the `.agenteval/` store, and print score deltas only when the two runs can be shown to
-have measured the same thing.
+Scenario scores and deltas are nullable. If either side did not measure a scenario, the table shows
+`n/m` for that score and `n/a` for its delta. JSON includes explicit null `baseline`, `candidate` and
+`delta` fields where absent. The library's `RunComparison.MeanScoreDelta` is null when no matched pair
+was measured; a genuinely zero delta stays zero. Comparability checks and regression exit rules still apply.
+
+Compare two AEF or legacy store runs, and print score deltas only when their recorded comparison facts agree.
 
 **Synopsis**
 
@@ -418,23 +442,42 @@ agenteval compare --baseline <run-dir> --candidate <run-dir> [--strict] [--json]
 
 **What it does**
 
-Reads the scenario files of two run directories — the folders under
-`.agenteval/subjects/<kind>/<name>/runs/<runId>/` that hold `manifest.json`, `summary.json` and `scenarios/`.
-Pointing at the `scenarios/` folder itself also works. Nothing else is read: no manifest, no workspace
-discovery, no network. The `eval --output-dir` layout (`results.jsonl`, `summary.json`, `run.json`) is a
-different format with no scenario files.
+Accepts native AEF run directories, legacy store run directories, copied legacy run folders and directories
+containing legacy scenario JSON files. A legacy run is converted through the store-v1 converter
+into temporary AEF evidence; its original files are unchanged. Pointing at its `scenarios/` folder also works.
+Both inputs are verified before comparison, and invalid AEF evidence is refused. The report includes integrity,
+run status and whether evidence was imported. An import seal protects the converted evidence from import onward;
+it does not establish that the original run was sealed when it executed. Signature trust is not checked here.
+The report lists importer-supplied header fields. Without a legacy manifest, original execution identity,
+timing and completion are unknown: the temporary import uses a new ID, an unknown subject and explicit
+placeholder timestamps, with an aborted status explaining that missing evidence. A malformed manifest is
+refused. Copied folders use a bounded snapshot of ordinary files; links and special files are refused.
+
+Comparison uses final observations, excluding individual trial rows. Native composite evaluations select their
+evaluation leaves; performance benchmarks select the whole benchmark score and retain component readings as
+supporting evidence. A readable AEF run still needs recorded, unambiguous comparison facts to produce deltas.
+The historical `eval --output-dir` report layout (`results.jsonl`, `summary.json`, `run.json`) is not a legacy
+scenario-store folder.
 
 The comparison is **refused** — the reasons are printed and no delta is — when:
 
 - the two runs do not hold the same set of scenario ids, or share none;
 - either run recorded no comparability facts for a shared scenario (runs written before those facts existed); or
 - for a shared scenario, one of these axes differs between the runs, or only one run recorded it: `evalKey`,
-  `evalVersion`, `effectiveBar` (the pass bar applied, compared exactly), `judge` (judged by a model or not),
-  `judge.modelId`, `judge.rubricDigest`, and `stimulus` (a hash of what the scenario was asked).
+  `evalVersion`, `effectiveBar` (the pass bar applied, compared exactly), `evaluationPolicyDigest`
+  (scoring configuration and measurement protocol), `judge` (model, deterministic or unknown instrument),
+  `judge.modelId`, `judge.rubricDigest`, and `stimulus` (a hash of what the scenario was asked);
+- the selected scores have different recorded metric identities, kinds, directions, scales or units.
 
 An axis that **neither** run recorded is not counted as a match: it is printed as a blind spot, before the
 deltas. `--strict` refuses on it instead. When neither run used a judge, `judge` matches but `judge.modelId` is
 such a blind spot, so `--strict` refuses two runs that were both graded without a judge.
+
+Performance policy evidence includes normalization budgets, sampling settings, aggregation and the frozen pricing
+schedule. It excludes subject identity and observed outcomes: different agents can be compared under the same
+policy. Older runs without a policy digest expose that absence; `--strict` refuses it. A digest recorded on only
+one side blocks even without strict mode. Different-policy trials cannot be rolled into one comparison instrument.
+Stimulus digests in AEF require content capture to be enabled; missing or heterogeneous stimuli remain unknown.
 
 When the runs are comparable, the report lists each shared scenario's baseline score, candidate score and delta,
 then the mean delta and how many scenarios recovered (failed, then passed) or regressed (passed, then failed).
@@ -542,7 +585,7 @@ prints all four catalogues.
 The metrics catalogue marks every name that `eval --metrics` cannot resolve with
 `[library only: not available via --metrics]`. Whether a name carries the marker is read from the same table
 `--metrics` resolves against, so the listing cannot offer a name the command then refuses. Marked names need
-input `--metrics` has no source for (expected tools, an embedding generator, a K); construct them in code.
+input `--metrics` has no source for (expected tools, a K); construct them in code.
 
 **Options**
 
@@ -797,16 +840,22 @@ agenteval compliance render --regulation <reg> --subject <name> [--ts <timestamp
 |--------|-------------|
 | `--regulation <reg>` | Required. Regulation identifier: `gdpr` or `eu-ai-act`. |
 | `--subject <name>` | Required. Subject name to render evidence for. |
-| `--ts <timestamp>` | Timestamp directory (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent. |
+| `--ts <timestamp>` | Recorded report timestamp (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent; an explicit timestamp can select an older captured report. |
 | `--root <path>` | Workspace root. Default: auto-detected. |
 
 A missing `--regulation` or `--subject` exits `2`.
+
+The reader verifies native AEF runs under `.agenteval/aef/runs` and reads captured rich compliance artifacts from those verified bytes. Legacy timestamp directories pass through the shared StoreV1 converter. Imported reports retain their exact bytes and are labeled **imported: not sealed when it ran**; an ingest seal establishes custody from conversion onward. A standalone report does not establish its original execution's timing, completion or provenance.
+
+Missing captured content, malformed reports, conflicting identities and invalid native evidence exit `1`. A legacy sibling cannot recover content omitted by the native capture policy. Selecting the latest report does not silently substitute an older captured report when a newer native report is unavailable. The bounded native scan verifies candidates before subject filtering, so an invalid or incompletely scanned native source must be resolved before rendering.
+
+PDFs are written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.pdf`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
 
 ---
 
 ### `agenteval render`
 
-Re-render a Markdown report from existing benchmark results — no LLM cost.
+Re-render Markdown and PDF from an original agentic report in verified AEF — no LLM cost.
 
 **Synopsis**
 
@@ -822,6 +871,12 @@ agenteval render --benchmark <kind> --subject <name> [--ts <timestamp>] [--root 
 | `--root <path>` | Workspace root. Default: auto-detected. |
 
 A missing `--benchmark` or `--subject` exits `2`.
+
+Native runs need `--aef-content on` when the benchmark runs to retain the original report for later rendering.
+Capture off keeps the report identity but omits its document. Rendering returns `1` when captured content is
+unavailable or evidence is invalid or ambiguous; it does not fall back to a dual-written legacy report.
+Existing legacy report folders are converted on read, with ingest custody labelled separately from original
+execution provenance. Reports still go to `.agenteval/benchmarks/agentic/<subject>/<timestamp>/`.
 
 ---
 
@@ -1004,12 +1059,24 @@ agenteval aef seal <run-dir> [--key <pkcs8.pem>] [--sealed-by producer|ingest] [
 agenteval aef view <run-dir> [--at <time>] [--policy <trust-policy.json>] [--json]
 agenteval aef checkpoint <manifest.json> --runs <dir> [--policy <trust-policy.json>] [--at <time>] [--envelope <file>] [--json]
 agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import store-v1 <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import otel <logs-file> <out-dir> --run-id <id> --from <tool> --subject <kind:name> [--subject-kind agent] --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef export-otel <run-dir> <out-file> [--policy <trust-policy.json>] [--json]
 agenteval aef import inspect <log-file> <out-dir> --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef export-inspect <run-dir> <out-file> [--ignore-overlays] [--policy <trust-policy.json>] [--json]
 ```
+
+**`import store-v1`** converts an existing legacy run folder, or a `.agenteval` workspace selected with `--run`,
+through the same converter as the retained `export` spelling. Its report says **imported: not sealed when it ran**;
+an ingest seal protects the conversion from import onward, not the original execution's history. Source files
+are preserved. See [legacy import](aef.md#import-a-legacy-run-check-it-sign-it) for the source-folder contract.
+
+An explicit workspace run folder is imported exactly as selected. A workspace plus `--run` must identify one
+folder; duplicate IDs across subjects are refused as ambiguous. Matching compliance reports must agree on
+subject, source run ID and the recorded source hash. With `--content-capture on`, rich report bytes are retained
+and cited by the corresponding scenarios; `off` retains only generic compliance evidence. Agreement with a
+recorded hash does not establish the original execution's custody.
 
 **`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
 which trusted identities signed it, and lets authorized redactions withhold blobs; with `--anchors`, whether one of
@@ -1089,11 +1156,11 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
 | `7` | `gatekeeper inspect` — **not certified**: the honesty guard refused an un-calibrated judge (run `calibrate --certify`, or pass `--allow-uncalibrated`). |
 | `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](copilot-studio.md#what---max-credits-does-today). |
-| `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL**. |
+| `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL** (for calibration: a pillar or category FAIL, INFRA-FAIL or INCOMPLETE). |
 | `10` | `bench <family>` — the composite gate is a **WARN** (soft finding, below ideal but not a hard failure). Calibration commands never return this — their thresholds are pass/fail binary. |
-| `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). Every `--sut mock` run exits `11` whatever it scores: it measured no agent. |
+| `11` | No conclusive verdict, and nothing failed. `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). Every `--sut mock` run exits `11` whatever it scores: it measured no agent. `eval --runs N` — a test case's verdict is undecided or not measured. `eval --metrics …` — a requested metric was not measured on some case. `bench <reg> calibrate` / `bench agentic calibrate` — a pillar or category is NOT MEASURED (nothing scored). A failure still exits `1` (`eval`) or `9` (calibrate). |
 | `12` | Reserved by [ADR-031](adr/031-eval-packs-ship-reduced.md). No command returns it. |
-| `13` | `compare` — **incomparable**: the two runs could not be shown to have measured the same thing, so no delta was emitted (`Incomparable`). Distinct from `11`, which means a run produced nothing scoreable: here both runs produced verdicts, and comparing them would be meaningless. See [`agenteval compare`](#agenteval-compare). |
+| `13` | `compare` — **incomparable**: the two runs could not be shown to have measured the same thing, so no delta was emitted (`Incomparable`). Distinct from `11`, which means a run produced nothing scoreable: here both runs produced verdicts, and comparing them would be meaningless. See [`agenteval compare`](#agenteval-compare). `redteam --baseline` — the baseline or the current scan has no probe that reached a verdict, so the comparison is refused, neither a regression (`4`) nor a pass; see [Red Team Security](redteam.md). |
 
 **Parse errors exit `2`.** An unknown command or option, a value that does not parse (`--runs abc`), a missing
 required option, or no command at all exits `2`. System.CommandLine prints the errors to stderr and the command's

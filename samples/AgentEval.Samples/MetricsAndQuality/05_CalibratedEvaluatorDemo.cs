@@ -32,6 +32,7 @@ public static class CalibratedEvaluatorDemo
             Console.WriteLine("   ❌ This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("      Set a provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig).");
             Console.ResetColor();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -100,7 +101,7 @@ public static class CalibratedEvaluatorDemo
     {
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("   ┌──────────────────────────────────────────────────┐");
-        Console.WriteLine($"   │  Calibrated Score: {result.OverallScore,3}/100                        │");
+        Console.WriteLine($"   │  Calibrated Score: {result.OverallScore?.ToString() ?? "n/a",3}/100                        │");
         Console.WriteLine("   └──────────────────────────────────────────────────┘");
         Console.ResetColor();
 

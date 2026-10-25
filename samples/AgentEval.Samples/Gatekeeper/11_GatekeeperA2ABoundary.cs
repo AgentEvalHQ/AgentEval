@@ -37,6 +37,7 @@ public static class GatekeeperA2ABoundary
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured for the boundary judges");
             return;
         }
 
@@ -44,6 +45,7 @@ public static class GatekeeperA2ABoundary
         {
             Console.WriteLine(
                 "   Set AGENTEVAL_A2A_BASE_URL to an absolute HTTP(S) base URL for an A2A agent.");
+            SampleOutcome.Skip("no remote A2A agent: AGENTEVAL_A2A_BASE_URL is not set");
             return;
         }
 
@@ -55,6 +57,7 @@ public static class GatekeeperA2ABoundary
         {
             Console.WriteLine(
                 "   Set AGENTEVAL_A2A_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true to allow the live remote call.");
+            SampleOutcome.Skip("the live remote call is not consented: AGENTEVAL_A2A_I_UNDERSTAND_LIVE_SIDE_EFFECTS is not true");
             return;
         }
 
@@ -76,6 +79,8 @@ public static class GatekeeperA2ABoundary
             Console.WriteLine(
                 "   STOP: at least one judge failed the Phase-4 safety/utility bar; " +
                 "the remote agent was not resolved or called.");
+            // Refusing an uncalibrated judge is the gate working, but the guarded call this sample shows never ran.
+            SampleOutcome.Skip("a boundary judge failed the Phase-4 calibration bar, so the remote call was not made");
             return;
         }
 

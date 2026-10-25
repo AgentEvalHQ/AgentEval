@@ -281,12 +281,16 @@ public class BenchMitreCommandTests : IDisposable
         var reportsRoot = Path.Combine(_root, ".agenteval", "compliance", "MITRE-ATLAS", "MitreSmokeAgent");
         Assert.StartsWith(reportsRoot, reportDir);
 
-        // The unified output-store should have a run manifest written by the
+        // The command writes verified AEF by default, with no legacy subject/run folder.
+        // The old output-store assertions below now locate the native run written by the
         // command's StartRunAsync/CompleteRunAsync flow.
-        var subjectRunsDir = Path.Combine(_root, ".agenteval", "subjects", "agents", "MitreSmokeAgent", "runs");
+        var subjectRunsDir = Path.Combine(_root, ".agenteval", "aef", "runs");
         Assert.True(Directory.Exists(subjectRunsDir),
             $"Run directory {subjectRunsDir} should exist after persisting the MITRE run.");
         Assert.NotEmpty(Directory.GetDirectories(subjectRunsDir));
+        Assert.False(Directory.Exists(Path.Combine(_root, ".agenteval", "subjects")));
+        var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(subjectRunsDir, "seal.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(native).Outcome);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

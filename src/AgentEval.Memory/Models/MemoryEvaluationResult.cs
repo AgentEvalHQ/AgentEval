@@ -9,9 +9,16 @@ namespace AgentEval.Memory.Models;
 public class MemoryEvaluationResult
 {
     /// <summary>
-    /// Overall memory score (0-100) for the entire evaluation.
+    /// Overall memory score (0-100), or null when no query was measured.
     /// </summary>
-    public required double OverallScore { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public required double? OverallScore
+    {
+        get => IsMeasured ? _overallScore : null;
+        init => _overallScore = value;
+    }
+
+    private readonly double? _overallScore;
 
     /// <summary>
     /// Results for each individual query in the scenario.
@@ -44,9 +51,11 @@ public class MemoryEvaluationResult
     public int TokensUsed { get; init; }
 
     /// <summary>
-    /// Estimated cost of the evaluation (in USD).
+    /// Estimated cost of the evaluation's judge calls (in USD), priced from the token counts the provider reported at
+    /// the judge model's rate. <see langword="null"/> when it was not priced: a judge call reported no usage, or the
+    /// model has no known rate. Never a flat made-up rate, and never 0 for "not priced".
     /// </summary>
-    public decimal EstimatedCost { get; init; }
+    public decimal? EstimatedCost { get; init; }
 
     /// <summary>
     /// Name of the scenario that was evaluated.
@@ -66,7 +75,7 @@ public class MemoryEvaluationResult
     /// <summary>
     /// Memory retention rate as a percentage (0-100), over the measured queries.
     /// </summary>
-    public double RetentionRate => MeasuredQueries > 0 ? QueryResults.Where(r => r.Measured).Average(r => r.Score) : 0;
+    public double? RetentionRate => MeasuredQueries > 0 ? QueryResults.Where(r => r.Measured).Average(r => r.Score) : null;
 
     /// <summary>
     /// Number of queries that passed their minimum score threshold.
@@ -93,9 +102,9 @@ public class MemoryEvaluationResult
     /// <summary>
     /// Success rate as a percentage of the measured queries that passed.
     /// </summary>
-    public double SuccessRate => MeasuredQueries > 0 ? (double)PassedQueries / MeasuredQueries * 100 : 0;
+    public double? SuccessRate => MeasuredQueries > 0 ? (double)PassedQueries / MeasuredQueries * 100 : null;
 
-    public override string ToString() => $"{ScenarioName}: {OverallScore:F1}% ({PassedQueries}/{TotalQueries} queries passed)";
+    public override string ToString() => $"{ScenarioName}: {(OverallScore is { } score ? $"{score:F1}%" : "n/a (not measured)")} ({PassedQueries}/{TotalQueries} queries passed)";
 }
 
 /// <summary>
@@ -143,6 +152,12 @@ public class MemoryQueryResult
     /// Forbidden facts that were incorrectly found in the response.
     /// </summary>
     public required IReadOnlyList<MemoryFact> ForbiddenFound { get; init; }
+
+    /// <summary>
+    /// Whether the judge supplied a usable forbidden-fact assessment, independently of the numeric score.
+    /// False when that assessment was absent, including legacy results without this property.
+    /// </summary>
+    public bool ForbiddenFactsAssessed { get; init; }
 
     /// <summary>
     /// Detailed explanation of the scoring decision.

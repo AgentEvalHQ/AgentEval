@@ -74,20 +74,50 @@ public class MemoryJudgeTests
     }
 
     [Theory]
-    [InlineData(150.0, 100.0)]  // BUG-09: above range clamps down to 100
-    [InlineData(-40.0, 0.0)]    // BUG-09: below range clamps up to 0
-    [InlineData(85.0, 85.0)]    // in-range score is untouched
-    public async Task JudgeAsync_JsonScoreOutOfRange_ClampsTo0To100(double judgeScore, double expected)
+    [InlineData(150.0)]
+    [InlineData(-40.0)]
+    [InlineData(101.0)]
+    public async Task JudgeAsync_JsonScoreOffTheScale_IsNotMeasured_NeverClamped(double judgeScore)
     {
-        // The judge returns valid JSON with an out-of-range score. The structured-JSON path
-        // must clamp it (the regex fallback already did), or it corrupts downstream roll-ups.
+        // BUG-09 stopped an off-scale score propagating unbounded by clamping it, so 150 read as a perfect 100 and -40
+        // as a measured 0. A score off 0-100 is a reply that cannot be read as a measurement: not measured.
         var fakeChatClient = new FakeChatClient(judgeScore, "out-of-range test");
         var memoryJudge = new MemoryJudge(fakeChatClient, NullLogger<MemoryJudge>.Instance);
         var query = MemoryQuery.Create("Test query", MemoryFact.Create("Test fact"));
 
         var result = await memoryJudge.JudgeAsync("Test response", query);
 
-        Assert.Equal(expected, result.Score);
+        Assert.False(result.Measured);
+        Assert.Equal(0, result.Score);
+        Assert.Contains("off the 0-100 scale", result.Explanation);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(85.0)]
+    [InlineData(100.0)]
+    public async Task JudgeAsync_JsonScoreOnTheScale_IsReadAsIs(double judgeScore)
+    {
+        var memoryJudge = new MemoryJudge(new FakeChatClient(judgeScore, "in range"), NullLogger<MemoryJudge>.Instance);
+
+        var result = await memoryJudge.JudgeAsync("Test response", MemoryQuery.Create("Test query", MemoryFact.Create("Test fact")));
+
+        Assert.True(result.Measured);
+        Assert.Equal(judgeScore, result.Score);
+        Assert.Equal("in range", result.Explanation);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_AScoreOffTheScale_IsNotMeasured_NeverClamped()
+    {
+        // The regex fallback read "Score: 150" as 100.
+        var judge = new MemoryJudge(new CustomResponseChatClient("The agent did well. Score: 150"), NullLogger<MemoryJudge>.Instance);
+
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+
+        Assert.False(result.Measured);
+        Assert.Equal(0, result.Score);
+        Assert.Contains("off the 0-100 scale", result.Explanation);
     }
 
     [Fact]
@@ -113,6 +143,31 @@ public class MemoryJudgeTests
         Assert.Single(result.FoundFacts);
         Assert.Same(originalFact, result.FoundFacts[0]);
         Assert.Empty(result.MissingFacts);
+    }
+
+    [Theory]
+    [InlineData("Score: 1000")]
+    [InlineData("Score: 1e3")]
+    [InlineData("-40/100")]
+    [InlineData("Score: 85.5.2")]
+    public async Task JudgeAsync_FallbackNumericToken_IsNeverTruncatedIntoAValidScore(string reply)
+    {
+        var judge = new MemoryJudge(new CustomResponseChatClient(reply), NullLogger<MemoryJudge>.Instance);
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+        Assert.False(result.Measured);
+    }
+
+    [Theory]
+    [InlineData("Score: 85.5", 85.5)]
+    [InlineData("85.5/100", 85.5)]
+    [InlineData("Score: 0", 0)]
+    [InlineData("Score: 100", 100)]
+    public async Task JudgeAsync_FallbackValidNumber_PreservesExactScore(string reply, double expected)
+    {
+        var judge = new MemoryJudge(new CustomResponseChatClient(reply), NullLogger<MemoryJudge>.Instance);
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+        Assert.True(result.Measured);
+        Assert.Equal(expected, result.Score);
     }
 
     [Fact]

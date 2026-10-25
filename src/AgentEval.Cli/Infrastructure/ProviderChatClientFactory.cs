@@ -8,6 +8,7 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using AgentEval.Core;
 
 namespace AgentEval.Cli.Infrastructure;
 
@@ -85,7 +86,7 @@ internal static class ProviderChatClientFactory
                 var options = new AzureOpenAIClientOptions();
                 if (timeout is { } t) options.NetworkTimeout = t;
                 client = new AzureOpenAIClient(settings.Endpoint!, new AzureKeyCredential(settings.ApiKey!), options)
-                    .GetChatClient(resolved).AsIChatClient();
+                    .GetChatClient(resolved).AsIChatClient().WithMinimalReasoning();
             }
             else
             {
@@ -93,7 +94,7 @@ internal static class ProviderChatClientFactory
                 var options = new OpenAIClientOptions { Endpoint = settings.Endpoint };
                 if (timeout is { } t) options.NetworkTimeout = t;
                 client = new OpenAIClient(new ApiKeyCredential(settings.ApiKey!), options)
-                    .GetChatClient(resolved).AsIChatClient();
+                    .GetChatClient(resolved).AsIChatClient().WithMinimalReasoning();
             }
 
             return (CliChatClientDiagnostics.Wrap(client, purpose, resolved), resolved, null, settings.Endpoint?.AbsoluteUri, settings.ProviderTag);

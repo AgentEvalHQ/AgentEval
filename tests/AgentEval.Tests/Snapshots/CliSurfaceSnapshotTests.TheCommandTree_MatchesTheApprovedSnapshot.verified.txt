@@ -1,0 +1,635 @@
+﻿command agenteval
+    option --capture-fixture String [1..1] recursive
+    option --help (-?, -h, /?, /h) Void [0..0] recursive
+    option --log-file String [1..1] recursive
+    option --version Void [0..0]
+    command aef
+        command checkpoint
+            argument <checkpoint> String [1..1]
+            option --at String [1..1]
+            option --envelope String [1..1]
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+            option --runs String [1..1] required
+        command companion
+            command create
+                argument <run-dir> String [1..1]
+                option --artifact-sha256 String [1..1] required
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --name String [1..1] default="_"
+                option --output String [1..1] required
+                option --policy String [1..1]
+            command verify
+                argument <run-dir> String [1..1]
+                option --artifact-sha256 String [1..1] required
+                option --document String [1..1] required
+                option --envelope String [1..1]
+                option --json Boolean [0..1] default=false
+                option --policy String [1..1]
+                option --require-signer String [1..1]
+        command compare-suites
+            argument <baseline-dir> String [1..1]
+            argument <candidate-dir> String [1..1]
+            option --baseline-hash String [1..1]
+            option --candidate-hash String [1..1]
+            option --json Boolean [0..1] default=false
+        command export
+            argument <store-dir> String [1..1]
+            argument <out-dir> String [1..1]
+            option --content-capture String [1..1] default="on"
+            option --json Boolean [0..1] default=false
+            option --key String [1..1]
+            option --no-seal Boolean [0..1] default=false
+            option --run String [1..1]
+            option --target-mode String [1..1] default="mocked"
+        command export-evalport
+            argument <run-dir> String [1..1]
+            argument <out-file> String [1..1]
+            option --ignore-overlays Boolean [0..1] default=false
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+            option --run-hash String [1..1]
+            option --suite-id String [1..1]
+        command export-inspect
+            argument <run-dir> String [1..1]
+            argument <out-file> String [1..1]
+            option --ignore-overlays Boolean [0..1] default=false
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+        command export-otel
+            argument <run-dir> String [1..1]
+            argument <out-file> String [1..1]
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+        command import
+            command assert-ai
+                argument <assert-run-dir> String [1..1]
+                argument <out-dir> String [1..1]
+                option --calibration String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --max-harm-rate Double? [1..1]
+                option --max-over-refusal-rate Double? [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --taxonomy String [1..1]
+                option --test-set String [1..1]
+            command evalport
+                argument <resultset-file> String [1..1]
+                argument <out-dir> String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --subject-kind String [1..1]
+                option --subject-ref String [1..1]
+                option --suite-version String [1..1]
+                option --target-mode String [1..1] required
+            command inspect
+                argument <log-file> String [1..1]
+                argument <out-dir> String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --target-mode String [1..1] required
+            command otel
+                argument <logs-file> String [1..1]
+                argument <out-dir> String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --from String [1..1] required
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --run-id String [1..1] required
+                option --subject String [1..1] required
+                option --subject-kind String [1..1] default="agent"
+                option --target-mode String [1..1] required
+            command store-v1
+                argument <store-dir> String [1..1]
+                argument <out-dir> String [1..1]
+                option --content-capture String [1..1] default="on"
+                option --json Boolean [0..1] default=false
+                option --key String [1..1]
+                option --no-seal Boolean [0..1] default=false
+                option --run String [1..1]
+                option --target-mode String [1..1] default="mocked"
+        command seal
+            argument <run-dir> String [1..1]
+            option --json Boolean [0..1] default=false
+            option --key String [1..1]
+            option --sealed-by String [1..1] default="producer"
+        command verify
+            argument <run-dir> String [1..1]
+            option --anchors String [1..1]
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+        command view
+            argument <run-dir> String [1..1]
+            option --at String [1..1]
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+    command assert-ai
+        command calibrate
+            argument <run-dir> String [1..1]
+            option --cases String [1..1] required
+            option --format String [1..1] default="text"
+            option -o (--output) String [1..1]
+        command export
+            option --assert-root String [1..1]
+            option --evaluator String[] [1..100000]
+            option --golden String[] [1..100000] required
+            option --judge-model String [1..1] required
+            option --out String [1..1] required
+            option --run String [1..1] default="judge-1"
+            option --suite String [1..1] default="agenteval"
+            option --taxonomy String [1..1] required
+        command import
+            argument <run-dir> String [1..1]
+            option --calibration String [1..1]
+            option --format String [1..1] default="text"
+            option --max-harm-rate Double? [1..1]
+            option --max-over-refusal-rate Double? [1..1]
+            option --max-unmeasured Double [1..1] default=0
+            option --taxonomy String [1..1]
+            option --test-set String [1..1]
+            option -o (--output) String [1..1]
+        command serve
+            option --api-key String [1..1]
+            option --endpoint String [1..1]
+            option --from-env Boolean [0..1] default=false
+            option --host String [1..1] default="localhost"
+            option --model String [1..1]
+            option --path String [1..1] default="/assert"
+            option --port Int32 [1..1] default=8765
+            option --system-prompt String [1..1]
+    command bench
+        option --list Boolean [0..1] default=false
+        command agentic
+            option --aef DirectoryInfo [1..1]
+            option --budget-tier String [1..1]
+            option --context String [1..1]
+            option --context-file String [1..1]
+            option --input String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --reference String [1..1]
+            option --reference-file String [1..1]
+            option --response String [1..1]
+            option --response-file String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+            option --trace String [1..1]
+            command calibrate
+                option --limit Int32? [1..1]
+                option --out String [1..1]
+                option --records String [1..1]
+                option --root String [1..1]
+        command autoaudit
+            option --aef DirectoryInfo [1..1]
+            option --models String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --out String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+        command eu-ai-act
+            option --aef DirectoryInfo [1..1]
+            option --copilotstudio-config FileInfo [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --input String [1..1]
+            option --max-credits Int32 [1..1] default=0
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --response String [1..1]
+            option --response-file String [1..1]
+            option --root String [1..1]
+            option --runs Int32? [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+            command calibrate
+                option --decisions Boolean [0..1] default=false
+                option --limit Int32? [1..1]
+                option --out String [1..1]
+                option --root String [1..1]
+        command gdpr
+            option --aef DirectoryInfo [1..1]
+            option --copilotstudio-config FileInfo [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --input String [1..1]
+            option --max-credits Int32 [1..1] default=0
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --response String [1..1]
+            option --response-file String [1..1]
+            option --root String [1..1]
+            option --runs Int32? [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+            command calibrate
+                option --decisions Boolean [0..1] default=false
+                option --limit Int32? [1..1]
+                option --out String [1..1]
+                option --root String [1..1]
+        command longmemeval
+            option --aef DirectoryInfo [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --paired-oracle Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+        command memory
+            option --aef DirectoryInfo [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+        command mitre
+            option --aef DirectoryInfo [1..1]
+            option --api-key String [1..1]
+            option --copilotstudio-config FileInfo [1..1]
+            option --endpoint String [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --input String [1..1]
+            option --max-credits Int32 [1..1] default=0
+            option --model String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+        command nist
+            option --aef DirectoryInfo [1..1]
+            option --api-key String [1..1]
+            option --copilotstudio-config FileInfo [1..1]
+            option --endpoint String [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --input String [1..1]
+            option --max-credits Int32 [1..1] default=0
+            option --model String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+        command owasp
+            option --aef DirectoryInfo [1..1]
+            option --api-key String [1..1]
+            option --copilotstudio-config FileInfo [1..1]
+            option --endpoint String [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --input String [1..1]
+            option --max-credits Int32 [1..1] default=0
+            option --model String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --sut String [1..1]
+        command perf
+            command cost
+                option --aef DirectoryInfo [1..1]
+                option --api-key String [1..1]
+                option --copilotstudio-config FileInfo [1..1]
+                option --endpoint String [1..1]
+                option --from-env (--azure-from-env) Boolean [0..1] default=false
+                option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --max-credits Int32 [1..1] default=0
+                option --model String [1..1]
+                option --no-aef Boolean [0..1] default=false
+                option --prompt String [1..1]
+                option --root String [1..1]
+                option --subject String [1..1]
+                option --subject-version String [1..1]
+                option --sut String [1..1]
+            command latency
+                option --aef DirectoryInfo [1..1]
+                option --api-key String [1..1]
+                option --copilotstudio-config FileInfo [1..1]
+                option --endpoint String [1..1]
+                option --from-env (--azure-from-env) Boolean [0..1] default=false
+                option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --max-credits Int32 [1..1] default=0
+                option --model String [1..1]
+                option --no-aef Boolean [0..1] default=false
+                option --prompt String [1..1]
+                option --root String [1..1]
+                option --subject String [1..1]
+                option --subject-version String [1..1]
+                option --sut String [1..1]
+            command throughput
+                option --aef DirectoryInfo [1..1]
+                option --api-key String [1..1]
+                option --copilotstudio-config FileInfo [1..1]
+                option --endpoint String [1..1]
+                option --from-env (--azure-from-env) Boolean [0..1] default=false
+                option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --max-credits Int32 [1..1] default=0
+                option --model String [1..1]
+                option --no-aef Boolean [0..1] default=false
+                option --prompt String [1..1]
+                option --root String [1..1]
+                option --subject String [1..1]
+                option --subject-version String [1..1]
+                option --sut String [1..1]
+        command trace-fidelity
+            option --aef DirectoryInfo [1..1]
+            option --agent-trace String [1..1]
+            option --chat-trace String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+        command typedmemeval
+            option --aef DirectoryInfo [1..1]
+            option --evidence-detail String [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --vertical String [1..1]
+        command workflow-trace-fidelity
+            option --aef DirectoryInfo [1..1]
+            option --no-aef Boolean [0..1] default=false
+            option --preset String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --subject-version String [1..1]
+            option --workflow-trace String [1..1]
+    command compare
+        option --baseline String [1..1] required
+        option --candidate String [1..1] required
+        option --fail-on-regression Boolean [0..1] default=false
+        option --json Boolean [0..1] default=false
+        option --strict Boolean [0..1] default=false
+    command compliance
+        command render
+            option --regulation String [1..1]
+            option --root String [1..1]
+            option --subject String [1..1]
+            option --ts String [1..1]
+    command decide
+        argument <run-dir> String [1..1]
+        option --by String [1..1] required
+        option --expires String [1..1]
+        option --json Boolean [0..1] default=false
+        option --key String [1..1]
+        option --kind String [1..1] required
+        option --reason String [1..1] required
+        option --requirement String [1..1]
+        option --result String [1..1]
+        option --state String [1..1]
+    command doctor
+    command eval
+        option --aef DirectoryInfo [1..1]
+        option --api-key String [1..1]
+        option --azure Boolean [0..1] default=false
+        option --copilotstudio-config FileInfo [1..1]
+        option --dataset FileInfo [1..1] required
+        option --deployment-name String [1..1]
+        option --endpoint String [1..1]
+        option --fail-on-tool-change Boolean [0..1] default=false
+        option --format String [1..1] default="json"
+        option --golden FileInfo [1..1]
+        option --i-understand-live-side-effects Boolean [0..1] default=false
+        option --judge String [1..1]
+        option --judge-model String [1..1]
+        option --max-credits Int32 [1..1] default=0
+        option --max-tokens Int32? [1..1]
+        option --metrics String [1..1]
+        option --model String [1..1]
+        option --no-aef Boolean [0..1] default=false
+        option --output-dir DirectoryInfo [1..1]
+        option --quiet Boolean [0..1] default=false
+        option --runs Int32 [1..1] default=1
+        option --save-golden FileInfo [1..1]
+        option --subject String [1..1]
+        option --subject-version String [1..1]
+        option --success-threshold Double [1..1] default=0.8
+        option --sut String [1..1]
+        option --system-prompt String [1..1]
+        option --system-prompt-file FileInfo [1..1]
+        option --temperature Single? [1..1]
+        option --verbose Boolean [0..1] default=false
+        option -o (--output) FileInfo [1..1]
+    command gatekeeper
+        command calibrate
+            option --api-key String [1..1]
+            option --azure Boolean [0..1] default=false
+            option --cert-dir String [1..1]
+            option --cert-path String [1..1]
+            option --certify Boolean [0..1] default=false
+            option --deployment-name String [1..1]
+            option --endpoint String [1..1]
+            option --gate String [1..1] required
+            option --max-concurrency Int32 [1..1] default=4
+            option --max-dangerous-errors Int32 [1..1] default=0
+            option --min-cases-per-direction Int32 [1..1] default=20
+            option --model String [1..1]
+        command inspect
+            option --allow-uncalibrated Boolean [0..1] default=false
+            option --allowed-domain String[] [1..100000]
+            option --api-key String [1..1]
+            option --attest-fingerprint String [1..1]
+            option --azure Boolean [0..1] default=false
+            option --cert-dir String [1..1]
+            option --deployment-name String [1..1]
+            option --endpoint String [1..1]
+            option --forbidden String[] [1..100000]
+            option --gate String [1..1] required
+            option --guarded-tool String[] [1..100000]
+            option --id-arg String[] [1..100000]
+            option --input String [1..1]
+            option --keyword String[] [1..100000]
+            option --keywords String [1..1]
+            option --min-taint-length Int32? [1..1]
+            option --model String [1..1]
+            option --model-reply String [1..1]
+            option --pattern String [1..1]
+            option --policy String [1..1] default="block"
+            option --sink-tool String[] [1..100000]
+            option --source-tool String[] [1..100000]
+            option --trusted-tool String[] [1..100000]
+        command list-gates
+            option --json Boolean [0..1] default=false
+            option --phase String [1..1] default="all"
+    command init
+        option --force Boolean [0..1] default=false
+        option --format String [1..1] default="yaml"
+        option -o (--output) String [1..1]
+    command init-workspace
+        option --name String [1..1]
+    command list
+        option --type String [1..1]
+    command log-file
+        command gate-replay
+            argument <captured> FileInfo [1..1]
+            option --baseline FileInfo [1..1] required
+            option --candidate FileInfo [1..1] required
+            option --json Boolean [0..1] default=false
+        command replay
+            argument <captured> FileInfo [1..1]
+            option --api-key String [1..1]
+            option --endpoint String [1..1]
+            option --from-env (--azure-from-env) Boolean [0..1] default=false
+            option --model String [1..1]
+            option --out FileInfo [1..1] required
+            option --strict-text Boolean [0..1] default=false
+        command to-fixture
+            argument <captured> FileInfo [1..1]
+            option --out FileInfo [1..1] required
+    command mc
+        command doctor
+        command serve
+            option --port Int32? [1..1]
+            option --workspace String [1..1]
+    command migrate
+        option --apply Boolean [0..1] default=false
+        option --root String [1..1]
+    command redteam
+        option --accept-license Boolean [0..1] default=false
+        option --aef DirectoryInfo [1..1]
+        option --api-key String [1..1]
+        option --attacker String [1..1]
+        option --attacker-api-key String [1..1]
+        option --attacker-model String [1..1]
+        option --attacks String [1..1]
+        option --azure Boolean [0..1] default=false
+        option --baseline FileInfo [1..1]
+        option --baseline-note String [1..1]
+        option --baseline-version String [1..1]
+        option --benign-controls Boolean [0..1] default=false
+        option --calibration FileInfo [1..1]
+        option --copilotstudio-config FileInfo [1..1]
+        option --copilotstudio-config-baseline FileInfo [1..1]
+        option --copilotstudio-save-config-baseline FileInfo [1..1]
+        option --delay Double [1..1] default=0
+        option --deployment-name String [1..1]
+        option --endpoint String [1..1]
+        option --explain Boolean [0..1] default=false
+        option --fail-fast Boolean [0..1] default=false
+        option --fail-on String [1..1] default="vuln"
+        option --fail-on-config-drift Boolean [0..1] default=false
+        option --format String [1..1] default="markdown"
+        option --i-understand-live-side-effects Boolean [0..1] default=false
+        option --import-id-column String [1..1]
+        option --import-probes FileInfo [1..1]
+        option --import-prompt-field String [1..1]
+        option --intensity String [1..1] default="moderate"
+        option --judge String [1..1]
+        option --judge-api-key String [1..1]
+        option --judge-mode String [1..1] default="primary"
+        option --judge-model String [1..1]
+        option --judge-rubric String [1..1] default="evidence-anchored"
+        option --judge-timeout Double [1..1] default=0
+        option --max-credits Int32 [1..1] default=0
+        option --max-probes Int32 [1..1] default=0
+        option --max-turn-timeout Double [1..1] default=0
+        option --memory-trials Int32 [1..1] default=1
+        option --model String [1..1]
+        option --no-aef Boolean [0..1] default=false
+        option --pack String [1..1]
+        option --package-registry String [1..1] default="none"
+        option --parallelism Int32 [1..1] default=1
+        option --quiet Boolean [0..1] default=false
+        option --save-baseline FileInfo [1..1]
+        option --scripted Boolean [0..1] default=false
+        option --subject String [1..1]
+        option --subject-version String [1..1]
+        option --sut String [1..1]
+        option --sut-tier String [1..1] default="text"
+        option --system-prompt String [1..1]
+        option --system-prompt-canary String [1..1]
+        option --timeout-per-probe Double [1..1] default=30
+        option --transform String [1..1]
+        option --verbose Boolean [0..1] default=false
+        option -o (--output) FileInfo [1..1]
+    command render
+        option --benchmark String [1..1]
+        option --root String [1..1]
+        option --subject String [1..1]
+        option --ts String [1..1]
+    command requirements
+        command status
+            argument <catalogue> String [1..1]
+            option --at String [1..1] required
+            option --evidence String[] [1..100000]
+            option --json Boolean [0..1] default=false
+            option --policy String [1..1]
+            option --subject String [1..1] required
+            option --version String [1..1] required
+        command validate
+            argument <catalogue> String [1..1]
+            option --json Boolean [0..1] default=false
+    command run
+        option --aef DirectoryInfo [1..1]
+        option --dry-run Boolean [0..1] default=false
+        option --json Boolean [0..1] default=false
+        option --max-usd Double? [1..1]
+        option --no-aef Boolean [0..1] default=false
+        option --plan String [1..1] required
+        option --progress String [1..1]
+        option --refuse-over-budget Boolean [0..1] default=false
+        option --root String [1..1]
+        option --runner-id String [1..1]
+        option --subject String [1..1]
+        option --subject-version String [1..1]
+    command runner
+        command manifest
+            option --json Boolean [0..1] default=false
+            option --runner-id String [1..1]
+    command skills
+        command baseline
+            command approve
+                argument <skill-name> String [1..1]
+                option --baseline FileInfo [1..1] required
+                option --note String [1..1]
+                option --skill-path DirectoryInfo [1..1] required
+            command diff
+                option --baseline-root String [1..1] default=".agenteval/skills-baselines"
+                option --hash String [1..1] default="content"
+                option --since String [1..1]
+                option --skill String [1..1]
+            command history
+                argument <skill-name> String [1..1]
+                option --baseline-root String [1..1] default=".agenteval/skills-baselines"
+            command list
+                option --baseline-root String [1..1] default=".agenteval/skills-baselines"
+        command scan
+            argument <path> DirectoryInfo [1..1]
+            option --baseline-note String [1..1]
+            option --baseline-root String [1..1] default=".agenteval/skills-baselines"
+            option --check-baseline Boolean [0..1] default=false
+            option --fail-on-noncompliant Boolean [0..1] default=false
+            option --format String [1..1] default="console"
+            option --manifest-baseline FileInfo [1..1]
+            option --repo Boolean [0..1] default=false
+            option --save-manifest-baseline FileInfo [1..1]
+            option --write-baseline Boolean [0..1] default=false
+            option -o (--output) FileInfo [1..1]
+        command scan-workspace
+            argument <path> DirectoryInfo [1..1]
+            option --baseline-note String [1..1]
+            option --baseline-root String [1..1] default=".agenteval/skills-baselines-workspace"
+            option --check-baseline Boolean [0..1] default=false
+            option --fail-on-noncompliant Boolean [0..1] default=false
+            option --format String [1..1] default="console"
+            option --manifest-baseline FileInfo [1..1]
+            option --save-manifest-baseline FileInfo [1..1]
+            option --write-baseline Boolean [0..1] default=false
+            option -o (--output) FileInfo [1..1]

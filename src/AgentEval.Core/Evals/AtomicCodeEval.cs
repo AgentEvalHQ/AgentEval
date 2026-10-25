@@ -19,7 +19,8 @@ public abstract class AtomicCodeEval : AtomicEval
     {
         ArgumentNullException.ThrowIfNull(input);
         ct.ThrowIfCancellationRequested();
-        return Task.FromResult(Evaluate(input));
+        var result = Evaluate(input);
+        return Task.FromResult(result with { Observation = result.Observation ?? new(input.Query, input.SubjectModel) });
     }
 
     /// <summary>Synchronously evaluates <paramref name="input"/> and returns a result.</summary>

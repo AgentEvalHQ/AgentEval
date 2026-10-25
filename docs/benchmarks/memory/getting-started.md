@@ -89,6 +89,7 @@ CLI verdict mapping (aligned with `MemoryBenchmarkResult.Passed` canonical seman
 - `overall_score >= 70` → `PASS`
 - `50 <= overall_score < 70` → `WARN`
 - `overall_score < 50` → `FAIL`
+- an incomplete run (a category crashed or measured nothing, a question went unscored, or no category ran because the agent supports none) → `INCOMPLETE`, stored as `WARN`, exit 11; `overall_score` is left out of `summary.json` when no category was measured.
 
 ## Interpreting results
 

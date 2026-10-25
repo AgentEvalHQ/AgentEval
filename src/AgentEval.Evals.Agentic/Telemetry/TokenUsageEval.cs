@@ -21,6 +21,8 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// <b>Input contract</b>: telemetry data must be provided either via the constructor or via
 /// <see cref="EvalInput.Metadata"/> under key <c>"agentic_telemetry"</c>
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
+/// A null token count is not tracked and is skipped; a reported zero remains a measurement.
+/// Negative counts produce an error without a measurement.
 /// </para>
 /// </summary>
 public sealed class TokenUsageEval : IEvalConfigurationSource
@@ -89,7 +91,14 @@ public sealed class TokenUsageEval : IEvalConfigurationSource
                 $"TokenUsageEval requires telemetry data via EvalInput.Metadata[\"{LatencyEval.MetadataKey}\"] or constructor parameter."));
         }
 
-        var score = TelemetryHelper.LinearScore(telemetry.TokensUsed, _budgetTokens);
+        if (telemetry.TokensUsed is not { } tokensUsed)
+            return Task.FromResult(EvalResult.Skipped(this,
+                "The run's token usage was not tracked (AgenticTelemetry.TokensUsed is null), so Token Usage was not measured. Supply a recorded count; an untracked count is not 0 tokens."));
+        if (tokensUsed < 0)
+            return Task.FromResult(TelemetryHelper.InvalidReading(this, _passThreshold,
+                $"AgenticTelemetry.TokensUsed is {tokensUsed}: expected a non-negative token count. Supply a recorded count or null when not tracked; Token Usage was not measured."));
+
+        var score = TelemetryHelper.LinearScore(tokensUsed, _budgetTokens);
         var passed = score >= _passThreshold;
         var severity = passed ? "none" : "low";
 
@@ -99,21 +108,21 @@ public sealed class TokenUsageEval : IEvalConfigurationSource
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
-                    ["tokens_used"]   = telemetry.TokensUsed,
+                    ["tokens_used"]   = tokensUsed,
                     ["budget_tokens"] = _budgetTokens,
-                    ["overage_ratio"] = _budgetTokens > 0 ? (double)telemetry.TokensUsed / _budgetTokens : 0,
+                    ["overage_ratio"] = _budgetTokens > 0 ? (double)tokensUsed / _budgetTokens : 0,
                 },
                 Evidence:
                 [
                     new EvalEvidence(
                         Source: "telemetry",
                         Reference: "token_usage",
-                        Message: $"Tokens used: {telemetry.TokensUsed:N0} vs budget {_budgetTokens:N0} " +
-                                 $"({(double)telemetry.TokensUsed / Math.Max(1, _budgetTokens):P0} of budget)."),
+                        Message: $"Tokens used: {tokensUsed:N0} vs budget {_budgetTokens:N0} " +
+                                 $"({(double)tokensUsed / Math.Max(1, _budgetTokens):P0} of budget)."),
                 ],
                 Recommendations: passed ? null :
                 [
-                    $"Token usage ({telemetry.TokensUsed:N0}) exceeds budget ({_budgetTokens:N0}). " +
+                    $"Token usage ({tokensUsed:N0}) exceeds budget ({_budgetTokens:N0}). " +
                     "Review prompt lengths, context window usage, and tool-result verbosity."
                 ],
                 SubResults: null,

@@ -194,7 +194,7 @@ public sealed class SensitiveDataLeakageEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.sensitive_data_leakage.v1",
-            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+            failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls };
     }
 
     /// <inheritdoc/>

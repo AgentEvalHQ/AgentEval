@@ -20,6 +20,52 @@ namespace AgentEval.Tests.Evals;
 /// </remarks>
 public class TestRunEvalProjectionTests
 {
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    [InlineData(false, "partial payload")]
+    [InlineData(true, "partial payload")]
+    public void ToEvalInput_UnknownTimelineOutcome_PreservesReasonAndPayload(bool placeholder, string? payload)
+    {
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        {
+            ToolName = "lookup", StartTime = TimeSpan.Zero, Duration = TimeSpan.Zero,
+            Succeeded = placeholder, Result = payload, OutcomeNotMeasuredReason = "completion was not observed"
+        });
+        var input = new TestCase { Name = "pending", Input = "query" }
+            .ToEvalInput(new TestResult { TestName = "pending", Timeline = timeline });
+        var call = Assert.Single(input.ToolCalls!);
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, call.Result);
+        Assert.Contains("completion was not observed", call.Result);
+        Assert.DoesNotContain(TestRunEvalProjection.ToolErrorResultPrefix, call.Result);
+        if (payload is not null) Assert.Contains(payload, call.Result);
+        Assert.Null(call.Succeeded);
+        Assert.Null(call.Error);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ToEvalInput_UnknownOutcomeWithRecordedError_PreservesBothFacts(bool placeholder)
+    {
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        {
+            ToolName = "lookup", StartTime = TimeSpan.Zero, Duration = TimeSpan.Zero,
+            Succeeded = placeholder, Result = "partial payload", ErrorMessage = "recorded error",
+            OutcomeNotMeasuredReason = "execution unconfirmed"
+        });
+        var input = new TestCase { Name = "pending", Input = "query" }
+            .ToEvalInput(new TestResult { TestName = "pending", Timeline = timeline });
+        var call = Assert.Single(input.ToolCalls!);
+        Assert.StartsWith(TestRunEvalProjection.ToolNotExecutedResultPrefix, call.Result);
+        Assert.Contains("execution unconfirmed", call.Result);
+        Assert.Contains(TestRunEvalProjection.ToolErrorResultPrefix + " recorded error", call.Result);
+        Assert.Contains("partial payload", call.Result);
+        Assert.Null(call.Succeeded);
+    }
+
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
     private static TestCase FullyPopulatedCase() => new()

@@ -38,9 +38,16 @@ public static class ResultConverter
         // composite root does in AgentEvalCompositeEvaluator; the marker's "skipped" label lets MeaiToEvalResultBridge read
         // it back as not measured. As failed:false it passed an item where nothing was measured (#203 review round 16, B12k).
         // No value: 1.0 is the lowest score on MEAI's 1–5 scale, and a reader of Value would count it (round 17, M1).
+        // The marker's label says why: "error" when the instrument gave no reading (its call failed, its reply could not
+        // be read, a check timed out), as the bridge marks a metric MEAI could not score; "skipped" for an input the
+        // case lacked, or a producer that did not say.
         if (!metricResult.Measured)
         {
-            var notMeasured = $"AgentEval score: 0/100 (skipped, severity none) — not measured: {metricResult.Explanation}";
+            var label = metricResult.NotMeasuredCause is NotMeasuredCause.JudgeCallFailed
+                or NotMeasuredCause.JudgeReplyUnreadable or NotMeasuredCause.CheckTimedOut
+                ? "error"
+                : "skipped";
+            var notMeasured = $"AgentEval score: 0/100 ({label}, severity none) — not measured: {metricResult.Explanation}";
             result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: null, reason: notMeasured)
             {
                 Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive, failed: true, reason: notMeasured),

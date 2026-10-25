@@ -400,6 +400,17 @@ public class RedTeamCommandTests
     public void ComputeExitCode_GatesCorrectly(string failOn, RegressionStatus? regression, bool passed, int expected)
         => Assert.Equal(expected, RedTeamCommand.ComputeExitCode(failOn, regression, passed));
 
+    // A comparison refused because one run measured nothing is incomparable (13), never a regression (4) or a pass.
+    [Theory]
+    [InlineData("regression", true, false, ExitCodes.Incomparable)]
+    [InlineData("regression", false, true, ExitCodes.Incomparable)]
+    [InlineData("vuln", true, false, ExitCodes.Incomparable)]
+    [InlineData("vuln", false, true, ExitCodes.Incomparable)]    // the scan reached no verdict either: no finding
+    [InlineData("vuln", false, false, ExitCodes.TestFailure)]    // a vulnerability the scan found still fails it
+    [InlineData("never", false, true, ExitCodes.Success)]        // --fail-on never always passes
+    public void ComputeExitCode_ARefusedComparison_IsIncomparable(string failOn, bool passed, bool scanInconclusive, int expected)
+        => Assert.Equal(expected, RedTeamCommand.ComputeExitCode(failOn, RegressionStatus.Incomparable, passed, scanInconclusive));
+
     [Fact]
     public async Task ExecuteAsync_MissingBaselineFile_Throws_BeforeAnyScan()
     {

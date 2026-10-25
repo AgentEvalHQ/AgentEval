@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Reading;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Adapters.StoreV1;
@@ -35,7 +36,8 @@ public sealed record StoreV1ExportOptions : AefConversionOptions
 /// <item>the run is an imported run ([RUN-15]): <c>producer</c> is the exporter, <c>imported.from</c> names store v1 and
 /// the AgentEval version that wrote it, and <c>imported.asserted</c> lists every run.json field the exporter supplied;</item>
 /// <item>each scenario is a root line at <see cref="ScenarioPath"/>, each of its assertions a child line at
-/// <see cref="AssertionPathPrefix"/> and its 1-based position;</item>
+/// <see cref="AssertionPathPrefix"/> and its 1-based position; nested evaluators use ordinal paths under
+/// <c>scenario/eval</c>, independently of content capture;</item>
 /// <item>a scenario's state comes from its eval-result tree (<c>ScenarioResult.Output</c>, when it holds one): its
 /// <c>MeasurementState</c> and label (<c>pass</c> → <c>passed</c>, <c>fail</c> → <c>failed</c>, <c>warn</c>,
 /// <c>error</c>, <c>skipped</c>, <c>inapplicable</c> → <c>not_applicable</c>, not measured → <c>not_measured</c>), else
@@ -47,7 +49,7 @@ public sealed record StoreV1ExportOptions : AefConversionOptions
 /// was driven, typed absences outside an eval-result tree, a severity outside one) is said in
 /// <see cref="AefConversion.Notes"/>, never filled in silently.
 /// </summary>
-public static class StoreV1Exporter
+public static partial class StoreV1Exporter
 {
     /// <summary>run.json <c>imported.from</c>, before the AgentEval version.</summary>
     public const string From = "agenteval store v1";
@@ -80,6 +82,9 @@ public static class StoreV1Exporter
     };
 
     /// <summary>Exports run <paramref name="runId"/> of <paramref name="store"/> to <paramref name="outputDirectory"/>.</summary>
+    /// <remarks>Filesystem-backed readers use checked snapshots of the uniquely selected workspace run,
+    /// including original rich reports. Rootless semantic readers preserve the generic compliance evidence
+    /// exposed by the reader. Use <see cref="ExportWorkspaceRun"/> to select an exact filesystem folder.</remarks>
     /// <param name="store">The store v1 workspace.</param>
     /// <param name="runId">The run.</param>
     /// <param name="outputDirectory">The AEF run folder to write: it must not exist, or be empty.</param>
@@ -93,6 +98,8 @@ public static class StoreV1Exporter
         ArgumentNullException.ThrowIfNull(store);
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        if (store.WorkspaceRoot is { } root)
+            return ExportWorkspaceRun(root, ResolveWorkspaceRunDirectory(root, runId, ct), outputDirectory, options, ct);
         StoreV1Run run;
         try
         {
@@ -107,30 +114,42 @@ public static class StoreV1Exporter
         return Export(run, outputDirectory, options);
     }
 
-    private static async Task<StoreV1Run> ReadAsync(IOutputStoreReader store, string runId, CancellationToken ct)
+    private static async Task<StoreV1Run> ReadAsync(IOutputStoreReader store, string runId, CancellationToken ct, AefWriteBudget? budget = null)
     {
+        var accountant = budget is null ? null : new SemanticAccountant(budget);
         var manifest = await store.GetRunManifestAsync(runId, ct).ConfigureAwait(false)
             ?? throw new InvalidDataException($"The store has no run {runId} (no manifest.json for it under subjects/*/*/runs/).");
+        ValidateManifest(manifest);
+        accountant?.Account(manifest);
         var summary = await store.GetRunSummaryAsync(runId, ct).ConfigureAwait(false);
+        accountant?.Account(summary);
         var scenarios = new List<ScenarioResult>();
         await foreach (var scenario in store.GetScenarioResultsAsync(runId, ct).ConfigureAwait(false))
         {
+            accountant?.Account(scenario);
             scenarios.Add(scenario);
         }
 
         var trace = await store.GetTraceAsync(runId, ct).ConfigureAwait(false);
+        accountant?.Account(trace);
         var compliance = new List<ComplianceEvidence>();
         var subject = manifest.Subject.ToIdentity();
         await foreach (var pointer in store.ListComplianceEvidenceAsync(subject: subject, ct: ct).ConfigureAwait(false))
         {
+            accountant?.Account(pointer);
             var evidence = await store.GetComplianceEvidenceAsync(pointer.Regulation, subject, pointer.Timestamp, ct).ConfigureAwait(false);
+            accountant?.Account(evidence);
             if (evidence is not null && evidence.SourceRun.RunId == runId)
             {
+                if (evidence.SourceRun.ManifestHash != manifest.ContentHash)
+                    throw InvalidSource("A compliance report's recorded source hash disagrees with the selected run manifest.");
                 compliance.Add(evidence);
             }
         }
 
-        return new StoreV1Run(manifest, summary, scenarios, trace, compliance);
+        var history = await ReadSubjectHistoryAsync(store, subject, ct, budget).ConfigureAwait(false);
+        return new StoreV1Run(manifest, summary, scenarios, trace, compliance)
+            { HistoryRecords = history?.Where(r => r.Entry.RunId == runId).ToArray() };
     }
 
     /// <summary>Exports a store v1 run already read.</summary>
@@ -141,6 +160,17 @@ public static class StoreV1Exporter
         ArgumentNullException.ThrowIfNull(run);
         options ??= new StoreV1ExportOptions();
         var manifest = run.Manifest;
+        ValidateManifest(manifest);
+        ValidateSummary(run.Summary);
+        if (run.Summary is { } summary)
+        {
+            if (summary.RunId != manifest.Run.RunId)
+                throw InvalidSource("The summary names a different execution than the selected manifest.");
+            if (manifest.Run.Verdict != "PENDING" &&
+                (manifest.Run.ScenarioCount != (run.ReportOnlyQuestionCount ?? run.Scenarios.Count)
+                    || summary.Stats.Total != (run.ReportOnlyQuestionCount ?? run.Scenarios.Count)))
+                throw InvalidSource("The completed run's recorded scenario counts disagree with the supplied results.");
+        }
         var capture = options.ContentCapture;
         var runId = manifest.Run.RunId;
         if (!AefConverter.IsId(runId))
@@ -149,6 +179,7 @@ public static class StoreV1Exporter
         }
 
         var notes = new List<string>();
+        notes.Add("Imported: not sealed when it ran. The original legacy run was not AEF-sealed during execution; any ingest seal protects the converted evidence from import onward, not its earlier history.");
         var asserted = new List<string> { "execution.targetMode", "contentCapture" };
         notes.Add($"How the target was driven is not recorded in store v1: execution.targetMode is the exporter's claim ({AefNames.Of(options.TargetMode)}).");
         notes.Add($"Store v1 records no content capture policy: contentCapture is the exporter's ({AefNames.Of(capture)}).");
@@ -167,6 +198,10 @@ public static class StoreV1Exporter
 
         notes.Add("Store v1 records no suite version or digest: run.json has no suite.");
         notes.Add("Store v1 records no deployment: run.json has no deployment.");
+        if (run.NativeReportProjection)
+            notes.Add("Canonical cases are projected from the recorded report-native.json EvalResult tree, not original scenario files. Inputs, input hashes and per-case durations were not recorded there and remain absent.");
+        if (run.ReportOnlyQuestionCount is { } questionCount)
+            notes.Add($"The legacy external memory producer recorded {questionCount} questions in report-native.json and no ScenarioResult files. Original question counts remain in legacy metadata; no canonical evaluator results or comparison facts are inferred from this report-only DTO.");
 
         // [RUN-5]: a run CompleteRunAsync finished has a summary and a final verdict; anything else never completed.
         var startedAt = manifest.Run.Timestamp;
@@ -178,6 +213,7 @@ public static class StoreV1Exporter
             abortReason = "AgentEval store v1: the run never completed (no summary.json, or the manifest's verdict is still PENDING).";
             asserted.Add("status");
             asserted.Add("endedAt");
+            asserted.Add("abortReason");
             notes.Add("The store's run never completed: it is written as aborted, and its endedAt (its start) is the exporter's.");
         }
 
@@ -201,12 +237,74 @@ public static class StoreV1Exporter
             Execution = new AefExecution { TargetMode = options.TargetMode },
             Imported = new AefImported { From = from, Asserted = asserted },
         };
+        if (run.Report is { } report) header.Ext![Native.AefReportArtifact.Extension] = report.Metadata(capture);
 
+        return Export(new ExportData(header, run.Scenarios, lane, endedAt, abortReason, notes)
+        {
+            Summary = run.Summary, Trace = run.Trace, ComplianceEvidence = run.ComplianceEvidence,
+            ComplianceArtifacts = run.ComplianceArtifacts,
+            CompliancePdfs = run.CompliancePdfs,
+            Reports = run.Reports,
+            TraceSnapshotPath = run.TraceSnapshotPath,
+            HistoryRecords = run.HistoryRecords,
+            Report = run.Report,
+        }, outputDirectory, options);
+    }
+
+    private static void ValidateManifest(RunManifest manifest)
+    {
+        if (manifest is null || manifest.Run is null || manifest.Subject is null || manifest.Solution is null
+            || manifest.Git is null || manifest.AgentEval is null || manifest.Environment is null)
+            throw InvalidSource("The legacy manifest is incomplete.");
+        if (!Enum.IsDefined(manifest.Subject.Kind) || manifest.Run.Duration < TimeSpan.Zero
+            || manifest.Run.ScenarioCount < 0 || string.IsNullOrWhiteSpace(manifest.Run.Verdict))
+            throw InvalidSource("The legacy manifest has an unknown subject kind, negative duration/count or missing completion verdict.");
+    }
+
+    private static void ValidateSummary(RunSummary? summary)
+    {
+        if (summary is not null && (summary.Metrics is null || summary.Stats is null))
+            throw InvalidSource("The legacy summary is incomplete.");
+        if (summary?.Stats is { } stats && (stats.Total < 0 || stats.Passed < 0 || stats.Failed < 0 || stats.Warnings < 0 || stats.Skipped < 0))
+            throw InvalidSource("The legacy summary contains a negative recorded count.");
+    }
+
+    private static InvalidDataException InvalidSource(string actual, Exception? inner = null) => new(
+        "Expected: readable legacy evidence with the fields needed for conversion. Actual: " + actual +
+        " Suggestions: select the original complete files, or an ordinary scenario-only collection when its manifest is unavailable." +
+        " Because: missing or malformed evidence cannot be reconstructed as recorded facts.", inner);
+
+    // Both workspace runs and detached scenario collections use this same evidence mapping.
+    private sealed record ExportData(AefRunHeader Header, IReadOnlyList<ScenarioResult> Scenarios,
+        string Lane, DateTimeOffset EndedAt, string? AbortReason, List<string> Notes)
+    {
+        internal RunSummary? Summary { get; init; }
+        internal AgentTrace? Trace { get; init; }
+        internal string? TraceSnapshotPath { get; init; }
+        internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
+        internal IReadOnlyList<ComplianceEvidence> ComplianceEvidence { get; init; } = [];
+        internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+        internal IReadOnlyList<StoreV1CompliancePdf> CompliancePdfs { get; init; } = [];
+        internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
+        internal Native.AefReportArtifact? Report { get; init; }
+    }
+
+    private static AefConversion Export(ExportData data, string outputDirectory, StoreV1ExportOptions options)
+    {
+        ValidateSummary(data.Summary);
+        if (data.Scenarios.Any(s => s.Input is null || s.Output is null || s.Metrics is null
+            || s.Assertions?.Any(a => a is null) == true))
+            throw InvalidSource("A legacy scenario contains null input, output, metrics or assertion evidence.");
+        if (data.HistoryRecords is { } history && data.Header.Ext?[ExtName] is JsonObject legacy)
+            legacy["history"] = new JsonObject
+            {
+                ["version"] = 1, ["entries"] = history.Count, ["captured"] = options.ContentCapture == AefContentCapture.On
+            };
         var existed = Directory.Exists(outputDirectory);
         AefRunWriter writer;
         try
         {
-            writer = AefRunWriter.Create(outputDirectory, header);
+            writer = AefRunWriter.Create(outputDirectory, data.Header, options.WriteBudget);
         }
         catch (ArgumentException e) when (e.ParamName != "directory")
         {
@@ -215,24 +313,58 @@ public static class StoreV1Exporter
 
         try
         {
-            writer.SetMetrics(Metrics(run.Scenarios));
-            var compliance = AddCompliance(writer, run.ComplianceEvidence);
-            var traceEvidence = AddTrace(writer, run.Trace, capture);
+            var trees = data.Scenarios.Select(PrepareTree).ToArray();
+            var metrics = Metrics(data.Scenarios, trees);
+            var treeScoreMetric = AddTreeMetrics(metrics, trees);
+            writer.SetMetrics(metrics);
+            var compliance = AddCompliance(writer, data.ComplianceEvidence);
+            if (options.ContentCapture == AefContentCapture.On)
+            {
+                for (var i = 0; i < data.ComplianceArtifacts.Count; i++)
+                {
+                    var id = $"E-compliance-original-{i + 1}";
+                    var document = new AefComplianceArtifactReader().ReadDocument(data.ComplianceArtifacts[i], id);
+                    writer.AddEvidence(new AefEvidence
+                    {
+                        EvidenceId = id,
+                        Kind = AefEvidenceKind.ComplianceArtifact,
+                        Link = AefEvidenceLink.ToBlob(writer.PutBlob(data.ComplianceArtifacts[i])),
+                        Description = "Original legacy compliance document bytes; ingest custody begins at conversion.",
+                    });
+                    foreach (var scenario in document.Evidence.Controls.SelectMany(c => c.ScenarioRefs).Distinct(StringComparer.Ordinal))
+                    {
+                        if (!compliance.TryGetValue(scenario, out var ids)) compliance[scenario] = ids = [];
+                        ids.Add(id);
+                    }
+                }
+            }
+            var traceEvidence = AddTrace(writer, data.Trace, data.TraceSnapshotPath, options.ContentCapture);
+            AddCompliancePdfs(writer, data.CompliancePdfs, options.ContentCapture);
+            AddReports(writer, data.Reports, options.ContentCapture);
+            data.Report?.Write(writer, options.ContentCapture);
+            if (options.ContentCapture == AefContentCapture.On && data.HistoryRecords is { } historyRecords)
+                writer.AddEvidence(new AefEvidence
+                {
+                    EvidenceId = StoreV1History.EvidenceId, Kind = AefEvidenceKind.Document,
+                    Link = AefEvidenceLink.ToBlob(writer.PutBlob(StoreV1History.Encode(historyRecords))),
+                    Description = "Recorded legacy history index entries, in original index order. References and index claims do not verify execution; ingest custody begins at conversion."
+                });
             var index = 0;
-            foreach (var scenario in run.Scenarios)
+            foreach (var scenario in data.Scenarios)
             {
                 index++;
-                AddScenario(writer, scenario, index, lane, capture, compliance, traceEvidence);
+                AddScenario(writer, scenario, trees[index - 1], treeScoreMetric, index, data.Lane, options.ContentCapture, compliance, traceEvidence);
             }
 
-            notes.Add("Severity and typed absences come only from a scenario's eval-result tree; a scenario without one is passed or failed, with no severity.");
-            if (run.Scenarios.Any(s => s.Assertions.Count > 0))
+            data.Notes.Add("Severity and typed absences come only from a scenario's eval-result tree; a scenario without one is passed or failed, with no severity.");
+            if (data.Scenarios.Any(s => s.Assertions.Count > 0))
             {
-                notes.Add("Store v1 does not record what part a scenario's assertions played in its verdict: each assertion line has component weight 0, not required, and the scenario's aggregation describes its own verdict.");
+                data.Notes.Add("Store v1 does not record what part a scenario's assertions played in its verdict: each assertion line has component weight 0, not required, and the scenario's aggregation describes its own verdict.");
             }
 
-            writer.SetSummary(Summary(run.Summary, lane));
-            return AefConverter.Finish(writer, options, from, asserted, notes, completed ? AefRunStatus.Completed : AefRunStatus.Aborted, endedAt, abortReason);
+            writer.SetSummary(Summary(data.Summary, data.Lane));
+            return AefConverter.Finish(writer, options, data.Header.Imported!.From, data.Header.Imported.Asserted,
+                data.Notes, data.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted, data.EndedAt, data.AbortReason);
         }
         catch (Exception e)
         {
@@ -309,8 +441,11 @@ public static class StoreV1Exporter
 
     // ---------------------------------------------------------------- metrics.json
 
-    private static List<AefMetric> Metrics(IReadOnlyList<ScenarioResult> scenarios)
+    private static List<AefMetric> Metrics(IReadOnlyList<ScenarioResult> scenarios, IReadOnlyList<EvalResult?> trees)
     {
+        // A generic ScenarioResult has no declared domain. Refine the shared metric only when every scenario
+        // proves the EvalScore contract from its recorded result, never merely because observed values fit 0..1.
+        var normalized = scenarios.Count > 0 && scenarios.Select((scenario, i) => HasNormalizedScoreContract(scenario, trees[i])).All(value => value);
         var metrics = new List<AefMetric>
         {
             new()
@@ -320,8 +455,10 @@ public static class StoreV1Exporter
             },
             new()
             {
-                Id = ScoreMetric, Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Unbounded,
-                Description = "The scenario's score (AgentEval store v1 ScenarioResult.Score).",
+                Id = ScoreMetric, Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter,
+                Scale = normalized ? AefScale.Between(0, 1) : AefScale.Unbounded,
+                Description = normalized ? "The recorded EvalScore's normalized score (0 to 1)."
+                    : "The scenario's score (AgentEval store v1 ScenarioResult.Score); no common normalized domain is established.",
             },
         };
         var dimensions = new HashSet<string>(StringComparer.Ordinal);
@@ -340,14 +477,29 @@ public static class StoreV1Exporter
         return metrics;
     }
 
+    private static bool HasNormalizedScoreContract(ScenarioResult scenario, EvalResult? tree)
+    {
+        if (tree?.Details is null || tree.Provenance is null || tree.EvaluatedAt == default ||
+            string.IsNullOrWhiteSpace(tree.Metric.Key) || string.IsNullOrWhiteSpace(tree.Metric.Version) ||
+            string.IsNullOrWhiteSpace(tree.Score.Label) || !Enum.IsDefined(tree.Score.Measurement) ||
+            tree.Score.Value is < 0 or > 1 || scenario.Score != tree.Score.MeasuredValue() || scenario.Passed != tree.Score.Passed)
+            return false;
+        if (scenario.Measurement is not null && scenario.Measurement != ScenarioMeasurement.Of(tree.Score.CensusBucket()))
+            return false;
+        return scenario.Comparability is not { } facts ||
+            facts.EvalKey == tree.Metric.Key && facts.EvalVersion == tree.Metric.Version && facts.EffectiveBar == tree.Score.Threshold;
+    }
+
     // A dimension's metric id: its name, unless the store lifted it from the tree (_lifted.*: the severity and confidence,
     // mapped elsewhere), it names one of the exporter's metrics, or it is longer than an id may be.
-    private static string? DimensionMetric(string name) =>
+    internal static string? DimensionMetric(string name) =>
         name.StartsWith("_lifted.", StringComparison.Ordinal) || name.Length is 0 or > 256 ? null
         : name is PassMetric or ScoreMetric ? "dimension:" + name
         : name;
 
     // ---------------------------------------------------------------- evidence
+
+    internal static byte[] SerializeComplianceEvidence(ComplianceEvidence evidence) => JsonSerializer.SerializeToUtf8Bytes(evidence, s_store);
 
     // Each compliance evidence document of the run: a blob (as the store reads it, re-serialized) and a record; the
     // scenarios each control names cite it.
@@ -359,7 +511,7 @@ public static class StoreV1Exporter
         {
             index++;
             var id = $"E-compliance-{index}";
-            var blob = writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(document, s_store));
+            var blob = writer.PutBlob(SerializeComplianceEvidence(document));
             writer.AddEvidence(new AefEvidence
             {
                 EvidenceId = id,
@@ -385,20 +537,27 @@ public static class StoreV1Exporter
 
     // The run's agent trace (one file per run in store v1): a transcript blob, cited by the scenario it names. Content:
     // written only when the run keeps content ([RUN-11]).
-    private static (string ScenarioId, string EvidenceId)? AddTrace(AefRunWriter writer, AgentTrace? trace, AefContentCapture capture)
+    private static (string ScenarioId, string EvidenceId)? AddTrace(AefRunWriter writer, AgentTrace? trace,
+        string? snapshotPath, AefContentCapture capture)
     {
         if (trace is null || capture == AefContentCapture.Off)
         {
             return null;
         }
 
-        var blob = writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(trace, s_store));
+        // Filesystem imports retain the owned snapshot's exact bytes, including
+        // absent fields and unfamiliar properties. Reserializing would turn a
+        // missing timestamp into the DTO's default and discard unknown evidence.
+        using var input = snapshotPath is null ? null : File.OpenRead(snapshotPath);
+        var blob = input is null ? writer.PutBlob(JsonSerializer.SerializeToUtf8Bytes(trace, s_store)) : writer.PutBlob(input);
         writer.AddEvidence(new AefEvidence
         {
             EvidenceId = "E-trace",
             Kind = AefEvidenceKind.Transcript,
             Link = AefEvidenceLink.ToBlob(blob),
-            Description = "AgentEval store v1 agent trace (traces/agent-trace.json), as the store reads it.",
+            Description = snapshotPath is null ? "AgentEval store v1 agent trace, as supplied by the semantic store."
+                : "AgentEval store v1 agent trace (traces/agent-trace.json), captured without rewriting.",
+            Ext = new JsonObject { [ExtName] = new JsonObject { ["traceFormat"] = "agent-trace-v1" } },
         });
         return (trace.ScenarioId, "E-trace");
     }
@@ -406,7 +565,7 @@ public static class StoreV1Exporter
     // ---------------------------------------------------------------- results.ndjson
 
     private static void AddScenario(
-        AefRunWriter writer, ScenarioResult scenario, int index, string lane, AefContentCapture capture,
+        AefRunWriter writer, ScenarioResult scenario, EvalResult? tree, string treeScoreMetric, int index, string lane, AefContentCapture capture,
         Dictionary<string, List<string>> compliance, (string ScenarioId, string EvidenceId)? trace)
     {
         if (!AefConverter.IsResultText(scenario.Id, 256))
@@ -414,7 +573,6 @@ public static class StoreV1Exporter
             throw new InvalidDataException($"The scenario id '{scenario.Id}' is not an AEF case id (1-256 characters, no control character).");
         }
 
-        var tree = Tree(scenario);
         var (state, reason, severity) = ScenarioState(scenario, tree, capture);
         var evidence = new List<string>();
         if (capture == AefContentCapture.On)
@@ -440,6 +598,9 @@ public static class StoreV1Exporter
 
         // The assertions, as children: Passed → passed, Failed → failed, Inconclusive → not_measured.
         var children = scenario.Assertions.Select((a, i) => Assertion(scenario.Id, a, i, lane)).ToList();
+        var evalChildren = (tree?.Details?.SubResults ?? []).Select((node, i) =>
+            ProjectTree(node, scenario.Id, ScenarioPath + "/eval/" + (i + 1).ToString(CultureInfo.InvariantCulture), treeScoreMetric, lane, capture)).ToList();
+        var allChildren = children.Concat(evalChildren.Select(n => n.Result)).ToList();
         var measured = IsMeasured(state);
         var facts = scenario.Comparability;
         var root = new AefResult
@@ -454,14 +615,15 @@ public static class StoreV1Exporter
                 ? new AefVerdictRule("the eval's own rule against its threshold", bar, "AgentEval eval threshold (store v1 comparability.effectiveBar)")
                 : null,
             Annotator = Annotator(facts, tree),
-            Aggregation = children.Count == 0 ? null : Aggregation(scenario, state, children, facts),
+            Aggregation = allChildren.Count == 0 ? null : Aggregation(scenario.Score, facts?.EffectiveBar, state, allChildren),
             Evidence = evidence.Count > 0 ? evidence : null,
-            Ext = new JsonObject { [ExtName] = ScenarioExt(scenario, capture) },
+            Ext = new JsonObject { [ExtName] = ScenarioExt(scenario, capture, tree is not null) },
             Lane = lane,
             Severity = severity,
-            DurationMs = scenario.Duration > TimeSpan.Zero ? scenario.Duration.TotalMilliseconds : null,
-            Usage = scenario.EstimatedCost > 0 && double.IsFinite(scenario.EstimatedCost)
-                ? [new AefUsage { Role = AefUsageRole.Other, CostUsd = scenario.EstimatedCost, CostSource = "AgentEval store v1 estimate (ScenarioResult.EstimatedCost)" }]
+            DurationMs = scenario.Duration is { } duration && duration >= TimeSpan.Zero ? duration.TotalMilliseconds : null,
+            // Preserve recorded zero; only absent or invalid costs omit usage.
+            Usage = scenario.EstimatedCost is double cost && cost >= 0 && double.IsFinite(cost)
+                ? [new AefUsage { Role = AefUsageRole.Other, CostUsd = cost, CostSource = "AgentEval store v1 estimate (ScenarioResult.EstimatedCost)" }]
                 : null,
         };
 
@@ -479,6 +641,7 @@ public static class StoreV1Exporter
         {
             handle.AddChild(child);
         }
+        foreach (var child in evalChildren) WriteTree(handle, child);
     }
 
     private static string Content(AefRunWriter writer, string id, AefEvidenceKind kind, string text, string description)
@@ -488,51 +651,28 @@ public static class StoreV1Exporter
         return id;
     }
 
-    // The scenario's eval-result tree, when ScenarioResult.Output holds one (EvalResultPersistence writes it there).
-    private static EvalResult? Tree(ScenarioResult scenario)
-    {
-        var output = scenario.Output.AsSpan().TrimStart();
-        if (output.Length == 0 || output[0] != '{')
-        {
-            return null;
-        }
-
-        try
-        {
-            var tree = EvalResultPersistence.FromScenarioResult(scenario);
-            return tree?.Metric is not null && tree.Score is not null ? tree : null;
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or NotSupportedException or JsonException)
-        {
-            return null;   // not a tree this version reads: the scenario's own pass flag decides
-        }
-    }
-
     // §7.5: MeasurementState and labels → state. An unknown label is read by the score's pass flag (as AgentEval's own
     // ReportStatus reads it). Without a tree, ScenarioResult.Passed decides and nothing gives a severity.
     private static (AefState State, string? Reason, AefSeverity? Severity) ScenarioState(ScenarioResult scenario, EvalResult? tree, AefContentCapture capture)
     {
         if (tree is null)
         {
+            if (!ScenarioMeasurement.IsMeasured(scenario))
+            {
+                var absence = scenario.Measurement == ScenarioMeasurement.NotApplicable ? AefState.NotApplicable : AefState.NotMeasured;
+                return (absence, "AgentEval store v1: the scenario has no measured score (measurement: "
+                    + (scenario.Measurement ?? "unrecorded") + ").", null);
+            }
             return (scenario.Passed ? AefState.Passed : AefState.Failed, null, null);
         }
 
+        return TreeState(tree, capture);
+    }
+
+    private static (AefState State, string? Reason, AefSeverity? Severity) TreeState(EvalResult tree, AefContentCapture capture)
+    {
         var score = tree.Score;
-        var state = score.Measurement switch
-        {
-            MeasurementState.NotApplicable => AefState.NotApplicable,
-            MeasurementState.NotMeasured => AefState.NotMeasured,
-            _ => score.Label switch
-            {
-                "pass" => AefState.Passed,
-                "fail" => AefState.Failed,
-                "warn" => AefState.Warn,
-                "error" => AefState.Error,
-                "skipped" => AefState.Skipped,
-                "inapplicable" => AefState.NotApplicable,
-                _ => score.Passed ? AefState.Passed : AefState.Failed,
-            },
-        };
+        var state = EvalScoreState.Of(score);
 
         AefSeverity? severity = state is AefState.Failed or AefState.Warn && AefNames.TryParse<AefSeverity>(score.Severity, out var s) ? s : null;
 
@@ -560,9 +700,9 @@ public static class StoreV1Exporter
     private static List<AefScore> Scores(ScenarioResult scenario)
     {
         var scores = new List<AefScore>();
-        if (double.IsFinite(scenario.Score))
+        if (scenario.Score is { } score && double.IsFinite(score))
         {
-            scores.Add(new AefScore { Metric = ScoreMetric, Value = scenario.Score });
+            scores.Add(new AefScore { Metric = ScoreMetric, Value = score });
         }
 
         foreach (var (name, value) in scenario.Metrics)
@@ -578,7 +718,7 @@ public static class StoreV1Exporter
 
     // Who graded: the judge the comparability facts name (an LLM), a deterministic eval (code), or, without facts, the
     // tree's judge model.
-    private static AefAnnotator? Annotator(ComparabilityFacts? facts, EvalResult? tree)
+    internal static AefAnnotator? Annotator(ComparabilityFacts? facts, EvalResult? tree)
     {
         if (facts?.Judge is { } judge)
         {
@@ -587,7 +727,17 @@ public static class StoreV1Exporter
 
         if (facts is not null)
         {
-            return new AefAnnotator { Kind = AefAnnotatorKind.Code };
+            return new AefAnnotator
+            {
+                Kind = facts.EffectiveInstrumentKind switch
+                {
+                    EvaluationInstrumentKind.Model => AefAnnotatorKind.Llm,
+                    EvaluationInstrumentKind.Deterministic => AefAnnotatorKind.Code,
+                    _ => AefAnnotatorKind.Other,
+                },
+                RubricDigest = facts.EffectiveInstrumentKind == EvaluationInstrumentKind.Model
+                    ? AefConverter.Sha256Uri(facts.EffectiveRubricDigest) : null,
+            };
         }
 
         return tree?.Provenance?.JudgeModel is { Length: > 0 } model ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = AefConverter.Text(model, 256) } : null;
@@ -596,7 +746,7 @@ public static class StoreV1Exporter
     // [RES-5]: a scenario with assertions is a composite. Store v1 records the scenario's own verdict and its assertions
     // beside it, not how one led to the other: the aggregation describes the scenario's own score against its threshold
     // (or nothing measured), its children weigh nothing and are not required, and no child is named decisive.
-    private static AefAggregation Aggregation(ScenarioResult scenario, AefState state, List<AefResult> children, ComparabilityFacts? facts)
+    private static AefAggregation Aggregation(double? score, double? threshold, AefState state, List<AefResult> children)
     {
         var count = (AefState s) => (long)children.Count(c => c.State == s);
         var unmeasured = new AefUnmeasured
@@ -610,8 +760,8 @@ public static class StoreV1Exporter
         return new AefAggregation
         {
             Strategy = AefAggregationStrategy.Own,
-            Threshold = facts?.EffectiveBar,
-            Score = IsMeasured(state) && double.IsFinite(scenario.Score) ? scenario.Score : null,
+            Threshold = threshold,
+            Score = IsMeasured(state) && score is { } value && double.IsFinite(value) ? value : null,
             RulePath = IsMeasured(state) ? AefRulePath.Threshold : AefRulePath.NothingMeasured,
             Measured = measured,
             Total = children.Count,
@@ -647,14 +797,15 @@ public static class StoreV1Exporter
         };
     }
 
-    private static JsonObject ScenarioExt(ScenarioResult scenario, AefContentCapture capture)
+    private static JsonObject ScenarioExt(ScenarioResult scenario, AefContentCapture capture, bool hasTree)
     {
         var ext = new JsonObject
         {
             ["name"] = scenario.Name,
             ["passed"] = scenario.Passed,
-            ["score"] = double.IsFinite(scenario.Score) ? scenario.Score : null,
+            ["score"] = scenario.Score is { } score && double.IsFinite(score) ? score : null,
         };
+        if (hasTree) ext["evalTreeProjectionVersion"] = 1;
         if (capture == AefContentCapture.On && scenario.StimulusHash is { } stimulus)
         {
             ext["stimulusHash"] = stimulus;   // a digest of the input: kept only with content ([RUN-11])
@@ -734,4 +885,15 @@ public sealed record StoreV1Run(
     RunSummary? Summary,
     IReadOnlyList<ScenarioResult> Scenarios,
     AgentTrace? Trace,
-    IReadOnlyList<ComplianceEvidence> ComplianceEvidence);
+    IReadOnlyList<ComplianceEvidence> ComplianceEvidence)
+{
+    // Exact bytes captured by the filesystem importer, after validating their generic evidence identity.
+    internal IReadOnlyList<byte[]> ComplianceArtifacts { get; init; } = [];
+    internal IReadOnlyList<StoreV1CompliancePdf> CompliancePdfs { get; init; } = [];
+    internal IReadOnlyList<StoreV1ReportArtifact> Reports { get; init; } = [];
+    internal string? TraceSnapshotPath { get; init; }
+    internal IReadOnlyList<StoreV1HistoryRecord>? HistoryRecords { get; init; }
+    internal bool NativeReportProjection { get; init; }
+    internal int? ReportOnlyQuestionCount { get; init; }
+    internal Native.AefReportArtifact? Report { get; init; }
+}

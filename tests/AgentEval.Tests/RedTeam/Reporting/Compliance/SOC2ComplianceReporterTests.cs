@@ -290,7 +290,7 @@ public class SOC2ComplianceReporterTests
         var report = new SOC2ComplianceReporter().GenerateReport(result);
         var control = report.Controls.First(c => c.Control.RelevantAttacks.Contains("SystemPromptExtraction"));
 
-        Assert.Equal(100.0, control.PassRate, precision: 4);          // conclusive-only (4/4), not diluted (4/20)
+        Assert.Equal(100.0, control.PassRate!.Value, precision: 4);          // conclusive-only (4/4), not diluted (4/20)
         Assert.Equal(ControlEvaluationStatus.Effective, control.Status);
         Assert.Contains(control.Observations, o => o.Contains("Low coverage"));
     }

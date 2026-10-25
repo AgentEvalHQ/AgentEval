@@ -16,7 +16,8 @@ A closed run that checks clean needs `run.json`, `results.ndjson`, `metrics.json
 3. **Write the summary** from the lines, exactly as [SUM-3]–[SUM-5] compute it, and leave no line `pending`
    ([RES-3]).
 4. **Close the run.** Set `status` to `completed` (or `aborted`, with an `abortReason`) and `endedAt`, writing every
-   file's final form at once. After this, nothing outside `overlays/` changes ([RUN-4]).
+   file's final form at once. Evaluation files are then immutable; only the seal, its attestation, overlays and
+   authorized blob withholding may follow ([RUN-4]).
 5. **Seal it** ([SEAL-1]–[SEAL-5]), and sign the seal if anyone else will rely on the run ([SIG-1]).
 
 `tools/aef_produce.py` is a reference writer: it writes a run's results and summary from its facts (steps 2 and 3,

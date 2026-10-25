@@ -130,12 +130,12 @@ public class ToolEfficiencyMetricTests
         {
             Input = "Hello",
             Output = "Hi!",
-            ToolUsage = null
+            ToolUsage = new ToolUsageReport() // recorded, and no tool was called (null would be "not recorded", T58)
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
+
         // Assert
         Assert.Equal(100, result.Score);
         Assert.True(result.Passed);

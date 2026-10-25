@@ -148,13 +148,16 @@ if (!AIConfig.IsConfigured)
 // Multi-model support for comparison samples
 var primaryModel = AIConfig.ModelDeployment; // "gpt-4o" (default)
 var secondaryModel = AIConfig.SecondaryModelDeployment; // "gpt-4o-mini" (default)
-var embeddingModel = AIConfig.EmbeddingDeployment; // "text-embedding-ada-002" (default)
+var embeddingModel = AIConfig.EmbeddingDeployment; // follows the chat provider: "BAAI/bge-m3" on bitdeer (default)
 
-// Embedding availability check for RAG samples
+// Embedding availability check for RAG samples: same provider as chat; a skip is recorded, never a pass
 if (!AIConfig.IsEmbeddingConfigured)
 {
-    Console.WriteLine("⚠️ Embedding model not configured, skipping RAG metrics");
+    Console.WriteLine($"⚠️ {AIConfig.EmbeddingSettings.Diagnostic}");
+    SampleOutcome.Skip("no embedding model configured");
+    return;
 }
+var embeddings = new MEAIEmbeddingAdapter(AIConfig.CreateEmbeddingGenerator());
 ```
 
 ### Program.cs Menu Structure
@@ -225,7 +228,7 @@ Track which samples depend on others:
 Environment dependencies:
 - Samples that use a model need a configured provider: `AI_INFERENCE_PROVIDER` and its variables (see `AIConfig`)
 - Samples that use no model run offline by design
-- Sample 05: May require `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` for RAG metrics
+- B1 (Comprehensive RAG) needs an embedding model on the chat provider: `BITDEER_EMBEDDING_MODEL` / `OPENAI_EMBEDDING_MODEL` have defaults; `AZURE_OPENAI_EMBEDDING_DEPLOYMENT`, `FOUNDRY_EMBEDDING_MODEL`, `OPENAI_COMPATIBLE_EMBEDDING_MODEL` must be set
 
 ## AgentEval Principles (Apply to Code)
 

@@ -281,7 +281,6 @@ public sealed class OwaspBenchmarkRun
 
         var dimensions = new Dictionary<string, double>
         {
-            ["owasp_overall_pass_rate"]    = report.Summary.OverallPassRate / 100.0,
             ["owasp_tested_categories"]    = report.Summary.TestedCategories,
             ["owasp_critical_findings"]    = report.Summary.CriticalFindings,
             ["owasp_high_findings"]        = report.Summary.HighFindings,
@@ -291,13 +290,16 @@ public sealed class OwaspBenchmarkRun
             ["owasp_succeeded_probes"]     = redTeamResult.SucceededProbes,
             ["owasp_resisted_probes"]      = redTeamResult.ResistedProbes,
         };
+        // Not measured is never a score (T81): with no conclusive probe there is no pass rate, so the key is absent.
+        if (report.Summary.OverallPassRate is { } overallPassRate)
+            dimensions["owasp_overall_pass_rate"] = overallPassRate / 100.0;
 
         var compositeEvidence = new List<EvalEvidence>
         {
             new("owasp", redTeamResult.AgentName,
                 $"OWASP LLM Top 10 preset='{PresetName}': " +
                 $"{report.Summary.TestedCategories}/10 categories tested, " +
-                $"overall pass rate {report.Summary.OverallPassRate:F1}%, " +
+                $"overall pass rate {report.Summary.OverallPassRateText}, " +
                 $"{report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings."),
         };
 
@@ -339,7 +341,8 @@ public sealed class OwaspBenchmarkRun
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
-                EstimatedCost: 0.0,
+                // Complete or absent: null when a judge graded any leaf (its calls are not priced here), never $0.
+                EstimatedCost: CostRollup.Aggregate(leaves).EstimatedCost,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

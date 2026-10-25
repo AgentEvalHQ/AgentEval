@@ -37,6 +37,114 @@ public sealed class EmbeddingMetricsTests
 
         Assert.False(result.Measured, because);
         Assert.False(result.Passed, because);
+        Assert.Equal(NotMeasuredCause.MissingInput, result.NotMeasuredCause);
+    }
+
+    // T05: an embedding call that failed, or vectors the cosine cannot be read from, measured nothing. Each was a Fail
+    // (a zero or NaN vector a measured 0 "Low semantic similarity"), and the caller's cancellation was swallowed.
+
+    private static readonly EvaluationContext s_everyInput = new()
+    {
+        Input = "What is the capital of France?", Output = "Paris.", Context = "France's capital is Paris.", GroundTruth = "Paris",
+    };
+
+    public static TheoryData<string> EmbeddingMetricNames() => new()
+    {
+        "embed_answer_similarity", "embed_response_context", "embed_query_context",
+    };
+
+    private static EmbeddingBasedMetric Create(string name, IAgentEvalEmbeddings embeddings) => name switch
+    {
+        "embed_answer_similarity" => new AnswerSimilarityMetric(embeddings),
+        "embed_response_context" => new ResponseContextSimilarityMetric(embeddings),
+        _ => new QueryContextSimilarityMetric(embeddings),
+    };
+
+    [Theory]
+    [MemberData(nameof(EmbeddingMetricNames))]
+    public async Task AFailedEmbeddingCall_IsNotMeasured_WithTheError(string name)
+    {
+        var embeddings = new StubEmbeddings(_ => throw new HttpRequestException("503 Service Unavailable"));
+
+        var result = await Create(name, embeddings).EvaluateAsync(s_everyInput);
+
+        Assert.False(result.Measured, name);
+        Assert.False(result.Passed, name);
+        Assert.Equal(NotMeasuredCause.JudgeCallFailed, result.NotMeasuredCause);
+        Assert.Equal("System.Net.Http.HttpRequestException", result.Details!["errorType"]);
+        Assert.Equal("503 Service Unavailable", result.Details["error"]);   // the key it reported before
+        Assert.Contains("503", result.Explanation, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [MemberData(nameof(EmbeddingMetricNames))]
+    public async Task AProviderSideTimeout_IsAFailedCall_NotACancellation(string name)
+    {
+        var embeddings = new StubEmbeddings(_ => throw new TaskCanceledException("HttpClient.Timeout"));
+
+        var result = await Create(name, embeddings).EvaluateAsync(s_everyInput);
+
+        Assert.False(result.Measured, name);
+        Assert.Equal(NotMeasuredCause.JudgeCallFailed, result.NotMeasuredCause);
+    }
+
+    [Theory]
+    [MemberData(nameof(EmbeddingMetricNames))]
+    public async Task TheCallersCancellation_Propagates(string name)
+    {
+        // It was caught and returned as "Embedding generation failed".
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var embeddings = new StubEmbeddings(ct =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return [new float[] { 1, 0 }, new float[] { 1, 0 }];
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Create(name, embeddings).EvaluateAsync(s_everyInput, cts.Token));
+    }
+
+    public static TheoryData<string, float[][]> UnusableVectors() => new()
+    {
+        { "one vector", new[] { new float[] { 1, 0, 0 } } },
+        { "two zero vectors", new[] { new float[] { 0, 0, 0 }, new float[] { 0, 0, 0 } } },
+        { "different dimensions 3 and 2", new[] { new float[] { 1, 0, 0 }, new float[] { 1, 0 } } },
+        { "a NaN component", new[] { new float[] { 1, float.NaN, 0 }, new float[] { 1, 0, 0 } } },
+        { "empty vectors", new[] { Array.Empty<float>(), Array.Empty<float>() } },
+    };
+
+    [Theory]
+    [MemberData(nameof(UnusableVectors))]
+    public async Task VectorsTheCosineCannotBeReadFrom_AreNotMeasured(string because, float[][] vectors)
+    {
+        var embeddings = new StubEmbeddings(_ => vectors.Select(v => new ReadOnlyMemory<float>(v)).ToList());
+
+        var result = await new AnswerSimilarityMetric(embeddings).EvaluateAsync(s_everyInput);
+
+        Assert.False(result.Measured, because);
+        Assert.False(result.Passed, because);
+        Assert.Equal(NotMeasuredCause.JudgeReplyUnreadable, result.NotMeasuredCause);
+    }
+
+    [Fact]
+    public async Task DifferentDimensions_AreNamedInTheReason()
+    {
+        // The ArgumentException from the cosine was caught and reported as "Embedding generation failed".
+        var embeddings = new StubEmbeddings(_ => [new float[] { 1, 0, 0 }, new float[] { 1, 0 }]);
+
+        var result = await new AnswerSimilarityMetric(embeddings).EvaluateAsync(s_everyInput);
+
+        Assert.Contains("3 and 2", result.Explanation, StringComparison.Ordinal);
+    }
+
+    /// <summary>Embeddings scripted per call; <see cref="GetEmbeddingAsync"/> is not used by the metrics.</summary>
+    private sealed class StubEmbeddings(Func<CancellationToken, IReadOnlyList<ReadOnlyMemory<float>>> vectors) : IAgentEvalEmbeddings
+    {
+        public Task<ReadOnlyMemory<float>> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ReadOnlyMemory<float>>> GetEmbeddingsAsync(IEnumerable<string> texts, CancellationToken cancellationToken = default)
+            => Task.FromResult(vectors(cancellationToken));
     }
 
     public static TheoryData<string, EmbeddingBasedMetric, EvaluationContext> EmptyAnswers() => new()

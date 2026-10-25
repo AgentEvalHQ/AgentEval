@@ -67,7 +67,7 @@ public sealed class TaskCompletionEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.task_completion.v1",
-            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+            failureSeverity: "medium") { JudgeSeesData = JudgeInputData.ToolCalls };
     }
 
     /// <inheritdoc/>

@@ -120,6 +120,11 @@ public class CachingEmbeddingsDecorator : IAgentEvalEmbeddings
 
     private void TryAddToCache(string text, ReadOnlyMemory<float> embedding)
     {
+        // A vector no similarity can be read from is passed on but not kept (T13): cached, one bad reply stayed
+        // "not measured" for that text for the life of the cache.
+        if (EmbeddingValidation.InvalidReason(embedding.Span) is not null)
+            return;
+
         // Best-effort approximate bound: Count check is not atomic with TryAdd, so under
         // high concurrency the cache may briefly exceed _maxCacheSize by a small margin.
         // This is acceptable for eval workloads (no eviction policy needed).
@@ -128,4 +133,5 @@ public class CachingEmbeddingsDecorator : IAgentEvalEmbeddings
             _cache.TryAdd(text, embedding);
         }
     }
+
 }

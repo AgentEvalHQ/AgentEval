@@ -88,7 +88,7 @@ public static class GatekeeperToolResultBehavioralAnomaly
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Result-anomaly sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Result-anomaly sample failed: " + message + ".");
         }
     }
 }

@@ -1,7 +1,7 @@
 # Mission Control API Design — REST + GraphQL Hybrid
 
 This page explains the hybrid REST + GraphQL split chosen for Mission Control:
-reads (dashboard, compliance matrix, recursive `EvalResult` tree, evaluator
+reads (dashboard, compliance matrix, canonical result trees, evaluator
 registry) flow through GraphQL; binary streams (PDF reports, agent traces,
 history JSONL) and the version endpoint stay on REST.
 
@@ -124,39 +124,53 @@ The shipped block above matches `src/AgentEval.MissionControl/Rest/BinaryEndpoin
 
 ## GraphQL surface (`POST /graphql`)
 
-Schema is auto-discovered from C# records (`src/AgentEval.MissionControl/GraphQL/Query.cs`). Top-level resolvers (Phase 1):
+Schema is auto-discovered from the C# records and `Query.*` partials in `src/AgentEval.MissionControl/GraphQL/`.
+The shipped run/subject selections use verified AEF projections:
 
 ```
 Query.solution                                 SolutionInfo?
 Query.workspace                                WorkspaceState!     ← drives first-run landing
-Query.subjects(kind?)                          [SubjectInfo!]!
-Query.subject(kind, name)                      SubjectInfo?
-Query.recentRuns(count = 50)                   [RunPointer!]!     ← max 500
-Query.run(runId)                               RunManifest?
-Query.runSummary(runId)                        RunSummary?
-Query.runCostBreakdown(runId)                  RunCostBreakdown?  ← per-tier cost
-Query.scenarios(runId)                         [ScenarioResult!]!
-Query.scenario(runId, scenarioId)              ScenarioResult?
-Query.scenarioTree(runId, scenarioId)          EvalResult?        ← recursive!
+Query.hasRunEvidence                           Boolean!
+Query.subjects(kind?: AefSubjectKind)           [WorkspaceSubject!]!
+Query.subject(kind: AefSubjectKind, name, subjectRef?) WorkspaceSubject?
+Query.recentRuns(count = 50)                   [WorkspaceRunPointer!]! ← max 500
+Query.run(runId, sourceId?)                    WorkspaceRunView?
+Query.runSummary(runId, sourceId?)             WorkspaceRunSummary?
+Query.runArtifacts(runId, sourceId?)           [WorkspaceArtifact!]!
+Query.runCostBreakdown(runId, sourceId?)        RunCostBreakdown?  ← per-tier cost
+Query.scenarios(runId, sourceId?)              [WorkspaceScenario!]!
+Query.scenario(runId, scenarioId, sourceId?, resultId?) WorkspaceScenario?
+Query.scenarioTree(runId, scenarioId, sourceId?, resultId?) EvalResult? ← checked captured legacy details
+Query.scenarioResultTree(runId, scenarioId, sourceId?, resultId?) WorkspaceResultTree? ← canonical case forest
 Query.compliance                               [ComplianceRegulationSummary!]!
 Query.complianceMatrix(regulation)             ComplianceMatrix!  ← killer feature
-Query.complianceEvidence(reg, kind, name, ts)  ComplianceEvidenceWithChain?
+Query.complianceEvidence(regulation, subjectKind, subjectName, timestamp) ComplianceEvidenceWithChain?
 Query.evaluators(category?, costTier?)         [EvaluatorCard!]!
 Query.evaluator(key)                           EvaluatorCard?
-Query.evaluatorTimeline(key, count = 30)       [EvaluatorTimelinePoint!]!  ← drift / calibration surface
+Query.evaluatorTimeline(evaluatorKey, count = 30) [EvaluatorTimelinePoint!]! ← observed occurrences
 Query.ping / Query.agentEvalVersion             smoke
 ```
 
-In Phase 2 the schema extends with `Query.workspaces`, `Query.search`, `Query.crossRegulationOverlap`, `Query.redTeamCampaigns`, etc. — see plan-07 §8.1 for the full forward-looking shape.
+`subjectsConnection` and `scenarioResultsConnection` provide pagination over the corresponding projected records.
+Use `sourceId` when an execution ID exists in multiple sources, `subjectRef` for exact subject identity and `resultId`
+for repeated case identities. `runSummary` exposes state counts and nullable totals, rather than the old store's
+`metrics` dictionary; `scenarioResultTree` exposes canonical result scores and their declared metric meaning.
+`scenarioTree` is an optional checked captured-legacy projection. Unknown timing, cost and token facts remain null.
+
+Additional shipped reads, including campaign registration inventory, suite definitions and governance, are declared
+in the `Query.*` partials. Mode C ingest/admin operations and live updates remain deferred.
 
 ---
 
 ## Versioning policy
 
 - **REST**: `/api/v1/`. Major bumps (`/api/v2/`) only on breaking schema change. Additive changes don't bump.
-- **GraphQL**: no version segment in the URL. Schema evolves via `@deprecated` directives on fields that are moving out; clients keep working until they migrate. Breaking-removal of a field is a coordinated release-note event.
+- **GraphQL**: no version segment in the URL. The rc.1 AEF migration replaces the pre-1.0 legacy response records above; existing clients must migrate their selections. From 1.0, additive fields and `@deprecated` transitions preserve clients until a coordinated breaking release. See [the AEF migration](../aef.md).
 
-Both surfaces share the data model; you cannot get *different* data shapes from REST vs GraphQL — they're views over the same `IOutputStoreReader` reads.
+Both surfaces select the same owned, verified AEF evidence. GraphQL returns focused `Workspace*` projections;
+REST streams captured artifacts or the documented trace/history representations, so their response shapes differ.
+`IOutputStoreReader` supplies configured inventory and legacy input to the shared conversion boundary; it is not
+the public run-response model or a route around AEF verification.
 
 ---
 

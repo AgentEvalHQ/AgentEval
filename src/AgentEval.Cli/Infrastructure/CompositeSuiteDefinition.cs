@@ -54,7 +54,8 @@ internal static class CompositeSuiteDefinition
                     node["severity"] = declaration.FailureSeverity;
                     node["judgeModel"] = declaration.JudgeModel;
                     node["judgeProvider"] = declaration.JudgeProvider;
-                    node["toolData"] = declaration.ToolData.ToString();
+                    // Retain the established identity field name; the source API now also names instruction inputs.
+                    node["toolData"] = declaration.InputData.ToString();
                     node["evaluatorType"] = declaration.EvaluatorType.FullName;
                     return node;
                 case CompositeEval composite:

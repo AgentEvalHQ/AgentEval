@@ -31,29 +31,47 @@ public sealed record AutoAuditEndpointResult(
     bool LeakedPastGate = false)
 {
     /// <summary>Total tokens (prompt + completion).</summary>
-    public int TotalTokens => PromptTokens + CompletionTokens;
+    public int TotalTokens => (int)Math.Min((long)PromptTokens + CompletionTokens, int.MaxValue);
+
+    /// <summary>
+    /// Whether <see cref="FidelityScore"/> is a measurement. <see langword="false"/> when the chat-boundary trace holds no
+    /// model response to reconcile against, or a discrepancy class could not be checked (for example, incomplete token
+    /// usage). A clean measured subset cannot establish complete fidelity or win the comparison.
+    /// </summary>
+    public bool FidelityMeasured { get; init; } = true;
+
+    /// <summary>
+    /// Whether every chat-boundary response reported its token usage. <see langword="false"/> when one did not: the token
+    /// counts then leave its usage out, so they are not the endpoint's token cost. Also false when the aggregate is
+    /// capped at the legacy integer limit and cannot represent the exact reported total.
+    /// </summary>
+    public bool TokensReported { get; init; } = true;
 }
 
 /// <summary>A cross-endpoint auto-audit comparison, rankable and renderable to Markdown.</summary>
 public sealed record AutoAuditReport(IReadOnlyList<AutoAuditEndpointResult> Results)
 {
     /// <summary>
-    /// Endpoints ranked best-first: completed runs first, then runs that leaked nothing past the gate, then highest
-    /// fidelity, then fewest gate blocks, then lowest token cost.
+    /// Endpoints ranked best-first: completed runs first, then runs that leaked nothing past the gate, then runs whose
+    /// fidelity was measured, then highest fidelity, then fewest gate blocks, then runs that reported their token
+    /// usage, then lowest token cost.
     /// </summary>
     public IReadOnlyList<AutoAuditEndpointResult> Ranking => Results
         .OrderByDescending(r => r.Completed)
         .ThenBy(r => r.LeakedPastGate)
+        .ThenByDescending(r => r.FidelityMeasured)
         .ThenByDescending(r => r.FidelityScore)
         .ThenBy(r => r.GateBlocks)
+        .ThenByDescending(r => r.TokensReported)
         .ThenBy(r => r.TotalTokens)
         .ToList();
 
     /// <summary>
-    /// The winning endpoint: the top of <see cref="Ranking"/> among those that completed, or null when none did. A run
-    /// that never completed has empty traces, which reconcile perfectly; it cannot win on that.
+    /// The winning endpoint: the top of <see cref="Ranking"/> among those that completed with a measured fidelity, or
+    /// null when none did. A run that never completed, or whose chat boundary recorded no model response, has nothing
+    /// to reconcile and so reconciles perfectly; it cannot win on that.
     /// </summary>
-    public AutoAuditEndpointResult? Winner => Ranking.FirstOrDefault(r => r.Completed);
+    public AutoAuditEndpointResult? Winner => Ranking.FirstOrDefault(r => r.Completed && r.FidelityMeasured);
 
     /// <summary>Renders the comparison as a Markdown report.</summary>
     public string ToMarkdown()
@@ -66,17 +84,20 @@ public sealed record AutoAuditReport(IReadOnlyList<AutoAuditEndpointResult> Resu
         var rank = 1;
         foreach (var r in Ranking)
         {
-            // An incomplete run's traces are empty or partial: its fidelity and discrepancies are not a measurement.
-            var top = !r.Completed ? "—" : r.TopDiscrepancies.Count > 0 ? string.Join("; ", r.TopDiscrepancies) : "—";
-            var fidelity = r.Completed ? $"{r.FidelityScore * 100:F0}%" : "not measured";
+            // An incomplete run's traces are empty or partial, and a chat boundary with no model response holds nothing
+            // to reconcile against: its fidelity and discrepancies are not a measurement.
+            var measured = r.Completed && r.FidelityMeasured;
+            var top = !measured ? "—" : r.TopDiscrepancies.Count > 0 ? string.Join("; ", r.TopDiscrepancies) : "—";
+            var fidelity = measured ? $"{r.FidelityScore * 100:F0}%" : "not measured";
             var blocks = r.LeakedPastGate ? $"{r.GateBlocks}, and a leak the gate missed" : r.GateBlocks.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            sb.AppendLine($"| {rank++} | {r.Endpoint} | {fidelity} | {blocks} | {r.TotalTokens} | {r.LatencyMs} | {(r.Completed ? "yes" : "no")} | {top} |");
+            var tokens = r.TokensReported ? r.TotalTokens.ToString(System.Globalization.CultureInfo.InvariantCulture) : $"{r.TotalTokens} (usage not reported or capped)";
+            sb.AppendLine($"| {rank++} | {r.Endpoint} | {fidelity} | {blocks} | {tokens} | {r.LatencyMs} | {(r.Completed ? "yes" : "no")} | {top} |");
         }
 
         sb.AppendLine();
         if (Winner is not null)
         {
-            sb.AppendLine($"**Winner: {Winner.Endpoint}** — fidelity {Winner.FidelityScore * 100:F0}%, {Winner.GateBlocks} gate block(s), {Winner.TotalTokens} tokens.");
+            sb.AppendLine($"**Winner: {Winner.Endpoint}** — fidelity {Winner.FidelityScore * 100:F0}%, {Winner.GateBlocks} gate block(s), {Winner.TotalTokens} tokens{(Winner.TokensReported ? "" : " (usage not reported or capped)")}.");
         }
 
         return sb.ToString();

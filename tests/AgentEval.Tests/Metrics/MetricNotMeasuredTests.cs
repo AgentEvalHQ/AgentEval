@@ -85,6 +85,29 @@ public sealed class MetricNotMeasuredTests
         Assert.NotEqual("error", report.Score.Label);
     }
 
+    [Theory]
+    [InlineData(NotMeasuredCause.JudgeCallFailed, "error")]
+    [InlineData(NotMeasuredCause.JudgeReplyUnreadable, "error")]
+    [InlineData(NotMeasuredCause.CheckTimedOut, "error")]
+    [InlineData(NotMeasuredCause.MissingInput, "skipped")]   // guard: an input the case lacked stays skipped
+    public void TheMeaiBridge_LabelsAnInstrumentThatGaveNoReadingAnError_AndAMissingInputSkipped(
+        NotMeasuredCause cause, string label)
+    {
+        // A failed judge call, an unreadable reply or a timed-out check read "skipped", as if the case lacked an input:
+        // it is an error, as the bridge marks a metric MEAI could not score.
+        var meai = ResultConverter.ToMEAI(MetricResult.NotMeasured("llm_faithfulness", cause, "llm_faithfulness not measured."));
+        var metric = (NumericMetric)meai.Metrics["llm_faithfulness"];
+
+        Assert.Null(metric.Value);
+        Assert.True(metric.Interpretation!.Failed);
+        Assert.StartsWith($"AgentEval score: 0/100 ({label},", metric.Interpretation.Reason, StringComparison.Ordinal);
+
+        var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [meai]));
+        var leaf = report.Details.SubResults![0].Details.SubResults![0];
+        Assert.Equal(label, leaf.Score.Label);
+        Assert.Equal(MeasurementState.NotMeasured, leaf.Score.CensusBucket());
+    }
+
     [Fact]
     public async Task AnItemWhereNothingWasMeasured_FailsOnTheNativeMafPath()
     {

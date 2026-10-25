@@ -167,6 +167,43 @@ public class AgentEvalLoggerTests
         Assert.DoesNotContain("Score", line);
     }
 
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    public void LogTimeline_MissingMeasurements_RetainsReasonsAndMeasuredZero(bool succeeded, bool unknownOutcome, bool unknownTiming)
+    {
+        var timeline = new ToolCallTimeline();
+        timeline.AddInvocation(new ToolInvocation
+        {
+            ToolName = "lookup", StartTime = TimeSpan.Zero, Duration = TimeSpan.Zero, Succeeded = succeeded,
+            OutcomeNotMeasuredReason = unknownOutcome ? "completion not observed" : null,
+            TimingNotMeasuredReason = unknownTiming ? "duration not observed" : null
+        });
+        var sink = new CapturingMeLogger();
+        new MicrosoftLoggingAdapter(sink).LogTimeline(timeline);
+        var line = Assert.Single(sink.Lines.Where(line => line.StartsWith("  Tool ", StringComparison.Ordinal)));
+        if (unknownOutcome)
+        {
+            Assert.Contains("outcome not measured", line);
+            Assert.Contains("completion not observed", line);
+            Assert.DoesNotContain("succeeded", line);
+            Assert.DoesNotContain("failed", line);
+        }
+        else Assert.Contains(succeeded ? "succeeded" : "failed", line);
+        if (unknownTiming)
+        {
+            Assert.Contains("duration not measured", line);
+            Assert.Contains("duration not observed", line);
+            Assert.DoesNotContain("0ms", line);
+        }
+        else Assert.Contains("in 0ms", line);
+    }
+
+
     private sealed class CapturingMeLogger : Microsoft.Extensions.Logging.ILogger
     {
         public List<string> Lines { get; } = [];

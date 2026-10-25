@@ -195,6 +195,61 @@ public class AgentEvalCompositeEvaluatorTests
     private static EvalResult SkippedLeaf(string name) =>
         EvalResult.Skipped(new NamedEval(name), $"{name}: no context: not measured.");
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EvaluateAsync_NativeCompositeWithInformationalAbsence_PreservesRootVerdict(bool inapplicable)
+    {
+        var optional = SkippedLeaf("optional");
+        if (inapplicable)
+            optional = optional with { Score = EvalScore.NotApplicable() };
+        var tree = Tree(Leaf("required", 0.9), optional) with { Score = Leaf("overall", 0.9).Score };
+        var evaluator = new AgentEvalAgentEvaluator(new AgentEvalCompositeEvaluator(new StubComposite(tree)),
+            new ChatConfiguration(new AgentEval.Testing.FakeChatClient("judge")));
+
+        var result = await evaluator.EvaluateAsync([new EvalItem("q", "r")]);
+
+        Assert.True(result.AllPassed);
+        var leaf = Assert.IsType<NumericMetric>(result.Items[0].Metrics["optional"]);
+        Assert.Null(leaf.Value);
+        Assert.False(leaf.Interpretation!.Failed);
+        var report = MeaiToEvalResultBridge.Build("run", ["q"], result);
+        Assert.True(report.Score.Passed);
+        Assert.Contains(report.Details.SubResults![0].Details.SubResults!,
+            node => node.Metric.Key == "optional" && node.Score.Label == optional.Score.Label && !node.Score.CountsTowardAggregate());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EvaluateAsync_NativeCompositeWithAbsentOrFailingRoot_StillFails(bool absent)
+    {
+        var tree = absent ? SkippedLeaf("root") : Tree(Leaf("required", 0.4)) with { Score = Leaf("root", 0.4).Score };
+        var evaluator = new AgentEvalAgentEvaluator(new AgentEvalCompositeEvaluator(new StubComposite(tree)),
+            new ChatConfiguration(new AgentEval.Testing.FakeChatClient("judge")));
+
+        var result = await evaluator.EvaluateAsync([new EvalItem("q", "r")]);
+
+        Assert.False(result.AllPassed);
+        Assert.True(Assert.IsType<NumericMetric>(result.Items[0].Metrics[$"{tree.Metric.Name} (overall)"]).Interpretation!.Failed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EvaluateAsync_ApprovalContinuation_PreservesOriginalQuery(bool approved)
+    {
+        var request = new ToolApprovalRequestContent("req-1", new FunctionCallContent("call-1", "PlaceOrder"));
+        var capture = new CapturingEval();
+
+        await new AgentEvalCompositeEvaluator(capture).EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "Order two of ABC-123"), new ChatMessage(ChatRole.Assistant, [request]),
+             new ChatMessage(ChatRole.User, [request.CreateResponse(approved, "reviewed")])],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "Order reviewed.")));
+
+        Assert.Equal("Order two of ABC-123", capture.Seen!.Query);
+    }
+
     private sealed class NamedEval(string name) : IEval
     {
         public string Key => name;

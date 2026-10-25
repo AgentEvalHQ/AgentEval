@@ -56,6 +56,8 @@ public enum WorkflowFailureHint
     Timing,
     /// <summary>An execution-path / routing expectation was not met.</summary>
     ExecutionPath,
+    /// <summary>A duration could not be measured, so a timing budget cannot be evaluated.</summary>
+    TimingNotMeasured,
 }
 
 /// <summary>
@@ -567,13 +569,15 @@ public class WorkflowAssertionBuilder
         _currentBecause = because;
         if (!_result.HasParallelExecution)
         {
-            AddFailure("Expected workflow to have parallel execution but it did not");
+            AddFailure("Expected: parallel execution with at least two recorded branches. " +
+                $"Actual: {_result.RecordedParallelBranchCount} recorded branches. " +
+                "Suggestions: record branch ownership for executed steps and check the selected route.");
         }
         return this;
     }
 
     /// <summary>
-    /// Assert the workflow has a specific number of parallel branches.
+    /// Assert the activations record a specific number of distinct parallel branches.
     /// </summary>
     /// <param name="expectedCount">Expected number of parallel branches.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -581,7 +585,7 @@ public class WorkflowAssertionBuilder
     public WorkflowAssertionBuilder HaveParallelBranchCount(int expectedCount, string? because = null)
     {
         _currentBecause = because;
-        var actualCount = _result.Graph?.ParallelBranches?.Count ?? 0;
+        var actualCount = _result.RecordedParallelBranchCount;
         if (actualCount != expectedCount)
         {
             AddFailure($"Expected {expectedCount} parallel branches but found {actualCount}");
@@ -744,7 +748,7 @@ public class WorkflowAssertionBuilder
                 failures: failureMessages,
                 expected: "(see failures list)",
                 actual: "(see failures list)",
-                context: _result.ToString(),
+                context: DescribeResult(_result),
                 suggestions: GetSuggestions(),
                 because: becauseClause);
         }
@@ -790,6 +794,9 @@ public class WorkflowAssertionBuilder
                 case WorkflowFailureHint.Timing:
                     suggestions.Add("Consider increasing timeout or optimizing executor performance");
                     break;
+                case WorkflowFailureHint.TimingNotMeasured:
+                    suggestions.Add("Record executor invocation and completion before checking its duration");
+                    break;
                 case WorkflowFailureHint.ExecutionPath:
                     suggestions.Add("Check workflow routing logic and edge conditions");
                     break;
@@ -800,6 +807,36 @@ public class WorkflowAssertionBuilder
         }
 
         return suggestions.Count > 0 ? suggestions.Distinct().ToList() : null;
+    }
+
+    private const int MaxContextExecutors = 12;
+    private const int MaxContextErrors = 3;
+    private const int MaxContextIdLength = 60;
+    private const int MaxContextErrorLength = 120;
+
+    /// <summary>
+    /// A short account of the run for the failure context: the executors in step order, the step count, the total
+    /// duration and the errors. Bounded however long the run was, and never the record's own <c>ToString()</c>,
+    /// which prints <c>Steps = System.Collections.Generic.List`1[...]</c> instead of the steps.
+    /// </summary>
+    private static string DescribeResult(WorkflowExecutionResult result)
+    {
+        var executors = result.Steps.Count == 0
+            ? "(none)"
+            : string.Join(" → ", result.Steps.Take(MaxContextExecutors).Select(s => Truncate(s.ExecutorId, MaxContextIdLength)))
+              + (result.Steps.Count > MaxContextExecutors ? $" → ... (+{result.Steps.Count - MaxContextExecutors} more)" : "");
+
+        var errorCount = result.Errors?.Count ?? 0;
+        var errors = errorCount == 0
+            ? "none"
+            : $"{errorCount}: " + string.Join("; ", result.Errors!.Take(MaxContextErrors)
+                  .Select(e => $"{Truncate(e.ExecutorId, MaxContextIdLength)}: " +
+                               Truncate(e.Message.ReplaceLineEndings(" "), MaxContextErrorLength)))
+              + (errorCount > MaxContextErrors ? $"; ... (+{errorCount - MaxContextErrors} more)" : "");
+
+        return $"Executors: {executors}\n" +
+               $"Steps: {result.Steps.Count}, total duration: {result.TotalDuration.TotalSeconds:F1}s\n" +
+               $"Errors: {errors}";
     }
 
     private static string Truncate(string text, int maxLength)
@@ -891,6 +928,12 @@ public class ExecutorStepAssertionBuilder
         if (_step == null)
         {
             AddFailure($"Executor '{_executorId}' was not found", WorkflowFailureHint.IdNotFound);
+        }
+        else if (_step.TimingNotMeasuredReason is { } reason)
+        {
+            AddFailure($"Expected: executor '{_executorId}' to complete within {maxDuration.TotalMilliseconds:F0}ms. " +
+                $"Actual: time not measured ({reason}). " +
+                "Suggestions: record executor invocation and completion before checking its duration.", WorkflowFailureHint.TimingNotMeasured);
         }
         else if (_step.Duration > maxDuration)
         {
@@ -1378,7 +1421,7 @@ public class WorkflowToolCallAssertionBuilder
 
     /// <summary>
     /// Assert tool duration is under a maximum.
-    /// If timing information is not available, the assertion is skipped.
+    /// If timing information is not available, validation fails because the duration requirement cannot be established.
     /// </summary>
     /// <param name="max">The maximum allowed duration.</param>
     /// <param name="because">Optional reason for the assertion.</param>
@@ -1561,7 +1604,7 @@ public class ExecutorToolCallAssertionBuilder
 
     /// <summary>
     /// Assert tool duration is under a maximum.
-    /// If timing information is not available, the assertion is skipped.
+    /// If timing information is not available, validation fails because the duration requirement cannot be established.
     /// </summary>
     /// <param name="max">The maximum allowed duration.</param>
     /// <param name="because">Optional reason for the assertion.</param>

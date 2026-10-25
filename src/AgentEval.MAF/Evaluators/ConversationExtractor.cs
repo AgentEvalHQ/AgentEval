@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using AgentEval.Core;
 using AgentEval.Models;
 
 namespace AgentEval.MAF.Evaluators;
@@ -41,7 +42,7 @@ public static class ConversationExtractor
 
         for (int i = list.Count - 1; i >= 0; i--)
         {
-            if (list[i].Role == ChatRole.User)
+            if (IsUserPrompt(list[i]))
                 return list[i].Text ?? "";
         }
 
@@ -63,97 +64,116 @@ public static class ConversationExtractor
     }
 
     /// <summary>
-    /// Extracts tool usage from conversation messages and response.
-    /// Captures tool names, arguments, and results — but NOT timing (light path limitation).
+    /// Extracts the evaluated turn's tool usage from conversation messages and response.
+    /// Captures tool names, arguments, results and whether each call ran — but NOT timing (light path limitation).
     /// </summary>
     /// <param name="messages">The conversation messages to inspect.</param>
     /// <param name="response">The agent response containing any additional messages.</param>
-    /// <param name="logger">Optional logger for correlation diagnostics (e.g. heuristic CallId matching). When null, diagnostics are silently dropped.</param>
+    /// <param name="logger">Optional logger; warns when approval-gated tool calls were seen that cannot be recorded. When null, diagnostics are silently dropped.</param>
+    /// <returns>
+    /// The turn's tool calls, or <see langword="null"/> when they are unknown: <paramref name="messages"/> is null, or the
+    /// turn shows no tool call. A transcript with no call in it cannot tell "the agent called nothing" from "the caller
+    /// passed only the query half" (MAF's own MEAI adapter does), so it is not read as a measured zero. A caller that
+    /// knows the conversation is complete uses
+    /// <see cref="ExtractToolUsage(IEnumerable{ChatMessage}, ChatResponse, bool, ILogger)"/>.
+    /// </returns>
     public static ToolUsageReport? ExtractToolUsage(
         IEnumerable<ChatMessage> messages,
         ChatResponse response,
         ILogger? logger = null)
+        => ExtractToolUsage(messages, response, conversationComplete: false, logger);
+
+    /// <summary>
+    /// Extracts the evaluated turn's tool usage from conversation messages and response, through the canonical
+    /// <see cref="ToolUsageExtractor"/>.
+    /// </summary>
+    /// <param name="messages">The conversation messages to inspect.</param>
+    /// <param name="response">The agent response containing any additional messages.</param>
+    /// <param name="conversationComplete">
+    /// <see langword="true"/> when the caller vouches that <paramref name="messages"/> and <paramref name="response"/>
+    /// carry the evaluated turn in full (every assistant and tool message, not only the query half). A turn with no tool
+    /// call is then an empty report, a recorded "none called"; otherwise it is <see langword="null"/>.
+    /// </param>
+    /// <param name="logger">Optional logger; warns when approval-gated tool calls were seen that cannot be recorded. When null, diagnostics are silently dropped.</param>
+    /// <returns>The turn's tool calls, or <see langword="null"/> when they are unknown.</returns>
+    /// <remarks>
+    /// <para>
+    /// The turn is the messages after the last user prompt, then the response's own messages: a MAF per-turn slice
+    /// (<c>EvalItem.PerTurnItems</c>) carries every earlier turn, and their calls are not this turn's.
+    /// </para>
+    /// <para>
+    /// This used to be a parallel copy of the extractor (T10). It never marked a call executed, so every call read as
+    /// emitted only; a reused CallId overwrote the earlier unanswered call; a stray result became an invented
+    /// <c>unknown_{callId}</c> record; an approval-gated call was invisible; calls were listed in result-arrival order;
+    /// and zero calls came back as "not recorded". The canonical extractor pairs each result with the nearest preceding
+    /// unpaired call of the same CallId and marks it executed, never invents a record, and keeps message order. It runs
+    /// approval-aware: the light path has no opt-in setting, and a gated call the agent made is a call, recorded as not
+    /// run (and a rejected one stays not run).
+    /// </para>
+    /// </remarks>
+    public static ToolUsageReport? ExtractToolUsage(
+        IEnumerable<ChatMessage> messages,
+        ChatResponse response,
+        bool conversationComplete,
+        ILogger? logger = null)
     {
         if (messages is null) return null;
 
-        var report = new ToolUsageReport();
-        var pendingCalls = new Dictionary<string, ToolCallRecord>();
-        int order = 0;
+        var turn = TurnMessages(messages, response);
+        var report = ToolUsageExtractor.Extract(turn.Cast<object>().ToList(), includeApprovalGatedCalls: true);
 
-        IEnumerable<ChatMessage> allMessages = messages;
-        if (response.Messages != null)
-            allMessages = allMessages.Concat(response.Messages);
-
-        foreach (var message in allMessages)
+        if (report.DroppedApprovalRequestCount > 0)
         {
-            if (message.Contents == null)
-                continue;
+            logger?.LogWarning(
+                "[AgentEval] Tool usage is INCOMPLETE: {DroppedCount} approval-gated tool call(s) that are not function " +
+                "calls (for example hosted MCP tools) were seen and not recorded.",
+                report.DroppedApprovalRequestCount);
+        }
 
-            foreach (var content in message.Contents)
+        // No call in the turn is a recorded "none" only when the caller vouches for the whole turn and nothing gated was
+        // dropped; otherwise it is unknown, never a measured zero.
+        if (report.Count == 0 && (!conversationComplete || report.DroppedApprovalRequestCount > 0))
+            return null;
+
+        return report;
+    }
+
+    /// <summary>
+    /// The messages of the evaluated turn: those after the last user prompt in <paramref name="messages"/>, then the
+    /// response's messages that are not already among them. A user message holding only approval responses continues
+    /// the turn, it does not start one.
+    /// </summary>
+    private static List<ChatMessage> TurnMessages(IEnumerable<ChatMessage> messages, ChatResponse? response)
+    {
+        var list = messages as IList<ChatMessage> ?? messages.ToList();
+
+        var start = 0;
+        for (var i = list.Count - 1; i >= 0; i--)
+        {
+            if (IsUserPrompt(list[i]))
             {
-                if (content is FunctionCallContent call)
-                {
-                    var callId = call.CallId ?? Guid.NewGuid().ToString("N");
-                    var record = new ToolCallRecord
-                    {
-                        Name = call.Name,
-                        CallId = callId,
-                        Arguments = call.Arguments,
-                        Order = ++order,
-                    };
-                    pendingCalls[callId] = record;
-                }
-                else if (content is FunctionResultContent result)
-                {
-                    // If the result has a CallId, use it directly.
-                    // If null, correlate to the most-recently-registered pending call (by highest Order).
-                    // This heuristic works for the typical sequential MAF tool-call pattern where
-                    // function calls and results appear in order. In concurrent or out-of-order scenarios
-                    // (where multiple calls are pending at once), this may mis-correlate results.
-                    // In those cases the result is still recorded — just possibly under the wrong call name.
-                    // A new unique ID is used as a last resort when there are no pending calls at all.
-                    string callId;
-                    if (result.CallId != null)
-                    {
-                        callId = result.CallId;
-                    }
-                    else
-                    {
-                        var latestPending = pendingCalls.Values
-                            .OrderByDescending(c => c.Order)
-                            .FirstOrDefault();
-                        callId = latestPending?.CallId ?? $"result-{Guid.NewGuid():N}";
-                        logger?.LogWarning(
-                            "[AgentEval] Tool result correlated by heuristic (CallId was null). " +
-                            "Matched to '{MatchedToolName}'. May mis-correlate for concurrent calls.",
-                            latestPending?.Name ?? "(none)");
-                    }
-
-                    if (pendingCalls.TryGetValue(callId, out var pending))
-                    {
-                        pending.Result = result.Result;
-                        pending.Exception = result.Exception;
-                        report.AddCall(pending);
-                        pendingCalls.Remove(callId);
-                    }
-                    else
-                    {
-                        report.AddCall(new ToolCallRecord
-                        {
-                            Name = $"unknown_{callId}",
-                            CallId = callId,
-                            Result = result.Result,
-                            Exception = result.Exception,
-                            Order = ++order,
-                        });
-                    }
-                }
+                start = i + 1;
+                break;
             }
         }
 
-        foreach (var pending in pendingCalls.Values.OrderBy(c => c.Order))
-            report.AddCall(pending);
+        var turn = list.Skip(start).ToList();
 
-        return report.Count > 0 ? report : null;
+        // MAF builds an item's conversation from the run's messages and its RawResponse from the last of them, so one
+        // message can arrive on both sides. It is read once (by reference, as MAF's own BuildEvalItem de-duplicates).
+        if (response?.Messages is { } responseMessages)
+        {
+            foreach (var message in responseMessages)
+            {
+                if (!list.Any(m => ReferenceEquals(m, message)))
+                    turn.Add(message);
+            }
+        }
+
+        return turn;
     }
+
+    private static bool IsUserPrompt(ChatMessage message) =>
+        message.Role == ChatRole.User
+        && (message.Contents.Count == 0 || message.Contents.Any(c => c is not ToolApprovalResponseContent));
 }

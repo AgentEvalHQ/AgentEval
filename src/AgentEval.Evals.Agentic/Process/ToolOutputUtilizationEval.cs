@@ -23,6 +23,11 @@ namespace AgentEval.Evals.Agentic.Process;
 /// 0.5 partial, 0.0 ignored), and the code does not recompute it.
 /// </para>
 /// <para>
+/// <b>Input contract</b>: requires <see cref="EvalInput.ToolCalls"/>. With no tool-call data captured (a null list) the
+/// result is skipped, not measured, and the judge is not called: there are no tool results to check the response
+/// against. A captured empty list is judged.
+/// </para>
+/// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_output_utilization/tool_output_utilization.prompty</c>.
@@ -61,12 +66,13 @@ public sealed class ToolOutputUtilizationEval : IEvalDefinitionWrapper
     public ToolOutputUtilizationEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.70)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        // 1.2.0: not measured without tool-call data (it used to grade the use of results it was never shown).
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "tool_output_utilization",
             name: "Tool Output Utilization",
             category: "agentic-process",
-            version: "1.1.0",
+            version: "1.2.0",
             criteria: new[]
             {
                 "Data returned by tool calls is referenced or acted upon in subsequent reasoning or final response",
@@ -77,7 +83,11 @@ public sealed class ToolOutputUtilizationEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_output_utilization.v1",
-            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
+            failureSeverity: "medium")
+        {
+            JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.ToolDefinitions,
+            JudgeNeedsData = JudgeInputData.ToolCalls,
+        };
     }
 
     /// <inheritdoc/>

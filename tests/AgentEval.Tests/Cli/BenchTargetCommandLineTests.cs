@@ -42,6 +42,41 @@ public sealed class BenchTargetCommandLineTests : IDisposable
             .OrderBy(e => e, StringComparer.Ordinal)
             .ToArray();
 
+    public static TheoryData<string[], string> RequiredInputs => new()
+    {
+        { ["bench", "gdpr"], "--subject is required" },
+        { ["bench", "eu-ai-act"], "--subject is required" },
+        { ["bench", "eu-ai-act", "--subject", "A"], "--input is required" },
+        { ["bench", "agentic"], "--subject is required" },
+        { ["bench", "owasp"], "--subject is required" },
+        { ["bench", "mitre"], "--subject is required" },
+        { ["bench", "nist"], "--subject is required" },
+        { ["bench", "longmemeval"], "--subject is required" },
+        { ["bench", "memory"], "--subject is required" },
+        { ["bench", "typedmemeval"], "--vertical is required" },
+        { ["bench", "typedmemeval", "--vertical", "episodic"], "--subject is required" },
+        { ["bench", "typedmemeval", "--vertical", "episodic", "--subject", "A", "--evidence-detail", "unsupported"], "--evidence-detail must be" },
+        { ["bench", "trace-fidelity"], "--agent-trace and --chat-trace are required" },
+        { ["bench", "trace-fidelity", "--agent-trace", "agent.json", "--chat-trace", "chat.json"], "--subject is required" },
+        { ["bench", "workflow-trace-fidelity"], "--workflow-trace is required" },
+        { ["bench", "workflow-trace-fidelity", "--workflow-trace", "workflow.json"], "--subject is required" },
+        { ["render"], "--benchmark and --subject are required" },
+        { ["compliance", "render"], "--regulation and --subject are required" },
+    };
+
+    [Theory]
+    [MemberData(nameof(RequiredInputs))]
+    public async Task MissingOrInvalidRequiredInput_IsExplicitUsageError_WithoutWorkspaceWrites(string[] args, string diagnostic)
+    {
+        var before = WorkspaceEntries();
+
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync([.. args, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains(diagnostic, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
     public static TheoryData<string[]> NoTarget => new()
     {
         new[] { "bench", "owasp", "--subject", "A" },
@@ -52,6 +87,142 @@ public sealed class BenchTargetCommandLineTests : IDisposable
         new[] { "bench", "eu-ai-act", "--subject", "A", "--input", "Are you a person?" },
         new[] { "bench", "agentic", "--subject", "A" },
     };
+
+    public static TheoryData<string[]> InvalidTarget => new()
+    {
+        new[] { "bench", "gdpr", "--subject", "A" },
+        new[] { "bench", "eu-ai-act", "--subject", "A", "--input", "q" },
+        new[] { "bench", "owasp", "--subject", "A" },
+        new[] { "bench", "mitre", "--subject", "A" },
+        new[] { "bench", "nist", "--subject", "A" },
+        new[] { "bench", "perf", "cost", "--subject", "A" },
+        new[] { "bench", "autoaudit" },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidTarget))]
+    public async Task UnknownTarget_IsRejectedBeforeRunningOrWritingEvidence(string[] args)
+    {
+        var before = WorkspaceEntries();
+        // autoaudit has no workspace option; it must reject the target before its command runs.
+        var rooted = args[1] == "autoaudit" ? args : [.. args, "--root", _root];
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync([.. rooted, "--sut", "unsupported"]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("Unknown --sut value: 'unsupported'", stderr, StringComparison.Ordinal);
+        Assert.Contains("mock", stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
+    [Theory]
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    public async Task MissingResponseFile_IsRejectedBeforeJudgeResolution(string family)
+    {
+        var before = WorkspaceEntries();
+        var missing = Path.Combine(_root, "missing-answer.txt");
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["bench", family, "--subject", "A", "--input", "q", "--response-file", missing, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("--response-file not found: " + missing, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
+    [Theory]
+    [InlineData("0", "--limit must be at least 1.")]
+    [InlineData("1", "--limit requires --out")]
+    public async Task AgenticCalibration_InvalidBoundedRun_RefusesBeforeAnyJudge(string limit, string diagnostic)
+    {
+        var before = WorkspaceEntries();
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["bench", "agentic", "calibrate", "--limit", limit, "--records", Path.Combine(_root, "records.jsonl"), "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains(diagnostic, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+        Assert.False(File.Exists(Path.Combine(_root, "records.jsonl")));
+    }
+
+    [Theory]
+    [InlineData("latency")]
+    [InlineData("throughput")]
+    [InlineData("cost")]
+    public async Task PerformancePreset_RequiresSubjectBeforeResolvingTarget(string preset)
+    {
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(["bench", "perf", preset]);
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("--subject is required", stderr, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("gdpr", "0", "--limit must be at least 1.")]
+    [InlineData("gdpr", "1", "--limit requires --out")]
+    [InlineData("eu-ai-act", "0", "--limit must be at least 1.")]
+    [InlineData("eu-ai-act", "1", "--limit requires --out")]
+    public async Task ComplianceCalibration_InvalidBoundedRun_RefusesBeforeAnyJudge(
+        string family, string limit, string diagnostic)
+    {
+        var before = WorkspaceEntries();
+
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["bench", family, "calibrate", "--limit", limit, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains(diagnostic, stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
+    [Fact]
+    public async Task BenchmarkList_IsAvailableWithoutTarget_AndListsRegisteredFamilies()
+    {
+        var (exit, stdout, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(["bench", "--list"]);
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Empty(stderr);
+        Assert.Contains("Registered benchmark families:", stdout, StringComparison.Ordinal);
+        Assert.Contains("agentic", stdout, StringComparison.Ordinal);
+        Assert.Contains("gdpr", stdout, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TraceFidelity_MissingTrace_RefusesWithoutWritingEvidence(bool workflow)
+    {
+        var before = WorkspaceEntries();
+        var missing = Path.Combine(_root, "missing-trace.json");
+        string[] args = workflow
+            ? ["bench", "workflow-trace-fidelity", "--workflow-trace", missing]
+            : ["bench", "trace-fidelity", "--agent-trace", missing, "--chat-trace", missing];
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync([.. args, "--subject", "A", "--root", _root]);
+
+        Assert.Equal(1, exit);
+        Assert.Contains(workflow ? "Workflow trace not found: " + missing : "Agent-boundary trace not found: " + missing,
+            stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
+    [Fact]
+    public async Task Render_NoCapturedReport_ExplainsTheMissingEvidence()
+    {
+        var before = WorkspaceEntries();
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["render", "--benchmark", "agentic", "--subject", "A", "--root", _root]);
+        Assert.Equal(1, exit);
+        Assert.Contains("No captured original agentic report is available", stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
+
+    [Fact]
+    public async Task ComplianceRender_NoCapturedReport_ExplainsTheMissingEvidence()
+    {
+        var before = WorkspaceEntries();
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["compliance", "render", "--regulation", "gdpr", "--subject", "A", "--root", _root]);
+        Assert.Equal(1, exit);
+        Assert.Contains("No captured rich compliance report is available", stderr, StringComparison.Ordinal);
+        Assert.Equal(before, WorkspaceEntries());
+    }
 
     [Theory]
     [MemberData(nameof(NoTarget))]

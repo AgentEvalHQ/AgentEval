@@ -22,6 +22,12 @@ namespace AgentEval.Evals.Agentic.Process;
 /// applies the formula, and the result does not keep <c>failure_type</c>.
 /// </para>
 /// <para>
+/// <b>Input contract</b>: requires <see cref="EvalInput.ToolCalls"/>. With no tool-call data captured (a null list) the
+/// result is skipped, not measured, and the judge is not called: it used to grade tool selection from the reply text. A
+/// captured empty list (no tool was called) is judged. The judge is also sent <see cref="EvalInput.ToolDefinitions"/> and
+/// <see cref="EvalInput.ExpectedActions"/> (the required tools) when the case supplies them.
+/// </para>
+/// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty</c>.
@@ -60,12 +66,13 @@ public sealed class ToolSelectionEval : IEvalDefinitionWrapper
     public ToolSelectionEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.70)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        // 1.2.0: not measured without tool-call data; the judge is sent the expected actions its first criterion names.
         _inner = new AtomicLlmEval(
             evaluator: judge,
             key: "tool_selection",
             name: "Tool Selection",
             category: "agentic-process",
-            version: "1.1.0",
+            version: "1.2.0",
             criteria: new[]
             {
                 "All required tools (per expected_actions.required_tools) were called",
@@ -76,7 +83,11 @@ public sealed class ToolSelectionEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_selection.v1",
-            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
+            failureSeverity: "medium")
+        {
+            JudgeSeesData = JudgeInputData.ToolCalls | JudgeInputData.ToolDefinitions | JudgeInputData.ExpectedActions,
+            JudgeNeedsData = JudgeInputData.ToolCalls,
+        };
     }
 
     /// <inheritdoc/>

@@ -39,6 +39,7 @@ public static class AgentSessionLifecycle
         if (!AIConfig.IsConfigured)
         {
             PrintMissingCredentialsBox();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -78,8 +79,10 @@ public static class AgentSessionLifecycle
 
         var containsAlice = response2.Text?.Contains("Alice", StringComparison.OrdinalIgnoreCase) == true;
         Console.ForegroundColor = containsAlice ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"   ✅ Recalled 'Alice': {containsAlice}\n");
+        Console.WriteLine($"   {(containsAlice ? "✅" : "❌")} Recalled 'Alice': {containsAlice}\n");
         Console.ResetColor();
+        if (!containsAlice)
+            SampleOutcome.Fail("session 1 did not recall 'Alice' on the next turn");
 
         // Step 2b: Serialize session state for persistence/replay
         Console.WriteLine("📝 Step 2b: Session serialization — save and restore session state...\n");
@@ -96,6 +99,8 @@ public static class AgentSessionLifecycle
         Console.ForegroundColor = forgotAfterReset ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine($"   🔄 After reset, forgot Alice: {forgotAfterReset}");
         Console.ResetColor();
+        if (!forgotAfterReset)
+            SampleOutcome.Fail("after a reset the agent still knew 'Alice'");
 
         // Restore the saved session
         await adapter.RestoreSessionAsync(serialized);
@@ -104,6 +109,8 @@ public static class AgentSessionLifecycle
         Console.ForegroundColor = remembersAfterRestore ? ConsoleColor.Green : ConsoleColor.Red;
         Console.WriteLine($"   ♻️ After restore, recalls Alice: {remembersAfterRestore}\n");
         Console.ResetColor();
+        if (!remembersAfterRestore)
+            SampleOutcome.Fail("the restored session did not recall 'Alice'");
 
         // Step 3: Reset session — creates a new AgentSession
         Console.WriteLine("📝 Step 3: Resetting session (adapter.ResetSessionAsync())...\n");
@@ -124,8 +131,10 @@ public static class AgentSessionLifecycle
 
         var noLongerKnows = response3.Text?.Contains("Alice", StringComparison.OrdinalIgnoreCase) != true;
         Console.ForegroundColor = noLongerKnows ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine($"   ✅ Session isolated (forgot 'Alice'): {noLongerKnows}\n");
+        Console.WriteLine($"   {(noLongerKnows ? "✅" : "❌")} Session isolated (forgot 'Alice'): {noLongerKnows}\n");
         Console.ResetColor();
+        if (!noLongerKnows)
+            SampleOutcome.Fail("session 2 still knew 'Alice': the sessions are not isolated");
 
         // Step 5: Use ConversationRunner with automatic session management
         Console.WriteLine("📝 Step 5: ConversationRunner with session-managed multi-turn...\n");
@@ -146,6 +155,8 @@ public static class AgentSessionLifecycle
         var conversationResult = await runner.RunAsync(testCase);
 
         Console.WriteLine($"   Result: {(conversationResult.Success ? "✅ PASSED" : "❌ FAILED")}");
+        if (!conversationResult.Success)
+            SampleOutcome.Fail($"conversation '{testCase.Name}' failed");
         Console.WriteLine($"   Duration: {conversationResult.Duration.TotalMilliseconds:F0}ms");
         Console.WriteLine($"   Turns completed: {conversationResult.ActualTurns.Count}\n");
 

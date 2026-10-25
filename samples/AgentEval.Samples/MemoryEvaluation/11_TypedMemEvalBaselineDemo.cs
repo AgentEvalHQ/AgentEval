@@ -85,6 +85,7 @@ public static class TypedMemEvalBaselineDemo
         if (!AIConfig.IsConfigured)
         {
             AIConfig.PrintMissingCredentialsWarning();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 

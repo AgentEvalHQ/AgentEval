@@ -1,10 +1,18 @@
 # Disclaimer
 
-## Preview / Experimental Status
+## Release Candidate and API Stability
 
-AgentEval is **preview software (work in progress)**. It is under active development and:
+AgentEval **1.0.0-rc.1 is a release candidate**, intended for feedback before 1.0.0. APIs and behavior
+can still change during this prerelease period; changes are recorded in the [CHANGELOG](CHANGELOG.md).
 
-- APIs, interfaces, and behavior may change without notice between versions.
+From **1.0.0**, the stable public API of the `AgentEval` library and the CLI's documented commands,
+options and exit codes follow semantic versioning: incompatible changes require a major version.
+Types marked `[Experimental]` and fronts labelled **Beta** or **Experimental** in the
+[Feature Maturity table](README.md#feature-maturity) remain outside that promise and may change in
+a minor release, with changes recorded in the changelog. A snapshot of an API does not promote its maturity.
+
+The toolkit remains subject to these limits:
+
 - It may contain defects, inaccuracies, or security vulnerabilities.
 - It has not been validated for production, mission-critical, or safety-critical use.
 

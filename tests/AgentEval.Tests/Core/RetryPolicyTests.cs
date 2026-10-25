@@ -116,18 +116,19 @@ public class RetryPolicyTests
     }
     
     [Fact]
-    public async Task EvaluateWithRetryAsync_ReturnsFailOnExhaustion()
+    public async Task EvaluateWithRetryAsync_ReturnsNotMeasuredOnExhaustion()
     {
         // Arrange
         var policy = new RetryPolicy { MaxRetries = 1, InitialDelayMs = 10 };
         var metric = new FailingTestMetric();
         var context = new EvaluationContext { Input = "test", Output = "test" };
-        
+
         // Act
         var result = await metric.EvaluateWithRetryAsync(context, policy);
-        
-        // Assert
+
+        // Assert - nothing was measured: not a Fail at 0 (T59)
         Assert.False(result.Passed);
+        Assert.False(result.Measured);
         Assert.Contains("failed after 2 attempts", result.Explanation);
     }
     

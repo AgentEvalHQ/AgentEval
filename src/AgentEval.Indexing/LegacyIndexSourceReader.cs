@@ -132,10 +132,19 @@ public sealed class LegacyIndexSourceReader : ILegacyIndexSourceReader
                 if (!ids.Add(id)) throw new EvidenceIndexException("duplicate-legacy-scenario");
                 var resultId = "legacy:scenario:" + id;
                 var passed = scenario.GetProperty("passed").GetBoolean();
-                CheckRows(); results.Add(new(resultId, id, null, passed ? "PASS" : "FAIL"));
+                double? score = scenario.TryGetProperty("score", out var scoreElement) && scoreElement.ValueKind != JsonValueKind.Null
+                    ? Number(scoreElement) : null;
+                var measurement = scenario.TryGetProperty("measurement", out var measurementElement) ? measurementElement.GetString() : null;
+                var measured = score is not null && measurement is not ("not_measured" or "not_applicable");
+                var outcome = measurement == "not_applicable" ? "NOT_APPLICABLE"
+                    : !measured ? "NOT_MEASURED" : passed ? "PASS" : "FAIL";
+                CheckRows(); results.Add(new(resultId, id, null, outcome));
                 AddMetrics(Object(scenario, "metrics"), resultId, "legacy-scenario-metric", metrics);
-                CheckRows();
-                metrics.Add(new(resultId, "legacy:scenario-score", int.MaxValue, Number(scenario.GetProperty("score")), null, passed, "legacy-scenario-score"));
+                if (measured)
+                {
+                    CheckRows();
+                    metrics.Add(new(resultId, "legacy:scenario-score", int.MaxValue, score!.Value, null, passed, "legacy-scenario-score"));
+                }
             }
             var completeness = verdict == "PENDING" || summary is null || ids.Count != declaredCount ? "partial" : "unknown";
             var digest = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(

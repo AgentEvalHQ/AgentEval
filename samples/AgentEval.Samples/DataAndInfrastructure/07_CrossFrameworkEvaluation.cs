@@ -37,6 +37,7 @@ public static class CrossFrameworkEvaluation
             Console.WriteLine("❌ This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Set a provider: AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig).");
             Console.ResetColor();
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -82,8 +83,10 @@ public static class CrossFrameworkEvaluation
             results.Add(await harness.RunEvaluationAsync(agent, testCase));
 
         var summary = new TestSummary("Cross-Framework Evaluation", results);
-        Console.WriteLine($"\n   ✅ {summary.TotalCount} tests completed: " +
+        Console.WriteLine($"\n   {(summary.FailedCount == 0 ? "✅" : "❌")} {summary.TotalCount} tests completed: " +
                           $"{summary.PassedCount} passed, {summary.FailedCount} failed\n");
+        foreach (var failed in results.Where(r => !r.Passed))
+            SampleOutcome.Fail($"'{failed.TestName}' failed: {failed.Details}");
 
         // ─── Step 5: Export to Markdown ──────────────────────────────
         Console.WriteLine("📝 Step 5: Export results to Markdown");

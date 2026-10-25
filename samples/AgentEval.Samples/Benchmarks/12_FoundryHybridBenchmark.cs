@@ -11,6 +11,9 @@ using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Core.Evals.Rendering;
 using AgentEval.Evals;
+using AgentEval.Evals.Agentic.Quality;
+using AgentEval.Evals.Agentic.Reasoning;
+using AgentEval.Evals.Agentic.System;
 using AgentEval.MAF.Evaluators;
 using AgentEval.Output;
 
@@ -24,11 +27,22 @@ namespace AgentEval.Samples.Benchmarks;
 /// AgentEval Composite Eval and the Foundry eval, and renders both in one source-tagged HTML report.
 /// </summary>
 /// <remarks>
-/// Requires a model provider (the judge + fallback agent; see AIConfig) and optionally an Azure AI Foundry
-/// project endpoint for the Foundry branch. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
+/// <para>
+/// Requires a model provider (the judge + fallback agent; see AIConfig) and an Azure AI Foundry project endpoint for
+/// the Foundry branch. Set <c>AZURE_FOUNDRY_ENDPOINT</c> to
 /// <c>https://&lt;hub&gt;.services.ai.azure.com/api/projects/&lt;project&gt;</c> (copy from the Foundry portal).
-/// Without it the sample runs AgentEval-local-only. The Foundry branch uses Azure AD
-/// (<c>DefaultAzureCredential</c>), so run <c>az login</c> first.
+/// The Foundry branch uses Azure AD (<c>DefaultAzureCredential</c>), so run <c>az login</c> first. Without the endpoint
+/// the AgentEval branch still runs and the report is written, and the run records NOT MEASURED: the Foundry branch
+/// is what this sample demonstrates.
+/// </para>
+/// <para>
+/// The AgentEval branch grades what a reply alone can show. MAF's <c>EvaluateAsync</c> hands each evaluator the
+/// conversation and the reply. Through <c>AgentEvalAgentEvaluator</c>, <see cref="AgentEvalCompositeEvaluator"/> is also
+/// given the turn's tool calls, the agent's tools (<c>EvalItem.Tools</c>) and the expected tool calls; the agent's
+/// instructions reach it only when <c>AgentEvalAgentEvaluator.AgentInstructions</c> is set. Until 2026-10 this branch
+/// ran the Agentic Execution preset, whose Tool Call Accuracy (20%) and Task Navigation Efficiency (10%, 0 without
+/// expected actions) graded a tool-less agent through a path that then carried no tool data.
+/// </para>
 /// </remarks>
 public static class FoundryHybridBenchmarkSample
 {
@@ -41,15 +55,34 @@ public static class FoundryHybridBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H11 — FOUNDRY HYBRID");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
-        // ── The AgentEval judge + a composite (local, deterministic, multi-dimension) ──────────────
-        IChatClient judgeChat = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
+        // ── The AgentEval judge + a composite (local, multi-dimension, itself a tree) ──────────────
+        // Fitted to what this path carries, the query and the reply: did the plan resolve the intent, is it a sound
+        // plan, does it stay on the question, does it read well.
+        var agentModel = AIConfig.ModelDeployment;
+        var judgeModel = AIConfig.JudgeModelDeployment;
+        Console.WriteLine($"   Agent: {agentModel}; configured judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}");
+        IChatClient judgeChat = AIConfig.CreateChatClient(judgeModel);
         var chatConfig = new ChatConfiguration(judgeChat);
+        var judge = new ChatClientEvaluator(judgeChat);
 
-        var composite = AgenticBenchmark
-            .AgenticExecution(new ChatClientEvaluator(judgeChat), judgeModel: AIConfig.ModelDeployment)
+        var composite = new CompositeEval(
+            key: "hybrid.trip_answer",
+            name: "Trip Answer Quality",
+            category: "agentic",
+            version: "1.0.0",
+            components:
+            [
+                new(new IntentResolutionEval(judge, judgeModel),       0.35) { OnFailure = ComponentFailureEffect.Fail },
+                new(new PlanFormulationQualityEval(judge, judgeModel), 0.35) { OnFailure = ComponentFailureEffect.Fail },
+                new(new RelevanceEval(judge, judgeModel),              0.20) { OnFailure = ComponentFailureEffect.Fail },
+                new(new CoherenceEval(judge, judgeModel),              0.10) { OnFailure = ComponentFailureEffect.Warn },
+            ],
+            aggregation: WeightedSumAggregation.Instance,
+            threshold: 0.70)
             .AsMeaiEvaluator();
         IAgentEvaluator local = composite.AsAgentEvaluator(chatConfig);
 
@@ -58,7 +91,7 @@ public static class FoundryHybridBenchmarkSample
         // Format: https://<hub>.services.ai.azure.com/api/projects/<project>
         // AIProjectClient uses DefaultAzureCredential (Azure AD) — run `az login` first.
         var foundryEndpoint = AIConfig.FoundryEndpoint;
-        var foundryModel = AIConfig.ModelDeployment;
+        var foundryModel = judgeModel;
         bool foundryOn = foundryEndpoint is not null;
 
         AIProjectClient? projectClient = foundryOn
@@ -67,8 +100,8 @@ public static class FoundryHybridBenchmarkSample
 
         // System-under-test agent: Foundry-hosted when available, else the configured chat provider as fallback.
         AIAgent agent = projectClient is not null
-            ? projectClient.AsAIAgent(model: foundryModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
-            : judgeChat.AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
+            ? projectClient.AsAIAgent(model: agentModel, instructions: "You are a helpful travel advisor.", name: "TravelAdvisor")
+            : AIConfig.CreateChatClient(agentModel).AsAIAgent(name: "TravelAdvisor", instructions: "You are a helpful travel advisor.");
 
         // ── Put the Foundry eval INTO the composite, alongside the AgentEval-local one ─────────────
         var inners = new List<(string Source, IAgentEvaluator Evaluator, TimeSpan? Timeout)>
@@ -107,8 +140,10 @@ public static class FoundryHybridBenchmarkSample
                 var isIntentional = string.Equals(r.Status, "skipped", StringComparison.OrdinalIgnoreCase);
                 Console.ForegroundColor = isIntentional ? ConsoleColor.Yellow : ConsoleColor.Red;
                 var verb = isIntentional ? "SKIPPED" : "ERROR";
-                Console.WriteLine($"   {icon} [{src}]  {verb} — {(!string.IsNullOrEmpty(r.Error) ? r.Error : "no results returned")}");
+                var reason = !string.IsNullOrEmpty(r.Error) ? r.Error : "no results returned";
+                Console.WriteLine($"   {icon} [{src}]  {verb} — {reason}");
                 Console.ResetColor();
+                SampleOutcome.Skip($"[{src}] not measured ({verb.ToLowerInvariant()}): {reason}");
             }
             else
             {
@@ -121,22 +156,31 @@ public static class FoundryHybridBenchmarkSample
                 foreach (var meai in r.Items)
                 {
                     foreach (var (metricName, metric) in meai.Metrics)
-                    {
-                        var score = metric is Microsoft.Extensions.AI.Evaluation.NumericMetric nm
-                            ? nm.Value?.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) ?? "N/A"
-                            : metric?.ToString() ?? "N/A";
-                        Console.WriteLine($"               • {metricName}: {score}");
-                    }
+                        Console.WriteLine($"               • {metricName}: {Describe(metric)}");
                 }
+
+                // The AgentEval branch has its tree: record the root's verdict as every report reads it. The Foundry
+                // branch has only MAF's pass count.
+                if (!isFoundry && composite.CapturedResults.Count > 0)
+                    SampleOutcome.RecordVerdict($"[{src}] {composite.CapturedResults[^1].Metric.Name}", composite.CapturedResults[^1].Score);
+                else if (r.Passed < r.Total)
+                    SampleOutcome.Warn($"[{src}] {r.Passed}/{r.Total} item(s) passed");
             }
         }
         Console.WriteLine();
 
+        if (!foundryOn)
+        {
+            SampleOutcome.Skip(
+                "the Foundry branch did not run: AZURE_FOUNDRY_ENDPOINT is not set (an Azure AI Foundry project and `az login`); " +
+                "only the AgentEval branch was measured");
+        }
+
         // One source-tagged report (a branch per source; the local branch keeps its full hierarchy).
         EvalResult tree = UnifiedEvalReport.Build(hybrid.CapturedPerSource, composite);
-        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: foundryModel, Framework: "MAF");
+        var subject = new SubjectIdentity(SubjectKind.Agent, agent.Name ?? "agent", ModelId: agentModel, Framework: "MAF");
         var html = await new HtmlEvalResultRenderer().RenderAsync(tree, new EvalResultRenderOptions(
-            Subject: subject, Title: "Foundry ⊕ AgentEval — hybrid eval"));
+            Subject: subject, Title: $"Foundry ⊕ AgentEval — hybrid eval; judge: {SampleJudgeModel.DescribeFor(agentModel, judgeModel)}"));
 
         var dir = BenchmarkSampleHelpers.EnsureRunDirectory("foundry-hybrid");
         var htmlPath = System.IO.Path.Combine(dir, "report.html");
@@ -149,5 +193,23 @@ public static class FoundryHybridBenchmarkSample
         Console.WriteLine("   - A Foundry eval sits INSIDE a CompositeAgentEvaluator, next to the AgentEval composite.");
         Console.WriteLine("   - One agent run, both evaluators (concurrent + isolated), one source-tagged report.");
         Console.WriteLine("   - A Foundry failure/timeout becomes a visible 'skipped' branch — the local results survive.");
+        Console.WriteLine("   - Through MAF's EvaluateAsync an evaluator sees the query and the reply: grade what they can show.");
+    }
+
+    /// <summary>
+    /// A metric as a reader reads it: a number with its rating, a yes/no, or the text a string metric carries (the
+    /// chance-floor declaration is one). A metric with no value was not measured, which is not a 0.
+    /// </summary>
+    private static string Describe(EvaluationMetric? metric)
+    {
+        var rating = metric?.Interpretation is { } interpretation ? $" ({interpretation.Rating})" : "";
+        return metric switch
+        {
+            NumericMetric { Value: { } value } => value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + rating,
+            BooleanMetric { Value: { } flag } => (flag ? "yes" : "no") + rating,
+            StringMetric { Value: { } text } => text,
+            null => "not measured",
+            _ => "not measured" + rating,
+        };
     }
 }

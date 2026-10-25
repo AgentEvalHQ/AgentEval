@@ -17,7 +17,7 @@ public class AdjudicatedMultiJudgeWrapperTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Stub IEval that always returns the given label/score.</summary>
-    private sealed class StubEval(string label, double score = 1.0, string severity = "none") : IEval
+    private sealed class StubEval(string label, double score = 1.0, string severity = "none", double? cost = 0) : IEval
     {
         public string Key => $"stub_{label}";
         public string Name => $"Stub {label}";
@@ -29,8 +29,65 @@ public class AdjudicatedMultiJudgeWrapperTests
                 Metric: new(Key, Name, Category, Version),
                 Score: new(score, null, label, label == "pass", 0.70, severity, null),
                 Details: new(null, null, null, null, null),
-                Provenance: new("stub", null, null, null, null, 0, false),
+                Provenance: new("stub", null, null, null, null, cost, false),
                 EvaluatedAt: DateTimeOffset.UtcNow));
+    }
+
+    /// <summary>Adjudicator stub that returns a warn at the given cost.</summary>
+    private sealed class CostedAdjudicator(double? cost) : IEval
+    {
+        public string Key => "costed_adjudicator";
+        public string Name => "Costed Adjudicator";
+        public string Category => "test";
+        public string Version => "1.0.0";
+
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+            Task.FromResult(new EvalResult(
+                Metric: new(Key, Name, Category, Version),
+                Score: new(0.5, null, "warn", false, 0.70, "low", null),
+                Details: new(null, null, null, null, null),
+                Provenance: new("stub", null, null, null, null, cost, false),
+                EvaluatedAt: DateTimeOffset.UtcNow));
+    }
+
+    // ── Cost: complete or absent (T63 / T13-9) ────────────────────────────────
+
+    private static EvalComponent[] DisputedPanel(double? cost) =>
+    [
+        new(new StubEval("pass", 1.0, cost: 0.01), 1.0),
+        new(new StubEval("fail", 0.0, cost: cost), 1.0),
+        new(new StubEval("warn", 0.5, cost: 0.01), 1.0),
+    ];
+
+    [Fact]
+    public async Task Cost_PanelAndAdjudicatorAllPriced_IsTheirSum()
+    {
+        var result = await BuildWrapper(DisputedPanel(0.01), new CostedAdjudicator(0.02), threshold: 0.90)
+            .EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Equal("Adjudicated", result.Details.AggregationStrategy);
+        Assert.Equal(0.05, result.Provenance.EstimatedCost!.Value, precision: 10);
+    }
+
+    [Fact]
+    public async Task Cost_AnUnpricedAdjudicator_MakesTheTotalNotPriced()
+    {
+        // The adjudicator's missing cost was read as $0 (`?? 0.0`), so this read 0.03: the panel alone.
+        var result = await BuildWrapper(DisputedPanel(0.01), new CostedAdjudicator(null), threshold: 0.90)
+            .EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Equal("Adjudicated", result.Details.AggregationStrategy);
+        Assert.Null(result.Provenance.EstimatedCost);
+    }
+
+    [Fact]
+    public async Task Cost_AnUnpricedPanelJudge_MakesTheTotalNotPriced()
+    {
+        // A nullable Sum skipped the unpriced judge and read 0.04 as the panel's cost.
+        var result = await BuildWrapper(DisputedPanel(null), new CostedAdjudicator(0.02), threshold: 0.90)
+            .EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Null(result.Provenance.EstimatedCost);
     }
 
     /// <summary>Adjudicator stub that passes, and counts its calls.</summary>

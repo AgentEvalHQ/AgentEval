@@ -82,6 +82,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         var steps = new List<ExecutorStep>();
         var errors = new List<WorkflowError>();
         var traversedEdges = new List<EdgeExecution>();
+        var indexedEdges = new List<EdgeExecution>();
+        string? workflowOutput = null;
         var routingDecisions = new List<RoutingDecision>();
         var parallelBranches = new List<ParallelBranch>();
         var overallStopwatch = Stopwatch.StartNew();
@@ -93,11 +95,23 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         var stepStartOffset = TimeSpan.Zero;
         var stepIndex = 0;
         var currentToolCalls = new List<ToolCallRecord>();
+        var pendingToolRecords = new Dictionary<(string ExecutorId, string CallId), ToolCallRecord>();
         EdgeExecution? stepIncomingEdge = null; // Incoming edge for current step
         EdgeExecution? pendingIncomingEdge = null; // Edge waiting for next step
         var currentOutgoingEdges = new List<EdgeExecution>();
         string? currentBranchId = null;
         string? stepBranchId = null; // Branch ID captured when step started
+
+        // The open step's timing as the event source measured it (MAFWorkflowEventBridge reports when MAF actually
+        // ran the executor), taken from the step's latest output event that carries it. Without it the step is
+        // timed by event arrival: from the edge or output event that opened it to the edge or output that closes it.
+        // The bridge yields a step's output only once the step has finished, so a step its own output opens (the
+        // first one) measured ~0 that way, starting at its own end.
+        (TimeSpan StartOffset, TimeSpan Duration)? measuredStepTiming = null;
+        string? timingNotMeasuredReason = null;
+
+        (TimeSpan StartOffset, TimeSpan Duration) StepTiming() =>
+            measuredStepTiming ?? (stepStartOffset, executorStopwatch.Elapsed);
 
         // Glass Box Part 2 (P2.B1): per-executor ledger of the token usage + finish reason MAF only
         // surfaces on a complete AgentResponse (ExecutorAgentResponseEvent). Keyed by executor id;
@@ -117,38 +131,39 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             return (null, null);
         }
 
+        void AppendCurrentStep()
+        {
+            if (currentExecutorId is null) return;
+            var (usage, finishReason) = TakeLedger(currentExecutorId);
+            var (startOffset, duration) = StepTiming();
+            steps.Add(CreateStep(currentExecutorId, currentOutput.ToString(), startOffset, duration,
+                stepIndex, currentToolCalls, stepIncomingEdge, currentOutgoingEdges, stepBranchId,
+                usage, finishReason, timingNotMeasuredReason));
+        }
+
         // The output-accumulation + executor-switch bookkeeping shared by ExecutorOutputEvent and its
         // ExecutorAgentResponseEvent subclass. Flushes the previous executor's step (with its ledger
         // values) when the executor changes, then begins tracking the new one.
         void HandleExecutorOutput(ExecutorOutputEvent e)
         {
-            if (currentExecutorId != e.ExecutorId && currentExecutorId != null)
+            if ((e.StartsNewStep || currentExecutorId != e.ExecutorId) && currentExecutorId != null)
             {
-                var (usage, finishReason) = TakeLedger(currentExecutorId);
-                steps.Add(CreateStep(
-                    currentExecutorId,
-                    currentOutput.ToString(),
-                    stepStartOffset,
-                    executorStopwatch.Elapsed,
-                    stepIndex++,
-                    currentToolCalls,
-                    stepIncomingEdge,
-                    currentOutgoingEdges,
-                    stepBranchId,
-                    usage,
-                    finishReason));
+                AppendCurrentStep();
+                stepIndex++;
 
                 currentToolCalls = [];
                 currentOutgoingEdges = [];
             }
 
-            if (currentExecutorId != e.ExecutorId)
+            if (e.StartsNewStep || currentExecutorId != e.ExecutorId)
             {
                 currentExecutorId = e.ExecutorId;
                 currentOutput.Clear();
                 stepStartOffset = overallStopwatch.Elapsed;
                 executorStopwatch.Restart();
-                stepBranchId = currentBranchId;
+                measuredStepTiming = null;
+                timingNotMeasuredReason = null;
+                stepBranchId = e.StartsNewStep ? e.ParallelBranchId : currentBranchId;
                 stepIncomingEdge = pendingIncomingEdge;
                 pendingIncomingEdge = null;
 
@@ -159,6 +174,16 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             }
 
             currentOutput.Append(e.Output ?? string.Empty);
+            if (e.TimingNotMeasuredReason is { } reason)
+            {
+                timingNotMeasuredReason = reason;
+                measuredStepTiming = (e.StartOffset ?? TimeSpan.Zero, TimeSpan.Zero);
+            }
+            else if (e.StartOffset is { } measuredStart && e.Duration is { } measuredDuration)
+            {
+                timingNotMeasuredReason = null;
+                measuredStepTiming = (measuredStart, measuredDuration);
+            }
         }
 
         try
@@ -199,15 +224,22 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                             SourceExecutorId = edgeEvent.SourceExecutorId,
                             TargetExecutorId = edgeEvent.TargetExecutorId,
                             EdgeType = edgeEvent.EdgeType,
-                            TraversedAt = overallStopwatch.Elapsed,
+                            TraversedAt = edgeEvent.ObservedAt ?? overallStopwatch.Elapsed,
                             ConditionResult = edgeEvent.ConditionResult,
                             MatchedSwitchLabel = edgeEvent.MatchedSwitchLabel,
                             TransferredData = edgeEvent.TransferredData,
-                            SourceStepIndex = stepIndex,
-                            TargetStepIndex = stepIndex + 1,
+                            SourceStepIndex = edgeEvent.SourceStepIndex ?? stepIndex,
+                            TargetStepIndex = edgeEvent.TargetStepIndex ?? stepIndex + 1,
                             RoutingReason = edgeEvent.RoutingReason
                         };
                         traversedEdges.Add(edgeExecution);
+                        if (edgeEvent.SourceStepIndex.HasValue && edgeEvent.TargetStepIndex.HasValue)
+                        {
+                            // The bridge resolves activation indices independently of display order.
+                            // Attach these edges after every step exists; an edge is not a step boundary.
+                            indexedEdges.Add(edgeExecution);
+                            break;
+                        }
                         currentOutgoingEdges.Add(edgeExecution);
 
                         // Flush the source executor's step immediately.
@@ -217,19 +249,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         // the source executor's step (the original off-by-one attribution bug).
                         if (currentExecutorId != null)
                         {
-                            var (edgeUsage, edgeFinishReason) = TakeLedger(currentExecutorId);
-                            steps.Add(CreateStep(
-                                currentExecutorId,
-                                currentOutput.ToString(),
-                                stepStartOffset,
-                                executorStopwatch.Elapsed,
-                                stepIndex++,
-                                currentToolCalls,
-                                stepIncomingEdge,
-                                currentOutgoingEdges,
-                                stepBranchId,
-                                edgeUsage,
-                                edgeFinishReason));
+                            AppendCurrentStep();
+                            stepIndex++;
 
                             currentToolCalls = [];
                             currentOutgoingEdges = [];
@@ -241,6 +262,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         currentExecutorId = edgeEvent.TargetExecutorId;
                         stepStartOffset = overallStopwatch.Elapsed;
                         executorStopwatch.Restart();
+                        measuredStepTiming = null;
+                        timingNotMeasuredReason = null;
                         stepBranchId = currentBranchId;
                         stepIncomingEdge = edgeExecution;
                         pendingIncomingEdge = null;
@@ -279,20 +302,43 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         break;
 
                     case ExecutorToolCallEvent toolEvent:
-                        currentToolCalls.Add(new ToolCallRecord
+                        var toolExecutorId = toolEvent.ExecutorId ?? currentExecutorId ?? "unknown";
+                        var toolCallId = toolEvent.CallId ?? Guid.NewGuid().ToString();
+                        var toolKey = (toolExecutorId, toolCallId);
+                        var observedAt = DateTimeOffset.UtcNow;
+                        if (toolEvent.HasResult && pendingToolRecords.Remove(toolKey, out var pendingCall))
+                        {
+                            pendingCall.Result = toolEvent.Result;
+                            pendingCall.Exception = toolEvent.Exception;
+                            pendingCall.WasExecuted = true;
+                            pendingCall.StartTime = toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt;
+                            pendingCall.EndTime = toolEvent.HasTiming ? observedAt : null;
+                            break;
+                        }
+
+                        // An agent can fail after requesting a tool but before producing any text.
+                        // Keep that attempted call and its executor visible even without a result.
+                        if (currentExecutorId is null)
+                            HandleExecutorOutput(new ExecutorOutputEvent(toolExecutorId, string.Empty));
+                        var toolRecord = new ToolCallRecord
                         {
                             Name = toolEvent.ToolName,
-                            CallId = toolEvent.CallId ?? Guid.NewGuid().ToString(),
+                            CallId = toolCallId,
                             Arguments = toolEvent.Arguments,
                             Result = toolEvent.Result,
-                            StartTime = DateTimeOffset.UtcNow - toolEvent.Duration,
-                            EndTime = DateTimeOffset.UtcNow,
+                            Exception = toolEvent.Exception,
+                            WasExecuted = toolEvent.HasResult,
+                            StartTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt - toolEvent.Duration : observedAt,
+                            EndTime = toolEvent.HasResult && toolEvent.HasTiming ? observedAt : null,
                             Order = currentToolCalls.Count + 1,
                             // Use the executor ID embedded in the event (set by the bridge from the
                             // MAF streaming update that contained the tool call), falling back to
                             // currentExecutorId only when the event carries no ID itself.
-                            ExecutorId = toolEvent.ExecutorId ?? currentExecutorId
-                        });
+                            ExecutorId = toolExecutorId
+                        };
+                        currentToolCalls.Add(toolRecord);
+                        if (!toolEvent.HasResult)
+                            pendingToolRecords[toolKey] = toolRecord;
                         break;
 
                     case ExecutorErrorEvent errorEvent:
@@ -306,25 +352,14 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         });
                         break;
 
-                    case WorkflowCompleteEvent:
+                    case WorkflowCompleteEvent completeEvent:
+                        workflowOutput = completeEvent.FinalOutput;
                         // Workflow complete - save final step. This is the MOST COMMON terminal flush
                         // (the bridge always yields WorkflowCompleteEvent), so it MUST take the ledger too,
                         // or the final executor of every workflow loses its tokens/finish reason.
                         if (currentExecutorId != null)
                         {
-                            var (completeUsage, completeFinishReason) = TakeLedger(currentExecutorId);
-                            steps.Add(CreateStep(
-                                currentExecutorId,
-                                currentOutput.ToString(),
-                                stepStartOffset,
-                                executorStopwatch.Elapsed,
-                                stepIndex,
-                                currentToolCalls,
-                                stepIncomingEdge,
-                                currentOutgoingEdges,
-                                stepBranchId,
-                                completeUsage,
-                                completeFinishReason));
+                            AppendCurrentStep();
                         }
                         workflowComplete = true;
                         break;
@@ -337,19 +372,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             // If no WorkflowCompleteEvent was received, save final step
             if (currentExecutorId != null && !steps.Any(s => s.ExecutorId == currentExecutorId && s.StepIndex == stepIndex))
             {
-                var (finalUsage, finalFinishReason) = TakeLedger(currentExecutorId);
-                steps.Add(CreateStep(
-                    currentExecutorId,
-                    currentOutput.ToString(),
-                    stepStartOffset,
-                    executorStopwatch.Elapsed,
-                    stepIndex,
-                    currentToolCalls,
-                    stepIncomingEdge,
-                    currentOutgoingEdges,
-                    stepBranchId,
-                    finalUsage,
-                    finalFinishReason));
+                AppendCurrentStep();
             }
 
             overallStopwatch.Stop();
@@ -375,9 +398,22 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             });
         }
 
+        for (var index = 0; index < steps.Count; index++)
+        {
+            var step = steps[index];
+            var outgoing = indexedEdges.Where(edge => edge.SourceStepIndex == step.StepIndex).ToArray();
+            var incoming = indexedEdges.FirstOrDefault(edge => edge.TargetStepIndex == step.StepIndex);
+            if (outgoing.Length > 0 || incoming is not null)
+                steps[index] = step with
+                {
+                    IncomingEdge = step.IncomingEdge ?? incoming,
+                    OutgoingEdges = (step.OutgoingEdges ?? []).Concat(outgoing).ToArray()
+                };
+        }
+
         return new WorkflowExecutionResult
         {
-            FinalOutput = steps.LastOrDefault()?.Output ?? string.Empty,
+            FinalOutput = workflowOutput ?? steps.LastOrDefault()?.Output ?? string.Empty,
             Steps = steps,
             TotalDuration = overallStopwatch.Elapsed,
             OriginalPrompt = prompt,
@@ -465,7 +501,8 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         List<EdgeExecution>? outgoingEdges = null,
         string? branchId = null,
         TokenUsage? tokenUsage = null,
-        string? finishReason = null)
+        string? finishReason = null,
+        string? timingNotMeasuredReason = null)
     {
         return new ExecutorStep
         {
@@ -473,6 +510,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             Output = output,
             StartOffset = startOffset,
             Duration = duration,
+            TimingNotMeasuredReason = timingNotMeasuredReason,
             StepIndex = stepIndex,
             ToolCalls = toolCalls.Count > 0 ? toolCalls.ToList() : null,
             IncomingEdge = incomingEdge,
@@ -577,7 +615,28 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         MAFWorkflows.Workflow workflow,
         string name,
         IEnumerable<string> executorIds,
-        string? workflowType = null)
+        string? workflowType = null) =>
+        CreateFromMAFWorkflow(workflow, name, executorIds, workflowType, null);
+
+    /// <summary>Wraps a MAF workflow and answers its external request ports during execution.</summary>
+    /// <param name="workflow">The built workflow.</param>
+    /// <param name="name">Human-readable workflow name.</param>
+    /// <param name="executorIds">Preferred executor display names, including nested paths such as Sub/A.</param>
+    /// <param name="workflowType">Optional workflow pattern name; pass null when unspecified.</param>
+    /// <param name="requestResponder">Creates a response with request.CreateResponse(...). Return null to decline;
+    /// a declined or failed response makes the run fail. Honor the supplied cancellation token.</param>
+    /// <returns>An adapter that hosts requests as well as recording execution.</returns>
+    public static MAFWorkflowAdapter FromMAFWorkflow(
+        MAFWorkflows.Workflow workflow, string name, IEnumerable<string> executorIds, string? workflowType,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>> requestResponder)
+    {
+        ArgumentNullException.ThrowIfNull(requestResponder);
+        return CreateFromMAFWorkflow(workflow, name, executorIds, workflowType, requestResponder);
+    }
+
+    private static MAFWorkflowAdapter CreateFromMAFWorkflow(
+        MAFWorkflows.Workflow workflow, string name, IEnumerable<string> executorIds, string? workflowType,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? requestResponder)
     {
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(name);
@@ -585,56 +644,13 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
 
         var cleanNames = executorIds.ToList();
 
-        // Discover real MAF executor IDs from ReflectEdges + StartExecutorId.
-        // MAF generates IDs in the form "Name_<32hexGuid>" (via GetDescriptiveId).
-        // We build a mapping from full MAF ID → user-provided clean name.
-        var reflectedEdges = workflow.ReflectEdges();
-        var allMafIds = new HashSet<string>(reflectedEdges.Keys);
-
-        // Also add sink IDs from edges (targets may not appear as source keys)
-        foreach (var edgeInfos in reflectedEdges.Values)
-        {
-            foreach (var edgeInfo in edgeInfos)
-            {
-                foreach (var sinkId in edgeInfo.Connection.SinkIds)
-                    allMafIds.Add(sinkId);
-                foreach (var sourceId in edgeInfo.Connection.SourceIds)
-                    allMafIds.Add(sourceId);
-            }
-        }
-
-        // Include the start executor ID
-        if (!string.IsNullOrEmpty(workflow.StartExecutorId))
-            allMafIds.Add(workflow.StartExecutorId);
-
-        // Build fullId → cleanName mapping by matching prefix
-        var idMap = new Dictionary<string, string>();
-        foreach (var fullId in allMafIds)
-        {
-            foreach (var cleanName in cleanNames)
-            {
-                // MAF format: "{Name}_{Guid32hex}" — match by prefix
-                if (string.Equals(fullId, cleanName, StringComparison.Ordinal)
-                    || fullId.StartsWith(cleanName + "_", StringComparison.Ordinal))
-                {
-                    idMap[fullId] = cleanName;
-                    break;
-                }
-            }
-
-            // If no clean name matched, map to itself (passthrough)
-            if (!idMap.ContainsKey(fullId))
-                idMap[fullId] = fullId;
-        }
-
-        // Use real MAF IDs for graph extraction (they match ReflectEdges keys),
-        // but pass the mapping so node/edge IDs are translated to clean names.
-        var realMafIds = allMafIds.ToList();
-        var graph = MAFGraphExtractor.ExtractGraph(workflow, realMafIds, idMap);
+        var topology = MAFWorkflowTopology.Create(workflow, cleanNames);
+        var idMap = topology.IdMap;
+        var graph = topology.Graph;
 
         return new MAFWorkflowAdapter(
             name,
-            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEvents(workflow, prompt, ct, idMap),
+            (prompt, ct) => MAFWorkflowEventBridge.StreamAsAgentEvalEventsCore(workflow, prompt, ct, idMap, cleanNames, graph, requestResponder, topology),
             cleanNames,
             workflowType,
             graph);
@@ -702,10 +718,42 @@ public abstract record WorkflowEvent;
 /// <summary>
 /// Event indicating output from an executor.
 /// </summary>
-public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowEvent;
+/// <remarks>
+/// An event source that knows when the executor actually ran sets <see cref="StartOffset"/> and
+/// <see cref="Duration"/> together (<see cref="MAFWorkflowEventBridge"/> does), and the adapter records them as the
+/// step's timing. When they are absent the adapter times the step by event arrival, which only measures how far
+/// apart the source yielded its events.
+/// </remarks>
+public record ExecutorOutputEvent(string ExecutorId, string? Output) : WorkflowEvent
+{
+    /// <summary>Starts a distinct activation, including another turn of the same executor.</summary>
+    public bool StartsNewStep { get; init; }
+
+    /// <summary>The observed parallel branch owning this activation, when <see cref="StartsNewStep"/> is true.</summary>
+    public string? ParallelBranchId { get; init; }
+
+    /// <summary>
+    /// When the step this output belongs to started, relative to the start of the event stream, as the event source
+    /// measured it; <c>null</c> when the source did not measure it.
+    /// </summary>
+    public TimeSpan? StartOffset { get; init; }
+
+    /// <summary>
+    /// How long the step had run when this output was complete, as the event source measured it; <c>null</c> when the
+    /// source did not measure it. When a step has several output events, the latest one that carries timing wins.
+    /// </summary>
+    public TimeSpan? Duration { get; init; }
+
+    /// <summary>
+    /// Why this activation could not be timed. When set, this takes precedence over numeric timing on the event.
+    /// A later event carrying complete measured timing clears the reason.
+    /// </summary>
+    public string? TimingNotMeasuredReason { get; init; }
+}
 
 /// <summary>
-/// Event indicating a tool call within an executor.
+/// Event indicating a tool call within an executor. A call with <see cref="HasResult"/> false records intent;
+/// a later event with the same executor and call ID updates it when a paired result arrives.
 /// </summary>
 public record ExecutorToolCallEvent(
     string ExecutorId, 
@@ -713,7 +761,27 @@ public record ExecutorToolCallEvent(
     string? CallId = null,
     IDictionary<string, object?>? Arguments = null,
     object? Result = null,
-    TimeSpan Duration = default) : WorkflowEvent;
+    TimeSpan Duration = default) : WorkflowEvent
+{
+    /// <summary>
+    /// Whether a paired result was observed, including a result whose value is null. Defaults to true for
+    /// compatibility with event sources that emit only completed calls. False never certifies execution or timing.
+    /// </summary>
+    public bool HasResult { get; init; } = true;
+
+    /// <summary>
+    /// The exception reported by a paired tool result, even when the agent catches it and completes normally.
+    /// A result with a null value and no exception remains a successful execution.
+    /// </summary>
+    public Exception? Exception { get; init; }
+
+    /// <summary>
+    /// Whether <see cref="Duration"/> was measured at the tool's execution boundaries. A paired result alone
+    /// does not prove timing. Defaults to true for existing custom sources; the queued MAF bridge sets false.
+    /// Timing is accepted only when <see cref="HasResult"/> is also true.
+    /// </summary>
+    public bool HasTiming { get; init; } = true;
+}
 
 /// <summary>
 /// Event indicating an error in an executor.
@@ -742,7 +810,14 @@ public record ExecutorAgentResponseEvent(
 /// <summary>
 /// Event indicating workflow completion.
 /// </summary>
-public record WorkflowCompleteEvent : WorkflowEvent;
+public record WorkflowCompleteEvent : WorkflowEvent
+{
+    /// <summary>
+    /// Output of the last output-producing activation. Null preserves the legacy last-step fallback.
+    /// A later empty activation does not erase an earlier explicit workflow output.
+    /// </summary>
+    public string? FinalOutput { get; init; }
+}
 
 /// <summary>
 /// Event indicating an edge was traversed between executors.
@@ -755,7 +830,17 @@ public record EdgeTraversedEvent(
     bool? ConditionResult = null,
     string? MatchedSwitchLabel = null,
     string? TransferredData = null,
-    string? RoutingReason = null) : WorkflowEvent;
+    string? RoutingReason = null) : WorkflowEvent
+{
+    /// <summary>Explicit source activation index. Set together with <see cref="TargetStepIndex"/>.</summary>
+    public int? SourceStepIndex { get; init; }
+
+    /// <summary>Explicit target activation index; indexed edges do not open or close steps.</summary>
+    public int? TargetStepIndex { get; init; }
+
+    /// <summary>Observed transition time relative to run start, when measured by the event source.</summary>
+    public TimeSpan? ObservedAt { get; init; }
+}
 
 /// <summary>
 /// Event indicating a routing decision was made at a conditional/switch point.

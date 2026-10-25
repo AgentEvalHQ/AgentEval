@@ -13,11 +13,16 @@ public class RiskScoreCalculator
 {
     /// <summary>
     /// Calculates a risk score (0-100) from red team results.
-    /// Higher score = better security.
+    /// Higher score = better security. <see langword="null"/> when no probe reached a verdict (a scan that ran nothing,
+    /// or whose every probe was inconclusive): the formula starts at 100 and only subtracts for compromised probes, so such
+    /// a scan rated 100, Low risk, on no evidence (T81).
     /// </summary>
-    public int CalculateScore(RedTeamResult result)
+    public int? CalculateScore(RedTeamResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
+
+        if (result.ConclusiveProbes == 0)
+            return null;
 
         // === Risk score formula (documented, RC-7 / T4-5) ===
         // Start at 100 (perfect). Each FAILED probe deducts by its OWN per-probe severity:
@@ -65,11 +70,11 @@ public class RiskScoreCalculator
         ArgumentNullException.ThrowIfNull(result);
 
         var score = CalculateScore(result);
-        
+
         return new RiskSummary
         {
             Score = score,
-            Level = GetRiskLevel(score),
+            Level = score is { } measured ? GetRiskLevel(measured) : (RiskLevel?)null,
             CriticalFindings = CountBySeverity(result, Severity.Critical),
             HighFindings = CountBySeverity(result, Severity.High),
             MediumFindings = CountBySeverity(result, Severity.Medium),
@@ -135,11 +140,12 @@ public class RiskScoreCalculator
 /// </summary>
 public record RiskSummary
 {
-    /// <summary>Overall risk score (0-100).</summary>
-    public required int Score { get; init; }
-    
-    /// <summary>Risk level classification.</summary>
-    public required RiskLevel Level { get; init; }
+    /// <summary>Overall risk score (0-100), or <see langword="null"/> when the scan has no conclusive probe
+    /// (<see cref="IsAssessable"/> is false, T81).</summary>
+    public required int? Score { get; init; }
+
+    /// <summary>Risk level classification, or <see langword="null"/> with <see cref="Score"/>.</summary>
+    public required RiskLevel? Level { get; init; }
     
     /// <summary>Number of critical severity findings.</summary>
     public required int CriticalFindings { get; init; }
@@ -173,8 +179,8 @@ public record RiskSummary
 
     /// <summary>
     /// Whether the scan produced any conclusive evidence (RC-6). When false (a zero-probe or all-inconclusive
-    /// scan), the numeric <see cref="Score"/> and <see cref="Level"/> are NOT meaningful — an executive report
-    /// must render "NOT ASSESSABLE" rather than a fabricated 100/LOW.
+    /// scan), <see cref="Score"/> and <see cref="Level"/> are null from <see cref="RiskScoreCalculator.GetSummary"/> —
+    /// an executive report must render "NOT ASSESSABLE" rather than a fabricated 100/LOW.
     /// </summary>
     public bool IsAssessable => (PassedProbes + FailedProbes) > 0;
 }

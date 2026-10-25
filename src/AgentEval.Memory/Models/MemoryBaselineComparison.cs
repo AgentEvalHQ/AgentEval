@@ -22,8 +22,11 @@ public class MemoryBaselineComparison
     /// <summary>Per-dimension comparison across all baselines.</summary>
     public required IReadOnlyList<DimensionComparison> Dimensions { get; init; }
 
-    /// <summary>ID of the baseline with the highest overall score.</summary>
-    public required string BestBaselineId { get; init; }
+    /// <summary>
+    /// ID of the highest-scoring baseline with recorded complete evidence and at least one dimension, or
+    /// <see langword="null"/> when none qualifies. Partial and unverified observations remain in Baselines.
+    /// </summary>
+    public required string? BestBaselineId { get; init; }
 
     /// <summary>Radar chart data for pentagon visualization.</summary>
     public required RadarChartData RadarChart { get; init; }
@@ -37,13 +40,25 @@ public class DimensionComparison
     /// <summary>Dimension name (e.g., "Recall", "Resilience").</summary>
     public required string DimensionName { get; init; }
 
-    /// <summary>Score per baseline ID.</summary>
+    /// <summary>
+    /// Score per baseline ID, for the baselines that measured this dimension only. A baseline that did not measure it
+    /// has no entry (read with <c>TryGetValue</c>) and is listed in <see cref="NotMeasuredBy"/>.
+    /// </summary>
     public required IReadOnlyDictionary<string, double> Scores { get; init; }
 
-    /// <summary>Highest score across all baselines for this dimension.</summary>
-    public double BestScore => Scores.Count > 0 ? Scores.Values.Max() : 0;
+    /// <summary>IDs of the compared baselines that did not measure this dimension.</summary>
+    public IReadOnlyList<string> NotMeasuredBy { get; init; } = [];
 
-    /// <summary>ID of the baseline with the best score for this dimension.</summary>
-    /// <remarks>Returns <c>null</c> when there are no scores.</remarks>
-    public string? BestBaselineId => Scores.Count > 0 ? Scores.MaxBy(kvp => kvp.Value).Key : null;
+    /// <summary>Baselines whose observations remain in Scores but cannot establish a ranking because run completeness is absent or false.</summary>
+    public IReadOnlyList<string> NotRankedBy { get; init; } = [];
+
+    /// <summary>
+    /// Highest score eligible for ranking, or null when none qualifies. Scores retains partial observations.
+    /// </summary>
+    public double? BestScore => RankedScores.Select(pair => (double?)pair.Value).Max();
+
+    /// <summary>ID with the highest eligible score for this dimension; null when none qualifies for ranking.</summary>
+    public string? BestBaselineId => RankedScores.OrderByDescending(pair => pair.Value).FirstOrDefault().Key;
+
+    private IEnumerable<KeyValuePair<string, double>> RankedScores => Scores.Where(pair => !NotRankedBy.Contains(pair.Key));
 }

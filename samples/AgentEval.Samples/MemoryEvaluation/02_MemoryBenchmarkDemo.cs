@@ -38,6 +38,7 @@ public static class MemoryBenchmarkDemo
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   Memory benchmarks use an LLM judge — they cannot run in mock mode.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -97,6 +98,7 @@ public static class MemoryBenchmarkDemo
         // Step 4: Run uickthe Q benchmark (good balance of coverage vs speed)
         Console.WriteLine("📝 Step 4: Running Quick memory benchmark (3 categories)...\n");
         var result = await benchmarkRunner.RunBenchmarkAsync(agent, MemoryBenchmark.Quick);
+        MemoryBenchmarkSampleSupport.RecordVerdict(AIConfig.ModelDeployment, result);
         PrintBenchmarkResult(result);
 
         PrintKeyTakeaways();
@@ -110,11 +112,11 @@ public static class MemoryBenchmarkDemo
 
         // Overall score with grade and stars
         Console.Write("   Overall: ");
-        Console.ForegroundColor = result.OverallScore >= 80 ? ConsoleColor.Green :
+        Console.ForegroundColor = !result.IsComplete ? ConsoleColor.DarkYellow : result.OverallScore >= 80 ? ConsoleColor.Green :
                                   result.OverallScore >= 60 ? ConsoleColor.Yellow : ConsoleColor.Red;
-        Console.Write($"{result.OverallScore:F1}%");
+        Console.Write(MemoryBenchmarkSampleSupport.FormatSummary(result));
         Console.ResetColor();
-        Console.WriteLine($"  Grade: {result.Grade}  {new string('★', result.Stars)}{new string('☆', 5 - result.Stars)}  {(result.Passed ? "✅ PASSED" : "❌ FAILED")}");
+        Console.WriteLine($"  {(!result.IsComplete ? "INCOMPLETE" : result.Passed ? "✅ PASSED" : "❌ FAILED")}");
         Console.WriteLine();
 
         // Category breakdown
@@ -125,9 +127,11 @@ public static class MemoryBenchmarkDemo
             if (cat.Skipped)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"   ⏭️  {cat.CategoryName,-25} SKIPPED ({cat.SkipReason})");
+                Console.WriteLine($"   ⏭️  {cat.CategoryName,-25} {(cat.Errored ? "NOT MEASURED" : "SKIPPED")} ({cat.SkipReason})");
                 Console.ResetColor();
             }
+            else if (cat.UnmeasuredQueries > 0)
+                Console.WriteLine($"   {cat.CategoryName,-25} {cat.Score:F1}% observed; {cat.UnmeasuredQueries} unscored question(s); category rating not established.");
             else
             {
                 var icon = cat.Score >= 80 ? "✅" : cat.Score >= 60 ? "⚠️" : "❌";

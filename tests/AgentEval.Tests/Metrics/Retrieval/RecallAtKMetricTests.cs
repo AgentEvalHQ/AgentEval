@@ -141,6 +141,7 @@ public sealed class RecallAtKMetricTests
 
         // Assert
         Assert.False(result.Measured);   // not supplied: not measured, not a fail at 0 (B12n)
+        Assert.Equal(NotMeasuredCause.MissingInput, result.NotMeasuredCause);
         Assert.False(result.Passed);
         Assert.Contains("RetrievedDocumentIds", result.Explanation!);
     }
@@ -162,6 +163,7 @@ public sealed class RecallAtKMetricTests
 
         // Assert
         Assert.False(result.Measured);   // no reference: not measured (B12n)
+        Assert.Equal(NotMeasuredCause.MissingInput, result.NotMeasuredCause);
         Assert.Contains("RelevantDocumentIds", result.Explanation!);
     }
 

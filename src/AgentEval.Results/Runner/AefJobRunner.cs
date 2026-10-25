@@ -578,23 +578,23 @@ public static class AefJobRunner
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                ChargePreparation(run, suite.PreparationIncurredUsd);
+                RecordPreparation(run, suite.PreparationIncurredUsd);
                 throw;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                ChargePreparation(run, suite.PreparationIncurredUsd);
+                RecordPreparation(run, suite.PreparationIncurredUsd);
                 throw;
             }
             catch (Exception ex)
             {
-                ChargePreparation(run, suite.PreparationIncurredUsd);
+                RecordPreparation(run, suite.PreparationIncurredUsd);
                 return deadline.IsCancellationRequested ? "Run preparation exceeded its time bound"
                     : $"Run preparation threw {ex.GetType().Name}";
             }
             if (result.Seconds < 0) throw new InvalidOperationException("Preparation duration must be nonnegative.");
             _jobClock.Advance(result.Seconds);
-            ChargePreparation(run, result.Usd);
+            RecordPreparation(run, result.Usd);
             if (result.Usd > suite.PreparationUsdBound) return "Run preparation exceeded its cost bound";
             if (unboundedAsync || result.Seconds > suite.PreparationSecondsBound
                 || (suite.PreparationSecondsBound > 0 && _clock.CompareTo(started.AddSeconds(suite.PreparationSecondsBound)) > 0))
@@ -602,11 +602,15 @@ public static class AefJobRunner
             return result.Ready ? null : "The target was not ready";
         }
 
-        private void ChargePreparation(OpenRun run, double usd)
+        private void RecordPreparation(OpenRun run, double usd)
         {
-            if (usd == 0) return;
-            AddSpend(run, usd);
-            _events!.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+            if (usd != 0)
+            {
+                AddSpend(run, usd);
+                _events!.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+            }
+            if (run.Suite.PreparationMetadata is { } metadata)
+                run.Writer.PutExtFile("agenteval/preparation.json", AefJsonWriter.Compact(metadata));
         }
 
         private async Task<string?> RunCaseAsync(OpenRun run, IAefJobCase next, IAefJobSuite suite, JsonObject planSuite, CancellationToken cancellationToken)

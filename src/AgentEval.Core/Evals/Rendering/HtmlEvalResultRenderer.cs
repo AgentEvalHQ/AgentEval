@@ -81,18 +81,13 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         WriteMetaPair(sb, "Scenarios", leafCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         sb.Append("</dl>\n");
 
-        // Overall verdict banner — translate "skipped" to "NOT TESTED" so an atomic
-        // skipped root presents consistently with the leaf badges (which already do
-        // this remapping inside WriteNode) and with the PDF cover ("OVERALL: NOT
-        // TESTED"). Without this, the HTML cover label read "SKIPPED" while per-leaf
-        // badges read "NOT TESTED" for the same state. Score is kept visible (mirrors
-        // PDF cover behaviour); for an atomic skipped result this is 0%.
+        // The banner labels skipped roots NOT TESTED and qualifies unavailable scores.
         var sev = SeverityClass(root.Score.Severity, root.Score.Label);
         var rootIsSkipped = string.Equals(root.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase);
         var rootBannerLabel = rootIsSkipped ? "NOT TESTED" : WebUtility.HtmlEncode(root.Score.Label.ToUpperInvariant());
         sb.Append("<div class=\"verdict ").Append(sev).Append("\">\n");
         sb.Append("<span class=\"label\">").Append(rootBannerLabel).Append("</span>\n");
-        sb.Append("<span class=\"score\">").Append(FormatPct(root.Score.Value)).Append("</span>\n");
+        sb.Append("<span class=\"score\">").Append(FormatScore(root.Score)).Append("</span>\n");
         sb.Append("</div>\n");
 
         sb.Append("</header>\n");
@@ -161,7 +156,7 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
         sb.Append("<span class=\"key\">").Append(WebUtility.HtmlEncode(node.Metric.Key)).Append("</span>\n");
         if (!isSkipped)
         {
-            sb.Append("<span class=\"score-inline\">").Append(FormatPct(node.Score.Value)).Append("</span>\n");
+            sb.Append("<span class=\"score-inline\">").Append(FormatScore(node.Score)).Append("</span>\n");
         }
         sb.Append("</summary>\n");
 
@@ -191,8 +186,11 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
                 WriteMetaPair(sb, "Prompt", node.Provenance.PromptId!);
             if (node.Provenance.TokensUsed is { } tokens)
                 WriteMetaPair(sb, "Tokens", tokens.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            if (node.Provenance.EstimatedCost > 0)
-                WriteMetaPair(sb, "Est. cost (USD)", node.Provenance.EstimatedCost.ToString("F4", System.Globalization.CultureInfo.InvariantCulture));
+            // Not priced (null) is said, never hidden like a free check's 0 — and never printed as $0.
+            if (node.Provenance.EstimatedCost is null)
+                WriteMetaPair(sb, "Est. cost (USD)", "not priced");
+            else if (node.Provenance.EstimatedCost is double cost and > 0)
+                WriteMetaPair(sb, "Est. cost (USD)", cost.ToString("F4", System.Globalization.CultureInfo.InvariantCulture));
             WriteMetaPair(sb, "Cache hit", node.Provenance.CacheHit ? "yes" : "no");
             sb.Append("</dl>\n</div>\n");
         }
@@ -264,6 +262,9 @@ public sealed class HtmlEvalResultRenderer : IEvalResultRenderer
 
     private static string FormatPct(double v) =>
         v.ToString("P1", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatScore(EvalScore score) =>
+        score.MeasuredValue() is { } value ? FormatPct(value) : "not measured";
 
     /// <summary>
     /// Maps the (severity, label) pair onto one of the four CSS classes used by the

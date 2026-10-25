@@ -26,6 +26,20 @@ public static class MemoryAssertions
     [StackTraceHidden]
     public static MemoryQueryAssertions Should(this MemoryQueryResult result)
         => new(result);
+
+    [StackTraceHidden]
+    internal static void RecordNotMeasured(AssertionProbe probe, string expected, string? because)
+    {
+        var reason = $"Expected {expected}, but the relevant memory evidence was not measured";
+        if (probe.IsActive)
+            probe.MarkInconclusive(reason);
+        else
+            AgentEvalScope.FailWith(new MemoryAssertionException(reason,
+                expected: expected,
+                actual: "not measured",
+                suggestions: ["Run the relevant memory query with a judge that returns usable evidence"],
+                because: because));
+    }
 }
 
 /// <summary>
@@ -47,7 +61,17 @@ public class MemoryEvaluationAssertions
     public MemoryEvaluationAssertions HaveOverallScoreAtLeast(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        if (_result.OverallScore < minimumScore)
+        if (_result.OverallScore is not { } score)
+        {
+            AgentEvalScope.FailWith(new MemoryAssertionException(
+                "Expected a measured memory score, but the score was not measured",
+                expected: $"Measured score >= {minimumScore}%",
+                actual: "not measured",
+                suggestions: ["Run a memory query with a judge that returns a usable score"],
+                because: because));
+            return probe.Complete(this);
+        }
+        if (score < minimumScore)
         {
             var suggestions = new List<string>();
             
@@ -128,7 +152,7 @@ public class MemoryEvaluationAssertions
                 $"Expected at least {minimumPassed} queries to pass, but only {_result.PassedQueries} passed",
                 expected: $"At least {minimumPassed} queries passed",
                 actual: $"{_result.PassedQueries} queries passed",
-                suggestions: new[] { $"Success rate: {_result.SuccessRate:F1}%" },
+                suggestions: new[] { $"Success rate: {(_result.SuccessRate is { } rate ? $"{rate:F1}%" : "n/a (not measured)")}" },
                 because: because
             ));
         }
@@ -199,6 +223,11 @@ public class MemoryEvaluationAssertions
                 because: because
             ));
         }
+        else if (_result.QueryResults.Any(query => query.Query.ForbiddenFacts.Count > 0
+            && (!query.Measured || !query.ForbiddenFactsAssessed)))
+        {
+            MemoryAssertions.RecordNotMeasured(probe, "no forbidden facts recalled", because);
+        }
         
         return probe.Complete(this);
     }
@@ -242,7 +271,7 @@ public class MemoryEvaluationAssertions
         {
             var suggestions = new List<string>
             {
-                $"Cost estimate: ${_result.EstimatedCost:F4}, Queries: {_result.TotalQueries}",
+                $"Cost estimate: {FormatCost(_result.EstimatedCost)}, Queries: {_result.TotalQueries}",
                 "Consider using string-based matching for simple fact verification",
                 "Reduce scenario complexity or query count to lower token usage"
             };
@@ -262,16 +291,46 @@ public class MemoryEvaluationAssertions
     /// <summary>
     /// Asserts that the memory evaluation cost less than the specified amount.
     /// </summary>
+    /// <remarks>
+    /// A cost that was not priced (<see cref="MemoryEvaluationResult.EstimatedCost"/> null: no usage reported, or no
+    /// rate for the judge model) cannot show the budget was kept. Inside a collecting scope the check is inconclusive;
+    /// outside one it fails, since nothing could record an undecided result and a silent pass would claim the budget.
+    /// </remarks>
     [StackTraceHidden]
     public MemoryEvaluationAssertions HaveCostLessThan(decimal maxCost, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
-        if (_result.EstimatedCost > maxCost)
+        if (_result.EstimatedCost is not { } cost)
+        {
+            const string why = "the cost was not priced (the judge's usage was not reported, or its model has no known rate)";
+            if (probe.IsActive)
+            {
+                probe.MarkInconclusive($"The memory evaluation's cost budget could not be checked: {why}.");
+            }
+            else
+            {
+                AgentEvalScope.FailWith(new MemoryAssertionException(
+                    $"Expected memory evaluation to cost less than ${maxCost:F4}, but {why}",
+                    expected: $"Cost < ${maxCost:F4}",
+                    actual: "Cost = not priced",
+                    suggestions: new[]
+                    {
+                        "Use a judge whose provider reports token usage",
+                        "Register the judge model's rate with ModelPricing.SetPricing or JudgeCostMap.Register"
+                    },
+                    because: because
+                ));
+            }
+
+            return probe.Complete(this);
+        }
+
+        if (cost > maxCost)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
-                $"Expected memory evaluation to cost less than ${maxCost:F4}, but cost ${_result.EstimatedCost:F4}",
+                $"Expected memory evaluation to cost less than ${maxCost:F4}, but cost ${cost:F4}",
                 expected: $"Cost < ${maxCost:F4}",
-                actual: $"Cost = ${_result.EstimatedCost:F4}",
+                actual: $"Cost = ${cost:F4}",
                 suggestions: new[] 
                 {
                     $"Tokens used: {_result.TokensUsed}, Queries: {_result.TotalQueries}",
@@ -280,9 +339,13 @@ public class MemoryEvaluationAssertions
                 because: because
             ));
         }
-        
+
         return probe.Complete(this);
     }
+
+    // Not priced is said in words, never printed as $0 (an empty interpolation of a null decimal read as "$").
+    private static string FormatCost(decimal? cost) =>
+        cost is { } c ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"${c:F4}") : "not priced";
 }
 
 /// <summary>
@@ -336,6 +399,11 @@ public class MemoryQueryAssertions
     public MemoryQueryAssertions HaveScoreAtLeast(double minimumScore, string? because = null)
     {
         using var probe = AgentEvalScope.BeginAssertion();
+        if (!_result.Measured)
+        {
+            MemoryAssertions.RecordNotMeasured(probe, $"a measured score >= {minimumScore}%", because);
+            return probe.Complete(this);
+        }
         if (_result.Score < minimumScore)
         {
             AgentEvalScope.FailWith(new MemoryAssertionException(
@@ -372,6 +440,11 @@ public class MemoryQueryAssertions
                 },
                 because: because
             ));
+        }
+        else if (_result.Query.ExpectedFacts.Count > 0
+            && (!_result.Measured || !_result.Query.ExpectedFacts.All(fact => _result.FoundFacts.Contains(fact))))
+        {
+            MemoryAssertions.RecordNotMeasured(probe, $"all {_result.Query.ExpectedFacts.Count} expected facts found", because);
         }
         
         return probe.Complete(this);

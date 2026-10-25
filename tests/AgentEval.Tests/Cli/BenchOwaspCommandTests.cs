@@ -238,10 +238,10 @@ public class BenchOwaspCommandTests : IDisposable
         // Through 0.42 a failing judge turned the semantic categories into skipped leaves and the composite read PASS.
         InitWorkspace();
 
-        var result = await BenchOwaspCommand.RunAsync(
+        var result = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchOwaspCommand.RunAsync(
             preset: "top10", subject: "OwaspFlakyJudgeAgent", rootOverride: _root, inputText: null,
             evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspFlakyJudgeAgent"),
-            judgeClientOverride: new FailsAfterPreflightJudge());
+            judgeClientOverride: new FailsAfterPreflightJudge()));
 
         Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
         var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;   // the AEF run has its own summary.json
@@ -470,13 +470,17 @@ public class BenchOwaspCommandTests : IDisposable
         var reportsRoot = Path.Combine(_root, ".agenteval", "compliance", "OWASP-LLM-Top10", "OwaspSmokeAgent");
         Assert.StartsWith(reportsRoot, reportDir);
 
-        // The unified output-store should have a run manifest written by the
+        // The command writes verified AEF by default, with no legacy subject/run folder.
+        // The old output-store assertions below now locate the native run written by the
         // command's StartRunAsync/CompleteRunAsync flow. FileSystemLayout writes
         // runs under .agenteval/subjects/<kind>/<name>/runs/<runId>.
-        var subjectRunsDir = Path.Combine(_root, ".agenteval", "subjects", "agents", "OwaspSmokeAgent", "runs");
+        var subjectRunsDir = Path.Combine(_root, ".agenteval", "aef", "runs");
         Assert.True(Directory.Exists(subjectRunsDir),
             $"Run directory {subjectRunsDir} should exist after persisting the OWASP run.");
         Assert.NotEmpty(Directory.GetDirectories(subjectRunsDir));
+        Assert.False(Directory.Exists(Path.Combine(_root, ".agenteval", "subjects")));
+        var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(subjectRunsDir, "seal.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(native).Outcome);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

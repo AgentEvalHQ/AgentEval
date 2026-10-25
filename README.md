@@ -34,7 +34,7 @@ AgentEval is **the comprehensive .NET toolkit for AI agent evaluation**—tool u
 > Portions of the code, tests, and documentation were created with assistance from AI tools and reviewed by maintainers.
 > Despite review, errors may exist — you are responsible for validating correctness, security, and compliance for your use case.
 >
-> Licensed under the **MIT License** — provided **"AS IS"** without warranty. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md).
+> Licensed under the **MIT License** — provided **"AS IS"** without warranty. See [LICENSE](LICENSE) and [DISCLAIMER.md](DISCLAIMER.md). The AEF evidence format in [`contracts/aef/`](contracts/aef/) is under the **Apache License 2.0**; see [License](#license).
 
 ---
 
@@ -201,7 +201,7 @@ Console.WriteLine(results.ToMarkdown());
 | 🥉 3 | GPT-3.5 Turbo | **75.2** | 68.9 | 88.0 | 90.1 | 60.0 | 3.00 |
 ```
 
-The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The cost column needs care. The harness prices every model's runs at the rate of one model name, `EvaluationOptions.ModelName`; with none set, as in the snippet above, no run is priced and every model gets the same cost score, so the differing cost scores in this illustration would not appear. See [how the scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
+The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The cost column needs care. The harness prices a run at the model `EvaluationOptions.ModelName` names (one name prices every model at one rate) or, with none set, at the model the agent names itself (`MAFIdentifiableAgentAdapter`); an agent that names no model, or a model without a price, leaves its runs unpriced, so cost is not measured: the Avg Cost column reads `n/a` and each composite weighs quality, speed and reliability. The cost scores in this illustration appear only when every model's runs are priced. See [how the scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
 
 ---
 
@@ -481,7 +481,7 @@ Console.WriteLine($"Report folder: {store.GetReportDirectory("MemoryAgent")}");
 | **5 memory metrics** | Retention, ReachBack, Temporal, NoiseResilience, ReducerFidelity |
 | **5 benchmark presets** | Quick (3 cats) → Standard (8) → Full (12) → Diagnostic / Overflow (192K-token haystacks) |
 | **HTML pentagon reports** | Saved baselines overlaid, per-category deltas between any two, a score timeline (a baseline stores scores, not transcripts, so there is no per-scenario drill-down) |
-| **LongMemEval (ICLR 2025)** | Re-implemented in .NET, with the paper's published scores shipped as a reference (GPT-4o = 57.7%, S mode) |
+| **LongMemEval (ICLR 2025)** | Re-implemented in .NET, with historical paper references (GPT-4o = 60.6%, full-history S without Chain-of-Note; [Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)) |
 | **MAF-native** | Compatible with `AIContextProvider`, `ChatHistoryProvider`, `CompactionStrategy` |
 | **Custom scenarios** | Build your own with `MemoryFact` / `MemoryQuery` / `MemoryTestRunner` |
 
@@ -594,7 +594,7 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | 14 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D; SkillInjection added for MAF Agent Skills) | Medium |
 | **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end (same targets as OWASP; graded judge first) | Same 14 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
 | **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | Same 14 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
-| **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
+| **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — historical GPT-4o reference 60.6% (full-history S, no Chain-of-Note; [Fig. 3b](https://arxiv.org/html/2410.10813v2#S3.F3)) | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **TypedMemEval** | one preset per vertical: `prospective` / `episodic` / `arithmetic` / `workingmemory` / `forgetting` / `bitemporal` / `semantic` / `conjunction` / `procedural` / `temporal` | ✅ `agenteval bench typedmemeval` | AgentEval's own typed memory corpora, embedded (no download); results are not comparable with LongMemEval numbers | Medium |
 | **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
@@ -623,19 +623,24 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 ## Feature Maturity
 
-AgentEval ships as a single lockstep-versioned package (see [Installation](#installation)) — there is no per-package version to signal maturity the way some multi-package frameworks do. Instead, maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning). Only Gatekeeper's public surface is frozen by a test; every other front can still change incompatibly, and breaking changes are listed in the [CHANGELOG](CHANGELOG.md).
+AgentEval ships as two packages released together on one version: the `AgentEval` library and the `AgentEval.Cli` tool (see [Installation](#installation)). Maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
 
-| Front | Maturity | Why |
-|---|---|---|
-| Core eval (assertions, RAG metrics, LLM-as-judge, benchmarks, exporters) | **GA-track, not frozen** | The longest-standing surface and the foundation every other front builds on. The public API of `AgentEval.Core` and `AgentEval.Abstractions` is snapshot-tested: any change to a public type or member fails the build until the new surface is reviewed, so it cannot move silently. It can still move on purpose, and the CHANGELOG records past breaking changes there (for example a type moved out of `AgentEval.Abstractions` and a member added to the `IOutputStoreReader` interface). |
-| RedTeam core (OWASP LLM Top 10, attacks/probes, Composite Judges) | **GA-track, not frozen** | Feature-complete for its stated scope. No test guards its public API, so it can still change incompatibly; breaking changes are listed in the CHANGELOG. |
-| Compliance benchmarks (GDPR, EU AI Act) | **Beta** | Scenario content, weights and aggregation are stable, but judge calibration is **not** reproducible yet: it was measured in May 2026 on the maintainer's own deployments, with the generic judge prompt rather than the regulation prompt the benchmarks send (`calibrate` sends the benchmark prompt from 0.42.0-beta), and the reports are not in the repository. Beta until re-calibration is published. See the CHANGELOG (`Corrected`). |
-| **Gatekeeper** (runtime enforcement) | **Stable (v1)** | The public surface is frozen and snapshot-tested: a change fails CI until it is reviewed. Eight newer types stay individually marked `[Experimental]` and are outside that promise, as are the A2A gates, which are implemented and calibrated but not promoted. It runs inside Microsoft Agent Framework's own AgentHooks host through an experimental adapter. Known limits are listed on the [implementation status](docs/gatekeeper/implementation-status.md) page. |
-| Agent Skills | **Beta** (evaluation) · **Stable (v1)** (governance gates) | The evaluation side (disclosure assertions, the efficiency metric, the `SKILL.md` scanner, the Skill Security Index and `SkillInjectionAttack`) is shipped and tested, but depends on a recently GA'd upstream (MAF Agent Skills) and is still growing. The Gatekeeper skill gates (`SkillScriptExecutionGate`, `SkillScriptApprovalGate` and `GatekeeperOptions.WithSkillGate`) are part of the frozen Gatekeeper v1 surface. |
-| Copilot Studio | **Experimental** | The connector has not yet been verified against a real tenant. |
-| Mission Control | **Experimental** | Real and functioning, but with acknowledged gaps and comparatively less investment than Core/RedTeam. |
+**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target). **1.0.0-rc.1 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
+
+| Front | Ships in | Maturity | Why |
+|---|---|---|---|
+| Core evaluation and red team (assertions, RAG metrics, LLM-as-judge, benchmarks, exporters; OWASP LLM Top 10, attacks and probes, Composite Judges) | library, CLI | **Stable at 1.0** (release candidate) | Established feature families with broad samples and assertions. API snapshots record the bundled library's public type/member shape, requiring review of changes; existing Beta/Experimental exceptions keep their maturity. Past breaking changes are in the CHANGELOG; from 1.0.0 there are none before 2.0 in stable areas. |
+| **Gatekeeper** (runtime enforcement) | library, CLI | **Stable (v1)** | The public v1 surface is frozen and snapshot-tested: a change fails CI until it is reviewed. Eight newer types stay individually marked `[Experimental]` and are outside that promise, as are the A2A gates, which are implemented and calibrated but not promoted. Some interception routes and workflow seams are experimental or unsupported; it runs inside Microsoft Agent Framework's AgentHooks host through an experimental adapter. Known limits are on the [implementation status](docs/gatekeeper/implementation-status.md) page. |
+| Compliance evaluation (GDPR, EU AI Act) | library, CLI | **Beta** | The benchmark scenarios screen observed behaviour; they do not establish legal compliance. Scenario content, weights and aggregation are stable, but judge calibration is **not** reproducible yet: it was measured in May 2026 on the maintainer's own deployments, with the generic judge prompt rather than the regulation prompt the benchmarks send (`calibrate` sends the benchmark prompt from 0.42.0-beta), and the reports are not in the repository. Beta until re-calibration is published. |
+| Agent Skills | library, CLI | **Beta** (evaluation) · **Stable (v1)** (governance gates) | The evaluation side (disclosure assertions, the efficiency metric, the `SKILL.md` scanner, the Skill Security Index and `SkillInjectionAttack`) is shipped and tested, but depends on a recently GA'd upstream (MAF Agent Skills) and is still growing. The Gatekeeper skill gates (`SkillScriptExecutionGate`, `SkillScriptApprovalGate` and `GatekeeperOptions.WithSkillGate`) are part of the frozen Gatekeeper v1 surface. |
+| Memory evaluation (LongMemEval, TypedMemEval, memory benchmarks) | library, CLI | **Beta** | Shipped and tested, and still changing as the benchmarks are recalibrated; it stays outside the 1.0 promise until its API settles. |
+| AgentEval Evidence Format ([AEF](docs/aef.md)) | CLI | **Release candidate** | AEF 1.0 records evaluation evidence that anyone can check independently, with two implementations passing the conformance corpus. Integrity shows the evidence was not changed after the run; it does not prove that a judge's conclusion is correct. The format freezes at the `aef-1.0` tag, released with AgentEval 1.0.0. |
+| Mission Control | CLI | **Experimental** | The local read-only evidence viewer works. Multi-workspace aggregation and the full self-hosted control-plane modes are not implemented yet. |
+| Copilot Studio connector | CLI | **Experimental** | The connector and its credential-free tests are implemented, but the live path against a real tenant has not been independently verified. |
 
 ---
+
+Upgrading from 0.43? Read the [1.0 migration guide](docs/upgrading-to-1.0.md).
 
 ## Installation
 
@@ -786,6 +791,12 @@ AgentEval is **MIT licensed** and will remain open source forever. We believe in
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+One folder has its own licence: [`contracts/aef/`](contracts/aef/), the AEF evidence format (specification, schemas,
+conformance corpus and reference tools), is under the Apache License 2.0. See [its LICENSE](contracts/aef/LICENSE),
+[NOTICE](contracts/aef/NOTICE) and [GOVERNANCE.md](contracts/aef/GOVERNANCE.md#licence-and-patents). The
+`AgentEval.Cli` tool embeds the AEF schemas, so its package is licensed `MIT AND Apache-2.0` and carries AEF's
+LICENSE and NOTICE.
 
 ---
 

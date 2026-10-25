@@ -192,7 +192,7 @@ public static class GatekeeperSecurityGraphIncident
             return;
         }
 
-        throw new InvalidOperationException("Security graph sample failed: " + message + ".");
+        throw new SampleCheckFailedException("Security graph sample failed: " + message + ".");
     }
 
     private static void DeleteOwnedTemporaryDirectory(string directory)
@@ -215,7 +215,7 @@ public static class GatekeeperSecurityGraphIncident
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Security graph sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Security graph sample failed: " + message + ".");
         }
     }
 

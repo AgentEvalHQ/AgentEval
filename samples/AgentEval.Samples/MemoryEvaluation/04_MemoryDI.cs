@@ -39,6 +39,7 @@ public static class MemoryDI
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("   This sample requires a model provider (Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint).");
             Console.WriteLine("   DI registration needs a real IChatClient for the LLM judge.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -99,8 +100,10 @@ public static class MemoryDI
             question: "What is my blood type?",
             serviceProvider: scope.ServiceProvider);
 
-        Console.WriteLine($"   CanRememberAsync: Score={canRememberResult.OverallScore:F1}% " +
-            $"({(canRememberResult.OverallScore >= 80 ? "✅ Remembered" : "❌ Forgot")})");
+        Console.WriteLine($"   CanRememberAsync: Score={MemorySampleReading.Percent(canRememberResult.OverallScore)} " +
+            $"({(canRememberResult.OverallScore is null ? "Not measured" : canRememberResult.OverallScore is >= 80 ? "✅ Remembered" : "❌ Forgot")})");
+        if (canRememberResult.OverallScore is not >= 80)
+            SampleOutcome.Fail($"CanRememberAsync: the blood type was not recalled (score {MemorySampleReading.Percent(canRememberResult.OverallScore)})");
 
         // One-liner: test recall through noise
         var noiseResult = await agent.CanRememberThroughNoiseAsync(
@@ -108,7 +111,7 @@ public static class MemoryDI
             distractionTurns: 5,
             serviceProvider: scope.ServiceProvider);
 
-        Console.WriteLine($"   CanRememberThroughNoiseAsync: Score={noiseResult.OverallScore:F1}% " +
+        Console.WriteLine($"   CanRememberThroughNoiseAsync: Score={MemorySampleReading.Percent(noiseResult.OverallScore)} " +
             $"(through 5 noise turns)");
         Console.WriteLine();
 
@@ -134,7 +137,7 @@ public static class MemoryDI
 
         var reachBackResult = await reachBack.EvaluateAsync(reachBackAgent, fact, query, [3, 7, 15]);
 
-        Console.WriteLine($"   Reach-back result: MaxReliableDepth={reachBackResult.MaxReliableDepth}, Score={reachBackResult.OverallScore:F1}%");
+        Console.WriteLine($"   Reach-back result: MaxReliableDepth={reachBackResult.MaxReliableDepth?.ToString() ?? "n/a"}, Score={MemorySampleReading.Percent(reachBackResult.OverallScore)}");
         Console.WriteLine();
 
         // Step 5: Demonstrate selective registration

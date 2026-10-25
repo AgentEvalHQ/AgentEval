@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 ECS2026 Demo
 
-using Azure.AI.OpenAI;
 using AgentEval.TravelDemo.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -28,11 +27,11 @@ public static class Demo03_LiveDemoComplete
         }
 
         // ════════════════════════════════════════════════════════════════════
-        //  1  —  Connect to Azure OpenAI
+        //  1  —  Connect to the model provider  (AI_INFERENCE_PROVIDER: Azure OpenAI, Bitdeer, OpenAI, ...)
         // ════════════════════════════════════════════════════════════════════
 
-        var azure      = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        var chatClient = azure.GetChatClient(Config.Model).AsIChatClient();
+        Config.PrintTarget();
+        var chatClient = Config.CreateChatClient();
 
         // ════════════════════════════════════════════════════════════════════
         //  2  —  Register travel tools  (static methods from TravelTools)
@@ -96,7 +95,24 @@ public static class Demo03_LiveDemoComplete
             Console.WriteLine("\n  " + new string('─', 70));
             Console.ResetColor();
 
-            var response = await agent.RunAsync(history, session);
+            AgentResponse response;
+            try
+            {
+                response = await agent.RunAsync(history, session);
+            }
+            catch (Exception ex)
+            {
+                // Any exception, not only ClientResultException: a DNS or network failure arrives as an
+                // AggregateException ("Retry failed after 4 tries"). Uncaught, the runtime would print the
+                // provider's raw error text (host, model) and end the chat; redacted here, the chat goes on.
+                history.RemoveAt(history.Count - 1);   // the turn did not happen; don't resend it next time
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"\n  ❌ The model call failed: {Config.Redact(ex)}");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("     Try again, or type 'exit' to quit.\n");
+                Console.ResetColor();
+                continue;
+            }
             history.Add(new ChatMessage(ChatRole.Assistant, response.Text ?? ""));
 
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -125,17 +141,5 @@ public static class Demo03_LiveDemoComplete
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials()
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(@"
-  ⚠️  Skipping Demo 03 — Azure OpenAI credentials required.
-
-     Set the following environment variables and try again:
-       AZURE_OPENAI_ENDPOINT
-       AZURE_OPENAI_API_KEY
-       AZURE_OPENAI_DEPLOYMENT
-");
-        Console.ResetColor();
-    }
+    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Demo 03");
 }

@@ -19,11 +19,11 @@ public static class DistributionStatisticsFactory
     /// <summary>
     /// Creates distribution statistics from a list of double values.
     /// </summary>
-    public static DistributionStatistics Create(IReadOnlyList<double> values)
+    public static DistributionStatistics? Create(IReadOnlyList<double> values)
     {
         if (values.Count == 0)
         {
-            return new DistributionStatistics(0, 0, 0, 0, 0, 0, 0, 0);
+            return null;
         }
 
         // PERF-06: sort ONCE and reuse the ordered array for Min/Max/Median/percentiles. Previously each
@@ -47,7 +47,7 @@ public static class DistributionStatisticsFactory
     /// <summary>
     /// Creates distribution statistics from a list of time spans (converted to milliseconds).
     /// </summary>
-    public static DistributionStatistics Create(IReadOnlyList<TimeSpan> values)
+    public static DistributionStatistics? Create(IReadOnlyList<TimeSpan> values)
     {
         return Create(values.Select(v => v.TotalMilliseconds).ToList());
     }
@@ -55,7 +55,7 @@ public static class DistributionStatisticsFactory
     /// <summary>
     /// Creates distribution statistics from integer values.
     /// </summary>
-    public static DistributionStatistics Create(IReadOnlyList<int> values)
+    public static DistributionStatistics? Create(IReadOnlyList<int> values)
     {
         return Create(values.Select(v => (double)v).ToList());
     }
@@ -63,7 +63,7 @@ public static class DistributionStatisticsFactory
     /// <summary>
     /// Creates distribution statistics from decimal values.
     /// </summary>
-    public static DistributionStatistics Create(IReadOnlyList<decimal> values)
+    public static DistributionStatistics? Create(IReadOnlyList<decimal> values)
     {
         return Create(values.Select(v => (double)v).ToList());
     }

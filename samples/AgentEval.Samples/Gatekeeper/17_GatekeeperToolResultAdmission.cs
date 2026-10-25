@@ -270,7 +270,7 @@ public static class GatekeeperToolResultAdmission
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Tool-result-admission sample invariant failed: " + message + ".");
+            throw new SampleCheckFailedException("Tool-result-admission sample invariant failed: " + message + ".");
         }
     }
 

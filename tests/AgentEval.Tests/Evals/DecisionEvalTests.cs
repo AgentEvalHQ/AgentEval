@@ -192,8 +192,31 @@ public class DecisionEvalTests
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        Assert.Equal(0.042, result.Provenance.EstimatedCost, precision: 9);
+        Assert.Equal(0.042, result.Provenance.EstimatedCost!.Value, precision: 9);
         Assert.Equal(1_000_000, result.Provenance.TokensUsed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ProviderReportedCost_WinsEvenForAModelWithNoRate()
+    {
+        // Guard: a cost the provider reported is a measurement; no rate is needed to keep it.
+        var client = new FakeDecisionClient { Usage = new DecisionUsage(1_000, 10, Cost: 0.0005), Model = "llama3.1:8b" };
+
+        var result = await MakeSut(client).EvaluateAsync(MakeInput());
+
+        Assert.Equal(0.0005, result.Provenance.EstimatedCost!.Value, precision: 12);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_UnknownModel_NoProviderCost_IsNotPriced()
+    {
+        // T07: a model with no rate used to be priced at the gpt-4o-mini fallback (1000 in + 1000 out = 0.00075).
+        var client = new FakeDecisionClient { Usage = new DecisionUsage(1_000, 1_000, Cost: null), Model = "llama3.1:8b" };
+
+        var result = await MakeSut(client).EvaluateAsync(MakeInput());
+
+        Assert.Null(result.Provenance.EstimatedCost);
+        Assert.Equal(2_000, result.Provenance.TokensUsed);
     }
 
     [Fact]
@@ -204,7 +227,7 @@ public class DecisionEvalTests
 
         var result = await MakeSut(client).EvaluateAsync(MakeInput());
 
-        Assert.Equal(0.042, result.Provenance.EstimatedCost, precision: 9);
+        Assert.Equal(0.042, result.Provenance.EstimatedCost!.Value, precision: 9);
     }
 
     [Fact]
@@ -215,14 +238,15 @@ public class DecisionEvalTests
 
         var result = await sut.EvaluateAsync(MakeInput());
 
-        Assert.Equal(0.002 + 0.002, result.Provenance.EstimatedCost, precision: 9);
+        Assert.Equal(0.002 + 0.002, result.Provenance.EstimatedCost!.Value, precision: 9);
     }
 
     [Fact]
-    public async Task EvaluateAsync_NoUsage_ZeroCostAndNullTokens()
+    public async Task EvaluateAsync_NoUsage_NotPricedAndNullTokens()
     {
+        // The model was called and reported no usage: what it cost is unknown (null), not $0.
         var result = await MakeSut(new FakeDecisionClient { Usage = null }).EvaluateAsync(MakeInput());
-        Assert.Equal(0.0, result.Provenance.EstimatedCost);
+        Assert.Null(result.Provenance.EstimatedCost);
         Assert.Null(result.Provenance.TokensUsed);
     }
 

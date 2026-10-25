@@ -132,7 +132,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                 ? "NOT TESTED"
                 : root.Score.Label.ToUpperInvariant();
             col.Item().Background(sevColor).Padding(12)
-                .Text($"OVERALL: {label} ({root.Score.Value:P0})")
+                .Text($"OVERALL: {label} ({FormatScore(root.Score, "P0")})")
                 .FontColor(Colors.White).FontSize(20).Bold();
 
             // Why the overall verdict is what it is: the root's own summary and recommendations were rendered nowhere, so a
@@ -199,7 +199,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                 {
                     var isSkipped = string.Equals(child.Score.Label, "skipped", StringComparison.OrdinalIgnoreCase);
                     table.Cell().Padding(5).Text(child.Metric.Key);
-                    table.Cell().Padding(5).Text(isSkipped ? "—" : child.Score.Value.ToString("P0"));
+                    table.Cell().Padding(5).Text(isSkipped ? "—" : FormatScore(child.Score, "P0"));
                     table.Cell().Padding(5).Text(isSkipped ? "NOT TESTED" : child.Score.Label.ToUpperInvariant());
                     table.Cell().Padding(5).Text(child.Score.Severity ?? "none");
                 }
@@ -225,7 +225,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().PaddingTop(8).Text(
                 isSkipped
                     ? "Status: NOT TESTED"
-                    : $"Score: {leaf.Score.Value:P1}  •  Label: {leaf.Score.Label.ToUpperInvariant()}  •  Severity: {leaf.Score.Severity}")
+                    : $"Score: {FormatScore(leaf.Score, "P1")}  •  Label: {leaf.Score.Label.ToUpperInvariant()}  •  Severity: {leaf.Score.Severity}")
                 .FontSize(12);
 
             if (opts.IncludeProvenance)
@@ -238,8 +238,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
                     col.Item().Text($"Prompt ID: {leaf.Provenance.PromptId}").FontSize(10);
                 if (leaf.Provenance.TokensUsed is { } tokens)
                     col.Item().Text($"Tokens: {tokens}").FontSize(10);
-                if (leaf.Provenance.EstimatedCost > 0)
-                    col.Item().Text($"Est. cost (USD): {leaf.Provenance.EstimatedCost:F4}").FontSize(10);
+                // Not priced (null) is said, never hidden like a free check's 0 and never printed as $0.
+                if (leaf.Provenance.EstimatedCost is null)
+                    col.Item().Text("Est. cost (USD): not priced").FontSize(10);
+                else if (leaf.Provenance.EstimatedCost is double cost && cost > 0)
+                    col.Item().Text($"Est. cost (USD): {cost:F4}").FontSize(10);
                 col.Item().Text($"Cache hit: {(leaf.Provenance.CacheHit ? "yes" : "no")}").FontSize(10);
             }
 
@@ -359,6 +362,9 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             t.TotalPages();
         });
     }
+
+    private static string FormatScore(EvalScore score, string format) =>
+        score.MeasuredValue() is { } value ? value.ToString(format) : "not measured";
 
     private static string SeverityColor(string? severity, string? label)
     {

@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text;
+using AgentEval.Evals;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Suites;
 using AgentEval.Results.Writing;
@@ -56,6 +57,8 @@ public sealed record AefProbeLine
 /// <summary>What an adversarial scan knows about its run that its probe lines do not hold.</summary>
 public sealed record AefProbeRunOptions
 {
+    /// <summary>An observed whole-benchmark comparison unit; probe identity and summary lanes remain unchanged.</summary>
+    public AefBenchmarkComparison? BenchmarkComparison { get; init; }
     /// <summary>Observed CLI invocation and Git facts; absent for non-CLI producers.</summary>
     public AefCliProvenance? Cli { get; init; }
 
@@ -152,6 +155,10 @@ public static class AefProbeRunWriter
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(options);
         AefNativeFinalization.Validate(options.Seal, options.Signer);
+        var benchmarkComparison = options.BenchmarkComparison?.Encode(options.ContentCapture);
+        if (options.BenchmarkComparison is { } original && options.BenchVerdict is { } supplied
+            && (original.Result.Score.Label != supplied.Label || original.Result.Score.Value != supplied.Score))
+            throw new ArgumentException("Expected: one consistent original benchmark verdict. Actual: comparison and summary verdicts differ. Suggestions: pass the same evaluation to both fields. Because: comparison must not replace the observed summary.", nameof(options));
         if (lines.Count == 0 && options.AbortReason is null)
         {
             throw new ArgumentException("a scan with no probe lines has nothing to record", nameof(lines));
@@ -213,6 +220,11 @@ public static class AefProbeRunWriter
                 });
             }
 
+            if (benchmarkComparison is not null) metrics.Add(new()
+            {
+                Id = AefCompositeRunWriter.ScoreMetric, Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter,
+                Scale = AefScale.Between(0, 1), Description = "The observed whole-benchmark score, distinct from per-probe resistance.",
+            });
             writer.SetMetrics(metrics);
             var artifactLinks = AefComplianceArtifact.Write(writer, options.ComplianceArtifacts, options.ContentCapture, lines.Select(l => l.CaseId));
             var resultIds = new List<string>();
@@ -241,7 +253,16 @@ public static class AefProbeRunWriter
                 ext["agenteval.redteam"] = new System.Text.Json.Nodes.JsonObject { ["probesNotRun"] = options.ProbesNotRun };
             }
 
-            if (options.BenchVerdict is { } verdict)
+            if (options.BenchmarkComparison is { } benchmark)
+            {
+                ext["agenteval.bench"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["label"] = benchmark.Result.Score.Label,
+                    ["score"] = benchmark.Result.Score.MeasuredValue(),
+                    ["comparison"] = benchmarkComparison,
+                };
+            }
+            else if (options.BenchVerdict is { } verdict)
             {
                 ext["agenteval.bench"] = new System.Text.Json.Nodes.JsonObject
                 {

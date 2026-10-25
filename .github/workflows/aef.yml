@@ -73,7 +73,17 @@ jobs:
             BASE="$HEAD~1"
           fi
           missing=0
-          for c in $(git rev-list "$BASE..$HEAD" -- contracts/aef); do
+          # Keep Git errors fatal: a failed substitution in a for-list does not trigger set -e.
+          commits=$(git rev-list "$BASE..$HEAD" -- contracts/aef)
+          for c in $commits; do
+            # Owner-approved prospective enforcement, 2026-10-24 (GOVERNANCE.md, Contributions).
+            # These exact pre-existing IDs are the entire exception; dates and new IDs never qualify.
+            case "$c" in
+              99ca442360b2be43fa7f7cf3cbe065e85b9d55c8|a2421fd9e6e0eb81efbe77c4f4664c992290b2df)
+                echo "Pre-policy commit $c: historical message retained."
+                continue
+                ;;
+            esac
             if ! git log -1 --format=%B "$c" | grep -q '^Signed-off-by: '; then
               echo "::error::commit $(git log -1 --format='%h %s' "$c") changes contracts/aef without a Signed-off-by line (GOVERNANCE.md, Contributions)"
               missing=1

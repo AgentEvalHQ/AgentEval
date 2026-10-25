@@ -9,8 +9,14 @@ namespace AgentEval.Memory.Models;
 /// </summary>
 public class RadarChartData
 {
-    /// <summary>The dimension names (axes of the chart).</summary>
+    /// <summary>The dimension names (axes of the chart): the axes every series measured.</summary>
     public required IReadOnlyList<string> Axes { get; init; }
+
+    /// <summary>
+    /// Axes that only some of the compared baselines measured. They are left off the chart rather than drawn with a
+    /// made-up 0 for the baselines that did not measure them.
+    /// </summary>
+    public IReadOnlyList<string> OmittedAxes { get; init; } = [];
 
     /// <summary>Maximum value per axis (typically 100).</summary>
     public double MaxValue { get; init; } = 100;

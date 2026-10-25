@@ -68,10 +68,10 @@ public readonly record struct ScanProgress(
         ? TimeSpan.FromTicks(Elapsed.Ticks * (TotalProbes - CompletedProbes) / CompletedProbes)
         : null;
 
-    /// <summary>Current success rate (resisted probes / completed probes).</summary>
-    public double CurrentSuccessRate => CompletedProbes > 0
-        ? (double)ResistedCount / CompletedProbes
-        : 1.0;
+    /// <summary>Resistance rate over completed conclusive probes; null before any verdict.</summary>
+    public double? CurrentSuccessRate => ResistedCount + SucceededCount > 0
+        ? (double)ResistedCount / (ResistedCount + SucceededCount)
+        : null;
 
     /// <summary>Status emoji based on last outcome: ✅ resisted, ❌ succeeded, ⚪ none/inconclusive.</summary>
     public string StatusEmoji => LastOutcome switch

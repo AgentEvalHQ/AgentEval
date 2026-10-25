@@ -35,6 +35,7 @@ public static class RealVsFrameworkTravelAgent
         {
             AIConfig.PrintMissingCredentialsWarning();
             Console.WriteLine("  This sample runs a REAL agent — it will not fake a run. Set the variables above and re-run.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -74,7 +75,7 @@ public static class RealVsFrameworkTravelAgent
 
         Console.WriteLine($"  Model    : {AIConfig.ModelDeployment}");
         Console.WriteLine($"  Request  : \"{TravelToolbox.CanonicalRequest}\"\n");
-        Console.WriteLine("  ⏳ Running the real agent (this calls Azure; ~20–40s)...\n");
+        Console.WriteLine($"  ⏳ Running the real agent (this calls {AIConfig.ProviderName}; ~20–40s)...\n");
 
         AgentResponse response;
         var startedAt = DateTimeOffset.UtcNow;
@@ -90,8 +91,9 @@ public static class RealVsFrameworkTravelAgent
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"  Agent run failed ({ex.GetType().Name}): {ex.Message}");
-            Console.WriteLine("  (Azure throttling/timeout or a tool error — the comparison needs a completed run.)");
+            Console.WriteLine("  (provider throttling/timeout or a tool error — the comparison needs a completed run.)");
             Console.ResetColor();
+            SampleOutcome.Error($"the agent run threw {ex.GetType().Name}: {ex.Message}");
             return;
         }
         var elapsed = DateTimeOffset.UtcNow - startedAt;

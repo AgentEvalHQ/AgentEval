@@ -38,6 +38,7 @@ public static class PerformanceBenchmarkSample
         if (!AIConfig.IsConfigured)
         {
             BenchmarkSampleHelpers.PrintMissingCredentialsBox("BENCHMARKS H2 — PERFORMANCE");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
 
@@ -93,6 +94,7 @@ public static class PerformanceBenchmarkSample
             judgeModel: AIConfig.ModelDeployment);
 
         BenchmarkSampleHelpers.PrintReportPaths(result, paths);
+        SampleOutcome.RecordVerdict("performance benchmark", result);
         BenchmarkSampleHelpers.OfferToOpenReports(paths);
 
         Console.WriteLine();

@@ -31,6 +31,10 @@ internal sealed class CliUsageMeter : IDisposable
             _ => AefUsageRole.Other,
         }, model) : client;
 
+    internal static IEmbeddingGenerator<string, Embedding<float>> WrapEmbeddings(
+        IEmbeddingGenerator<string, Embedding<float>> generator, string? model) =>
+        Active.Value is { } meter ? new MeteredEmbeddings(generator, meter, model) : generator;
+
     /// <summary>Attributes calls in this asynchronous flow; nested scopes restore their parent.</summary>
     internal static IDisposable Attribute(AefUsageRole? role = null, string? caseId = null)
     {
@@ -164,6 +168,22 @@ internal sealed class CliUsageMeter : IDisposable
             }
             // Only completed enumeration supplies a total; throwing or early disposal leaves the call unknown.
             meter.Finish(call, reportedModel, invalidInput ? null : input, invalidOutput ? null : output);
+        }
+    }
+
+    private sealed class MeteredEmbeddings(IEmbeddingGenerator<string, Embedding<float>> inner,
+        CliUsageMeter meter, string? model) : DelegatingEmbeddingGenerator<string, Embedding<float>>(inner)
+    {
+        public override async Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(IEnumerable<string> values,
+            EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            // This is a scoring instrument, not an LLM judge. Retain the enclosing case, not its role.
+            using var attribution = Attribute(AefUsageRole.Other);
+            var call = meter.Start(AefUsageRole.Other, options?.ModelId ?? model);
+            var response = await base.GenerateAsync(values, options, cancellationToken).ConfigureAwait(false);
+            // Keep absent SDK counts unknown, even when the provider normally charges only for input.
+            meter.Finish(call, null, response.Usage?.InputTokenCount, response.Usage?.OutputTokenCount);
+            return response;
         }
     }
 }

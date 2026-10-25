@@ -104,18 +104,37 @@ public sealed record RedTeamCampaignContext(string Name, IReadOnlyList<SubjectId
 public sealed record RedTeamFindings(IReadOnlyList<object> Items);
 
 /// <summary>Result of a single scenario evaluation within a run.</summary>
+/// <remarks><see cref="EstimatedCost"/> is USD, or <see langword="null"/> when the scenario's cost was not priced
+/// (no usage reported, no rate for the model, or an unpriced part); 0 is a real cost of nothing.
+/// <see cref="Duration"/> is null when timing was not recorded; a recorded zero remains zero.
+/// Score normalization does not change record equality: the original backing score remains part of its value.
+/// </remarks>
 public sealed record ScenarioResult(
     string Id,
     string Name,
     string Input,
     string Output,
     bool Passed,
-    double Score,
+    double? Score,
     IReadOnlyDictionary<string, double> Metrics,
     IReadOnlyList<AssertionResult> Assertions,
-    TimeSpan Duration,
-    double EstimatedCost)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    TimeSpan? Duration,
+    double? EstimatedCost)
 {
+    private readonly double? _score = Score;
+
+    /// <summary>
+    /// Measured score, or null when absent or explicitly unmeasured/not applicable. Normalizes placeholders in legacy
+    /// files and third-party results. JSON always carries this key, including explicit null.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)]
+    public double? Score
+    {
+        get => Measurement is ScenarioMeasurement.NotMeasured or ScenarioMeasurement.NotApplicable ? null : _score;
+        init => _score = value;
+    }
+
     /// <summary>
     /// A stable digest of the stimulus in <see cref="Input"/>, or <see langword="null"/> when the
     /// producer did not supply one. See <see cref="StimulusHash"/> for the rule.
@@ -173,6 +192,48 @@ public sealed record ScenarioResult(
     /// </para>
     /// </remarks>
     public ComparabilityFacts? Comparability { get; init; }
+
+    /// <summary>
+    /// Whether <see cref="Score"/> is a measurement: <see cref="ScenarioMeasurement.NotMeasured"/> when the scenario
+    /// errored, was skipped or its judge produced no verdict, <see cref="ScenarioMeasurement.NotApplicable"/> when the
+    /// case could not test the thing. Its <see cref="Score"/> is then null; <see cref="Passed"/> is not a verdict.
+    /// </summary>
+    /// <remarks>
+    /// <see langword="null"/> reads as measured only when a score is present. A measured scenario, and every one written before this member existed,
+    /// carries none: non-positional and null-defaulting for the same reason as <see cref="StimulusHash"/>, so their files
+    /// are byte-identical under the store's <c>DefaultIgnoreCondition = WhenWritingNull</c>.
+    /// </remarks>
+    public string? Measurement { get; init; }
+}
+
+/// <summary>The values <see cref="ScenarioResult.Measurement"/> takes.</summary>
+public static class ScenarioMeasurement
+{
+    /// <summary>The scenario errored, was skipped, or its judge produced no verdict.</summary>
+    public const string NotMeasured = "not_measured";
+
+    /// <summary>The case could not test the thing.</summary>
+    public const string NotApplicable = "not_applicable";
+
+    /// <summary>
+    /// The <see cref="ScenarioResult.Measurement"/> value for a census bucket: <see langword="null"/> for a measurement
+    /// (see the member's remarks), otherwise the matching constant.
+    /// </summary>
+    /// <param name="state">The scenario's measurement state.</param>
+    public static string? Of(AgentEval.Evals.Meta.MeasurementState state) => state switch
+    {
+        AgentEval.Evals.Meta.MeasurementState.NotMeasured => NotMeasured,
+        AgentEval.Evals.Meta.MeasurementState.NotApplicable => NotApplicable,
+        _ => null,
+    };
+
+    /// <summary>Whether a scenario has a score and does not explicitly mark it unmeasured or not applicable.</summary>
+    /// <param name="result">The scenario.</param>
+    public static bool IsMeasured(ScenarioResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Measurement is not (NotMeasured or NotApplicable) && result.Score is not null;
+    }
 }
 
 // AssertionResult moved to AssertionResult.cs (same namespace and assembly, so this is not an

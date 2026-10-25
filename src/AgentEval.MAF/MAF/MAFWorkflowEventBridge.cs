@@ -2,10 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using AgentEval.Core;
 using AgentEval.Models;
 using Microsoft.Extensions.AI;
 using MAFWorkflows = Microsoft.Agents.AI.Workflows;
@@ -19,7 +16,7 @@ namespace AgentEval.MAF;
 /// <remarks>
 /// <para>
 /// MAF emits events as a class hierarchy (ExecutorInvokedEvent, AgentResponseUpdateEvent,
-/// ExecutorCompletedEvent, etc.) via <see cref="MAFWorkflows.StreamingRun.WatchStreamAsync"/>.
+/// ExecutorCompletedEvent, etc.) via <see cref="MAFWorkflows.StreamingRun.WatchStreamAsync(CancellationToken)"/>.
 /// AgentEval expects record-based events (ExecutorOutputEvent, EdgeTraversedEvent, etc.)
 /// consumed by <see cref="MAFWorkflowAdapter"/>.
 /// </para>
@@ -30,7 +27,8 @@ namespace AgentEval.MAF;
 /// <para>
 /// <b>ChatProtocol requirement:</b> MAF's <c>AIAgentHostExecutor</c> (created by
 /// <c>BindAsExecutor</c>) uses <c>ChatProtocolExecutor</c> internally, which requires:
-/// (1) Input as <see cref="ChatMessage"/> (not plain string — string messages are silently dropped), and
+/// (1) Input as <see cref="ChatMessage"/> (a plain string is accepted only when the executor sets a string
+/// message role, as MAF 1.24's <c>AIAgentHostExecutor</c> does; a <c>ChatProtocolExecutor</c> without one drops it), and
 /// (2) A <see cref="MAFWorkflows.TurnToken"/> to trigger actual LLM processing.
 /// This bridge sends both automatically. The <c>TurnToken</c> is forwarded downstream
 /// through the workflow chain, so only the initial send is needed.
@@ -38,8 +36,30 @@ namespace AgentEval.MAF;
 /// implicit <c>AIAgent → ExecutorBinding</c> conversion, since <c>TurnToken(emitEvents: true)</c>
 /// overrides the binding's default.
 /// </para>
+/// <para>
+/// <b>Step boundaries:</b> MAF raises an <c>ExecutorInvokedEvent</c> for every message it delivers, so one agent
+/// turn shows up as 2-3 invocations of the same executor (the incoming chat messages, which only accumulate, and
+/// the <c>TurnToken</c> that runs the turn). The bridge reports one step per executor activation: deliveries to
+/// same function executor within one superstep are one step. A chat-protocol executor's deliveries up to each
+/// turn are one activation; a second turn starts another even in the same superstep. Concurrent executors own
+/// separate output, tool, usage and timing state. Completed activations are emitted at superstep boundaries in
+/// configured executor order, with ordinal name order for executors not in that list.
+/// </para>
+/// <para>
+/// <b>Step timing:</b> a step's output only goes out once the step has finished, so a consumer cannot time the step
+/// by when its output arrives. The bridge stamps each <see cref="ExecutorOutputEvent"/> with
+/// <see cref="ExecutorOutputEvent.StartOffset"/> and <see cref="ExecutorOutputEvent.Duration"/> instead: a step runs
+/// from its first delivery's producer-side <c>executor.process</c> span start until its latest delivery's span ends.
+/// Build the workflow with <see cref="MAFWorkflowInstrumentation"/> to establish producer ownership; otherwise
+/// executor timing is explicitly unmeasured. The bridge preserves the built workflow's telemetry configuration.
+/// Event queue arrival times are never used as production execution durations. An agent's first delivery is the chat messages it
+/// accumulates, which MAF hands over in the same superstep as the <c>TurnToken</c> that runs the turn, so the step
+/// starts when its turn starts; the start agent's input can land one superstep before its <c>TurnToken</c>, and its
+/// step then also counts the moment it waited for it. Each parallel sibling is timed to its own completion,
+/// independently of display order. A step whose completion was never observed is emitted without measured timing.
+/// </para>
 /// </remarks>
-public static class MAFWorkflowEventBridge
+public static partial class MAFWorkflowEventBridge
 {
     /// <summary>
     /// Executes a MAF <see cref="MAFWorkflows.Workflow"/> and yields AgentEval-compatible
@@ -53,29 +73,29 @@ public static class MAFWorkflowEventBridge
     /// (e.g., "Planner"). When provided, all emitted event IDs are normalized to clean names.
     /// </param>
     /// <returns>An async enumerable of AgentEval <see cref="WorkflowEvent"/> records.</returns>
-    public static async IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEvents(
+    public static IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEvents(
+        MAFWorkflows.Workflow workflow,
+        string input,
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? executorIdMap = null) =>
+        StreamAsAgentEvalEventsCore(workflow, input, cancellationToken, executorIdMap);
+
+    internal static async IAsyncEnumerable<WorkflowEvent> StreamAsAgentEvalEventsCore(
         MAFWorkflows.Workflow workflow,
         string input,
         [EnumeratorCancellation] CancellationToken cancellationToken = default,
-        IReadOnlyDictionary<string, string>? executorIdMap = null)
+        IReadOnlyDictionary<string, string>? executorIdMap = null,
+        IReadOnlyList<string>? executorOrder = null,
+        WorkflowGraphSnapshot? graph = null,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? requestResponder = null,
+        MAFWorkflowTopology? topology = null)
     {
         ArgumentNullException.ThrowIfNull(workflow);
         ArgumentNullException.ThrowIfNull(input);
 
-        // Helper to translate full MAF IDs to clean names
-        string NormalizeId(string id) =>
-            executorIdMap is not null && executorIdMap.TryGetValue(id, out var clean) ? clean : id;
-
-        // Track state for event translation
-        string? previousExecutorId = null;
-        string? currentExecutorId = null;
-        var outputAccumulator = new StringBuilder();
-        bool workflowOutputReceived = false;
-        var sw = Stopwatch.StartNew();
-
-        // Track pending tool calls: FunctionCallContent arrives first, FunctionResultContent later.
-        // We buffer the call and yield a complete ExecutorToolCallEvent only when the result arrives.
-        var pendingToolCalls = new Dictionary<string, (string ExecutorId, string ToolName, string? CallId, IDictionary<string, object?>? Arguments, TimeSpan StartTime)>();
+        // Step timings count from here, when the caller started enumerating this run, so they share their origin
+        // with the caller's own clock (MAFWorkflowAdapter starts its clock just before it enumerates this stream).
+        var runStartedAt = TimeProvider.System.GetTimestamp();
 
         // Start the MAF workflow execution via InProcessExecution.
         // Detect if workflow uses ChatProtocol (AIAgent-based executors via BindAsExecutor)
@@ -84,20 +104,37 @@ public static class MAFWorkflowEventBridge
         var protocol = await workflow.DescribeProtocolAsync(cancellationToken).ConfigureAwait(false);
         bool isChatProtocol = MAFWorkflows.ChatProtocolExtensions.IsChatProtocol(protocol);
 
+        // Which executors take TURNS (accumulate chat messages, run on a TurnToken) — needed to tell one turn's
+        // several message deliveries apart from a genuine re-entry (see TranslateEventsAsync). Read before the
+        // run starts so a reflection failure cannot leak a started run.
+        topology ??= MAFWorkflowTopology.Create(workflow, executorOrder, executorIdMap);
+        using var timing = new MAFWorkflowTimingCapture(runStartedAt, topology.TimingSources);
+        // A subworkflow host advertises a catch-all route, hiding its entry agent's chat protocol.
+        // Resolve that protocol through containment so the child receives both input and TurnToken.
+        isChatProtocol |= topology.ChatIds.Contains(workflow.StartExecutorId);
+        var chatProtocolExecutorIds = topology.ChatIds;
+        var subworkflowExecutorIds = topology.HostIds;
+        executorIdMap = topology.IdMap;
+        graph ??= topology.Graph;
+
         MAFWorkflows.StreamingRun run;
+        ChatMessage? inputMessage = null;
         if (isChatProtocol)
         {
-            // AIAgentHostExecutor (from BindAsExecutor) requires ChatMessage input — plain strings
-            // are silently dropped because ChatProtocolExecutor has no string handler by default.
+            // Send a ChatMessage: every ChatProtocolExecutor accumulates one, while a plain string is accepted
+            // only when the executor sets a string message role (AIAgentHostExecutor does in MAF 1.24).
+            inputMessage = new ChatMessage(ChatRole.User, input);
+            using var timingScope = timing.Enter();
             run = await MAFWorkflows.InProcessExecution
-                .RunStreamingAsync(workflow, new ChatMessage(ChatRole.User, input), cancellationToken: cancellationToken)
+                .RunStreamingAsync(workflow, inputMessage, sessionId: timing.SessionId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
         else
         {
+            using var timingScope = timing.Enter();
             // Function-based executors (Func<string, ValueTask<string>>) handle string input directly.
             run = await MAFWorkflows.InProcessExecution
-                .RunStreamingAsync<string>(workflow, input, cancellationToken: cancellationToken)
+                .RunStreamingAsync<string>(workflow, input, sessionId: timing.SessionId, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -108,6 +145,7 @@ public static class MAFWorkflowEventBridge
 
         if (isChatProtocol)
         {
+            using var timingScope = timing.Enter();
             // ChatProtocolExecutor uses a two-phase protocol: messages are accumulated first,
             // then processed only when a TurnToken is received. RunStreamingAsync does NOT auto-send
             // a TurnToken (only RunAsync does). We must send it manually.
@@ -116,279 +154,196 @@ public static class MAFWorkflowEventBridge
             await run.TrySendMessageAsync(new MAFWorkflows.TurnToken(emitEvents: true)).ConfigureAwait(false);
         }
 
-        // Watch the MAF event stream and translate each event
-        await foreach (var mafEvent in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var evt in TranslateEventsAsync(
+            WatchWithResponsesAsync(run, topology, requestResponder, timing, cancellationToken),
+            chatProtocolExecutorIds, executorIdMap, cancellationToken,
+            runStartedAt: runStartedAt, inputMessage: inputMessage, executorOrder: executorOrder, graph: graph,
+            subworkflowExecutorIds: subworkflowExecutorIds, parentExecutorIds: topology.Parents, timingCapture: timing)
+            .ConfigureAwait(false))
         {
-            switch (mafEvent)
-            {
-                // ── Executor lifecycle events ──────────────────────────────
-
-                case MAFWorkflows.ExecutorInvokedEvent invoked:
-                    // A new executor is starting. If we had a previous one, flush it.
-                    var normalizedInvokedId = NormalizeId(invoked.ExecutorId);
-                    if (currentExecutorId != null && currentExecutorId != normalizedInvokedId)
-                    {
-                        // Flush accumulated output for the previous executor
-                        yield return new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString());
-
-                        // Emit edge between previous and current executor
-                        yield return new EdgeTraversedEvent(
-                            currentExecutorId,
-                            normalizedInvokedId,
-                            EdgeType.Sequential);
-
-                        outputAccumulator.Clear();
-                    }
-                    else if (currentExecutorId == normalizedInvokedId)
-                    {
-                        // 15: a DIRECT SELF-LOOP — an executor's own edge routes back to itself (e.g. a
-                        // retry/refine step), so this ExecutorInvokedEvent re-invokes the SAME executor ID.
-                        // Neither branch above fires for this case, which used to silently merge this
-                        // invocation's streaming output into the SAME accumulator as the PRIOR invocation's
-                        // output (folding two steps into one ExecutorOutputEvent) and never emit an
-                        // EdgeTraversedEvent(A, A) — the self-loop transition was invisible. Flush the prior
-                        // invocation's output as its own step (with the self-edge) before starting a clean
-                        // accumulator for this invocation, mirroring the flush-then-edge order above.
-                        yield return new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString());
-
-                        yield return new EdgeTraversedEvent(
-                            currentExecutorId,
-                            normalizedInvokedId,
-                            EdgeType.Sequential);
-
-                        outputAccumulator.Clear();
-                    }
-                    else if (currentExecutorId == null && previousExecutorId == null)
-                    {
-                        // Very first executor — no edge to emit
-                        outputAccumulator.Clear();
-                    }
-
-                    previousExecutorId = currentExecutorId;
-                    currentExecutorId = normalizedInvokedId;
-                    break;
-
-                // ── Agent streaming update (RC: now inherits WorkflowOutputEvent, not ExecutorEvent) ──
-                case MAFWorkflows.AgentResponseUpdateEvent agentUpdate:
-                    // Agent streaming update — inspect for tool calls AND text
-                    var updateExecutorId = NormalizeId(agentUpdate.ExecutorId ?? currentExecutorId ?? "unknown");
-
-                    // Check for tool call invocations (FunctionCallContent)
-                    foreach (var call in agentUpdate.Update.Contents.OfType<FunctionCallContent>())
-                    {
-                        var callId = call.CallId ?? Guid.NewGuid().ToString();
-                        pendingToolCalls[callId] = (
-                            ExecutorId: updateExecutorId,
-                            ToolName: call.Name,
-                            CallId: callId,
-                            Arguments: call.Arguments,
-                            StartTime: sw.Elapsed
-                        );
-                    }
-
-                    // Check for tool results (FunctionResultContent)
-                    foreach (var result in agentUpdate.Update.Contents.OfType<FunctionResultContent>())
-                    {
-                        var resultCallId = result.CallId ?? string.Empty;
-                        
-                        // Try exact CallId match first
-                        if (!pendingToolCalls.TryGetValue(resultCallId, out var pending))
-                        {
-                            // Fallback: when CallId is null/empty, match the most recent pending call.
-                            // This handles the case where FunctionCallContent.CallId was null (stored
-                            // under a generated GUID) and FunctionResultContent.CallId is also null.
-                            if (string.IsNullOrEmpty(resultCallId) && pendingToolCalls.Count > 0)
-                            {
-                                var fallbackEntry = pendingToolCalls
-                                    .OrderByDescending(kvp => kvp.Value.StartTime)
-                                    .First();
-                                resultCallId = fallbackEntry.Key;
-                                pending = fallbackEntry.Value;
-                            }
-                        }
-                        
-                        if (pending != default)
-                        {
-                            var duration = sw.Elapsed - pending.StartTime;
-                            yield return new ExecutorToolCallEvent(
-                                ExecutorId: pending.ExecutorId,
-                                ToolName: pending.ToolName,
-                                CallId: pending.CallId,
-                                Arguments: pending.Arguments,
-                                Result: result.Result,
-                                Duration: duration);
-                            pendingToolCalls.Remove(resultCallId);
-                        }
-                    }
-
-                    // Also extract text from the update (existing behavior)
-                    var updateText = agentUpdate.Update.Text;
-                    if (!string.IsNullOrEmpty(updateText))
-                    {
-                        outputAccumulator.Append(updateText);
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorEvent genericExecutorEvent
-                    when genericExecutorEvent is not MAFWorkflows.ExecutorInvokedEvent
-                    && genericExecutorEvent is not MAFWorkflows.ExecutorCompletedEvent
-                    && genericExecutorEvent is not MAFWorkflows.ExecutorFailedEvent:
-                    // Catch remaining ExecutorEvent subtypes
-                    // by extracting text from their Data property
-                    var evtText = ExtractTextFromResult(genericExecutorEvent.Data);
-                    if (!string.IsNullOrEmpty(evtText))
-                    {
-                        outputAccumulator.Append(evtText);
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorCompletedEvent completed:
-                    // Executor finished — extract text from result if no streaming output was accumulated
-                    if (currentExecutorId != null)
-                    {
-                        // If no streaming text was accumulated, try to extract from the result
-                        if (outputAccumulator.Length == 0 && completed.Data is not null)
-                        {
-                            var resultText = ExtractTextFromResult(completed.Data);
-                            if (!string.IsNullOrEmpty(resultText))
-                            {
-                                outputAccumulator.Append(resultText);
-                            }
-                        }
-
-                        var output = outputAccumulator.ToString();
-                        if (!string.IsNullOrEmpty(output))
-                        {
-                            yield return new ExecutorOutputEvent(currentExecutorId, output);
-                            outputAccumulator.Clear();
-                        }
-                    }
-                    break;
-
-                case MAFWorkflows.ExecutorFailedEvent failed:
-                    // Executor encountered an error
-                    var exception = failed.Data as Exception;
-                    yield return new ExecutorErrorEvent(
-                        NormalizeId(failed.ExecutorId),
-                        exception?.Message ?? "Executor failed",
-                        exception?.StackTrace,
-                        exception?.GetType().Name);
-                    break;
-
-                // ── Agent complete (non-streaming) response ──────────────
-                // AgentResponseEvent inherits WorkflowOutputEvent, so this case
-                // MUST come before the generic WorkflowOutputEvent handler.
-
-                case MAFWorkflows.AgentResponseEvent agentResponse:
-                    // Non-streaming complete response from an executor.
-                    // Extract per-executor text, token usage, and finish reason.
-                    var responseExecutorId = NormalizeId(agentResponse.ExecutorId);
-
-                    // Flush any previously accumulated streaming output for a different executor
-                    if (currentExecutorId != null && currentExecutorId != responseExecutorId && outputAccumulator.Length > 0)
-                    {
-                        yield return new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString());
-                        outputAccumulator.Clear();
-                    }
-                    currentExecutorId = responseExecutorId;
-
-                    // Build response text: prefer accumulated streaming text, fall back to Response.Text
-                    var agentResponseText = outputAccumulator.Length > 0
-                        ? outputAccumulator.ToString()
-                        : agentResponse.Response.Text;
-                    outputAccumulator.Clear();
-
-                    // Extract token usage from AgentResponse.Usage
-                    TokenUsage? responseUsage = null;
-                    if (agentResponse.Response.Usage is { } usage)
-                    {
-                        responseUsage = new TokenUsage
-                        {
-                            PromptTokens = (int)(usage.InputTokenCount ?? 0),
-                            CompletionTokens = (int)(usage.OutputTokenCount ?? 0)
-                        };
-                    }
-
-                    // Extract finish reason (ChatFinishReason.ToString())
-                    var finishReason = agentResponse.Response.FinishReason?.ToString();
-
-                    yield return new ExecutorAgentResponseEvent(
-                        ExecutorId: responseExecutorId,
-                        Output: agentResponseText,
-                        Usage: responseUsage,
-                        FinishReason: finishReason);
-                    break;
-
-                // ── Workflow-level events ────────────────────────────────
-
-                case MAFWorkflows.WorkflowOutputEvent workflowOutput:
-                    // Workflow produced final output — flush any remaining output
-                    if (currentExecutorId != null && outputAccumulator.Length > 0)
-                    {
-                        yield return new ExecutorOutputEvent(
-                            currentExecutorId,
-                            outputAccumulator.ToString());
-                        outputAccumulator.Clear();
-                    }
-                    workflowOutputReceived = true;
-                    yield return new WorkflowCompleteEvent();
-                    break;
-
-                case MAFWorkflows.WorkflowErrorEvent workflowError:
-                    // Global workflow error
-                    var errorData = workflowError.Data as Exception;
-                    yield return new ExecutorErrorEvent(
-                        "workflow",
-                        errorData?.Message ?? "Workflow error",
-                        errorData?.StackTrace,
-                        errorData?.GetType().Name);
-                    break;
-
-                // ── SuperStep events (informational, no direct mapping) ──
-
-                case MAFWorkflows.SuperStepStartedEvent:
-                case MAFWorkflows.SuperStepCompletedEvent:
-                case MAFWorkflows.WorkflowStartedEvent:
-                case MAFWorkflows.WorkflowWarningEvent:
-                case MAFWorkflows.RequestInfoEvent:
-                    // These MAF events don't have direct AgentEval equivalents.
-                    // They could be used for detailed tracing in the future.
-                    break;
-            }
-        }
-
-        // If the stream ended without a WorkflowOutputEvent, still flush and complete
-        if (!workflowOutputReceived)
-        {
-            if (currentExecutorId != null && outputAccumulator.Length > 0)
-            {
-                yield return new ExecutorOutputEvent(
-                    currentExecutorId,
-                    outputAccumulator.ToString());
-            }
-            yield return new WorkflowCompleteEvent();
+            yield return evt;
         }
     }
+
+    private static async IAsyncEnumerable<MAFWorkflows.WorkflowEvent> WatchWithResponsesAsync(
+        MAFWorkflows.StreamingRun run, MAFWorkflowTopology topology,
+        Func<MAFWorkflows.ExternalRequest, CancellationToken, ValueTask<MAFWorkflows.ExternalResponse?>>? responder,
+        MAFWorkflowTimingCapture timing,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var outstandingAnswers = new HashSet<string>(StringComparer.Ordinal);
+        do
+        {
+            await foreach (var evt in run.WatchStreamAsync(blockOnPendingRequest: false, cancellationToken).ConfigureAwait(false))
+            {
+                if (evt is MAFWorkflows.ExecutorCompletedEvent { Data: MAFWorkflows.ExternalResponse completed })
+                    outstandingAnswers.Remove(completed.RequestId);
+                if (evt is MAFWorkflows.WorkflowErrorEvent or MAFWorkflows.ExecutorFailedEvent)
+                    outstandingAnswers.Clear();
+                if (responder is null || evt is not MAFWorkflows.RequestInfoEvent request)
+                {
+                    yield return topology.RestoreNestedAgentEvent(evt);
+                    continue;
+                }
+                MAFWorkflows.ExternalResponse? response;
+                try
+                {
+                    response = await responder(request.Request, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (response is not null)
+                    {
+                        if (response.RequestId != request.Request.RequestId || response.PortInfo != request.Request.PortInfo)
+                            throw new InvalidOperationException("The response does not match the request and port identity.");
+                        using (timing.Enter())
+                            await run.SendResponseAsync(response).ConfigureAwait(false);
+                        outstandingAnswers.Add(response.RequestId);
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error)
+                {
+                    throw new InvalidOperationException($"Expected: response to request '{request.Request.RequestId}' on port '{request.Request.PortInfo.PortId}'. Actual: responder failed. Suggestions: return request.CreateResponse(...) with the required payload. {error.Message}", error);
+                }
+                if (response is null)
+                {
+                    // The existing pending-request diagnostic names the declined request. Stop this enumeration
+                    // instead of blocking on an answer the caller has explicitly declined to provide.
+                    yield return evt;
+                    yield break;
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            // A queued response can start a new MAF streaming epoch after the pending-request halt.
+            // Drain that epoch until the response delivery is observed. Unexposed nested requests
+            // instead end promptly and are diagnosed by the recorder's outstanding-request check.
+        } while (outstandingAnswers.Count > 0);
+    }
+
+    /// <summary>
+    /// Translates a MAF workflow event stream into AgentEval <see cref="WorkflowEvent"/> records — the
+    /// translation half of <see cref="StreamAsAgentEvalEvents"/>, split out so the step-boundary rules can be
+    /// exercised against exact MAF event orderings (e.g. the off-thread input race) that a live run only
+    /// produces nondeterministically.
+    /// </summary>
+    /// <param name="mafEvents">The MAF event stream (normally <c>StreamingRun.WatchStreamAsync</c>).</param>
+    /// <param name="chatProtocolExecutorIds">
+    /// Raw MAF IDs of the executors that implement the chat protocol (<see cref="MAFWorkflows.ChatProtocolExecutor"/>).
+    /// </param>
+    /// <param name="executorIdMap">Optional full-ID → clean-name map, as for <see cref="StreamAsAgentEvalEvents"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="timeProvider">The clock step timings and tool-call durations are read from; the system clock by default.</param>
+    /// <param name="runStartedAt">
+    /// The <paramref name="timeProvider"/> timestamp the run started at, which step start offsets count from;
+    /// defaults to when translation starts.
+    /// </param>
+    /// <param name="inputMessage">The original chat input, excluded by identity from chat-list output.</param>
+    /// <param name="executorOrder">Preferred display-name order within a superstep; remaining names sort ordinally.</param>
+    /// <param name="graph">Reflected topology for attributing observed transitions; null for custom event streams.</param>
+    /// <param name="subworkflowExecutorIds">Hosts whose delivery timing does not cover nested execution.</param>
+    /// <param name="parentExecutorIds">Raw child-to-host containment, resolved before execution.</param>
+    /// <param name="timingCapture">Producer-side timing for live MAF runs; null only for controlled event streams.</param>
+    internal static async IAsyncEnumerable<WorkflowEvent> TranslateEventsAsync(
+        IAsyncEnumerable<MAFWorkflows.WorkflowEvent> mafEvents,
+        IReadOnlySet<string> chatProtocolExecutorIds,
+        IReadOnlyDictionary<string, string>? executorIdMap = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default,
+        TimeProvider? timeProvider = null,
+        long? runStartedAt = null,
+        ChatMessage? inputMessage = null,
+        IReadOnlyList<string>? executorOrder = null,
+        WorkflowGraphSnapshot? graph = null,
+        IReadOnlySet<string>? subworkflowExecutorIds = null,
+        IReadOnlyDictionary<string, string>? parentExecutorIds = null,
+        MAFWorkflowTimingCapture? timingCapture = null)
+    {
+        ArgumentNullException.ThrowIfNull(mafEvents);
+        ArgumentNullException.ThrowIfNull(chatProtocolExecutorIds);
+
+        var clock = timeProvider ?? TimeProvider.System;
+        var origin = runStartedAt ?? clock.GetTimestamp();
+        var recorder = new ActivationRecorder(chatProtocolExecutorIds, executorIdMap, executorOrder, graph,
+            inputMessage, () => clock.GetElapsedTime(origin), subworkflowExecutorIds, parentExecutorIds, timingCapture);
+
+        Exception? streamError = null;
+        await using var enumerator = mafEvents.GetAsyncEnumerator(cancellationToken);
+        while (true)
+        {
+            try
+            {
+                if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error)
+            {
+                streamError = error;
+                break;
+            }
+            foreach (var translated in recorder.Add(enumerator.Current))
+                yield return translated;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (streamError is not null)
+            yield return new ExecutorErrorEvent("workflow", streamError.Message, streamError.StackTrace, streamError.GetType().Name);
+        foreach (var translated in recorder.Finish(streamError is null))
+            yield return translated;
+        yield return new WorkflowCompleteEvent { FinalOutput = recorder.FinalOutput };
+    }
+
+    /// <summary>
+    /// The raw MAF IDs of the workflow's executors that implement the chat protocol — every
+    /// <see cref="MAFWorkflows.ChatProtocolExecutor"/> and <see cref="MAFWorkflows.ChatForwardingExecutor"/>, including each agent bound with <c>BindAsExecutor</c>
+    /// (an <c>AIAgentBinding</c> declares <c>AIAgentHostExecutor</c> as its executor type before it is instantiated).
+    /// </summary>
+    internal static HashSet<string> GetChatProtocolExecutorIds(MAFWorkflows.Workflow workflow)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (id, binding) in workflow.ReflectExecutors())
+        {
+            if (binding.ExecutorType is { } executorType
+                && (typeof(MAFWorkflows.ChatProtocolExecutor).IsAssignableFrom(executorType)
+                    || executorType == typeof(MAFWorkflows.ChatForwardingExecutor)))
+            {
+                ids.Add(id);
+            }
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="message"/> is one a <see cref="MAFWorkflows.ChatProtocolExecutor"/> only ACCUMULATES
+    /// for its next turn (its <see cref="ChatMessage"/>, chat-message-collection and — when the executor sets a
+    /// string message role, as <c>AIAgentHostExecutor</c> does — <see cref="string"/> handlers), as opposed to the
+    /// <see cref="MAFWorkflows.TurnToken"/> that runs the turn or any other message.
+    /// </summary>
+    private static bool IsChatProtocolAccumulation(object? message) =>
+        message is ChatMessage or IEnumerable<ChatMessage> or string;
 
     /// <summary>
     /// Attempts to extract text from an executor's completed result or event data.
     /// Uses reflection-free duck typing: checks for .Text property common to
     /// AgentResponse, AgentResponseUpdate, and string results.
     /// </summary>
-    private static string? ExtractTextFromResult(object? result)
+    private static string? ExtractTextFromResult(object? result, ChatMessage? inputMessage = null)
     {
-        if (result is null)
+        // A request-port handler returns its request envelope, not an answer from the executor.
+        if (result is null or MAFWorkflows.ExternalRequest)
             return null;
+
+        if (result is MAFWorkflows.ExternalResponse response)
+            return response.TryGetDataAs<object>(out var value) ? ExtractTextFromResult(value, inputMessage) : null;
 
         // Plain string result
         if (result is string str)
             return str;
+
+        if (result is IEnumerable<ChatMessage> messages)
+            return string.Join(Environment.NewLine, messages.Where(message => !ReferenceEquals(message, inputMessage))
+                .Select(message => message.Text));
+
+        if (result is ChatMessage message)
+            return ReferenceEquals(message, inputMessage) ? string.Empty : message.Text;
 
         // Duck-type: check for a Text property (covers AgentResponse, AgentResponseUpdate, etc.)
         var textProp = result.GetType().GetProperty("Text");

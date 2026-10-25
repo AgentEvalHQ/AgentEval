@@ -77,7 +77,7 @@ public class RelevanceMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_MalformedLlmResponse_ReturnsFail()
+    public async Task EvaluateAsync_MalformedLlmResponse_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient("This is not valid JSON!");
@@ -94,6 +94,7 @@ public class RelevanceMetricTests
         
         // Assert
         Assert.False(result.Passed);
+        Assert.False(result.Measured);   // nothing was measured: not a Fail at 0 (T03)
         Assert.Contains("parse", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }
     
@@ -134,29 +135,43 @@ public class RelevanceMetricTests
     }
 
     [Theory]
-    [InlineData(-10, 0)]
-    [InlineData(0, 0)]
-    [InlineData(100, 100)]
-    [InlineData(150, 100)]
-    public async Task EvaluateAsync_ScoreOutOfRange_ClampedTo0To100(int llmScore, int expectedScore)
+    [InlineData(0)]
+    [InlineData(100)]
+    public async Task EvaluateAsync_ScoreOnTheScale_IsReadAsIs(int llmScore)
     {
         // Arrange
         var fakeResponse = $$"""{"score": {{llmScore}}, "reasoning": "test"}""";
         var fakeChatClient = new FakeChatClient(fakeResponse);
         var metric = new RelevanceMetric(fakeChatClient);
-        
+
         var context = new EvaluationContext
         {
             Input = "Question",
             Output = "Answer"
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
+
         // Assert
-        Assert.InRange(result.Score, 0, 100);
-        Assert.Equal(expectedScore, result.Score);
+        Assert.True(result.Measured);
+        Assert.Equal(llmScore, result.Score);
+    }
+
+    [Theory]
+    [InlineData(-10)]
+    [InlineData(150)]
+    public async Task EvaluateAsync_ScoreOffTheScale_IsNotMeasured_NeverClamped(int llmScore)
+    {
+        // It was clamped: 150 read as a confident 100, -10 as a measured 0 (T04).
+        var fakeChatClient = new FakeChatClient($$"""{"score": {{llmScore}}, "reasoning": "test"}""");
+        var metric = new RelevanceMetric(fakeChatClient);
+
+        var result = await metric.EvaluateAsync(new EvaluationContext { Input = "Question", Output = "Answer" });
+
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Equal(NotMeasuredCause.JudgeReplyUnreadable, result.NotMeasuredCause);
     }
 
     [Theory]

@@ -115,8 +115,8 @@ public static class BenchMemoryCommand
             includeHistory: true);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -128,12 +128,13 @@ public static class BenchMemoryCommand
         var suiteDefinition = noAef ? null : AgentEval.Cli.Infrastructure.MemorySuiteDefinition.Create(
             preset, benchmark, model, chatClientOverride is null ? AgentEval.Cli.Infrastructure.ProviderChatClientFactory.Settings.ProviderTag : "override");
         MemoryBenchmarkResult? result = null;
+        byte[]? nativeReportJson = null;
         var completed = new List<BenchmarkCategoryResult>();
         var startedAt = DateTimeOffset.UtcNow;
         string Verdict(MemoryBenchmarkResult value) => !value.IsComplete ? "INCOMPLETE"
             : value.OverallScore >= 70 ? "PASS" : value.OverallScore >= 50 ? "WARN" : "FAIL";
         string? storeRunId = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null)
         {
             if (noAef) return false;
@@ -150,7 +151,7 @@ public static class BenchMemoryCommand
             return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
                 startedAt, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
-                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition);
+                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint, definition: suiteDefinition, nativeReportJson: nativeReportJson);
         }
         try
         {
@@ -170,6 +171,7 @@ public static class BenchMemoryCommand
         // ── Persist via output store ─────────────────────────────────────────
         try
         {
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -191,6 +193,14 @@ public static class BenchMemoryCommand
             // for) is neither a pass nor a fail. The stored verdict is WARN, the schema's indeterminate value (as for
             // bench typedmemeval); the console says INCOMPLETE and the exit code is GateIndeterminate (11).
             var verdict = Verdict(result);
+            // overall_score only when a category was measured (T13): with every category skipped it is a placeholder 0.
+            var metrics = new Dictionary<string, double>
+            {
+                ["unmeasured_queries"] = result.UnmeasuredQueries,
+                ["errored_categories"] = result.ErroredCategories.Count,
+            };
+            if (result.HasMeasuredCategory)
+                metrics["overall_score"] = result.OverallScore;
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
@@ -202,12 +212,7 @@ public static class BenchMemoryCommand
                     Failed: result.CategoryResults.Count(c => !c.Skipped && c.Score < 50),
                     Warnings: result.CategoryResults.Count(c => !c.Skipped && c.Score >= 50 && c.Score < 70),
                     Skipped: result.CategoryResults.Count(c => c.Skipped)),
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overall_score"] = result.OverallScore,
-                    ["unmeasured_queries"] = result.UnmeasuredQueries,
-                    ["errored_categories"] = result.ErroredCategories.Count,
-                });
+                Metrics: metrics);
             // One scenario result per MEASURED category, so `agenteval compare` can diff two memory runs per category
             // (before this, a memory run had no scenarios/ and compare could not read it). A skipped, crashed or wholly
             // unmeasured category measured nothing and is left out: written as a 0 it would read as a regression in
@@ -230,7 +235,8 @@ public static class BenchMemoryCommand
                     },
                     Assertions: [],
                     Duration: category.Duration,
-                    EstimatedCost: 0.0), ct);
+                    // The category's judge calls are not priced: null (not priced), never $0; a skipped one spent nothing.
+                    EstimatedCost: category.Skipped ? 0.0 : null), ct);
             }
 
             await store.CompleteRunAsync(manifest, summary, ct);
@@ -238,18 +244,17 @@ public static class BenchMemoryCommand
             // Native MemoryBenchmarkResult JSON alongside the manifest (Shape B per ADR-017).
             // Resolve via the store so the report path matches the manifest exactly; hand-building
             // from the RAW subject diverges when FileSystemLayout.Sanitize rewrites the name (BUG-17).
-            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            var runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "memory");
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+                nativeReportJson);
 
             Console.WriteLine();
-            var anythingMeasured = result.CategoryResults.Any(c => !c.Skipped);
             if (result.IsComplete)
             {
                 Console.WriteLine($"   Overall score: {result.OverallScore:F1}%  Grade: {result.Grade}");
             }
-            else if (anythingMeasured)
+            else if (result.HasMeasuredCategory)
             {
                 // Incomplete: no grade. The overall counts each unmeasured category as 0; the measured-only figure
                 // leaves them out. Neither is the true score, which is why the verdict is INCOMPLETE.
@@ -259,6 +264,12 @@ public static class BenchMemoryCommand
             Console.WriteLine($"   Verdict:       {verdict}");
             if (!result.IsComplete)
             {
+                if (!result.HasMeasuredCategory && result.ErroredCategories.Count == 0)
+                {
+                    // Every category was skipped (the agent supports none of them), or the benchmark has none (T13): it
+                    // printed "Overall score 0.0% Grade F" and failed.
+                    Console.WriteLine("   Not measured:  no category ran (the agent supports none of this benchmark's categories)");
+                }
                 if (result.ErroredCategories.Count > 0)
                 {
                     Console.WriteLine($"   Not measured:  {string.Join(", ", result.ErroredCategories)} (the run failed, or no question produced a score)");
@@ -275,7 +286,7 @@ public static class BenchMemoryCommand
             }
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
-            Console.WriteLine($"   Canonical: {runDir}");
+            Console.WriteLine($"   Reports:   {runDir}");
             Console.WriteLine($"   Native:    {Path.Combine(runDir, "report-native.json")}");
 
             // Align with the family convention via the shared BenchExitCodes helper: PASS=>0,

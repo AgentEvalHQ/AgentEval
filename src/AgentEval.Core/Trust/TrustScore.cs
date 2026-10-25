@@ -11,13 +11,13 @@ namespace AgentEval.Trust;
 /// <param name="Name">Stable identifier for this signal (e.g. a gate's <c>PolicyName</c> or an eval's metric name).</param>
 /// <param name="Score">
 /// 0..1 — how trustworthy this signal found the subject (1.0 = fully trusted, 0.0 = fully distrusted).
-/// Ignored (never read) when <paramref name="Label"/> is <c>"skipped"</c> or <c>"error"</c>.
+/// Ignored (never read) when <paramref name="Label"/> is <c>"skipped"</c>, <c>"error"</c> or <c>"inapplicable"</c>.
 /// </param>
 /// <param name="Weight">Relative weight in the composite. Non-positive weights are excluded, same as <c>WeightedSumAggregation</c>.</param>
 /// <param name="Label">
-/// <c>"measured"</c> (default) — a real signal, included in the composite. <c>"skipped"</c> or <c>"error"</c> —
-/// the SAME vocabulary <see cref="Evals.EvalScore.Label"/> already uses — excludes this signal from the
-/// weighted math entirely (not scored at 0.0) so an infrastructure gap never fabricates distrust.
+/// <c>"measured"</c> (default) — a real signal, included in the composite. <c>"skipped"</c>, <c>"error"</c> or
+/// <c>"inapplicable"</c> (in any case) — the SAME vocabulary <see cref="Evals.EvalScore.Label"/> already uses — excludes
+/// this signal from the weighted math entirely (not scored at 0.0) so an infrastructure gap never fabricates distrust.
 /// </param>
 public sealed record TrustSignal(string Name, double Score, double Weight, string Label = "measured");
 
@@ -53,7 +53,7 @@ public static class TrustScoreCalculator
 
         foreach (var signal in signals)
         {
-            if (signal.Label is "skipped" or "error")
+            if (IsNotMeasured(signal.Label))
             {
                 excluded.Add($"{signal.Name} ({signal.Label})");
                 continue;
@@ -75,10 +75,18 @@ public static class TrustScoreCalculator
         var explanation = signals.Count == 0
             ? "No signals supplied — nothing to score."
             : score is null
-                ? $"No signal contributed a usable score (0/{signals.Count} measured) — every signal was skipped, errored, or non-positive weight."
+                ? $"No signal contributed a usable score (0/{signals.Count} measured) — every signal was skipped, errored, inapplicable, or non-positive weight."
                 : $"Composite trust score {score:F0}/100 from {measured}/{signals.Count} signal(s) measured" +
                   (excluded.Count > 0 ? $"; excluded: {string.Join(", ", excluded)} (never scored as distrust)." : ".");
 
         return new TrustScoreResult(score, measured, signals.Count, explanation);
     }
+
+    /// <summary>
+    /// Whether a signal's label says it measured nothing: <c>skipped</c>, <c>error</c> or <c>inapplicable</c>, ignoring
+    /// case — the labels <see cref="Evals.EvalScoreExtensions.CountsTowardAggregate"/> leaves out. An inapplicable signal
+    /// (the case could not test it) was scored as a measured value, so its placeholder 0 read as distrust (T13).
+    /// </summary>
+    internal static bool IsNotMeasured(string? label) =>
+        label?.ToLowerInvariant() is "skipped" or "error" or "inapplicable";
 }

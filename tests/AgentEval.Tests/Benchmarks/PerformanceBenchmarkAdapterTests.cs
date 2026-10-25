@@ -96,7 +96,11 @@ public class PerformanceBenchmarkAdapterTests
     public async Task EvaluateAsync_HappyPath_ReturnsCompositeWithThreeLeaves()
     {
         // Arrange
-        var agent = new MockTestableAgent("HappyAgent", "Success response");
+        // It reports usage: a response with none is not priced (T13-7), and this test wants a measured cost.
+        var agent = new MockTestableAgent("HappyAgent", "Success response")
+        {
+            TokenUsage = new TokenUsage { PromptTokens = 10, CompletionTokens = 5 },
+        };
         var benchmark = FastBenchmark(agent);
         var input = new EvalInput("Test prompt for performance measurement");
 

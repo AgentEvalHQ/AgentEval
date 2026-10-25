@@ -561,7 +561,7 @@ public class DirectoryExporterTests : IDisposable
         var summaryJson = await File.ReadAllTextAsync(Path.Combine(outputDir, DirectoryExporter.SummaryFileName));
         var doc = JsonDocument.Parse(summaryJson);
         Assert.Equal(0, doc.RootElement.GetProperty("stats").GetProperty("total").GetInt32());
-        Assert.Equal(0, doc.RootElement.GetProperty("stats").GetProperty("passRate").GetDouble());
+        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("stats").GetProperty("passRate").ValueKind);
     }
 
     [Fact]

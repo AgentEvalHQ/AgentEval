@@ -202,7 +202,7 @@ public sealed class PartnerDeskPhaseTests : IClassFixture<PartnerDeskPhaseFixtur
         var claims = PhaseOracle.Evaluate(Outcome(phase));
 
         Assert.NotEmpty(claims);
-        var failed = claims.Where(claim => !claim.Holds).ToArray();
+        var failed = claims.Where(claim => claim.Holds != true).ToArray();
         Assert.True(
             failed.Length == 0,
             "unmet claims: " + string.Join(" | ", failed.Select(claim => $"{claim.Claim} ({claim.Detail})")));

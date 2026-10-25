@@ -80,28 +80,36 @@ The portal exposes both REST and GraphQL surfaces. Reads → GraphQL; binary str
 }
 ```
 
-### Recursive eval-result tree (the GraphQL killer feature)
+### Evaluator occurrences
+
+The evaluator detail page reads verified canonical results, including native capture-off runs, repeated evaluator keys and trial nodes. `evaluatorTimeline` limits occurrences (default 30, maximum 200), rather than keeping an arbitrary first match per run. Each row retains source, run, result, case/path, trial, evaluator version and score meanings. Unknown or importer-asserted execution times stay null; unmeasured states do not become zero scores or failed decisions.
+
+The compatibility `score` field is populated only for one unambiguous declared score on a 0..1 scale with higher-better direction and no unit. All recorded values remain in `scores` with their `metrics` definitions, including unbounded values. The existing chart appears only for one comparable context with observed dates and measurements; it uses the recorded threshold. Mixed contexts or trials remain visible in the table. `manifestHash` is optional legacy metadata; `evidence` separately describes container integrity/import custody.
+
+### Canonical scenario tree
+
+Use `scenarioResultTree` for native AEF and converted legacy evidence. Pass the `sourceId` returned by `recentRuns` when selecting a run; duplicate run IDs require it. An optional `resultId` selects a node without dropping its siblings or other trials.
 
 ```graphql
-{
-  scenarioTree(runId: "2026-05-09_14-30-22_a3f91c2b", scenarioId: "scenario-1") {
-    metric { key name }
-    score { value passed severity }
-    details {
-      aggregationStrategy
-      subResults {
-        metric { key name }
-        score { value passed }
-        details {
-          subResults { metric { key } score { value } }
-        }
-      }
+query CaseTree($runId: String!, $scenarioId: String!, $sourceId: String) {
+  scenarioResultTree(runId: $runId, scenarioId: $scenarioId, sourceId: $sourceId) {
+    sourceId caseId rootResultIds
+    metrics { id kind direction scale minimum maximum unit }
+    nodes {
+      resultId parentResultId path trial evaluatorId state
+      scores { metricId value normalized }
+      startedAt endedAt durationMs
+      recordedJson
     }
   }
 }
 ```
 
-A single fragment walks the whole composite tree in **one round-trip**. Compare with REST, which would require either a fat endpoint (large response) or a `?depth=N` parameter (chatty).
+The response contains a flat list of every recorded node in the case, including trial and final roots. Follow `parentResultId` to reconstruct the hierarchy without recursive GraphQL selection limits. Cases larger than 10,000 nodes are refused explicitly; inspect their AEF results directly. Missing times, costs and scores remain unknown, and metric definitions determine each score's meaning. `recordedJson` retains fields outside the typed projection, including producer extensions.
+
+Canonical descendants remain available with content capture off. Captured artifacts are listed separately and are downloadable only when their bytes exist in the verified snapshot. The older `scenarioTree` operation remains a legacy compatibility surface; it does not provide this canonical native view.
+
+When an import includes a captured legacy evaluation tree, the page also shows **Captured legacy details** using the existing judge, adjudication, dimensions and recommendation panels. These details are checked against their canonical results before display; conflicting captures are refused. Missing measurements and costs remain explicitly unrecorded, while a recorded zero cost stays zero. Older imports can retain descendants only in this attachment; they do not acquire invented canonical result IDs. Both tree operations accept source/result selection for disambiguation.
 
 ### Compliance dashboard matrix
 
@@ -122,7 +130,13 @@ A single fragment walks the whole composite tree in **one round-trip**. Compare 
 }
 ```
 
-`allChainsValid` reports `true` when every cell's source-evidence `manifest_hash` matches its run's `content_hash` — this is the audit-chain integrity check.
+Compliance list, matrix and detail views read verified AEF snapshots. Existing legacy reports pass through the converter, including standalone reports whose source run is missing. Cells retain the recorded subject kind/name, status, nullable pass rate and timestamp selector.
+
+For compatibility the fields retain the names `allChainsValid`, `chainValid` and `chainBreakReason`. A true value means the displayed reports are captured in intact native AEF containers; signature trust is not checked. Imports display `imported-not-sealed-when-run`, orphan reports display `source-run-not-found`, and unsealed native evidence displays `unsealed-evidence`. A conversion seal protects captured bytes from ingest onward and does not establish original execution custody. Conflicting or tampered evidence is refused explicitly.
+
+The detail wrapper exposes `containerRunId` and `sourceId` for navigation to the exact verified workspace source. The report's `sourceRun` remains its recorded original reference; a standalone orphan has no invented workspace run link.
+
+A newer uncaptured report cannot silently select an older report as the latest. An explicit timestamp can still select an older captured report. Native capture-off evidence cannot recover report content through a legacy sibling.
 
 ### Evaluator registry
 
@@ -203,7 +217,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 
 **`GraphQL ... allowed depth: 10`** — you're issuing a query that recurses deeper than 10 levels. The depth limit guards against unbounded-tree attacks. Restructure the query — most production trees fit within 3 nested `details { subResults { ... } }` pairs.
 
-**Tampered evidence detected** — `complianceMatrix.allChainsValid: false` means at least one piece of evidence's `manifest_hash` no longer matches its source run's `content_hash`. Run `agenteval doctor` to identify the affected runs.
+**Evidence custody warning** — inspect the per-cell `chainBreakReason`: an import or missing source is not itself proof of tampering. Invalid containers and conflicting source hashes produce explicit read errors.
 
 ---
 

@@ -36,11 +36,11 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.NotMeasured(Name,
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
                     "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
-            if (!memoryResult.IsMeasured)
+            if (!memoryResult.IsMeasured || memoryResult.OverallScore is not { } score)
             {
                 return Task.FromResult(MetricResult.NotMeasured(Name,
                     "Not measured: the judge produced no score for any query."));
@@ -50,18 +50,36 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
             var isNoiseTest = IsNoiseResilienceScenario(memoryResult.ScenarioName, memoryResult.Metadata);
             if (!isNoiseTest)
             {
-                return Task.FromResult(MetricResult.Pass(Name, memoryResult.OverallScore,
+                return Task.FromResult(MetricResult.Pass(Name, score,
                     "Non-noise scenario - using general memory score"));
             }
 
+            // A numeric score does not establish fact-by-fact classification or the absence of false recalls.
+            // Retain it independently when the evidence needed for this derived measurement is unavailable.
+            var factsAssessed = memoryResult.QueryResults.All(query =>
+                (query.Query.ForbiddenFacts.Count == 0 || query.Measured && query.ForbiddenFactsAssessed)
+                && query.Query.ExpectedFacts.All(fact => query.Measured
+                    && (query.FoundFacts.Contains(fact) || query.MissingFacts.Contains(fact))));
+            if (!factsAssessed || memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count == 0)
+            {
+                return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
+                    "Noise resilience not measured: relevant fact assessments are incomplete or no expected facts were classified; the numeric memory score is retained separately.",
+                    new Dictionary<string, object>
+                    {
+                        ["overall_score"] = score,
+                        ["observed_forbidden_facts"] = memoryResult.ForbiddenFound.Count,
+                        ["scenario_name"] = memoryResult.ScenarioName,
+                    }));
+            }
+
             // Calculate noise resilience score
-            var resilienceScore = CalculateNoiseResilience(memoryResult);
+            var resilienceScore = CalculateNoiseResilience(memoryResult, score);
             var passed = resilienceScore >= 70; // Higher threshold for noise resilience
 
             var details = new Dictionary<string, object>
             {
                 ["resilience_score"] = resilienceScore,
-                ["overall_score"] = memoryResult.OverallScore,
+                ["overall_score"] = score,
                 ["scenario_name"] = memoryResult.ScenarioName,
                 ["queries_passed"] = memoryResult.PassedQueries,
                 ["total_queries"] = memoryResult.TotalQueries
@@ -82,7 +100,14 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error evaluating noise resilience metric");
-            return Task.FromResult(MetricResult.Fail(Name, $"Error during noise resilience evaluation: {ex.Message}"));
+            // An error is no reading: not measured, never a Fail at 0 that an aggregate would count.
+            return Task.FromResult(MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeCallFailed,
+                $"Noise resilience not measured: {ex.GetType().Name}: {ex.Message}",
+                new Dictionary<string, object>
+                {
+                    ["errorType"] = ex.GetType().FullName ?? ex.GetType().Name,
+                    ["errorMessage"] = ex.Message,
+                }));
         }
     }
 
@@ -113,9 +138,8 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
         return false;
     }
 
-    private static double CalculateNoiseResilience(MemoryEvaluationResult memoryResult)
+    private static double CalculateNoiseResilience(MemoryEvaluationResult memoryResult, double baseScore)
     {
-        var baseScore = memoryResult.OverallScore;
 
         // Analyze factors that affect noise resilience
         var totalFacts = memoryResult.FoundFacts.Count + memoryResult.MissingFacts.Count;
@@ -199,11 +223,11 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
         }
         
         var querySuccessRate = memoryResult.SuccessRate;
-        if (querySuccessRate >= 90)
+        if (querySuccessRate is >= 90)
         {
             explanation.Add("Exceptional performance in noisy environment");
         }
-        else if (querySuccessRate >= 70)
+        else if (querySuccessRate is >= 70)
         {
             explanation.Add("Good performance despite distractions");
         }

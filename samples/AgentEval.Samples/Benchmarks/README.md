@@ -154,13 +154,13 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 |-----|-------------------------|----------------------------------------------------------------------------------------------------------|
 | H1  | Registry Discovery      | No agent, no judge. Walks `BenchmarkFamilyRegistry` + force-loads sub-assemblies.                       |
 | H2  | Performance             | Real agent, no judge. Latency + throughput + cost metrics against your live deployment.                  |
-| H3  | Agentic                 | Real agent **invoked once** with a representative prompt; real judge grades the live response.           |
+| H3  | Agentic                 | Real agent with one local weather tool (fixed data) **invoked once** with a representative prompt; real judge grades the live response and the tool calls the run recorded. |
 | H4  | GDPR                    | Real agent **invoked per scenario** with each YAML `input`; real judge grades each live response.        |
 | H5  | EU AI Act               | Same per-scenario probing as GDPR; pillar-nested presets descend recursively.                            |
 | H6  | OWASP LLM Top 10        | Real agent driven by the OWASP adversarial pipeline (Shape B runner — pipeline owns the probe loop).    |
 | H7  | MITRE ATLAS             | Real agent driven by the ATLAS adversarial pipeline (Shape B runner).                                    |
 | H8  | NIST AI RMF             | Real agent driven by the red-team pipeline → NIST AI RMF MEASURE evidence (Shape B runner). Governance/MAP/MANAGE controls render Not Applicable (never PASS). |
-| H9  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
+| H9  | LongMemEval             | Real history-injectable agent + LLM judge against the REAL `longmemeval_s_cleaned.json` dataset (no fake fallback). Smoke=10Q, Standard=50Q, AuditGrade=~500Q (requires `LONGMEMEVAL_DATASET_PATH`). Every selected question is accounted for (scored, judge-inconclusive or an agent error) and the answer prompts' delivery is measured, as in G8. Shape-B result synthesised into an `EvalResult` tree; native shape preserved in `report-native.json`. Friendly download-instructions box when dataset missing. |
 | H10 | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
 | H11 | Foundry Hybrid          | A Foundry eval running INSIDE a composite eval — one run, one report (Foundry is sample-only). |
 | H12 | Foundry Hierarchy       | Foundry evals as weighted leaves inside a composite benchmark tree (Foundry is sample-only). |

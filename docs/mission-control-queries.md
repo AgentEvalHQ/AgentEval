@@ -1,5 +1,64 @@
 # Shared Mission Control queries
 
+Scenario `score` and `duration` fields are nullable. A missing score is not zero or a failed result; use
+`measurement` (`not_measured` / `not_applicable`) to explain absence. The run detail page labels these
+states. A recorded zero score or duration remains zero. Legacy numeric scores explicitly marked
+unmeasured are normalized to null when read.
+
+## Subject history downloads
+
+`GET /api/v1/subjects/{kind}/{name}/history` reads verified workspace evidence without requiring
+solution configuration or an optional index. Supported kinds are `agent`, `workflow`, `model`,
+`endpoint`, `mcp-server` and `other`. The response is `application/x-ndjson` with `Cache-Control: no-store`.
+The complete selection is verified before any history is emitted; invalid, ambiguous or over-budget
+evidence returns 422. The download is bounded to 100,000 rows and 64 MiB.
+
+Each row retains `runId`, nullable `timestamp`, `verdict`, `score` and `notes`, with `sourceId`,
+`containerRunId`, `recordKind` and container `evidence` metadata. `legacy_index` rows preserve recorded
+index order, duplicate entries, explicit notes and orphan run references. `sourceOrdinal` is the original
+one-based index position, not chronological order. `recordedEntry` retains the captured entry, including
+additional producer fields. These are index claims; the import seal does not prove original execution custody.
+
+`execution_summary` rows reuse the verified execution summary projection. Their `timestampBasis` is
+`execution-start`; an importer-asserted start remains null. Completion is not converted into a passing
+verdict. A native summary's metric definitions and recorded summary are included as `metrics` and
+`summary`; a legacy index score has only the meaning its original producer recorded. Do not compare
+these scalar scores as if they all had the same normalized scale. No notes are reconstructed from summaries.
+
+`historyAvailability` distinguishes captured entries, `recorded_empty`, `not_captured` and `not_recorded`.
+`recordedEntryCount` retains a known empty or uncaptured count when available. A stored AEF snapshot
+takes precedence over its explicitly linked legacy run entries; capture-off content is never recovered
+from that sibling. Independent sources remain source-qualified, without an invented total chronology.
+An orphan index's `containerRunId` identifies a temporary import container, not an original execution.
+
+## Source compliance PDFs
+
+`GET /api/v1/compliance/{regulation}/{subjectName}/{timestamp}/report.pdf` serves captured PDF bytes
+from verified workspace evidence, including converted legacy reports. It does not read a live sibling
+file after selecting AEF evidence, re-render a report or fetch an external link. Optional `kind=agent`
+or `kind=workflow` and `sourceId` qualify the selection; the detail page supplies them when available.
+An ambiguous selection returns 409, unavailable PDF content returns 404 (`pdf_not_captured`), and
+invalid/tampered evidence returns 422. Downloads use `Cache-Control: no-store`.
+
+A source PDF is a `document` evidence artifact whose `ext.agenteval.compliance.pdfFor` names the
+`evidenceId` of its captured `compliance_artifact` JSON document. This explicit link supplies the recorded
+report identity; the filename alone does not. The converter preserves `report.pdf` through both workspace-run
+and standalone compliance-directory conversion when content capture is on. Capture-off omits its bytes
+and digest. Stored AEF evidence takes precedence over linked legacy reports. A PDF-only legacy file
+without a recorded compliance document is unavailable through this route; no report identity is invented.
+As with other imported artifacts, the ingest seal protects the captured bytes from conversion onward and
+does not establish original execution custody or independent signature trust.
+
+## Campaign registrations
+
+`redTeamCampaigns` and `redTeamCampaign` retain the existing registration inventory: campaign ID,
+name, declared targets/mode, registration timestamp and optional completion declaration. They do not
+read execution findings or establish an AEF run's outcome. Missing completion metadata means completion
+was not recorded; it does not prove an execution is still running. The campaign page links to Runs for
+verified execution evidence. A CLI red-team execution writes an AEF run and does not automatically
+create a campaign registration or invent a campaign-to-run identity.
+
+
 ## Implemented UI and desktop scope
 
 The governance views described here are part of the existing React web app,

@@ -1,58 +1,59 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using System.ClientModel;
+using AgentEval.Core;
+using AgentEval.Providers;
 using Azure;
+using Azure.AI.OpenAI;
+using Microsoft.Extensions.AI;
+using OpenAI;
 
 namespace AgentEval.AgentSkillsEval;
 
 /// <summary>
-/// Azure OpenAI configuration for this sample, sourced from environment variables. Mirrors the
-/// convention in <c>samples/AgentEval.Samples/AIConfig.cs</c> — set
-/// <c>AZURE_OPENAI_ENDPOINT</c> / <c>AZURE_OPENAI_API_KEY</c> / <c>AZURE_OPENAI_DEPLOYMENT</c>.
+/// Chat configuration using the same environment-variable provider selection as the main samples.
+/// An explicit <c>AI_INFERENCE_PROVIDER</c> selection never falls back to a different host.
 /// </summary>
 public static class AIConfig
 {
-    private static readonly Lazy<(Uri Endpoint, AzureKeyCredential KeyCredential)?> s_values =
-        new(() =>
+    /// <summary>The provider settings resolved from the current environment.</summary>
+    public static InferenceProviderSettings Settings => InferenceProviderEnvironment.Resolve();
+
+    /// <summary>Whether the selected provider has the required configuration.</summary>
+    public static bool IsConfigured => Settings.IsConfigured;
+
+    /// <summary>The selected model or Azure deployment name.</summary>
+    public static string ModelDeployment => Settings.Model
+        ?? throw new InvalidOperationException(Settings.Diagnostic);
+
+    /// <summary>Constructs the selected provider's SDK client without making a model call.</summary>
+    public static IChatClient CreateChatClient()
+    {
+        var settings = Settings;
+        if (!settings.IsConfigured)
+            throw new InvalidOperationException(settings.Diagnostic ?? "No chat provider is configured.");
+
+        if (settings.UsesAzureProtocol)
         {
-            var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-            var key = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-            var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+            return new AzureOpenAIClient(settings.Endpoint!, new AzureKeyCredential(settings.ApiKey!))
+                .GetChatClient(settings.Model!)
+                .AsIChatClient().WithMinimalReasoning();
+        }
 
-            if (string.IsNullOrWhiteSpace(endpoint) ||
-                string.IsNullOrWhiteSpace(key) ||
-                string.IsNullOrWhiteSpace(deployment))
-            {
-                return null;
-            }
+        return new OpenAIClient(new ApiKeyCredential(settings.ApiKey!),
+                new OpenAIClientOptions { Endpoint = settings.Endpoint })
+            .GetChatClient(settings.Model!)
+            .AsIChatClient().WithMinimalReasoning();
+    }
 
-            return (new Uri(endpoint), new AzureKeyCredential(key));
-        }, isThreadSafe: true);
-
-    public static bool IsConfigured => s_values.Value.HasValue;
-
-    public static Uri Endpoint => s_values.Value?.Endpoint
-        ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT not configured");
-
-    public static AzureKeyCredential KeyCredential => s_values.Value?.KeyCredential
-        ?? throw new InvalidOperationException("AZURE_OPENAI_API_KEY not configured");
-
-    public static string ModelDeployment =>
-        Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") ?? "gpt-4o";
-
+    /// <summary>Prints the selected provider's configuration diagnostic without credentials.</summary>
     public static void PrintMissingCredentialsWarning()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  Azure OpenAI credentials not configured                      ║");
-        Console.WriteLine("║                                                                ║");
-        Console.WriteLine("║  Set these environment variables:                              ║");
-        Console.WriteLine("║    AZURE_OPENAI_ENDPOINT   = https://your-resource.openai...  ║");
-        Console.WriteLine("║    AZURE_OPENAI_API_KEY    = your-api-key                     ║");
-        Console.WriteLine("║    AZURE_OPENAI_DEPLOYMENT = your-deployment-name (e.g. gpt-4o)║");
-        Console.WriteLine("║                                                                ║");
-        Console.WriteLine("║  This sample runs a REAL agent — it will not fake a run.      ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
+        Console.WriteLine(Settings.Diagnostic ?? "No chat provider is configured.");
+        Console.WriteLine("Set AI_INFERENCE_PROVIDER to azure, bitdeer, openai, foundry or openai-compatible.");
+        Console.WriteLine("See this sample's README for provider variables. No agent run was measured.");
         Console.ResetColor();
         Console.WriteLine();
     }

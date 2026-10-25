@@ -88,42 +88,71 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
         if (validationError != null)
         {
             return validationError.EndsWith(NotSuppliedSuffix, StringComparison.Ordinal)
-                ? MetricResult.NotMeasured(Name, validationError)
+                ? MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput, validationError)
                 : MetricResult.Fail(Name, validationError);
         }
-        
+
+        // Only the provider call is caught: a failed call is not measured (it was a Fail at 0), and the caller's own
+        // cancellation propagates. The similarity below is outside any catch, so a bug there is not relabelled as a
+        // failed embedding call.
+        IReadOnlyList<ReadOnlyMemory<float>> embeddings;
         try
         {
             var texts = new[] { text1!, text2! };
-            var embeddings = await Embeddings.GetEmbeddingsAsync(texts, cancellationToken)
+            embeddings = await Embeddings.GetEmbeddingsAsync(texts, cancellationToken)
                 .ConfigureAwait(false);
-            
-            if (embeddings.Count < 2)
-            {
-                return MetricResult.Fail(Name, "Failed to generate embeddings.");
-            }
-            
-            var similarity = EmbeddingSimilarity.CosineSimilarity(embeddings[0], embeddings[1]);
-            var score = ScoreNormalizer.FromSimilarity(similarity);
-            var metadata = GetAdditionalMetadata(context, similarity, score);
-            
-            if (score >= PassingThreshold)
-            {
-                return MetricResult.Pass(Name, score, GetPassMessage(similarity), metadata);
-            }
-            else
-            {
-                return MetricResult.Fail(Name, GetFailMessage(similarity), score, metadata);
-            }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (JudgeReplyEvidence.IsCallFailure(ex, cancellationToken))
         {
-            return MetricResult.Fail(
-                Name, 
-                $"Embedding generation failed: {ex.Message}",
-                details: new Dictionary<string, object> { ["error"] = ex.Message });
+            return JudgeReplyEvidence.CallFailed(Name, Name, ex, "the embedding call",
+                new Dictionary<string, object> { ["error"] = ex.Message });
+        }
+
+        if (embeddings.Count != 2)
+        {
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable,
+                $"{Name} not measured: expected 2 embeddings, got {embeddings.Count}.");
+        }
+
+        // A vector the cosine cannot be read from gives no similarity, not a similarity of 0 (EmbeddingSimilarity's
+        // "zero vector = 0" convention is for ranking a vector store, not for scoring an answer).
+        if (UnusableEmbeddings(embeddings[0].Span, embeddings[1].Span) is { } why)
+        {
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable, $"{Name} not measured: {why}.");
+        }
+
+        var similarity = EmbeddingSimilarity.CosineSimilarity(embeddings[0], embeddings[1]);
+
+        // Defence in depth (T13): a cosine that is not a finite number is no similarity. ScoreNormalizer reads NaN as 0,
+        // so it was a measured Fail at 0 with NaN in the details.
+        if (!float.IsFinite(similarity))
+        {
+            return MetricResult.NotMeasured(Name, NotMeasuredCause.JudgeReplyUnreadable,
+                $"{Name} not measured: the cosine of the two embeddings is not a finite number.");
+        }
+
+        var score = ScoreNormalizer.FromSimilarity(similarity);
+        var metadata = GetAdditionalMetadata(context, similarity, score);
+
+        if (score >= PassingThreshold)
+        {
+            return MetricResult.Pass(Name, score, GetPassMessage(similarity), metadata);
+        }
+        else
+        {
+            return MetricResult.Fail(Name, GetFailMessage(similarity), score, metadata);
         }
     }
+
+    // Why two embeddings cannot be compared, or null when they can.
+    private static string? UnusableEmbeddings(ReadOnlySpan<float> a, ReadOnlySpan<float> b)
+    {
+        if (a.Length != b.Length)
+            return $"the embeddings have different dimensions ({a.Length} and {b.Length})";
+        return AgentEval.Embeddings.EmbeddingValidation.InvalidReason(a)
+            ?? AgentEval.Embeddings.EmbeddingValidation.InvalidReason(b);
+    }
+
 }
 
 /// <summary>

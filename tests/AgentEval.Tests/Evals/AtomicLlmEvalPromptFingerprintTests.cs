@@ -123,7 +123,7 @@ public class AtomicLlmEvalPromptFingerprintTests
                 Leaf(new NamedPromptEvaluator("p", "m"), ["x\u001fy"])),
             "tools" => (Leaf(new NamedPromptEvaluator("p", "m\u001fjudge-sees-tool-data:ToolCalls"), ["y"]),
                 new AtomicLlmEval(new NamedPromptEvaluator("p", "m"), "k", "n", "c", "1.0.0", ["y"])
-                    { JudgeSeesToolData = JudgeToolData.ToolCalls }),
+                    { JudgeSeesData = JudgeInputData.ToolCalls }),
             _ => (Leaf(new NamedPromptEvaluator("p", "m"), []), Leaf(new NamedPromptEvaluator("p", "m"), [""])),
         };
         var a = await ProvenanceOf(first);

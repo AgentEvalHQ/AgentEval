@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Core.Reporting;
+
 using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Models;
@@ -131,7 +133,7 @@ public sealed class GDPRPdfRenderer
             col.Item().PaddingTop(30)
                 .Background(StatusColor(ev.Summary.OverallStatus))
                 .Padding(10)
-                .Text($"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScore:P0})")
+                .Text($"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScoreText()})")
                 .FontColor(Colors.White).FontSize(20).Bold();
 
             col.Item().PaddingTop(30).Text(ev.Disclaimer).FontSize(10).Italic();
@@ -177,7 +179,7 @@ public sealed class GDPRPdfRenderer
                 foreach (var (key, p) in ev.Summary.PerPillar)
                 {
                     table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{p.Score:P0}");
+                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(p.Score)}");
                     table.Cell().Padding(5).Text(p.Status);
                     table.Cell().Padding(5).Text(
                         p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails));
@@ -204,7 +206,7 @@ public sealed class GDPRPdfRenderer
         {
             col.Item().Text(pillar.Metric.Name).FontSize(20).Bold();
             col.Item().Text(
-                $"Score: {pillar.Score.Value:P0} — Status: {pillar.Score.Label.ToUpperInvariant()}")
+                $"Score: {ScoreFormatting.Percentage(pillar.Score.MeasuredValue())} — Status: {pillar.Score.Label.ToUpperInvariant()}")
                 .FontSize(12);
             col.Item().PaddingTop(15);
 
@@ -230,7 +232,7 @@ public sealed class GDPRPdfRenderer
                 foreach (var article in articles)
                 {
                     table.Cell().Padding(5).Text(article.Metric.Key);
-                    table.Cell().Padding(5).Text($"{article.Score.Value:P0}");
+                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(article.Score.MeasuredValue())}");
                     table.Cell().Padding(5).Text(article.Score.Label.ToUpperInvariant());
                     table.Cell().Padding(5).Text(article.Score.Severity);
                 }
@@ -260,7 +262,7 @@ public sealed class GDPRPdfRenderer
         {
             col.Item().Text($"Article: {articleKey}").FontSize(18).Bold();
             col.Item().Text(
-                $"Score: {articleSummary.Score:P0} — Status: {articleSummary.Status} — " +
+                $"Score: {ScoreFormatting.Percentage(articleSummary.Score)} — Status: {articleSummary.Status} — " +
                 $"Severity: {articleSummary.Severity} — " +
                 $"Failed: {articleSummary.ScenariosFailed}/{articleSummary.ScenarioCount}")
                 .FontSize(11);
@@ -318,7 +320,7 @@ public sealed class GDPRPdfRenderer
                             preview = TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
 
                         table.Cell().Padding(5).Text(scenario.Metric.Key);
-                        table.Cell().Padding(5).Text($"{scenario.Score.Value:P0}");
+                        table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(scenario.Score.MeasuredValue())}");
                         table.Cell().Padding(5).Text(scenario.Score.Label.ToUpperInvariant());
                         table.Cell().Padding(5).Text(preview);
                     }

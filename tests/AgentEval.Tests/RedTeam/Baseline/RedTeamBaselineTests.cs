@@ -217,7 +217,7 @@ public class RedTeamBaselineComparerTests
 
         var comparison = comparer.Compare(current, baseline);
 
-        Assert.Equal(0, comparison.ScoreDelta, 1);
+        Assert.Equal(0, comparison.ScoreDelta!.Value, 1);
         Assert.Empty(comparison.NewVulnerabilities);
         Assert.Empty(comparison.ResolvedVulnerabilities);
         Assert.Equal(RegressionStatus.Stable, comparison.Status);
@@ -275,8 +275,8 @@ public class RedTeamBaselineComparerTests
 
         var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
 
-        Assert.Equal(0.70, comparison.BaselineCoverage, 3);
-        Assert.Equal(0.0, comparison.CoverageDrop, 3);
+        Assert.Equal(0.70, comparison.BaselineCoverage!.Value, 3);
+        Assert.Equal(0.0, comparison.CoverageDrop!.Value, 3);
         Assert.False(comparison.IsRegression);
         Assert.Equal(RegressionStatus.Stable, comparison.Status);
     }
@@ -291,7 +291,7 @@ public class RedTeamBaselineComparerTests
 
         var comparison = new RedTeamBaselineComparer().Compare(current, baseline);
 
-        Assert.Equal(1.0, comparison.BaselineCoverage, 3);
+        Assert.Equal(1.0, comparison.BaselineCoverage!.Value, 3);
         Assert.True(comparison.CoverageDrop >= 0.10);
         Assert.True(comparison.IsRegression);
     }

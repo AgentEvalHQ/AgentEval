@@ -30,7 +30,7 @@ public static class Demo03_LiveDemo
         }
 
         // ════════════════════════════════════════════════════════════════════
-        // 1  —  Connect to Azure OpenAI
+        // 1  —  Connect to the model provider  (Config.CreateChatClient — AI_INFERENCE_PROVIDER)
         // ════════════════════════════════════════════════════════════════════
 
 
@@ -69,18 +69,6 @@ public static class Demo03_LiveDemo
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials()
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(@"
-  ⚠️  Skipping Demo 03 — Azure OpenAI credentials required.
-
-     Set the following environment variables and try again:
-       AZURE_OPENAI_ENDPOINT
-       AZURE_OPENAI_API_KEY
-       AZURE_OPENAI_DEPLOYMENT
-");
-        Console.ResetColor();
-    }
+    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Demo 03");
 }
 

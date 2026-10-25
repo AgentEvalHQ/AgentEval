@@ -279,6 +279,7 @@ enum AgentEval.Assertions.WorkflowFailureHint
     IdNotFound
     Timing
     ExecutionPath
+    TimingNotMeasured
 class AgentEval.Assertions.WorkflowToolCallAssertionBuilder
     AgentEval.Assertions.WorkflowAssertionBuilder And()
     AgentEval.Assertions.WorkflowToolCallAssertionBuilder AfterTool(System.String otherToolName, System.String because = null)
@@ -310,7 +311,9 @@ sealed class AgentEval.Benchmarks.AutoAuditEndpointResult : System.IEquatable<Ag
     System.Boolean Completed { get; init; }
     System.Boolean Equals(AgentEval.Benchmarks.AutoAuditEndpointResult other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean FidelityMeasured { get; init; }
     System.Boolean LeakedPastGate { get; init; }
+    System.Boolean TokensReported { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> TopDiscrepancies { get; init; }
     System.Double FidelityScore { get; init; }
     System.Int32 CompletionTokens { get; init; }
@@ -409,6 +412,7 @@ sealed class AgentEval.Benchmarks.TraceFidelityDiscrepancy : System.IEquatable<A
     AgentEval.Benchmarks.TraceFidelityDiscrepancy <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.TraceFidelityDiscrepancy other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean Measured { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> Examples { get; init; }
     System.Double Score { get; init; }
     System.Int32 Count { get; init; }
@@ -552,11 +556,11 @@ sealed class AgentEval.Comparison.DefaultStatisticsCalculator : AgentEval.Compar
     AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.Int32> values)
     AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.TimeSpan> values)
     AgentEval.Comparison.StochasticStatistics CreateStatistics(System.Collections.Generic.IReadOnlyList<System.Int32> scores, System.Collections.Generic.IReadOnlyList<System.Boolean> passResults, System.Double confidenceLevel = 0.95)
-    System.Double CalculatePassRate(System.Collections.Generic.IReadOnlyList<System.Boolean> results)
-    System.Double Mean(System.Collections.Generic.IReadOnlyList<System.Double> values)
-    System.Double Median(System.Collections.Generic.IReadOnlyList<System.Double> values)
-    System.Double Percentile(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double percentile)
-    System.Double StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    System.Double? CalculatePassRate(System.Collections.Generic.IReadOnlyList<System.Boolean> results)
+    System.Double? Mean(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    System.Double? Median(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    System.Double? Percentile(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double percentile)
+    System.Double? StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
     ctor()
     static AgentEval.Comparison.IStatisticsCalculator Instance { get; }
 class AgentEval.Comparison.DelegateAgentFactory : AgentEval.Comparison.IAgentFactory
@@ -599,11 +603,11 @@ static class AgentEval.Comparison.StatisticsCalculator
     static AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.Int32> values)
     static AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.TimeSpan> values)
     static AgentEval.Comparison.StochasticStatistics CreateStatistics(System.Collections.Generic.IReadOnlyList<System.Int32> scores, System.Collections.Generic.IReadOnlyList<System.Boolean> passResults, System.Double confidenceLevel = 0.95)
-    static System.Double CalculatePassRate(System.Collections.Generic.IReadOnlyList<System.Boolean> results)
-    static System.Double Mean(System.Collections.Generic.IReadOnlyList<System.Double> values)
-    static System.Double Median(System.Collections.Generic.IReadOnlyList<System.Double> values)
-    static System.Double Percentile(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double percentile)
-    static System.Double StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    static System.Double? CalculatePassRate(System.Collections.Generic.IReadOnlyList<System.Boolean> results)
+    static System.Double? Mean(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    static System.Double? Median(System.Collections.Generic.IReadOnlyList<System.Double> values)
+    static System.Double? Percentile(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double percentile)
+    static System.Double? StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
 class AgentEval.Comparison.StochasticRunner : AgentEval.Comparison.IStochasticRunner
     System.Threading.Tasks.Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Comparison.IAgentFactory factory, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Core.IEvaluableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, System.Threading.CancellationToken cancellationToken = default)
@@ -689,10 +693,12 @@ enum AgentEval.Core.Benchmarks.CostTier
     Low
     Medium
     High
-class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Core.IAnswerSamplingConfigurableAgent, AgentEval.Core.IEvaluableAgent, AgentEval.Core.IHistoryInjectableAgent, AgentEval.Core.ISessionResettableAgent, AgentEval.Core.IStreamableAgent, AgentEval.Core.ITimestampedHistoryInjectableAgent
+class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Comparison.IModelIdentifiable, AgentEval.Core.IAnswerSamplingConfigurableAgent, AgentEval.Core.IEvaluableAgent, AgentEval.Core.IHistoryInjectableAgent, AgentEval.Core.ISessionResettableAgent, AgentEval.Core.IStreamableAgent, AgentEval.Core.ITimestampedHistoryInjectableAgent
     AgentEval.Core.AnswerSamplingAcknowledgement ConfigureAnswerSampling(AgentEval.Core.AnswerSamplingRequest request)
     System.Collections.Generic.IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
     System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> History { get; }
+    System.String ModelDisplayName { get; }
+    System.String ModelId { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task ResetSessionAsync(System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Core.AgentResponse> InvokeAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
@@ -717,6 +723,7 @@ class AgentEval.Core.ChatClientEvaluator : AgentEval.Core.IEvaluator, AgentEval.
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.String systemPrompt, System.String systemPromptId)
 static class AgentEval.Core.ChatClientExtensions
     static AgentEval.Core.IStreamableAgent AsEvaluableAgent(Microsoft.Extensions.AI.IChatClient chatClient, System.String name = "Agent", System.String systemPrompt = null, Microsoft.Extensions.AI.ChatOptions chatOptions = null, System.Boolean includeHistory = false)
+    static Microsoft.Extensions.AI.IChatClient WithMinimalReasoning(Microsoft.Extensions.AI.IChatClient chatClient)
 sealed class AgentEval.Core.ConsoleAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
@@ -779,6 +786,11 @@ sealed class AgentEval.Core.MicrosoftLoggingAdapter : AgentEval.Core.IAgentEvalL
     ctor(Microsoft.Extensions.Logging.ILogger logger)
     static AgentEval.Core.MicrosoftLoggingAdapter Create(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.String categoryName = "AgentEval")
     static AgentEval.Core.MicrosoftLoggingAdapter Create<T>(Microsoft.Extensions.Logging.ILogger<T> logger)
+sealed class AgentEval.Core.MinimalReasoningChatClient : Microsoft.Extensions.AI.DelegatingChatClient, Microsoft.Extensions.AI.IChatClient, System.IDisposable
+    Microsoft.Extensions.AI.ReasoningEffort? CurrentLevel { get; }
+    System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
+    System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
+    ctor(Microsoft.Extensions.AI.IChatClient innerClient)
 sealed class AgentEval.Core.NullAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
@@ -800,6 +812,8 @@ static class AgentEval.Core.Reporting.MarkdownText
     static System.String Escape(System.String text)
     static System.String EscapeInline(System.String text, System.Int32 maxLength = 200)
     static System.String Truncate(System.String text, System.Int32 maxLength = 200)
+static class AgentEval.Core.Reporting.ScoreFormatting
+    static System.String Percentage(System.Double? score)
 class AgentEval.Core.RetryExhaustedException : System.Exception, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.Exception> Attempts { get; }
     ctor(System.String message, System.Collections.Generic.IEnumerable<System.Exception> attempts)
@@ -961,7 +975,7 @@ abstract class AgentEval.Evals.AtomicEval : AgentEval.Evals.IEval
     protected ctor(System.String key, System.String name, System.String category, System.String version)
 sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.Evals.AtomicLlmDefinition>
     AgentEval.Evals.AtomicLlmDefinition <Clone>$()
-    AgentEval.Evals.JudgeToolData ToolData { get; init; }
+    AgentEval.Evals.JudgeInputData InputData { get; init; }
     System.Boolean Equals(AgentEval.Evals.AtomicLlmDefinition other)
     System.Boolean Equals(System.Object obj)
     System.Boolean PromptIdentified { get; init; }
@@ -977,8 +991,9 @@ sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.E
     ctor()
 sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
     AgentEval.Evals.AtomicLlmDefinition CaptureDefinition()
-    AgentEval.Evals.JudgeToolData JudgeSeesToolData { get; init; }
+    AgentEval.Evals.JudgeInputData JudgeSeesData { get; init; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
+    const System.Int32 SystemMessageCharacterLimit
     const System.Int32 ToolSectionCharacterLimit
     const System.Int32 ToolValueCharacterLimit
     const System.String JudgeInputFramingVersion
@@ -1007,7 +1022,7 @@ sealed class AgentEval.Evals.CompositeEval : AgentEval.Evals.IEval
 static class AgentEval.Evals.CompositeEvalsServiceExtensions
     static Microsoft.Extensions.DependencyInjection.IServiceCollection AddCompositeEvals(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
 static class AgentEval.Evals.CostRollup
-    static System.ValueTuple<System.Double, System.Boolean> Aggregate(System.Collections.Generic.IEnumerable<AgentEval.Evals.EvalResult> results)
+    static System.ValueTuple<System.Double?, System.Boolean, System.Collections.Generic.IReadOnlyList<System.String>> Aggregate(System.Collections.Generic.IEnumerable<AgentEval.Evals.EvalResult> results)
 sealed class AgentEval.Evals.DecisionEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.Double PassThreshold { get; }
     System.String Instructions { get; }
@@ -1036,6 +1051,7 @@ sealed class AgentEval.Evals.EvalRegistry : AgentEval.Evals.IEvalRegistry
     static AgentEval.Evals.EvalRegistry Shared { get; }
 static class AgentEval.Evals.EvalResultPersistence
     static AgentEval.Evals.EvalResult FromScenarioResult(AgentEval.Output.ScenarioResult sr)
+    static AgentEval.Output.ComparabilityFacts AggregateComparability(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> trials)
     static AgentEval.Output.ScenarioResult ToScenarioResult(AgentEval.Evals.EvalResult result, System.String scenarioId, System.String scenarioName, System.Collections.Generic.IReadOnlyList<AgentEval.Output.AssertionResult> assertions = null, System.String input = null, System.String subjectModel = null)
 sealed class AgentEval.Evals.EvaluatorCardRegistry
     AgentEval.Evals.EvaluatorCard Get(System.String key)
@@ -1053,10 +1069,12 @@ interface AgentEval.Evals.IEvalRegistry
     AgentEval.Evals.IEval Resolve(System.String key, AgentEval.Core.IEvaluator judge, System.String judgeModel)
     System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalRegistration> All { get; }
     System.Void Register(AgentEval.Evals.EvalRegistration registration)
-enum AgentEval.Evals.JudgeToolData
+enum AgentEval.Evals.JudgeInputData
     None
     ToolCalls
     ToolDefinitions
+    SystemMessage
+    ExpectedActions
 sealed class AgentEval.Evals.MajorityVoteAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
@@ -1336,8 +1354,9 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ScenarioComparison> WithUnpinnedAxes { get; }
     System.Collections.Generic.IReadOnlyList<System.String> BaselineOnly { get; init; }
     System.Collections.Generic.IReadOnlyList<System.String> CandidateOnly { get; init; }
+    System.Collections.Generic.IReadOnlyList<System.String> NotMeasuredScenarios { get; }
     System.Collections.Generic.IReadOnlyList<System.String> RefusalReasons { get; }
-    System.Double MeanScoreDelta { get; }
+    System.Double? MeanScoreDelta { get; }
     System.Int32 GetHashCode()
     System.Int32 Recovered { get; }
     System.Int32 Regressed { get; }
@@ -1349,8 +1368,11 @@ sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output
 sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.Output.ScenarioComparison>
     AgentEval.Output.ScenarioComparison <Clone>$()
     System.Boolean BaselineHasUsableFloor { get; init; }
+    System.Boolean BaselineMeasured { get; }
     System.Boolean BaselinePassed { get; init; }
+    System.Boolean BothMeasured { get; }
     System.Boolean CandidateHasUsableFloor { get; init; }
+    System.Boolean CandidateMeasured { get; }
     System.Boolean CandidatePassed { get; init; }
     System.Boolean DeltaHasAFloor { get; }
     System.Boolean Equals(AgentEval.Output.ScenarioComparison other)
@@ -1359,14 +1381,41 @@ sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.O
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Blocking { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Unpinned { get; }
-    System.Double BaselineScore { get; init; }
-    System.Double CandidateScore { get; init; }
-    System.Double ScoreDelta { get; }
+    System.Double? BaselineScore { get; init; }
+    System.Double? CandidateScore { get; init; }
+    System.Double? ScoreDelta { get; }
     System.Int32 GetHashCode()
     System.String ScenarioId { get; init; }
     System.String ToString()
-    System.Void Deconstruct(out System.String ScenarioId, out System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, out System.Double BaselineScore, out System.Double CandidateScore, out System.Boolean BaselinePassed, out System.Boolean CandidatePassed, out System.Boolean BaselineHasUsableFloor, out System.Boolean CandidateHasUsableFloor, out System.Boolean JudgeGradedItsOwnSubject)
-    ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double BaselineScore, System.Double CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
+    System.Void Deconstruct(out System.String ScenarioId, out System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, out System.Double? BaselineScore, out System.Double? CandidateScore, out System.Boolean BaselinePassed, out System.Boolean CandidatePassed, out System.Boolean BaselineHasUsableFloor, out System.Boolean CandidateHasUsableFloor, out System.Boolean JudgeGradedItsOwnSubject)
+    ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double? BaselineScore, System.Double? CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
+static class AgentEval.Providers.EmbeddingProviderEnvironment
+    const System.String BitdeerDefaultModel
+    const System.String OpenAIDefaultModel
+    static AgentEval.Providers.EmbeddingProviderSettings Resolve(AgentEval.Providers.InferenceProviderSettings chat, System.Func<System.String, System.String> getEnvironmentVariable)
+    static System.Collections.Generic.IReadOnlyList<System.String> AllEmbeddingVariables
+    static System.String DefaultModelOf(AgentEval.Providers.InferenceProvider provider)
+    static System.String ModelVariableOf(AgentEval.Providers.InferenceProvider provider)
+sealed class AgentEval.Providers.EmbeddingProviderSettings : System.IEquatable<AgentEval.Providers.EmbeddingProviderSettings>
+    AgentEval.Providers.EmbeddingProviderSettings <Clone>$()
+    AgentEval.Providers.InferenceProvider Provider { get; init; }
+    System.Boolean Equals(AgentEval.Providers.EmbeddingProviderSettings other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean IsConfigured { get; }
+    System.Boolean ModelIsDefault { get; init; }
+    System.Boolean UsesAzureProtocol { get; }
+    System.Int32 GetHashCode()
+    System.String ApiKey { get; init; }
+    System.String Diagnostic { get; init; }
+    System.String DisplayName { get; init; }
+    System.String Model { get; init; }
+    System.String ModelIdentity { get; }
+    System.String ModelVariable { get; init; }
+    System.String ProviderTag { get; init; }
+    System.String ToString()
+    System.Uri Endpoint { get; init; }
+    System.Void Deconstruct(out AgentEval.Providers.InferenceProvider Provider, out System.String ProviderTag, out System.String DisplayName, out System.Uri Endpoint, out System.String ApiKey, out System.String Model, out System.String ModelVariable, out System.Boolean ModelIsDefault, out System.String Diagnostic)
+    ctor(AgentEval.Providers.InferenceProvider Provider, System.String ProviderTag, System.String DisplayName, System.Uri Endpoint, System.String ApiKey, System.String Model, System.String ModelVariable, System.Boolean ModelIsDefault, System.String Diagnostic)
 enum AgentEval.Providers.InferenceProvider
     None
     AzureOpenAI
@@ -1674,6 +1723,7 @@ sealed class AgentEval.Snapshots.GoldenTraceCase : System.IEquatable<AgentEval.S
     AgentEval.Snapshots.GoldenTraceCase <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceCase other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean NotMeasured { get; init; }
     System.Boolean Passed { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls { get; init; }
     System.Int32 GetHashCode()
@@ -1689,6 +1739,7 @@ sealed class AgentEval.Snapshots.GoldenTraceComparison : System.IEquatable<Agent
     AgentEval.Snapshots.GoldenTraceComparison <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceComparison other)
     System.Boolean Equals(System.Object obj)
+    System.Boolean HasNotMeasured { get; }
     System.Boolean HasRegression { get; }
     System.Boolean HasToolChange { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases { get; init; }
@@ -1731,6 +1782,7 @@ enum AgentEval.Snapshots.TraceChange
     Unchanged
     Added
     Removed
+    NotMeasured
 class AgentEval.Testing.AssertionResult : System.IEquatable<AgentEval.Testing.AssertionResult>
     AgentEval.Output.AssertionResult ToAssertionResult()
     AgentEval.Testing.AssertionResult <Clone>$()
@@ -1753,7 +1805,9 @@ class AgentEval.Testing.ConversationAggregateStats : System.IEquatable<AgentEval
     System.Double SuccessRate { get; }
     System.Int32 ErrorCount { get; init; }
     System.Int32 GetHashCode()
+    System.Int32 ResponseRateMeasuredCount { get; init; }
     System.Int32 SuccessfulConversations { get; init; }
+    System.Int32 ToolUsageMeasuredCount { get; init; }
     System.Int32 TotalConversations { get; init; }
     System.String ToString()
     System.TimeSpan AverageDuration { get; init; }
@@ -2138,9 +2192,11 @@ class AgentEval.Tracing.TraceTokenUsage
 class AgentEval.Tracing.TraceToolCall
     System.Boolean Failed { get; }
     System.Boolean Succeeded { get; set; }
+    System.Boolean? WasExecuted { get; set; }
     System.DateTimeOffset? StartedAt { get; set; }
     System.Int64? DurationMs { get; set; }
     System.String Arguments { get; set; }
+    System.String CallId { get; set; }
     System.String Error { get; set; }
     System.String Name { get; set; }
     System.String Result { get; set; }
@@ -2167,10 +2223,17 @@ sealed class AgentEval.Tracing.WorkflowTrace
     System.String WorkflowType { get; set; }
     ctor()
 class AgentEval.Tracing.WorkflowTraceEdge
+    System.Boolean? ConditionResult { get; set; }
+    System.Int32? SourceStepIndex { get; set; }
+    System.Int32? TargetStepIndex { get; set; }
     System.String Condition { get; set; }
+    System.String EdgeId { get; set; }
     System.String EdgeType { get; set; }
     System.String From { get; set; }
+    System.String MatchedSwitchLabel { get; set; }
     System.String To { get; set; }
+    System.String TransferredData { get; set; }
+    System.TimeSpan? TraversedAt { get; set; }
     ctor()
 class AgentEval.Tracing.WorkflowTraceError
     System.Int64 OccurredAtMs { get; set; }
@@ -2182,7 +2245,9 @@ class AgentEval.Tracing.WorkflowTraceError
 class AgentEval.Tracing.WorkflowTraceGraph
     System.Boolean HasConditionalRouting { get; set; }
     System.Boolean HasParallelExecution { get; set; }
+    System.Collections.Generic.List<AgentEval.Models.ParallelBranch> ParallelBranches { get; set; }
     System.Collections.Generic.List<AgentEval.Tracing.WorkflowTraceEdge> Edges { get; set; }
+    System.Collections.Generic.List<AgentEval.Tracing.WorkflowTraceEdge> TraversedEdges { get; set; }
     System.Collections.Generic.List<System.String> ExitPoints { get; set; }
     System.Collections.Generic.List<System.String> Nodes { get; set; }
     System.String EntryPoint { get; set; }
@@ -2265,6 +2330,7 @@ class AgentEval.Tracing.WorkflowTraceStep
     System.String Input { get; set; }
     System.String Output { get; set; }
     System.String ParallelBranchId { get; set; }
+    System.String TimingNotMeasuredReason { get; set; }
     ctor()
 enum AgentEval.Trust.TrustBand
     Unknown

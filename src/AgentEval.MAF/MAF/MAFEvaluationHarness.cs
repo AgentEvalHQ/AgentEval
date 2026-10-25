@@ -97,7 +97,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             if (metrics != null)
             {
                 metrics.EndTime = DateTimeOffset.UtcNow;
-                metrics.ModelUsed = options.ModelName;
+                metrics.ModelUsed = ModelForCost(options, agent);
             }
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
 
@@ -155,7 +155,9 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                     // Fallback: estimate tokens from text when provider doesn't return usage
                     // This is common with Azure OpenAI via MAF SDK
                     metrics.PromptTokens = ModelPricing.EstimatePromptTokens(null, testCase.Input);
-                    metrics.CompletionTokens = ModelPricing.EstimateTokensFromText(result.ActualOutput);
+                    // The response text, as the streaming path does: result.ActualOutput is not set until below, so
+                    // this estimated 0 completion tokens on every run and priced them.
+                    metrics.CompletionTokens = ModelPricing.EstimateTokensFromText(response.Text);
                     metrics.TokensAreEstimated = true;
                 }
                 
@@ -265,7 +267,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         
         options ??= new EvaluationOptions();
         var result = new TestResult { TestName = testCase.Name };
-        var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = options.ModelName };
+        var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = ModelForCost(options, agent) };
         WarnIfExpectedToolsUnenforced(testCase);
         var toolCalls = new Dictionary<string, ToolCallRecord>();
         var responseText = new System.Text.StringBuilder();
@@ -601,10 +603,18 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
 
         _logger.LogInformation($"   Suite: {summary.SuiteName}");
         _logger.LogInformation($"   Tests Passed: {summary.PassedCount}/{summary.TotalCount}");
-        _logger.LogInformation($"   Average Score: {summary.AverageScore:F1}/100");
+        // The average is over the measured tests: a test with no verdict carries a placeholder 0 that is not a score.
+        _logger.LogInformation(summary.HasMeasuredScore
+            ? $"   Average Score: {summary.AverageScore:F1}/100 (over {summary.MeasuredCount} measured)"
+            : "   Average Score: n/a (nothing measured)");
 
         foreach (var result in summary.Results)
         {
+            if (result.JudgeFailed || result.HasError)
+            {
+                _logger.LogWarning($"   ⚠️ {result.TestName}: not measured");
+                continue;
+            }
             var status = result.Passed ? "✅" : "❌";
             var level = result.Passed ? LogLevel.Information : LogLevel.Error;
             _logger.Log(level, $"   {status} {result.TestName}: {result.Score}/100");
@@ -616,7 +626,11 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         }
         else
         {
-            _logger.LogWarning($"\n   ⚠️ {summary.FailedCount} test(s) need attention.\n");
+            // Failures and tests with no verdict apart: a run that only went unmeasured printed "0 test(s) need attention".
+            if (summary.FailedCount > 0)
+                _logger.LogWarning($"\n   ⚠️ {summary.FailedCount} test(s) failed.\n");
+            if (summary.NotMeasuredCount > 0)
+                _logger.LogWarning($"\n   ⚠️ {summary.NotMeasuredCount} test(s) not measured (the judge produced no verdict, or the run errored).\n");
         }
     }
     
@@ -626,7 +640,16 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         if (text.Length <= maxLength) return text;
         return text[..(maxLength - 3)] + "...";
     }
-    
+
+    /// <summary>
+    /// The model a run's cost is priced at: <see cref="EvaluationOptions.ModelName"/> when set, else the model the agent
+    /// says it runs (<see cref="AgentEval.Comparison.IModelIdentifiable"/>). With options shared across agents, as
+    /// <c>StochasticRunner</c> and <c>ModelComparer</c> share them, the agent's own model is what prices each model's
+    /// runs at its own rate; before, every run was priced at the one options name, or not priced at all.
+    /// </summary>
+    private static string? ModelForCost(EvaluationOptions options, IEvaluableAgent agent) =>
+        options.ModelName ?? (agent as AgentEval.Comparison.IModelIdentifiable)?.ModelId;
+
     // ═══════════════════════════════════════════════════════════════════════════
     // TIMELINE & FAILURE REPORT HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -640,9 +663,13 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             var invocation = new ToolInvocation
             {
                 ToolName = call.Name,
-                StartTime = (call.StartTime ?? timeline.StartedAt) - timeline.StartedAt,
+                // Trace enrichment anchors duration at UnixEpoch, not at a real start in this run.
+                StartTime = call.StartTime is { } start && start >= timeline.StartedAt
+                    ? start - timeline.StartedAt : TimeSpan.Zero,
                 Duration = call.Duration ?? TimeSpan.Zero,
-                Succeeded = !call.HasError,
+                Succeeded = call.WasExecuted && !call.HasError,
+                OutcomeNotMeasuredReason = !call.WasExecuted && !call.HasError ? "Tool execution was not observed." : null,
+                TimingNotMeasuredReason = !call.HasTiming ? "Tool completion timing was not observed." : null,
                 ErrorMessage = call.Exception?.Message,
                 Arguments = call.GetArgumentsAsJson(),
                 Result = call.Result?.ToString()
@@ -673,34 +700,27 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     /// <b>a judge that failed to produce a verdict never passes.</b>
     /// </summary>
     /// <remarks>
-    /// ADR-030 Slice 0.2 (defect D-b). <c>ChatClientEvaluator</c> returns
-    /// <c>OverallScore = EvaluationDefaults.DefaultFailureScore</c> (50) with
-    /// <see cref="EvaluationResult.EvaluationFailed"/> set when the judge returned no JSON, malformed JSON or
-    /// no recognisable score field. That 50 is a sentinel, documented as "should not be read as a real grade"
-    /// — but this harness compared it against <see cref="TestCase.PassingScore"/> and never read the flag, so
-    /// every test case with <c>PassingScore &lt;= 50</c> passed on a judge parse failure. Non-optional and
-    /// without opt-out: the sentinel is discarded (score 0, the same shape the harness already uses for an
-    /// agent exception), <c>Passed</c> is false, and the failure report names the judge as the cause so it is
-    /// distinguishable from a genuinely low-scoring agent.
+    /// Missing or failed verdicts cannot pass, including at a zero passing threshold.
+    /// The legacy TestResult score is unmeasured when JudgeFailed is set.
     /// </remarks>
     private static void ApplyJudgeVerdict(TestResult result, TestCase testCase, EvaluationResult evaluation)
     {
-        if (evaluation.EvaluationFailed)
+        if (evaluation.EvaluationFailed || evaluation.OverallScore is not { } score)
         {
             result.JudgeFailed = true;
             result.Score = 0;
             result.Passed = false;
             result.Details = "The judge produced no verdict (evaluation failed): " +
                              (string.IsNullOrWhiteSpace(evaluation.Summary) ? "no parseable judgement was returned" : evaluation.Summary) +
-                             ". This is an evaluation-infrastructure failure, not a grade — the fallback score was discarded.";
+                             ". This is an evaluation-infrastructure failure, not a grade — no score was measured.";
             result.Suggestions = evaluation.Improvements.ToList();
             result.CriteriaResults = evaluation.CriteriaResults.ToList();
             return;
         }
 
         result.JudgeRubricDigest = evaluation.RubricDigest;
-        result.Score = evaluation.OverallScore;
-        result.Passed = evaluation.OverallScore >= testCase.PassingScore;
+        result.Score = score;
+        result.Passed = score >= testCase.PassingScore;
         result.Details = evaluation.Summary;
         result.Suggestions = evaluation.Improvements.ToList();
         result.CriteriaResults = evaluation.CriteriaResults.ToList();
@@ -709,7 +729,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     private static FailureReport BuildFailureReport(TestResult result, TestCase testCase, ToolCallTimeline timeline, EvaluationResult? evaluation = null)
     {
         // Determine the primary failure reason for the headline
-        var judgeFailed = evaluation?.EvaluationFailed == true;
+        var judgeFailed = result.JudgeFailed;
         var headline = judgeFailed
             ? $"Test '{testCase.Name}' could not be graded: the judge produced no verdict"
             : result.Score < testCase.PassingScore
@@ -731,7 +751,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             report.AddReason("Judge",
                 "The evaluator failed to produce a usable judgement (no JSON, malformed JSON, or no score field): " +
                 (string.IsNullOrWhiteSpace(evaluation!.Summary) ? "no details" : evaluation.Summary) +
-                ". The fallback score was discarded; re-run the evaluation or inspect the judge model / prompt.",
+                ". No score was measured; re-run the evaluation or inspect the judge model / prompt.",
                 FailureSeverity.Critical);
             report.AddSuggestion("Check Judge", "Inspect the judge model's raw response and the evaluation prompt; the agent was not graded.", 0.9);
         }

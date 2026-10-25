@@ -180,6 +180,88 @@ public class TraceFidelityTests
             chat: Chat(ChatResp(0, "stop", new[] { ("Book", "{\"x\":1}") }, prompt: 10, completion: 5)));
         Assert.Equal(1.0, report.OverallScore, 6);
         Assert.All(report.Discrepancies, d => Assert.Equal(1.0, d.Score, 6));
+        Assert.All(report.Discrepancies, d => Assert.True(d.Measured));
+    }
+
+    // A chat-boundary response whose provider reported no token usage.
+    private static TraceEntry ChatRespNoUsage(int i, string? finish = "stop", IEnumerable<(string Name, string Args)>? calls = null)
+        => TraceEntry.ForChatResponse(
+            i, correlationId: "inv-1", text: "…", durationMs: 10, usage: null,
+            toolCalls: calls?.Select(c => new TraceToolCall { Name = c.Name, Arguments = c.Args }).ToList(),
+            finishReason: finish, providerMetadata: null);
+
+    [Fact]
+    public void TokenUnderReporting_WithNoChatSideUsage_IsNotMeasured_AndTheRootLeavesItOut()
+    {
+        // Decision 8. The chat boundary's unknown token count read as 0, met any agent account, and the class read clean:
+        // one hidden retry rooted at 0.90 with token_under_reporting counted as a clean 0.10 of it.
+        var report = Reconcile(
+            agent: Agent(null, AgentResp(0, new[] { ("SearchFlights", "{}") })),
+            chat: Chat(
+                ChatRespNoUsage(0, "tool_calls", new[] { ("SearchFlights", "{}") }),
+                ChatRespNoUsage(1, "tool_calls", new[] { ("SearchFlights", "{}") })));
+
+        var tokens = Class(report, TraceFidelityRubric.TokenUnderReporting);
+        Assert.False(tokens.Measured);
+        Assert.Equal(0, tokens.Count);
+        Assert.Contains("not measured", Assert.Single(tokens.Examples));
+        Assert.Equal(1.0 - 0.20 * 0.50 / 0.90, report.OverallScore, 6);   // over the five measured classes
+    }
+
+    [Fact]
+    public void TokenUnderReporting_WithSomeChatSideUsage_CannotCertifyCleanAccounting()
+    {
+        // A partial lower bound cannot prove that the agent's account was complete.
+        var report = Reconcile(
+            agent: Agent(new TracePerformance { TotalPromptTokens = 10, TotalCompletionTokens = 5 }, AgentResp(0)),
+            chat: Chat(ChatResp(0, prompt: 10, completion: 5), ChatRespNoUsage(1)));
+
+        Assert.False(Class(report, TraceFidelityRubric.TokenUnderReporting).Measured);
+        Assert.Equal(1.0, report.OverallScore, 6);
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(new TracePerformance { TotalPromptTokens = 10, TotalCompletionTokens = 5 }, AgentResp(0)),
+            Chat(ChatResp(0, prompt: 10, completion: 5), ChatRespNoUsage(1)));
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public void TokenUnderReporting_PartialUsageWithProvenShortfall_StillDetectsViolation()
+    {
+        var report = Reconcile(
+            agent: Agent(new TracePerformance { TotalPromptTokens = 1, TotalCompletionTokens = 0 }, AgentResp(0)),
+            chat: Chat(ChatResp(0, prompt: 100, completion: 50), ChatRespNoUsage(1)));
+        var tokens = Class(report, TraceFidelityRubric.TokenUnderReporting);
+        Assert.True(tokens.Measured);
+        Assert.Equal(1, tokens.Count);
+    }
+
+    [Fact]
+    public void TokenUnderReporting_PartialZeroUsage_DoesNotCertifyZeroSpend()
+    {
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(new TracePerformance { TotalPromptTokens = 0, TotalCompletionTokens = 0 }, AgentResp(0)),
+            Chat(ChatResp(0, prompt: 0, completion: 0), ChatRespNoUsage(1)));
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public void AnOtherwiseCleanPair_WithNoChatSideUsage_WithholdsItsPass()
+    {
+        // Today: PASS, a clean verdict over a class nobody checked.
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(null, AgentResp(0, new[] { ("Book", "{\"x\":1}") })),
+            Chat(ChatRespNoUsage(0, "stop", new[] { ("Book", "{\"x\":1}") })));
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+        Assert.Contains("token_under_reporting", result.Details.Summary);
+        var tokens = result.Details.SubResults!.Single(s => s.Metric.Key == "trace_fidelity.token_under_reporting");
+        Assert.Equal("skipped", tokens.Score.Label);
+        Assert.False(tokens.Details.Dimensions!.ContainsKey("score100"));
+        Assert.All(result.Details.SubResults!.Where(s => s != tokens), s => Assert.Equal("pass", s.Score.Label));
     }
 
     // ── T3.3: EvalResult tree projection ──

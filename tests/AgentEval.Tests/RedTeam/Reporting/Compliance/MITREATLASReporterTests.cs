@@ -446,7 +446,7 @@ public class MITREATLASReporterTests
         var t0051 = report.Techniques.First(t => t.Id == "AML.T0051");
 
         Assert.Equal(TechniqueTestStatus.Tested, t0051.Status);
-        Assert.Equal(100.0, t0051.PassRate, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
+        Assert.Equal(100.0, t0051.PassRate!.Value, precision: 4);   // conclusive-only (5/5), not diluted (5/100)
     }
 
     private static RedTeamResult CreateResultForMitreIds(params string[] mitreIds) => new()

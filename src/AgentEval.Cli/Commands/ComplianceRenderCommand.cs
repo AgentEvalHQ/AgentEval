@@ -10,6 +10,7 @@ using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Reporting;
 using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Reading;
 using EuAiActLoader = AgentEval.Compliance.EuAiAct.Articles.Loading.ArticleScenarioYamlLoader;
 using EuAiActScenarioToAtomicEval = AgentEval.Compliance.EuAiAct.Articles.Building.ScenarioToAtomicEval;
 using EuAiActArticleCompositeBuilder = AgentEval.Compliance.EuAiAct.Articles.Building.ArticleCompositeBuilder;
@@ -21,7 +22,7 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval compliance render</c> subcommand.
-/// Reads an existing <c>gdpr-evidence.json</c> and renders a PDF report without any LLM cost.
+/// Reads a verified AEF compliance artifact (converting legacy reports when needed) and renders without LLM cost.
 /// </summary>
 public static class ComplianceRenderCommand
 {
@@ -87,61 +88,40 @@ public static class ComplianceRenderCommand
         var regulationFolder = isGdpr ? "GDPR" : "EU-AI-Act";
         var complianceDir = Path.Combine(agentEvalDir, "compliance", regulationFolder, sanitizedSubject);
 
-        if (!Directory.Exists(complianceDir))
+        AefComplianceReport? report;
+        try
         {
-            Console.Error.WriteLine($"No compliance evidence found at {complianceDir}.");
-            return 1;
-        }
-
-        if (isEuAiAct)
-        {
-            return await RenderEuAiActAsync(complianceDir, ts);
-        }
-
-        // ── Resolve timestamp directory ──────────────────────────────────────
-        string evidenceDir;
-        if (!string.IsNullOrWhiteSpace(ts))
-        {
-            evidenceDir = Path.Combine(complianceDir, ts);
-        }
-        else
-        {
-            // Use the most recent timestamp directory
-            var dirs = Directory.GetDirectories(complianceDir)
-                .OrderByDescending(d => d)
-                .ToList();
-            if (dirs.Count == 0)
+            var legacyDirectories = Directory.Exists(complianceDir)
+                ? Directory.EnumerateDirectories(complianceDir).Take(1001).ToArray()
+                : [];
+            report = new AefComplianceReportReader().Read(Path.Combine(agentEvalDir, "aef", "runs"),
+                legacyDirectories, subject, regulationFolder, string.IsNullOrWhiteSpace(ts) ? null : ts);
+            if (report is null)
             {
-                Console.Error.WriteLine($"No evidence directories found under {complianceDir}.");
+                Console.Error.WriteLine("No captured rich compliance report is available for this selection. Native evidence takes precedence; absent content cannot be reconstructed from legacy siblings.");
                 return 1;
             }
-            evidenceDir = dirs[0];
         }
-
-        if (!Directory.Exists(evidenceDir))
+        catch (Exception ex)
         {
-            Console.Error.WriteLine($"Evidence directory not found: {evidenceDir}.");
+            Console.Error.WriteLine($"Failed to read verified compliance evidence: {ex.Message}");
             return 1;
         }
-
-        // ── Load gdpr-evidence.json ──────────────────────────────────────────
-        var evidenceFile = Path.Combine(evidenceDir, "gdpr-evidence.json");
-        if (!File.Exists(evidenceFile))
-        {
-            Console.Error.WriteLine($"gdpr-evidence.json not found at {evidenceFile}.");
-            return 1;
-        }
+        var evidenceDir = Path.Combine(complianceDir, report.Timestamp);
+        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
+        Console.WriteLine($"Evidence integrity: {report.Run.Integrity}; signature trust: {report.Run.SignatureTrust}.");
+        if (report.Run.Imported)
+            Console.WriteLine("Imported: not sealed when it ran. Original execution provenance is not established by the ingest seal.");
+        if (isEuAiAct) return await RenderEuAiActAsync(report.Document, pdfPath);
 
         GdprComplianceEvidence evidence;
         try
         {
-            await using var stream = File.OpenRead(evidenceFile);
-            evidence = await JsonSerializer.DeserializeAsync<GdprComplianceEvidence>(stream, s_jsonOpts)
-                ?? throw new InvalidOperationException("Deserialized evidence was null.");
+            evidence = BenchmarkReportJson.Read<GdprComplianceEvidence>(report.Document.Document, s_jsonOpts, "gdpr-evidence.schema.json");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to read evidence file: {ex.Message}");
+            Console.Error.WriteLine($"Failed to read GDPR report: {ex.Message}");
             return 1;
         }
 
@@ -165,9 +145,9 @@ public static class ComplianceRenderCommand
         }
 
         // ── Render PDF ───────────────────────────────────────────────────────
-        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
         try
         {
+            Directory.CreateDirectory(evidenceDir);
             var renderer = new GDPRPdfRenderer(articles);
             await renderer.RenderAsync(evidence, pdfPath);
             Console.WriteLine($"PDF report written to: {pdfPath}");
@@ -180,49 +160,16 @@ public static class ComplianceRenderCommand
         }
     }
 
-    private static async Task<int> RenderEuAiActAsync(string complianceDir, string? ts)
+    private static async Task<int> RenderEuAiActAsync(AefComplianceDocument document, string pdfPath)
     {
-        // ── Resolve timestamp directory ──────────────────────────────────────
-        string evidenceDir;
-        if (!string.IsNullOrWhiteSpace(ts))
-        {
-            evidenceDir = Path.Combine(complianceDir, ts);
-        }
-        else
-        {
-            var dirs = Directory.GetDirectories(complianceDir).OrderByDescending(d => d).ToList();
-            if (dirs.Count == 0)
-            {
-                Console.Error.WriteLine($"No evidence directories found under {complianceDir}.");
-                return 1;
-            }
-            evidenceDir = dirs[0];
-        }
-
-        if (!Directory.Exists(evidenceDir))
-        {
-            Console.Error.WriteLine($"Evidence directory not found: {evidenceDir}.");
-            return 1;
-        }
-
-        // ── Load eu-ai-act-evidence.json ─────────────────────────────────────
-        var evidenceFile = Path.Combine(evidenceDir, "eu-ai-act-evidence.json");
-        if (!File.Exists(evidenceFile))
-        {
-            Console.Error.WriteLine($"eu-ai-act-evidence.json not found at {evidenceFile}.");
-            return 1;
-        }
-
         EuAiActComplianceEvidence evidence;
         try
         {
-            await using var stream = File.OpenRead(evidenceFile);
-            evidence = await JsonSerializer.DeserializeAsync<EuAiActComplianceEvidence>(stream, s_jsonOpts)
-                ?? throw new InvalidOperationException("Deserialized evidence was null.");
+            evidence = BenchmarkReportJson.Read<EuAiActComplianceEvidence>(document.Document, s_jsonOpts, "eu-ai-act-evidence.schema.json");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to read evidence file: {ex.Message}");
+            Console.Error.WriteLine($"Failed to read EU AI Act report: {ex.Message}");
             return 1;
         }
 
@@ -247,9 +194,9 @@ public static class ComplianceRenderCommand
         }
 
         // ── Render PDF ───────────────────────────────────────────────────────
-        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
         try
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(pdfPath)!);
             var renderer = new EuAiActPdfRenderer(articles);
             await renderer.RenderAsync(evidence, pdfPath);
             Console.WriteLine($"PDF report written to: {pdfPath}");

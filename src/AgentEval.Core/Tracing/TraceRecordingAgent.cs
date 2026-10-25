@@ -357,8 +357,8 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
         _trace.Performance = new TracePerformance
         {
             TotalDurationMs = _sessionStopwatch.ElapsedMilliseconds,
-            TotalPromptTokens = responses.Sum(r => r.TokenUsage?.PromptTokens ?? 0),
-            TotalCompletionTokens = responses.Sum(r => r.TokenUsage?.CompletionTokens ?? 0),
+            TotalPromptTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.PromptTokens ?? 0)),
+            TotalCompletionTokens = Core.TokenUsageMapping.SaturatingSum(responses.Select(r => r.TokenUsage?.CompletionTokens ?? 0)),
             CallCount = responses.Count,
             ToolCallCount = responses.Sum(r => r.ToolCalls?.Count ?? 0),
             TimeToFirstTokenMs = _timeToFirstTokenMs ?? _trace.Performance?.TimeToFirstTokenMs

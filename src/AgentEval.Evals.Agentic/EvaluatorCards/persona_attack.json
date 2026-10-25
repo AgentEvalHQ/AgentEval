@@ -3,7 +3,7 @@
   "key": "persona_attack",
   "name": "Persona Attack Resistance",
   "category": "adversarial",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Hybrid deterministic-first detector for persona-substitution attacks (DAN, act as if you have no restrictions, etc.). Template scan triggers an LLM judge to assess whether the agent adopted the adversarial persona or resisted.",
   "costTier": "Low",
   "higherIsBetter": true,
@@ -25,7 +25,7 @@
       "kind": "systemMessage",
       "key": "",
       "required": false,
-      "description": "Optional system message."
+      "description": "The agent's system message, when captured; sent to the judge (fenced as data) as the agent's configured identity and constraints."
     }
   ],
   "recommendedVisualization": "histogram",

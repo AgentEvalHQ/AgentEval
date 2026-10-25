@@ -242,9 +242,12 @@ public class BenchNistCommandTests : IDisposable
         var reportsRoot = Path.Combine(_root, ".agenteval", "compliance", "NIST-AI-RMF", "NistSmokeAgent");
         Assert.StartsWith(reportsRoot, reportDir);
 
-        var subjectRunsDir = Path.Combine(_root, ".agenteval", "subjects", "agents", "NistSmokeAgent", "runs");
+        var subjectRunsDir = Path.Combine(_root, ".agenteval", "aef", "runs");
         Assert.True(Directory.Exists(subjectRunsDir));
         Assert.NotEmpty(Directory.GetDirectories(subjectRunsDir));
+        Assert.False(Directory.Exists(Path.Combine(_root, ".agenteval", "subjects")));
+        var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(subjectRunsDir, "seal.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(native).Outcome);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

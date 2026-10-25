@@ -2,8 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using AgentEval.Output;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
 
@@ -15,111 +13,13 @@ namespace AgentEval.MissionControl.Rest;
 /// (per plan-07 §3 Challenge 1: GraphQL doesn't do streams cleanly) so they
 /// stay REST. Plan-08 MC1.3.2 / MC1.3.3 / MC1.3.4 / MC1.3.5 / MC1.3.6.
 /// </summary>
-internal static class BinaryEndpoints
+internal static partial class BinaryEndpoints
 {
-    private static readonly JsonSerializerOptions s_traceJson = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-    };
-
     public static void MapBinaryEndpoints(this WebApplication app)
     {
-        // ─── MC1.3.2 — trace stream ──────────────────────────────────────────
-        // Returns the agent-trace.json for a given run as application/json.
-        // 404 when the run is unknown OR has no trace artifact.
-        app.MapGet("/api/v1/runs/{runId}/trace", async (
-            string runId,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            if (!FileSystemLayout.IsSafePathSegment(runId)) return HttpResults.BadRequest("Invalid runId.");
-            if (!store.IsAvailable) return HttpResults.NotFound();
-            var trace = await store.GetTraceAsync(runId, ct);
-            if (trace is null) return HttpResults.NotFound();
-
-            // Serialize on the fly; trace files are typically <1 MB JSON. For
-            // large traces (>5 MB compressed), Phase 2's blob-store-backed
-            // S3 streaming will replace this in-memory path.
-            //
-            // Phase-7 Task 7.13: force attachment Content-Disposition. A trace
-            // contains agent + tool I/O, which is user-controlled. Forcing
-            // attachment (over `application/json` inline) prevents a browser
-            // from treating any reflected XSS-shaped JSON as an HTML render
-            // path. Defence-in-depth — the JSON content type already protects.
-            var json = JsonSerializer.Serialize(trace, s_traceJson);
-            var result = HttpResults.File(
-                System.Text.Encoding.UTF8.GetBytes(json),
-                contentType: "application/json",
-                fileDownloadName: $"agent-trace.{runId}.json");
-            return result;
-        });
-
-        // ─── MC1.3.3 — report stream (markdown / html / junit / sarif) ───────
-        app.MapGet("/api/v1/runs/{runId}/reports/{format}", async (
-            string runId,
-            string format,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            if (!FileSystemLayout.IsSafePathSegment(runId)) return HttpResults.BadRequest("Invalid runId.");
-            // `format` is also a path segment (`report.{format}`) — a `..`-laced
-            // value would escape the reports dir even though IsAllowedReportFormat
-            // already rejects it. Defence-in-depth.
-            if (!FileSystemLayout.IsSafePathSegment(format)) return HttpResults.BadRequest("Invalid format.");
-            if (!IsAllowedReportFormat(format))
-                return HttpResults.BadRequest($"Unsupported report format '{format}'. Allowed: {string.Join(", ", AllowedReportFormats)}.");
-
-            // Mode A: locate via filesystem path. We need the subject (kind + name)
-            // to build the path; resolve via the run manifest first.
-            if (string.IsNullOrEmpty(store.WorkspaceRoot))
-                return HttpResults.NotFound();
-
-            var manifest = await store.GetRunManifestAsync(runId, ct);
-            if (manifest is null) return HttpResults.NotFound();
-
-            var layout = new FileSystemLayout(store.WorkspaceRoot);
-            var subject = manifest.Subject.ToIdentity();
-            var path = layout.ReportFile(subject, runId, format);
-
-            if (!File.Exists(path)) return HttpResults.NotFound();
-
-            var contentType = ContentTypeFor(format);
-            // Force download for browser-rendered formats (html / xml / sarif) so a
-            // report containing user-controlled content can't run as same-origin
-            // script against the GraphQL + REST surface. Markdown is safe to inline.
-            var inline = format is "markdown" or "md";
-            var fileDownloadName = inline ? null : $"report.{format}";
-            var result = HttpResults.File(File.OpenRead(path), contentType, fileDownloadName: fileDownloadName);
-            return result;
-        });
-
-        // ─── MC1.3.4 — compliance PDF stream ─────────────────────────────────
-        app.MapGet("/api/v1/compliance/{regulation}/{subjectName}/{ts}/report.pdf", async (
-            string regulation,
-            string subjectName,
-            string ts,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            if (!FileSystemLayout.IsSafePathSegment(regulation)) return HttpResults.BadRequest("Invalid regulation.");
-            if (!FileSystemLayout.IsSafePathSegment(subjectName)) return HttpResults.BadRequest("Invalid subjectName.");
-            if (!FileSystemLayout.IsSafePathSegment(ts)) return HttpResults.BadRequest("Invalid timestamp.");
-            if (string.IsNullOrEmpty(store.WorkspaceRoot)) return HttpResults.NotFound();
-
-            // Compliance evidence on disk is keyed by subject NAME only — the kind
-            // doesn't appear in the path. Try both kinds; whichever resolves wins.
-            var layout = new FileSystemLayout(store.WorkspaceRoot);
-            foreach (var kind in new[] { SubjectKind.Agent, SubjectKind.Workflow })
-            {
-                var pdfPath = layout.ComplianceReportPdf(regulation, new SubjectIdentity(kind, subjectName), ts);
-                if (File.Exists(pdfPath))
-                    return HttpResults.File(File.OpenRead(pdfPath), "application/pdf");
-            }
-            await Task.CompletedTask;  // placate analyser; nothing to await on the not-found path
-            return HttpResults.NotFound();
-        });
+        app.MapRunDownloads();
+        app.MapHistoryDownload();
+        app.MapCompliancePdfDownload();
 
         // ─── MC1.3.5 — compliance evidence JSON schema ───────────────────────
         // Returns the JSON schema for a regulation's evidence so a generic SPA can
@@ -149,49 +49,11 @@ internal static class BinaryEndpoints
             return HttpResults.Content(schema, "application/schema+json");
         });
 
-        // ─── MC1.3.6 — subject history JSONL stream ──────────────────────────
-        app.MapGet("/api/v1/subjects/{kind}/{name}/history", async (
-            HttpContext httpContext,
-            string kind,
-            string name,
-            IOutputStoreReader store,
-            CancellationToken ct) =>
-        {
-            // Accept "agent"/"workflow" in any case so the URL stays user-friendly.
-            if (!Enum.TryParse<SubjectKind>(kind, ignoreCase: true, out var kindEnum))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await httpContext.Response.WriteAsync($"Unknown subject kind '{kind}'.", ct);
-                return;
-            }
-            if (!FileSystemLayout.IsSafePathSegment(name))
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await httpContext.Response.WriteAsync("Invalid subject name.", ct);
-                return;
-            }
-            if (!store.IsAvailable)
-            {
-                httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
-
-            var subject = new SubjectIdentity(kindEnum, name);
-            httpContext.Response.ContentType = "application/x-ndjson";
-            httpContext.Response.Headers["Cache-Control"] = "no-store";
-
-            await foreach (var entry in store.GetHistoryAsync(subject, range: null, ct))
-            {
-                var line = JsonSerializer.Serialize(entry, s_traceJson);
-                await httpContext.Response.WriteAsync(line, ct);
-                await httpContext.Response.WriteAsync("\n", ct);
-            }
-        });
     }
 
     // Single source of truth for accepted report formats — the rejection message is derived from
     // this so it can never drift from the allow-list (MNT-13).
-    private static readonly string[] AllowedReportFormats = { "markdown", "md", "html", "junit", "sarif", "xml" };
+    private static readonly string[] AllowedReportFormats = AgentEval.MissionControl.Services.WorkspaceArtifactProjector.ReportFormats;
 
     private static bool IsAllowedReportFormat(string format) => Array.IndexOf(AllowedReportFormats, format) >= 0;
 

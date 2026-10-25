@@ -195,11 +195,14 @@ public static class BenchAgenticCalibrateCommand
     /// <summary>
     /// A category's gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a key was left out of the scoring because
     /// it was not measured on every record (#203 review, B6c-7) — scoring the rest would score a sample selected on the
-    /// evaluator's own verdict, so the category is not a measured PASS. Otherwise PASS or FAIL on accuracy and kappa.
+    /// evaluator's own verdict, so the category is not a measured PASS. NOT MEASURED: entries were dispatched but none was
+    /// scored (all not measured or inapplicable), so accuracy and kappa are the 0 of an empty set, not a measured FAIL
+    /// (T13-13). Otherwise PASS or FAIL on accuracy and kappa. Only PASS meets the gate.
     /// </summary>
     internal static string CategoryStatus(CalibrationCategoryReport report, double accuracyThreshold, double kappaThreshold) =>
         report.EvaluationFailures > 0 ? "INFRA-FAIL"
         : report.ExcludedKeys.Count > 0 ? "INCOMPLETE"
+        : report.EntryCount == 0 ? "NOT MEASURED"
         : report.Accuracy >= accuracyThreshold && report.CohensKappa >= kappaThreshold ? "PASS"
         : "FAIL";
 
@@ -252,7 +255,8 @@ public static class BenchAgenticCalibrateCommand
     /// <param name="ct">Cancellation token.</param>
     /// <param name="recordsPath">When set, one JSON line per evaluated case is written here (<c>--records</c>).</param>
     /// <param name="limitPerCategory">When set, at most this many entries per category are evaluated (<c>--limit</c>).</param>
-    /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
+    /// <returns>0 on success, <see cref="ExitCodes.GateFailed"/> (9) if thresholds not met,
+    /// <see cref="ExitCodes.GateIndeterminate"/> (11) if nothing was scored in a category and none failed, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
@@ -442,7 +446,7 @@ public static class BenchAgenticCalibrateCommand
         // EvaluationFailures > 0 with a distinct INFRA-FAIL status.
         // Post-remediation tuning: per-category threshold overrides + skip the
         // "unknown" bucket that captures dispatch-coverage gaps (deferred to v1.1).
-        bool allPass = true;
+        var statuses = new List<string>();
         foreach (var (category, categoryReport) in report.PerCategory.OrderBy(kv => kv.Key))
         {
             if (IsAgentInfraSkipCategory(category, categoryReport))
@@ -464,21 +468,26 @@ public static class BenchAgenticCalibrateCommand
             var thrSuffix = s_categoryOverrides.ContainsKey(category)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
+            var scored = categoryReport.EntryCount > 0;   // nothing scored: no accuracy or kappa to show
             Console.WriteLine(
-                $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
-                $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
+                $"  [{status}] {category}: accuracy={(scored ? categoryReport.Accuracy.ToString("P1") : "n/a")}, " +
+                $"kappa={(scored ? FormatKappa(categoryReport.CohensKappa) : "n/a")}, entries={categoryReport.EntryCount}, " +
                 $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
                 $"inapplicable={categoryReport.NotApplicable}, carved_out={carvedOut}" +
                 (notRouted > 0 ? $", not_routed={notRouted} ({notRoutedKeys})" : "") + thrSuffix +
                 (complete ? "" : $" — excluded keys (not measured on every record): {string.Join(", ", categoryReport.ExcludedKeys)}"));
-            if (status != "PASS") allPass = false;
+            statuses.Add(status);
         }
 
-        Console.WriteLine(allPass
-            ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
-            : $"Agentic calibration gate FAILED — one or more categories below " +
-              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, " +
-              "or was INCOMPLETE (a key not measured on every record).");
+        var gateExitCode = BenchCalibrateCommand.GateExitCode(statuses);
+        Console.WriteLine(gateExitCode switch
+        {
+            ExitCodes.Success => "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures.",
+            ExitCodes.GateIndeterminate => "Agentic calibration gate NOT MEASURED — nothing was scored in one or more categories and none failed: no conclusive verdict.",
+            _ => $"Agentic calibration gate FAILED — one or more categories below " +
+                 $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, " +
+                 "or was INCOMPLETE (a key not measured on every record).",
+        });
 
         if (limitPerCategory is not null)
         {
@@ -490,7 +499,7 @@ public static class BenchAgenticCalibrateCommand
             return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
         }
 
-        return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
+        return gateExitCode;
     }
 
     // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset
@@ -500,7 +509,7 @@ public static class BenchAgenticCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    private static string BuildMarkdownReport(
+    internal static string BuildMarkdownReport(
         AgentEval.Evals.Agentic.Calibration.CalibrationReport report,
         CalibrationJudgeIdentity judge)
     {
@@ -546,10 +555,12 @@ public static class BenchAgenticCalibrateCommand
             if (unrouted > 0)
                 sb.AppendLine($"| Not routed (a golden key nothing dispatches) | {unrouted} ({unroutedKeys}) | — | info |");
             sb.AppendLine($"| Keys excluded (not measured on every record) | {(cr.ExcludedKeys.Count == 0 ? "none" : string.Join(", ", cr.ExcludedKeys))} | none | {(cr.ExcludedKeys.Count == 0 ? "OK" : "INCOMPLETE")} |");
-            sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
-            sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
+            // Nothing scored: accuracy, kappa and the mean delta are the 0 of an empty set, so they read n/a.
+            var scored = cr.EntryCount > 0;
+            sb.AppendLine($"| Accuracy | {(scored ? cr.Accuracy.ToString("P1") : "n/a")} | >= {accThr:P0} | {(!scored ? "NOT MEASURED" : accOk ? "OK" : "BELOW")} |");
+            sb.AppendLine($"| Cohen's kappa | {(scored ? FormatKappa(cr.CohensKappa) : "n/a")} | >= {kapThr:F2} | {(!scored ? "NOT MEASURED" : kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
-            sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
+            sb.AppendLine($"| Mean score delta | {(scored ? cr.MeanScoreDelta.ToString("+0.000;-0.000;0.000") : "n/a")} | — | — |");
             sb.AppendLine();
         }
 

@@ -82,7 +82,7 @@ public sealed class SpaQueriesValidateTests : IClassFixture<SeededMissionControl
                 "Int" => 1,
                 "Float" => 1.0,
                 "Boolean" => false,
-                "SubjectKind" => "AGENT",
+                "SubjectKind" or "AefSubjectKind" => "AGENT",
                 "EvaluatorCostTier" => "LOW",
                 _ => "does-not-exist",
             }));

@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 namespace AgentEval.Exporters.Models;
 
 /// <summary>
@@ -21,13 +23,18 @@ internal sealed class DirectoryTestResult
     
     /// <summary>Whether the test was skipped.</summary>
     public bool Skipped { get; set; }
-    
-    /// <summary>Score achieved (0-100).</summary>
-    public double Score { get; set; }
-    
-    /// <summary>Duration in milliseconds.</summary>
-    public long DurationMs { get; set; }
-    
+
+    /// <summary>The test produced no verdict (the judge produced none, or the run errored): not a failure.</summary>
+    public bool NotMeasured { get; set; }
+
+    /// <summary>Score achieved (0-100); written as null when the test produced no score.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? Score { get; set; }
+
+    /// <summary>Duration in milliseconds; written as null when no timing was recorded.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public long? DurationMs { get; set; }
+
     /// <summary>Error message if failed.</summary>
     public string? Error { get; set; }
     
@@ -53,14 +60,16 @@ internal sealed class DirectorySummary
     /// <summary>When the evaluation was run.</summary>
     public DateTimeOffset Timestamp { get; set; }
     
-    /// <summary>Total duration formatted as hh:mm:ss.</summary>
-    public string Duration { get; set; } = "";
-    
+    /// <summary>Total duration formatted as hh:mm:ss; written as null when the run was not timed.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? Duration { get; set; }
+
     /// <summary>Overall aggregate statistics.</summary>
     public DirectorySummaryStats Stats { get; set; } = new();
-    
-    /// <summary>Overall score (0-100).</summary>
-    public double OverallScore { get; set; }
+
+    /// <summary>Overall score (0-100); written as null when nothing was measured.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? OverallScore { get; set; }
     
     /// <summary>Per-metric aggregate statistics.</summary>
     public Dictionary<string, DirectoryMetricStats> Metrics { get; set; } = new();
@@ -89,8 +98,9 @@ internal sealed class DirectorySummaryStats
     /// <summary>Number of skipped tests.</summary>
     public int Skipped { get; set; }
     
-    /// <summary>Pass rate (0.0 – 1.0).</summary>
-    public double PassRate { get; set; }
+    /// <summary>Pass rate (0.0 – 1.0); written as null when there are no tests.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public double? PassRate { get; set; }
 }
 
 /// <summary>
@@ -136,10 +146,11 @@ internal sealed class DirectoryRunMetadata
     
     /// <summary>When the evaluation started.</summary>
     public DateTimeOffset Timestamp { get; set; }
-    
-    /// <summary>Total duration formatted as hh:mm:ss.</summary>
-    public string Duration { get; set; } = "";
-    
+
+    /// <summary>Total duration formatted as hh:mm:ss; written as null when the run was not timed.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? Duration { get; set; }
+
     /// <summary>Agent/model information.</summary>
     public DirectoryAgentInfo? Agent { get; set; }
     

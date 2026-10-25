@@ -112,7 +112,7 @@ public static class GatekeeperBulkheadIsolation
     {
         if (!condition)
         {
-            throw new InvalidOperationException("Bulkhead sample failed: " + message + ".");
+            throw new SampleCheckFailedException("Bulkhead sample failed: " + message + ".");
         }
     }
 

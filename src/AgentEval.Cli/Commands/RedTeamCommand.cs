@@ -724,7 +724,10 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine($"  === Red Team Summary ===");
                 Console.Error.WriteLine($"  {result.Summary}");
                 // RC-6 honesty: lead with the conclusive-only score + coverage, not the inconclusive-diluted OverallScore.
-                Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
+                // T81: with no conclusive probe there is no score; say why instead of printing a blank or a 0.
+                Console.Error.WriteLine(result.ConclusiveScore is { } conclusiveScore
+                    ? $"  Verdict: {result.Verdict}  (score {conclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)"
+                    : $"  Verdict: {result.Verdict}  (score not measured: {result.ScoresNotMeasuredReason})");
                 if (result.InconclusiveProbes > 0)
                     Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
                 // The second headline number, always: an agent that refuses everything passes on attacks alone.
@@ -756,12 +759,8 @@ internal static class RedTeamCommand
                 if (!opts.Quiet)
                 {
                     Console.Error.WriteLine($"  Baseline written to: {opts.SaveBaseline.FullName}");
-                    // Honesty: a baseline captured from a low-coverage run carries that coverage forward;
-                    // future comparisons measure drops relative to it, not relative to a perfect 100%.
-                    if (result.ConclusiveRate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop)
-                        Console.Error.WriteLine(
-                            $"  Note: this baseline's coverage is only {result.ConclusiveRate * 100:F0}% conclusive — " +
-                            "future runs are compared against that level, not 100%.");
+                    if (BaselineCaptureNote(result) is { } note)
+                        Console.Error.WriteLine("  " + note);
                 }
             }
 
@@ -798,6 +797,9 @@ internal static class RedTeamCommand
                     regression = comparison.Status;
                     if (!opts.Quiet)
                         PrintComparison(comparison);
+                    else if (!comparison.IsComparable)
+                        // The refusal decides the exit code (13), so its reason is printed even with --quiet.
+                        Console.Error.WriteLine(NotComparableLine(comparison));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -810,15 +812,17 @@ internal static class RedTeamCommand
             ct.ThrowIfCancellationRequested();
 
             // 11. Honest exit-code gate (W-E3).
-            var exitCode = comparisonError is null ? ComputeExitCode(failOn, regression, result.Passed) : ExitCodes.RuntimeError;
+            var exitCode = comparisonError is null
+                ? ComputeExitCode(failOn, regression, result.Passed, scanInconclusive: result.Verdict == AgentEval.RedTeam.Verdict.Inconclusive)
+                : ExitCodes.RuntimeError;
             var gate = new AefCommandGate
             {
                 GateId = "gate:redteam",
                 Rule = "fail-on:" + failOn,
-                Outcome = comparisonError is not null ? AefGateOutcome.Inconclusive
+                Outcome = comparisonError is not null || exitCode == ExitCodes.Incomparable ? AefGateOutcome.Inconclusive
                     : exitCode == ExitCodes.Success ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
                 ExitCode = exitCode,
-                Comparability = comparisonError is not null ? AefComparability.Incomparable
+                Comparability = comparisonError is not null || regression == RegressionStatus.Incomparable ? AefComparability.Incomparable
                     : regression is not null && failOn != "never" ? AefComparability.Comparable : AefComparability.NotApplicable,
                 Ext = baselineDigest is null ? null : new System.Text.Json.Nodes.JsonObject
                 {
@@ -922,19 +926,39 @@ internal static class RedTeamCommand
     /// Pure exit-code gate (W-E3), separated from the scan for testability. A regression versus the baseline is the
     /// strongest signal (<see cref="ExitCodes.RegressionFailure"/> = 4) and takes precedence over the absolute
     /// vulnerability gate (<see cref="ExitCodes.TestFailure"/> = 1); <paramref name="failOn"/> selects which gate
-    /// applies. <c>never</c> always passes; <c>regression</c> ignores absolute vulnerabilities.
+    /// applies. <c>never</c> always passes; <c>regression</c> ignores absolute vulnerabilities. A comparison the baseline
+    /// gate had to refuse (<see cref="RegressionStatus.Incomparable"/>: one run has no probe that reached a verdict) is
+    /// <see cref="ExitCodes.Incomparable"/> (13), not a regression; under <c>vuln</c> a scan that found a vulnerability
+    /// still exits 1, a real failure winning over a gate that could not decide. <paramref name="scanInconclusive"/>: the
+    /// scan itself reached no verdict, so its not passing is no finding either.
     /// </summary>
-    internal static int ComputeExitCode(string failOn, RegressionStatus? regression, bool passed)
+    internal static int ComputeExitCode(string failOn, RegressionStatus? regression, bool passed, bool scanInconclusive = false)
     {
         var isRegression = regression == RegressionStatus.Regression;
+        var incomparable = regression == RegressionStatus.Incomparable;
         return failOn.ToLowerInvariant() switch
         {
             "never" => ExitCodes.Success,
-            "regression" => isRegression ? ExitCodes.RegressionFailure : ExitCodes.Success,
-            _ /* vuln */ => isRegression
-                ? ExitCodes.RegressionFailure
-                : (passed ? ExitCodes.Success : ExitCodes.TestFailure),
+            "regression" => incomparable ? ExitCodes.Incomparable
+                : isRegression ? ExitCodes.RegressionFailure : ExitCodes.Success,
+            _ /* vuln */ => isRegression ? ExitCodes.RegressionFailure
+                : incomparable && (passed || scanInconclusive) ? ExitCodes.Incomparable
+                : passed ? ExitCodes.Success : ExitCodes.TestFailure,
         };
+    }
+
+    // The refusal, in the words of the comparison: why the runs cannot be compared and what that means for the gate.
+    private static string NotComparableLine(RedTeamComparison c) =>
+        $"  Not comparable: {c.NotComparableReason}. No delta against the baseline is a measurement, so the comparison " +
+        "is refused (exit 13), neither a regression nor a pass.";
+
+    internal static string? BaselineCaptureNote(RedTeamResult result)
+    {
+        if (result.ConclusiveProbes == 0)
+            return $"Note: this baseline measured nothing ({result.ScoresNotMeasuredReason}): every comparison against it is refused (exit 13).";
+        return result.ConclusiveRate is { } rate && rate < 1.0 - ComparisonThresholds.Default.RegressionCoverageDrop
+            ? $"Note: this baseline's coverage is only {rate * 100:F0}% conclusive; future runs are compared against that level, not 100%."
+            : null;
     }
 
     /// <summary>Renders a baseline comparison (new / fixed / persistent findings + deltas) to stderr.</summary>
@@ -942,14 +966,23 @@ internal static class RedTeamCommand
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine($"  === Baseline Comparison ===");
+        if (c.UnverifiedVulnerabilities.Count > 0)
+            Console.Error.WriteLine($"  Unverified: {c.UnverifiedVulnerabilities.Count} known vulnerability probe(s) produced no verdict; excluded from Fixed.");
+        if (!c.IsComparable)
+        {
+            // Missing measurements or unverified known vulnerabilities prevent a comparison verdict.
+            Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}");
+            Console.Error.WriteLine(NotComparableLine(c));
+            return;
+        }
         Console.Error.WriteLine($"  Status: {c.StatusEmoji} {c.Status}  (score {c.ScoreDelta:+0.0;-0.0;0.0} vs baseline {c.Baseline.OverallScore:F1})");
         // RC-6: the conclusive-only score is the honest dimension; show it so a green overall score can't hide a conclusive drop.
         Console.Error.WriteLine($"  Conclusive score delta: {c.ConclusiveScoreDelta:+0.0;-0.0;0.0} (current {c.Current.ConclusiveScore:F1} vs baseline {(c.Baseline.ConclusiveScore is { } b ? b.ToString("F1") : "n/a (pre-field baseline)")})");
         Console.Error.WriteLine($"  New: {c.NewVulnerabilities.Count}   Fixed: {c.ResolvedVulnerabilities.Count}   Persistent: {c.PersistentVulnerabilities.Count}");
         if (c.NotReTested.Count > 0)
             Console.Error.WriteLine($"  Not re-tested: {c.NotReTested.Count} baseline attack(s) with {c.NotReTested.Sum(n => n.KnownVulnerabilities)} known vuln(s) — excluded from Fixed.");
-        if (c.CoverageDrop > 0)
-            Console.Error.WriteLine($"  Coverage drop: {c.CoverageDrop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
+        if (c.CoverageDrop is { } drop && drop > 0)
+            Console.Error.WriteLine($"  Coverage drop: {drop * 100:F0}% (current conclusive {c.Current.ConclusiveRate * 100:F0}% vs baseline {c.BaselineCoverage * 100:F0}%).");
         foreach (var v in c.NewVulnerabilities)
             Console.Error.WriteLine($"    + NEW [{v.Severity}] {v.AttackName} / {v.ProbeId}: {v.Reason}");
         foreach (var e in c.FidelityEscalations)

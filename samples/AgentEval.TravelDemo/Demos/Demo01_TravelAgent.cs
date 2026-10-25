@@ -33,6 +33,9 @@ public static class Demo01_TravelAgent
             return;
         }
 
+        Config.PrintTarget();
+        Console.WriteLine();
+
         Console.WriteLine("  Creating TravelAgent...\n");
         var agent = TravelAgentFactory.Create();
 
@@ -56,22 +59,22 @@ public static class Demo01_TravelAgent
         }
         catch (RequestFailedException azureEx)
         {
-            // Azure SDK (legacy) — most common shape for AzureOpenAIClient errors.
-            PrintAzureFailure(azureEx.Status, azureEx.ErrorCode, azureEx.Message, azureEx.StackTrace);
+            // Azure SDK (legacy) — an error shape of the Azure-protocol providers (Azure OpenAI, Foundry).
+            PrintProviderFailure(azureEx.Status, azureEx.ErrorCode, azureEx);
             return;
         }
         catch (ClientResultException clientEx)
         {
-            // Azure SDK (System.ClientModel) — newer GA SDK; same family of failures.
-            PrintAzureFailure(clientEx.Status, errorCode: null, clientEx.Message, clientEx.StackTrace);
+            // System.ClientModel — what both AzureOpenAIClient (GA SDK) and OpenAIClient throw on an HTTP error.
+            PrintProviderFailure(clientEx.Status, errorCode: null, clientEx);
             return;
         }
         catch (TaskCanceledException timeoutEx)
         {
             PrintGenericFailure(
                 kind: "Timeout",
-                hint: "Azure response did not return inside the SDK's HTTP timeout. " +
-                      "This often points to Azure-side throttling or a long content-filter check on the deployment.",
+                hint: $"{Config.HostLabel} did not respond inside the SDK's HTTP timeout. " +
+                      "This often points to throttling, a slow model turn, or a long content-filter check.",
                 ex: timeoutEx);
             return;
         }
@@ -95,7 +98,7 @@ public static class Demo01_TravelAgent
         Console.ResetColor();
         Console.WriteLine();
 
-        // Diagnostic trace — useful when Azure cuts a run short, the agent stops
+        // Diagnostic trace — useful when the provider cuts a run short, the agent stops
         // mid-flow, or tools error out. Prints which tools fired (in order) and
         // a preview of each result so you can pinpoint where the chain broke.
         PrintToolTrace(response, elapsed);
@@ -107,14 +110,14 @@ public static class Demo01_TravelAgent
 
         // Suspicious-output heuristic: a real "Tokyo + Cologne" trip summary is
         // multi-paragraph (flights + hotels + costs). A short response is almost
-        // always Azure cutting the run short — content filter, rate limit, or
+        // always the provider cutting the run short — content filter, rate limit, or
         // a tool-call loop that exited early.
         if (string.IsNullOrWhiteSpace(response.Text) || response.Text.Length < 200)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"\n  ⚠  Suspicious: agent response is only {response.Text?.Length ?? 0} characters.");
             Console.WriteLine("     A complete TravelAgent trip summary is normally 1–2 kB. Short responses");
-            Console.WriteLine("     typically mean: (a) Azure content filter trimmed the output, (b) the");
+            Console.WriteLine("     typically mean: (a) a provider content filter trimmed the output, (b) the");
             Console.WriteLine("     agent loop hit a tool error and bailed, or (c) the model hit the max-tokens");
             Console.WriteLine("     budget. Inspect the tool trace above for which step (if any) returned last.");
             Console.ResetColor();
@@ -180,32 +183,41 @@ public static class Demo01_TravelAgent
         return text.Length <= 120 ? text : text[..117] + "…";
     }
 
-    private static void PrintAzureFailure(int status, string? errorCode, string message, string? stackTrace)
+    private static void PrintProviderFailure(int status, string? errorCode, Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"\n  ❌ Azure OpenAI request failed (HTTP {status})");
+        // The host and model names come off the SDK's message unless --show-model; the error itself stays.
+        Console.WriteLine($"\n  ❌ Model request failed (HTTP {status}){(Config.ShowModel ? $" — {Config.ProviderName}" : "")}");
         if (!string.IsNullOrEmpty(errorCode))
-            Console.WriteLine($"     ErrorCode: {errorCode}");
-        Console.WriteLine($"     Message:   {message}");
+            Console.WriteLine($"     ErrorCode: {Config.Redact(errorCode)}");
+        Console.WriteLine($"     Message:   {Config.Redact(ex)}");
 
-        // Targeted hints for the most common Azure-side failure modes — these
-        // are the ones that "look like" tool tampering from the demo's POV.
+        // Targeted hints for the most common provider-side failure modes — these
+        // are the ones that "look like" tool tampering from the demo's POV. The
+        // variable names identify the provider, so they appear only with --show-model.
+        var check = Config.ShowModel
+            ? null
+            : "Check your model configuration (run with --show-model for the variable names).";
         var hint = status switch
         {
-            400 => "Bad request. If the model says 'response cut off / content filter', " +
-                   "Azure's content-safety policy trimmed the output mid-tool-call. Check the deployment's filter settings.",
-            401 or 403 => "Auth / quota. Re-check AZURE_OPENAI_API_KEY and that the deployment has function-calling enabled.",
-            404 => "Deployment not found. Verify AZURE_OPENAI_DEPLOYMENT matches a deployment that exists in this resource.",
-            408 => "Azure timed out reading the request.",
+            400 => "Bad request. If the message mentions a content filter, a content-safety policy trimmed the " +
+                   "output mid-tool-call. Also check the model supports tool calling.",
+            401 or 403 => check is null
+                ? $"Auth / quota. Re-check {Config.ApiKeyVariable} and that the model has function-calling enabled."
+                : $"Auth / quota. {check}",
+            404 => check is null
+                ? $"Model not found. Verify {Config.ModelVariable} (or --model) names a model this endpoint serves."
+                : $"Model not found. {check}",
+            408 => $"{Config.HostLabel} timed out reading the request.",
             429 => "Rate-limited. The demo will succeed on retry once the bucket refills.",
-            >= 500 => "Azure-side server error. Usually transient — retry. Persistent 5xx → open Azure support ticket.",
+            >= 500 => $"{Config.HostLabel} returned a server error. Usually transient — retry. Persistent 5xx → contact the provider's support.",
             _ => null,
         };
         if (hint is not null)
             Console.WriteLine($"     Hint:      {hint}");
 
-        if (!string.IsNullOrEmpty(stackTrace))
-            Console.WriteLine($"\n     Stack trace:\n{stackTrace}");
+        if (!string.IsNullOrEmpty(ex.StackTrace))
+            Console.WriteLine($"\n     Stack trace:\n{Config.Redact(ex.StackTrace)}");
         Console.ResetColor();
     }
 
@@ -213,11 +225,10 @@ public static class Demo01_TravelAgent
     {
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"\n  ❌ Agent run failed — {kind}");
-        Console.WriteLine($"     Message:  {ex.Message}");
+        // Message, then every distinct inner exception (an AggregateException's too), redacted.
+        Console.WriteLine($"     Message:  {Config.Redact(ex)}");
         Console.WriteLine($"     Hint:     {hint}");
-        if (ex.InnerException is not null)
-            Console.WriteLine($"     Inner:    {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
-        Console.WriteLine($"\n     Stack trace:\n{ex.StackTrace}");
+        Console.WriteLine($"\n     Stack trace:\n{Config.Redact(ex.StackTrace)}");
         Console.ResetColor();
     }
 
@@ -235,17 +246,5 @@ public static class Demo01_TravelAgent
         Console.ResetColor();
     }
 
-    private static void PrintMissingCredentials()
-    {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(@"
-  ⚠️  Skipping Demo 01 — Azure OpenAI credentials required.
-
-     Set the following environment variables and try again:
-       AZURE_OPENAI_ENDPOINT
-       AZURE_OPENAI_API_KEY
-       AZURE_OPENAI_DEPLOYMENT
-");
-        Console.ResetColor();
-    }
+    private static void PrintMissingCredentials() => Config.PrintMissingProvider("Demo 01");
 }

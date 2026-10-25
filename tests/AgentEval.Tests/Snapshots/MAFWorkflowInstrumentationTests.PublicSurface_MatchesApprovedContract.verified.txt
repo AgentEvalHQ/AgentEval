@@ -1,0 +1,4 @@
+﻿sealed class AgentEval.MAF.MAFWorkflowInstrumentation : IDisposable
+    Void Dispose()
+    Workflow Build(WorkflowBuilder builder, Boolean validateOrphans = true)
+    ctor()

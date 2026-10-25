@@ -98,7 +98,7 @@ public sealed class UnsafeToolUseEval : IEvalDefinitionWrapper
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.unsafe_tool_use.v1",
-            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
+            failureSeverity: "high") { JudgeSeesData = JudgeInputData.ToolCalls };
     }
 
     /// <inheritdoc/>

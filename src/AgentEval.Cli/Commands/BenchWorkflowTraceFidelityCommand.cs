@@ -93,16 +93,19 @@ public static class BenchWorkflowTraceFidelityCommand
 
         // ── Persist via the canonical output store (manifest + native report) ──
         string? storeRunId = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        IOutputStore? store = null;
+        byte[]? nativeReportJson = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "workflow-trace-fidelity", preset, subject, subjectVersion,
             AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
             subjectKind: "workflow", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, storeV1: StoreLink(), definition: definition);
+            abortReason: reason, storeV1: StoreLink(), definition: definition, nativeReportJson: nativeReportJson);
         try
         {
-            var store = new FileSystemOutputStore(agentEvalDir);
-            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
+            store = CliRunOutput.CreateStore(agentEvalDir);
+            await CliRunOutput.SweepAsync(store, ct);
             var subjectIdentity = new SubjectIdentity(SubjectKind.Workflow, subject);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);
@@ -134,10 +137,10 @@ public static class BenchWorkflowTraceFidelityCommand
                 Metrics: new Dictionary<string, double> { ["workflow_trace_fidelity_score100"] = result.Score.Value * 100 });
             await store.CompleteRunAsync(manifest, summary, ct);
 
-            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
-            await File.WriteAllTextAsync(
+            var runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "workflow-trace-fidelity");
+            await File.WriteAllBytesAsync(
                 Path.Combine(runDir, "report-native.json"),
-                JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }),
+                nativeReportJson,
                 ct);
 
             Console.WriteLine();
@@ -155,7 +158,7 @@ public static class BenchWorkflowTraceFidelityCommand
 
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
-            Console.WriteLine($"   Canonical: {runDir}");
+            Console.WriteLine($"   Reports:   {runDir}");
             // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
             ct.ThrowIfCancellationRequested();
             if (WriteEvidence())

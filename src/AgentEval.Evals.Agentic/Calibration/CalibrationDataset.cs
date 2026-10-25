@@ -44,6 +44,14 @@ public sealed record CalibrationEntry(
     /// </summary>
     public IReadOnlyList<ToolCall>? ToolCalls { get; init; }
 
+    /// <summary>
+    /// The agent's instructions (its system message); passed as <see cref="EvalInput.SystemMessage"/>. The
+    /// <c>task_adherence</c> rule, procedural, presentation and authorization judges grade the response against them and
+    /// are not measured without them. The goldens had no such column, so a <c>systemMessage</c> key was dropped on load
+    /// and those judges were never shown the rules (T73). Absent stays <see langword="null"/>.
+    /// </summary>
+    public string? SystemMessage { get; init; }
+
     /// <summary>The <see cref="EvalInput"/> this entry is graded on.</summary>
     public EvalInput ToEvalInput() => new(
         Query: Input,
@@ -51,6 +59,7 @@ public sealed record CalibrationEntry(
         Context: Context,
         GroundTruth: GroundTruth,
         ToolCalls: ToolCalls,
+        SystemMessage: SystemMessage,
         Metadata: ConversationHistory is { Count: > 0 } history
             ? new Dictionary<string, object> { [ConversationHistoryHelper.MetadataKey] = history }
             : null);

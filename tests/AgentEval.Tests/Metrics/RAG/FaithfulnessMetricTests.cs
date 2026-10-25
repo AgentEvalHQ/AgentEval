@@ -103,24 +103,25 @@ public class FaithfulnessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_MalformedLlmResponse_ReturnsFail()
+    public async Task EvaluateAsync_MalformedLlmResponse_IsNotMeasured()
     {
         // Arrange - LLM returns invalid JSON
         var fakeChatClient = new FakeChatClient("This is not valid JSON at all!");
         var metric = new FaithfulnessMetric(fakeChatClient);
-        
+
         var context = new EvaluationContext
         {
             Input = "Question",
             Output = "Answer",
             Context = "Some context"
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
-        // Assert
+
+        // Assert - nothing was measured: not a Fail at 0 (T03)
         Assert.False(result.Passed);
+        Assert.False(result.Measured);
         Assert.Contains("parse", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }
     
@@ -188,33 +189,48 @@ public class FaithfulnessMetricTests
     #region Edge Cases - Score Boundaries
 
     [Theory]
-    [InlineData(-50, 0)]    // Negative score should clamp to 0
-    [InlineData(-1, 0)]     // Just below zero
-    [InlineData(0, 0)]      // Zero is valid
-    [InlineData(100, 100)]  // Max valid
-    [InlineData(101, 100)]  // Just above max
-    [InlineData(150, 100)]  // Well above max
-    [InlineData(999999, 100)] // Extreme value
-    public async Task EvaluateAsync_ScoreOutOfRange_ClampedTo0To100(int llmScore, int expectedScore)
+    [InlineData(0)]      // Zero is valid
+    [InlineData(100)]    // Max valid
+    public async Task EvaluateAsync_ScoreOnTheScale_IsReadAsIs(int llmScore)
     {
         // Arrange
         var fakeResponse = $$"""{"score": {{llmScore}}, "reasoning": "test"}""";
         var fakeChatClient = new FakeChatClient(fakeResponse);
         var metric = new FaithfulnessMetric(fakeChatClient);
-        
+
         var context = new EvaluationContext
         {
             Input = "Question",
             Output = "Answer",
             Context = "Context"
         };
-        
+
         // Act
         var result = await metric.EvaluateAsync(context);
-        
+
         // Assert
-        Assert.InRange(result.Score, 0, 100);
-        Assert.Equal(expectedScore, result.Score);
+        Assert.True(result.Measured);
+        Assert.Equal(llmScore, result.Score);
+    }
+
+    [Theory]
+    [InlineData(-50)]      // Negative
+    [InlineData(-1)]       // Just below zero
+    [InlineData(101)]      // Just above max
+    [InlineData(150)]      // Well above max
+    [InlineData(999999)]   // Extreme value
+    public async Task EvaluateAsync_ScoreOffTheScale_IsNotMeasured_NeverClamped(int llmScore)
+    {
+        // It was clamped: 150 read as a confident Pass at 100, -50 as a measured 0 (T04).
+        var fakeChatClient = new FakeChatClient($$"""{"score": {{llmScore}}, "reasoning": "test"}""");
+        var metric = new FaithfulnessMetric(fakeChatClient);
+
+        var result = await metric.EvaluateAsync(new EvaluationContext { Input = "Question", Output = "Answer", Context = "Context" });
+
+        Assert.False(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Equal(NotMeasuredCause.JudgeReplyUnreadable, result.NotMeasuredCause);
+        Assert.Equal("score_out_of_range", result.Details!["judgeReplyFailure"]);
     }
 
     #endregion
@@ -279,7 +295,7 @@ public class FaithfulnessMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_LlmReturnsEmptyJson_ReturnsFail()
+    public async Task EvaluateAsync_LlmReturnsEmptyJson_IsNotMeasured()
     {
         // Arrange
         var fakeResponse = """{}""";
@@ -296,8 +312,10 @@ public class FaithfulnessMetricTests
         // Act
         var result = await metric.EvaluateAsync(context);
         
-        // Assert - should handle missing score gracefully
+        // Assert - a reply with no score is not measured (T03); 0 is the placeholder no aggregate counts
         Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);
+        Assert.Equal("no_score", result.Details!["judgeReplyFailure"]);
     }
 
     [Fact]

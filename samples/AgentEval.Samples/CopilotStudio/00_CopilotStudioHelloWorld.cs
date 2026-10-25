@@ -32,6 +32,7 @@ public static class CopilotStudioHelloWorld
         if (string.IsNullOrWhiteSpace(configPath) || !understood)
         {
             PrintMissingSetupWarning();
+            SampleOutcome.Skip("no live Copilot Studio agent: set COPILOTSTUDIO_CONFIG_PATH and COPILOTSTUDIO_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true");
             return;
         }
 
@@ -43,6 +44,7 @@ public static class CopilotStudioHelloWorld
         catch (InvalidOperationException ex)
         {
             Console.WriteLine($"   ❌ Config error: {ex.Message}");
+            SampleOutcome.Error($"the Copilot Studio config could not be loaded: {ex.Message}");
             return;
         }
 
@@ -73,6 +75,7 @@ public static class CopilotStudioHelloWorld
         {
             Console.WriteLine($"   [FAIL] {label}");
             Console.WriteLine($"          {ex.Message.Split('\n')[0]}");
+            SampleOutcome.Fail($"{label}: {ex.Message.Split('\n')[0]}");
         }
     }
 

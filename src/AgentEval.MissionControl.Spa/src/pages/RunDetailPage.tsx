@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { gqlRequest } from "@/lib/graphql-client";
@@ -16,30 +16,33 @@ import { formatDateTime, formatScore, formatCost } from "@/lib/format";
 interface RunDetailResponse {
   run: {
     schemaVersion: string;
-    contentHash: string;
-    solution: { id: string; name: string };
+    contentHash: string | null;
+    evidence: { integrity: string; imported: boolean; signatureTrust: string };
+    solution: { id: string | null; name: string | null } | null;
     subject: {
-      kind: "AGENT" | "WORKFLOW";
+      kind: string | null;
+      rawKind: string;
       name: string;
       modelId: string | null;
       framework: string | null;
     };
     run: {
       runId: string;
-      timestamp: string;
-      duration: string;
-      verdict: Verdict;
-      kind: string;
+      timestamp: string | null;
+      duration: string | null;
+      verdict: Verdict | null;
+      kind: string | null;
       scenarioCount: number;
-      harness: string;
+      harness: string | null;
       seed: number | null;
     };
-    git: { commit: string | null; branch: string | null; dirty: boolean };
-    environment: { os: string; dotnetVersion: string; ci: boolean };
-    agentEval: { version: string };
+    git: { commit: string | null; branch: string | null; dirty: boolean | null } | null;
+    environment: { os: string | null; dotnetVersion: string | null; ci: boolean | null } | null;
+    agentEval: { version: string | null } | null;
   } | null;
   runSummary: {
-    verdict: Verdict;
+    states: { state: string; count: number }[];
+    verdict: Verdict | null;
     stats: {
       total: number;
       passed: number;
@@ -49,18 +52,29 @@ interface RunDetailResponse {
       skipped: number;
     };
     cost: {
-      estimatedCost: number;
-      promptTokens: number;
-      completionTokens: number;
+      estimatedCost: number | null;
+      promptTokens: number | null;
+      completionTokens: number | null;
     } | null;
   } | null;
   scenarios: {
     id: string;
+    resultId: string;
+    state: string;
     name: string;
-    passed: boolean;
-    score: number;
-    duration: string;
-    estimatedCost: number;
+    passed: boolean | null;
+    score: number | null;
+    measurement: string | null;
+    duration: string | null;
+    estimatedCost: number | null;
+  }[];
+  runArtifacts: {
+    evidenceId: string;
+    kind: string;
+    description: string | null;
+    captured: boolean;
+    reportFormat: string | null;
+    legacyTrace: boolean;
   }[];
   runCostBreakdown: {
     totalCost: number;
@@ -68,16 +82,19 @@ interface RunDetailResponse {
     unknownKeyCost: number;
     legacyFlatCost: number;
     filteredOut: string[];
+    unpricedCount: number;
+    isComplete: boolean;
   } | null;
 }
 
 const RUN_DETAIL_QUERY = /* GraphQL */ `
-  query RunDetail($runId: String!) {
-    run(runId: $runId) {
+  query RunDetail($runId: String!, $sourceId: String) {
+    run(runId: $runId, sourceId: $sourceId) {
       schemaVersion
       contentHash
+      evidence { integrity imported signatureTrust }
       solution { id name }
-      subject { kind name modelId framework }
+      subject { kind rawKind name modelId framework }
       run {
         runId
         timestamp
@@ -92,25 +109,34 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
       environment { os dotnetVersion ci }
       agentEval { version }
     }
-    runSummary(runId: $runId) {
+    runSummary(runId: $runId, sourceId: $sourceId) {
       verdict
+      states { state count }
       stats { total passed failed warnings skipped }
       cost { estimatedCost promptTokens completionTokens }
     }
-    scenarios(runId: $runId) {
+    scenarios(runId: $runId, sourceId: $sourceId) {
       id
+      resultId
+      state
       name
       passed
       score
+      measurement
       duration
       estimatedCost
     }
-    runCostBreakdown(runId: $runId) {
+    runArtifacts(runId: $runId, sourceId: $sourceId) {
+      evidenceId kind description captured reportFormat legacyTrace
+    }
+    runCostBreakdown(runId: $runId, sourceId: $sourceId) {
       totalCost
       byTier { trivial low medium high }
       unknownKeyCost
       legacyFlatCost
       filteredOut
+      unpricedCount
+      isComplete
     }
   }
 `;
@@ -119,10 +145,12 @@ export function RunDetailPage() {
   const { runId: runIdParam } = useParams<{ runId: string }>();
   const runId = runIdParam ? decodeURIComponent(runIdParam) : "";
 
+  const [search] = useSearchParams();
+  const sourceId = search.get("sourceId");
   const detailQ = useQuery({
-    queryKey: queryKeys.runs.detail(runId),
+    queryKey: queryKeys.runs.detail(runId, sourceId),
     queryFn: () =>
-      gqlRequest<RunDetailResponse>(RUN_DETAIL_QUERY, { runId }),
+      gqlRequest<RunDetailResponse>(RUN_DETAIL_QUERY, { runId, sourceId }),
     enabled: runId.length > 0,
   });
 
@@ -148,7 +176,7 @@ export function RunDetailPage() {
             <header className="flex items-start justify-between gap-4">
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-400">
-                  {d.run.subject.kind} · {d.run.run.kind}
+                  {d.run.subject.rawKind} · {d.run.run.kind}
                 </span>
                 <h2 className="text-2xl font-bold text-slate-900 mt-1">
                   {d.run.subject.name}
@@ -159,7 +187,7 @@ export function RunDetailPage() {
                 </p>
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
                   <VerdictBadge verdict={d.run.run.verdict} size="md" />
-                  <ManifestHashBadge contentHash={d.run.contentHash} />
+                  <ManifestHashBadge contentHash={d.run.contentHash} integrity={d.run.evidence.integrity} imported={d.run.evidence.imported} />
                   <ModelBadge model={d.run.subject.modelId} role="agent" />
                   {d.run.subject.framework && (
                     <span className="text-xs text-slate-500">
@@ -169,22 +197,23 @@ export function RunDetailPage() {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0 text-right">
-                <a
-                  href={restUrls.trace(runId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
-                >
-                  Trace JSON <ExternalLink size={12} />
-                </a>
-                <a
-                  href={restUrls.report(runId, "markdown")}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500"
-                >
-                  Markdown report <ExternalLink size={12} />
-                </a>
+                {d.runArtifacts.length === 0 && <span className="text-xs text-slate-500">No captured artifacts</span>}
+                {d.runArtifacts.map(artifact => {
+                  const label = artifact.legacyTrace ? "Trace JSON"
+                    : artifact.reportFormat ? `${artifact.reportFormat} report`
+                    : artifact.description ?? `${artifact.kind} · ${artifact.evidenceId}`;
+                  if (!artifact.captured) return <span key={artifact.evidenceId} className="text-xs text-slate-500">
+                    {label} · content not captured
+                  </span>;
+                  const uniqueFormat = artifact.reportFormat && d.runArtifacts.filter(a => a.reportFormat === artifact.reportFormat).length === 1;
+                  const href = artifact.legacyTrace ? restUrls.trace(runId, sourceId)
+                    : uniqueFormat ? restUrls.report(runId, artifact.reportFormat!, sourceId)
+                    : restUrls.artifact(runId, artifact.evidenceId, sourceId);
+                  return <a key={artifact.evidenceId} href={href} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-accent-700 hover:text-accent-500">
+                    {label} <ExternalLink size={12} />
+                  </a>;
+                })}
               </div>
             </header>
 
@@ -192,7 +221,7 @@ export function RunDetailPage() {
               <Stat
                 label="Verdict"
                 value={
-                  d.runSummary?.verdict ?? d.run.run.verdict
+                  d.runSummary?.verdict ?? d.run.run.verdict ?? "NOT RECORDED"
                 }
               />
               <Stat
@@ -208,10 +237,10 @@ export function RunDetailPage() {
               />
               {/* Without this tile a run whose every check errored showed FAIL beside "Failures 0". */}
               <Stat
-                label="Not measured"
-                value={`${d.runSummary?.stats.skipped ?? "—"}`}
+                label="Errors / unavailable"
+                value={d.runSummary ? `${d.runSummary.states.filter(s => ["error", "not_measured", "not_applicable", "skipped"].includes(s.state)).reduce((sum, s) => sum + s.count, 0)}` : "—"}
                 tone={d.runSummary && d.runSummary.stats.skipped > 0 ? "warn" : "neutral"}
-                hint="skipped or errored"
+                hint={d.runSummary?.states.map(s => `${s.state}: ${s.count}`).join(" · ")}
               />
               <Stat
                 label="Cost"
@@ -219,7 +248,8 @@ export function RunDetailPage() {
               />
             </section>
 
-            {d.runCostBreakdown && d.runCostBreakdown.totalCost > 0 && (
+            {/* A run with unpriced costs keeps the section, so a partial total is never silently hidden (T83). */}
+            {d.runCostBreakdown && (d.runCostBreakdown.totalCost > 0 || !d.runCostBreakdown.isComplete) && (
               <section className="rounded-lg border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">
                   Cost by tier
@@ -239,9 +269,16 @@ export function RunDetailPage() {
                   )}
                   {" "}— derived from each leaf evaluator's{" "}
                   <code>provenance.estimatedCost</code> in the recursive{" "}
-                  <code>EvalResult</code> tree. Inclusive total{" "}
-                  {formatCost(d.runCostBreakdown.totalCost)} (chart segments above
-                  exclude the legacy-flat slice; see breakdown below).
+                  <code>EvalResult</code> tree.{" "}
+                  {d.runCostBreakdown.isComplete ? "Inclusive total" : "Priced part (partial)"}{" "}
+                  {formatCost(d.runCostBreakdown.totalCost)}
+                  {!d.runCostBreakdown.isComplete && (
+                    <>
+                      {" "}— {d.runCostBreakdown.unpricedCount} cost(s) not priced, so this is
+                      not the run's cost
+                    </>
+                  )}{" "}
+                  (chart segments above exclude the legacy-flat slice; see breakdown below).
                 </p>
                 {(d.runCostBreakdown.unknownKeyCost > 0 ||
                   d.runCostBreakdown.legacyFlatCost > 0) && (
@@ -300,10 +337,10 @@ export function RunDetailPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {d.scenarios.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50">
+                      <tr key={s.resultId} className="hover:bg-slate-50">
                         <td className="px-4 py-2 text-slate-900">
                           <Link
-                            to={`/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(s.id)}`}
+                            to={`/runs/${encodeURIComponent(runId)}/scenarios/${encodeURIComponent(s.id)}?${new URLSearchParams({ ...(sourceId ? { sourceId } : {}), resultId: s.resultId })}`}
                             className="text-accent-700 hover:text-accent-500"
                           >
                             {s.name}
@@ -315,7 +352,13 @@ export function RunDetailPage() {
                           {formatCost(s.estimatedCost)}
                         </td>
                         <td className="px-4 py-2 text-center">
-                          {s.passed ? (
+                          {s.measurement === "not_applicable" ? (
+                            <span className="text-slate-600 font-medium text-xs">NOT APPLICABLE</span>
+                          ) : s.measurement === "not_measured" ? (
+                            <span className="text-slate-600 font-medium text-xs">NOT MEASURED</span>
+                          ) : s.passed === null ? (
+                            <span className="text-slate-600 font-medium text-xs">{s.state.toUpperCase()}</span>
+                          ) : s.passed ? (
                             <span className="text-green-700 font-medium text-xs">PASS</span>
                           ) : (
                             <span className="text-red-700 font-medium text-xs">FAIL</span>
@@ -333,17 +376,17 @@ export function RunDetailPage() {
                 Provenance
               </h3>
               <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-                <DT label="Solution" value={d.run.solution.name} />
-                <DT label="Harness" value={d.run.run.harness} />
+                <DT label="Solution" value={d.run.solution?.name ?? "not recorded"} />
+                <DT label="Harness" value={d.run.run.harness ?? "not recorded"} />
                 <DT label="Seed" value={`${d.run.run.seed ?? "—"}`} />
                 <DT label="Schema" value={d.run.schemaVersion} />
-                <DT label="OS" value={d.run.environment.os} />
-                <DT label=".NET" value={d.run.environment.dotnetVersion} />
-                <DT label="Git branch" value={d.run.git.branch ?? "—"} />
+                <DT label="OS" value={d.run.environment?.os ?? "not recorded"} />
+                <DT label=".NET" value={d.run.environment?.dotnetVersion ?? "not recorded"} />
+                <DT label="Git branch" value={d.run.git?.branch ?? "—"} />
                 <DT
                   label="Commit"
                   value={
-                    d.run.git.commit
+                    d.run.git?.commit
                       ? `${d.run.git.commit.slice(0, 8)}${d.run.git.dirty ? " (dirty)" : ""}`
                       : "—"
                   }

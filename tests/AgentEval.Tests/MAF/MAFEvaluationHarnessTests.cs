@@ -52,6 +52,33 @@ public class MAFEvaluationHarnessTests
         public void Dispose() => dispose();
     }
 
+    [Fact]
+    public async Task RunBatchAsync_ASummaryOfTestsWithNoVerdict_SaysTheyWereNotMeasured()
+    {
+        // Every run errored: the summary printed "Average Score: 0.0/100" and "0 test(s) need attention".
+        var logger = new AgentEval.Tests.Core.ToolUsageExtractorApprovalTests.CapturingLogger();
+        var harness = new MAFEvaluationHarness(evaluator: null, logger);
+
+        var summary = await harness.RunBatchAsync(new ThrowingAgent(),
+            [new DatasetTestCase { Id = "first", Input = "one" }, new DatasetTestCase { Id = "second", Input = "two" }]);
+
+        Assert.Equal(2, summary.NotMeasuredCount);
+        var log = string.Join("\n", logger.Entries.Select(e => e.Message));
+        Assert.Contains("Average Score: n/a (nothing measured)", log);
+        Assert.Contains("2 test(s) not measured", log);
+        Assert.DoesNotContain("need attention", log);
+        Assert.DoesNotContain("test(s) failed", log);
+        Assert.DoesNotContain("Average Score: 0.0/100", log);
+    }
+
+    private sealed class ThrowingAgent : IEvaluableAgent
+    {
+        public string Name => "down";
+
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            throw new HttpRequestException("503 Service Unavailable");
+    }
+
     #region Constructor Tests
 
     [Fact]

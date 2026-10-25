@@ -308,6 +308,22 @@ public class AgentEvalTestBaseTests : IDisposable
     }
 
     [Fact]
+    public void TestResultBuilder_WithToolCall_RecordsACallThatRan()
+    {
+        // T58 made code_tool_success count only executed calls; WithToolCall records a call with its duration and result
+        // but left WasExecuted false, so every call it recorded read as one that never ran.
+        var settings = new VerbositySettings { Level = VerbosityLevel.None, SaveTraceFiles = false };
+        using var testBase = new TestableAgentEvalTestBase(null, settings);
+
+        var result = testBase.TestCreateResult("ToolRan")
+            .WithToolCall("GetWeather", "call_1", result: "72°F, Sunny")
+            .Passed()
+            .Build();
+
+        Assert.True(Assert.Single(result.ToolUsage!.Calls).WasExecuted);
+    }
+
+    [Fact]
     public void TestResultBuilder_WithTokens_SetsPerformance()
     {
         var settings = new VerbositySettings 

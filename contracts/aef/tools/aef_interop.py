@@ -1292,6 +1292,8 @@ def _check_types(log):
     for i, entry in enumerate((results or {}).get("scores") or []):
         where = f"results.scores[{i}]"
         _need(entry, "object", where, "IN-9")
+        if entry is None:
+            continue  # null object-list entries are absent, like optional null members
         _need(entry.get("name"), "string", f"{where}.name", "IN-9")
         _need(entry.get("scorer"), "string", f"{where}.scorer", "IN-9")
         _need(entry.get("metrics"), "object", f"{where}.metrics", "IN-9")
@@ -1301,12 +1303,16 @@ def _check_types(log):
     for n, sample in enumerate(log.get("samples") or []):
         where = f"samples[{n}]"
         _need(sample, "object", where, "IN-8")
+        if sample is None:
+            continue
         for key in ("scores", "role_usage", "model_usage"):
             _need(sample.get(key), "object", f"{where}.{key}", "IN-8")
     _need(log.get("reductions"), "list", "reductions", "IN-8")
     for i, reduction in enumerate(log.get("reductions") or []):
         where = f"reductions[{i}]"
         _need(reduction, "object", where, "IN-8")
+        if reduction is None:
+            continue
         for key in ("scorer", "reducer"):
             _need(reduction.get(key), "string", f"{where}.{key}", "IN-8")
         _need(reduction.get("samples"), "list", f"{where}.samples", "IN-8")
@@ -1408,6 +1414,8 @@ def from_inspect(log_path, out, target_mode, capture, at):
     blobs, lines, seen, trial_lines = _Blobs(), [], set(), {}
     for n, sample in enumerate(log.get("samples") or []):
         where = f"samples[{n}]"
+        if sample is None:
+            continue
         if not isinstance(sample, dict) or not isinstance(sample.get("id"), (int, float, str)):
             _in(where, "a sample whose id is no string and no number", "IN-8")
         sample_id = sample["id"]
@@ -1492,12 +1500,16 @@ def from_inspect(log_path, out, target_mode, capture, at):
         rolled = set()
         for i, reduction in enumerate(log.get("reductions") or []):
             where = f"reductions[{i}]"
+            if reduction is None:
+                continue
             scorer = reduction.get("scorer") if isinstance(reduction, dict) else None
             mapped = _from_reducer(reduction.get("reducer"), epochs, where) if isinstance(scorer, str) else None
             if not mapped:
                 _in(where, f"the reducer {reduction.get('reducer') if isinstance(reduction, dict) else None!r}, "
                            "which has no AEF trial aggregation", "IN-8")
             for j, reduced in enumerate(reduction.get("samples") or []):
+                if reduced is None:
+                    continue
                 sample_id = reduced.get("sample_id") if isinstance(reduced, dict) else None
                 if not isinstance(sample_id, (int, float, str)):
                     _in(f"{where}.samples[{j}]", "a reduction without a sample_id", "IN-8")
@@ -1529,6 +1541,8 @@ def from_inspect(log_path, out, target_mode, capture, at):
     request, inspect_values, summary_ext = [], {}, {}
     for i, es in enumerate(results.get("scores") or [] if closed else []):
         where = f"results.scores[{i}]"
+        if es is None:
+            continue
         name, measures = es.get("name"), es.get("metrics") or {}
         if not isinstance(name, str) or not isinstance(measures, dict):
             _in(where, "an EvalScore without a name or metrics", "IN-9")

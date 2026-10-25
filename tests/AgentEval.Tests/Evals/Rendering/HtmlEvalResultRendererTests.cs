@@ -207,6 +207,35 @@ public class HtmlEvalResultRendererTests
         Assert.DoesNotContain("<h4>Provenance</h4>", html);
     }
 
+    // ── Cost: not priced is said, never $0 (T63) ──────────────────────────────
+
+    [Fact]
+    public void RenderAsync_UnpricedLeaf_SaysNotPriced()
+    {
+        // An unpriced judge used to carry 0, which the renderer hid exactly like a free deterministic check.
+        var result = MakeAtomic("k", 0.9, "pass", true, "none", evaluatorType: "atomic-llm", judgeModel: "llama3.1:8b")
+            with { Provenance = new("atomic-llm", "llama3.1:8b", null, null, 2000, null, false) };
+
+        var html = Render(result, DefaultOpts(includeProvenance: true));
+
+        Assert.Contains("Est. cost (USD)", html);
+        Assert.Contains("not priced", html);
+    }
+
+    [Fact]
+    public void RenderAsync_PricedAndFreeLeaves_KeepTheirRendering()
+    {
+        var priced = Render(MakeAtomic("k", 0.9, "pass", true, "none"), DefaultOpts(includeProvenance: true));
+        var free = Render(MakeAtomic("k", 0.9, "pass", true, "none") with
+        {
+            Provenance = new("atomic-code", null, null, null, null, 0, false),
+        }, DefaultOpts(includeProvenance: true));
+
+        Assert.Contains("0.0010", priced);
+        Assert.DoesNotContain("not priced", priced);
+        Assert.DoesNotContain("Est. cost (USD)", free); // a measured zero stays hidden, as before
+    }
+
     // ── Self-containment ──────────────────────────────────────────────────────
 
     [Fact]

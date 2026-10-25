@@ -21,8 +21,12 @@ public class EvaluationReport
     /// <summary>When the evaluation completed.</summary>
     public DateTimeOffset EndTime { get; set; }
     
-    /// <summary>Total duration of the evaluation.</summary>
-    public TimeSpan Duration => EndTime - StartTime;
+    /// <summary>
+    /// Total duration of the evaluation, or <see langword="null"/> when it was not timed: <see cref="EndTime"/> is not
+    /// after <see cref="StartTime"/> (a report built with no timing data, or <c>new EvaluationReport()</c>). Never a
+    /// 0 that reads as an instant run.
+    /// </summary>
+    public TimeSpan? Duration => EndTime > StartTime ? EndTime - StartTime : null;
     
     /// <summary>Total number of tests run.</summary>
     public int TotalTests { get; set; }
@@ -30,17 +34,24 @@ public class EvaluationReport
     /// <summary>Number of tests that passed.</summary>
     public int PassedTests { get; set; }
     
-    /// <summary>Number of tests that failed.</summary>
+    /// <summary>Number of measured tests that failed.</summary>
     public int FailedTests { get; set; }
-    
-    /// <summary>Number of tests that were skipped.</summary>
+
+    /// <summary>
+    /// Number of tests that were skipped. From <see cref="TestSummaryExtensions.ToEvaluationReport"/>, the tests that
+    /// produced no verdict (the judge failed, or the run errored): not failures, and not in <see cref="OverallScore"/>.
+    /// </summary>
     public int SkippedTests { get; set; }
-    
-    /// <summary>Overall score (0-100).</summary>
-    public double OverallScore { get; set; }
-    
-    /// <summary>Pass rate as a percentage.</summary>
-    public double PassRate => TotalTests > 0 ? (double)PassedTests / TotalTests * 100 : 0;
+
+    /// <summary>
+    /// Overall score (0-100), or <see langword="null"/> when nothing was measured. From
+    /// <see cref="TestSummaryExtensions.ToEvaluationReport"/>, the average over the measured tests only
+    /// (<see cref="TotalTests"/> minus <see cref="SkippedTests"/>).
+    /// </summary>
+    public double? OverallScore { get; set; }
+
+    /// <summary>Pass rate as a percentage, or <see langword="null"/> for a report with no tests.</summary>
+    public double? PassRate => TotalTests > 0 ? (double)PassedTests / TotalTests * 100 : null;
     
     /// <summary>Individual test results.</summary>
     public List<TestResultSummary> TestResults { get; set; } = new();
@@ -63,17 +74,27 @@ public class TestResultSummary
     /// <summary>Category or group this test belongs to.</summary>
     public string? Category { get; set; }
     
-    /// <summary>Score achieved (0-100).</summary>
-    public double Score { get; set; }
+    /// <summary>Score achieved (0-100), or <see langword="null"/> when the test produced no score.</summary>
+    public double? Score { get; set; }
     
     /// <summary>Whether the test passed.</summary>
     public bool Passed { get; set; }
     
     /// <summary>Whether the test was skipped.</summary>
     public bool Skipped { get; set; }
-    
-    /// <summary>Duration in milliseconds.</summary>
-    public long DurationMs { get; set; }
+
+    /// <summary>
+    /// The test produced no verdict: the judge produced none, or the run errored. <see cref="Passed"/> is then a
+    /// placeholder, and <see cref="Skipped"/> is set too, so it is never counted as a failure; <see cref="Error"/> says
+    /// why. <see cref="Score"/> is <see langword="null"/> when no score was produced at all; a stochastic test whose
+    /// verdict is undecided keeps the mean of its measured runs. The JUnit and TRX exporters write it as an error (JUnit
+    /// <c>&lt;error&gt;</c>, TRX outcome <c>Error</c>), not a skip, so a CI run stays red; the Markdown report reads
+    /// INCOMPLETE.
+    /// </summary>
+    public bool NotMeasured { get; set; }
+
+    /// <summary>Duration in milliseconds, or <see langword="null"/> when no timing was recorded.</summary>
+    public long? DurationMs { get; set; }
     
     /// <summary>Error message if failed.</summary>
     public string? Error { get; set; }

@@ -23,8 +23,8 @@ namespace AgentEval.Evals.Agentic.Telemetry;
 /// (an <see cref="AgenticTelemetry"/> instance). Per-input metadata takes precedence.
 /// </para>
 /// <para>
-/// If <see cref="AgenticTelemetry.TotalCalls"/> is zero, the evaluator returns a skipped result
-/// to avoid division by zero.
+/// Missing counts skip the check. Recorded zero calls and zero errors are not applicable.
+/// Negative counts or errors exceeding total call attempts return an error without a measurement.
 /// </para>
 /// </summary>
 public sealed class ErrorRateEval : IEvalConfigurationSource
@@ -92,13 +92,12 @@ public sealed class ErrorRateEval : IEvalConfigurationSource
                 $"ErrorRateEval requires telemetry data via EvalInput.Metadata[\"{LatencyEval.MetadataKey}\"] or constructor parameter."));
         }
 
-        if (telemetry.TotalCalls == 0)
-        {
-            return Task.FromResult(EvalResult.Skipped(this,
-                "ErrorRateEval: TotalCalls is 0 — cannot compute error rate."));
-        }
+        var absent = TelemetryHelper.ValidateCallCounts(this, _passThreshold,
+            telemetry.ErrorCount, telemetry.TotalCalls, nameof(AgenticTelemetry.ErrorCount));
+        if (absent is not null)
+            return Task.FromResult(absent);
 
-        var errorRate = Math.Clamp((double)telemetry.ErrorCount / telemetry.TotalCalls, 0.0, 1.0);
+        var errorRate = (double)telemetry.ErrorCount!.Value / telemetry.TotalCalls!.Value;
         var score = Math.Clamp(1.0 - errorRate, 0.0, 1.0);
         var passed = score >= _passThreshold;
         var severity = passed ? "none" : "medium";
@@ -109,8 +108,8 @@ public sealed class ErrorRateEval : IEvalConfigurationSource
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
-                    ["error_count"]  = telemetry.ErrorCount,
-                    ["total_calls"]  = telemetry.TotalCalls,
+                    ["error_count"]  = telemetry.ErrorCount.Value,
+                    ["total_calls"]  = telemetry.TotalCalls.Value,
                     ["error_rate"]   = errorRate,
                     ["success_rate"] = score,
                 },

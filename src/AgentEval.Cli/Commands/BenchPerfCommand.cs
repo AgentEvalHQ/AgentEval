@@ -174,8 +174,8 @@ public static class BenchPerfCommand
                 $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for the echo stand-in", aefWritten: aef is not null && !noAef);
         }
 
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+        var store = CliRunOutput.CreateStore(agentEvalDir);
+        await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();
         await store.EnsureSubjectAsync(subjectIdentity);
@@ -184,15 +184,16 @@ public static class BenchPerfCommand
 
         EvalResult? result = null;
         var startedAt = DateTimeOffset.UtcNow;
+        var comparisonName = $"Performance — {preset}";
         string? storeRunId = null;
-        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null ? null : new() { RunId = storeRunId };
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() => storeRunId is null || store?.WorkspaceRoot is null ? null : new() { RunId = storeRunId };
         bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
             aef, agentEvalDir, "perf", preset, subject, subjectVersion,
             agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
             abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null,
-            definition: suiteDefinition);
+            definition: suiteDefinition, comparisonName: comparisonName);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);
@@ -222,31 +223,28 @@ public static class BenchPerfCommand
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 result,
                 scenarioId: $"perf-{preset.ToLowerInvariant()}",
-                scenarioName: $"Performance — {preset}");
+                scenarioName: comparisonName);
             await store.WriteScenarioResultAsync(runId, scenarioResult);
 
             var runStats = new[] { result.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
             var verdict = result.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+            // The score only when it is a reading (T13): an agent whose every call failed wrote overallScore 0.
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
                 Stats: runStats,
-                Metrics: new Dictionary<string, double>
-                {
-                    ["overallScore"] = result.Score.Value,
-                });
+                Metrics: result.Score.MeasuredValue() is { } overallScore
+                    ? new Dictionary<string, double> { ["overallScore"] = overallScore }
+                    : new Dictionary<string, double>());
             await store.CompleteRunAsync(manifest, summary, ct);
-            Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
+            Console.WriteLine(store.WorkspaceRoot is null ? $"Prepared transient report source {runId}" : $"Persisted run {runId} to {agentEvalDir}");
             ct.ThrowIfCancellationRequested();
 
             // T0.5 (v1.1): emit JSON + HTML + PDF reports alongside the canonical run.
-            // Perf previously emitted nothing beyond the store; this brings it to parity
-            // with the compliance commands. Reports land in the canonical run dir.
-            // Resolve via the store so the path matches the manifest exactly — hand-building
-            // it from the RAW subject diverges whenever FileSystemLayout.Sanitize rewrites the
-            // name (BUG-17), orphaning the report or throwing on a non-existent directory.
-            var runDir = store.ResolveRunDirectory(subjectIdentity, runId);
+            // Reports are standalone exports in native mode; compatibility mode keeps the old run location.
+            // Resolve both through the output boundary so subject sanitization cannot orphan reports (BUG-17).
+            var runDir = CliRunOutput.ReportDirectory(store, agentEvalDir, subjectIdentity, runId, "perf");
             try
             {
                 var jsonPath = Path.Combine(runDir, "report.json");
@@ -274,7 +272,7 @@ public static class BenchPerfCommand
         }
 
         Console.WriteLine($"Overall result: composite verdict {result.Score.Label.ToUpperInvariant()} " +
-            $"(score {result.Score.Value:F3})");
+            (result.Score.MeasuredValue() is { } shownScore ? $"(score {shownScore:F3})" : "(no measured score)"));
 
         // AEF: the perf result as sealed evidence (the mock run returned above, unstored).
         if (WriteEvidence())

@@ -60,8 +60,15 @@ public static class ReliabilityRace
             Console.WriteLine("   D6 is live-only and never generates simulated results.");
             Console.ResetColor();
             Console.WriteLine("   It uses the same shared AIConfig endpoint, key, and primary deployment as the other live samples.\n");
+            SampleOutcome.Skip("no chat provider configured");
             return;
         }
+
+        // Two distinct models, or a clear stop before any prompt or call: on every provider but Azure the second model
+        // defaults to the primary.
+        var models = ComparisonModels.Distinct(AIConfig.ModelDeployment, AIConfig.SecondaryModelDeployment);
+        if (!ComparisonModels.Require("D6", models))
+            return;
 
         var runs = ReliabilityRaceRunCountSelector.Select(
             Environment.GetEnvironmentVariable("AGENTEVAL_RELIABILITY_RUNS"),
@@ -69,8 +76,8 @@ public static class ReliabilityRace
             Console.In,
             Console.Out);
         var delayMs = ReadInt("AGENTEVAL_RELIABILITY_DELAY_MS", 0, 0, 30_000);
-        var primaryDeployment = AIConfig.ModelDeployment;
-        var secondaryDeployment = AIConfig.SecondaryModelDeployment;
+        var primaryDeployment = models[0];
+        var secondaryDeployment = models[1];
 
         PrintWilsonExplanation();
         Console.WriteLine("   Stochastic design: repeated independent agent executions expose behavioral variance.");
@@ -89,19 +96,12 @@ public static class ReliabilityRace
         Console.WriteLine("   A single prompt would measure randomness for only that prompt; the suite estimates average");
         Console.WriteLine("   reliability across a small representative workload.\n");
 
-        if (string.Equals(primaryDeployment, secondaryDeployment, StringComparison.OrdinalIgnoreCase))
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"   D6 requires two distinct deployments; both shared AIConfig slots resolve to '{primaryDeployment}'.");
-            Console.ResetColor();
-            Console.WriteLine("   No calls were made and no results were fabricated.\n");
-            return;
-        }
-
+        // Each arm is labelled by its model name: the sample cannot know which model is "frontier" and which "economy",
+        // and it used to label A and B that way whatever they were.
         var arms = new[]
         {
-            CreateLiveArm($"Frontier · {primaryDeployment}", primaryDeployment),
-            CreateLiveArm($"Economy · {secondaryDeployment}", secondaryDeployment),
+            CreateLiveArm(primaryDeployment, primaryDeployment),
+            CreateLiveArm(secondaryDeployment, secondaryDeployment),
         };
 
         Console.WriteLine("   LIVE RUN — shared AIConfig credentials, real model calls, no fallback:");
@@ -132,6 +132,10 @@ public static class ReliabilityRace
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("   Stopping after three consecutive setup failures. Check deployment names and quota.\n");
                 Console.ResetColor();
+                var failing = arms.Where(arm => ReliabilityRaceTrialRules.HasConsecutiveSetupFailures(arm.Observations))
+                                  .Select(arm => arm.Label);
+                SampleOutcome.Skip($"stopped after round {round + 1} of {runs}: three consecutive setup failures for " +
+                                   $"{string.Join(", ", failing)} (check the model name and quota)");
                 break;
             }
 
@@ -294,6 +298,21 @@ public static class ReliabilityRace
         Console.WriteLine("   tool behavior, latency, and economics separate so the audience can choose the trade-off.\n");
 
         PrintRecommendation(decision);
+
+        var unpriced = summaries.Where(s => s.TotalCost is null).Select(s => s.Label).ToArray();
+        if (unpriced.Length > 0)
+        {
+            // The recommendation compares only factors measured for both arms; say which one it could not.
+            Console.WriteLine($"      Cost not compared: no price for {string.Join(", ", unpriced)} (N/A above is not $0).\n");
+        }
+
+        // Each arm's failures are the race's data. Two arms that never produced a reliable run are a wiring fault
+        // until shown otherwise, not a result to recommend from.
+        if (summaries.All(s => s.Total > 0 && s.Reliable.Successes == 0))
+        {
+            SampleOutcome.Fail("neither model produced a single end-to-end reliable run (correct route, required tool " +
+                               "called, no error): there is nothing to recommend");
+        }
     }
 
     private static void PrintInterpretation(

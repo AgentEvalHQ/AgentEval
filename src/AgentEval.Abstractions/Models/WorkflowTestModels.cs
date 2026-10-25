@@ -173,14 +173,16 @@ public record WorkflowTestSummary
     public TimeSpan TotalDuration { get; init; }
 
     /// <summary>
-    /// Pass rate as a percentage (0-100).
+    /// Pass rate as a percentage (0-100), or <see langword="null"/> when the suite ran no test: a rate over nothing is
+    /// not a 0% (T13).
     /// </summary>
-    public double PassRate => TotalTests > 0 ? (double)PassedTests / TotalTests * 100 : 0;
+    public double? PassRate => TotalTests > 0 ? (double)PassedTests / TotalTests * 100 : null;
 
     /// <summary>
-    /// Whether all tests passed.
+    /// Whether at least one test ran and every test passed. A suite with no test case passed nothing (T13): it read as
+    /// all passed.
     /// </summary>
-    public bool AllPassed => FailedTests == 0;
+    public bool AllPassed => TotalTests > 0 && FailedTests == 0;
 }
 
 /// <summary>

@@ -157,6 +157,61 @@ public class GoldenTraceTests
     }
 
     [Fact]
+    public void FromResults_ACaseWithNoVerdict_IsNotMeasured()
+    {
+        var trace = GoldenTrace.FromResults(
+        [
+            new TestResult { TestName = "judged", Passed = true, Score = 90 },
+            new TestResult { TestName = "no-verdict", Passed = false, Score = 0, JudgeFailed = true },
+            new TestResult { TestName = "errored", Passed = false, Score = 0, Error = new HttpRequestException("503") },
+        ]);
+
+        Assert.Equal([false, true, true], trace.Cases.Select(c => c.NotMeasured));
+    }
+
+    [Theory]
+    [InlineData(true, false)]    // the run errored where the golden one passed: read as a regression
+    [InlineData(false, true)]    // the golden run had no verdict and this one passed: read as an improvement
+    public void Compare_ACaseWithNoVerdictOnEitherSide_IsNotMeasured_NotARegressionOrAnImprovement(bool goldenMeasured, bool currentMeasured)
+    {
+        var golden = Trace(Case("t", true) with { NotMeasured = !goldenMeasured, Passed = goldenMeasured });
+        var current = Trace(Case("t", currentMeasured) with { NotMeasured = !currentMeasured });
+
+        var comparison = GoldenTraceComparer.Compare(golden, current);
+
+        var c = Assert.Single(comparison.Cases);
+        Assert.Equal(TraceChange.NotMeasured, c.Change);
+        Assert.False(comparison.HasRegression);
+        Assert.True(comparison.HasNotMeasured);
+        Assert.Contains("not measured in", c.Detail);
+    }
+
+    [Fact]
+    public async Task SaveThenLoad_KeepsNotMeasured_AndAnOlderFileReadsAsMeasured()
+    {
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "golden-" + Guid.NewGuid().ToString("N")));
+        try
+        {
+            var path = Path.Combine(dir.FullName, "trace.json");
+            await Trace(Case("a", true), Case("b", false) with { NotMeasured = true }).SaveAsync(path);
+            var json = await File.ReadAllTextAsync(path);
+            var loaded = await GoldenTrace.LoadAsync(path);
+
+            Assert.Equal([false, true], loaded.Cases.Select(c => c.NotMeasured));
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "notMeasured"));   // written only when true
+
+            var older = Path.Combine(dir.FullName, "older.json");
+            await File.WriteAllTextAsync(older,
+                """{"schemaVersion":1,"createdAt":"2026-01-01T00:00:00Z","cases":[{"name":"a","passed":true,"score":100}]}""");
+            Assert.False(Assert.Single((await GoldenTrace.LoadAsync(older)).Cases).NotMeasured);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public void Compare_MatchesARepeatedNameByItsOccurrence()
     {
         var comparison = GoldenTraceComparer.Compare(
