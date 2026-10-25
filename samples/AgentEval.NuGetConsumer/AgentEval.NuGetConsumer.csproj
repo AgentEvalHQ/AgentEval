@@ -14,34 +14,20 @@
     <!-- It tests the NuGet package as an external consumer would -->
   </PropertyGroup>
 
-  <!--
-    NOTE: Designed to reference AgentEval from NuGet (not project reference).
-    This validates that the published package works correctly.
-    
-    FOR DEVELOPMENT: Uses local project reference while package isn't published.
-    FOR VALIDATION: Change to PackageReference after publishing.
-      
-  -->
+  <!-- Validate the published RC as an external consumer; do not substitute a source project reference. -->
   <ItemGroup>
-    <!-- LOCAL: During development, use project reference
-    <ProjectReference Include="../../src/AgentEval/AgentEval.csproj" />
-    -->
-    
-    <!-- NUGET: For validation — track the LATEST published package (built on MAF 1.23.0). It is also the first
-         consumer-facing version with the AI_INFERENCE_PROVIDER resolver (AgentEval.Providers), which Config.cs uses. -->
-    <PackageReference Include="AgentEval" Version="0.43.0-beta" />
+    <PackageReference Include="AgentEval" Version="1.0.0-rc.1" />
 
-    <!-- Supporting packages with explicit versions (CPM disabled) — aligned to AgentEval 0.43.0-beta's
-         dependency baseline (MAF 1.23.0 / Microsoft.Extensions.AI 10.10.0 / OpenTelemetry.Api 1.18.0), read from the
-         PUBLISHED nuspec rather than guessed — see AgentEval.nuspec inside AgentEval.0.43.0-beta.nupkg.
-         Microsoft.Extensions.AI.OpenAI is 10.10.1, the version this repository pins for MAF 1.23. -->
+    <!-- Explicit versions (CPM disabled), aligned to the published RC.1 nuspec:
+         MAF 1.24.0 / Microsoft.Extensions.AI 10.10.0 / OpenTelemetry.Api 1.18.0.
+         Microsoft.Extensions.AI.OpenAI 10.10.1 matches this repository's provider adapter. -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageReference Include="System.Memory.Data" Version="10.0.10" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.23.0" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.24.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
     <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project.
-         MAF 1.23.0 already brings OpenTelemetry.Api 1.18.0 transitively, but a CPM-disabled consumer
+         The published RC already requires OpenTelemetry.Api 1.18.0, but a CPM-disabled consumer
          won't inherit transitive pinning — keep this explicit so the resolved version is unambiguous. -->
     <PackageReference Include="OpenTelemetry.Api" Version="1.18.0" />
     <!-- Security servicing fix for GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7; CPM is disabled. -->
