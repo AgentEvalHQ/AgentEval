@@ -56,7 +56,7 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void Create_Has31Options()
+    public void Create_Has37Options()
     {
         // dataset, endpoint, azure, model, deployment-name, api-key, system-prompt, system-prompt-file,
         // temperature, max-tokens, metrics, runs, success-threshold, judge, judge-model,
@@ -65,8 +65,10 @@ public class EvalCommandTests
         // max-credits = 4 (SutTargetResolver.AddOptionsTo("eval")) => 24
         // + golden trace: save-golden, golden, fail-on-tool-change => 27
         // + AEF (S1 #5a): aef, no-aef, subject, subject-version => 31
+        // + --sut microsoft365 (Work IQ A2A, SutTargetResolver.AddOptionsTo("eval")): m365-config, m365-max-turns,
+        // m365-profile, m365-capture-raw, m365-verbose, m365-trace = 6 => 37
         var command = EvalCommand.Create();
-        Assert.Equal(31, command.Options.Count);
+        Assert.Equal(37, command.Options.Count);
     }
 
     [Theory]

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Microsoft 365 agents — Microsoft 365 Copilot and declarative agents reached over Work IQ A2A 1.0 — are evaluable through the new, experimental `AgentEval.Microsoft365` provider (`Microsoft365AgentFactory.BuildLive` returns an `IEvaluableAgent` whose every turn carries a versioned evidence document with an availability label per channel) and the CLI target `--sut microsoft365` for `eval` and the `gdpr`, `eu-ai-act`, `owasp`, `mitre` and `nist` benchmark families, with `--m365-config`, `--m365-max-turns` (turns counted, not metered), `--m365-profile`, `--m365-capture-raw`, `--m365-verbose` and `--m365-trace`. A turn that does not complete is an error, never a graded answer; tool and retrieval evidence is reported as not requested, not provided or provided, never inferred; a message is never resent. The `--i-understand-live-side-effects` consent flag is now registered once per verb by the shared `--sut` resolver instead of by each live target (no behaviour change). `agenteval m365 doctor` runs staged readiness checks (config, sign-in, card discovery, protocol handshake, optional probe and census) and writes a readiness report with a redacted JSONL trace and issue register; `docs/microsoft365-tester-guide.md` describes the live validation an external tester performs. The live path has not been verified on a tenant by the maintainers. See [Microsoft 365](docs/microsoft365.md).
+
 ## [1.0.0-rc.1]
 
 Release candidate for feedback before 1.0.0. See the [upgrade guide](docs/upgrading-to-1.0.md) for the source, result and CLI migrations from 0.43.0-beta.

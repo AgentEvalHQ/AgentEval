@@ -118,6 +118,40 @@ public sealed record WorkIqOptions
     /// </summary>
     public DateTimeOffset? EvaluationReferenceInstant { get; init; }
 
+    /// <summary>
+    /// Writes every trace event to stderr (one line per event, see <see cref="Diagnostics.ConsoleTraceSink"/>) in
+    /// addition to the JSONL trace file. Off by default; the CLI's <c>--m365-verbose</c> turns it on and
+    /// <c>m365 doctor</c> defaults to on.
+    /// </summary>
+    public bool Verbose { get; init; }
+
+    /// <summary>
+    /// Where the JSONL trace (every event of the run) is written; null resolves to
+    /// <c>&lt;DiagnosticsDirectory&gt;/m365-trace-&lt;RunId&gt;.jsonl</c>. Redacted: no token, auth code or
+    /// <c>Authorization</c> header ever appears in it.
+    /// </summary>
+    public FileInfo? TraceFile { get; init; }
+
+    /// <summary>
+    /// Where the JSONL issue register (every warning/error with category and suggested cause) is written; null
+    /// resolves to <c>&lt;DiagnosticsDirectory&gt;/m365-issues.jsonl</c>. Appended across runs; each entry carries
+    /// its run id.
+    /// </summary>
+    public FileInfo? IssueFile { get; init; }
+
+    /// <summary>
+    /// The directory of the default trace and issue files; null resolves to the workspace's <c>.agenteval/m365/</c>
+    /// (the first <c>.agenteval</c> directory found walking up from the current directory), else
+    /// <c>&lt;temp&gt;/agenteval-m365</c>. The resolved paths are traced as the first event of the run.
+    /// </summary>
+    public DirectoryInfo? DiagnosticsDirectory { get; init; }
+
+    /// <summary>
+    /// The run id stamped on every trace event and issue (and used in the trace file name); null or blank mints
+    /// <c>m365-&lt;yyyyMMdd-HHmmss UTC&gt;-&lt;4 hex&gt;</c>. Set it to correlate the diagnostics with an AEF run id.
+    /// </summary>
+    public string? RunId { get; init; }
+
     /// <summary>Throws when any duration, count or bound is negative, naming every offending option.</summary>
     /// <exception cref="InvalidOperationException">One or more options are negative.</exception>
     public void Validate()

@@ -3,6 +3,9 @@
 // Licensed under the MIT License.
 
 using AgentEval.Microsoft365.Auth;
+using AgentEval.Microsoft365.Capture;
+using AgentEval.Microsoft365.Diagnostics;
+using AgentEval.Microsoft365.Protocol;
 
 namespace AgentEval.Microsoft365;
 
@@ -19,6 +22,9 @@ public static class Microsoft365AgentFactory
 {
     /// <summary>Logical name of the one named <c>HttpClient</c> the live connector uses.</summary>
     public const string HttpClientName = "microsoft365";
+
+    /// <summary>How long a pooled connection of the default <see cref="SocketsHttpHandler"/> lives (DNS changes are picked up after it).</summary>
+    internal static readonly TimeSpan PooledConnectionLifetime = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// The LIVE path: validates consent and config, builds the authenticated A2A transport and a
@@ -57,9 +63,51 @@ public static class Microsoft365AgentFactory
         }
 
         config.Validate();
-        (options ?? new WorkIqOptions()).Validate();
+        options ??= new WorkIqOptions();
+        options.Validate();
 
-        throw new NotImplementedException("TODO(M24)");
+        var clock = TimeProvider.System;
+        var diagnostics = WorkIqDiagnosticsFactory.Create(config, options, clock);
+        try
+        {
+            var policy = new WorkIqTrustPolicy(config.TrustedHosts);
+            tokenProvider ??= new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope) { Diagnostics = diagnostics };
+
+            var inner = innerHandler ?? new SocketsHttpHandler { PooledConnectionLifetime = PooledConnectionLifetime };
+            var capture = new RawCaptureHandler { InnerHandler = inner, Diagnostics = diagnostics };
+            var auth = new WorkIqAuthHandler(tokenProvider)
+            {
+                InnerHandler = capture,
+                Diagnostics = diagnostics,
+                Policy = policy,
+                ExpectedScope = config.Scope,
+            };
+            var http = new HttpClient(auth, disposeHandler: true)
+            {
+                // Zero means "no cap", like the other zero-valued options; HttpClient needs the explicit infinite value.
+                Timeout = options.SendTimeout == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : options.SendTimeout,
+            };
+
+            var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics);
+            var conversation = new WorkIqConversation(client, config, options, clock, diagnostics);
+            var agent = new WorkIqEvaluableAgent(conversation, config.DisplayName, options, onTurn, diagnostics);
+            agent.Owned.Add(new SyncDisposableAdapter(http));
+            agent.Owned.Add(new SyncDisposableAdapter(diagnostics));
+
+            var cardUri = config.ResolveCardUri();
+            diagnostics.Trace(
+                WorkIqTraceStage.Config,
+                "config.agent_built",
+                $"live agent built for {config.DisplayName}: card {cardUri.Scheme}://{cardUri.Host}{cardUri.AbsolutePath}, agent id {(string.IsNullOrWhiteSpace(config.AgentId) ? "default" : "set")}, " +
+                $"profile {client.Profile}, policy {options.ConversationPolicy}, MaxTurns {(options.MaxTurns == 0 ? "uncapped" : options.MaxTurns.ToString())}, " +
+                $"token provider {tokenProvider.GetType().Name}, trusted hosts {string.Join(", ", config.TrustedHosts)}; no network call was made (discovery and sign-in run on the first turn)");
+            return agent;
+        }
+        catch
+        {
+            diagnostics.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -80,5 +128,22 @@ public static class Microsoft365AgentFactory
     {
         ArgumentNullException.ThrowIfNull(conversation);
         return new WorkIqEvaluableAgent(conversation, name, options, onTurn);
+    }
+
+    /// <summary>Lets a synchronous disposable (the HttpClient, the diagnostics) ride the agent's owned list.</summary>
+    private sealed class SyncDisposableAdapter : IAsyncDisposable
+    {
+        private readonly IDisposable _inner;
+
+        public SyncDisposableAdapter(IDisposable inner)
+        {
+            _inner = inner;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _inner.Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 }

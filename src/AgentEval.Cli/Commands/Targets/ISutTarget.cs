@@ -115,7 +115,7 @@ internal static class SutTargetResolver
 {
     /// <summary>The built-in targets available under this shared seam. Only `copilot-studio` today (see <see cref="ISutTarget"/>'s scope note).</summary>
     internal static IReadOnlyList<ISutTarget> BuiltInTargets() =>
-        [new global::AgentEval.Cli.CopilotStudio.CopilotStudioRedTeamTarget()];
+        [new global::AgentEval.Cli.CopilotStudio.CopilotStudioRedTeamTarget(), new global::AgentEval.Cli.Microsoft365.Microsoft365SutTarget()];
 
     /// <summary>
     /// Registers <c>--sut</c>, the common <c>--i-understand-live-side-effects</c> consent flag, and every applicable

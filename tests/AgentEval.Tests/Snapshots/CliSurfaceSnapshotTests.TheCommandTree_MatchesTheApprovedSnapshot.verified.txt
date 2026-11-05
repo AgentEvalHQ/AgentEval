@@ -201,6 +201,12 @@
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1]
+            option --m365-max-turns Int32 [1..1] default=0
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=false
             option --max-credits Int32 [1..1] default=0
             option --no-aef Boolean [0..1] default=false
             option --preset String [1..1]
@@ -222,6 +228,12 @@
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1]
+            option --m365-max-turns Int32 [1..1] default=0
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=false
             option --max-credits Int32 [1..1] default=0
             option --no-aef Boolean [0..1] default=false
             option --preset String [1..1]
@@ -260,6 +272,12 @@
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1]
+            option --m365-max-turns Int32 [1..1] default=0
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=false
             option --max-credits Int32 [1..1] default=0
             option --model String [1..1]
             option --no-aef Boolean [0..1] default=false
@@ -276,6 +294,12 @@
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1]
+            option --m365-max-turns Int32 [1..1] default=0
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=false
             option --max-credits Int32 [1..1] default=0
             option --model String [1..1]
             option --no-aef Boolean [0..1] default=false
@@ -292,6 +316,12 @@
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1]
+            option --m365-max-turns Int32 [1..1] default=0
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=false
             option --max-credits Int32 [1..1] default=0
             option --model String [1..1]
             option --no-aef Boolean [0..1] default=false
@@ -308,6 +338,12 @@
                 option --endpoint String [1..1]
                 option --from-env (--azure-from-env) Boolean [0..1] default=false
                 option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --m365-capture-raw DirectoryInfo [1..1]
+                option --m365-config FileInfo [1..1]
+                option --m365-max-turns Int32 [1..1] default=0
+                option --m365-profile String [1..1] default="public"
+                option --m365-trace FileInfo [1..1]
+                option --m365-verbose Boolean [0..1] default=false
                 option --max-credits Int32 [1..1] default=0
                 option --model String [1..1]
                 option --no-aef Boolean [0..1] default=false
@@ -323,6 +359,12 @@
                 option --endpoint String [1..1]
                 option --from-env (--azure-from-env) Boolean [0..1] default=false
                 option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --m365-capture-raw DirectoryInfo [1..1]
+                option --m365-config FileInfo [1..1]
+                option --m365-max-turns Int32 [1..1] default=0
+                option --m365-profile String [1..1] default="public"
+                option --m365-trace FileInfo [1..1]
+                option --m365-verbose Boolean [0..1] default=false
                 option --max-credits Int32 [1..1] default=0
                 option --model String [1..1]
                 option --no-aef Boolean [0..1] default=false
@@ -338,6 +380,12 @@
                 option --endpoint String [1..1]
                 option --from-env (--azure-from-env) Boolean [0..1] default=false
                 option --i-understand-live-side-effects Boolean [0..1] default=false
+                option --m365-capture-raw DirectoryInfo [1..1]
+                option --m365-config FileInfo [1..1]
+                option --m365-max-turns Int32 [1..1] default=0
+                option --m365-profile String [1..1] default="public"
+                option --m365-trace FileInfo [1..1]
+                option --m365-verbose Boolean [0..1] default=false
                 option --max-credits Int32 [1..1] default=0
                 option --model String [1..1]
                 option --no-aef Boolean [0..1] default=false
@@ -409,6 +457,12 @@
         option --i-understand-live-side-effects Boolean [0..1] default=false
         option --judge String [1..1]
         option --judge-model String [1..1]
+        option --m365-capture-raw DirectoryInfo [1..1]
+        option --m365-config FileInfo [1..1]
+        option --m365-max-turns Int32 [1..1] default=0
+        option --m365-profile String [1..1] default="public"
+        option --m365-trace FileInfo [1..1]
+        option --m365-verbose Boolean [0..1] default=false
         option --max-credits Int32 [1..1] default=0
         option --max-tokens Int32? [1..1]
         option --metrics String [1..1]
