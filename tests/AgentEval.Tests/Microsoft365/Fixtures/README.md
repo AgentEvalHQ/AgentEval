@@ -1,8 +1,8 @@
 # Microsoft 365 (Work IQ A2A 1.0) fixture corpus
 
 **All data in this folder is synthetic.** Nothing here was captured from a Microsoft service or a tenant; every
-id, name, URL, timestamp, answer and citation is invented for the design (task M04 of
-`strategy/M365Integration/03-Implementation-Plan.md`). Hosts are `*.example.invalid` or the public Work IQ
+id, name, URL, timestamp, answer and citation is invented for the provider's design (see
+[docs/microsoft365.md](../../../../docs/microsoft365.md)). Hosts are `*.example.invalid` or the public Work IQ
 endpoint; no real people, organisations or tenants appear.
 
 Every `*.json` and `*.txt` file is an embedded resource (`AgentEval.Tests.csproj` glob

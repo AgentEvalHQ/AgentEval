@@ -26,3 +26,7 @@ samples/interop/assert-ai/example-run/** text eol=lf
 scripts/otlp-fixtures/proto/**/*.proto text eol=lf
 tests/AgentEval.Results.Tests/Observations/Fixtures/*.pb -text
 tests/AgentEval.Results.Tests/Observations/Fixtures/*.json text eol=lf
+
+# Microsoft 365 provider test fixtures: byte-exact on every platform. FixtureCatalogTests asserts the bytes
+# (JSON and LF streams without CR, one CRLF stream with CRLF only), so no checkout may convert line endings.
+tests/AgentEval.Tests/Microsoft365/Fixtures/** -text
