@@ -7,6 +7,7 @@ using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Cli.Microsoft365;
 using AgentEval.Core;
+using AgentEval.Microsoft365;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.Microsoft365;
@@ -168,7 +169,93 @@ public class EvalCommandMicrosoft365SutTests
         finally { TryDelete(dataset); TryDelete(cfg); }
     }
 
+    // ── a turn that does not complete is an error row, never a verdict (review M4) ──
+
+    [Theory]
+    [InlineData(WorkIqTurnOutcome.Indeterminate)]
+    [InlineData(WorkIqTurnOutcome.Failed)]
+    [InlineData(WorkIqTurnOutcome.InputRequired)]
+    public async Task Eval_Microsoft365_NonCompletedTurn_IsAnErrorRowExit11(WorkIqTurnOutcome outcome)
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-notcompleted-");
+        try
+        {
+            // A REAL WorkIqEvaluableAgent (completion gate, typed exception, turn sink) over a scripted conversation.
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation
+            {
+                OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.NotCompleted(request, outcome)),
+            };
+            var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-not-completed", onTurn: sink.Record);
+            sink.AttachTo(agent);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+                var opts = new EvalOptions
+                {
+                    Dataset = dataset,
+                    Sut = "microsoft365",
+                    AckLiveSideEffects = true,
+                    TargetOptions = new Dictionary<string, ISutTargetOptions?>
+                    {
+                        ["microsoft365"] = new Microsoft365SutOptions { ConfigFile = cfg, Profile = "public" },
+                    },
+                    Format = "json",
+                    Output = report,
+                    Aef = new DirectoryInfo(Path.Combine(root.FullName, "aef")),
+                    SubjectVersion = "1",
+                    Quiet = true,
+                };
+
+                var exit = await RunWithContentCaptureAsync(opts, agent);
+
+                Assert.Equal(ExitCodes.GateIndeterminate, exit);   // not measured: no verdict, and never a pass
+
+                // The case is an error row: no pass, the safe not-completed message, and nothing graded.
+                var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(report.FullName))!;
+                var row = Assert.Single(json["results"]!.AsArray())!;
+                Assert.False((bool)row["passed"]!);
+                var error = (string?)row["error"];
+                Assert.NotNull(error);
+                Assert.Contains("Work IQ turn did not complete", error, StringComparison.Ordinal);
+                Assert.Contains($"outcome={outcome}", error, StringComparison.Ordinal);
+                Assert.Null(row["score"]?.GetValue<double?>());
+
+                // The sink saw the turn before the throw, under the case's AEF id, and the AEF run carries its document.
+                var turn = Assert.Single(sink.All);
+                Assert.Equal(outcome, turn.Outcome);
+                Assert.Equal("test1", turn.Identity.CaseId);
+                var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(root.FullName, "aef"), "run.json", SearchOption.AllDirectories)))!;
+                var evidence = File.ReadAllLines(Path.Combine(run, "evidence.ndjson"))
+                    .Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!)
+                    .Where(l => (string?)l["kind"] == "document")
+                    .ToArray();
+                Assert.Single(evidence);
+                Assert.Equal(1, conversation.Turns.Count);
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
     // ── helpers ──
+
+    /// <summary>Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on</c>, the way the CLI invokes it.</summary>
+    private static Task<int> RunWithContentCaptureAsync(EvalOptions opts, IEvaluableAgent standIn)
+    {
+        var command = new System.CommandLine.Command("eval-m365-notcompleted-test");
+        command.Options.Add(new System.CommandLine.Option<DirectoryInfo?>("--aef"));
+        var controls = new AefCliOptions(command);
+        return controls.InvokeAsync(
+            command.Parse(["--aef-content", "on"]),
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None, sutOverride: standIn));
+    }
 
     private static EvalOptions BaseOptions(
         FileInfo dataset, bool ackConsent, FileInfo? config, string? sut = "microsoft365", int runs = 1, string? metrics = null,

@@ -42,7 +42,7 @@ internal sealed class ExpectedIssueFilter : IWorkIqIssueSink, IDisposable
     public void Write(WorkIqIssue i)
     {
         ArgumentNullException.ThrowIfNull(i);
-        if (Volatile.Read(ref _expected) is { } expected && expected(i))
+        if (IsExpected(i))
         {
             Interlocked.Increment(ref _suppressed);
             return;
@@ -57,6 +57,40 @@ internal sealed class ExpectedIssueFilter : IWorkIqIssueSink, IDisposable
         if (_inner is IDisposable disposable)
         {
             disposable.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A sink that forwards to <paramref name="extra"/> under this filter's expectation, so a caller-owned issue sink
+    /// receives exactly what the issue register receives. It does not count toward <see cref="Suppressed"/> (the
+    /// register's own filter counts once per held-back issue), is a separate sink of the diagnostics (a failing extra
+    /// sink is dropped alone, the register keeps writing) and is never disposed by the filter.
+    /// </summary>
+    /// <param name="extra">The caller's sink.</param>
+    public IWorkIqIssueSink Filtering(IWorkIqIssueSink extra) => new View(this, extra ?? throw new ArgumentNullException(nameof(extra)));
+
+    private bool IsExpected(WorkIqIssue issue) => Volatile.Read(ref _expected) is { } expected && expected(issue);
+
+    private sealed class View : IWorkIqIssueSink, ICallerOwnedSink
+    {
+        private readonly ExpectedIssueFilter _filter;
+        private readonly IWorkIqIssueSink _extra;
+
+        public View(ExpectedIssueFilter filter, IWorkIqIssueSink extra)
+        {
+            _filter = filter;
+            _extra = extra;
+        }
+
+        public object Inner => _extra;
+
+        public void Write(WorkIqIssue i)
+        {
+            ArgumentNullException.ThrowIfNull(i);
+            if (!_filter.IsExpected(i))
+            {
+                _extra.Write(i);
+            }
         }
     }
 

@@ -29,6 +29,9 @@ public sealed class WorkIqAadstsCatalogTests
         "AADSTS530003",
         "AADSTS53003",
         "AADSTS900144",
+        "AADSTS90002",
+        "AADSTS50059",
+        "AADSTS90019",
     ];
 
     [Fact]
@@ -46,6 +49,18 @@ public sealed class WorkIqAadstsCatalogTests
         }
 
         Assert.Equal(CodesThatMatter.Length, WorkIqAadstsCatalog.Entries.Count);
+    }
+
+    [Theory]
+    [InlineData("AADSTS90002", "tenantId")]
+    [InlineData("AADSTS50059", "tenantId")]
+    [InlineData("AADSTS90019", "tenantId")]
+    public void TryGet_TenantNotFoundCodes_NameTheTenantIdAsTheFix(string code, string field)
+    {
+        // Review M2: the placeholder-tenant case, the most predictable first failure, gets a cause and a fix.
+        Assert.True(WorkIqAadstsCatalog.TryGet(code, out var entry));
+        Assert.Contains(field, entry.Fix, StringComparison.Ordinal);
+        Assert.DoesNotContain("not in this catalog", WorkIqAadstsCatalog.Describe(code), StringComparison.Ordinal);
     }
 
     [Fact]

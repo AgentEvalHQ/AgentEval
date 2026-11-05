@@ -24,7 +24,8 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
         int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null, string? comparisonName = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? judgeProvider = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, string? subjectModel = null, string? comparisonName = null,
+        System.Text.Json.Nodes.JsonObject? subjectSettings = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -33,6 +34,7 @@ internal static class BenchAef
             var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = 1 };
             if (complianceArtifacts is not null)
                 settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
+            AddSubjectSettings(settings, subjectSettings);
             var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
             {
                 BenchmarkComparison = verdict is null ? null : new($"{family}-{preset.ToLowerInvariant()}", verdict, subjectModel) { Name = comparisonName },
@@ -81,9 +83,11 @@ internal static class BenchAef
         AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt, string subjectKind = "agent",
         IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt = null, int? exitCode = null,
         string? abortReason = null, bool emptyResults = false, AefStoreV1Link? storeV1 = null, string? endpoint = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null, string? comparisonName = null) =>
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, byte[]? nativeReportJson = null, string? comparisonName = null,
+        System.Text.Json.Nodes.JsonObject? subjectSettings = null) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt, subjectKind, caseExt, exitCode,
-            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson, comparisonName: comparisonName);
+            abortReason: abortReason, emptyResults: emptyResults, storeV1: storeV1, endpoint: endpoint, definition: definition, summaryExt: summaryExt, nativeReportJson: nativeReportJson, comparisonName: comparisonName,
+            subjectSettings: subjectSettings);
 
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
@@ -108,8 +112,25 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, AefReportArtifact? report = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition, report: report);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null, AefReportArtifact? report = null,
+        System.Text.Json.Nodes.JsonObject? subjectSettings = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier, definition, report: report,
+            subjectSettings: subjectSettings);
+
+    /// <summary>
+    /// Adds a built-in target's content-free provenance (for <c>--sut microsoft365</c>: the protocol, profile, normaliser
+    /// and config-identity keys, the same keys <c>eval</c> writes) to a run's config settings. A target's key never
+    /// replaces the command's own: <see cref="System.Text.Json.Nodes.JsonObject.Add(string, System.Text.Json.Nodes.JsonNode?)"/>
+    /// throws on a clash, which the writer reports instead of writing a run with a silently overwritten setting.
+    /// </summary>
+    /// <param name="settings">The run's settings.</param>
+    /// <param name="subjectSettings">The target's settings; null adds nothing.</param>
+    internal static void AddSubjectSettings(System.Text.Json.Nodes.JsonObject settings, System.Text.Json.Nodes.JsonObject? subjectSettings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        foreach (var (key, value) in subjectSettings ?? [])
+            settings.Add(key, value?.DeepClone());
+    }
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -219,7 +240,8 @@ internal static class BenchAef
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
         Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null, AgentEval.Results.Suites.SuiteDefinitionManifest? definition = null,
-        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null, string? comparisonName = null)
+        System.Text.Json.Nodes.JsonObject? summaryExt = null, AefReportArtifact? report = null, byte[]? nativeReportJson = null, string? comparisonName = null,
+        System.Text.Json.Nodes.JsonObject? subjectSettings = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -228,6 +250,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             if (report is not null || complianceArtifacts is not null)
                 settings["reportSourceManifestStorage"] = storeV1 is null ? "transient-in-memory" : "store-v1";
+            AddSubjectSettings(settings, subjectSettings);
             var options = new AefCompositeRunOptions
             {
                 Report = report,

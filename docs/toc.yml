@@ -103,6 +103,8 @@
     items:
     - name: Tester Guide
       href: microsoft365-tester-guide.md
+    - name: Tester Results Template
+      href: microsoft365-tester-RESULTS-TEMPLATE.md
   - name: Agent Skills
     href: agent-skills.md
     items:

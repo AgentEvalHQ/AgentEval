@@ -1,0 +1,11 @@
+{
+  "endpoint": "https://workiq.svc.cloud.microsoft/a2a/",
+  "agentId": null,
+  "tenantId": "REPLACE-WITH-ENTRA-TENANT-GUID",
+  "appClientId": "REPLACE-WITH-PUBLIC-CLIENT-APP-REGISTRATION-GUID",
+  "scope": "api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask",
+  "agentName": "My Non-Prod Microsoft 365 Agent",
+  "diagnosticProfile": "PublicAnswerOnly",
+  "timeZone": "Europe/Zurich",
+  "trustedHosts": ["workiq.svc.cloud.microsoft"]
+}

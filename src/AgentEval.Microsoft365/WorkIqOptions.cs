@@ -80,9 +80,12 @@ public sealed record WorkIqOptions
     public ConversationPolicy ConversationPolicy { get; init; } = ConversationPolicy.FreshContextPerInvocation;
 
     /// <summary>
-    /// Maximum number of completed turns per agent instance (0 = no cap). Turns are counted; consumption is not
-    /// metered — the service exposes no cost. Exceeding the cap throws <see cref="WorkIqTurnBudgetExceededException"/>
-    /// before the send that would cross it.
+    /// Maximum number of turns per agent instance (0 = no cap). Every turn that returned a typed result counts, whether
+    /// it completed or not — a failed, paused, canceled or indeterminate turn, and also one that failed before its prompt
+    /// went out (a sign-in or discovery failure); only a turn refused before it started (this cap, a disposed agent)
+    /// does not (see <see cref="WorkIqEvaluableAgent.TurnsUsed"/>). Turns are counted; consumption is not metered — the
+    /// service exposes no cost. Reaching the cap throws <see cref="WorkIqTurnBudgetExceededException"/> before the send
+    /// that would cross it.
     /// </summary>
     public int MaxTurns { get; init; }
 
@@ -152,10 +155,37 @@ public sealed record WorkIqOptions
     /// </summary>
     public string? RunId { get; init; }
 
-    /// <summary>Throws when any duration, count or bound is negative, naming every offending option.</summary>
-    /// <exception cref="InvalidOperationException">One or more options are negative.</exception>
+    /// <summary>
+    /// Extra trace sinks of a live agent (<see cref="Microsoft365AgentFactory.BuildLive"/>), next to the JSONL trace
+    /// file and the verbose console. Each receives every event the JSONL trace file receives, in the same order and
+    /// after the same redaction (no token, auth code or <c>Authorization</c> header ever reaches it). The caller owns
+    /// their lifetime: the agent never disposes them, so one sink may outlive several agents. A sink that throws is
+    /// reported once on stderr and dropped for the rest of the run, like any other sink; it never fails a turn.
+    /// Null or empty means none.
+    /// </summary>
+    public IReadOnlyList<Diagnostics.IWorkIqTraceSink>? TraceSinks { get; init; }
+
+    /// <summary>
+    /// Extra issue sinks of a live agent (<see cref="Microsoft365AgentFactory.BuildLive"/>), next to the JSONL issue
+    /// register. Each receives every issue the JSONL issue file receives, stamped and redacted the same way. The caller
+    /// owns their lifetime (never disposed by the agent); a sink that throws is reported once and dropped. Null or empty
+    /// means none.
+    /// </summary>
+    public IReadOnlyList<Diagnostics.IWorkIqIssueSink>? IssueSinks { get; init; }
+
+    /// <summary>
+    /// Throws when any duration, count or bound is negative (naming every offending option), or when
+    /// <see cref="TraceSinks"/> or <see cref="IssueSinks"/> contains a null entry.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">One or more options are negative, or a sink list has a null entry.</exception>
     public void Validate()
     {
+        if (TraceSinks?.Any(s => s is null) == true || IssueSinks?.Any(s => s is null) == true)
+        {
+            throw new InvalidOperationException(
+                "WorkIqOptions.TraceSinks and WorkIqOptions.IssueSinks must not contain a null entry (pass an empty list or null for none).");
+        }
+
         var invalid = new List<string>();
         if (SendTimeout < TimeSpan.Zero) { invalid.Add(nameof(SendTimeout)); }
         if (TurnDeadline < TimeSpan.Zero) { invalid.Add(nameof(TurnDeadline)); }

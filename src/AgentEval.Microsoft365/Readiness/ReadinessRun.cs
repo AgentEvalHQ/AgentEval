@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AgentEval.Microsoft365.Auth;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Protocol;
@@ -13,8 +14,9 @@ namespace AgentEval.Microsoft365.Readiness;
 
 /// <summary>
 /// One run of the readiness check behind <see cref="Microsoft365ReadinessCheck"/>: loads the config, opens the
-/// run's diagnostics (JSONL trace, issue register behind <see cref="ExpectedIssueFilter"/>, the verbose console and
-/// an in-memory list the stages read their own events from), runs the stages in order, traces each one on the
+/// run's diagnostics (JSONL trace, issue register behind <see cref="ExpectedIssueFilter"/>, the verbose console, an
+/// in-memory list the stages read their own events from, and the caller's <see cref="ReadinessCheckOptions.TraceSinks"/>
+/// and <see cref="ReadinessCheckOptions.IssueSinks"/>), runs the stages in order, traces each one on the
 /// <see cref="WorkIqTraceStage.Doctor"/> stage (<c>doctor.&lt;stage&gt;.start</c>, then <c>.pass</c>, <c>.fail</c> or
 /// <c>.skipped</c> with the evidence as data) and registers every failed stage as a <c>doctor.&lt;stage&gt;.failed</c>
 /// issue. The stage implementations live in the <c>Stages</c> and <c>Turns</c> partials. Single-use.
@@ -42,6 +44,9 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     /// <summary>How long a turn stage may outlive its turn deadline before the stage itself stops waiting.</summary>
     private static readonly TimeSpan TurnGrace = TimeSpan.FromSeconds(30);
 
+    /// <summary>How long past the sign-in code's expiry a stage still waits (MSAL itself ends the wait with <c>code_expired</c>).</summary>
+    private static readonly TimeSpan SignInGrace = TimeSpan.FromSeconds(10);
+
     private static readonly IReadOnlySet<string> TraceExcludedKeys = new HashSet<string>(StringComparer.Ordinal) { ProbePromptKey, AnswerPreviewKey };
 
     private readonly Microsoft365Config? _configInput;
@@ -65,6 +70,9 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     private HttpClient? _http;
     private WorkIqA2AClient? _client;
     private ProbeTurn? _probe;
+    private CancellationTokenSource? _activeStage;
+    private DateTimeOffset _activeStageDeadline;
+    private DateTimeOffset? _signInCodeExpiresOn;
     private int _disposed;
 
     /// <summary>Creates the run; nothing is read, opened or sent until <see cref="ExecuteAsync"/>.</summary>
@@ -120,7 +128,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         string? AadstsCode);
 
     /// <summary>The data of the first event: where the run's files are.</summary>
-    private sealed record ReadyData(string RunId, string TraceFile, string IssueFile, string Directory, bool Verbose, string? ConfigSha256, string? AdapterVersion, string A2AVersion);
+    private sealed record ReadyData(string RunId, string TraceFile, string IssueFile, string Directory, bool Verbose, string? ConfigSha256, string? AdapterVersion, [property: JsonPropertyName("a2aVersion")] string A2AVersion);
 
     /// <summary>Runs every stage and returns the report; the diagnostics files are closed when the run is disposed.</summary>
     /// <param name="cancellationToken">Stops the run; the stage in progress fails as canceled and the rest are skipped.</param>
@@ -300,8 +308,18 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         }
 
         _issueFilter = new ExpectedIssueFilter(issues);
+
+        // The caller's own sinks come last and see exactly what the files see: every event after the same stamping and
+        // redaction, every issue behind the same expected-reply filter. They are never disposed with the run.
+        CallerOwnedTraceSink.AppendTo(traceSinks, _options.TraceSinks);
+        var issueSinks = new List<IWorkIqIssueSink> { _issueFilter };
+        foreach (var extra in _options.IssueSinks ?? [])
+        {
+            issueSinks.Add(_issueFilter.Filtering(extra));
+        }
+
         var configSha256 = _config is null ? null : WorkIqDiagnosticsFactory.ComputeConfigSha256(_config);
-        _diagnostics = new WorkIqDiagnostics(_runId, configSha256, traceSinks, [_issueFilter], _clock);
+        _diagnostics = new WorkIqDiagnostics(_runId, configSha256, traceSinks, issueSinks, _clock);
     }
 
     private void TraceReady()
@@ -419,8 +437,64 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     /// <summary>The profile the stages run under: <see cref="ReadinessCheckOptions.Profile"/> over the config's.</summary>
     private DiagnosticProfile EffectiveProfile => _options.Profile ?? Config.ResolveProfile();
 
-    private IWorkIqTokenProvider TokenProvider => _tokenProvider ??= _tokenProviderOverride
-        ?? new WorkIqDeviceCodeTokenProvider(Config.TenantId, Config.AppClientId, Config.Scope, _console) { Diagnostics = _diagnostics };
+    private IWorkIqTokenProvider TokenProvider
+    {
+        get
+        {
+            if (_tokenProvider is not null)
+            {
+                return _tokenProvider;
+            }
+
+            var provider = _tokenProviderOverride
+                ?? new WorkIqDeviceCodeTokenProvider(Config.TenantId, Config.AppClientId, Config.Scope, _console) { Diagnostics = _diagnostics };
+            if (provider is IWorkIqSignInWaitSource source)
+            {
+                // A device-code sign-in is bounded by its code's own expiry, not by the stage timeout meant for network calls.
+                source.SignInPrompted = OnSignInPrompted;
+            }
+
+            return _tokenProvider = provider;
+        }
+    }
+
+    /// <summary>
+    /// A device-code sign-in started inside the running stage: the stage now waits until the code expires (plus
+    /// <see cref="SignInGrace"/>) when that is longer than what the stage timeout leaves, and the trace says so.
+    /// </summary>
+    /// <param name="expiresOn">When the sign-in code expires.</param>
+    private void OnSignInPrompted(DateTimeOffset expiresOn)
+    {
+        _signInCodeExpiresOn = expiresOn;
+        var source = Volatile.Read(ref _activeStage);
+        if (source is null)
+        {
+            return;
+        }
+
+        var now = _clock.GetUtcNow();
+        var wait = expiresOn - now + SignInGrace;
+        if (wait <= _activeStageDeadline - now)
+        {
+            return;
+        }
+
+        try
+        {
+            source.CancelAfter(wait);
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        _activeStageDeadline = now + wait;
+        _diagnostics.Trace(
+            WorkIqTraceStage.Doctor,
+            "doctor.sign_in_wait",
+            $"a device-code sign-in started: this stage now waits until the code expires at {expiresOn.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} UTC " +
+            $"(up to {Seconds(wait)} s) instead of the {Seconds(_options.StageTimeout)} s stage timeout, which bounds network calls only");
+    }
 
     private WorkIqA2AClient Client
     {
@@ -534,9 +608,16 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
 
     private double Elapsed(long started) => _clock.GetElapsedTime(started).TotalMilliseconds;
 
-    private static CancellationTokenSource StageTokenSource(CancellationToken cancellationToken, TimeSpan timeout)
+    /// <summary>
+    /// The token of one stage's wait: the caller's token plus <paramref name="timeout"/>. It becomes the active stage
+    /// source, so a device-code sign-in that starts inside it can extend it to the code's expiry (<see cref="OnSignInPrompted"/>).
+    /// </summary>
+    private CancellationTokenSource StageTokenSource(CancellationToken cancellationToken, TimeSpan timeout)
     {
         var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _activeStageDeadline = _clock.GetUtcNow() + timeout;
+        _signInCodeExpiresOn = null;   // a sign-in code is reported only by the stage that started it
+        Volatile.Write(ref _activeStage, source);
         source.CancelAfter(timeout);
         return source;
     }

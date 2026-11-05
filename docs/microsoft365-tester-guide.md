@@ -7,6 +7,48 @@ see, what each exit code means, what a failure means and what to do next.
 The maintainers have no tenant. Nothing in this guide has been run live by them: your run is the first evidence.
 Allow about an hour, most of it for the prerequisites.
 
+## Start here: the demo project
+
+The fastest way through this validation is the demo project
+[`samples/AgentEval.Microsoft365Demo`](../samples/AgentEval.Microsoft365Demo/README.md): one console app that runs the
+readiness check, one read-only prompt and a small benchmark, prints every trace event and issue at the verbosity you
+choose, and saves everything in one run folder that you zip and send back. You need the prerequisites of
+[section 2](#2-what-you-need) and the config file of [section 4](#4-the-config-file) either way.
+
+```bash
+git clone --branch work/dev https://github.com/AgentEvalHQ/AgentEval.git
+cd AgentEval
+cp samples/datasets/m365-config.template.json workiq.json        # put your tenantId and appClientId in it (section 4)
+dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only
+dotnet run --project samples/AgentEval.Microsoft365Demo -- --i-understand-live-side-effects --zip
+```
+
+The `workiq.json` in the clone's root is the same file the rest of this guide uses.
+
+1. **`--readiness-only`** checks the config, signs you in (the first time with a device-code message: open the page,
+   enter the code, sign in as the test user), fetches the agent card and checks the protocol. No prompt reaches the
+   agent. It must exit `0`. If a stage fails, open `summary.md` or `readiness.md` in the run folder it printed: the
+   failed stage says what it means and what to do, and the tables of [Step 1](#step-1--readiness-check-no-prompt)
+   below apply unchanged.
+2. **The full run** needs `--i-understand-live-side-effects`, because the agent now acts as the signed-in user: use a
+   non-production identity only. It sends one prompt and five read-only benchmark prompts (6 agent turns). A case
+   whose turn did not complete is an `ERROR` row, never a graded zero. The criteria are graded only by a judge model
+   configured in your environment (`AI_INFERENCE_PROVIDER` and that provider's variables; each call costs money,
+   `--no-judge` makes none); without one they are `NOT MEASURED` and the run exits `11`, which is an honest result,
+   not a failure.
+3. **Send back** the `.zip` it printed and the exit code, plus the [results file](microsoft365-tester-RESULTS-TEMPLATE.md)
+   if you have time. Read the demo README's *What to send back* first: the folder holds the agent's answers and your
+   tenant id, and never a token.
+
+The [demo README](../samples/AgentEval.Microsoft365Demo/README.md) lists every option, the verbosity levels, the run
+folder, the exit codes and how to redact. Opened in VS Code on its own, the folder brings its own GitHub Copilot agent
+(`m365-demo`) that sets it up with you, adapts it, and reads a run folder back.
+
+The rest of this guide is the same validation with the `agenteval` command-line tool (`m365 doctor`, `eval`, `bench`).
+Follow it when the maintainers ask for the CLI results, or when the demo cannot run. (Developers who want the same path
+in a few lines of C# can read the samples R1 *Hello World* and R2 *Live Walkthrough* in `samples/AgentEval.Samples`;
+you do not need them.)
+
 ## 1. What you will check
 
 The connector lets AgentEval evaluate a Microsoft 365 agent (Microsoft 365 Copilot, or a declarative agent) over the
@@ -135,8 +177,8 @@ cp samples/datasets/m365-config.template.json ./workiq.json
 
 | Field | What to put | Notes |
 |---|---|---|
-| `tenantId` | **Required.** The *Directory (tenant) ID*. | The config check only tests that it is not blank: a placeholder left in place passes the `config` stage and fails at sign-in (`AADSTS90002` or `AADSTS700016`). |
-| `appClientId` | **Required.** The *Application (client) ID* of the public-client app. | Your own app registration, never a Microsoft-owned client id (`AADSTS65002`). |
+| `tenantId` | **Required.** The *Directory (tenant) ID*. | A value still reading `REPLACE-WITH-…` is refused by the `config` stage, with nothing sent. A value that is neither a GUID nor a domain name passes with a warning: the sign-in would fail with `AADSTS90002`. |
+| `appClientId` | **Required.** The *Application (client) ID* of the public-client app. | Your own app registration, never a Microsoft-owned client id (`AADSTS65002`). A placeholder is refused; a value that is not a GUID passes with a warning (`AADSTS700016` would follow). |
 | `agentId` | `null` for the default Microsoft 365 Copilot, or the declarative agent's id as a string. | One path segment, passed as-is: no `/`, `\`, `?`, `#` or spaces. |
 | `agentName` | Any label. | Appears in reports. |
 | `timeZone` | Your IANA time zone, such as `Europe/Zurich` or `America/New_York`. | Sent with every prompt so date questions are deterministic. Delete the line if unsure. |
@@ -192,9 +234,10 @@ Then trace lines. During `auth`, on the first run, a sign-in message:
 To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code ABCD1234 to authenticate.
 ```
 
-Open the page (on any device), enter the code and sign in **as the test user**. You have 120 seconds; the stage
-fails if the sign-in is not finished by then (add `--timeout-seconds 300` for more time). Then the summary, which
-looks like this (your ids, names and times differ):
+Open the page (on any device), enter the code and sign in **as the test user**. Once that message is shown, the stage
+waits until the code expires (about 15 minutes); `--timeout-seconds` does not cut a sign-in short. The trace file
+keeps the message, and the time the code is valid until, with the code replaced by `[redacted]`. Then the summary,
+which looks like this (your ids, names and times differ):
 
 ```text
 Microsoft 365 readiness (m365 doctor) — run m365-20261105-184133-5f30
@@ -236,15 +279,20 @@ causes:
 | `config` | `Microsoft 365 config file not found: …` | The path is wrong. | Run from the clone's root; check `./workiq.json` exists. |
 | `config` | `Invalid Microsoft 365 config JSON (…): …` | The file is not valid JSON. | Fix the syntax at the line the message names. |
 | `config` | `Microsoft 365 config is missing required field(s): …` | `tenantId` or `appClientId` is missing or blank. | Fill in the named fields. |
+| `config` | `Microsoft 365 config field '…' still holds the template placeholder 'REPLACE-WITH-…'` | A template value was never replaced. Nothing was sent. | Put the value the message names (from the app registration's *Overview* page). |
 | `config` | `Microsoft 365 config field '…' …` | One field has a bad value (endpoint not https, `trustedHosts` without the endpoint host, an `agentId` with a `/`, an unknown time zone or profile). | Fix that field as the message says. |
+| `config` | `PASS` with a warning: `tenantId '…' is neither a GUID nor a domain name` or `appClientId '…' is not a GUID` | A value that cannot be right; the sign-in would fail with `AADSTS90002` or `AADSTS700016`. | Copy both ids from the app registration's *Overview* page. |
 | `auth` | `AADSTS65001` | Admin consent for `WorkIQAgent.Ask` is missing. | An administrator grants admin consent on the app's *API permissions* page. |
 | `auth` | `AADSTS7000218` | The app is not a public client. | Set *Allow public client flows* to **Yes** on the app's *Authentication* page. |
-| `auth` | `AADSTS700016` or `AADSTS90002` | The app, or the tenant, was not found — often a placeholder left in `workiq.json`. | Check `appClientId` and `tenantId`; both must belong to the same tenant. |
+| `auth` | `AADSTS700016` | The app was not found in that tenant. | Check `appClientId` and `tenantId`; both must belong to the same tenant. |
+| `auth` | `AADSTS90002` | The tenant was not found: a typo, a deleted tenant, or a tenant in another cloud. | Check `tenantId`: the *Directory (tenant) ID*, or the tenant's verified domain. |
+| `auth` | `AADSTS50059` / `AADSTS90019` | No tenant could be identified (for example a personal account), or the request named none. | Set `tenantId`, and sign in with a work account of that tenant. |
 | `auth` | `AADSTS50020` | The account you signed in with is not in that tenant. | Sign in as the test user of that tenant. |
 | `auth` | `AADSTS50076` / `AADSTS50079` | Multi-factor authentication is required, or must be set up first. | Complete it in the browser, then run again. |
 | `auth` | `AADSTS50105` | The user is not assigned to the app. | An administrator assigns the user, or turns off *Assignment required* on the enterprise application. |
 | `auth` | `AADSTS53003` / `AADSTS530003` | A conditional access policy blocked the sign-in (for example, a managed device is required). | An administrator checks the policy in the Entra sign-in log; sign in from a compliant device. |
-| `auth` | `sign-in not completed in time: no token within 120 s` / `code_expired` | The browser sign-in was not finished in time. Nothing was sent to Work IQ. | Run again and finish it within 120 s, or add `--timeout-seconds 300`. |
+| `auth` | `sign-in not completed: the device code expired at … UTC before the sign-in finished` / `code_expired` | The browser sign-in was not finished while the code was valid (about 15 minutes). Nothing was sent to Work IQ. | Run again, open the page, enter the code and sign in as the test user. |
+| `auth` | `sign-in not completed in time: no token within 120 s` | No sign-in was started and the token cache or Entra did not answer within the stage timeout. Nothing was sent. | Check the path to `login.microsoftonline.com`; run again, with `--timeout-seconds 300` if it is slow. |
 | `auth` | any other `AADSTS…` code | Not in the doctor's catalogue; the code is kept with a link to Microsoft's list. | Look it up at <https://learn.microsoft.com/entra/identity-platform/reference-error-codes>; send the folder back if unclear. |
 | `discovery` or `protocol` | `HTTP 401` | The service rejected the token. | Check that `scope` is unchanged and that `tenantId` and `appClientId` name the app that holds `WorkIQAgent.Ask`; run again. |
 | `discovery` or `protocol` | `HTTP 403` | The user or app lacks the permission or its consent, the user has no Copilot licence, or Work IQ is not enabled. The three look the same from outside. | Ask the administrator to check all three, then run again. |
@@ -260,7 +308,8 @@ causes:
 
 `--continue` runs the remaining stages after a failure, which can tell you more in one go (for example whether
 `protocol` also fails after a `discovery` failure). `--stage auth` (or `discovery`, `protocol`) runs one stage, plus
-the `config` stage it needs.
+the `config` stage it needs; a later stage acquires its own token and card as needed. `--stage census` also runs the
+probe (both need the consent flag of Step 2).
 
 ### Step 1b — run Step 1 again (the token cache)
 
@@ -395,7 +444,9 @@ It must say the run is intact (exit `0`); exit `1` means invalid — note it.
 | Exit `11`, a case's `error` says `Work IQ turn did not complete: outcome=InputRequired` | The agent asked to confirm an action on a read-only prompt. Nothing was approved. | A finding: note the case id. |
 | Exit `11`, `outcome=Indeterminate`, `Failed` or `Rejected` | The turn did not complete. The prompt was not resent. | Run Step 3 once more; if it repeats, send the files back. |
 | Exit `11`, every turn completed but the cases are "not measured" | The judge did not answer (wrong URL, key or model). | Test the judge with any other tool, fix it, run Step 3 again (8 more agent turns). |
+| A line `[m365] WARNING case=… the turn COMPLETED but no answer was selected (answer Ambiguous)` (or `None`), and that case's `output` is empty | The task completed, but its answer could not be chosen: several answer candidates and none named as the answer (`Ambiguous`), or no answer at all (`None`). The case is graded on an empty text that is **not** the agent's answer; the response carries `FinishReason` `completed-no-answer`. | A finding about the agent's output shape: note the case id. The evidence folder (`--aef-content on`) keeps every candidate. |
 | A sign-in message appears | The cache expired or was not reused. | Complete the sign-in; note it. |
+| A case's `error` says `… sign-in not completed: no token was acquired before the wait was stopped …; nothing was sent` | A sign-in started during the run and was not finished in time. Nothing reached the agent. | Run Step 1 again (it caches the token), then Step 3. |
 | Exit `1` | Some cases failed their criteria (for example the "Demo Q3 Planning" case when the document is missing). | Record the per-case outcomes. Do not rewrite the prompts. |
 
 **Optional: the raw protocol traffic, once.** Only if the maintainers ask for it:
@@ -467,7 +518,7 @@ What these files may contain, and what they never contain:
 | File | May contain | Never contains |
 |---|---|---|
 | `readiness.md` / `readiness.json` | Your tenant id, app id, agent id, a masked account name, the card's URLs, HTTP statuses, error codes, the service's `request-id`, the config's SHA-256, file paths on your machine; after Step 2 the probe prompt and the first 80 characters of the answer. | A token, an auth code, the device code, the `Authorization` header. |
-| `m365-trace-*.jsonl` | The same ids and codes, timings, event codes, counts, file paths. | Prompts, answers, tokens. |
+| `m365-trace-*.jsonl` | The same ids and codes, timings, event codes, counts, file paths; the device-code sign-in message with its code replaced by `[redacted]`. | Prompts, answers, tokens, the device code. |
 | `m365-issues.jsonl` | The same, plus suggested causes and AADSTS codes. | Prompts, answers, tokens. |
 | `m365-smoke.json` | The prompts' case names, the agent's **answers**, scores, error messages. | Tokens. |
 | `aef/` (with `--aef-content on`) | The prompts, the agent's **answers**, citation names and URLs, the evidence documents, verdicts. | Tokens, keys. |
@@ -524,9 +575,9 @@ app's *API permissions* page. The connector cannot ask for consent itself.
 **`AADSTS7000218` during sign-in.** The app is not a public client, so Entra asks for a client secret. Set *Allow
 public client flows* to **Yes** on the app's *Authentication* page. The connector never uses a secret.
 
-**`AADSTS700016` or `AADSTS90002`.** The app or the tenant was not found: usually a value left as
-`REPLACE-WITH-…` in `workiq.json`, or the app registered in another tenant. The `config` stage does not catch a
-placeholder; only the sign-in does.
+**`AADSTS700016` or `AADSTS90002`.** The app (`700016`) or the tenant (`90002`) was not found: a typo, the app
+registered in another tenant, or a tenant in another cloud. A value left as `REPLACE-WITH-…` never gets this far: the
+`config` stage refuses it and names the field. A value that is not a GUID gets a warning at `config`.
 
 **HTTP 403 on discovery, protocol or the probe.** Three causes look the same from outside: no Microsoft 365 Copilot
 licence on the test user, Work IQ not enabled in the tenant, or the permission's consent missing. The administrator

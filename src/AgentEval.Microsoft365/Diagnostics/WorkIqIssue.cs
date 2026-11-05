@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 namespace AgentEval.Microsoft365.Diagnostics;
 
 /// <summary>
@@ -68,7 +70,8 @@ public sealed record WorkIqIssue(
     /// <summary>The Entra error code (<c>AADSTS…</c>), when the issue came from MSAL.</summary>
     public string? AadstsCode { get; init; }
 
-    /// <summary>The raw A2A task state, when observed.</summary>
+    /// <summary>The raw A2A task state, when observed. Serialized as <c>a2aState</c>.</summary>
+    [JsonPropertyName("a2aState")]
     public string? A2AState { get; init; }
 
     /// <summary>The service's <c>request-id</c> response header, when received.</summary>
@@ -86,7 +89,8 @@ public sealed record WorkIqIssue(
     /// <summary>The provider assembly's informational version; null means "stamp it".</summary>
     public string? AdapterVersion { get; init; }
 
-    /// <summary>The A2A protocol version spoken (<c>1.0</c>); null means "stamp it".</summary>
+    /// <summary>The A2A protocol version spoken (<c>1.0</c>); null means "stamp it". Serialized as <c>a2aVersion</c>.</summary>
+    [JsonPropertyName("a2aVersion")]
     public string? A2AVersion { get; init; }
 
     /// <summary>Creates an issue that stamps nothing (<see cref="At"/> <c>default</c>, every stamped field null).</summary>

@@ -156,6 +156,37 @@ public class CliTurnSinkTests
         Assert.Equal(1, sink.Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Record_CompletedWithNoSelectedAnswer_WarnsEvenWhenNotVerbose(bool verbose)
+    {
+        var err = new StringWriter();
+        var sink = new CliTurnSink(verbose, err);
+        var noAnswer = Completed("case-amb", "unused", "task-9", "ctx-9") with { AnswerText = null, AnswerCompleteness = OutputCompleteness.Ambiguous };
+
+        sink.Record(noAnswer);
+
+        var lines = err.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(verbose ? 2 : 1, lines.Length);
+        var warning = lines[^1];
+        Assert.StartsWith("[m365] WARNING case=case-amb task=task-9", warning, StringComparison.Ordinal);
+        Assert.Contains("no answer was selected (answer Ambiguous)", warning, StringComparison.Ordinal);
+        Assert.Contains(WorkIqEvaluableAgent.CompletedNoAnswerFinishReason, warning, StringComparison.Ordinal);
+        Assert.Same(noAnswer, Assert.Single(sink.All));
+    }
+
+    [Fact]
+    public void Record_CompletedEmptyAnswer_IsNoWarning()
+    {
+        var err = new StringWriter();
+        var sink = new CliTurnSink(verbose: false, err);
+
+        sink.Record(Completed("case-empty", "", "task-1", "ctx-1") with { AnswerCompleteness = OutputCompleteness.Empty });
+
+        Assert.Equal("", err.ToString());
+    }
+
     [Fact]
     public void Record_Null_Throws()
     {

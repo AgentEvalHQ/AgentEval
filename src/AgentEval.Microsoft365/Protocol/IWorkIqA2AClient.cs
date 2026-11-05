@@ -88,8 +88,8 @@ internal sealed record WorkIqRpcResult<T>(
 /// receipt time, the typed event when it parsed, the raw <c>data</c> JSON, the SSE envelope fields, and a
 /// frame-level failure (JSON-RPC error, malformed payload, one-of violation) when it did not.
 /// </summary>
-/// <param name="ClientSequence">Monotonic sequence across the whole turn (continues across reconnects).</param>
-/// <param name="ConnectionEpoch">Which connection delivered the frame (0 for the first; incremented on reconnect/subscribe).</param>
+/// <param name="ClientSequence">The frame's 1-based position within its own stream call: every <c>SendStreamingMessage</c> or <c>SubscribeToTask</c> call numbers its frames from 1 again (a failure frame included); order across calls comes from <paramref name="ConnectionEpoch"/>.</param>
+/// <param name="ConnectionEpoch">Which stream call delivered the frame: 1-based, incremented by the client for every stream call (send or subscribe), so a reconnect's frames carry a higher epoch than the dropped stream's.</param>
 /// <param name="ReceivedAt">Local receipt time.</param>
 /// <param name="Event">The typed stream response, when the frame parsed and validated.</param>
 /// <param name="DataJson">The raw <c>data</c> payload (joined multi-line), under the content policy.</param>

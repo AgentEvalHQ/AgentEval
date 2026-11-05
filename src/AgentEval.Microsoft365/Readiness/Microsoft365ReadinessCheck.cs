@@ -63,16 +63,25 @@ public static class Microsoft365ReadinessCheck
         RunAsync(config, configFile, options, innerHandler: null, tokenProvider: null, cancellationToken);
 
     /// <summary>
-    /// The seam of <see cref="RunAsync(Microsoft365Config, FileInfo, ReadinessCheckOptions, CancellationToken)"/> with the
-    /// innermost HTTP handler and the token provider injectable (offline tests).
+    /// <see cref="RunAsync(Microsoft365Config, FileInfo, ReadinessCheckOptions, CancellationToken)"/> with the innermost
+    /// HTTP handler and the token provider injectable — for hosts and tests: a host that owns its own sign-in passes its
+    /// <see cref="IWorkIqTokenProvider"/>, and an offline test passes a fake handler and a fake token. The same seams as
+    /// <see cref="Microsoft365AgentFactory.BuildLive"/>'s <c>tokenProvider</c> and <c>innerHandler</c>, so a host can run
+    /// the readiness check and its live agent through the same transport. The handler chain built over
+    /// <paramref name="innerHandler"/> is disposed when the check ends; pass a handler that tolerates that (or wrap a
+    /// shared one in a delegating handler that does not dispose its inner handler). Auth events of a caller-supplied
+    /// token provider are not traced by the provider itself (the default MSAL provider traces them).
     /// </summary>
-    /// <param name="config">The config, when given in code.</param>
-    /// <param name="configFile">The config file.</param>
+    /// <param name="config">The config, when given in code; exactly one of this and <paramref name="configFile"/>.</param>
+    /// <param name="configFile">The config file; exactly one of this and <paramref name="config"/>.</param>
     /// <param name="options">What to run and how.</param>
     /// <param name="innerHandler">The innermost HTTP handler; null uses a socket handler.</param>
     /// <param name="tokenProvider">The token source; null uses the MSAL device-code provider with <see cref="ReadinessCheckOptions.Console"/> as the prompt writer.</param>
-    /// <param name="cancellationToken">Stops the check.</param>
-    internal static async Task<ReadinessReport> RunAsync(
+    /// <param name="cancellationToken">Stops the check: the running stage fails as canceled, the rest are skipped.</param>
+    /// <exception cref="ArgumentException">Both or neither of <paramref name="config"/> and <paramref name="configFile"/> were given.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><see cref="ReadinessCheckOptions.StageTimeout"/> is not positive.</exception>
+    /// <exception cref="InvalidOperationException">The trace or issue file could not be opened (the message names the path).</exception>
+    public static async Task<ReadinessReport> RunAsync(
         Microsoft365Config? config,
         FileInfo? configFile,
         ReadinessCheckOptions options,

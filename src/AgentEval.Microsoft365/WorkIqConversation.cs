@@ -694,6 +694,14 @@ public sealed class WorkIqConversation : IWorkIqConversation
         {
             failure = RefineLocalStop(ctx, failure, tokens, callerToken, operation, "before a reply");
         }
+        else if (global::AgentEval.Microsoft365.Capture.WorkIqAuthHandler.IsSignInNotCompleted(failure))
+        {
+            // The token wait before the call was stopped: nothing was sent, so the failure keeps its "sign-in not
+            // completed" text (never a timeout that may have reached the service); only the stop's source is recorded,
+            // so a caller's cancellation still surfaces as WorkIqTurnCanceledException.
+            ctx.CanceledByCaller = callerToken.IsCancellationRequested;
+            ctx.Abandoned = !ctx.CanceledByCaller && tokens.Abandon.IsCancellationRequested;
+        }
 
         if (failure.Capture is not null)
         {
@@ -850,16 +858,40 @@ public sealed class WorkIqConversation : IWorkIqConversation
                     ContextId: ctx.ContextId,
                     Capture: ctx.LastCapture);
                 ctx.Transport = TransportOutcome.Interrupted;
-                Diagnostics.Trace(WorkIqTraceStage.Budget, "budget.exceeded", ctx.Failure.SafeMessage, WorkIqTraceLevel.Error, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId, a2aState: current.RawState);
-                Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Budget, WorkIqIssueCategory.Budget, "budget.recovery_exhausted", ctx.Failure.SafeMessage, "The task stayed submitted/working longer than RecoveryBudget allows; raise the budget or inspect the task with GetTask/CancelTask using the handle on the result.") with
-                {
-                    CaseId = ctx.Request.CaseId,
-                    TurnId = ctx.Request.TurnId,
-                    TaskId = taskId,
-                    ContextId = ctx.ContextId,
-                    A2AState = current.RawState,
-                });
+                var exhaustedMessage = ctx.Failure.SafeMessage;
+                Diagnostics.Trace(WorkIqTraceStage.Budget, "budget.exceeded", exhaustedMessage, WorkIqTraceLevel.Error, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId, a2aState: current.RawState);
+
+                // The issue is registered after the opt-in CancelTask: its reply may show the task had already finished
+                // on its own (the completed race), and then the register must not keep an Error for a turn that ended well.
                 await TryCancelRemoteOnTimeoutAsync(ctx).ConfigureAwait(false);
+                if (ctx.Snapshot is { State: not WorkIqTaskState.Canceled } finished && (finished.IsTerminal || finished.IsSuspended))
+                {
+                    var recovered = $"the recovery budget ({budget}) ran out with the task {current.RawState ?? "(absent)"}, but the CancelTask reply showed it had already reached {finished.RawState ?? "(absent)"} on its own: " +
+                        "that observed state is the turn's outcome (the timeout no longer applies); the input was not resent";
+                    Diagnostics.Trace(WorkIqTraceStage.Budget, "budget.recovered_after_cancel", recovered, WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId, a2aState: finished.RawState);
+                    Diagnostics.Issue(
+                        WorkIqIssue.Create(WorkIqTraceStage.Budget, WorkIqIssueCategory.Budget, "budget.recovered_after_cancel", recovered, "The task needed longer than RecoveryBudget but finished on its own; raise RecoveryBudget so the answer is read by polling instead of by the CancelTask race.") with
+                        {
+                            CaseId = ctx.Request.CaseId,
+                            TurnId = ctx.Request.TurnId,
+                            TaskId = taskId,
+                            ContextId = ctx.ContextId,
+                            A2AState = finished.RawState,
+                        },
+                        WorkIqTraceLevel.Warning);
+                }
+                else
+                {
+                    Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Budget, WorkIqIssueCategory.Budget, "budget.recovery_exhausted", exhaustedMessage, "The task stayed submitted/working longer than RecoveryBudget allows; raise the budget or inspect the task with GetTask/CancelTask using the handle on the result.") with
+                    {
+                        CaseId = ctx.Request.CaseId,
+                        TurnId = ctx.Request.TurnId,
+                        TaskId = taskId,
+                        ContextId = ctx.ContextId,
+                        A2AState = ctx.Snapshot?.RawState ?? current.RawState,
+                    });
+                }
+
                 return;
             }
 
@@ -1318,8 +1350,9 @@ public sealed class WorkIqConversation : IWorkIqConversation
 
         if (completeness == OutputCompleteness.Ambiguous)
         {
+            // Traced here (where the selection happened); the issue itself is registered once, by the normaliser below,
+            // which records the same ambiguity in the evidence document.
             Diagnostics.Trace(WorkIqTraceStage.Reduce, "answer.ambiguous", $"{selection.CandidateArtifactIds.Length} answer candidates; none was chosen and all are retained", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: snapshot?.Handle.TaskId, contextId: ctx.ContextId);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Reduce, WorkIqIssueCategory.Protocol, "answer.ambiguous", $"The completed task carries {selection.CandidateArtifactIds.Length} answer candidates; no text was projected.", "The service returned several non-diagnostic artifacts without a single 'Answer'; evaluate the structured artifacts or extend the selection policy.") with { CaseId = ctx.Request.CaseId, TurnId = ctx.Request.TurnId, TaskId = snapshot?.Handle.TaskId, ContextId = ctx.ContextId }, WorkIqTraceLevel.Warning);
         }
 
         var diagnosticsObserved = snapshot is not null && snapshot.Artifacts.Any(WorkIqAnswerSelector.IsDiagnosticArtifact);
@@ -1337,18 +1370,17 @@ public sealed class WorkIqConversation : IWorkIqConversation
         };
 
         Microsoft365TurnEvidence evidence;
-        using (var scope = Diagnostics.Measure(WorkIqTraceStage.Normalize, "normalize", "evidence normalisation", ctx.Request.CaseId, ctx.Request.TurnId, snapshot?.Handle.TaskId, ctx.ContextId))
+        try
         {
-            try
-            {
-                evidence = new WorkIqEvidenceNormalizer().Normalize(snapshot, direct, captures, captureState, Profile, identity);
-            }
-            catch (Exception ex)
-            {
-                scope.Fail(ex);
-                Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Normalize, WorkIqIssueCategory.Unknown, "normalize.failed", $"The evidence normaliser threw {ex.GetType().Name}; the turn result could not be built (outcome would have been {outcome}).", "A normaliser defect or an unexpected payload shape; the trace carries the task state and ids, and the raw capture shows what arrived.") with { CaseId = ctx.Request.CaseId, TurnId = ctx.Request.TurnId, TaskId = snapshot?.Handle.TaskId, ContextId = ctx.ContextId, A2AState = snapshot?.RawState });
-                throw;
-            }
+            // The normaliser runs on this conversation's diagnostics: it traces its own measured scope
+            // (normalize.start / .end / .failed) and its normalize.* summaries, and registers its evidence issues
+            // (approval.*, diagnostics.*, citations.*, answer.ambiguous), so they reach the run's trace and issue files.
+            evidence = new WorkIqEvidenceNormalizer(Diagnostics).Normalize(snapshot, direct, captures, captureState, Profile, identity);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Normalize, WorkIqIssueCategory.Unknown, "normalize.failed", $"The evidence normaliser threw {ex.GetType().Name}; the turn result could not be built (outcome would have been {outcome}).", "A normaliser defect or an unexpected payload shape; the trace carries the task state and ids, and the raw capture shows what arrived.") with { CaseId = ctx.Request.CaseId, TurnId = ctx.Request.TurnId, TaskId = snapshot?.Handle.TaskId, ContextId = ctx.ContextId, A2AState = snapshot?.RawState });
+            throw;
         }
 
         var timing = new WorkIqTurnTiming(ctx.StartedAt, ctx.FirstEventAt, ctx.FirstAnswerAt, ctx.TerminalAt, endedAt, ctx.RecoveryRequests);
@@ -1510,8 +1542,8 @@ public sealed class WorkIqConversation : IWorkIqConversation
             WorkIqTurnOutcome.AuthRequired => "The agent needs an external connector sign-in that this provider cannot complete; sign in to the connector in Microsoft 365 first.",
             WorkIqTurnOutcome.Rejected => "The service refused the task (policy, licence or content); see the status message in the capture.",
             WorkIqTurnOutcome.Canceled => "The service confirmed cancellation of the task.",
-            WorkIqTurnOutcome.Failed => result.Failure is { } ff ? WorkIqA2AClient.SuggestedCauseOf(ff.Category) : "The task ended failed on the service side.",
-            _ => result.Failure is { } fi ? WorkIqA2AClient.SuggestedCauseOf(fi.Category) : "The remote state is unknown; the task handle on the result can be read with GetTask.",
+            WorkIqTurnOutcome.Failed => result.Failure is { } ff ? WorkIqA2AClient.SuggestedCauseOf(ff) : "The task ended failed on the service side.",
+            _ => result.Failure is { } fi ? WorkIqA2AClient.SuggestedCauseOf(fi) : "The remote state is unknown; the task handle on the result can be read with GetTask.",
         };
         Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Outcome, category, "turn." + result.Outcome.ToString().ToLowerInvariant(), message, cause)
         {

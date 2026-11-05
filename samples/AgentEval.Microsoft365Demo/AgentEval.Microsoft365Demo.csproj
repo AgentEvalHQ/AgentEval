@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.Microsoft365Demo</RootNamespace>
+    <AssemblyName>AgentEval.Microsoft365Demo</AssemblyName>
+    <!-- The tester's demo for the Microsoft 365 (Work IQ A2A 1.0) provider: readiness, one prompt, a small benchmark
+         through MAFEvaluationHarness, and a run folder with every trace and issue. Consumes AgentEval; does not modify
+         it. Versions come from Directory.Packages.props (Central Package Management). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Microsoft365Demo.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The provider references Abstractions and Core with PrivateAssets=all, so the demo references both itself.
+         MAF brings MAFEvaluationHarness, the batch harness every benchmark case runs through. -->
+    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The command line (the same package the agenteval CLI uses). -->
+    <PackageReference Include="System.CommandLine" />
+    <!-- The optional judge: the model AI_INFERENCE_PROVIDER selects — the Azure protocol for Azure OpenAI and Foundry,
+         the OpenAI protocol for the other providers. System.Memory.Data is the floor Azure.Core needs. -->
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="System.Memory.Data" />
+    <!-- Security: transitive pin (GHSA-g94r-2vxg-569j) -->
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The default benchmark: five read-only cases copied from samples/datasets/m365-smoke.json. Embedded, so the demo
+         runs from any working directory. -->
+    <EmbeddedResource Include="Data\m365-demo-cases.json" LogicalName="AgentEval.Microsoft365Demo.m365-demo-cases.json" />
+    <!-- A copy of samples/datasets/m365-config.template.json, next to the binary too, for the "no config" message. -->
+    <None Update="workiq.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

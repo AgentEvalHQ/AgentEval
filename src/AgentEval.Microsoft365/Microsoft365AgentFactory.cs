@@ -138,7 +138,10 @@ public static class Microsoft365AgentFactory
             Timeout = options.SendTimeout == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : options.SendTimeout,
         };
 
-        var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics);
+        // The client acquires the token before every call (Auth set), outside HttpClient.Timeout: a device-code sign-in is
+        // bounded by its own code's expiry and the operation's token, and a sign-in that does not finish is reported as
+        // "sign-in not completed, nothing was sent", never as a network timeout that may have reached the service.
+        var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics) { Auth = auth };
         return (http, client);
     }
 

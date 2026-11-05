@@ -403,12 +403,12 @@ internal sealed partial class ReadinessRun
 
         var (task, conversation) = target.Value;
         var filter = _issueFilter!;
-        var heldBack = filter.Suppressed;
         using var stage = StageTokenSource(cancellationToken, _options.StageTimeout);
         try
         {
             WorkIqTaskSnapshot snapshot;
             using (filter.Expect(i => i.RpcErrorCode == (int)A2AErrorCode.TaskNotCancelable && string.Equals(i.TaskId, task.TaskId, StringComparison.Ordinal)))
+            using (Client.ExpectFailure(f => f.RpcErrorCode == (int)A2AErrorCode.TaskNotCancelable && string.Equals(f.TaskId, task.TaskId, StringComparison.Ordinal)))
             {
                 snapshot = await conversation.CancelTaskAsync(task, stage.Token).ConfigureAwait(false);
             }
@@ -423,12 +423,13 @@ internal sealed partial class ReadinessRun
         }
         catch (WorkIqProtocolException ex)
         {
-            if (filter.Suppressed > heldBack)
+            if (ex.Failure.RpcErrorCode == (int)A2AErrorCode.TaskNotCancelable)
             {
+                // The client traced it at Info as rpc.expected_error (no issue); the filter is the backstop.
                 _diagnostics.Trace(
                     WorkIqTraceStage.Doctor,
                     "doctor.census.expected_not_cancelable",
-                    "the JSON-RPC TaskNotCancelable (-32002) above is the expected answer to CancelTask on a finished task; it is not an anomaly and was not written to the issue register",
+                    "the JSON-RPC TaskNotCancelable (-32002) above (rpc.expected_error) is the expected answer to CancelTask on a finished task; it is not an anomaly and was not written to the issue register",
                     taskId: task.TaskId,
                     requestId: ex.Failure.RequestId,
                     httpStatus: ex.Failure.HttpStatus,

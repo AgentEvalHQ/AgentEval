@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using A2A;
 using AgentEval.Microsoft365.Auth;
+using AgentEval.Microsoft365.Capture;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Protocol;
 using Microsoft.Identity.Client;
@@ -79,6 +80,17 @@ internal sealed partial class ReadinessRun
             warnings.Add("Profile native118 is EXPERIMENTAL: it requests two diagnostic output modes observed in Microsoft's native evaluator 1.18.0; it is not a documented contract.");
         }
 
+        // Shape checks only (no network): the sign-in is the authority, but a value that cannot be right saves a round trip.
+        if (!Guid.TryParse(config.TenantId.Trim(), out _) && !config.TenantId.Trim().Contains('.', StringComparison.Ordinal))
+        {
+            warnings.Add($"tenantId '{config.TenantId.Trim()}' is neither a GUID nor a domain name: the sign-in will most likely fail with AADSTS90002 (tenant not found). Use the Directory (tenant) ID from the app registration's Overview page.");
+        }
+
+        if (!Guid.TryParse(config.AppClientId.Trim(), out _))
+        {
+            warnings.Add($"appClientId '{config.AppClientId.Trim()}' is not a GUID: an app registration's Application (client) ID always is, so the sign-in will most likely fail with AADSTS700016 (application not found). Copy it from the app registration's Overview page.");
+        }
+
         return Passed(
             ReadinessStage.Config,
             $"config valid: {config.DisplayName}; {(string.IsNullOrWhiteSpace(config.AgentId) ? "default agent" : "agent " + config.AgentId!.Trim())}; tenant {config.TenantId.Trim()}; profile {profile}",
@@ -140,6 +152,16 @@ internal sealed partial class ReadinessRun
         if (message.StartsWith("Invalid Microsoft 365 config JSON", StringComparison.Ordinal))
         {
             return "Fix the JSON syntax at the line and position the message names, then run the doctor again.";
+        }
+
+        const string placeholderMarker = "still holds the template placeholder";
+        if (message.Contains(placeholderMarker, StringComparison.Ordinal))
+        {
+            var quoted = message.IndexOf("field '", StringComparison.Ordinal);
+            var name = quoted >= 0 && message.IndexOf('\'', quoted + 7) is var close && close > quoted + 7
+                ? message[(quoted + 7)..close]
+                : "the field the message names";
+            return $"Replace the template placeholder in '{name}' with the real value (tenantId and appClientId are on the app registration's Overview page in the Entra admin center), then run the doctor again.";
         }
 
         const string missingMarker = "missing required field(s): ";
@@ -205,17 +227,36 @@ internal sealed partial class ReadinessRun
             evidence.Add("token acquired", "no");
             evidence.Add("stage timeout", $"{Seconds(_options.StageTimeout)} s");
             evidence.Add("error", $"{ex.GetType().Name}: {FirstLine(ex.Message)}");
+            if (_signInCodeExpiresOn is { } expired)
+            {
+                // A device-code prompt was shown: the stage waited for the code's own lifetime, not the stage timeout.
+                var at = expired.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+                evidence.Add("device code expired at (UTC)", at);
+                return Failed(
+                    ReadinessStage.Auth,
+                    $"sign-in not completed: the device code expired at {at} UTC before the sign-in finished",
+                    "A device-code sign-in was started (the prompt above shows the page and the code), but nobody completed it before the code expired. Nothing was sent to Work IQ.",
+                    "Run the doctor again, open the page the prompt names, enter the code and sign in as the test user while the code is valid (about 15 minutes).",
+                    WorkIqIssue.Create(
+                        WorkIqTraceStage.Auth,
+                        WorkIqIssueCategory.Authentication,
+                        "auth.sign_in_timeout",
+                        $"the device code expired at {at} UTC before the sign-in was completed",
+                        "the device-code sign-in was not completed before its code expired; run again and complete it in the browser"),
+                    evidence) with { ElapsedMs = Elapsed(started) };
+            }
+
             return Failed(
                 ReadinessStage.Auth,
                 $"sign-in not completed in time: no token within {Seconds(_options.StageTimeout)} s",
-                "The device-code sign-in was not completed before the stage timeout (or the token provider did not answer). Nothing was sent to Work IQ.",
-                $"Run the doctor again and finish the browser sign-in (open the page, enter the code, sign in as the test user) within {Seconds(_options.StageTimeout)} s; raise --timeout-seconds if you need longer.",
+                "The token provider gave no token before the stage timeout, and no device-code sign-in was started (a cached sign-in or the host's token provider did not answer). Nothing was sent to Work IQ.",
+                $"Run the doctor again; if it repeats, check the network path to login.microsoftonline.com (or the host's token provider) and raise --timeout-seconds (now {Seconds(_options.StageTimeout)} s).",
                 WorkIqIssue.Create(
                     WorkIqTraceStage.Auth,
                     WorkIqIssueCategory.Authentication,
                     "auth.sign_in_timeout",
                     $"no token within the stage timeout of {Seconds(_options.StageTimeout)} s",
-                    "the device-code sign-in was not completed in time; run again and complete it in the browser"),
+                    "the token provider did not answer in time and no device-code sign-in was started; run again"),
                 evidence) with { ElapsedMs = Elapsed(started) };
         }
         catch (Exception ex)
@@ -437,13 +478,13 @@ internal sealed partial class ReadinessRun
         var evidence = new ReadinessEvidence();
         evidence.Add("request", $"GetTask for the random task id {taskId}; the expected answer is JSON-RPC TaskNotFound (-32001)");
         var filter = _issueFilter!;
-        var heldBack = filter.Suppressed;
         var started = _clock.GetTimestamp();
         using var stage = StageTokenSource(cancellationToken, _options.StageTimeout);
         try
         {
             WorkIqRpcResult<AgentTask> reply;
             using (filter.Expect(i => i.RpcErrorCode == (int)A2AErrorCode.TaskNotFound && string.Equals(i.TaskId, taskId, StringComparison.Ordinal)))
+            using (client.ExpectFailure(f => f.RpcErrorCode == (int)A2AErrorCode.TaskNotFound && string.Equals(f.TaskId, taskId, StringComparison.Ordinal)))
             {
                 reply = await client.GetTaskAsync(taskId, historyLength: null, stage.Token).ConfigureAwait(false);
             }
@@ -475,17 +516,17 @@ internal sealed partial class ReadinessRun
             evidence.Add("JSON-RPC code", "-32001 (TaskNotFound)");
             evidence.Add("request-id", ex.Failure.RequestId ?? "absent (the service sent no request-id header)");
             evidence.Add("elapsed ms", Ms(elapsed));
-            if (filter.Suppressed > heldBack)
-            {
-                _diagnostics.Trace(
-                    WorkIqTraceStage.Doctor,
-                    "doctor.protocol.expected_not_found",
-                    "the JSON-RPC TaskNotFound (-32001) above is the expected answer to the doctor's GetTask on a random task id; it is not an anomaly and was not written to the issue register",
-                    taskId: taskId,
-                    requestId: ex.Failure.RequestId,
-                    httpStatus: ex.Failure.HttpStatus,
-                    rpcErrorCode: ex.Failure.RpcErrorCode);
-            }
+
+            // The client traced the reply at Info as rpc.expected_error (no Error line, no issue); the filter is the
+            // backstop for any other layer that would register it. Either way, say once why it is not an anomaly.
+            _diagnostics.Trace(
+                WorkIqTraceStage.Doctor,
+                "doctor.protocol.expected_not_found",
+                "the JSON-RPC TaskNotFound (-32001) above (rpc.expected_error) is the expected answer to the doctor's GetTask on a random task id; it is not an anomaly and was not written to the issue register",
+                taskId: taskId,
+                requestId: ex.Failure.RequestId,
+                httpStatus: ex.Failure.HttpStatus,
+                rpcErrorCode: ex.Failure.RpcErrorCode);
 
             return Passed(
                 ReadinessStage.Protocol,
@@ -528,6 +569,10 @@ internal sealed partial class ReadinessRun
             : "";
         var summary = during + (failure switch
         {
+            _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+                _signInCodeExpiresOn is { } expires
+                    ? $"sign-in not completed: the device code expired at {expires.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} UTC before the sign-in finished; nothing was sent"
+                    : $"sign-in not completed: no token before the stage stopped waiting ({Seconds(_options.StageTimeout)} s); nothing was sent",
             { HttpStatus: 401 } or { Category: WorkIqFailureCategory.Unauthorized } =>
                 $"HTTP 401 on {OperationText(failure)}: the token was rejected",
             { HttpStatus: 403 } or { Category: WorkIqFailureCategory.Forbidden } =>
@@ -553,6 +598,8 @@ internal sealed partial class ReadinessRun
 
         var meaning = failure switch
         {
+            _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+                "No token was acquired, so nothing was sent to Work IQ: the device-code sign-in this stage started was not completed (or the token provider did not answer) before the wait ended. This is not a network timeout.",
             { HttpStatus: 404 } when failure.Operation == WorkIqOperation.GetTask =>
                 "The RPC endpoint answered HTTP 404 where a JSON-RPC endpoint answers a missing task with error -32001: either the selected interface URL is not the Work IQ JSON-RPC endpoint, or the service reports a missing task differently than A2A 1.0 says.",
             { Category: WorkIqFailureCategory.UntrustedHost } =>
@@ -579,6 +626,8 @@ internal sealed partial class ReadinessRun
     /// <summary>What a tester does about a transport failure, by its HTTP status, JSON-RPC code and category.</summary>
     private string ActionFor(WorkIqFailure failure) => failure switch
     {
+        _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+            "Run the doctor again (or `--stage auth` alone first) and finish the browser sign-in while the code is valid: open the page the prompt names, enter the code, sign in as the test user.",
         { HttpStatus: 401 } or { Category: WorkIqFailureCategory.Unauthorized } =>
             $"Run the doctor again to sign in afresh. Check that 'scope' is {Microsoft365Config.DefaultScope} and that tenantId and appClientId name the app registration that holds WorkIQAgent.Ask.",
         { HttpStatus: 403 } or { Category: WorkIqFailureCategory.Forbidden } =>

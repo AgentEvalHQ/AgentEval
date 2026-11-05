@@ -304,7 +304,11 @@ public sealed class WorkIqDiagnostics : IDisposable
         return new WorkIqTraceScope(this, stage, code, message ?? "", caseId, turnId, taskId, contextId, requestId);
     }
 
-    /// <summary>Disposes every sink that is <see cref="IDisposable"/> (once; <see cref="None"/> owns nothing).</summary>
+    /// <summary>
+    /// Disposes every sink that is <see cref="IDisposable"/> (once; <see cref="None"/> owns nothing). A caller-owned
+    /// sink (<see cref="WorkIqOptions.TraceSinks"/>, <see cref="WorkIqOptions.IssueSinks"/>) is held through a
+    /// non-disposable wrapper and is never disposed here.
+    /// </summary>
     public void Dispose()
     {
         if (IsNone || Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -380,8 +384,9 @@ public sealed class WorkIqDiagnostics : IDisposable
         try
         {
             var writer = FallbackWriter ?? Console.Error;
+            var name = sink is ICallerOwnedSink owned ? owned.Inner.GetType().Name + " (caller-owned)" : sink.GetType().Name;
             writer.WriteLine(
-                $"[m365 diagnostics] {kind} sink {sink.GetType().Name} failed and is dropped for the rest of run {RunId}: " +
+                $"[m365 diagnostics] {kind} sink {name} failed and is dropped for the rest of run {RunId}: " +
                 $"{ex.GetType().Name}: {WorkIqRedaction.Redact(ex.Message)}");
             writer.Flush();
         }

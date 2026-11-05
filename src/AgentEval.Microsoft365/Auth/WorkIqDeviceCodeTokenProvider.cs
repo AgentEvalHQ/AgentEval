@@ -39,13 +39,15 @@ internal sealed record WorkIqTokenInfo(
 /// <remarks>
 /// Every step is traced through <see cref="Diagnostics"/> (<c>auth.silent_hit</c>, <c>auth.silent_miss</c>,
 /// <c>auth.device_code_prompted</c>, <c>auth.token_acquired</c>, <c>auth.failed</c>); the device-code message
-/// MSAL produces (where to sign in and which code to enter) is the one auth text that is shown, on the prompt
-/// writer and in the trace. Tokens never reach a trace. An MSAL service failure is wrapped in
+/// MSAL produces (where to sign in and which code to enter) is the one auth text that is shown, in full on the prompt
+/// writer; the trace keeps the page and the expiry with the user code masked. Tokens never reach a trace. The wait for
+/// the sign-in is bounded by the device code's own expiry (MSAL ends it with <c>code_expired</c>), not by an HTTP
+/// timeout: the A2A client acquires the token before each call, outside the call's timeout. An MSAL service failure is wrapped in
 /// <see cref="WorkIqProtocolException"/> (<see cref="WorkIqFailureCategory.Forbidden"/> for consent/permission
 /// AADSTS codes or HTTP 403, else <see cref="WorkIqFailureCategory.Unauthorized"/>) carrying the AADSTS code and
 /// MSAL error code only, so the transport classifier can map it.
 /// </remarks>
-public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
+public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider, IWorkIqSignInWaitSource
 {
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private IPublicClientApplication? _app;
@@ -84,6 +86,16 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
 
     /// <summary>What the last successful acquisition established (no token); null before the first success.</summary>
     internal WorkIqTokenInfo? LastTokenInfo => Volatile.Read(ref _lastTokenInfo);
+
+    /// <inheritdoc/>
+    Action<DateTimeOffset>? IWorkIqSignInWaitSource.SignInPrompted
+    {
+        get => SignInPrompted;
+        set => SignInPrompted = value;
+    }
+
+    /// <summary>Invoked with the device code's expiry when the device-code sign-in starts (the readiness check bounds its wait by it).</summary>
+    internal Action<DateTimeOffset>? SignInPrompted { get; set; }
 
     /// <summary>The directory of the persisted MSAL cache (<c>%LOCALAPPDATA%/AgentEval/msal_cache</c> or the platform equivalent).</summary>
     internal static string CacheDirectory =>
@@ -203,18 +215,47 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
 
     private Task ShowDeviceCodePrompt(DeviceCodeResult deviceCode)
     {
-        // The device-code message tells the user where to sign in and which code to type: it must be shown.
+        // The device-code message tells the user where to sign in and which code to type: it must be shown, in full, on
+        // the prompt writer. The trace keeps where and until when, with the user code masked: the trace is a file that
+        // is sent back, and the code is a credential for the next minutes.
         Diagnostics.Trace(
             WorkIqTraceStage.Auth,
             "auth.device_code_prompted",
-            $"device-code sign-in required (code valid until {deviceCode.ExpiresOn:O}): {deviceCode.Message}",
+            $"device-code sign-in required (code valid until {deviceCode.ExpiresOn:O}): {MaskUserCode(deviceCode.Message, deviceCode.UserCode)}",
             WorkIqTraceLevel.Warning);
         DeviceCodePrompt.WriteLine();
         DeviceCodePrompt.WriteLine("  Microsoft 365 (Work IQ) sign-in required:");
         DeviceCodePrompt.WriteLine($"    {deviceCode.Message}");
         DeviceCodePrompt.WriteLine();
         DeviceCodePrompt.Flush();
+        try
+        {
+            SignInPrompted?.Invoke(deviceCode.ExpiresOn);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.sign_in_observer_failed", $"the sign-in observer threw {ex.GetType().Name}; the sign-in continues", WorkIqTraceLevel.Warning);
+        }
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The device-code message with the user code replaced by <see cref="WorkIqRedaction.RedactedMarker"/> (the page
+    /// address and the rest of the sentence kept); the message unchanged when no code is known or it does not appear.
+    /// </summary>
+    /// <param name="message">MSAL's device-code message.</param>
+    /// <param name="userCode">MSAL's user code.</param>
+    internal static string MaskUserCode(string? message, string? userCode)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return message ?? "";
+        }
+
+        return string.IsNullOrWhiteSpace(userCode)
+            ? message
+            : message.Replace(userCode.Trim(), WorkIqRedaction.RedactedMarker, StringComparison.Ordinal);
     }
 
     private void Record(AuthenticationResult result, bool acquiredSilently)

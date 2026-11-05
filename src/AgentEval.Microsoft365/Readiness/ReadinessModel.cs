@@ -186,7 +186,11 @@ public sealed record ReadinessCheckOptions
     /// <summary>Runs the remaining stages after a failure instead of stopping (a stage that needs the config still cannot run without it).</summary>
     public bool ContinueAfterFailure { get; init; }
 
-    /// <summary>The most one stage may take (also the HTTP timeout and the turn deadline of the probe); must be positive.</summary>
+    /// <summary>
+    /// The most one stage may take for its network calls (also the HTTP timeout and the turn deadline of the probe); must
+    /// be positive. A device-code sign-in that starts inside a stage is bounded by its code's own expiry instead (the
+    /// stage's wait is extended to it and the trace says so), so a person completing MFA is not cut off by a network bound.
+    /// </summary>
     public TimeSpan StageTimeout { get; init; } = DefaultStageTimeout;
 
     /// <summary>Overrides the config's diagnostic profile for the auth, discovery, protocol and probe stages; null keeps the config's.</summary>
@@ -207,13 +211,40 @@ public sealed record ReadinessCheckOptions
     /// <summary>Where the device-code sign-in message and the verbose trace go; null means <see cref="System.Console.Error"/>.</summary>
     public TextWriter? Console { get; init; }
 
-    /// <summary>Throws when <see cref="StageTimeout"/> is not positive.</summary>
+    /// <summary>
+    /// Extra trace sinks, next to the JSONL trace file and the verbose console. Each receives every event the JSONL
+    /// trace file receives (the stages' <c>doctor.*</c> events and every seam's own), in the same order and after the
+    /// same redaction. The caller owns their lifetime: the check never disposes them. A sink that throws is reported
+    /// once on stderr and dropped. Null or empty means none.
+    /// </summary>
+    public IReadOnlyList<IWorkIqTraceSink>? TraceSinks { get; init; }
+
+    /// <summary>
+    /// Extra issue sinks, next to the JSONL issue register. Each receives every issue the issue file receives — the
+    /// two replies the doctor provokes on purpose (TaskNotFound on the random task id, TaskNotCancelable on the finished
+    /// task) are held back from them exactly as from the file. The caller owns their lifetime (never disposed by the
+    /// check). Null or empty means none.
+    /// </summary>
+    public IReadOnlyList<IWorkIqIssueSink>? IssueSinks { get; init; }
+
+    /// <summary>Throws when <see cref="StageTimeout"/> is not positive, or a sink list has a null entry.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><see cref="StageTimeout"/> is zero or negative.</exception>
+    /// <exception cref="ArgumentException"><see cref="TraceSinks"/> or <see cref="IssueSinks"/> contains null.</exception>
     public void Validate()
     {
         if (StageTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(StageTimeout), StageTimeout, "The stage timeout must be positive.");
+        }
+
+        if (TraceSinks?.Any(s => s is null) == true)
+        {
+            throw new ArgumentException("TraceSinks must not contain a null entry.", nameof(TraceSinks));
+        }
+
+        if (IssueSinks?.Any(s => s is null) == true)
+        {
+            throw new ArgumentException("IssueSinks must not contain a null entry.", nameof(IssueSinks));
         }
     }
 

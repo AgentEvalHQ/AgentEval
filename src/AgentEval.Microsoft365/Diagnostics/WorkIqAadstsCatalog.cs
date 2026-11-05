@@ -195,6 +195,18 @@ internal static partial class WorkIqAadstsCatalog
                 "access was blocked by a conditional access policy",
                 "an administrator reviews the conditional access policies for this user, app and location (the Entra sign-in log names the policy)"),
             new WorkIqAadstsEntry(
+                "AADSTS90002",
+                "the tenant named by tenantId was not found: it is not an Entra tenant (a template placeholder left in the config, a typo, a deleted tenant) or it lives in another cloud than the public Microsoft cloud",
+                "check tenantId in the config: use the Directory (tenant) ID from the app registration's Overview page, or the tenant's verified domain"),
+            new WorkIqAadstsEntry(
+                "AADSTS50059",
+                "no tenant could be identified for the sign-in: the request named no tenant and the credentials imply none (typically a personal Microsoft account, or a sign-in through the common endpoint)",
+                "set tenantId in the config to your tenant's Directory (tenant) ID and sign in with a work account of that tenant"),
+            new WorkIqAadstsEntry(
+                "AADSTS90019",
+                "the sign-in request named no tenant (a missing or blank tenant id, or a tenant-independent endpoint)",
+                "set tenantId in the config to your tenant's Directory (tenant) ID, then run again"),
+            new WorkIqAadstsEntry(
                 "AADSTS900144",
                 "a required parameter is missing from the sign-in request (typically the scope or the client id)",
                 "check that the config carries tenantId, appClientId and the scope; if the config is complete this is a client bug — report the exact message"),

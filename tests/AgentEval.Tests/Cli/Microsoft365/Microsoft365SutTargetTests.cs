@@ -180,18 +180,21 @@ public class Microsoft365SutTargetTests
     }
 
     [Theory]
-    [InlineData("public")]
-    [InlineData("PUBLIC")]
-    [InlineData(" Public ")]
-    [InlineData("native118")]
-    [InlineData("Native118")]
-    public void Validate_ProfileIsCaseInsensitiveAndTrimmed(string profile)
+    [InlineData("public", "PublicAnswerOnly")]
+    [InlineData("PUBLIC", "PublicAnswerOnly")]
+    [InlineData(" Public ", "PublicAnswerOnly")]
+    [InlineData("native118", "Native118Diagnostics")]
+    [InlineData("Native118", "Native118Diagnostics")]
+    public void Validate_ProfileIsCaseInsensitiveAndTrimmed(string profile, string expected)
     {
         var cfg = WriteConfig(ValidConfigJson);
         try
         {
             var target = new Microsoft365SutTarget(new StringWriter());
             target.Validate(Common(consent: true), new Microsoft365SutOptions { ConfigFile = cfg, Profile = profile });
+
+            // Review L4: the memoised profile is the one the run records, not merely "Validate did not throw".
+            Assert.Equal(expected, (string?)target.AefRunSettings(null)!["m365Profile"]);
         }
         finally { TryDelete(cfg); }
     }

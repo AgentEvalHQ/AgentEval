@@ -81,6 +81,7 @@ and read the evidence honestly. Use the `m365-eval` skill (`.github/skills/m365-
 | "Do it in code" | Skill step 8 (`BuildLive`, assertions, `reply.Evidence()`) |
 | "What did we actually observe?" | Skill step 9: the evidence availability per case; say what was and was not observed |
 | "Our tester has a tenant" | Point them at `docs/microsoft365-tester-guide.md`; it needs no repository knowledge |
+| "Get the tester running fast" / "run the demo" | `samples/AgentEval.Microsoft365Demo` (its `README.md`): `dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only`, then the same with `--i-understand-live-side-effects --zip` (ask first; `--no-judge` avoids judge cost); one run folder with every trace and issue. Opened on its own in VS Code it has its own `m365-demo` agent and setup / customise / triage skills |
 
 ## Files you should reference
 

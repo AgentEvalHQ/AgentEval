@@ -1,0 +1,363 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Globalization;
+using AgentEval.Core;
+using AgentEval.MAF;
+using AgentEval.Microsoft365;
+using AgentEval.Microsoft365.Diagnostics;
+using AgentEval.Models;
+
+namespace AgentEval.Microsoft365Demo;
+
+/// <summary>The verdict of one benchmark case.</summary>
+internal enum CaseVerdict
+{
+    /// <summary>Every check that applies ran and passed.</summary>
+    Pass,
+
+    /// <summary>A check ran and failed (an empty answer, or the judge's score below the passing score).</summary>
+    Fail,
+
+    /// <summary>The turn did not complete, or the case could not run: nothing about the answer was measured. Never a FAIL score.</summary>
+    Error,
+
+    /// <summary>Nothing failed, but a check that applies was not measured (no judge for the criteria, the judge gave no verdict, no answer selected, the turn cap).</summary>
+    NotMeasured,
+}
+
+/// <summary>The result of one check of a case.</summary>
+internal enum CheckResult
+{
+    /// <summary>The check ran and passed.</summary>
+    Pass,
+
+    /// <summary>The check ran and failed.</summary>
+    Fail,
+
+    /// <summary>The check applies but could not be measured.</summary>
+    NotMeasured,
+
+    /// <summary>The check did not apply (the turn did not complete, or the case declares no criteria); it does not change the verdict.</summary>
+    NotRun,
+}
+
+/// <summary>One check of a case.</summary>
+/// <param name="Name">The check (see <see cref="Benchmark"/>'s constants).</param>
+/// <param name="Result">Its result.</param>
+/// <param name="Detail">What was observed, in plain words.</param>
+internal sealed record CheckOutcome(string Name, CheckResult Result, string Detail);
+
+/// <summary>The outcome of one benchmark case.</summary>
+/// <param name="Case">The case.</param>
+/// <param name="Verdict">The verdict.</param>
+/// <param name="Reason">The verdict in one sentence.</param>
+/// <param name="Checks">Every check, in order.</param>
+/// <param name="Turn">The case's turn result, when the agent produced one.</param>
+/// <param name="Score">The judge's score (0-100), only when the criteria were measured.</param>
+/// <param name="Criteria">The judge's per-criterion results, only when the criteria were measured.</param>
+internal sealed record CaseOutcome(
+    DemoCase Case,
+    CaseVerdict Verdict,
+    string Reason,
+    IReadOnlyList<CheckOutcome> Checks,
+    WorkIqTurnResult? Turn,
+    int? Score,
+    IReadOnlyList<CriterionResult>? Criteria);
+
+/// <summary>What the benchmark ran and why it stopped early, when it did.</summary>
+/// <param name="Cases">One outcome per case, in dataset order (cases it did not reach are NOT MEASURED).</param>
+/// <param name="StopReason">Why the benchmark stopped before the last case; null when it ran them all.</param>
+internal sealed record BenchmarkOutcome(IReadOnlyList<CaseOutcome> Cases, string? StopReason);
+
+/// <summary>
+/// The benchmark: every case runs through AgentEval's <see cref="MAFEvaluationHarness"/> over the live
+/// <see cref="WorkIqEvaluableAgent"/> (one turn per case, a fresh context each), with the judge when one exists. The
+/// verdicts are the demo's own reading of the harness result and the provider's turn result: the deterministic checks
+/// (turn completed, answer non-empty, response time recorded, evidence availability recorded) always run; the criteria are
+/// graded only by a judge, and are NOT MEASURED without one; a turn that did not complete is an ERROR row with its outcome
+/// and its failure, never a FAIL score.
+/// </summary>
+internal static class Benchmark
+{
+    /// <summary>The check that the turn completed.</summary>
+    public const string TurnCompleted = "turn completed";
+
+    /// <summary>The check that the answer is not empty.</summary>
+    public const string AnswerNonEmpty = "answer non-empty";
+
+    /// <summary>The check that the client-side response time was recorded.</summary>
+    public const string ResponseTime = "response time recorded";
+
+    /// <summary>The check that the evidence document recorded every channel's availability.</summary>
+    public const string EvidenceRecorded = "evidence availability recorded";
+
+    /// <summary>The judge's grade of the case's criteria.</summary>
+    public const string CriteriaCheck = "criteria (judge)";
+
+    /// <summary>Runs every case and returns the outcomes; stops early on the turn cap or cancellation.</summary>
+    /// <param name="agent">The live agent (its <see cref="WorkIqEvaluableAgent.NextCaseId"/> is set per case).</param>
+    /// <param name="cases">The cases.</param>
+    /// <param name="judge">The judge.</param>
+    /// <param name="turns">The agent's turn recorder.</param>
+    /// <param name="console">The demo console.</param>
+    /// <param name="cancellationToken">Stops the benchmark; the cases not run are NOT MEASURED.</param>
+    public static async Task<BenchmarkOutcome> RunAsync(
+        WorkIqEvaluableAgent agent,
+        IReadOnlyList<DemoCase> cases,
+        JudgeChoice judge,
+        TurnRecorder turns,
+        DemoConsole console,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        ArgumentNullException.ThrowIfNull(cases);
+        ArgumentNullException.ThrowIfNull(judge);
+        ArgumentNullException.ThrowIfNull(turns);
+        ArgumentNullException.ThrowIfNull(console);
+
+        var evaluator = judge.Client is null ? null : new ChatClientEvaluator(judge.Client);
+        var harness = new MAFEvaluationHarness(evaluator, NullAgentEvalLogger.Instance);
+        var options = new EvaluationOptions
+        {
+            // The provider reports no tool calls, tokens or cost (RawMessages and TokenUsage stay null): the harness must
+            // not estimate them, so performance and tool tracking are off and the turn's own timing is used instead.
+            TrackTools = false,
+            TrackPerformance = false,
+            EvaluateResponse = evaluator is not null,
+            Verbose = false,
+        };
+
+        var outcomes = new List<CaseOutcome>(cases.Count);
+        string? stopReason = null;
+        for (var index = 0; index < cases.Count; index++)
+        {
+            var demoCase = cases[index];
+            if (stopReason is not null)
+            {
+                outcomes.Add(NotReached(demoCase, stopReason));
+                continue;
+            }
+
+            console.Line(DemoVerbosity.Normal, $"  case {(index + 1).ToString(CultureInfo.InvariantCulture)}/{cases.Count.ToString(CultureInfo.InvariantCulture)}  {demoCase.Id}" +
+                (demoCase.Category is null ? "" : $"  ({demoCase.Category})"));
+            var since = turns.Count;
+            agent.NextCaseId = demoCase.Id;
+            TestResult? result = null;
+            try
+            {
+                result = await harness.RunEvaluationAsync(agent, demoCase.ToTestCase(), options, cancellationToken).ConfigureAwait(false);
+            }
+            catch (WorkIqTurnBudgetExceededException ex)
+            {
+                stopReason = $"the --max-turns cap ({ex.MaxTurns.ToString(CultureInfo.InvariantCulture)}) was reached after {ex.TurnsUsed.ToString(CultureInfo.InvariantCulture)} turn(s); nothing more was sent";
+            }
+            catch (FatalEvaluationException ex)
+            {
+                stopReason = "the run stopped: " + WorkIqRedaction.Redact(ex.Message);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                stopReason = "the run was canceled";
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                // The harness rejected the case before sending it (a malformed case); nothing reached the agent.
+                outcomes.Add(new CaseOutcome(
+                    demoCase,
+                    CaseVerdict.Error,
+                    $"the case could not run: {ex.GetType().Name}: {WorkIqRedaction.Redact(ex.Message)}",
+                    [new CheckOutcome(TurnCompleted, CheckResult.NotRun, "nothing was sent")],
+                    null,
+                    null,
+                    null));
+                continue;
+            }
+
+            agent.NextCaseId = null;
+            if (result is null)
+            {
+                outcomes.Add(NotReached(demoCase, stopReason ?? "the case did not run"));
+                continue;
+            }
+
+            var outcome = Classify(demoCase, result, turns.LatestFor(demoCase.Id, since), judge);
+            outcomes.Add(outcome);
+            console.Line(DemoVerbosity.Normal, "        " + VerdictLabel(outcome.Verdict) + " — " + outcome.Reason, TintOf(outcome.Verdict));
+            foreach (var check in outcome.Checks)
+            {
+                console.Line(DemoVerbosity.Detailed, $"          {CheckLabel(check.Result),-13} {check.Name}: {check.Detail}", Tint.Dim);
+            }
+
+            // A cancellation inside a turn ends that turn (an ERROR row above); the cases after it are not sent.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                stopReason = "the run was canceled";
+            }
+        }
+
+        if (stopReason is not null)
+        {
+            console.Line(DemoVerbosity.Quiet, "  benchmark stopped early: " + stopReason, Tint.Warn);
+        }
+
+        return new BenchmarkOutcome(outcomes, stopReason);
+    }
+
+    /// <summary>
+    /// The verdict of a case from the harness result and the case's turn: ERROR when the turn did not complete (or the
+    /// agent failed before a turn); otherwise the deterministic checks, then the criteria — graded by the judge only, NOT
+    /// MEASURED without one, without a verdict from it, or when no answer was selected.
+    /// </summary>
+    /// <param name="demoCase">The case.</param>
+    /// <param name="result">The harness result.</param>
+    /// <param name="turn">The case's turn result (null when the agent produced none).</param>
+    /// <param name="judge">The judge.</param>
+    internal static CaseOutcome Classify(DemoCase demoCase, TestResult result, WorkIqTurnResult? turn, JudgeChoice judge)
+    {
+        ArgumentNullException.ThrowIfNull(demoCase);
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(judge);
+
+        if (result.Error is { } error)
+        {
+            var carried = (error as IWorkIqTurnResultCarrier)?.TurnResult ?? (error.InnerException as IWorkIqTurnResultCarrier)?.TurnResult ?? turn;
+            var failure = carried?.Failure ?? (error as WorkIqProtocolException)?.Failure;
+            var what = carried is not null
+                ? "the turn did not complete: " + TurnRecorder.NotCompletedSummary(carried)
+                : failure is not null
+                    ? $"the agent failed before a turn result: {TurnRecorder.FailureCodes(failure)}: {IssueText.Flatten(failure.SafeMessage)}"
+                    : $"the agent failed: {error.GetType().Name}: {IssueText.Flatten(error.Message)}";
+            var checks = new List<CheckOutcome>
+            {
+                new(TurnCompleted, CheckResult.NotRun, what),
+                new(AnswerNonEmpty, CheckResult.NotRun, "no answer: the turn did not complete (partial text is never graded)"),
+                carried is null
+                    ? new(ResponseTime, CheckResult.NotMeasured, "no turn result")
+                    : new(ResponseTime, CheckResult.Pass, $"{Milliseconds(carried.Timing.Elapsed)} until the turn ended (client side)"),
+                carried is null
+                    ? new(EvidenceRecorded, CheckResult.NotMeasured, "no turn result")
+                    : new(EvidenceRecorded, CheckResult.Pass, TurnRecorder.EvidenceAvailability(carried.Evidence)),
+                new(CriteriaCheck, CheckResult.NotRun, "not graded: there is no answer"),
+            };
+            return new CaseOutcome(demoCase, CaseVerdict.Error, WorkIqRedaction.Redact(what), checks, carried, null, null);
+        }
+
+        var list = new List<CheckOutcome>();
+        if (turn is null)
+        {
+            // The harness returned a response but the turn sink saw no turn: nothing provider-side can be checked.
+            list.Add(new(TurnCompleted, CheckResult.NotMeasured, "the response arrived but no turn result was recorded"));
+            list.Add(new(AnswerNonEmpty, string.IsNullOrWhiteSpace(result.ActualOutput) ? CheckResult.Fail : CheckResult.Pass,
+                string.IsNullOrWhiteSpace(result.ActualOutput) ? "the response text is empty" : $"{(result.ActualOutput ?? "").Length.ToString(CultureInfo.InvariantCulture)} characters"));
+            list.Add(new(ResponseTime, CheckResult.NotMeasured, "no turn result"));
+            list.Add(new(EvidenceRecorded, CheckResult.NotMeasured, "no turn result"));
+        }
+        else
+        {
+            list.Add(new(TurnCompleted, CheckResult.Pass, $"Completed (task {turn.Task?.TaskId ?? turn.Identity.ProviderTaskId ?? "(none: direct message)"})"));
+            list.Add(AnswerCheck(turn));
+            list.Add(new(ResponseTime, CheckResult.Pass, $"{Milliseconds(turn.Timing.Elapsed)} (client side: network and service, not model latency)"));
+            list.Add(new(EvidenceRecorded, CheckResult.Pass, TurnRecorder.EvidenceAvailability(turn.Evidence)));
+        }
+
+        int? score = null;
+        IReadOnlyList<CriterionResult>? criteria = null;
+        if (demoCase.Criteria.Count == 0)
+        {
+            list.Add(new(CriteriaCheck, CheckResult.NotRun, "the case declares no criteria"));
+        }
+        else if (!judge.IsAvailable)
+        {
+            list.Add(new(CriteriaCheck, CheckResult.NotMeasured, judge.NotMeasuredReason));
+        }
+        else if (turn?.AnswerCompleteness == OutputCompleteness.Ambiguous)
+        {
+            list.Add(new(CriteriaCheck, CheckResult.NotMeasured, "no answer was selected (several candidates), so the judge graded an empty string: not a measurement of the agent"));
+        }
+        else if (result.JudgeFailed)
+        {
+            list.Add(new(CriteriaCheck, CheckResult.NotMeasured, "the judge produced no verdict: " + IssueText.Truncate(IssueText.Flatten(result.Details), 300)));
+        }
+        else
+        {
+            score = result.Score;
+            criteria = result.CriteriaResults;
+            var passed = result.Score >= demoCase.PassingScore;
+            list.Add(new(CriteriaCheck, passed ? CheckResult.Pass : CheckResult.Fail,
+                $"score {result.Score.ToString(CultureInfo.InvariantCulture)}/100, passing {demoCase.PassingScore.ToString(CultureInfo.InvariantCulture)}" +
+                (criteria is { Count: > 0 } ? $"; {criteria.Count(c => c.Met).ToString(CultureInfo.InvariantCulture)} of {criteria.Count.ToString(CultureInfo.InvariantCulture)} criteria met" : "")));
+        }
+
+        var verdict = list.Any(c => c.Result == CheckResult.Fail)
+            ? CaseVerdict.Fail
+            : list.Any(c => c.Result == CheckResult.NotMeasured) ? CaseVerdict.NotMeasured : CaseVerdict.Pass;
+        var reason = verdict switch
+        {
+            CaseVerdict.Fail => "failed: " + string.Join("; ", list.Where(c => c.Result == CheckResult.Fail).Select(c => $"{c.Name} ({c.Detail})")),
+            CaseVerdict.NotMeasured => "not measured: " + string.Join("; ", list.Where(c => c.Result == CheckResult.NotMeasured).Select(c => $"{c.Name} ({c.Detail})")),
+            _ => "every check passed" + (score is { } s ? $" (judge score {s.ToString(CultureInfo.InvariantCulture)}/100)" : ""),
+        };
+        return new CaseOutcome(demoCase, verdict, WorkIqRedaction.Redact(reason), list, turn, score, criteria);
+    }
+
+    /// <summary>A case the benchmark did not reach (the turn cap, a cancellation): NOT MEASURED, nothing sent.</summary>
+    /// <param name="demoCase">The case.</param>
+    /// <param name="why">Why it did not run.</param>
+    internal static CaseOutcome NotReached(DemoCase demoCase, string why) => new(
+        demoCase,
+        CaseVerdict.NotMeasured,
+        "not run: " + why,
+        [new CheckOutcome(TurnCompleted, CheckResult.NotMeasured, "not run: " + why)],
+        null,
+        null,
+        null);
+
+    /// <summary>The verdict as printed: <c>PASS</c>, <c>FAIL</c>, <c>ERROR</c>, <c>NOT MEASURED</c>.</summary>
+    /// <param name="verdict">The verdict.</param>
+    public static string VerdictLabel(CaseVerdict verdict) => verdict switch
+    {
+        CaseVerdict.Pass => "PASS",
+        CaseVerdict.Fail => "FAIL",
+        CaseVerdict.Error => "ERROR",
+        _ => "NOT MEASURED",
+    };
+
+    /// <summary>A check result as printed: <c>PASS</c>, <c>FAIL</c>, <c>NOT MEASURED</c>, <c>NOT RUN</c>.</summary>
+    /// <param name="result">The result.</param>
+    public static string CheckLabel(CheckResult result) => result switch
+    {
+        CheckResult.Pass => "PASS",
+        CheckResult.Fail => "FAIL",
+        CheckResult.NotMeasured => "NOT MEASURED",
+        _ => "NOT RUN",
+    };
+
+    /// <summary>The colour of a verdict.</summary>
+    /// <param name="verdict">The verdict.</param>
+    public static Tint TintOf(CaseVerdict verdict) => verdict switch
+    {
+        CaseVerdict.Pass => Tint.Good,
+        CaseVerdict.Fail or CaseVerdict.Error => Tint.Bad,
+        _ => Tint.Warn,
+    };
+
+    /// <summary>Milliseconds without decimals (<c>1234 ms</c>).</summary>
+    /// <param name="elapsed">The duration.</param>
+    public static string Milliseconds(TimeSpan elapsed) => elapsed.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture) + " ms";
+
+    private static CheckOutcome AnswerCheck(WorkIqTurnResult turn) => turn.AnswerCompleteness switch
+    {
+        OutputCompleteness.Complete when !string.IsNullOrWhiteSpace(turn.AnswerText) =>
+            new(AnswerNonEmpty, CheckResult.Pass, $"{turn.AnswerText!.Length.ToString(CultureInfo.InvariantCulture)} characters"),
+        OutputCompleteness.Complete or OutputCompleteness.Empty =>
+            new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with an empty answer"),
+        OutputCompleteness.None =>
+            new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with no answer artifact"),
+        OutputCompleteness.Ambiguous =>
+            new(AnswerNonEmpty, CheckResult.NotMeasured, "several answer candidates and none selected; the evidence document keeps them all"),
+        _ =>
+            new(AnswerNonEmpty, CheckResult.NotMeasured, $"answer {turn.AnswerCompleteness}: not a complete answer"),
+    };
+}

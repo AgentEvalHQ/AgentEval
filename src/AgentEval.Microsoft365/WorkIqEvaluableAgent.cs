@@ -15,7 +15,10 @@ namespace AgentEval.Microsoft365;
 /// (<see cref="WorkIqTurnBudgetExceededException"/> before any send), the conversation policy decides whether the
 /// context is reset, then the completion gate applies — an <see cref="AgentResponse"/> is returned only for
 /// <see cref="WorkIqTurnOutcome.Completed"/> (text = selected answer, <c>AdditionalProperties[Microsoft365Evidence.Key]</c>
-/// = evidence; <c>RawMessages</c>, <c>TokenUsage</c> and <c>ModelId</c> stay null because nothing is inferred);
+/// = evidence; <c>RawMessages</c>, <c>TokenUsage</c> and <c>ModelId</c> stay null because nothing is inferred; a turn
+/// that completed with no selected answer is marked with <see cref="CompletedNoAnswerFinishReason"/> and
+/// <c>AdditionalProperties[Microsoft365Evidence.NoAnswerSelectedKey] = true</c>, so its empty text is never mistaken
+/// for an empty answer);
 /// every other outcome throws <see cref="WorkIqTurnNotCompletedException"/>, and a local cancellation throws
 /// <see cref="WorkIqTurnCanceledException"/>. The optional <c>onTurn</c> sink receives every immutable result
 /// <b>before</b> an exception is thrown, so a run can persist interrupted evidence. The agent never approves a
@@ -23,8 +26,17 @@ namespace AgentEval.Microsoft365;
 /// </summary>
 public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAgent, IAsyncDisposable
 {
-    /// <summary>The <see cref="AgentResponse.FinishReason"/> of a completed turn.</summary>
+    /// <summary>The <see cref="AgentResponse.FinishReason"/> of a completed turn with a selected answer (an empty answer included).</summary>
     public const string CompletedFinishReason = "completed";
+
+    /// <summary>
+    /// The <see cref="AgentResponse.FinishReason"/> of a turn that completed with <b>no selected answer</b>: the task
+    /// carried several answer candidates and none was chosen (<c>Ambiguous</c>), or no answer artifact at all
+    /// (<c>None</c>). The response text is then an empty string that is not the agent's answer, so a grader sees an empty
+    /// string; <c>AdditionalProperties[<see cref="Microsoft365Evidence.NoAnswerSelectedKey"/>]</c> is <see langword="true"/>
+    /// and the evidence document keeps every candidate. Not an error: the task did complete.
+    /// </summary>
+    public const string CompletedNoAnswerFinishReason = "completed-no-answer";
 
     private readonly Action<WorkIqTurnResult>? _onTurn;
     private readonly List<IAsyncDisposable> _owned = [];
@@ -61,7 +73,12 @@ public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAg
     /// <summary>The validated runtime options.</summary>
     public WorkIqOptions Options { get; }
 
-    /// <summary>Completed turns counted so far (the quantity <see cref="WorkIqOptions.MaxTurns"/> caps); turns are counted, consumption is not metered.</summary>
+    /// <summary>
+    /// Turns counted so far (the quantity <see cref="WorkIqOptions.MaxTurns"/> caps): every turn that returned a typed
+    /// result, completed or not — a failed, paused, canceled or indeterminate turn, and also one that failed before its
+    /// prompt went out (a sign-in or discovery failure). Only a turn refused before it started (the cap itself, a disposed
+    /// agent) is not counted. Turns are counted, consumption is not metered.
+    /// </summary>
     public int TurnsUsed { get; private set; }
 
     /// <summary>
@@ -131,22 +148,45 @@ public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAg
 
         if (result.IsCompleted)
         {
-            Diagnostics.Trace(
-                WorkIqTraceStage.Outcome,
-                "agent.turn_mapped",
-                $"Completed → AgentResponse ({result.AnswerText?.Length ?? 0} answer characters, answer {result.AnswerCompleteness}, telemetry {result.Telemetry})",
-                caseId: caseId,
-                turnId: turnId,
-                taskId: result.Task?.TaskId,
-                contextId: result.ContextId);
+            var noAnswer = result.AnswerText is null;
+            if (noAnswer)
+            {
+                Diagnostics.Trace(
+                    WorkIqTraceStage.Outcome,
+                    "agent.turn_mapped",
+                    $"Completed with NO selected answer (answer {result.AnswerCompleteness}) → AgentResponse with empty text and FinishReason '{CompletedNoAnswerFinishReason}'; " +
+                    "the empty text is not the agent's answer (the evidence document keeps the candidates)",
+                    WorkIqTraceLevel.Warning,
+                    caseId: caseId,
+                    turnId: turnId,
+                    taskId: result.Task?.TaskId,
+                    contextId: result.ContextId);
+            }
+            else
+            {
+                Diagnostics.Trace(
+                    WorkIqTraceStage.Outcome,
+                    "agent.turn_mapped",
+                    $"Completed → AgentResponse ({result.AnswerText!.Length} answer characters, answer {result.AnswerCompleteness}, telemetry {result.Telemetry})",
+                    caseId: caseId,
+                    turnId: turnId,
+                    taskId: result.Task?.TaskId,
+                    contextId: result.ContextId);
+            }
+
             return new AgentResponse
             {
                 Text = result.AnswerText ?? "",
-                AdditionalProperties = new Dictionary<string, object?>(StringComparer.Ordinal) { [Microsoft365Evidence.Key] = result.Evidence },
+                AdditionalProperties = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    [Microsoft365Evidence.Key] = result.Evidence,
+                    [Microsoft365Evidence.NoAnswerSelectedKey] = noAnswer,
+                    [Microsoft365Evidence.AnswerCompletenessKey] = result.AnswerCompleteness.ToString(),
+                },
                 RawMessages = null,
                 TokenUsage = null,
                 ModelId = null,
-                FinishReason = CompletedFinishReason,
+                FinishReason = noAnswer ? CompletedNoAnswerFinishReason : CompletedFinishReason,
             };
         }
 

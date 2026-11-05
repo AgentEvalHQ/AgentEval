@@ -78,7 +78,9 @@ public sealed class JsonlSinkTests : IDisposable
         Assert.Equal("Send", second.RootElement.GetProperty("stage").GetString());
         Assert.Equal(401, second.RootElement.GetProperty("httpStatus").GetInt32());
         Assert.Equal(-32009, second.RootElement.GetProperty("rpcErrorCode").GetInt32());
-        Assert.Equal("TASK_STATE_FAILED", second.RootElement.GetProperty("a2AState").GetString());
+        // One spelling for the A2A fields across the trace, the issue register and readiness.json.
+        Assert.Equal("TASK_STATE_FAILED", second.RootElement.GetProperty("a2aState").GetString());
+        Assert.False(second.RootElement.TryGetProperty("a2AState", out _));
         Assert.Equal(12.5, second.RootElement.GetProperty("elapsedMs").GetDouble());
         Assert.Equal("task-1", second.RootElement.GetProperty("taskId").GetString());
         Assert.Equal(2, second.RootElement.GetProperty("data").GetProperty("count").GetInt32());
@@ -210,7 +212,8 @@ public sealed class JsonlSinkTests : IDisposable
         Assert.Equal("Admin consent for WorkIQAgent.Ask is missing.", root.GetProperty("suggestedCause").GetString());
         Assert.Equal(403, root.GetProperty("httpStatus").GetInt32());
         Assert.Equal("abc", root.GetProperty("configSha256").GetString());
-        Assert.Equal("1.0", root.GetProperty("a2AVersion").GetString());
+        Assert.Equal("1.0", root.GetProperty("a2aVersion").GetString());
+        Assert.False(root.TryGetProperty("a2AVersion", out _));
         Assert.False(root.TryGetProperty("aadstsCode", out _));
         Assert.False(root.TryGetProperty("taskId", out _));
     }

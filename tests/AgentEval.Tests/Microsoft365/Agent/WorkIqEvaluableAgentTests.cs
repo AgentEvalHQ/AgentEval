@@ -97,6 +97,47 @@ public sealed class WorkIqEvaluableAgentTests
     }
 
     [Theory]
+    [InlineData(OutputCompleteness.Ambiguous)]
+    [InlineData(OutputCompleteness.None)]
+    public async Task InvokeAsync_CompletedWithNoSelectedAnswer_MarkedCompletedNoAnswerWithTheFlag(OutputCompleteness completeness)
+    {
+        var (conversation, agent, sink, trace) = Build();
+        conversation.OnRun = (request, _) => Task.FromResult(TurnResults.Completed(request) with { AnswerText = null, AnswerCompleteness = completeness });
+        await using (agent)
+        {
+            var response = await agent.InvokeAsync("x");
+
+            // Review M3: a missing answer is never indistinguishable from an empty one.
+            Assert.Equal("", response.Text);
+            Assert.Equal(WorkIqEvaluableAgent.CompletedNoAnswerFinishReason, response.FinishReason);
+            Assert.Equal("completed-no-answer", response.FinishReason);
+            Assert.True(response.AdditionalProperties![Microsoft365Evidence.NoAnswerSelectedKey] is true);
+            Assert.Equal(completeness.ToString(), response.AdditionalProperties[Microsoft365Evidence.AnswerCompletenessKey]);
+            Assert.NotNull(response.Evidence());
+            Assert.Single(sink);
+            Assert.Contains(trace.Events, e => e.Code == "agent.turn_mapped" && e.Level == WorkIqTraceLevel.Warning && e.Message.Contains("NO selected answer", StringComparison.Ordinal));
+        }
+    }
+
+    [Theory]
+    [InlineData("The pilot starts on 17 November.", OutputCompleteness.Complete)]
+    [InlineData("", OutputCompleteness.Empty)]
+    public async Task InvokeAsync_CompletedWithASelectedAnswer_FinishReasonCompletedAndFlagFalse(string text, OutputCompleteness completeness)
+    {
+        var (conversation, agent, _, _) = Build();
+        conversation.OnRun = (request, _) => Task.FromResult(TurnResults.Completed(request, text) with { AnswerCompleteness = completeness });
+        await using (agent)
+        {
+            var response = await agent.InvokeAsync("x");
+
+            Assert.Equal(text, response.Text);
+            Assert.Equal(WorkIqEvaluableAgent.CompletedFinishReason, response.FinishReason);
+            Assert.True(response.AdditionalProperties![Microsoft365Evidence.NoAnswerSelectedKey] is false);
+            Assert.Equal(completeness.ToString(), response.AdditionalProperties[Microsoft365Evidence.AnswerCompletenessKey]);
+        }
+    }
+
+    [Theory]
     [InlineData(WorkIqTurnOutcome.InputRequired)]
     [InlineData(WorkIqTurnOutcome.AuthRequired)]
     [InlineData(WorkIqTurnOutcome.Failed)]

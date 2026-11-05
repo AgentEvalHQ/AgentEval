@@ -54,7 +54,7 @@ public static class BenchCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null)
+        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
     {
         if (runs < 1)
         {
@@ -354,7 +354,7 @@ public static class BenchCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked;
                 aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
                     compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-                    trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null, definition: suiteDefinition);
+                    trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null, definition: suiteDefinition, subjectSettings: subjectSettings);
             }
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -379,7 +379,7 @@ public static class BenchCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
                 trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: abortReason, requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
-                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null, definition: suiteDefinition))
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null, definition: suiteDefinition, subjectSettings: subjectSettings))
                 return ExitCodes.RuntimeError;
             return 1;
         }

@@ -15,6 +15,21 @@ public static class Microsoft365Evidence
     /// <summary>The <c>AgentResponse.AdditionalProperties</c> key under which the <see cref="Microsoft365TurnEvidence"/> travels.</summary>
     public const string Key = "AgentEval.Microsoft365.Evidence";
 
+    /// <summary>
+    /// The <c>AgentResponse.AdditionalProperties</c> key of a <see cref="bool"/>: <see langword="true"/> when the turn
+    /// completed but no answer was selected (several answer candidates, or no answer artifact at all), so the response
+    /// text is an empty string that is <b>not</b> the agent's answer; <see langword="false"/> when an answer was
+    /// selected (an empty answer included). Always present on a response of <c>WorkIqEvaluableAgent</c>.
+    /// </summary>
+    public const string NoAnswerSelectedKey = "AgentEval.Microsoft365.NoAnswerSelected";
+
+    /// <summary>
+    /// The <c>AgentResponse.AdditionalProperties</c> key of the answer completeness of the turn, as the
+    /// <c>OutputCompleteness</c> member name (<c>Complete</c>, <c>Empty</c>, <c>Ambiguous</c>, <c>None</c>, …). Always
+    /// present on a response of <c>WorkIqEvaluableAgent</c>.
+    /// </summary>
+    public const string AnswerCompletenessKey = "AgentEval.Microsoft365.AnswerCompleteness";
+
     /// <summary>The evidence document schema id (an AgentEval schema, not a Microsoft wire contract).</summary>
     public const string SchemaVersion = "agenteval.microsoft365.turn-evidence/v1";
 

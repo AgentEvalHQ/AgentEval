@@ -57,7 +57,11 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     /// <summary>The answer output mode requested under every profile (alias of <see cref="TextPlainOutputMode"/>).</summary>
     internal const string TextPlainMediaType = TextPlainOutputMode;
 
+    /// <summary>The trace code of a failure the caller declared expected (<see cref="ExpectFailure"/>), traced at Info.</summary>
+    internal const string ExpectedErrorCode = "rpc.expected_error";
+
     private readonly object _discoveryGate = new();
+    private Func<WorkIqFailure, bool>? _expectedFailure;
     private Task<RawAgentCard>? _discovery;
     private RawAgentCard? _card;
     private A2AClient? _client;
@@ -103,6 +107,14 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
     /// <summary>The capture handler inside <see cref="Http"/>.</summary>
     internal RawCaptureHandler Capture { get; }
+
+    /// <summary>
+    /// The auth handler inside <see cref="Http"/>, when the client should acquire the bearer token itself before every
+    /// HTTP call (the live transport sets it): the token wait — a device-code sign-in included — then runs under the
+    /// operation's own token, outside <c>HttpClient.Timeout</c>, so a slow sign-in ends as "sign-in not completed,
+    /// nothing was sent" and never as a network timeout. Null leaves the acquisition inside the pipeline.
+    /// </summary>
+    internal WorkIqAuthHandler? Auth { get; init; }
 
     /// <summary>The clock.</summary>
     internal TimeProvider Clock { get; }
@@ -251,6 +263,20 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         }
 
         return sink.Complete();
+    }
+
+    /// <summary>
+    /// Declares, until the returned scope is disposed, which failure reply is the answer the caller provokes on purpose
+    /// (the readiness check's GetTask on a random task id → TaskNotFound; its CancelTask on a finished task →
+    /// TaskNotCancelable). A matching failure is traced once as <see cref="ExpectedErrorCode"/> at Info instead of an
+    /// Error-level <c>rpc.error</c> and is not registered as an issue; it is still thrown to the caller, which decides.
+    /// </summary>
+    /// <param name="predicate">Which failure is expected.</param>
+    internal IDisposable ExpectFailure(Func<WorkIqFailure, bool> predicate)
+    {
+        ArgumentNullException.ThrowIfNull(predicate);
+        Volatile.Write(ref _expectedFailure, predicate);
+        return new ExpectationScope(this, predicate);
     }
 
     /// <summary>Mints a JSON-RPC id (<c>rpc-&lt;32 hex&gt;</c>).</summary>
@@ -510,6 +536,18 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         _ => "Unclassified; see the trace and the raw capture.",
     };
 
+    /// <summary>
+    /// The suggested cause of one failure: <see cref="SuggestedCauseOf(WorkIqFailureCategory)"/>, except for a token wait
+    /// stopped before the call (<see cref="WorkIqAuthHandler.IsSignInNotCompleted"/>), which is no rejected token: nothing
+    /// was sent, the sign-in did not finish.
+    /// </summary>
+    /// <param name="failure">The failure.</param>
+    internal static string SuggestedCauseOf(WorkIqFailure failure)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        return WorkIqAuthHandler.IsSignInNotCompleted(failure) ? WorkIqAuthHandler.SignInNotCompletedCause : SuggestedCauseOf(failure.Category);
+    }
+
     /// <summary>Registers an issue for a failure (none for a local cancellation) and traces <c>rpc.error</c>.</summary>
     /// <param name="failure">The failure.</param>
     /// <param name="stage">The pipeline stage.</param>
@@ -518,6 +556,24 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     internal void ReportFailure(WorkIqFailure failure, WorkIqTraceStage stage, string? rpcId, double? elapsedMs)
     {
         ArgumentNullException.ThrowIfNull(failure);
+        if (Volatile.Read(ref _expectedFailure) is { } expected && expected(failure))
+        {
+            // The caller provoked this reply on purpose (the readiness check's GetTask on a random id, its CancelTask on a
+            // finished task): it is the answer the caller wants, so it is traced at Info and never registered as an issue.
+            Diagnostics.Trace(new WorkIqTraceEvent(default, stage, WorkIqTraceLevel.Info, ExpectedErrorCode, $"{failure.Category}: {failure.SafeMessage} (the expected answer to a call made on purpose; not an anomaly, not registered as an issue)")
+            {
+                RpcId = rpcId,
+                TaskId = failure.TaskId,
+                ContextId = failure.ContextId,
+                RequestId = failure.RequestId,
+                HttpStatus = failure.HttpStatus,
+                RpcErrorCode = failure.RpcErrorCode,
+                A2AState = failure.RemoteTaskState,
+                ElapsedMs = elapsedMs,
+            });
+            return;
+        }
+
         Diagnostics.Trace(new WorkIqTraceEvent(default, stage, WorkIqTraceLevel.Error, "rpc.error", $"{failure.Category} ({failure.Certainty}): {failure.SafeMessage}")
         {
             RpcId = rpcId,
@@ -646,11 +702,14 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             throw new WorkIqProtocolException(refused);
         }
 
+        // The token first, outside HttpClient.Timeout: the first sign-in of a run happens here.
+        var token = await AcquireTokenBeforeCallAsync(WorkIqOperation.Discover, HttpMethod.Get, cardUri, WorkIqTraceStage.Discovery, cancellationToken).ConfigureAwait(false);
+
         var sink = BeginCapture(WorkIqOperation.Discover);
         HttpExchange exchange;
         try
         {
-            exchange = await ExchangeWithRetryAsync(() => new HttpRequestMessage(HttpMethod.Get, cardUri), WorkIqOperation.Discover, allowRetry: true, taskId: null, cancellationToken).ConfigureAwait(false);
+            exchange = await ExchangeWithRetryAsync(WithToken(() => new HttpRequestMessage(HttpMethod.Get, cardUri), token), WorkIqOperation.Discover, allowRetry: true, taskId: null, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not WorkIqProtocolException)
         {
@@ -781,6 +840,9 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     {
         var card = Card ?? await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
         var stage = StageOf(op);
+
+        // The token before the call and before "rpc.sent": a sign-in that does not finish sends nothing.
+        var token = await AcquireTokenBeforeCallAsync(op, HttpMethod.Post, card.SelectedEndpoint, stage, cancellationToken).ConfigureAwait(false);
         var rpcId = Interlocked.Exchange(ref _nextRpcId, null) ?? NewRpcId();
         var envelope = new JsonRpcRequest
         {
@@ -803,7 +865,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         try
         {
             exchange = await ExchangeWithRetryAsync(
-                () => new HttpRequestMessage(HttpMethod.Post, card.SelectedEndpoint) { Content = new JsonRpcContent(envelope) },
+                WithToken(() => new HttpRequestMessage(HttpMethod.Post, card.SelectedEndpoint) { Content = new JsonRpcContent(envelope) }, token),
                 op,
                 allowRetry,
                 taskId,
@@ -1019,6 +1081,75 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     // ---------------------------------------------------------------------------------------------------------
 
     private sealed record HttpExchange(int HttpStatus, bool Success, string? RequestId, byte[] Bytes, string Body, DateTimeOffset ReceivedAt, TimeSpan? RetryAfter);
+
+    /// <summary>Ends an <see cref="ExpectFailure"/> declaration (only its own: a later declaration is left in place).</summary>
+    private sealed class ExpectationScope : IDisposable
+    {
+        private WorkIqA2AClient? _owner;
+        private readonly Func<WorkIqFailure, bool> _predicate;
+
+        public ExpectationScope(WorkIqA2AClient owner, Func<WorkIqFailure, bool> predicate)
+        {
+            _owner = owner;
+            _predicate = predicate;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _owner, null) is { } owner)
+            {
+                Interlocked.CompareExchange(ref owner._expectedFailure, null, _predicate);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Acquires the bearer token of one operation before its HTTP call, under <paramref name="cancellationToken"/> only
+    /// (never <c>HttpClient.Timeout</c>), when <see cref="Auth"/> is set; null otherwise (the auth handler then acquires
+    /// it inside the pipeline). A failure has already been traced and registered by the auth handler; this adds one
+    /// <c>auth.call_not_sent</c> line naming the operation and rethrows it with the operation filled in. Nothing is sent.
+    /// </summary>
+    /// <param name="op">The operation.</param>
+    /// <param name="method">The HTTP method of the call.</param>
+    /// <param name="destination">The call's URI.</param>
+    /// <param name="stage">The trace stage of the operation.</param>
+    /// <param name="cancellationToken">The operation's token.</param>
+    internal async Task<string?> AcquireTokenBeforeCallAsync(WorkIqOperation op, HttpMethod method, Uri destination, WorkIqTraceStage stage, CancellationToken cancellationToken)
+    {
+        if (Auth is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await Auth.AcquireTokenAsync(op, WorkIqAuthHandler.DescribeDestination(method, destination), outsideHttpTimeout: true, cancellationToken).ConfigureAwait(false);
+        }
+        catch (WorkIqProtocolException ex)
+        {
+            var failure = ex.Failure.Operation == WorkIqOperation.Unknown ? ex.Failure with { Operation = op } : ex.Failure;
+            Diagnostics.Trace(
+                stage,
+                "auth.call_not_sent",
+                $"{op} was not sent: no bearer token ({failure.Category}: {failure.SafeMessage})",
+                WorkIqTraceLevel.Error,
+                httpStatus: failure.HttpStatus);
+            throw new WorkIqProtocolException(failure, ex);
+        }
+    }
+
+    /// <summary>Wraps a request factory so every request it builds carries <paramref name="token"/> for the auth handler (unchanged when null).</summary>
+    /// <param name="factory">The request factory.</param>
+    /// <param name="token">The pre-acquired token, or null.</param>
+    private static Func<HttpRequestMessage> WithToken(Func<HttpRequestMessage> factory, string? token) =>
+        token is null
+            ? factory
+            : () =>
+            {
+                var request = factory();
+                request.Options.Set(WorkIqAuthHandler.PreAcquiredTokenOption, token);
+                return request;
+            };
 
     private async Task<HttpExchange> ExchangeWithRetryAsync(
         Func<HttpRequestMessage> requestFactory,

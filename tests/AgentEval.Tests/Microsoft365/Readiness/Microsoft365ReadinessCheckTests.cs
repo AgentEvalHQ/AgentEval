@@ -85,6 +85,46 @@ public sealed class Microsoft365ReadinessCheckTests
     }
 
     [Fact]
+    public async Task Config_UntouchedTemplatePlaceholder_FailsAtConfigNamingTheField_NothingSent()
+    {
+        using var rig = new ReadinessTestRig();
+        var file = rig.WriteConfig("{\"tenantId\":\"REPLACE-WITH-ENTRA-TENANT-GUID\",\"appClientId\":\"REPLACE-WITH-PUBLIC-CLIENT-APP-REGISTRATION-GUID\"}");
+
+        var report = await rig.RunAsync(rig.Options(), file);
+
+        var config = report.Find(ReadinessStage.Config)!;
+        Assert.Equal(ReadinessResult.Fail, config.Result);
+        Assert.Contains("'tenantId'", config.Summary, StringComparison.Ordinal);
+        Assert.Contains("Replace the template placeholder in 'tenantId'", config.Action, StringComparison.Ordinal);
+        Assert.Equal(ReadinessResult.Skipped, report.Find(ReadinessStage.Auth)!.Result);
+        Assert.Equal(0, rig.Tokens.Calls);
+        rig.Handler.AssertNoRequests();
+    }
+
+    [Theory]
+    [InlineData("contoso", "app-1", 2)]
+    [InlineData("contoso.onmicrosoft.com", "22222222-2222-2222-2222-222222222222", 0)]
+    [InlineData("11111111-1111-1111-1111-111111111111", "app-1", 1)]
+    public async Task Config_IdsThatCannotBeRight_PassWithAWarningEach(string tenantId, string appClientId, int warnings)
+    {
+        using var rig = new ReadinessTestRig();
+        var file = rig.WriteConfig($"{{\"tenantId\":\"{tenantId}\",\"appClientId\":\"{appClientId}\"}}");
+
+        var report = await rig.RunAsync(rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config }), file);
+
+        // Review L7: a shape check saves the tester a sign-in round trip; the sign-in stays the authority, so it only warns.
+        var config = report.Find(ReadinessStage.Config)!;
+        Assert.Equal(ReadinessResult.Pass, config.Result);
+        Assert.Equal(warnings, config.Warnings.Count);
+        if (warnings > 0)
+        {
+            Assert.Contains(config.Warnings, w => w.Contains("AADSTS", StringComparison.Ordinal));
+        }
+
+        rig.Handler.AssertNoRequests();
+    }
+
+    [Fact]
     public async Task Config_FileNotFound_FailsAndPointsAtThePath()
     {
         using var rig = new ReadinessTestRig();
@@ -400,12 +440,18 @@ public sealed class Microsoft365ReadinessCheckTests
         foreach (var expected in new[]
         {
             "doctor.started", "doctor.config.start", "doctor.config.pass", "doctor.auth.start", "doctor.auth.pass",
-            "doctor.discovery.start", "discovery.card_fetched", "doctor.discovery.pass", "doctor.protocol.start", "rpc.error",
+            "doctor.discovery.start", "discovery.card_fetched", "doctor.discovery.pass", "doctor.protocol.start", "rpc.expected_error",
             "doctor.protocol.pass", "doctor.probe.skipped", "doctor.census.skipped", "doctor.finished",
         })
         {
             Assert.Contains(expected, codes);
         }
+
+        // The TaskNotFound the protocol stage provokes on purpose is no anomaly: no Error-level rpc.error and no mirrored
+        // issue.* line reaches the trace (or the verbose console) for it.
+        Assert.DoesNotContain("rpc.error", codes);
+        Assert.DoesNotContain(codes, c => c.StartsWith("issue.", StringComparison.Ordinal));
+        Assert.DoesNotContain("rpc.error", rig.Console.ToString(), StringComparison.Ordinal);
 
         foreach (var line in ReadLines(report.TraceFile).Where(l => l.Contains("\"code\":\"doctor.", StringComparison.Ordinal)))
         {
@@ -550,6 +596,71 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.Equal(2, sends.Length);
         Assert.DoesNotContain("developer-info", sends[0].BodyJson!, StringComparison.Ordinal);
         Assert.Contains("developer-info", sends[1].BodyJson!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Census_PublicProbe_Native118TurnRejected_PassesAsARefusalWithAWarning()
+    {
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard)
+            .OnRpcSequence("SendMessage", CompletedWithAttributions, "envelopes/send-task-rejected.json")
+            .OnRpc("CancelTask", NotCancelable);
+
+        var report = await rig.RunAsync(rig.Options(
+            stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Probe, ReadinessStage.Census },
+            consent: true));
+
+        var census = report.Find(ReadinessStage.Census)!;
+        Assert.Equal(ReadinessResult.Pass, census.Result);
+        Assert.StartsWith("no: the service refused the turn", EvidenceOf(census, "diagnostic modes accepted"), StringComparison.Ordinal);
+        Assert.StartsWith("not observed", EvidenceOf(census, "Developer Info artifact"), StringComparison.Ordinal);
+        var warning = Assert.Single(census.Warnings);
+        Assert.Contains("completed under the public profile", warning, StringComparison.Ordinal);
+        Assert.Contains("native118 refused", census.Summary, StringComparison.Ordinal);
+        Assert.Equal(2, rig.Handler.CountOf("SendMessage"));
+    }
+
+    [Fact]
+    public async Task Census_PublicProbe_Native118HttpBadRequest_PassesAsARefusal()
+    {
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard)
+            .OnRpcSequence(
+                "SendMessage",
+                FakeWorkIqResponse.Json(CompletedWithAttributions),
+                FakeWorkIqResponse.Fail(HttpStatusCode.BadRequest))
+            .OnRpc("CancelTask", NotCancelable);
+
+        var report = await rig.RunAsync(rig.Options(
+            stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Probe, ReadinessStage.Census },
+            consent: true));
+
+        var census = report.Find(ReadinessStage.Census)!;
+        Assert.Equal(ReadinessResult.Pass, census.Result);
+        Assert.Contains("HTTP 400", EvidenceOf(census, "diagnostic modes accepted"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Census_Native118TurnIndeterminate_FailsAsNotMeasured()
+    {
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard)
+            .OnRpcSequence(
+                "SendMessage",
+                FakeWorkIqResponse.Json(CompletedWithAttributions),
+                FakeWorkIqResponse.Throw(new HttpRequestException("connection reset")))
+            .OnRpc("CancelTask", NotCancelable);
+
+        var report = await rig.RunAsync(rig.Options(
+            stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Probe, ReadinessStage.Census },
+            consent: true));
+
+        Assert.Equal(ReadinessResult.Pass, report.Find(ReadinessStage.Probe)!.Result);
+        var census = report.Find(ReadinessStage.Census)!;
+        Assert.Equal(ReadinessResult.Fail, census.Result);
+        Assert.Contains("the census could not be measured", census.Summary, StringComparison.Ordinal);
+        Assert.StartsWith("unknown", EvidenceOf(census, "diagnostic modes accepted"), StringComparison.Ordinal);
+        Assert.Contains("doctor.census.failed", Codes(report.IssueFile));
     }
 
     // ---------------------------------------------------------------------------------------------------------

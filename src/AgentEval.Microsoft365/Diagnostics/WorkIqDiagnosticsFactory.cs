@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AgentEval.Microsoft365.Diagnostics;
 
@@ -148,8 +149,9 @@ internal static class WorkIqDiagnosticsFactory
     /// <summary>
     /// Creates the diagnostics of a live run: mints the run id when <see cref="WorkIqOptions.RunId"/> is blank,
     /// opens the JSONL trace and issue sinks (directories created), adds the console sink when
-    /// <see cref="WorkIqOptions.Verbose"/>, stamps the config hash, and traces <c>config.diagnostics_ready</c> with
-    /// both file paths as data.
+    /// <see cref="WorkIqOptions.Verbose"/>, appends the caller's <see cref="WorkIqOptions.TraceSinks"/> and
+    /// <see cref="WorkIqOptions.IssueSinks"/> (never disposed with the run), stamps the config hash, and traces
+    /// <c>config.diagnostics_ready</c> with both file paths as data.
     /// </summary>
     /// <param name="config">The config.</param>
     /// <param name="options">The options.</param>
@@ -199,6 +201,11 @@ internal static class WorkIqDiagnosticsFactory
             traceSink?.Dispose();
             throw;
         }
+
+        // The caller's own sinks come last: they see exactly what the JSONL files see, after the same stamping and
+        // redaction, and they are never disposed with the run (the caller owns them).
+        CallerOwnedTraceSink.AppendTo(traceSinks, options.TraceSinks);
+        CallerOwnedIssueSink.AppendTo(issueSinks, options.IssueSinks);
 
         var diagnostics = new WorkIqDiagnostics(runId, ComputeConfigSha256(config), traceSinks, issueSinks, clock);
         diagnostics.Trace(new WorkIqTraceEvent(
@@ -263,5 +270,5 @@ internal static class WorkIqDiagnosticsFactory
         bool Verbose,
         string? ConfigSha256,
         string? AdapterVersion,
-        string A2AVersion);
+        [property: JsonPropertyName("a2aVersion")] string A2AVersion);
 }

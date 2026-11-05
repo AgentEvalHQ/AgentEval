@@ -220,7 +220,8 @@ public sealed class WorkIqDiagnosticsFactoryTests : IDisposable
         Assert.Equal(traceFile, ready.Data!.Value.GetProperty("traceFile").GetString());
         Assert.Equal(issueFile, ready.Data!.Value.GetProperty("issueFile").GetString());
         Assert.Equal("Options", ready.Data!.Value.GetProperty("directorySource").GetString());
-        Assert.Equal("1.0", ready.Data!.Value.GetProperty("a2AVersion").GetString());
+        Assert.Equal("1.0", ready.Data!.Value.GetProperty("a2aVersion").GetString());
+        Assert.False(ready.Data!.Value.TryGetProperty("a2AVersion", out _));
         Assert.Contains(traceFile, ready.Message, StringComparison.Ordinal);
         Assert.Contains(issueFile, ready.Message, StringComparison.Ordinal);
 

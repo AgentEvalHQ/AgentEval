@@ -137,6 +137,10 @@ internal sealed partial class WorkIqA2AClient
 
         // Discovery failures propagate before any frame exists, exactly like the blocking operations.
         var card = await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
+
+        // So does a sign-in that does not finish: the token is acquired before the stream opens, outside
+        // HttpClient.Timeout (the SDK builds its own requests, so the auth handler's own call is then a cache hit).
+        _ = await AcquireTokenBeforeCallAsync(operation, HttpMethod.Post, card.SelectedEndpoint, isSubscribe ? WorkIqTraceStage.Subscribe : WorkIqTraceStage.Stream, cancellationToken).ConfigureAwait(false);
         var routingTenant = ResolveRoutingTenant(card);
         var expectedTaskId = subscribedTaskId ?? request?.Message.TaskId;
         var expectedContextId = request?.Message.ContextId;

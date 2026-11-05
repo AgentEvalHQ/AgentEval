@@ -127,12 +127,20 @@ internal sealed class CliTurnSink
         return AttachedSinks.TryGetValue(agent, out var sink) ? sink : null;
     }
 
-    /// <summary>Records one turn result (the <c>onTurn</c> callback of the agent) and, when verbose, prints its line.</summary>
+    /// <summary>
+    /// Records one turn result (the <c>onTurn</c> callback of the agent) and, when verbose, prints its line. A turn that
+    /// completed with no selected answer prints a warning line even when not verbose (<see cref="FormatNoAnswerWarning"/>):
+    /// the case is then graded on an empty string that is not the agent's answer, and the person reading the run must know.
+    /// </summary>
     /// <param name="result">The result.</param>
     public void Record(WorkIqTurnResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
         var line = Verbose ? FormatLine(result) : null;
+        if (result.IsCompleted && result.AnswerText is null)
+        {
+            line = line is null ? FormatNoAnswerWarning(result) : line + Environment.NewLine + FormatNoAnswerWarning(result);
+        }
         lock (_gate)
         {
             _all.Add(result);
@@ -193,6 +201,19 @@ internal sealed class CliTurnSink
         }
 
         return line.ToString();
+    }
+
+    /// <summary>
+    /// The warning printed for a turn that completed with no selected answer (answer <c>Ambiguous</c> or <c>None</c>): the
+    /// response carries <c>FinishReason</c> <c>completed-no-answer</c> and an empty text that is not the agent's answer.
+    /// </summary>
+    /// <param name="result">A completed result without answer text.</param>
+    internal static string FormatNoAnswerWarning(WorkIqTurnResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return $"[m365] WARNING case={OneLine(result.Identity.CaseId)} task={IdOrNone(result.Task?.TaskId ?? result.Identity.ProviderTaskId)}: " +
+            $"the turn COMPLETED but no answer was selected (answer {result.AnswerCompleteness}); the case is graded on an empty text that is " +
+            $"not the agent's answer (FinishReason '{WorkIqEvaluableAgent.CompletedNoAnswerFinishReason}'). The evidence document (--aef-content on) and the trace keep the candidates.";
     }
 
     private static string DescribeAnswer(WorkIqTurnResult result) =>

@@ -28,6 +28,12 @@ public sealed record Microsoft365Config
     /// <summary>The report-facing name used when neither <see cref="AgentName"/> nor <see cref="AgentId"/> is set.</summary>
     public const string DefaultDisplayName = "Work IQ default agent";
 
+    /// <summary>
+    /// The prefix of every placeholder in the config template (<c>REPLACE-WITH-…</c>); <see cref="Validate"/> rejects a
+    /// field that still starts with it (case-insensitive), naming the field.
+    /// </summary>
+    public const string TemplatePlaceholderPrefix = "REPLACE-WITH-";
+
     /// <summary>The Work IQ A2A service root (absolute <c>https</c> URL; defaults to <see cref="DefaultEndpoint"/>).</summary>
     public string Endpoint { get; init; } = DefaultEndpoint;
 
@@ -117,7 +123,8 @@ public sealed record Microsoft365Config
     }
 
     /// <summary>
-    /// Throws if <c>tenantId</c>, <c>appClientId</c>, <c>endpoint</c> or <c>scope</c> is blank; if the endpoint is
+    /// Throws if <c>tenantId</c>, <c>appClientId</c>, <c>endpoint</c> or <c>scope</c> is blank; if any field still holds a
+    /// template placeholder (<see cref="TemplatePlaceholderPrefix"/>, the message names the field); if the endpoint is
     /// not an absolute <c>https</c> URL without query/fragment; if <c>trustedHosts</c> is empty, has a blank entry,
     /// or omits the endpoint's host; if <c>agentId</c> contains a path separator, query/fragment character,
     /// whitespace or control character; if <c>diagnosticProfile</c> is not a recognised profile name; or if
@@ -137,6 +144,22 @@ public sealed record Microsoft365Config
             throw new InvalidOperationException(
                 "Microsoft 365 config is missing required field(s): " + string.Join(", ", missing) +
                 ". Required: tenantId, appClientId (endpoint and scope have defaults and must not be blank when set).");
+        }
+
+        ThrowIfPlaceholder("tenantId", TenantId, "the Directory (tenant) ID from the app registration's Overview page");
+        ThrowIfPlaceholder("appClientId", AppClientId, "the Application (client) ID from the app registration's Overview page");
+        ThrowIfPlaceholder("endpoint", Endpoint, $"the Work IQ A2A endpoint (default {DefaultEndpoint})");
+        ThrowIfPlaceholder("scope", Scope, $"the delegated scope (default {DefaultScope})");
+        ThrowIfPlaceholder("agentId", AgentId, "the opaque agent id, or null for the default Work IQ agent");
+        ThrowIfPlaceholder("agentName", AgentName, "a display name for reports, or remove the field");
+        ThrowIfPlaceholder("diagnosticProfile", DiagnosticProfile, "PublicAnswerOnly or Native118Diagnostics");
+        ThrowIfPlaceholder("timeZone", TimeZone, "an IANA time zone id such as Europe/Zurich, or remove the field");
+        if (TrustedHosts is not null)
+        {
+            foreach (var host in TrustedHosts)
+            {
+                ThrowIfPlaceholder("trustedHosts", host, $"a host name such as {DefaultTrustedHost}");
+            }
         }
 
         if (!Uri.TryCreate(Endpoint, UriKind.Absolute, out var endpoint)
@@ -254,6 +277,20 @@ public sealed record Microsoft365Config
         }
 
         return Enum.TryParse(DiagnosticProfile.Trim(), ignoreCase: true, out profile) && Enum.IsDefined(profile);
+    }
+
+    /// <summary>
+    /// Throws when <paramref name="value"/> is still a placeholder of the config template
+    /// (<c>samples/datasets/m365-config.template.json</c>): it starts with <see cref="TemplatePlaceholderPrefix"/>.
+    /// </summary>
+    private static void ThrowIfPlaceholder(string field, string? value, string expected)
+    {
+        if (value is not null && value.TrimStart().StartsWith(TemplatePlaceholderPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Microsoft 365 config field '{field}' still holds the template placeholder '{value.Trim()}': replace it with {expected}. " +
+                "Nothing was sent; a placeholder would only fail later, at sign-in.");
+        }
     }
 
     private static bool IsForbiddenInAgentId(char c) =>

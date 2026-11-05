@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AgentEval.Microsoft365.Diagnostics;
 
@@ -67,7 +68,8 @@ public sealed record WorkIqTraceEvent(DateTimeOffset At, WorkIqTraceStage Stage,
     /// <summary>The JSON-RPC error code, when an error object was received.</summary>
     public int? RpcErrorCode { get; init; }
 
-    /// <summary>The raw A2A task state (<c>TASK_STATE_*</c>), when observed.</summary>
+    /// <summary>The raw A2A task state (<c>TASK_STATE_*</c>), when observed. Serialized as <c>a2aState</c>.</summary>
+    [JsonPropertyName("a2aState")]
     public string? A2AState { get; init; }
 
     /// <summary>Elapsed wall-clock milliseconds of the operation the event closes, when measured.</summary>

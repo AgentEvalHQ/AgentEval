@@ -88,7 +88,7 @@ public sealed class WorkIqTurnCanceledException : OperationCanceledException, IW
 public sealed class WorkIqTurnBudgetExceededException : FatalEvaluationException
 {
     /// <summary>Creates the exception.</summary>
-    /// <param name="turnsUsed">Completed turns counted so far on this agent.</param>
+    /// <param name="turnsUsed">Turns counted so far on this agent: every turn that returned a typed result, completed or not (<see cref="WorkIqEvaluableAgent.TurnsUsed"/>).</param>
     /// <param name="maxTurns">The configured cap.</param>
     public WorkIqTurnBudgetExceededException(int turnsUsed, int maxTurns)
         : base(
@@ -100,7 +100,7 @@ public sealed class WorkIqTurnBudgetExceededException : FatalEvaluationException
         MaxTurns = maxTurns;
     }
 
-    /// <summary>Completed turns counted so far on this agent.</summary>
+    /// <summary>Turns counted so far on this agent: every turn that returned a typed result, completed or not (<see cref="WorkIqEvaluableAgent.TurnsUsed"/>).</summary>
     public int TurnsUsed { get; }
 
     /// <summary>The configured cap.</summary>

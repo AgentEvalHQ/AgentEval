@@ -10,8 +10,9 @@ namespace AgentEval.Microsoft365.Diagnostics;
 /// <summary>
 /// The one redaction policy of the provider's diagnostics: tokens, auth codes, secrets, cookies and the
 /// <c>Authorization</c> header never reach a trace, an issue, a capture header dump, a report or an exception
-/// message. Everything else — including the MSAL device-code message that tells the user where to sign in and
-/// which user code to enter — passes through unchanged, because the user must see it. The patterns are simple
+/// message. Everything else passes through unchanged. The MSAL device-code message (where to sign in, which user code
+/// to enter) is shown in full on the sign-in prompt only: the device-code token provider masks the user code itself
+/// before it traces the message, so no trace or issue file carries it. The patterns are simple
 /// and linear (no nested quantifiers) and run without a match timeout: a timeout that reads as "no match" would
 /// be a load-dependent fail-open.
 /// </summary>

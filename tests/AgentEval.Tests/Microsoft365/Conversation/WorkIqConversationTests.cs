@@ -313,7 +313,11 @@ public sealed class WorkIqConversationTests
             Assert.Equal(WorkIqTurnOutcome.Completed, result.Outcome);
             Assert.Equal(OutputCompleteness.Ambiguous, result.AnswerCompleteness);
             Assert.Null(result.AnswerText);
-            Assert.Contains(h.Issues.Issues, i => i.Code == "answer.ambiguous");
+
+            // Registered once, by the normaliser on the run's diagnostics; the selection step only traces it.
+            var issue = Assert.Single(h.Issues.Issues, i => i.Code == "answer.ambiguous");
+            Assert.Equal(WorkIqTraceStage.Normalize, issue.Stage);
+            Assert.Contains(h.Events("answer.ambiguous"), e => e.Stage == WorkIqTraceStage.Reduce);
         }
     }
 
@@ -805,6 +809,192 @@ public sealed class WorkIqConversationTests
             Assert.Equal(WorkIqTurnOutcome.Completed, result.Outcome);
             Assert.Single(h.Events("cancel.not_confirmed"));
             Assert.Null(conversation.ConfirmedCanceledTaskId);
+
+            // Review L5: the task finished on its own, so the register carries a Warning that says so — never the Error
+            // "budget.recovery_exhausted" for a turn that completed.
+            Assert.Single(h.Events("budget.recovered_after_cancel"));
+            var recovered = Assert.Single(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
+            Assert.Equal(WorkIqIssueCategory.Budget, recovered.Category);
+            Assert.Equal("TASK_STATE_COMPLETED", recovered.A2AState);
+            Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted");
+            Assert.Contains(h.Events("issue.budget"), e => e.Level == WorkIqTraceLevel.Warning);
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_RecoveryBudgetExhausted_CancelRemoteConfirmed_CanceledAndConfirmed()
+    {
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(2), CancelRemoteTaskOnTimeout = true };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            var canceled = FixtureLoader.Text("envelopes/gettask-working.json").Replace("TASK_STATE_WORKING", "TASK_STATE_CANCELED", StringComparison.Ordinal);
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .OnRpc("GetTask", "envelopes/gettask-working.json")
+                .OnRpc("CancelTask", canceled);
+
+            var result = await PumpRecoveryAsync(conversation.RunTurnAsync(Turn()), h, Step);
+
+            Assert.Equal(1, h.Handler.CountOf("CancelTask"));
+            Assert.Equal(WorkIqTurnOutcome.Canceled, result.Outcome);
+            Assert.Null(result.AnswerText);
+            Assert.Single(h.Events("cancel.confirmed"));
+            Assert.Equal(SubmittedTaskId, conversation.ConfirmedCanceledTaskId);
+            // The budget ran out and the task was canceled because of it: that Error stays in the register.
+            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted");
+            Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_RecoveryBudgetExhausted_CancelRemoteNotConfirmed_TimeoutStandsAndBudgetIssueKept()
+    {
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(2), CancelRemoteTaskOnTimeout = true };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .OnRpc("GetTask", "envelopes/gettask-working.json")
+                .OnRpc("CancelTask", "envelopes/gettask-working.json");
+
+            var result = await PumpRecoveryAsync(conversation.RunTurnAsync(Turn()), h, Step);
+
+            Assert.Equal(1, h.Handler.CountOf("CancelTask"));
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Timeout, result.Failure!.Category);
+            Assert.Single(h.Events("cancel.not_confirmed"));
+            Assert.Null(conversation.ConfirmedCanceledTaskId);
+            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted" && i.A2AState == "TASK_STATE_WORKING");
+            Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_RecoveryBudgetExhausted_CancelTaskFails_TimeoutStands()
+    {
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(2), CancelRemoteTaskOnTimeout = true };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .OnRpc("GetTask", "envelopes/gettask-working.json")
+                .FailWith("CancelTask", HttpStatusCode.InternalServerError);
+
+            var result = await PumpRecoveryAsync(conversation.RunTurnAsync(Turn()), h, Step);
+
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Timeout, result.Failure!.Category);
+            Assert.Single(h.Events("cancel.failed"));
+            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted");
+        }
+    }
+
+    [Fact]
+    public async Task AbandonAndReset_ZeroRecoveryBudget_NotQuiescedIsReportedAndTheTurnStillEndsCanceled()
+    {
+        var (client, conversation, trace, issues, _) = Fake(new WorkIqOptions { RecoveryBudget = TimeSpan.Zero });
+        await using (conversation)
+        {
+            client.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pending = conversation.RunTurnAsync(Turn());
+            await Task.Yield();
+            Assert.True(conversation.IsTurnActive);
+
+            var receipt = await conversation.AbandonAndResetAsync("no time to wait");
+
+            Assert.False(receipt.Quiesced);
+            Assert.Contains(trace.Events, e => e.Code == "turn.abandon_not_quiesced" && e.Level == WorkIqTraceLevel.Error);
+            Assert.Contains(issues.Issues, i => i.Code == "turn.abandon_not_quiesced");
+            Assert.Null(conversation.ContextId);
+            var ex = await Assert.ThrowsAsync<WorkIqTurnCanceledException>(() => pending);
+            Assert.Contains("abandoned", ex.TurnResult.Failure!.SafeMessage, StringComparison.Ordinal);
+            Assert.Equal(0, client.CancelCalls);
+        }
+    }
+
+    [Fact]
+    public async Task StreamTurnAsync_HappyPath_YieldsTheEventSequenceAndACompletedResult()
+    {
+        var (h, conversation) = Real();
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnSse("SendStreamingMessage", "sse/stream-happy-path.txt");
+
+            var events = new List<WorkIqStreamEvent>();
+            await foreach (var e in conversation.StreamTurnAsync(Turn(turnId: "turn-stream-1")))
+            {
+                events.Add(e);
+            }
+
+            Assert.IsType<WorkIqStreamEvent.TaskSnapshotObserved>(events[0]);
+            Assert.Equal(2, events.OfType<WorkIqStreamEvent.ArtifactRevisionObserved>().Count());
+            Assert.Contains(events, e => e is WorkIqStreamEvent.ProgressObserved);
+            var statuses = events.OfType<WorkIqStreamEvent.TaskStatusObserved>().Select(s => s.RawState).ToArray();
+            Assert.Equal(new[] { "TASK_STATE_WORKING", "TASK_STATE_COMPLETED" }, statuses);
+            Assert.IsType<WorkIqStreamEvent.EvidenceObserved>(events[^2]);
+            var finished = Assert.IsType<WorkIqStreamEvent.TurnFinished>(events[^1]);
+            Assert.Equal(WorkIqTurnOutcome.Completed, finished.Result.Outcome);
+            Assert.StartsWith("Project Atlas is on schedule", finished.Result.AnswerText, StringComparison.Ordinal);
+            Assert.All(events, e => Assert.Equal("turn-stream-1", e.TurnId));
+            Assert.Equal(events.Select(e => e.Sequence).OrderBy(s => s), events.Select(e => e.Sequence));
+            Assert.Equal(events.Count, events.Select(e => e.Sequence).Distinct().Count());
+            Assert.Equal(1, h.Handler.CountOf("SendStreamingMessage"));
+            Assert.Equal(0, h.Handler.CountOf("SendMessage"));
+            Assert.False(conversation.IsTurnActive);
+        }
+    }
+
+    [Fact]
+    public async Task SubscribeAsync_StreamEndsWithoutAFirstSnapshot_MalformedNeverCompleted()
+    {
+        var (h, conversation) = Real();
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnRpc("SendMessage", "envelopes/send-task-completed-with-answer-and-attributions.json");
+            var first = await conversation.RunTurnAsync(Turn());
+            h.Handler.OnSse("SubscribeToTask", ": keep-alive comment only, no frame\n\n");
+
+            var events = new List<WorkIqStreamEvent>();
+            await foreach (var e in conversation.SubscribeAsync(first.Task!))
+            {
+                events.Add(e);
+            }
+
+            var finished = Assert.IsType<WorkIqStreamEvent.TurnFinished>(events[^1]);
+            Assert.NotEqual(WorkIqTurnOutcome.Completed, finished.Result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Malformed, finished.Result.Failure!.Category);
+            Assert.Contains("without a first task snapshot", finished.Result.Failure.SafeMessage, StringComparison.Ordinal);
+            Assert.Null(finished.Result.AnswerText);
+            Assert.Equal(1, h.Handler.CountOf("SubscribeToTask"));
+            Assert.Equal(1, h.Handler.CountOf("SendMessage"));   // a subscription never resubmits the input
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_Completed_NormaliserTracesOnTheConversationsDiagnostics()
+    {
+        var (h, conversation) = Real();
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnRpc("SendMessage", "envelopes/send-task-completed-with-answer-and-attributions.json");
+
+            await conversation.RunTurnAsync(Turn(caseId: "atlas-norm"));
+
+            // The normaliser's own events reach the run's trace (they were dropped before: it ran without diagnostics).
+            Assert.Single(h.Events("normalize.start"));
+            Assert.Single(h.Events("normalize.end"));
+            Assert.Contains(h.Events("normalize.answer"), e => e.CaseId == "atlas-norm");
+            Assert.Single(h.Events("normalize.citations"));
+            Assert.Single(h.Events("normalize.channels"));
         }
     }
 

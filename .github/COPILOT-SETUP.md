@@ -86,6 +86,29 @@ when a task matches its description:
   benchmarks, the evidence, and what each failure means. Live steps need a non-production identity and
   `--i-understand-live-side-effects`; judge runs spend money and are asked for first.
 
+#### **A sample with its own Copilot setup: the Microsoft 365 demo**
+
+`samples/AgentEval.Microsoft365Demo/.github/` is a second, self-contained Copilot setup for the Microsoft 365 demo
+project, written for an external tester who opens **only that folder** in VS Code (*File* → *Open Folder* →
+`samples/AgentEval.Microsoft365Demo`). Copilot loads a folder's `.github/` only when that folder is the workspace root,
+so these files are invisible when the repository root is open — and the repository's files are invisible to the
+tester:
+
+```
+samples/AgentEval.Microsoft365Demo/.github/
+├── copilot-instructions.md                  # the demo's rules and conventions
+├── agents/m365-demo.agent.md                # the m365-demo agent: rules + routing to the three skills
+├── skills/
+│   ├── m365-demo-setup/SKILL.md             # tenant prerequisites → workiq.json → --readiness-only → full run → --zip
+│   ├── m365-demo-customize/SKILL.md         # another agent, prompt, cases, a deterministic check, verbosity, profile
+│   └── m365-demo-triage/SKILL.md            # read a run folder: stage, category, codes → cause → action
+├── instructions/m365-demo.instructions.md   # → **/*.cs (the demo and its tests)
+└── prompts/                                 # /run-demo, /triage-run, /add-case
+```
+
+From the repository root, `@agenteval-m365` points at the demo. When the demo's options, run folder or exit codes
+change, update its README and these files together.
+
 #### **Agent Workflows**
 
 ```

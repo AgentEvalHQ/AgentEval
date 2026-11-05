@@ -115,7 +115,7 @@ internal static class M365DoctorCommand
         };
         var probeOpt = new Option<bool>("--probe")
         {
-            Description = "Also run the probe (one real prompt: \"Reply with the single word READY.\") and the capability census. Needs --i-understand-live-side-effects; without it both are SKIPPED and the command exits 11.",
+            Description = "Also run the probe and the capability census. The probe sends one real prompt (\"Reply with the single word READY.\"). Under the default public profile the census sends the same prompt a SECOND time under the experimental native118 profile; it then calls CancelTask on the finished task (the expected answer is TaskNotCancelable). Needs --i-understand-live-side-effects; without it both are SKIPPED, no prompt is sent and the command exits 11.",
         };
         var consentOpt = new Option<bool>("--i-understand-live-side-effects")
         {
@@ -150,13 +150,13 @@ internal static class M365DoctorCommand
         var timeoutOpt = new Option<int>("--timeout-seconds")
         {
             DefaultValueFactory = _ => DefaultTimeoutSeconds,
-            Description = "The most one stage may take, in seconds (also the HTTP timeout and the probe's turn deadline). The device-code sign-in must be completed within it. Default 120.",
+            Description = "The most one stage may take for its network calls, in seconds (also the HTTP timeout and the probe's turn deadline). A device-code sign-in is not cut short by it: once the sign-in prompt is shown, the stage waits until the sign-in code expires (about 15 minutes). Default 120.",
         };
 
         var command = new Command(
             CommandName,
             "Readiness check of a Microsoft 365 agent over Work IQ A2A 1.0, stage by stage: config, sign-in, agent card, protocol handshake (GetTask on a random id); with --probe and consent, one real prompt and the capability census. " +
-            "Stops at the first FAIL (--continue runs on) and writes readiness.md, readiness.json, the trace and the issues file into the report folder. Exit 0 all passed, 1 a stage failed, 11 a stage was skipped for consent, 2 usage.");
+            "Stops at the first FAIL (--continue runs on) and writes readiness.md, readiness.json, the trace and the issues file into the report folder. Exit 0 all passed, 1 a stage failed, 11 a stage was skipped for consent, 2 usage, 3 the report or the diagnostics files could not be written.");
         command.Options.Add(configOpt);
         command.Options.Add(stageOpt);
         command.Options.Add(probeOpt);

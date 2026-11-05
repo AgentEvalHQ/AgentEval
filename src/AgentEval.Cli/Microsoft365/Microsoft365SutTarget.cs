@@ -132,6 +132,18 @@ internal sealed class Microsoft365SutTarget : ISutTarget
     /// <summary>The turn sink of the live agent built by <see cref="Build"/>; null until a live build, and with a <c>sutOverride</c>.</summary>
     internal CliTurnSink? TurnSink { get; private set; }
 
+    /// <summary>
+    /// Test seam of the live <see cref="Build"/> path (never set by the CLI): the token source handed to
+    /// <c>BuildLive</c>; null uses the MSAL device-code provider.
+    /// </summary>
+    internal AgentEval.Microsoft365.Auth.IWorkIqTokenProvider? TokenProviderForTests { get; init; }
+
+    /// <summary>Test seam of the live <see cref="Build"/> path: the innermost HTTP handler; null uses a socket handler.</summary>
+    internal HttpMessageHandler? InnerHandlerForTests { get; init; }
+
+    /// <summary>Test seam of the live <see cref="Build"/> path: the diagnostics directory; null resolves the workspace's <c>.agenteval/m365</c>.</summary>
+    internal DirectoryInfo? DiagnosticsDirectoryForTests { get; init; }
+
     /// <summary>AEF run setting (HLD D15): the A2A protocol version the provider speaks.</summary>
     internal const string A2AVersionSetting = "a2aVersion";
 
@@ -207,6 +219,25 @@ internal sealed class Microsoft365SutTarget : ISutTarget
         }
 
         return settings;
+    }
+
+    /// <summary>
+    /// The run provenance a <c>bench</c> command adds to its AEF run when <paramref name="sut"/> is <c>microsoft365</c>:
+    /// <see cref="AefRunSettings"/> of the validated target among <paramref name="targets"/> (the instance the resolver
+    /// validated and built), without <c>m365ContentPolicy</c> — a bench run writes no per-case evidence document, so no
+    /// projection policy is claimed. Null for any other <c>--sut</c>, or when the target loaded no config.
+    /// </summary>
+    /// <param name="targets">The targets the bench command resolved <c>--sut</c> against.</param>
+    /// <param name="sut">The parsed <c>--sut</c> value.</param>
+    internal static JsonObject? BenchRunSettings(IEnumerable<ISutTarget> targets, string? sut)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        if (!string.Equals(sut?.Trim(), SutName, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return targets.OfType<Microsoft365SutTarget>().FirstOrDefault()?.AefRunSettings(contentPolicy: null);
     }
 
     /// <summary>
@@ -313,6 +344,7 @@ internal sealed class Microsoft365SutTarget : ISutTarget
             RawCaptureDirectory = m.CaptureRaw,
             Verbose = m.Verbose,
             TraceFile = m.TraceFile,
+            DiagnosticsDirectory = DiagnosticsDirectoryForTests,
             // Minted here so the printed trace path is the exact file the run writes (no {runId} placeholder).
             RunId = Microsoft365Diagnostics.NewRunId(),
         };
@@ -326,7 +358,13 @@ internal sealed class Microsoft365SutTarget : ISutTarget
 
         // iUnderstandLiveSideEffects: true is safe here: Validate (above) already enforced the common consent flag before
         // SutTargetResolver reaches this Build call.
-        return Microsoft365AgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true, options, onTurn: sink.Record);
+        return Microsoft365AgentFactory.BuildLive(
+            config,
+            iUnderstandLiveSideEffects: true,
+            options,
+            tokenProvider: TokenProviderForTests,
+            onTurn: sink.Record,
+            innerHandler: InnerHandlerForTests);
     }
 
     /// <summary>Maps a <c>--m365-profile</c> value (case-insensitive, trimmed) to the profile, or throws naming the valid values.</summary>

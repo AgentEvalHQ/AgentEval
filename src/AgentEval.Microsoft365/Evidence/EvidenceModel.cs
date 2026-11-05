@@ -4,6 +4,7 @@
 
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AgentEval.Microsoft365.Evidence;
 
@@ -746,7 +747,7 @@ public sealed record SkillActivationObservation(
 /// <param name="SchemaVersion">The document schema id (<see cref="Microsoft365Evidence.SchemaVersion"/>).</param>
 /// <param name="NormalizerVersion">The normaliser version that produced it (<see cref="Microsoft365Evidence.NormalizerVersion"/>).</param>
 /// <param name="ProviderProfileVersion">The provider profile/decoder version (<see cref="Microsoft365Evidence.ProviderProfileVersion"/>).</param>
-/// <param name="A2AVersion">The A2A protocol version negotiated (<see cref="Microsoft365Evidence.A2AVersion"/>).</param>
+/// <param name="A2AVersion">The A2A protocol version negotiated (<see cref="Microsoft365Evidence.A2AVersion"/>); serialized as <c>a2aVersion</c>, the spelling the trace, the issue register and <c>readiness.json</c> use.</param>
 /// <param name="Identity">The turn's identities.</param>
 /// <param name="TaskState">The raw final task state (for example <c>TASK_STATE_COMPLETED</c>); null for a direct message with no task.</param>
 /// <param name="CaptureState">Whether the retained material can reproduce this document.</param>
@@ -765,7 +766,7 @@ public sealed record Microsoft365TurnEvidence(
     string SchemaVersion,
     string NormalizerVersion,
     string ProviderProfileVersion,
-    string A2AVersion,
+    [property: JsonPropertyName("a2aVersion")] string A2AVersion,
     TurnIdentity Identity,
     string? TaskState,
     CaptureState CaptureState,

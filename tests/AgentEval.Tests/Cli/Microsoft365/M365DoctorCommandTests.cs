@@ -263,6 +263,24 @@ public sealed class M365DoctorCommandTests
         Assert.True(doctor.Options.Single(o => o.Name == "--m365-config").Required);
     }
 
+    [Fact]
+    public void Help_ProbeAndTimeout_SayWhatIsReallySentAndWhatBoundsTheSignIn()
+    {
+        var doctor = CliCommandTree.Build().Root.Subcommands.Single(c => c.Name == "m365").Subcommands.Single(c => c.Name == "doctor");
+
+        // The census sends the probe prompt a second time and calls CancelTask: the help text must not say "one prompt".
+        var probe = doctor.Options.Single(o => o.Name == "--probe").Description!;
+        Assert.Contains("SECOND time", probe, StringComparison.Ordinal);
+        Assert.Contains("CancelTask", probe, StringComparison.Ordinal);
+        Assert.Contains("--i-understand-live-side-effects", probe, StringComparison.Ordinal);
+
+        // A device-code sign-in is bounded by its code's expiry, not by the stage timeout.
+        var timeout = doctor.Options.Single(o => o.Name == "--timeout-seconds").Description!;
+        Assert.Contains("sign-in code expires", timeout, StringComparison.Ordinal);
+        Assert.Contains("exit", doctor.Description!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("3 the report", doctor.Description!, StringComparison.Ordinal);
+    }
+
     // ── stage mapping, default folder, exit codes ──
 
     [Theory]
