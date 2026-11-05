@@ -41,6 +41,9 @@ internal sealed partial class DemoConsole : IDisposable
 {
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>The symbols the screen uses when it can show them (every one has an ASCII stand-in in <see cref="ToAsciiScreen"/>).</summary>
+    internal const string Symbols = "✓✗–—→←…·×";
+
     private readonly object _gate = new();
     private readonly TextWriter _out;
     private readonly TextWriter _err;
@@ -52,16 +55,74 @@ internal sealed partial class DemoConsole : IDisposable
     /// <param name="err">The screen's error output (usage and runtime errors).</param>
     /// <param name="verbosity">What the screen shows.</param>
     /// <param name="colors">Whether <paramref name="out"/> is the interactive console and may be coloured.</param>
-    public DemoConsole(TextWriter @out, TextWriter err, DemoVerbosity verbosity, bool colors)
+    /// <param name="asciiScreen">Whether the screen gets ASCII markers instead of the symbols (see <see cref="NeedsAsciiScreen"/>); console.log never does.</param>
+    public DemoConsole(TextWriter @out, TextWriter err, DemoVerbosity verbosity, bool colors, bool asciiScreen = false)
     {
         _out = @out ?? throw new ArgumentNullException(nameof(@out));
         _err = err ?? throw new ArgumentNullException(nameof(err));
         Verbosity = verbosity;
         _colors = colors;
+        AsciiScreen = asciiScreen;
     }
 
     /// <summary>What the screen shows.</summary>
     public DemoVerbosity Verbosity { get; }
+
+    /// <summary>Whether the screen gets ASCII markers (<c>[PASS] [FAIL] [SKIP]</c>) instead of the symbols; console.log is always UTF-8 with the symbols.</summary>
+    public bool AsciiScreen { get; }
+
+    /// <summary>
+    /// Whether the screen needs ASCII markers: its output is redirected (a file or a pipe, which on Windows gets the legacy
+    /// code page, where <c>✓ ✗ –</c> print as <c>?</c>), or its encoding cannot encode the symbols.
+    /// </summary>
+    /// <param name="outputRedirected"><see cref="Console.IsOutputRedirected"/>.</param>
+    /// <param name="encoding"><see cref="Console.OutputEncoding"/>.</param>
+    internal static bool NeedsAsciiScreen(bool outputRedirected, Encoding encoding)
+    {
+        ArgumentNullException.ThrowIfNull(encoding);
+        if (outputRedirected)
+        {
+            return true;
+        }
+
+        try
+        {
+            var strict = Encoding.GetEncoding(encoding.CodePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+            strict.GetBytes(Symbols);
+            return false;
+        }
+        catch (Exception ex) when (ex is EncoderFallbackException or ArgumentException or NotSupportedException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// The screen form of <paramref name="text"/> for a console that cannot show the symbols: a status symbol that starts a
+    /// line becomes <c>[PASS]</c>, <c>[FAIL]</c> or <c>[SKIP]</c>; any other symbol its ASCII stand-in (<c>—</c> and <c>–</c>
+    /// → <c>-</c>, <c>→</c> → <c>-&gt;</c>, <c>…</c> → <c>...</c>, <c>·</c> → <c>|</c>, <c>×</c> → <c>x</c>).
+    /// </summary>
+    /// <param name="text">The text (one or more lines).</param>
+    internal static string ToAsciiScreen(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var marked = StatusSymbolAtLineStart().Replace(text, m => m.Groups[1].Value + m.Groups[2].Value switch
+        {
+            "✓" => "[PASS]",
+            "✗" => "[FAIL]",
+            _ => "[SKIP]",
+        });
+        return marked
+            .Replace("✓", "[PASS]", StringComparison.Ordinal)
+            .Replace("✗", "[FAIL]", StringComparison.Ordinal)
+            .Replace("—", "-", StringComparison.Ordinal)
+            .Replace("–", "-", StringComparison.Ordinal)
+            .Replace("→", "->", StringComparison.Ordinal)
+            .Replace("←", "<-", StringComparison.Ordinal)
+            .Replace("…", "...", StringComparison.Ordinal)
+            .Replace("·", "|", StringComparison.Ordinal)
+            .Replace("×", "x", StringComparison.Ordinal);
+    }
 
     /// <summary>The first error writing console.log, when any (the log is then closed and the run exits 3).</summary>
     public string? LogError { get; private set; }
@@ -208,6 +269,11 @@ internal sealed partial class DemoConsole : IDisposable
 
     private void WriteScreen(TextWriter writer, string text, Tint tint)
     {
+        if (AsciiScreen)
+        {
+            text = ToAsciiScreen(text);
+        }
+
         try
         {
             var color = _colors && writer == _out ? ColorOf(tint) : null;
@@ -276,6 +342,9 @@ internal sealed partial class DemoConsole : IDisposable
 
     [GeneratedRegex(@"\b(?=[A-Z0-9]*[0-9])(?=[A-Z0-9]*[A-Z])[A-Z0-9]{8,12}\b", RegexOptions.CultureInvariant)]
     private static partial Regex UserCodeShape();
+
+    [GeneratedRegex(@"^([ \t]*)([✓✗–])(?= )", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    private static partial Regex StatusSymbolAtLineStart();
 }
 
 /// <summary>

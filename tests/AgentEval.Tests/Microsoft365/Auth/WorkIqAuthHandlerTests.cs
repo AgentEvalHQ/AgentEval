@@ -115,7 +115,8 @@ public sealed class WorkIqAuthHandlerTests
         var fake = new FakeWorkIqHandler();
         var tokens = new StaticTokenProvider();
         var trace = new ListTraceSink();
-        using var diagnostics = new WorkIqDiagnostics("run-auth", null, [trace], [new ListIssueSink()]);
+        var issues = new ListIssueSink();
+        using var diagnostics = new WorkIqDiagnostics("run-auth", null, [trace], [issues]);
         var handler = new WorkIqAuthHandler(tokens)
         {
             InnerHandler = fake,
@@ -125,6 +126,10 @@ public sealed class WorkIqAuthHandlerTests
         using var http = new HttpClient(handler);
 
         var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => http.GetAsync("https://example.invalid/a2a/.well-known/agent-card.json"));
+
+        // The same category as discovery.untrusted_host: Config (the fix is in the trustedHosts config), never Protocol.
+        var issue = Assert.Single(issues.Issues, i => i.Code == "auth.untrusted_destination");
+        Assert.Equal(WorkIqIssueCategory.Config, issue.Category);
 
         Assert.Equal(WorkIqFailureCategory.UntrustedHost, ex.Failure.Category);
         Assert.Equal(WorkIqOperation.Discover, ex.Failure.Operation);

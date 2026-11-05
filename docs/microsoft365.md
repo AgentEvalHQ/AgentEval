@@ -87,7 +87,9 @@ dotnet run --project samples/AgentEval.Microsoft365Demo -- --i-understand-live-s
    others) through `MAFEvaluationHarness` over the agent `BuildLive` returns. Deterministic checks always run (turn
    completed, answer not empty, response time recorded, evidence availability recorded); the judge criteria only when
    a judge provider is configured (`InferenceProviderEnvironment`) and `--no-judge` is not given, otherwise they are
-   `NOT MEASURED`. A turn that did not complete is an `ERROR` row, never a graded zero. Needs consent.
+   `NOT MEASURED`. A turn that did not complete is an `ERROR` row, never a graded zero; a judge call that fails keeps
+   the case's measured checks, makes its criteria `NOT MEASURED` and registers `judge.call_failed`, naming the judge,
+   not the agent. Needs consent.
 4. **One run folder**, whatever the screen shows: `summary.md`, `console.log`, `trace.jsonl`, `issues.jsonl`,
    `readiness.md` / `.json`, `turns.jsonl`, `evidence/<caseId>.json`, `results.md` / `.json`, `raw/` with
    `--capture-raw`, and a zip with `--zip`.
@@ -103,8 +105,10 @@ case stopped by `--max-turns`, no config file).
 Every option, the run-folder table and how to redact are in the
 [demo README](../samples/AgentEval.Microsoft365Demo/README.md). Opened on its own in VS Code, the folder brings its own
 GitHub Copilot setup (`.github/`: an `m365-demo` agent, skills for setup, customisation and triage, and prompt files).
-The offline tests in `samples/AgentEval.Microsoft365Demo.Tests` drive it through the real provider with a fake HTTP
-handler and a fake token provider.
+One token source serves the readiness check and the live agent (a `WorkIqDeviceCodeTokenProvider` whose prompt writer
+shows the device-code message in full on the screen and masks the code in `console.log`). The offline tests in
+`samples/AgentEval.Microsoft365Demo.Tests` drive it through the real provider with a fake HTTP handler and a fake token
+provider.
 
 ## Using it directly in code (no CLI)
 
@@ -169,7 +173,14 @@ What the pieces are:
   builds the authenticated transport and returns a `WorkIqEvaluableAgent` (`IEvaluableAgent`,
   `ISessionResettableAgent`, `IAsyncDisposable`). It makes **no network call**; sign-in and card discovery run on
   the first turn. `tokenProvider` defaults to `WorkIqDeviceCodeTokenProvider` (MSAL public client, silent then
-  device code, OS-encrypted persisted cache); pass your own `IWorkIqTokenProvider` to own the sign-in policy.
+  device code, OS-encrypted persisted cache, the device-code message on stderr); pass your own `IWorkIqTokenProvider`
+  to own the sign-in policy. To keep MSAL but choose where the message goes (a screen that shows it and a log that
+  masks the code, as the demo does), pass `new WorkIqDeviceCodeTokenProvider(tenantId, appClientId, scope, promptWriter)`
+  — and the same instance to the readiness check, so one sign-in serves both. Its `auth.*` events go to the agent's
+  trace (the agent attaches its diagnostics unless you set the provider's `Diagnostics`). A device-code sign-in that
+  starts inside a blocking turn (a token that can no longer be refreshed silently) waits for the code's expiry, not
+  for `TurnDeadline`: the trace says so (`turn.sign_in_wait`), and the deadline restarts when the sign-in ends
+  (`turn.sign_in_done`).
   `onTurn` receives every `WorkIqTurnResult`, completed or not, before the agent returns or throws — use it to
   persist the evidence of interrupted turns.
 - `WorkIqOptions` carries the timeouts (`SendTimeout` 300 s, `TurnDeadline` 10 min, `RecoveryBudget` 2 min,
@@ -217,7 +228,10 @@ config `FileInfo`, runs the stages `ReadinessCheckOptions.Stages` selects (null 
 `IUnderstandLiveSideEffects` add the probe and the census), and returns a `ReadinessReport` (`Stages`, `Verdict`,
 `AllPassed`, `AnyFailed`, `AnySkippedForConsent`, `TraceFile`, `IssueFile`, `ConfigSha256`). Runtime failures become
 failed stages, not exceptions. `ReadinessCheckOptions.TraceSinks` / `IssueSinks` stream every event and issue to your
-own sinks while the check runs (the demo project uses them to print the trace live). For hosts and tests, the overload
+own sinks while the check runs (the demo project uses them to print the trace live). `ReadinessCheckOptions.IssueFile`
+puts the issue register where the host wants it (the demo's `issues.jsonl`, which its live agent then appends to; the
+report and the trace name that path), and `ProfileSource` names where `Profile` came from in the config stage's
+evidence (`--m365-profile` for the doctor, `--profile` for the demo; "the options" when unset). For hosts and tests, the overload
 `RunAsync(config, configFile, options, innerHandler, tokenProvider, cancellationToken)` runs the check over your own
 innermost `HttpMessageHandler` and `IWorkIqTokenProvider` (null for either keeps the default), the same seams
 `BuildLive` takes.
@@ -593,7 +607,10 @@ While a run is going the files are open for writing: a reader must share them (`
 **What the codes look like:** `<stage>.<event>` — for example `auth.silent_hit`, `auth.device_code_prompted`,
 `discovery.card_fetched`, `discovery.interface_selected`, `discovery.untrusted_host`, `rpc.sent`, `rpc.response`,
 `rpc.error`, `task.state`, `turn.outcome`, `budget.exceeded`. Measured operations emit `<code>.start`, `<code>.end`
-(with `elapsedMs`) or `<code>.failed`. Every issue is mirrored into the trace as `issue.<category>` so the trace shows
+(with `elapsedMs`) or `<code>.failed`. Codes are snake case throughout: a turn that did not complete registers
+`turn.input_required`, `turn.auth_required`, `turn.failed`, `turn.rejected`, `turn.canceled` or `turn.indeterminate`.
+A host outside `trustedHosts` is always category `Config` (`discovery.untrusted_host`, `auth.untrusted_destination`):
+the fix is in the config. Every issue is mirrored into the trace as `issue.<category>` so the trace shows
 where in the sequence it happened. Stages: `Config`, `Auth`, `Discovery`, `Send`, `Stream`, `GetTask`, `Cancel`,
 `Subscribe`, `Reduce`, `Normalize`, `Outcome`, `Budget`, `Capture`, `Doctor`.
 
@@ -701,7 +718,7 @@ Messages the target, the provider and the doctor print, their cause and the fix.
 |---|---|---|
 | A device-code message appears and the run waits | First run for this (tenant, app) pair, or the cache expired — expected MSAL device-code sign-in, not a bug. | Open the printed URL in a browser and enter the printed code. Later runs reuse the cache at `%LOCALAPPDATA%\AgentEval\msal_cache\workiq_<hash>.msalcache.bin`. |
 | `Work IQ Discover failed: Unauthorized (…)` with `http=401` | The token was missing, expired or rejected by the service. | Sign in again (delete the cache file to force it); check `tenantId`, `appClientId` and `scope`. The request is never resent automatically. |
-| `Work IQ … failed: Unauthorized (Known): …: sign-in not completed: no token was acquired before the wait was stopped after N s …; nothing was sent` (issue `auth.sign_in_not_completed`) | A device-code sign-in started during the run and was not finished before the caller's cancellation or the turn deadline. The token is acquired outside the HTTP timeout, so a slow sign-in is never reported as a network timeout. | Sign in first with `agenteval m365 doctor --stage auth` (the token is cached), then run again. |
+| `Work IQ … failed: Unauthorized (Known): …: sign-in not completed: no token was acquired before the wait was stopped after N s …; nothing was sent` (issue `auth.sign_in_not_completed`) | A device-code sign-in started during the run and was not finished before the caller's cancellation or the device code's expiry (inside a blocking turn the turn deadline waits for the code, `turn.sign_in_wait`). The token is acquired outside the HTTP timeout, so a slow sign-in is never reported as a network timeout. | Sign in first with `agenteval m365 doctor --stage auth` (the token is cached), then run again. |
 | `Work IQ … failed: Forbidden (…)` with `http=403` | The user lacks the delegated permission or admin consent, has no Copilot licence, or Work IQ is not enabled in the tenant. | An administrator grants admin consent for `WorkIQAgent.Ask`, assigns the licence, or enables Work IQ. |
 | `Work IQ … failed: ProtocolVersionMismatch (…)` | The service answered in the A2A 0.3 shape (`kind` discriminators) or rejected version 1.0 (`rpcError=-32009`). | Report it with the trace. The provider never parses 0.3 and never downgrades. |
 | `Work IQ Discover failed: UntrustedHost (…)` | The card, or the selected interface, points at a host outside `trustedHosts`; refused before any token use. | Inspect the card (the doctor's `discovery` evidence lists every advertised interface and host). Add the host only if it is Microsoft's. |

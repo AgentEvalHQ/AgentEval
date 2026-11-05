@@ -240,6 +240,7 @@ public sealed class M365DoctorCommandTests
         Assert.True(captured.ContinueAfterFailure);
         Assert.Equal(TimeSpan.FromSeconds(30), captured.StageTimeout);
         Assert.Equal(DiagnosticProfile.Native118Diagnostics, captured.Profile);
+        Assert.Equal("--m365-profile", captured.ProfileSource);   // the doctor names its own option in the profile evidence
         Assert.Equal(raw, captured.RawCaptureDirectory!.FullName);
         Assert.False(captured.Verbose);
         Assert.Equal(trace, captured.TraceFile!.FullName);

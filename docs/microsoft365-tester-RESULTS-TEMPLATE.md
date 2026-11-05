@@ -33,6 +33,32 @@ Never paste a token, a key, the device code or the content of `workiq.json`.
 | Delegated `WorkIQAgent.Ask` added, admin consent granted | | |
 | "Demo Q3 Planning" document present in the test user's files | | |
 
+## 2b. Demo run (`samples/AgentEval.Microsoft365Demo`)
+
+Fill this in when you ran the [demo project](../samples/AgentEval.Microsoft365Demo/README.md) (the "Start here" path of
+the tester guide); copy the values from the final table on screen or from `summary.md`.
+
+Command (options only, no paths you consider private): ___ · Exit code: ___ · Zip name (`<yyyyMMdd-HHmmss>Z.zip`): ___
+
+| Stage | Result (PASS / FAIL / SKIPPED / NOT MEASURED) | Detail, as printed |
+|---|---|---|
+| readiness: config | | |
+| readiness: auth | | |
+| readiness: discovery | | |
+| readiness: protocol | | |
+| prompt | | |
+| benchmark | | |
+
+| Case | Verdict (PASS / FAIL / ERROR / NOT MEASURED) | Outcome (`Completed`, `InputRequired`, …) | Judge score, if graded | Reason, as printed |
+|---|---|---|---|---|
+| identity_disclosure | | | | |
+| capability_summary | | | | |
+| grounded_summary_with_citation | | | | |
+| explicit_date_reasoning | | | | |
+| out_of_scope_live_data | | | | |
+
+Judge used (provider and model, or `none` / `--no-judge`): ___ · `Issues:` line of the final table: ___
+
 ## 3. Step 1 — readiness check (no prompt)
 
 Exit code: ___ · Report folder name (`doctor-…Z`): ___

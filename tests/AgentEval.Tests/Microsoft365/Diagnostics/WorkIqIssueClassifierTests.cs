@@ -361,6 +361,31 @@ public sealed class WorkIqIssueClassifierTests
         Assert.Equal("turn-3", issue.TurnId);
     }
 
+    [Theory]
+    [InlineData(WorkIqTurnOutcome.InputRequired, "turn.input_required")]
+    [InlineData(WorkIqTurnOutcome.AuthRequired, "turn.auth_required")]
+    [InlineData(WorkIqTurnOutcome.Indeterminate, "turn.indeterminate")]
+    public void TurnOutcomeIssueCode_TheConversationAndTheClassifierSpellItTheSame(WorkIqTurnOutcome outcome, string code)
+    {
+        // Review L5: the conversation registered "turn.inputrequired" while the classifier said "turn.input_required".
+        var fromClassifier = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(TurnResult(outcome, null)), WorkIqTraceStage.Outcome);
+
+        Assert.Equal(code, WorkIqConversation.OutcomeIssueCode(outcome));
+        Assert.Equal(code, fromClassifier.Code);
+    }
+
+    [Fact]
+    public void TurnOutcomeIssueCode_EveryOutcome_IsSnakeCase()
+    {
+        var codes = Enum.GetValues<WorkIqTurnOutcome>().ToDictionary(o => o, WorkIqConversation.OutcomeIssueCode);
+
+        Assert.All(codes.Values, c => Assert.Matches("^turn\\.[a-z]+(_[a-z]+)*$", c));
+        Assert.Equal("turn.input_required", codes[WorkIqTurnOutcome.InputRequired]);
+        Assert.Equal("turn.auth_required", codes[WorkIqTurnOutcome.AuthRequired]);
+        Assert.Equal("turn.failed", codes[WorkIqTurnOutcome.Failed]);
+        Assert.Equal("turn.canceled", codes[WorkIqTurnOutcome.Canceled]);
+    }
+
     [Fact]
     public void FromException_TurnCanceledLocally_IsALocalStopNotATimeout()
     {

@@ -513,7 +513,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         WorkIqFailureCategory.NotFound => WorkIqIssueCategory.Service,
         WorkIqFailureCategory.ProtocolVersionMismatch => WorkIqIssueCategory.Protocol,
         WorkIqFailureCategory.Malformed => WorkIqIssueCategory.Protocol,
-        WorkIqFailureCategory.UntrustedHost => WorkIqIssueCategory.Protocol,
+        WorkIqFailureCategory.UntrustedHost => WorkIqIssueCategory.Config,   // the fix is in trustedHosts (the config), like WorkIqIssueClassifier says
         WorkIqFailureCategory.Canceled => null,
         _ => WorkIqIssueCategory.Unknown,
     };

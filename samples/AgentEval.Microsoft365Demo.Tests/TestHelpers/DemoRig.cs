@@ -78,8 +78,17 @@ internal sealed class DemoRig : IDisposable
     /// <summary>The innermost handler the demo receives: routes marked prompts, forwards the rest to <see cref="Handler"/>.</summary>
     public PromptRoutingHandler Router { get; }
 
-    /// <summary>The token source of every Work IQ connection.</summary>
+    /// <summary>The token source of every Work IQ connection (unless <see cref="TokenProviderFactory"/> is set).</summary>
     public FakeTokenProvider Tokens { get; } = new();
+
+    /// <summary>
+    /// When set, the demo builds its token source with this factory (the demo's own seam, given the loaded config and the
+    /// demo's sign-in prompt writer) instead of receiving <see cref="Tokens"/>.
+    /// </summary>
+    public Func<AgentEval.Microsoft365.Microsoft365Config, TextWriter, AgentEval.Microsoft365.Auth.IWorkIqTokenProvider>? TokenProviderFactory { get; set; }
+
+    /// <summary>Forces the screen's ASCII markers on or off; null lets the demo decide (a StringWriter screen: off).</summary>
+    public bool? AsciiScreen { get; set; }
 
     /// <summary>The judge the demo receives through its host seam; null means "resolve from the (empty) environment", that is: none.</summary>
     public IChatClient? Judge { get; set; }
@@ -163,7 +172,9 @@ internal sealed class DemoRig : IDisposable
         var overrides = new DemoHostOverrides
         {
             InnerHandler = Router,
-            TokenProvider = Tokens,
+            TokenProvider = TokenProviderFactory is null ? Tokens : null,
+            TokenProviderFactory = TokenProviderFactory,
+            AsciiScreen = AsciiScreen,
             Out = stdout,
             Err = stderr,
             RunsRoot = RunsRoot,

@@ -109,6 +109,27 @@ public sealed class VerbosityTests : IDisposable
     }
 
     [Fact]
+    public async Task AsciiScreen_RedirectedOutputGetsMarkers_ConsoleLogKeepsTheUtf8Symbols()
+    {
+        // Review L2: a redirected screen on Windows is in the legacy code page, where ✓ ✗ – print as '?'.
+        _rig.AsciiScreen = true;
+
+        var run = await RunScenarioAsync("normal");
+
+        Assert.Contains(run.OutLines, l => l.StartsWith("  [PASS] readiness: auth", StringComparison.Ordinal));
+        Assert.Contains(run.OutLines, l => l.StartsWith("  [SKIP] benchmark", StringComparison.Ordinal) && l.Contains("NOT MEASURED", StringComparison.Ordinal));
+        foreach (var symbol in DemoConsole.Symbols)
+        {
+            Assert.DoesNotContain(symbol.ToString(), run.Out, StringComparison.Ordinal);
+        }
+
+        var bytes = File.ReadAllBytes(run.File("console.log").FullName);
+        var log = new System.Text.UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes);
+        Assert.Contains("✓ readiness: auth", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("[PASS] readiness: auth", log, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ShortAlias_SelectsTheSameVerbosity()
     {
         var run = await RunScenarioAsync("detailed", alias: true);

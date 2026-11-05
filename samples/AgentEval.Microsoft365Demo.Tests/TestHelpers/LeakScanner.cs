@@ -24,7 +24,23 @@ internal static class LeakScanner
     public static IReadOnlyList<string> Scan(string screen, params FileSystemInfo[] roots)
     {
         var hits = new List<string>();
-        Check("screen", screen, hits);
+        Check("screen", screen, Forbidden, hits);
+        ScanFiles(Forbidden, roots, hits);
+        return hits;
+    }
+
+    /// <summary>Every hit of <paramref name="forbidden"/> in the files under <paramref name="roots"/> (zip entries included); the screen is not scanned.</summary>
+    /// <param name="forbidden">The substrings no file may contain.</param>
+    /// <param name="roots">The run folder, a zip beside it…; missing paths are skipped.</param>
+    public static IReadOnlyList<string> ScanFiles(string[] forbidden, params FileSystemInfo[] roots)
+    {
+        var hits = new List<string>();
+        ScanFiles(forbidden, roots, hits);
+        return hits;
+    }
+
+    private static void ScanFiles(string[] forbidden, FileSystemInfo[] roots, List<string> hits)
+    {
         foreach (var root in roots)
         {
             root.Refresh();
@@ -39,7 +55,7 @@ internal static class LeakScanner
             foreach (var file in files)
             {
                 var bytes = File.ReadAllBytes(file.FullName);
-                CheckBytes(file.FullName, bytes, hits);
+                CheckBytes(file.FullName, bytes, forbidden, hits);
                 if (file.Extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
                 {
                     using var archive = ZipFile.OpenRead(file.FullName);
@@ -48,24 +64,22 @@ internal static class LeakScanner
                         using var stream = entry.Open();
                         using var buffer = new MemoryStream();
                         stream.CopyTo(buffer);
-                        CheckBytes($"{file.FullName}!{entry.FullName}", buffer.ToArray(), hits);
+                        CheckBytes($"{file.FullName}!{entry.FullName}", buffer.ToArray(), forbidden, hits);
                     }
                 }
             }
         }
-
-        return hits;
     }
 
-    private static void CheckBytes(string where, byte[] bytes, List<string> hits)
+    private static void CheckBytes(string where, byte[] bytes, string[] forbiddenList, List<string> hits)
     {
-        Check(where, Encoding.UTF8.GetString(bytes), hits);
-        Check(where + " (utf-16)", Encoding.Unicode.GetString(bytes), hits);
+        Check(where, Encoding.UTF8.GetString(bytes), forbiddenList, hits);
+        Check(where + " (utf-16)", Encoding.Unicode.GetString(bytes), forbiddenList, hits);
     }
 
-    private static void Check(string where, string text, List<string> hits)
+    private static void Check(string where, string text, string[] forbiddenList, List<string> hits)
     {
-        foreach (var forbidden in Forbidden)
+        foreach (var forbidden in forbiddenList)
         {
             var at = text.IndexOf(forbidden, StringComparison.Ordinal);
             if (at >= 0)

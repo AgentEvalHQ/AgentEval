@@ -95,7 +95,7 @@ commit `workiq.json`** and never send it back: it names your tenant.
 | Step | What happens | Needs |
 |---|---|---|
 | 1. Banner | The run id and folder, the config file, which agent (the default agent or the id, and where the id came from), the tenant and app, the trusted hosts, the profile, the plan (which steps will run, or why not), the judge, the turn cap and timeout. | — |
-| 2. Readiness | The provider's readiness check: `config` → `auth` (silent from the cache, else device-code sign-in) → `discovery` (the agent card) → `protocol` (`GetTask` on a random task id must come back as JSON-RPC `-32001` TaskNotFound). **No prompt reaches the agent.** | a config file |
+| 2. Readiness | The provider's readiness check: `config` → `auth` (silent from the cache, else device-code sign-in; the sign-in waits until the code expires, about 15 minutes, not `--timeout-seconds`) → `discovery` (the agent card) → `protocol` (`GetTask` on a random task id must come back as JSON-RPC `-32001` TaskNotFound). **No prompt reaches the agent.** One sign-in serves the whole run: the prompt and the benchmark use the same token source, and a sign-in they need (a token that can no longer be refreshed) prints the same message and also waits for the code, not the turn's timeout. | a config file |
 | 3. One prompt | `--prompt` (default *"In one sentence, what can you help me with?"*) as one turn in a fresh conversation. Passes only if the turn completes; a turn that does not complete fails this step (exit `1`). | consent |
 | 4. Benchmark | The dataset (default: 5 read-only cases taken from `samples/datasets/m365-smoke.json`: identity, capabilities, a grounded summary of a "Demo Q3 Planning" document, date arithmetic, out-of-scope live data) through AgentEval's `MAFEvaluationHarness`, one fresh conversation per case. Deterministic checks always; judge criteria only when a judge is configured. | consent; a judge for the criteria |
 | 5. Summary | The final table on screen and every file of the run folder. | — |
@@ -105,6 +105,13 @@ and exits `11`: nothing was measured past readiness, and nothing was sent to the
 step 2 on purpose and exits `0` when readiness passed. `--no-benchmark` skips step 4. A failed readiness stage skips
 steps 3 and 4, and a failed prompt skips step 4 (the benchmark would only send its turns into the same failure).
 
+**The prompt step and the benchmark read a non-completed turn differently, on purpose.** The prompt step is the
+connectivity check of the live path: if one plain read-only prompt does not complete (`InputRequired`, `Failed`,
+`Indeterminate`, …), the agent cannot be evaluated at all, so the step **fails** (exit `1`) and the benchmark is not run.
+In the benchmark the same outcome is an `ERROR` row, **not measured** (exit `11` when nothing failed): one case's turn
+that did not complete says nothing about the answers the agent gives, it is never graded and never counted as a
+`FAIL` score. Both name the outcome, the failure codes and the `request-id`.
+
 Every case gets one of four verdicts, and only one of them is a grade:
 
 | Verdict | Meaning |
@@ -112,7 +119,7 @@ Every case gets one of four verdicts, and only one of them is a grade:
 | `PASS` | Every check that applies ran and passed. |
 | `FAIL` | A check ran and failed — an empty answer, no answer at all, or the judge's score below the case's passing score. A result about the agent, not an error. |
 | `ERROR` | The turn did not complete (`InputRequired`, `AuthRequired`, `Failed`, `Rejected`, `Canceled` or `Indeterminate`), or the agent failed before a turn result. The row names the outcome and the failure (codes, `request-id`). It is never graded: no partial text is scored. |
-| `NOT MEASURED` | Nothing failed, but a check that applies could not be measured: no judge for the criteria, the judge gave no verdict, no answer was selected, or the turn cap stopped the case before it ran. Never counted as a pass. |
+| `NOT MEASURED` | Nothing failed, but a check that applies could not be measured: no judge for the criteria, the judge gave no verdict, the judge call failed, no answer was selected, or the turn cap stopped the case before it ran. Never counted as a pass. |
 
 The checks of every case (`results.md` / `results.json` list each one as `PASS`, `FAIL`, `NOT MEASURED` or `NOT RUN`
 with what was observed): **turn completed**; **answer non-empty**; **response time recorded** (client side: network
@@ -152,10 +159,17 @@ Every option `dotnet run --project samples/AgentEval.Microsoft365Demo -- --help`
 |---|---|
 | `quiet` | The final table and errors (and the sign-in message, which you must see). |
 | `normal` (default) | One line per stage (`✓` passed, `✗` failed, `–` skipped), one line per turn, one line per issue (`! issue <category> <code> (<stage>) HTTP … · JSON-RPC … · AADSTS… request-id=… — message`), then the final table. |
-| `detailed` | Also every trace event in the provider's one-line format (`[m365 HH:mm:ss.fff Stage/Level code] message …` with the known ids, HTTP status, JSON-RPC code and A2A state), and a DETAIL block per issue (`! ISSUE <category> <code>`): stage, category and who can fix it, code, HTTP / JSON-RPC / AADSTS codes, `request-id`, task and context ids, case, A2A state, message, cause and action. |
+| `detailed` | Also every trace event in the provider's one-line format (`[m365 HH:mm:ss.fff Stage/Level code] message …` with the known ids, HTTP status, JSON-RPC code and A2A state), and a DETAIL block per issue (`! ISSUE <category> <code>`): stage, category and who can fix it, code, HTTP / JSON-RPC / AADSTS codes, `request-id`, task and context ids, case, A2A state, message, cause and action. A failed readiness stage's own issue (`doctor.<stage>.failed`) stays one line: the stage's `FAILED` block below it has the detail. |
 | `diagnostic` | Also each event's data payload and elapsed time — the view `console.log` always holds. |
 
-Colours are used only when the console is interactive; `console.log` has none.
+The screen shows each distinct issue (stage, code and message) once; when it occurs again (the same judge failure on
+every case, for example) it is counted, and a `Repeated issues` list before the final table gives each count
+(`×N`). `console.log` and `issues.jsonl` keep every occurrence.
+
+Colours are used only when the console is interactive; `console.log` has none. When the output is redirected (a file,
+a pipe, a CI log) or the console cannot show the symbols, the screen uses ASCII markers instead — `[PASS]`, `[FAIL]`,
+`[SKIP]` for `✓ ✗ –`, and `-`, `->`, `...`, `|` for the other symbols — so nothing prints as `?`; `console.log` is
+always UTF-8 with the symbols.
 
 ## The run folder
 
@@ -169,7 +183,7 @@ file creates none):
 | `console.log` | Everything printed, plus every trace event at diagnostic detail. No colours. |
 | `readiness.md`, `readiness.json` | The readiness report: per stage PASS / FAIL / SKIPPED, what it means, what to do, and the evidence (schema `agenteval.m365.readiness/v1`). |
 | `trace.jsonl` | Every trace event of the run, one JSON object per line (stage, level, code, message, ids, HTTP status, JSON-RPC code, A2A state, elapsed). |
-| `issues.jsonl` | Every warning and error, with its category, code, suggested cause, AADSTS code, `request-id` and the config hash. |
+| `issues.jsonl` | Every warning and error of the run — the readiness check writes it, the prompt and the benchmark append to it — with its category, code, suggested cause, AADSTS code, `request-id` and the config hash. |
 | `turns.jsonl` | One line per turn (metadata only, never the answer text): case id (`prompt` for the prompt step), outcome, answer completeness, task and context ids, answer length, timings, the evidence availability, and for a turn that did not complete its failure category, codes and `request-id`. |
 | `evidence/<caseId>.json` | The connector's evidence document of each turn (`agenteval.microsoft365.turn-evidence/v1`, under the run's content policy): the answer, citations and the availability of every evidence channel. |
 | `results.md`, `results.json` | Per case: the verdict (`PASS` / `FAIL` / `ERROR` / `NOT MEASURED`), every check with what was observed, and the judge's score and explanation when it graded. |
@@ -203,6 +217,12 @@ The judge is read from the same environment variables as every AgentEval sample,
 With the selector unset, the first provider whose variables are set is used. Without any, or with `--no-judge`, every
 criterion is `NOT MEASURED` (never passed) and the run exits `11` when nothing failed; the deterministic checks still
 run. Each judge call costs money on your provider: use `--no-judge` to make none even when a provider is configured.
+
+A judge call that fails (a mistyped key: HTTP 401; a wrong deployment: 403/404; a network error or an outage) is the
+**judge's** problem, not the agent's: the case keeps its measured checks (the turn completed, the answer, the timing,
+the evidence), its criteria are `NOT MEASURED` with `the judge call failed: <type>: <message>`, and one issue
+`judge.call_failed` names the judge (category `Authentication` for 401/403, else `Service`) with what to check — the
+judge provider's variables. Nothing is resent to the agent.
 
 ## What to send back
 

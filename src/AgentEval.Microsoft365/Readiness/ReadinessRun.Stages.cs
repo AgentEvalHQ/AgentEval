@@ -107,10 +107,12 @@ internal sealed partial class ReadinessRun
             return string.IsNullOrWhiteSpace(config.DiagnosticProfile) ? "default: diagnosticProfile not set in the config" : "from the config's diagnosticProfile";
         }
 
+        // The host names its own source (a CLI option, a demo option); the check itself does not assume a command line.
+        var source = string.IsNullOrWhiteSpace(_options.ProfileSource) ? "the options" : _options.ProfileSource.Trim();
         var configured = config.ResolveProfile();
         return configured == effective
-            ? "from --m365-profile; the config says the same"
-            : $"from --m365-profile; it overrides the config's {configured}";
+            ? $"from {source}; the config says the same"
+            : $"from {source}; it overrides the config's {configured}";
     }
 
     private static void AddEnvironment(ReadinessEvidence evidence)

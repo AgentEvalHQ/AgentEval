@@ -80,7 +80,8 @@ public sealed class WorkIqA2AClientTests
         Assert.Equal(0, h.Handler.CountOf("SendMessage"));
         Assert.All(h.Handler.Requests, r => Assert.Equal(HttpMethod.Get, r.Method));
         Assert.NotEmpty(h.Events("discovery.untrusted_host"));
-        Assert.Contains(h.Issues.Issues, i => i.Category == WorkIqIssueCategory.Protocol && i.Code == "discovery.untrusted_host");
+        Assert.Contains(h.Issues.Issues, i => i.Category == WorkIqIssueCategory.Config && i.Code == "discovery.untrusted_host");
+        Assert.DoesNotContain(h.Issues.Issues, i => i.Code.Contains("untrusted", StringComparison.Ordinal) && i.Category != WorkIqIssueCategory.Config);
         Assert.Throws<InvalidOperationException>(() => h.Client.Client);
     }
 
@@ -612,7 +613,8 @@ public sealed class WorkIqA2AClientTests
         Assert.Null(WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Canceled));
         Assert.Equal(WorkIqIssueCategory.Authentication, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Unauthorized));
         Assert.Equal(WorkIqIssueCategory.Permission, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Forbidden));
-        Assert.Equal(WorkIqIssueCategory.Protocol, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.UntrustedHost));
+        // One category for an untrusted host everywhere: Config (the fix is in trustedHosts), as WorkIqIssueClassifier and the stream path say.
+        Assert.Equal(WorkIqIssueCategory.Config, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.UntrustedHost));
     }
 
     [Fact]

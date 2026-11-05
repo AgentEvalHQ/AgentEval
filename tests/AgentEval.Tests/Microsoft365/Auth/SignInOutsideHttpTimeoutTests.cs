@@ -95,6 +95,93 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
     }
 
     // ---------------------------------------------------------------------------------------------------------
+    // A sign-in inside a turn (the card is known, the token can no longer be refreshed silently)
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task BuildLive_SignInInsideATurnLongerThanTheTurnDeadline_WaitsForTheCode_AndTheTurnCompletes()
+    {
+        var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnRpc("SendMessage", CompletedFixture);
+        var tokens = new TurnSignInTokenProvider { SignInOnCall = 2, SignInTakes = TimeSpan.FromMilliseconds(1200), CodeExpiresIn = TimeSpan.FromMinutes(1) };
+        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TimeSpan.FromMilliseconds(300));
+        await using (agent)
+        {
+            var response = await agent.InvokeAsync("Summarize the status of Project Atlas and cite the sources.");
+
+            Assert.StartsWith("Project Atlas is on schedule", response.Text, StringComparison.Ordinal);
+            Assert.Equal(2, tokens.Calls);   // discovery (cached sign-in), then the send (the device-code sign-in)
+            Assert.Equal(1, handler.CountOf("SendMessage"));
+            var events = agent.Diagnostics.RecentEvents;
+            var wait = Assert.Single(events, e => e.Code == "turn.sign_in_wait");
+            Assert.Contains("until the code expires", wait.Message, StringComparison.Ordinal);
+            Assert.Single(events, e => e.Code == "turn.sign_in_done");
+            Assert.DoesNotContain(events, e => e.Message.Contains("turn deadline", StringComparison.Ordinal) && e.Message.Contains("elapsed", StringComparison.Ordinal));
+            Assert.DoesNotContain(events, e => e.Code == "auth.sign_in_not_completed");
+        }
+    }
+
+    [Fact]
+    public async Task BuildLive_SignInInsideATurnThatOutlivesTheCode_EndsAsSignInNotCompleted_NothingSent()
+    {
+        var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnRpc("SendMessage", CompletedFixture);
+        var tokens = new TurnSignInTokenProvider
+        {
+            SignInOnCall = 2,
+            SignInTakes = Timeout.InfiniteTimeSpan,
+            // Already 9.4 s past expiry: with the 10 s grace the turn waits about 0.6 s, longer than its 0.3 s deadline, then stops.
+            CodeExpiresIn = TimeSpan.FromSeconds(-9.4),
+        };
+        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TimeSpan.FromMilliseconds(300));
+        await using (agent)
+        {
+            var ex = await Assert.ThrowsAsync<WorkIqTurnNotCompletedException>(() => agent.InvokeAsync("Summarize the status of Project Atlas."));
+
+            var failure = ex.TurnResult.Failure!;
+            Assert.Contains("sign-in not completed", failure.SafeMessage, StringComparison.Ordinal);
+            Assert.Contains("nothing was sent", failure.SafeMessage, StringComparison.Ordinal);
+            Assert.Equal(0, handler.CountOf("SendMessage"));
+            Assert.Contains(agent.Diagnostics.RecentEvents, e => e.Code == "turn.sign_in_wait");
+            Assert.DoesNotContain(agent.Diagnostics.RecentEvents, e => e.Code == "turn.sign_in_done");
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // A host's device-code provider (the demo builds one with its own prompt writer)
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task BuildLive_HostDeviceCodeProviderWithoutDiagnostics_TracesIntoTheAgentsRun()
+    {
+        var prompt = new StringWriter();
+        var config = WorkIqClientHarness.DefaultConfig();
+        var provider = new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope, prompt);
+        Assert.True(provider.Diagnostics.IsNone);
+        Assert.Same(prompt, provider.DeviceCodePrompt);
+
+        var agent = Build(new FakeWorkIqHandler(), provider, sendTimeout: TimeSpan.FromSeconds(30));
+        await using (agent)
+        {
+            Assert.Same(agent.Diagnostics, provider.Diagnostics);
+            Assert.False(provider.Diagnostics.IsNone);
+        }
+    }
+
+    [Fact]
+    public async Task BuildLive_HostDeviceCodeProviderWithItsOwnDiagnostics_KeepsThem()
+    {
+        using var own = new WorkIqDiagnostics("host-run", null, [], []);
+        var config = WorkIqClientHarness.DefaultConfig();
+        var provider = new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope, TextWriter.Null) { Diagnostics = own };
+
+        var agent = Build(new FakeWorkIqHandler(), provider, sendTimeout: TimeSpan.FromSeconds(30));
+        await using (agent)
+        {
+            Assert.Same(own, provider.Diagnostics);
+            Assert.NotSame(agent.Diagnostics, provider.Diagnostics);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
     // The readiness check
     // ---------------------------------------------------------------------------------------------------------
 
@@ -191,13 +278,59 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
         return reader.ReadToEnd();
     }
 
-    private WorkIqEvaluableAgent Build(FakeWorkIqHandler handler, IWorkIqTokenProvider tokens, TimeSpan sendTimeout) =>
+    private WorkIqEvaluableAgent Build(FakeWorkIqHandler handler, IWorkIqTokenProvider tokens, TimeSpan sendTimeout, TimeSpan? turnDeadline = null) =>
         Microsoft365AgentFactory.BuildLive(
             WorkIqClientHarness.DefaultConfig(),
             iUnderstandLiveSideEffects: true,
-            new WorkIqOptions { SendTimeout = sendTimeout, DiagnosticsDirectory = new DirectoryInfo(_root), RunId = "run-signin" },
+            new WorkIqOptions
+            {
+                SendTimeout = sendTimeout,
+                TurnDeadline = turnDeadline ?? new WorkIqOptions().TurnDeadline,
+                DiagnosticsDirectory = new DirectoryInfo(_root),
+                RunId = "run-signin",
+            },
             tokens,
             innerHandler: handler);
+
+    /// <summary>
+    /// A token provider whose call number <see cref="SignInOnCall"/> is a device-code sign-in started inside a turn: it
+    /// reports the sign-in to the waiting turn the way <see cref="WorkIqDeviceCodeTokenProvider"/> does
+    /// (<see cref="WorkIqSignInWait.Current"/>: started with the code's expiry, then ended), and takes
+    /// <see cref="SignInTakes"/> under the call's token. Every other call is an immediate cache hit.
+    /// </summary>
+    private sealed class TurnSignInTokenProvider : IWorkIqTokenProvider
+    {
+        private int _calls;
+
+        public int SignInOnCall { get; init; }
+
+        public TimeSpan SignInTakes { get; init; }
+
+        public TimeSpan CodeExpiresIn { get; init; }
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public async ValueTask<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _calls) != SignInOnCall)
+            {
+                return StaticTokenProvider.DefaultToken;
+            }
+
+            var waiting = WorkIqSignInWait.Current;
+            waiting?.SignInStarted(DateTimeOffset.UtcNow + CodeExpiresIn);
+            try
+            {
+                await Task.Delay(SignInTakes, cancellationToken);
+            }
+            finally
+            {
+                waiting?.SignInEnded();
+            }
+
+            return StaticTokenProvider.DefaultToken;
+        }
+    }
 
     /// <summary>
     /// A token provider whose first acquisition is a slow interactive sign-in (it can announce a sign-in code expiry

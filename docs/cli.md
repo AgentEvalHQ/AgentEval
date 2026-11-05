@@ -271,7 +271,7 @@ LLM-as-judge, named metrics (`--metrics`), and AEF evidence under `--output-dir`
 | `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
 | `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors are still printed. |
 | `--aef <dir>` / `--no-aef` | Where the sealed AEF run goes: by default a workspace's `.agenteval/aef`; `--aef` writes it anywhere and fails the command (exit 3) if it cannot; `--no-aef` writes none. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench). |
-| `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`), and its exact version. |
+| `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`; `agent:<display name>` for `--sut microsoft365`, a Microsoft 365 agent being an agent, not a model), and its exact version. |
 
 **Stochastic mode (`--runs` greater than 1)**
 

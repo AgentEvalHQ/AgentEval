@@ -52,6 +52,8 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private IPublicClientApplication? _app;
     private WorkIqTokenInfo? _lastTokenInfo;
+    private WorkIqDiagnostics _diagnostics = WorkIqDiagnostics.None;
+    private bool _diagnosticsFromHost;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="tenantId">The Entra tenant id (from <see cref="Microsoft365Config.TenantId"/>).</param>
@@ -78,11 +80,41 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
     /// <summary>The token scope.</summary>
     internal string Scope { get; }
 
-    /// <summary>Where the device-code sign-in instructions are written.</summary>
-    internal TextWriter DeviceCodePrompt { get; }
+    /// <summary>
+    /// Where the device-code sign-in instructions are written (in full: the person must read the page and the code). A
+    /// host that keeps a log routes it through a writer that shows the code on screen and masks it in the log.
+    /// </summary>
+    public TextWriter DeviceCodePrompt { get; }
 
-    /// <summary>The diagnostics auth events are traced through; never null (defaults to <see cref="WorkIqDiagnostics.None"/>).</summary>
-    internal WorkIqDiagnostics Diagnostics { get; init; } = WorkIqDiagnostics.None;
+    /// <summary>
+    /// The diagnostics the auth events (<c>auth.*</c>) are traced through; never null. A host that owns a
+    /// <see cref="WorkIqDiagnostics"/> sets it here. When the host sets none, the connection that uses this provider
+    /// attaches its own — <see cref="Microsoft365AgentFactory.BuildLive"/> the live agent's, the readiness check its run's —
+    /// so one provider shared by the readiness check and the live agent traces each sign-in into the run that started it.
+    /// </summary>
+    public WorkIqDiagnostics Diagnostics
+    {
+        get => Volatile.Read(ref _diagnostics);
+        init
+        {
+            _diagnostics = value ?? throw new ArgumentNullException(nameof(value));
+            _diagnosticsFromHost = true;
+        }
+    }
+
+    /// <summary>
+    /// Attaches the diagnostics of the connection now using this provider, unless the host set <see cref="Diagnostics"/>
+    /// itself (the host's choice wins).
+    /// </summary>
+    /// <param name="diagnostics">The connection's diagnostics.</param>
+    internal void AttachDiagnostics(WorkIqDiagnostics diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        if (!_diagnosticsFromHost)
+        {
+            Volatile.Write(ref _diagnostics, diagnostics);
+        }
+    }
 
     /// <summary>What the last successful acquisition established (no token); null before the first success.</summary>
     internal WorkIqTokenInfo? LastTokenInfo => Volatile.Read(ref _lastTokenInfo);
@@ -107,6 +139,8 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
     /// <inheritdoc/>
     public async ValueTask<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
+        // The turn waiting on this token, if any: captured here, before MSAL runs the prompt callback on its own flow.
+        var signInWait = WorkIqSignInWait.Current;
         var app = await EnsureAppAsync(cancellationToken).ConfigureAwait(false);
         var scopes = new[] { Scope };
         var started = Diagnostics.Clock.GetTimestamp();
@@ -147,7 +181,7 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
 
         try
         {
-            var result = await app.AcquireTokenWithDeviceCode(scopes, ShowDeviceCodePrompt).ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            var result = await app.AcquireTokenWithDeviceCode(scopes, deviceCode => ShowDeviceCodePrompt(deviceCode, signInWait)).ExecuteAsync(cancellationToken).ConfigureAwait(false);
             Record(result, acquiredSilently: false);
             Diagnostics.Trace(
                 WorkIqTraceStage.Auth,
@@ -163,6 +197,11 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
         catch (MsalClientException ex)
         {
             throw WrapClient(ex, "device-code sign-in", started);
+        }
+        finally
+        {
+            // The sign-in attempt is over (a token, a failure or a stop): a waiting turn's deadline bounds the network again.
+            NotifySignInEnded(signInWait);
         }
     }
 
@@ -213,7 +252,7 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
         httpStatus == 403
         || aadstsCode is "AADSTS65001" or "AADSTS65004" or "AADSTS650052" or "AADSTS90094" or "AADSTS53003" or "AADSTS7000215";
 
-    private Task ShowDeviceCodePrompt(DeviceCodeResult deviceCode)
+    private Task ShowDeviceCodePrompt(DeviceCodeResult deviceCode, IWorkIqSignInWaitListener? signInWait)
     {
         // The device-code message tells the user where to sign in and which code to type: it must be shown, in full, on
         // the prompt writer. The trace keeps where and until when, with the user code masked: the trace is a file that
@@ -237,7 +276,29 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.sign_in_observer_failed", $"the sign-in observer threw {ex.GetType().Name}; the sign-in continues", WorkIqTraceLevel.Warning);
         }
 
+        try
+        {
+            // A turn waiting on this token now waits for the code's expiry, not for its network deadline.
+            signInWait?.SignInStarted(deviceCode.ExpiresOn);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.sign_in_observer_failed", $"the turn's sign-in listener threw {ex.GetType().Name}; the sign-in continues", WorkIqTraceLevel.Warning);
+        }
+
         return Task.CompletedTask;
+    }
+
+    private void NotifySignInEnded(IWorkIqSignInWaitListener? signInWait)
+    {
+        try
+        {
+            signInWait?.SignInEnded();
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.sign_in_observer_failed", $"the turn's sign-in listener threw {ex.GetType().Name} at the end of the sign-in", WorkIqTraceLevel.Warning);
+        }
     }
 
     /// <summary>

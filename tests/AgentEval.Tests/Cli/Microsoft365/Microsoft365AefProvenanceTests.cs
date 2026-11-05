@@ -12,6 +12,7 @@ using AgentEval.Cli.Microsoft365;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Evidence;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Integrity;
 using AgentEval.Tests.Microsoft365.Auth;
 using AgentEval.Tests.Microsoft365.TestHelpers;
@@ -107,6 +108,49 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
             AssertNoTokenIn(dir);
         }
     }
+
+    [Fact]
+    public async Task Eval_Microsoft365_NoSubjectOption_TheSubjectIsTheAgentByItsDisplayName_NotAModel()
+    {
+        // Review L8 (owner's decision): an M365 agent is an agent; the run named it model:<name>.
+        var config = WriteConfig($$"""{ "tenantId": "{{TenantId}}", "appClientId": "{{AppClientId}}", "agentName": "HR Copilot (non-prod)" }""");
+        var (agent, _, _) = StandIn(config, CompletedFixture);
+        await using (agent)
+        {
+            var exit = await RunEvalAsync(contentCapture: false, Options(config), agent);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            var run = Document(RunDirectory(), "run.json");
+            Assert.Equal(AefEvalWriter.Ref("agent", "HR Copilot (non-prod)"), (string?)run["subject"]!["ref"]);
+            Assert.StartsWith("agent:", (string?)run["subject"]!["ref"], StringComparison.Ordinal);
+            Assert.Equal("agent", (string?)run["subject"]!["kind"]);
+            Assert.DoesNotContain("model:", (string?)run["subject"]!["ref"], StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Eval_Microsoft365_ExplicitSubjectOption_IsKeptAsGiven()
+    {
+        var config = WriteConfig();
+        var (agent, _, _) = StandIn(config, CompletedFixture);
+        await using (agent)
+        {
+            var opts = Options(config, subject: "agent:hr-copilot");
+
+            var exit = await RunEvalAsync(contentCapture: false, opts, agent);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            Assert.Equal("agent:hr-copilot", (string?)Document(RunDirectory(), "run.json")["subject"]!["ref"]);
+        }
+    }
+
+    [Theory]
+    [InlineData("microsoft365", "agent:Contoso")]
+    [InlineData(" Microsoft365 ", "agent:Contoso")]
+    [InlineData(null, "model:Contoso")]
+    [InlineData("copilot-studio", "model:Contoso")]
+    public void DefaultSubjectRef_IsAnAgentForMicrosoft365Only(string? sut, string expected) =>
+        Assert.Equal(expected, EvalCommand.DefaultSubjectRef(new EvalOptions { Dataset = new FileInfo("x.yaml"), Format = "json", Sut = sut }, "Contoso"));
 
     [Fact]
     public async Task Eval_Microsoft365_InputRequiredTurn_ErrorRowStillCarriesTheInterruptedTurnsDocument()
@@ -306,7 +350,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
         return (agent, handler, sink);
     }
 
-    private EvalOptions Options(FileInfo config, int runs = 1)
+    private EvalOptions Options(FileInfo config, int runs = 1, string? subject = null)
     {
         var dataset = Path.Combine(_root, "dataset.yaml");
         File.WriteAllText(dataset, $"- id: {CaseId}\n  input: \"Summarize the status of Project Atlas and cite the sources.\"\n  expectedOutput: \"on schedule\"\n");
@@ -322,6 +366,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
             Format = "json",
             Output = new FileInfo(Path.Combine(_root, "report.json")),
             Aef = new DirectoryInfo(Path.Combine(_root, "aef")),
+            Subject = subject,
             SubjectVersion = "1",
             Quiet = true,
             Runs = runs,

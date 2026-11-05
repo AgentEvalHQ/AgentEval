@@ -34,7 +34,8 @@ public static class Program
         {
             if (!Console.IsOutputRedirected && Console.OutputEncoding.CodePage != Encoding.UTF8.CodePage)
             {
-                // ✓ ✗ – and the arrows need UTF-8 on a console that defaults to a legacy code page; restored on exit.
+                // ✓ ✗ – and the arrows need UTF-8 on a console that defaults to a legacy code page; restored on exit. A
+                // redirected screen keeps its encoding and gets ASCII markers instead ([PASS] [FAIL] [SKIP], see DemoHost).
                 originalEncoding = Console.OutputEncoding;
                 Console.OutputEncoding = Encoding.UTF8;
             }

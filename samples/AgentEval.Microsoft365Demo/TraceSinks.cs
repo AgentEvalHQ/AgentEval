@@ -122,12 +122,17 @@ internal sealed class DemoTraceSink : IWorkIqTraceSink
 /// The demo's issue sink (<c>ReadinessCheckOptions.IssueSinks</c>, <c>WorkIqOptions.IssueSinks</c>): it keeps every issue
 /// for the summary, shows one line per issue at <see cref="DemoVerbosity.Normal"/> and the detail block (stage, category,
 /// code, AADSTS/HTTP/JSON-RPC codes, request-id, task/context ids, message, cause, action) at
-/// <see cref="DemoVerbosity.Detailed"/>, and always writes the detail block to console.log. It never throws.
+/// <see cref="DemoVerbosity.Detailed"/>, and always writes the detail block to console.log. The screen shows each distinct
+/// issue (stage + code + message) once: a repeat is counted, not printed again, and <see cref="RepeatedIssuesText"/> lists
+/// the counts (<c>×N</c>) at the end; console.log and issues.jsonl keep every occurrence. A readiness stage's own verdict
+/// issue (<c>doctor.&lt;stage&gt;.failed</c>) is one line even at detailed: the stage's FAILED block repeats it in full.
+/// It never throws.
 /// </summary>
 internal sealed class DemoIssueSink : IWorkIqIssueSink
 {
     private readonly DemoConsole _console;
     private readonly List<WorkIqIssue> _issues = [];
+    private readonly Dictionary<(WorkIqTraceStage Stage, string Code, string Message), (WorkIqIssue First, int Count)> _distinct = [];
     private readonly object _gate = new();
 
     /// <summary>Creates the sink.</summary>
@@ -149,25 +154,71 @@ internal sealed class DemoIssueSink : IWorkIqIssueSink
         }
     }
 
+    /// <summary>
+    /// The issues the screen showed once but that occurred more than once, one line each with its count
+    /// (<c>! Category code (Stage) ×N — message</c>); null when none repeated or the screen shows no issues (quiet).
+    /// </summary>
+    public string? RepeatedIssuesText
+    {
+        get
+        {
+            if (!_console.Shows(DemoVerbosity.Normal))
+            {
+                return null;
+            }
+
+            KeyValuePair<(WorkIqTraceStage Stage, string Code, string Message), (WorkIqIssue First, int Count)>[] repeated;
+            lock (_gate)
+            {
+                repeated = _distinct.Where(d => d.Value.Count > 1).ToArray();
+            }
+
+            if (repeated.Length == 0)
+            {
+                return null;
+            }
+
+            var text = new StringBuilder(256).Append("Repeated issues (each shown once above; console.log and issues.jsonl keep every occurrence):");
+            foreach (var (_, (first, count)) in repeated)
+            {
+                text.Append('\n').Append(IssueText.Counted(first, count));
+            }
+
+            return text.ToString();
+        }
+    }
+
     /// <inheritdoc/>
     public void Write(WorkIqIssue i)
     {
         try
         {
+            int occurrence;
             lock (_gate)
             {
                 _issues.Add(i);
+                var key = (i.Stage, i.Code, IssueText.Flatten(i.Message));
+                occurrence = _distinct.TryGetValue(key, out var seen) ? seen.Count + 1 : 1;
+                _distinct[key] = (occurrence == 1 ? i : seen.First, occurrence);
             }
 
             var block = IssueText.DetailBlock(i);
-            if (_console.Shows(DemoVerbosity.Detailed))
+            string? screen;
+            if (occurrence > 1 || !_console.Shows(DemoVerbosity.Normal))
             {
-                _console.Line(DemoVerbosity.Detailed, block, Tint.Warn);
+                // A repeat (or quiet): console.log gets the block, the screen nothing; the count comes at the end.
+                screen = null;
+            }
+            else if (_console.Shows(DemoVerbosity.Detailed) && !IssueText.IsStageVerdict(i))
+            {
+                screen = block;
             }
             else
             {
-                _console.Trace(_console.Shows(DemoVerbosity.Normal) ? IssueText.OneLine(i) : null, block, Tint.Warn);
+                screen = IssueText.OneLine(i) + (_console.Shows(DemoVerbosity.Detailed) ? " (the stage's FAILED block has the detail)" : "");
             }
+
+            _console.Trace(screen, block, Tint.Warn);
         }
         catch (Exception)
         {
@@ -211,6 +262,36 @@ internal static class IssueText
         return line.ToString();
     }
 
+    /// <summary>One line with the count of a repeated issue: <c>! Category code (Stage) ×N — message</c>.</summary>
+    /// <param name="i">The issue (its first occurrence).</param>
+    /// <param name="count">How many times it occurred.</param>
+    public static string Counted(WorkIqIssue i, int count)
+    {
+        var line = new StringBuilder(200)
+            .Append("  ! ").Append(i.Category).Append(' ').Append(i.Code).Append(" (").Append(i.Stage).Append(") ×")
+            .Append(count.ToString(CultureInfo.InvariantCulture));
+        var codes = Codes(i);
+        if (codes.Length > 0)
+        {
+            line.Append(' ').Append(codes);
+        }
+
+        line.Append(" — ").Append(Truncate(Flatten(i.Message), 160));
+        return line.ToString();
+    }
+
+    /// <summary>Whether <paramref name="i"/> is a readiness stage's own verdict issue (<c>doctor.&lt;stage&gt;.failed</c>), which the stage's FAILED block repeats in full.</summary>
+    /// <param name="i">The issue.</param>
+    public static bool IsStageVerdict(WorkIqIssue i) =>
+        i.Stage == WorkIqTraceStage.Doctor && i.Code.StartsWith("doctor.", StringComparison.Ordinal) && i.Code.EndsWith(".failed", StringComparison.Ordinal);
+
+    /// <summary>Who or what can fix <paramref name="i"/>: the judge's provider for a judge issue, else by its category.</summary>
+    /// <param name="i">The issue.</param>
+    public static string WhoFixes(WorkIqIssue i) =>
+        i.Code.StartsWith("judge.", StringComparison.Ordinal)
+            ? "the judge model's provider settings (AI_INFERENCE_PROVIDER and its variables), not the agent or Work IQ"
+            : WhoFixes(i.Category);
+
     /// <summary>The detail block of one issue (several lines, each field only when known).</summary>
     /// <param name="i">The issue.</param>
     public static string DetailBlock(WorkIqIssue i)
@@ -219,7 +300,7 @@ internal static class IssueText
         var block = new StringBuilder(512);
         block.Append("  ! ISSUE ").Append(i.Category).Append(' ').Append(i.Code).Append('\n');
         Field(block, "stage", i.Stage.ToString());
-        Field(block, "category", $"{i.Category} — {WhoFixes(i.Category)}");
+        Field(block, "category", $"{i.Category} — {WhoFixes(i)}");
         Field(block, "code", i.Code);
         var codes = Codes(i);
         Field(block, "codes", codes.Length == 0 ? "none (no HTTP status, JSON-RPC code or AADSTS code)" : codes);

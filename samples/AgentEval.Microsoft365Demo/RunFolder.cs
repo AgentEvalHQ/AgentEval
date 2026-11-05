@@ -251,49 +251,6 @@ internal sealed class RunFolder
         }
     }
 
-    /// <summary>
-    /// Moves the readiness check's issue register into <c>issues.jsonl</c>: the check writes it as
-    /// <c>m365-issues.jsonl</c> in its diagnostics folder (the run folder), and the live agent then appends to
-    /// <c>issues.jsonl</c>, so the run has one register. Returns the error when the move failed (the file is then kept
-    /// where the check wrote it).
-    /// </summary>
-    /// <param name="readinessIssueFile">The path the readiness report names.</param>
-    public string? AdoptReadinessIssues(string? readinessIssueFile)
-    {
-        if (string.IsNullOrWhiteSpace(readinessIssueFile))
-        {
-            return null;
-        }
-
-        var source = new FileInfo(readinessIssueFile);
-        if (!source.Exists || string.Equals(source.FullName, Issues.FullName, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        try
-        {
-            if (Issues.Exists)
-            {
-                System.IO.File.AppendAllText(Issues.FullName, System.IO.File.ReadAllText(source.FullName, Encoding.UTF8), Utf8NoBom);
-                source.Delete();
-            }
-            else
-            {
-                source.MoveTo(Issues.FullName);
-            }
-
-            return null;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            var error = $"{source.Name} could not be moved to {IssuesName}: {ex.Message} (the readiness issues stay in {source.Name})";
-            RecordError(error);
-
-            return error;
-        }
-    }
-
     /// <summary>Zips the folder into <see cref="ZipFile"/> (replacing an older zip of the same name).</summary>
     /// <exception cref="IOException">The zip could not be written.</exception>
     /// <exception cref="UnauthorizedAccessException">The zip could not be written.</exception>

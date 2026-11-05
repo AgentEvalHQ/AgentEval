@@ -70,9 +70,20 @@ public sealed class Microsoft365ConfigPlaceholderTests
     }
 
     [Fact]
-    public void Validate_RealValues_Pass()
+    public void Validate_RealValues_PassAndResolveToTheseValues()
     {
-        new Microsoft365Config { TenantId = Tenant, AppClientId = App, AgentName = "Replace me later (not a placeholder)" }.Validate();
+        // "Replace me later" is prose, not the REPLACE-WITH- prefix: it must survive validation unchanged.
+        var config = new Microsoft365Config { TenantId = Tenant, AppClientId = App, AgentName = "Replace me later (not a placeholder)" };
+
+        config.Validate();
+
+        Assert.Equal("Replace me later (not a placeholder)", config.DisplayName);
+        Assert.Equal(Tenant, config.TenantId);
+        Assert.Equal(App, config.AppClientId);
+        Assert.Equal(Microsoft365Config.DefaultScope, config.Scope);
+        Assert.Equal(DiagnosticProfile.PublicAnswerOnly, config.ResolveProfile());
+        Assert.Equal(new Uri("https://workiq.svc.cloud.microsoft/a2a/.well-known/agent-card.json"), config.ResolveCardUri());
+        Assert.Equal([Microsoft365Config.DefaultTrustedHost], config.TrustedHosts);
     }
 
     /// <summary>The shipped template, found by walking up from the test binaries to the repository root.</summary>

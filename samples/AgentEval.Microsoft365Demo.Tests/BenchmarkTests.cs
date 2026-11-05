@@ -178,6 +178,87 @@ public sealed class BenchmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task FullRun_TheJudgeCallFailsWith401_TheCaseIsNotMeasured_TheAgentsChecksStand_AndTheIssueNamesTheJudge()
+    {
+        // Review M1: a judge outage after a completed turn was an ERROR row "the turn did not complete: outcome Completed".
+        _rig.WithHealthyEndpoint().WithCompletedTurns();
+        var judge = new ThrowingJudgeChatClient();
+        _rig.Judge = judge;
+        var dataset = _rig.WriteDataset($$"""
+            [
+              { "id": "case_ok", "input": "In one sentence, what is {{OkMarker}}?", "evaluation_criteria": ["Answers in one sentence"], "passing_score": 70 }
+            ]
+            """);
+
+        var run = await _rig.RunAsync(DemoRig.Consent, "--dataset", dataset.FullName);
+
+        // Nothing failed, the criteria were not measured: exit 11, NOT MEASURED, never ERROR and never a score.
+        run.AssertExit(11);
+        var results = run.Json("results.json");
+        var c = Assert.Single(results.GetProperty("cases").EnumerateArray());
+        Assert.Equal("NOT MEASURED", c.GetProperty("verdict").GetString());
+        Assert.Equal(JsonValueKind.Null, c.GetProperty("score").ValueKind);
+        var reason = c.GetProperty("reason").GetString()!;
+        Assert.Contains("the judge call failed: HttpRequestException", reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("did not complete", reason, StringComparison.Ordinal);
+
+        // The agent was measured: its deterministic checks pass; the criteria are NOT MEASURED with the judge's error.
+        var checks = Checks(c);
+        Assert.All(DeterministicChecks, name => Assert.Equal("PASS", checks[name]));
+        Assert.Equal("NOT MEASURED", checks["criteria (judge)"]);
+        var criteria = c.GetProperty("checks").EnumerateArray().Single(k => k.GetProperty("name").GetString() == "criteria (judge)");
+        Assert.Equal("the judge call failed: HttpRequestException: " + judge.Message, criteria.GetProperty("detail").GetString());
+        Assert.Equal("Completed", c.GetProperty("turn").GetProperty("outcome").GetString());
+        Assert.Equal(1, results.GetProperty("counts").GetProperty("notMeasured").GetInt32());
+        Assert.Equal(0, results.GetProperty("counts").GetProperty("error").GetInt32());
+
+        // One issue that names the JUDGE (Authentication for its 401), with the case id; on the screen and in the summary.
+        var issue = Assert.Single(run.JsonLines("issues.jsonl"), i => i.GetProperty("code").GetString() == "judge.call_failed");
+        Assert.Equal("Authentication", issue.GetProperty("category").GetString());
+        Assert.Equal(401, issue.GetProperty("httpStatus").GetInt32());
+        Assert.Equal("case_ok", issue.GetProperty("caseId").GetString());
+        Assert.Contains("the JUDGE failed, not the agent", issue.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Contains("AI_INFERENCE_PROVIDER", issue.GetProperty("suggestedCause").GetString(), StringComparison.Ordinal);
+        Assert.Contains(run.OutLines, l => l.Contains("judge.call_failed", StringComparison.Ordinal) && l.Contains("HTTP 401", StringComparison.Ordinal));
+        Assert.Contains("the judge call failed", run.Text("summary.md"), StringComparison.Ordinal);
+        Assert.Contains("the judge call failed for 1 case(s)", results.GetProperty("exitMeaning").GetString(), StringComparison.Ordinal);
+
+        // The judge was reached once; the agent got the prompt and the case once each — nothing resent.
+        Assert.Equal(1, judge.Calls);
+        Assert.Equal(2, _rig.Handler.CountOf("SendMessage"));
+    }
+
+    [Fact]
+    public async Task FullRun_TheJudgeFailsWith503OnEveryCase_TheScreenShowsTheIssueOnceWithItsCount_TheFilesKeepEveryOccurrence()
+    {
+        // Review L4 (screen noise): the same issue on three cases is one block on the screen and a ×3 count, three entries in the files.
+        _rig.WithHealthyEndpoint().WithCompletedTurns();
+        _rig.Judge = new ThrowingJudgeChatClient { Status = System.Net.HttpStatusCode.ServiceUnavailable };
+        var dataset = _rig.WriteDataset("""
+            [
+              { "id": "case_a", "input": "In one sentence, what is A?", "evaluation_criteria": ["Answers in one sentence"], "passing_score": 70 },
+              { "id": "case_b", "input": "In one sentence, what is B?", "evaluation_criteria": ["Answers in one sentence"], "passing_score": 70 },
+              { "id": "case_c", "input": "In one sentence, what is C?", "evaluation_criteria": ["Answers in one sentence"], "passing_score": 70 }
+            ]
+            """);
+
+        var run = await _rig.RunAsync(DemoRig.Consent, "--dataset", dataset.FullName, "--verbosity", "detailed");
+
+        run.AssertExit(11);
+        var issues = run.JsonLines("issues.jsonl").Where(i => i.GetProperty("code").GetString() == "judge.call_failed").ToArray();
+        Assert.Equal(new[] { "case_a", "case_b", "case_c" }, issues.Select(i => i.GetProperty("caseId").GetString()).ToArray());
+        Assert.All(issues, i => Assert.Equal("Service", i.GetProperty("category").GetString()));
+
+        // The screen: one detail block, then the count at the end.
+        Assert.Single(run.OutLines, l => l.Contains("! ISSUE Service judge.call_failed", StringComparison.Ordinal));
+        Assert.Single(run.OutLines, l => l.Contains("judge.call_failed (Outcome) ×3", StringComparison.Ordinal));
+        Assert.Contains(run.OutLines, l => l.TrimStart().StartsWith("category", StringComparison.Ordinal) && l.Contains("the judge model's provider settings", StringComparison.Ordinal));
+
+        // console.log keeps every occurrence in full.
+        Assert.Equal(3, run.Text("console.log").Split('\n').Count(l => l.Contains("! ISSUE Service judge.call_failed", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task FullRun_TurnCapBelowThePlan_StopsBeforeTheCrossingTurn_AndTheRestAreNotMeasured()
     {
         _rig.WithHealthyEndpoint().WithCompletedTurns();

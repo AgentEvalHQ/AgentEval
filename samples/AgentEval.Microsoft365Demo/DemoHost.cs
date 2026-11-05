@@ -44,8 +44,23 @@ internal sealed record DemoHostOverrides
     /// <summary>The innermost HTTP handler of every Work IQ connection (readiness and the live agent). The demo never disposes it.</summary>
     public HttpMessageHandler? InnerHandler { get; init; }
 
-    /// <summary>The token source of every Work IQ connection; null uses the provider's MSAL device-code sign-in.</summary>
+    /// <summary>The token source of every Work IQ connection; null builds one with <see cref="TokenProviderFactory"/>.</summary>
     public IWorkIqTokenProvider? TokenProvider { get; init; }
+
+    /// <summary>
+    /// Builds the run's one token source from the loaded config and the demo's sign-in prompt writer (the screen shows
+    /// the device-code message in full, console.log keeps it with the code masked). Called at most once per run; the
+    /// readiness check and the live agent share what it returns, so one sign-in serves both. Null builds the provider's
+    /// MSAL device-code sign-in (<see cref="DemoTokenProviders.DeviceCode"/>). <see cref="TokenProvider"/> wins when set.
+    /// </summary>
+    public Func<Microsoft365Config, TextWriter, IWorkIqTokenProvider>? TokenProviderFactory { get; init; }
+
+    /// <summary>
+    /// Whether the screen gets ASCII markers (<c>[PASS] [FAIL] [SKIP]</c>, <c>-</c>, <c>-&gt;</c>) instead of the symbols;
+    /// null decides from the console (redirected output, or an encoding that cannot encode the symbols). console.log is
+    /// always UTF-8 with the symbols.
+    /// </summary>
+    public bool? AsciiScreen { get; init; }
 
     /// <summary>The screen's standard output; null is <see cref="Console.Out"/> (and only then may lines be coloured).</summary>
     public TextWriter? Out { get; init; }
@@ -64,6 +79,25 @@ internal sealed record DemoHostOverrides
 
     /// <summary>Reads an environment variable (<c>M365_CONFIG_PATH</c>, the consent variable, the judge's provider, <c>NO_COLOR</c>); null reads the process environment.</summary>
     public Func<string, string?>? GetEnvironmentVariable { get; init; }
+}
+
+/// <summary>The token sources the demo builds when the host supplies none.</summary>
+internal static class DemoTokenProviders
+{
+    /// <summary>
+    /// The provider's MSAL device-code sign-in for <paramref name="config"/>, writing its prompt to
+    /// <paramref name="prompt"/> (the demo's <see cref="SignInPromptWriter"/>). Its auth events reach the trace of whichever
+    /// run uses it (the readiness check, then the live agent attach their diagnostics), and a sign-in that starts inside a
+    /// turn waits for the code's expiry, not the turn deadline. Building it makes no network call.
+    /// </summary>
+    /// <param name="config">The loaded config (tenant, app, scope).</param>
+    /// <param name="prompt">Where the device-code message goes.</param>
+    public static IWorkIqTokenProvider DeviceCode(Microsoft365Config config, TextWriter prompt)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(prompt);
+        return new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope, prompt);
+    }
 }
 
 /// <summary>
@@ -140,7 +174,11 @@ internal static class DemoHost
         }
 
         var colors = overrides.Out is null && !Console.IsOutputRedirected && string.IsNullOrEmpty(env("NO_COLOR"));
-        using var console = new DemoConsole(stdout, stderr, settings.Verbosity, colors);
+
+        // A redirected screen (a file, a pipe, a CI log) gets ASCII markers: on Windows it is in the legacy code page, where
+        // the symbols print as '?'. console.log is UTF-8 whatever the screen.
+        var ascii = overrides.AsciiScreen ?? (overrides.Out is null && DemoConsole.NeedsAsciiScreen(Console.IsOutputRedirected, Console.OutputEncoding));
+        using var console = new DemoConsole(stdout, stderr, settings.Verbosity, colors, ascii);
 
         // ── no config: say exactly what is missing and how to create it; nothing is created, nothing is sent ──
         settings.ConfigFile.Refresh();
@@ -218,6 +256,8 @@ internal sealed class DemoRun
     private readonly DemoTraceSink _traceSink;
     private readonly DemoIssueSink _issueSink;
     private readonly TurnRecorder _turns;
+    private readonly SignInPromptWriter _signIn;
+    private IWorkIqTokenProvider? _tokenProvider;
     private DemoCaseSet? _caseSet;
     private Microsoft365Config? _config;
     private Microsoft365Config? _overriddenConfig;
@@ -247,6 +287,30 @@ internal sealed class DemoRun
         _traceSink = new DemoTraceSink(console) { OnStage = PrintReadinessStage };
         _issueSink = new DemoIssueSink(console);
         _turns = new TurnRecorder(folder, console, settings.ContentPolicy);
+        _signIn = new SignInPromptWriter(console);
+    }
+
+    /// <summary>
+    /// The run's one token source, shared by the readiness check and the live agent so one sign-in serves both, with the
+    /// demo's sign-in prompt writer (screen in full, console.log masked): the host's <see cref="DemoHostOverrides.TokenProvider"/>,
+    /// else built once by <see cref="DemoHostOverrides.TokenProviderFactory"/> (the MSAL device-code sign-in by default).
+    /// Null when the config did not load: the readiness check then fails at its config stage before any sign-in.
+    /// </summary>
+    /// <param name="config">The loaded config.</param>
+    internal IWorkIqTokenProvider? TokenProviderFor(Microsoft365Config? config)
+    {
+        if (_overrides.TokenProvider is { } supplied)
+        {
+            return supplied;
+        }
+
+        if (_tokenProvider is not null || config is null)
+        {
+            return _tokenProvider;
+        }
+
+        var factory = _overrides.TokenProviderFactory ?? DemoTokenProviders.DeviceCode;
+        return _tokenProvider = factory(config, _signIn);
     }
 
     private bool BenchmarkPlanned => _settings.Consent && !_settings.ReadinessOnly && !_settings.NoBenchmark;
@@ -280,6 +344,7 @@ internal sealed class DemoRun
         finally
         {
             _judge.Dispose();
+            _signIn.Flush();
         }
 
         var (exit, meaning) = ExitCode(runtimeError);
@@ -292,6 +357,12 @@ internal sealed class DemoRun
             (exit, meaning) = ExitCode(runtimeError);
             report = BuildReport(startedAt, exit, meaning, runtimeError);
             _folder.TryWriteText(_folder.Summary, Summary.ToSummaryMarkdown(report));
+        }
+
+        if (_issueSink.RepeatedIssuesText is { } repeated)
+        {
+            _console.Line(DemoVerbosity.Normal, repeated, Tint.Warn);
+            _console.Blank();
         }
 
         _console.Line(DemoVerbosity.Quiet, Summary.FinalTable(report), Summary.ResultWord(exit) switch
@@ -436,7 +507,6 @@ internal sealed class DemoRun
     private async Task RunReadinessAsync(CancellationToken cancellationToken)
     {
         _console.Line(DemoVerbosity.Normal, "Readiness (no prompt is sent)", Tint.Accent);
-        using var signIn = new SignInPromptWriter(_console);
         var options = new ReadinessCheckOptions
         {
             Stages = null,
@@ -445,11 +515,14 @@ internal sealed class DemoRun
             ContinueAfterFailure = false,
             StageTimeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds),
             Profile = _settings.Profile,
+            ProfileSource = "--profile",
             RawCaptureDirectory = _settings.CaptureRaw ? _folder.RawFolder : null,
             Verbose = false,
             TraceFile = _folder.Trace,
+            // One issue register for the run: the check writes issues.jsonl, the live agent appends to it.
+            IssueFile = _folder.Issues,
             DiagnosticsDirectory = _folder.Root,
-            Console = signIn,
+            Console = _signIn,
             TraceSinks = [_traceSink],
             IssueSinks = [_issueSink],
         };
@@ -462,17 +535,9 @@ internal sealed class DemoRun
             inCode is null ? _settings.ConfigFile : null,
             options,
             Wrap(_overrides.InnerHandler),
-            _overrides.TokenProvider,
+            TokenProviderFor(_config),
             cancellationToken).ConfigureAwait(false);
-        signIn.Flush();
-
-        // One issue register for the run: the check wrote m365-issues.jsonl into the run folder; the live agent appends to issues.jsonl.
-        var adoptError = _folder.AdoptReadinessIssues(report.IssueFile);
-        report = report with
-        {
-            ReportDirectory = _folder.Root.FullName,
-            IssueFile = adoptError is null ? _folder.Issues.FullName : report.IssueFile,
-        };
+        _signIn.Flush();
         _readiness = report;
         _folder.TryWriteText(_folder.ReadinessMarkdown, ReadinessReportRenderer.ToMarkdown(report));
         _folder.TryWriteText(_folder.ReadinessJson, ReadinessReportRenderer.ToJson(report));
@@ -623,11 +688,13 @@ internal sealed class DemoRun
         };
 
         var config = _config ?? throw new InvalidOperationException("The config passed readiness but did not load in the demo.");
+        // The readiness check's token source: a sign-in it completed serves these turns too, and a new device-code prompt
+        // (a token that can no longer be refreshed) goes through the demo's prompt writer and waits for the code's expiry.
         await using var agent = Microsoft365AgentFactory.BuildLive(
             config,
             iUnderstandLiveSideEffects: true,
             options,
-            _overrides.TokenProvider,
+            TokenProviderFor(config),
             _turns.OnTurn,
             Wrap(_overrides.InnerHandler));
 
@@ -752,6 +819,11 @@ internal sealed class DemoRun
             detail += "; criteria not graded: " + _judge.NotMeasuredReason;
         }
 
+        if (JudgeFailureSummary(outcomes) is { } judgeFailed)
+        {
+            detail += "; criteria not graded: " + judgeFailed;
+        }
+
         if (_benchmark.StopReason is not null)
         {
             detail += "; stopped early: " + _benchmark.StopReason;
@@ -815,7 +887,9 @@ internal sealed class DemoRun
         var errorCases = cases.Where(c => c.Verdict == CaseVerdict.Error).Select(c => c.Case.Id).ToArray();
         if (errorCases.Length > 0)
         {
-            notMeasured.Add($"{errorCases.Length.ToString(CultureInfo.InvariantCulture)} case(s) ERROR, the turn did not complete ({string.Join(", ", errorCases)})");
+            // Each ERROR row's reason says which: the turn did not complete, the agent failed before a turn result, or the
+            // case could not be evaluated.
+            notMeasured.Add($"{errorCases.Length.ToString(CultureInfo.InvariantCulture)} case(s) ERROR, not evaluated ({string.Join(", ", errorCases)}; results.md gives each reason)");
         }
 
         var notMeasuredCases = cases.Where(c => c.Verdict == CaseVerdict.NotMeasured).Select(c => c.Case.Id).ToArray();
@@ -825,6 +899,11 @@ internal sealed class DemoRun
             if (!_judge.IsAvailable && cases.Any(c => c.Case.Criteria.Count > 0))
             {
                 why += "; criteria: " + _judge.NotMeasuredReason;
+            }
+
+            if (JudgeFailureSummary(cases) is { } judgeFailed)
+            {
+                why += "; criteria: " + judgeFailed;
             }
 
             notMeasured.Add($"{notMeasuredCases.Length.ToString(CultureInfo.InvariantCulture)} case(s) NOT MEASURED ({string.Join(", ", notMeasuredCases)}{why})");
@@ -843,6 +922,15 @@ internal sealed class DemoRun
         return (DemoExitCodes.Success, _settings.ReadinessOnly
             ? "readiness passed (--readiness-only)"
             : "every stage that ran passed and everything requested was measured");
+    }
+
+    /// <summary>"the judge call failed for N case(s): &lt;first failure&gt;" when a judge call failed after a completed turn; else null.</summary>
+    private static string? JudgeFailureSummary(IReadOnlyList<CaseOutcome> outcomes)
+    {
+        var failed = outcomes.Where(o => o.JudgeFailure is not null).ToArray();
+        return failed.Length == 0
+            ? null
+            : $"the judge call failed for {failed.Length.ToString(CultureInfo.InvariantCulture)} case(s) ({failed[0].JudgeFailure!.ErrorType}: {IssueText.Truncate(failed[0].JudgeFailure!.SafeMessage, 160)}); the agent was measured, the judge was not";
     }
 
     private DemoReport BuildReport(DateTimeOffset startedAt, int exit, string meaning, string? runtimeError) => new()

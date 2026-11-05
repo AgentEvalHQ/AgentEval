@@ -263,6 +263,7 @@ internal static class M365DoctorCommand
             ContinueAfterFailure = arguments.Continue,
             StageTimeout = TimeSpan.FromSeconds(arguments.TimeoutSeconds),
             Profile = profile,
+            ProfileSource = "--m365-profile",
             RawCaptureDirectory = arguments.CaptureRaw,
             Verbose = arguments.Verbose,
             TraceFile = arguments.TraceFile,

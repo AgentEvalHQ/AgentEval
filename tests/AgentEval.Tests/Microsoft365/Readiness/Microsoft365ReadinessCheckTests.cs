@@ -6,6 +6,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Microsoft365;
+using AgentEval.Microsoft365.Auth;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Readiness;
 using AgentEval.Tests.Microsoft365.TestHelpers;
@@ -176,16 +177,51 @@ public sealed class Microsoft365ReadinessCheckTests
     }
 
     [Fact]
-    public async Task Config_ProfileOverride_IsNamedWithItsSource()
+    public async Task Config_ProfileOverride_WithoutASource_SaysTheOptions_NotACommandLineOption()
     {
+        // Review L7: the check said "from --m365-profile" for every host, the demo (whose option is --profile) included.
         using var rig = new ReadinessTestRig();
 
         var report = await rig.RunAsync(rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config }, profile: DiagnosticProfile.Native118Diagnostics));
 
         var config = report.Find(ReadinessStage.Config)!;
-        Assert.Contains("Native118Diagnostics", EvidenceOf(config, "profile"), StringComparison.Ordinal);
-        Assert.Contains("--m365-profile", EvidenceOf(config, "profile"), StringComparison.Ordinal);
+        var profile = EvidenceOf(config, "profile");
+        Assert.Equal("Native118Diagnostics (from the options; it overrides the config's PublicAnswerOnly)", profile);
+        Assert.DoesNotContain("--m365-profile", profile, StringComparison.Ordinal);
         Assert.Contains(config.Warnings, w => w.Contains("EXPERIMENTAL", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("--m365-profile", DiagnosticProfile.Native118Diagnostics, "Native118Diagnostics (from --m365-profile; it overrides the config's PublicAnswerOnly)")]
+    [InlineData("--profile", DiagnosticProfile.PublicAnswerOnly, "PublicAnswerOnly (from --profile; the config says the same)")]
+    public async Task Config_ProfileOverride_IsNamedWithTheSourceTheHostGives(string source, DiagnosticProfile profile, string expected)
+    {
+        using var rig = new ReadinessTestRig();
+        var options = rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config }, profile: profile) with { ProfileSource = source };
+
+        var report = await rig.RunAsync(options);
+
+        Assert.Equal(expected, EvidenceOf(report.Find(ReadinessStage.Config)!, "profile"));
+    }
+
+    [Fact]
+    public async Task IssueFileOption_TheRegisterIsWrittenThere_AndTheReportAndTheTraceNameIt()
+    {
+        // Review L2: a host that wants one register for the run (the demo's issues.jsonl) names it; nothing is renamed afterwards.
+        using var rig = new ReadinessTestRig();
+        rig.Handler.FailWith(FakeWorkIqHandler.CardMethod, System.Net.HttpStatusCode.Unauthorized);
+        var issueFile = new FileInfo(Path.Combine(rig.Root.FullName, "run", "issues.jsonl"));
+        var options = rig.Options() with { IssueFile = issueFile };
+
+        var report = await rig.RunAsync(options);
+
+        Assert.True(report.AnyFailed);
+        Assert.Equal(issueFile.FullName, report.IssueFile);
+        Assert.Contains("doctor.discovery.failed", Codes(issueFile.FullName));
+        Assert.False(File.Exists(Path.Combine(rig.Diagnostics.FullName, "m365-issues.jsonl")), "Nothing goes to the default register when the host names one.");
+        var trace = ReadText(report.TraceFile);
+        Assert.Contains(issueFile.FullName.Replace("\\", "\\\\", StringComparison.Ordinal), trace, StringComparison.Ordinal);
+        Assert.DoesNotContain("m365-issues.jsonl", trace, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -239,6 +275,89 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.DoesNotContain(FakeToken, auth.Summary, StringComparison.Ordinal);
         Assert.Equal(1, rig.Tokens.Calls);
         rig.Handler.AssertNoRequests();
+    }
+
+    /// <summary>
+    /// A host's device-code provider built without diagnostics (the demo builds one with its own prompt writer and
+    /// shares it with the live agent later) traces the check's sign-in into the check's run: the auth stage attaches the
+    /// run's diagnostics to it, so <c>auth.device_code_prompted</c> / <c>auth.token_acquired</c> reach this run's
+    /// trace.jsonl. Offline by construction: the caller's token is canceled the moment the auth stage starts, after the
+    /// stage has taken the provider (the attach) and before the provider's first await, which refuses a canceled token
+    /// before any MSAL client, token cache or network call exists.
+    /// </summary>
+    [Fact]
+    public async Task Auth_HostDeviceCodeProviderWithoutDiagnostics_TracesIntoTheChecksRun()
+    {
+        using var rig = new ReadinessTestRig();
+        var provider = new WorkIqDeviceCodeTokenProvider("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", Microsoft365Config.DefaultScope, TextWriter.Null);
+        Assert.True(provider.Diagnostics.IsNone);
+
+        var (report, codes) = await RunAuthStageCanceledAtItsStartAsync(rig, provider);
+
+        AssertTheTokenCallNeverRan(report, codes, rig);
+        Assert.False(provider.Diagnostics.IsNone);
+        Assert.False(string.IsNullOrEmpty(report.RunId));
+        Assert.Equal(report.RunId, provider.Diagnostics.RunId);
+        Assert.Contains(provider.Diagnostics.RecentEvents, e => e.Code == "doctor.auth.start" && e.RunId == report.RunId);
+        Assert.Same(TextWriter.Null, provider.DeviceCodePrompt);
+    }
+
+    /// <summary>A host's device-code provider that carries diagnostics of its own keeps them through the check (the host's choice wins).</summary>
+    [Fact]
+    public async Task Auth_HostDeviceCodeProviderWithItsOwnDiagnostics_KeepsThem()
+    {
+        using var rig = new ReadinessTestRig();
+        using var own = new WorkIqDiagnostics("host-run", null, [], []);
+        var provider = new WorkIqDeviceCodeTokenProvider("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", Microsoft365Config.DefaultScope, TextWriter.Null) { Diagnostics = own };
+
+        var (report, codes) = await RunAuthStageCanceledAtItsStartAsync(rig, provider);
+
+        AssertTheTokenCallNeverRan(report, codes, rig);
+        Assert.Same(own, provider.Diagnostics);
+        Assert.Equal("host-run", provider.Diagnostics.RunId);
+        Assert.NotEqual(report.RunId, provider.Diagnostics.RunId);
+    }
+
+    /// <summary>
+    /// Runs config + auth with <paramref name="provider"/>, canceling the caller's token from a trace sink when
+    /// <c>doctor.auth.start</c> is traced; returns the report and the trace file's event codes.
+    /// </summary>
+    private static async Task<(ReadinessReport Report, IReadOnlyList<string> Codes)> RunAuthStageCanceledAtItsStartAsync(ReadinessTestRig rig, IWorkIqTokenProvider provider)
+    {
+        using var cancel = new CancellationTokenSource();
+        var options = rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Auth }) with
+        {
+            TraceSinks = [new CancelOnTraceSink("doctor.auth.start", cancel)],
+        };
+
+        var report = await Microsoft365ReadinessCheck.RunAsync(null, rig.WriteConfig(), options, rig.Handler, provider, cancel.Token);
+        return (report, Codes(report.TraceFile));
+    }
+
+    /// <summary>The auth stage took the device-code provider and stopped on the cancellation before MSAL was ever built: nothing touched the token cache or the network.</summary>
+    private static void AssertTheTokenCallNeverRan(ReadinessReport report, IReadOnlyList<string> codes, ReadinessTestRig rig)
+    {
+        Assert.Equal(ReadinessResult.Pass, report.Find(ReadinessStage.Config)!.Result);
+        var auth = report.Find(ReadinessStage.Auth)!;
+        Assert.Equal(ReadinessResult.Fail, auth.Result);
+        Assert.StartsWith("stopped: the check was canceled", auth.Summary, StringComparison.Ordinal);
+        Assert.Equal("doctor.canceled", auth.Issue?.Code);
+        Assert.Contains("doctor.auth.start", codes);
+        Assert.DoesNotContain("auth.cache_registered", codes);
+        Assert.DoesNotContain(codes, c => c.StartsWith("auth.", StringComparison.Ordinal));
+        rig.Handler.AssertNoRequests();
+    }
+
+    /// <summary>A caller-owned trace sink that cancels <paramref name="source"/> when an event with <paramref name="code"/> is traced.</summary>
+    private sealed class CancelOnTraceSink(string code, CancellationTokenSource source) : IWorkIqTraceSink
+    {
+        public void Write(WorkIqTraceEvent e)
+        {
+            if (string.Equals(e.Code, code, StringComparison.Ordinal))
+            {
+                source.Cancel();
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------------------------------------

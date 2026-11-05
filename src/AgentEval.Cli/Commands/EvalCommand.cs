@@ -722,6 +722,18 @@ internal static class EvalCommand
         ExitCode = ExitCodes.GateIndeterminate,
     };
 
+    /// <summary>
+    /// The AEF subject ref of a run without <c>--subject</c>: <c>agent:&lt;display name&gt;</c> for <c>--sut microsoft365</c>
+    /// (a Microsoft 365 agent is an agent, not a model; the name is the config's display name), <c>model:&lt;name&gt;</c>
+    /// otherwise (the model or deployment the run called). An explicit <c>--subject</c> is always kept as given.
+    /// </summary>
+    /// <param name="opts">The command options.</param>
+    /// <param name="resolvedName">The subject's resolved name.</param>
+    internal static string DefaultSubjectRef(EvalOptions opts, string resolvedName) =>
+        AefEvalWriter.Ref(
+            string.Equals(opts.Sut?.Trim(), global::AgentEval.Cli.Microsoft365.Microsoft365SutTarget.SutName, StringComparison.OrdinalIgnoreCase) ? "agent" : "model",
+            resolvedName);
+
     /// <summary>The AEF run options of an eval run.</summary>
     /// <param name="opts">The command options.</param>
     /// <param name="resolvedName">The subject's resolved name.</param>
@@ -739,7 +751,7 @@ internal static class EvalCommand
     internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null,
         EmbeddingProviderSettings? embeddingSettings = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
     {
-        var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
+        var subjectRef = opts.Subject ?? DefaultSubjectRef(opts, resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
         if (opts.Runs > 1) settings["successThreshold"] = opts.SuccessThreshold;
         if (opts.Sut is null)

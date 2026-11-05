@@ -1,6 +1,6 @@
 ---
 name: m365-demo-triage
-version: 0.1.0
+version: 0.2.0
 description: Read a run folder of the AgentEval Microsoft 365 demo (summary.md, readiness.md, issues.jsonl, trace.jsonl, turns.jsonl, results.json) and say, per issue, which stage failed, what the category and codes (AADSTS, HTTP, JSON-RPC, turn outcome) mean, the likely cause and the next action. Use when a run exited 1, 3 or 11, a stage shows a cross, or someone asks what went wrong.
 ---
 
@@ -38,8 +38,12 @@ What the user saw on screen, by verbosity: at `normal` one line per issue,
 `! issue <Category> <code> (<Stage>) HTTP … · JSON-RPC … · AADSTS… request-id=… case=… — <message>`; at `detailed`
 also a block per issue, `! ISSUE <Category> <code>` followed by `stage`, `category` (with who can fix it), `code`,
 `codes`, `request-id` (or "not received"), `task/context`, `case/turn`, `A2A state`, `message`, `cause`, `action` and
-`run`. The demo splits the cause from the action when the provider's suggested cause carries both (the readiness
-check's "… What to do: …", the AADSTS catalogue's "CODE: cause → fix"); otherwise the action comes from the category:
+`run`. Each distinct issue (stage, code, message) is shown once; a repeat is only counted, and the `Repeated issues`
+list before the final table gives `×N` (the files keep every occurrence, so count in `issues.jsonl`). A failed
+readiness stage's own issue (`doctor.<stage>.failed`) stays one line at `detailed`: the stage's `FAILED` block has the
+detail. A redirected screen shows `[PASS] [FAIL] [SKIP]` for `✓ ✗ –`. The demo splits the cause from the action when the
+provider's suggested cause carries both (the readiness check's "… What to do: …", the AADSTS catalogue's
+"CODE: cause → fix"); otherwise the action comes from the category (a `judge.*` issue names the judge's provider settings instead):
 
 | Category | Who can fix it (the block's `category` line) |
 |---|---|
@@ -88,6 +92,7 @@ A stage that did not run is `–` / SKIPPED with its reason — never a pass, an
 | a `config` warning: `tenantId '…' is neither a GUID nor a domain name` / `appClientId '…' is not a GUID` | a value that cannot be right | copy the ids from the app registration's *Overview*; the sign-in would fail with `AADSTS90002` / `AADSTS700016` |
 | `http.404` (discovery) | the `agentId` (or the endpoint) is wrong, or the user cannot reach that agent | check `--agent-id` / `agentId`; try the default agent (`null`) |
 | `discovery.untrusted_host` | the card advertised a URL on a host outside `trustedHosts`; **no token was sent there** | report it with the card evidence; add a host only if it is clearly Microsoft's |
+| `auth.untrusted_destination` | a request was about to go to a host outside `trustedHosts`; refused before any token | the same as `discovery.untrusted_host`: the fix, if any, is in `trustedHosts` |
 
 ### Authentication (sign-in and token)
 
@@ -125,7 +130,8 @@ Other Authentication codes:
 |---|---|---|
 | `auth.sign_in_timeout`, `sign-in not completed: the device code expired at … UTC before the sign-in finished` | nobody completed the device-code sign-in while the code was valid (about 15 minutes); nothing was sent | run again, open the page, enter the code, sign in as the test user |
 | `auth.sign_in_timeout`, `sign-in not completed in time: no token within N s` | no sign-in was started and the token provider did not answer within the stage timeout | check the path to `login.microsoftonline.com`; raise `--timeout-seconds` |
-| `auth.sign_in_not_completed` | a sign-in during a turn was not finished before the wait ended; nothing was sent | run `--readiness-only` first (it caches the token), then run again |
+| `auth.sign_in_not_completed` | a sign-in during a turn was not finished before the wait ended (the device code expired, or Ctrl+C); nothing was sent. A sign-in inside a turn waits for the code, not `--timeout-seconds` (`turn.sign_in_wait` in the trace) | run `--readiness-only` first (it caches the token), then run again |
+| `judge.call_failed` with HTTP 401 / 403 | the **judge** model's provider refused its key or deployment — not the agent, not Work IQ, not the Microsoft 365 sign-in; the case's criteria are `NOT MEASURED`, its other checks were measured | check `AI_INFERENCE_PROVIDER` and that provider's key, endpoint and model / deployment; or run with `--no-judge` |
 | `http.401`, `…unauthorized`, `HTTP 401` on discovery / protocol / a turn | the service rejected the token (audience, scope, expiry, other tenant) | check `scope`, `tenantId`, `appClientId`; run again to sign in afresh |
 
 ### Permission
@@ -152,7 +158,6 @@ Other Authentication codes:
 | HTTP 404 on the `protocol` stage instead of `-32001` | the selected interface URL is not the A2A 1.0 JSON-RPC endpoint | report it with the `request-id` |
 | `protocol.malformed`, `reduce.*` | a reply could not be parsed or broke a one-of rule | run once more with `--capture-raw` only if the maintainers ask; report the folder |
 | `rpc.method_not_found` (`-32601`), `rpc.invalid_params` (`-32602`), `rpc.invalid_request` (`-32600`), `rpc.parse_error` (`-32700`) | the service refused the envelope or its parameters | report it with the `request-id` |
-| `auth.untrusted_destination` | a request was about to go to a host outside `trustedHosts`; refused before any token | report it |
 
 ### Service
 
@@ -164,6 +169,7 @@ Other Authentication codes:
 | `rpc.content_type_not_supported` (`-32005`) | the requested output modes were refused — usually `--profile native118` | use `--profile public`; record the refusal (a fact about the tenant) |
 | `rpc.task_not_cancelable` (`-32002`) | the task was already terminal when cancelled | informational |
 | `task.failed`, `task.rejected`, `task.canceled` | the service ended the task with that state (a partial artifact is never an answer) | the status message in the evidence says why; report it |
+| `judge.call_failed` (no 401/403) | the **judge** model's provider failed or could not be reached (network, timeout, overload); the agent was measured, the criteria are `NOT MEASURED` | check the judge provider's endpoint and status; run again, or with `--no-judge` |
 | `turn.input_required` (`InputRequired`) | the agent paused for a confirmation or more input; **nothing was approved** | unexpected for a read-only prompt: note the case id; never approve it; make the prompt read-only |
 | `turn.auth_required` (`AuthRequired`) | the agent needs a connector sign-in the demo cannot complete | sign in to that connector in Microsoft 365 Copilot Chat, then run again |
 

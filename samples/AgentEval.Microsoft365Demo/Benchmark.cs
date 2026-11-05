@@ -64,7 +64,77 @@ internal sealed record CaseOutcome(
     IReadOnlyList<CheckOutcome> Checks,
     WorkIqTurnResult? Turn,
     int? Score,
-    IReadOnlyList<CriterionResult>? Criteria);
+    IReadOnlyList<CriterionResult>? Criteria)
+{
+    /// <summary>The judge call that failed after the agent's turn completed, when one did (the criteria are then NOT MEASURED).</summary>
+    public JudgeFailure? JudgeFailure { get; init; }
+}
+
+/// <summary>A judge call that threw after the agent's turn completed: the judge's problem, never the agent's.</summary>
+/// <param name="ErrorType">The exception type (<c>HttpRequestException</c>, <c>ClientResultException</c>, …).</param>
+/// <param name="SafeMessage">The exception message, redacted and on one line.</param>
+/// <param name="HttpStatus">The HTTP status the judge's provider answered with, when the exception carries one.</param>
+internal sealed record JudgeFailure(string ErrorType, string SafeMessage, int? HttpStatus)
+{
+    /// <summary>The issue code of a failed judge call.</summary>
+    public const string IssueCode = "judge.call_failed";
+
+    /// <summary>How the criteria check and the case reason describe it: <c>the judge call failed: &lt;type&gt;: &lt;message&gt;</c>.</summary>
+    public string Text => $"the judge call failed: {ErrorType}: {SafeMessage}";
+
+    /// <summary>Whether the judge's provider refused the credentials or the deployment (HTTP 401 or 403).</summary>
+    public bool IsAuthRefusal => HttpStatus is 401 or 403;
+
+    /// <summary>Reads a judge exception: its type, its redacted message and the HTTP status of the first exception in the chain that carries one.</summary>
+    /// <param name="error">The exception the judge call threw.</param>
+    public static JudgeFailure From(Exception error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new JudgeFailure(error.GetType().Name, IssueText.Flatten(WorkIqRedaction.Redact(error.Message)), StatusOf(error));
+    }
+
+    /// <summary>
+    /// The issue that names the JUDGE: category <see cref="WorkIqIssueCategory.Authentication"/> for an HTTP 401/403 from
+    /// the judge's provider, <see cref="WorkIqIssueCategory.Service"/> otherwise. The message carries no case id (the
+    /// issue's <c>caseId</c> does), so the same failure on several cases is one distinct issue on the screen.
+    /// </summary>
+    /// <param name="caseId">The case whose criteria were not graded.</param>
+    public WorkIqIssue ToIssue(string caseId) =>
+        WorkIqIssue.Create(
+            WorkIqTraceStage.Outcome,
+            IsAuthRefusal ? WorkIqIssueCategory.Authentication : WorkIqIssueCategory.Service,
+            IssueCode,
+            $"{Text} — the JUDGE failed, not the agent: the agent's turn completed and its deterministic checks were measured; the criteria were NOT MEASURED",
+            IsAuthRefusal
+                ? $"The judge model's provider refused the judge's key or deployment (HTTP {HttpStatus!.Value.ToString(CultureInfo.InvariantCulture)}): " +
+                  "this is the judge's configuration, not the agent, Work IQ or your Microsoft 365 sign-in. " +
+                  "What to do: check AI_INFERENCE_PROVIDER and that provider's API key, endpoint and model or deployment, then run again (or run with --no-judge)."
+                : "The judge model's provider failed or could not be reached (network, timeout, overload or a service error): this is the judge, not the agent or Work IQ. " +
+                  "What to do: check the judge provider's endpoint and status and run again (or run with --no-judge).")
+        with
+        {
+            CaseId = caseId,
+            HttpStatus = HttpStatus,
+        };
+
+    private static int? StatusOf(Exception error)
+    {
+        for (var e = error; e is not null; e = e.InnerException)
+        {
+            switch (e)
+            {
+                case HttpRequestException { StatusCode: { } status }:
+                    return (int)status;
+                case System.ClientModel.ClientResultException { Status: > 0 } client:
+                    return client.Status;
+                case Azure.RequestFailedException { Status: > 0 } azure:
+                    return azure.Status;
+            }
+        }
+
+        return null;
+    }
+}
 
 /// <summary>What the benchmark ran and why it stopped early, when it did.</summary>
 /// <param name="Cases">One outcome per case, in dataset order (cases it did not reach are NOT MEASURED).</param>
@@ -184,6 +254,13 @@ internal static class Benchmark
 
             var outcome = Classify(demoCase, result, turns.LatestFor(demoCase.Id, since), judge);
             outcomes.Add(outcome);
+            if (outcome.JudgeFailure is { } judgeFailure)
+            {
+                // One issue per failed judge call, through the agent's diagnostics: issues.jsonl and trace.jsonl keep every
+                // occurrence (with the case id); the screen shows a repeated one once, with its count.
+                agent.Diagnostics.Issue(judgeFailure.ToIssue(demoCase.Id), WorkIqTraceLevel.Warning);
+            }
+
             console.Line(DemoVerbosity.Normal, "        " + VerdictLabel(outcome.Verdict) + " — " + outcome.Reason, TintOf(outcome.Verdict));
             foreach (var check in outcome.Checks)
             {
@@ -220,28 +297,23 @@ internal static class Benchmark
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(judge);
 
+        JudgeFailure? judgeFailure = null;
         if (result.Error is { } error)
         {
-            var carried = (error as IWorkIqTurnResultCarrier)?.TurnResult ?? (error.InnerException as IWorkIqTurnResultCarrier)?.TurnResult ?? turn;
-            var failure = carried?.Failure ?? (error as WorkIqProtocolException)?.Failure;
-            var what = carried is not null
-                ? "the turn did not complete: " + TurnRecorder.NotCompletedSummary(carried)
-                : failure is not null
-                    ? $"the agent failed before a turn result: {TurnRecorder.FailureCodes(failure)}: {IssueText.Flatten(failure.SafeMessage)}"
-                    : $"the agent failed: {error.GetType().Name}: {IssueText.Flatten(error.Message)}";
-            var checks = new List<CheckOutcome>
+            var fromAgent = (error as IWorkIqTurnResultCarrier)?.TurnResult ?? (error.InnerException as IWorkIqTurnResultCarrier)?.TurnResult;
+            var protocolFailure = (error as WorkIqProtocolException)?.Failure;
+            var judgeCalled = judge.IsAvailable && demoCase.Criteria.Count > 0;
+            if (fromAgent is null && protocolFailure is null && turn is { IsCompleted: true } && judgeCalled)
             {
-                new(TurnCompleted, CheckResult.NotRun, what),
-                new(AnswerNonEmpty, CheckResult.NotRun, "no answer: the turn did not complete (partial text is never graded)"),
-                carried is null
-                    ? new(ResponseTime, CheckResult.NotMeasured, "no turn result")
-                    : new(ResponseTime, CheckResult.Pass, $"{Milliseconds(carried.Timing.Elapsed)} until the turn ended (client side)"),
-                carried is null
-                    ? new(EvidenceRecorded, CheckResult.NotMeasured, "no turn result")
-                    : new(EvidenceRecorded, CheckResult.Pass, TurnRecorder.EvidenceAvailability(carried.Evidence)),
-                new(CriteriaCheck, CheckResult.NotRun, "not graded: there is no answer"),
-            };
-            return new CaseOutcome(demoCase, CaseVerdict.Error, WorkIqRedaction.Redact(what), checks, carried, null, null);
+                // The agent's turn completed and the agent returned its answer; the exception came after it, from the
+                // judge (MAFEvaluationHarness lets a genuine judge error propagate into TestResult.Error). The agent was
+                // measured: its deterministic checks stand, and the criteria are NOT MEASURED because the judge failed.
+                judgeFailure = JudgeFailure.From(error);
+            }
+            else
+            {
+                return ErrorOutcome(demoCase, error, fromAgent ?? turn, protocolFailure, judgeCalled);
+            }
         }
 
         var list = new List<CheckOutcome>();
@@ -272,6 +344,10 @@ internal static class Benchmark
         {
             list.Add(new(CriteriaCheck, CheckResult.NotMeasured, judge.NotMeasuredReason));
         }
+        else if (judgeFailure is not null)
+        {
+            list.Add(new(CriteriaCheck, CheckResult.NotMeasured, judgeFailure.Text));
+        }
         else if (turn?.AnswerCompleteness == OutputCompleteness.Ambiguous)
         {
             list.Add(new(CriteriaCheck, CheckResult.NotMeasured, "no answer was selected (several candidates), so the judge graded an empty string: not a measurement of the agent"));
@@ -299,7 +375,50 @@ internal static class Benchmark
             CaseVerdict.NotMeasured => "not measured: " + string.Join("; ", list.Where(c => c.Result == CheckResult.NotMeasured).Select(c => $"{c.Name} ({c.Detail})")),
             _ => "every check passed" + (score is { } s ? $" (judge score {s.ToString(CultureInfo.InvariantCulture)}/100)" : ""),
         };
-        return new CaseOutcome(demoCase, verdict, WorkIqRedaction.Redact(reason), list, turn, score, criteria);
+        return new CaseOutcome(demoCase, verdict, WorkIqRedaction.Redact(reason), list, turn, score, criteria) { JudgeFailure = judgeFailure };
+    }
+
+    /// <summary>
+    /// The ERROR row of a case whose evaluation failed: the turn did not complete (its outcome and failure), the agent
+    /// failed before a turn result, or — rarely — the turn completed and the evaluation failed after it without a judge
+    /// failure to blame. Nothing about the answer is graded and the verdict is never a FAIL score.
+    /// </summary>
+    private static CaseOutcome ErrorOutcome(DemoCase demoCase, Exception error, WorkIqTurnResult? carried, WorkIqFailure? protocolFailure, bool judgeCalled)
+    {
+        if (carried is { IsCompleted: true })
+        {
+            // Not the agent: its turn completed. Say what failed instead of "the turn did not complete: outcome Completed".
+            var after = $"the turn completed, but the evaluation failed after it: {error.GetType().Name}: {IssueText.Flatten(error.Message)}";
+            var completedChecks = new List<CheckOutcome>
+            {
+                new(TurnCompleted, CheckResult.Pass, $"Completed (task {carried.Task?.TaskId ?? carried.Identity.ProviderTaskId ?? "(none: direct message)"})"),
+                AnswerCheck(carried),
+                new(ResponseTime, CheckResult.Pass, $"{Milliseconds(carried.Timing.Elapsed)} (client side: network and service, not model latency)"),
+                new(EvidenceRecorded, CheckResult.Pass, TurnRecorder.EvidenceAvailability(carried.Evidence)),
+                new(CriteriaCheck, CheckResult.NotRun, judgeCalled ? "not graded: " + after : "not graded: the evaluation failed after the turn"),
+            };
+            return new CaseOutcome(demoCase, CaseVerdict.Error, WorkIqRedaction.Redact(after), completedChecks, carried, null, null);
+        }
+
+        var failure = carried?.Failure ?? protocolFailure;
+        var what = carried is not null
+            ? "the turn did not complete: " + TurnRecorder.NotCompletedSummary(carried)
+            : failure is not null
+                ? $"the agent failed before a turn result: {TurnRecorder.FailureCodes(failure)}: {IssueText.Flatten(failure.SafeMessage)}"
+                : $"the agent failed: {error.GetType().Name}: {IssueText.Flatten(error.Message)}";
+        var checks = new List<CheckOutcome>
+        {
+            new(TurnCompleted, CheckResult.NotRun, what),
+            new(AnswerNonEmpty, CheckResult.NotRun, "no answer: the turn did not complete (partial text is never graded)"),
+            carried is null
+                ? new(ResponseTime, CheckResult.NotMeasured, "no turn result")
+                : new(ResponseTime, CheckResult.Pass, $"{Milliseconds(carried.Timing.Elapsed)} until the turn ended (client side)"),
+            carried is null
+                ? new(EvidenceRecorded, CheckResult.NotMeasured, "no turn result")
+                : new(EvidenceRecorded, CheckResult.Pass, TurnRecorder.EvidenceAvailability(carried.Evidence)),
+            new(CriteriaCheck, CheckResult.NotRun, "not graded: there is no answer"),
+        };
+        return new CaseOutcome(demoCase, CaseVerdict.Error, WorkIqRedaction.Redact(what), checks, carried, null, null);
     }
 
     /// <summary>A case the benchmark did not reach (the turn cap, a cancellation): NOT MEASURED, nothing sent.</summary>

@@ -100,7 +100,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         _requested = options.ResolveStages();
         _runId = WorkIqDiagnosticsFactory.NewRunId(clock);
         _paths = WorkIqDiagnosticsFactory.Describe(
-            new WorkIqOptions { TraceFile = options.TraceFile, DiagnosticsDirectory = options.DiagnosticsDirectory, RunId = _runId },
+            new WorkIqOptions { TraceFile = options.TraceFile, IssueFile = options.IssueFile, DiagnosticsDirectory = options.DiagnosticsDirectory, RunId = _runId },
             _runId);
     }
 
@@ -448,6 +448,13 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
 
             var provider = _tokenProviderOverride
                 ?? new WorkIqDeviceCodeTokenProvider(Config.TenantId, Config.AppClientId, Config.Scope, _console) { Diagnostics = _diagnostics };
+            if (provider is WorkIqDeviceCodeTokenProvider deviceCode)
+            {
+                // A host's device-code provider (its own prompt writer, shared with the live agent later) traces this check's
+                // sign-in into this check's trace, unless the host gave it diagnostics of its own.
+                deviceCode.AttachDiagnostics(_diagnostics);
+            }
+
             if (provider is IWorkIqSignInWaitSource source)
             {
                 // A device-code sign-in is bounded by its code's own expiry, not by the stage timeout meant for network calls.

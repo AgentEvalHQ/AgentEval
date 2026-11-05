@@ -194,8 +194,12 @@ public sealed class ReadinessTests : IDisposable
         Assert.Contains(lines, l => l.TrimStart().StartsWith("category", StringComparison.Ordinal) && l.Contains(category, StringComparison.Ordinal));
         Assert.Contains(lines, l => l.TrimStart().StartsWith("codes", StringComparison.Ordinal) && l.Contains("HTTP " + ((int)status).ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal));
         Assert.Contains(lines, l => l.TrimStart().StartsWith("request-id", StringComparison.Ordinal) && l.Contains(requestId, StringComparison.Ordinal));
-        Assert.Contains(lines, l => l.TrimStart().StartsWith("cause", StringComparison.Ordinal) && l.Contains(cause, StringComparison.Ordinal));
+        // The plain-language cause is in the stage's FAILED block ("meaning"): the doctor's own stage issue, which repeats
+        // it, is one line on the screen (its full block is in console.log).
+        Assert.Contains(lines, l => (l.TrimStart().StartsWith("cause", StringComparison.Ordinal) || l.TrimStart().StartsWith("meaning", StringComparison.Ordinal))
+                                    && l.Contains(cause, StringComparison.Ordinal));
         Assert.Contains(lines, l => l.TrimStart().StartsWith("action", StringComparison.Ordinal) && l.Contains(action, StringComparison.Ordinal));
+        Assert.Contains(run.Text("console.log").Split('\n'), l => l.TrimStart().StartsWith("cause", StringComparison.Ordinal) && l.Contains(cause, StringComparison.Ordinal));
 
         // issues.jsonl has it, with the category, the HTTP status and the request-id.
         var issues = run.JsonLines("issues.jsonl");
@@ -261,5 +265,56 @@ public sealed class ReadinessTests : IDisposable
         // The sign-in failed first: no request reached Work IQ.
         _rig.Handler.AssertNoRequests();
         Assert.Empty(LeakScanner.Scan(run.Screen, run.Folder));
+    }
+
+    [Fact]
+    public async Task SignInFailsAtDetailed_TheStageVerdictIssueIsOneLine_TheStageBlockHasTheDetail_ConsoleLogHasBoth()
+    {
+        // Review L4: one auth failure printed near-identical blocks (the doctor's stage issue and the stage's FAILED block).
+        _rig.WithHealthyEndpoint().WithCompletedTurns();
+        _rig.Tokens.Failure = new MsalServiceException(
+            "invalid_grant",
+            "AADSTS65001: The user or administrator has not consented to use the application with ID '22222222-2222-2222-2222-222222222222'. Trace ID: t Correlation ID: c Timestamp: 2026-11-05 10:00:00Z");
+
+        var run = await _rig.RunAsync("--verbosity", "detailed", DemoRig.Consent);
+
+        run.AssertExit(1);
+        var lines = run.OutLines;
+        Assert.DoesNotContain(lines, l => l.Contains("! ISSUE Authentication doctor.auth.failed", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.Contains("! issue Authentication doctor.auth.failed", StringComparison.Ordinal) && l.Contains("the stage's FAILED block has the detail", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.Contains("readiness: auth FAILED:", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.TrimStart().StartsWith("action", StringComparison.Ordinal) && l.Contains("admin consent", StringComparison.Ordinal));
+
+        // console.log keeps the full issue block and the stage block; issues.jsonl keeps the issue.
+        var log = run.Text("console.log");
+        Assert.Contains("! ISSUE Authentication doctor.auth.failed", log, StringComparison.Ordinal);
+        Assert.Contains("readiness: auth FAILED:", log, StringComparison.Ordinal);
+        Assert.Contains(run.JsonLines("issues.jsonl"), i => i.GetProperty("code").GetString() == "doctor.auth.failed");
+    }
+
+    [Fact]
+    public async Task Readiness_TheIssueRegisterIsIssuesJsonl_FromTheStart_AndTheProfileEvidenceNamesTheDemosOption()
+    {
+        // Review L3: the check wrote m365-issues.jsonl and the demo renamed it, while the trace still named the old path.
+        // Review L7: the profile evidence said "from --m365-profile", a CLI option the demo does not have.
+        _rig.Handler.FailWith(FakeWorkIqHandler.CardMethod, HttpStatusCode.Unauthorized);
+
+        var run = await _rig.RunAsync("--readiness-only");
+
+        run.AssertExit(1);
+        Assert.False(run.File("m365-issues.jsonl").Exists);
+        Assert.Contains(run.JsonLines("issues.jsonl"), i => i.GetProperty("code").GetString() == "doctor.discovery.failed");
+        Assert.Equal(run.File("issues.jsonl").FullName, run.Json("readiness.json").GetProperty("issueFile").GetString());
+        foreach (var name in new[] { "trace.jsonl", "console.log", "readiness.md", "readiness.json", "summary.md" })
+        {
+            Assert.DoesNotContain("m365-issues.jsonl", run.Text(name), StringComparison.Ordinal);
+        }
+
+        var ready = Assert.Single(run.JsonLines("trace.jsonl"), e => e.GetProperty("code").GetString() == "config.diagnostics_ready");
+        Assert.Contains(run.File("issues.jsonl").FullName, ready.GetProperty("message").GetString(), StringComparison.Ordinal);
+
+        var readiness = run.Text("readiness.md");
+        Assert.Contains("PublicAnswerOnly (from --profile; the config says the same)", readiness, StringComparison.Ordinal);
+        Assert.DoesNotContain("--m365-profile", readiness, StringComparison.Ordinal);
     }
 }

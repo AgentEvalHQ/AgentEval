@@ -40,7 +40,14 @@ public static class Microsoft365AgentFactory
     /// not just the CLI (which enforces its own <c>--i-understand-live-side-effects</c> flag first).
     /// </param>
     /// <param name="options">Runtime options; null means defaults.</param>
-    /// <param name="tokenProvider">The token source; null uses <see cref="WorkIqDeviceCodeTokenProvider"/> (MSAL public client, silent → device code).</param>
+    /// <param name="tokenProvider">
+    /// The token source; null uses <see cref="WorkIqDeviceCodeTokenProvider"/> (MSAL public client, silent → device code,
+    /// its prompt on <see cref="Console.Error"/>). A host passes its own <see cref="WorkIqDeviceCodeTokenProvider"/> to
+    /// choose the prompt writer or to share one sign-in with the readiness check; unless the host set its
+    /// <see cref="WorkIqDeviceCodeTokenProvider.Diagnostics"/>, this agent's diagnostics are attached to it. A device-code
+    /// sign-in that starts inside a blocking turn is bounded by the code's expiry, not by
+    /// <see cref="WorkIqOptions.TurnDeadline"/>, which restarts when the sign-in ends.
+    /// </param>
     /// <param name="onTurn">Optional sink invoked with every turn result before the agent returns or throws.</param>
     /// <param name="innerHandler">Optional innermost <see cref="HttpMessageHandler"/> (tests pass a fake that asserts zero requests); null uses a <see cref="SocketsHttpHandler"/>.</param>
     /// <exception cref="InvalidOperationException"><paramref name="iUnderstandLiveSideEffects"/> is <see langword="false"/>, or the config/options are invalid.</exception>
@@ -71,6 +78,12 @@ public static class Microsoft365AgentFactory
         try
         {
             tokenProvider ??= new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope) { Diagnostics = diagnostics };
+            if (tokenProvider is WorkIqDeviceCodeTokenProvider deviceCode)
+            {
+                // A host-built device-code provider (its own prompt writer, perhaps shared with the readiness check) traces
+                // this agent's sign-ins into this agent's run, unless the host gave it diagnostics of its own.
+                deviceCode.AttachDiagnostics(diagnostics);
+            }
 
             var (http, client) = CreateTransport(config, options, tokenProvider, diagnostics, clock, innerHandler);
             var conversation = new WorkIqConversation(client, config, options, clock, diagnostics);

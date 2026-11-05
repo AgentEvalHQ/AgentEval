@@ -386,6 +386,12 @@ A2A 1.0 — see [docs/microsoft365.md](../../docs/microsoft365.md) for the provi
 consent rationale and the evidence model, and [docs/microsoft365-tester-guide.md](../../docs/microsoft365-tester-guide.md)
 for a step-by-step run on a tenant. The group key skips `Q`, which the menu reads as Quit.
 
+> **Testing a tenant? Start with the demo project instead:**
+> [`samples/AgentEval.Microsoft365Demo`](../AgentEval.Microsoft365Demo/README.md) runs the readiness check, one prompt and
+> a five-case benchmark in one command (`dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only`
+> first, then `-- --i-understand-live-side-effects --zip`), shows every trace and issue at the chosen `--verbosity`, and
+> writes one run folder to send back. R1 and R2 below are the code-level walkthroughs of the same provider.
+
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 0 | **Hello World** | Build the live provider (`Microsoft365AgentFactory.BuildLive`), send ONE read-only prompt, ONE assertion (`NotBeEmpty`), and ONE printed line of evidence availability (citation markers, citation sources, tool executions) — printed, not asserted | No (a Microsoft 365 tenant instead) | 1 min |

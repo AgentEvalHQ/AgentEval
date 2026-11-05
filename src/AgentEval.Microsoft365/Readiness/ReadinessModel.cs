@@ -196,6 +196,13 @@ public sealed record ReadinessCheckOptions
     /// <summary>Overrides the config's diagnostic profile for the auth, discovery, protocol and probe stages; null keeps the config's.</summary>
     public DiagnosticProfile? Profile { get; init; }
 
+    /// <summary>
+    /// Where <see cref="Profile"/> came from, as the config stage's evidence names it (<c>profile: … (from &lt;source&gt;; …)</c>):
+    /// the host's own words, for example its command-line option (<c>--m365-profile</c>, <c>--profile</c>). Null or blank
+    /// says <c>the options</c>. Ignored when <see cref="Profile"/> is null (the evidence then names the config).
+    /// </summary>
+    public string? ProfileSource { get; init; }
+
     /// <summary>Retains the raw A2A exchanges under this folder (content policy <see cref="EvidenceContentPolicy.FullEvidence"/>; may contain tenant data).</summary>
     public DirectoryInfo? RawCaptureDirectory { get; init; }
 
@@ -204,6 +211,13 @@ public sealed record ReadinessCheckOptions
 
     /// <summary>Where the JSONL trace goes; null puts <c>m365-trace-&lt;runId&gt;.jsonl</c> in <see cref="DiagnosticsDirectory"/>.</summary>
     public FileInfo? TraceFile { get; init; }
+
+    /// <summary>
+    /// Where the JSONL issue register goes (appended to when it exists, so a host can give the check and its live agent one
+    /// register); null puts <c>m365-issues.jsonl</c> in <see cref="DiagnosticsDirectory"/>. The report, the trace's
+    /// <c>config.diagnostics_ready</c> and <c>doctor.finished</c> events name this path.
+    /// </summary>
+    public FileInfo? IssueFile { get; init; }
 
     /// <summary>The folder of the trace and issue files; null resolves to the workspace's <c>.agenteval/m365/</c>, else <c>&lt;temp&gt;/agenteval-m365</c>.</summary>
     public DirectoryInfo? DiagnosticsDirectory { get; init; }

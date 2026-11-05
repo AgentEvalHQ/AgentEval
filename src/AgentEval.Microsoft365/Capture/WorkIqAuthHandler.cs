@@ -94,7 +94,7 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 OutcomeCertainty.Known,
                 op);
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.untrusted_destination", refused.SafeMessage, WorkIqTraceLevel.Error);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Protocol, "auth.untrusted_destination", refused.SafeMessage, WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.UntrustedHost)));
+            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Config, "auth.untrusted_destination", refused.SafeMessage, WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.UntrustedHost)));
             throw new WorkIqProtocolException(refused);
         }
 

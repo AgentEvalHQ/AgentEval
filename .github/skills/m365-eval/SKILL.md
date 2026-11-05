@@ -1,6 +1,6 @@
 ---
 name: m365-eval
-version: 0.2.0
+version: 0.3.0
 description: Evaluate a Microsoft 365 agent (Microsoft 365 Copilot or a declarative agent via Work IQ A2A 1.0) with AgentEval - check the connection with agenteval m365 doctor, write a custom benchmark, run it in code or with the agenteval CLI, run the standard benchmarks, and read the evidence honestly. Use whenever a task mentions Microsoft 365 Copilot, Work IQ, a declarative agent, m365 doctor or --sut microsoft365.
 ---
 
@@ -19,7 +19,8 @@ money: ask first.** The maintainers have not run the live path; see `docs/micros
 - **In code, not CLI?** → step 8
 - **Read a result?** → step 9
 - **Something failed?** → step 10
-- **An external tester with a tenant?** → `docs/microsoft365-tester-guide.md`
+- **An external tester with a tenant?** → start with the demo project `samples/AgentEval.Microsoft365Demo` (readiness, one prompt,
+  a five-case benchmark, one run folder to send back), then `docs/microsoft365-tester-guide.md`
 
 Running from a clone: the CLI targets net8.0 and net10.0, so `agenteval …` below means
 `dotnet run --project src/AgentEval.Cli --framework net10.0 -- …` (after `dotnet build src/AgentEval.Cli`), or an installed tool.
@@ -44,8 +45,10 @@ Copy `samples/datasets/m365-config.template.json` to `workiq.json` (never commit
 }
 ```
 
-- Required: `tenantId`, `appClientId`. Validation checks they are present, not that they are real: a `REPLACE-WITH-…` placeholder
-  passes the config check and fails at sign-in (`AADSTS90002` / `AADSTS700016`).
+- Required: `tenantId`, `appClientId`. A field that still holds the template's `REPLACE-WITH-…` placeholder is refused at the config
+  check (any field; the message names it; nothing is sent). The config stage also warns when `tenantId` is neither a GUID nor a
+  domain (the sign-in would fail with `AADSTS90002`) or `appClientId` is not a GUID (`AADSTS700016`). Validation cannot tell a
+  real-looking id from the right one: that is what the sign-in stage proves.
 - `agentId` `null` = the default Work IQ agent (Microsoft 365 Copilot). To target another agent the signed-in user can reach (a
   declarative agent, a Copilot Studio agent published to Microsoft 365, or a Microsoft-built agent): the experimental
   `workiq list-agents` command of Microsoft's WorkIQ CLI, or the agent's Copilot Chat URL. Ids look like `<LETTER>_<opaque>.<opaque>`;
@@ -67,9 +70,11 @@ agenteval m365 doctor --m365-config ./workiq.json
 
 Stages, in order, stopping at the first FAIL (`--continue` runs on): **config** (fields, endpoint, card URI, profile; no network) →
 **auth** (silent from the OS-encrypted cache, else device-code sign-in — the first run prints "To sign in, use a web browser to open the
-page https://microsoft.com/devicelogin and enter the code …"; it must be finished within `--timeout-seconds`, default 120; on failure
-the AADSTS code with a cause and a fix: consent missing, app not found, public-client flows disabled, MFA, user not in tenant,
-conditional access) → **discovery** (the agent card: HTTP status, every interface, the one chosen, trust and version verdict) →
+page https://microsoft.com/devicelogin and enter the code …"; the stage then waits until that code expires, about 15 minutes, not
+`--timeout-seconds` (default 120, which bounds network calls only; the trace says so in `doctor.sign_in_wait`), and a code that
+expires first fails "the device code expired at … UTC"; on failure the AADSTS code with a cause and a fix: consent missing, app not
+found, public-client flows disabled, MFA, user not in tenant, tenant not found or not named (`AADSTS90002`, `AADSTS50059`,
+`AADSTS90019`: check `tenantId`), conditional access) → **discovery** (the agent card: HTTP status, every interface, the one chosen, trust and version verdict) →
 **protocol** (`GetTask` on a random id must come back as JSON-RPC `-32001` TaskNotFound: proves the endpoint speaks A2A 1.0 and
 accepts the token; a 401/403 here is the permission, consent, licence or enablement verdict). No prompt reaches the agent.
 
@@ -267,6 +272,10 @@ if (evidence is not null)
 - For a judge-graded batch use `MAFEvaluationHarness` (namespace `AgentEval.MAF`) with a judge `IChatClient` and `RunBatchAsync`,
   exactly as for any other agent.
 - Multi-turn: set `ConversationPolicy.ContinueContext`, keep one agent per conversation, call `ResetSessionAsync()` to start a new one.
+- Sign-in: the default token provider prints the device-code message on stderr. To route it (a log that masks the code), pass your
+  own `new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope, promptWriter)` to `BuildLive` (and the
+  same instance to the readiness check, so one sign-in serves both); its auth events reach the agent's trace unless you set its
+  `Diagnostics`. A sign-in that starts inside a turn waits for the code's expiry, not `WorkIqOptions.TurnDeadline`.
 - The readiness check in code: `Microsoft365ReadinessCheck.RunAsync(config, configFile: null, new ReadinessCheckOptions())`
   (`AgentEval.Microsoft365.Readiness`) returns a `ReadinessReport`; `ReadinessReportRenderer.ToMarkdown(report)` renders it.
 - A credential-free test seam: `Microsoft365AgentFactory.FromConversation(IWorkIqConversation conversation, string name)` with a fake
@@ -294,13 +303,16 @@ For each case report: verdict, outcome, and the availability of every evidence c
 | `Microsoft 365 config is missing required field(s)` / `config field '…'` | config | fix the named field |
 | doctor `auth` FAIL `sign-in failed with AADSTS65001` | admin consent missing | an administrator grants consent for `WorkIQAgent.Ask` |
 | doctor `auth` FAIL `… AADSTS7000218` | not a public client | "Allow public client flows" = Yes |
-| doctor `auth` FAIL `… AADSTS700016` / `AADSTS90002` | wrong `appClientId` / `tenantId` (often a placeholder) | fix the config |
-| doctor `auth` FAIL `sign-in not completed in time` | the device-code sign-in was not finished | run again; raise `--timeout-seconds` |
+| doctor `config` FAIL `field '…' still holds the template placeholder` | the template was copied but not filled in | replace every `REPLACE-WITH-…` value; nothing was sent |
+| doctor `auth` FAIL `… AADSTS700016` | wrong `appClientId` | copy the Application (client) ID from the app registration's Overview page |
+| doctor `auth` FAIL `… AADSTS90002` / `AADSTS50059` / `AADSTS90019` | `tenantId` names no Entra tenant, or none was named | set `tenantId` to the Directory (tenant) ID (or the verified domain) |
+| doctor `auth` FAIL `the device code expired at … UTC` | the device-code sign-in was not finished while the code was valid (about 15 minutes) | run again and finish the browser sign-in in time; `--timeout-seconds` does not shorten or lengthen this wait |
+| doctor `auth` FAIL `sign-in not completed in time: no token within … s` | no device-code prompt started and the token provider did not answer | check the network path to `login.microsoftonline.com`; raise `--timeout-seconds` |
 | `HTTP 401` on discovery/protocol | token rejected | check `scope`, `tenantId`, `appClientId`; sign in afresh |
 | `HTTP 403` on discovery/protocol/probe | consent, Copilot licence or Work IQ enablement missing | the administrator checks all three |
 | `HTTP 404 on …: the endpoint or agent was not found` | wrong `agentId` | check it; try `null` |
 | `ProtocolVersionMismatch`, JSON-RPC `-32009` | the service answered as A2A 0.3 or rejected 1.0 | report it with the trace; the provider never parses 0.3 |
-| `the card points at a host outside trustedHosts` / `UntrustedHost` | the card advertised a URL outside `trustedHosts` | inspect the card evidence; add the host only if it is Microsoft's |
+| `the card points at a host outside trustedHosts` / `UntrustedHost` (issue category `Config`) | the card advertised a URL outside `trustedHosts` | inspect the card evidence; add the host to `trustedHosts` only if it is Microsoft's |
 | `Indeterminate` | no final task state in time, or a drop | never auto-resend; inspect the task id in the trace |
 | `Work IQ evaluation stopped: … MaxTurns` | the turn cap | raise `--m365-max-turns` after checking the tenant's usage reporting |
 | exit `11` | a case has no verdict (non-completed turn, judge without an answer, unmeasured metric) or the doctor's probe skipped for consent | read the case's `error` / the doctor summary; do not re-run blindly |

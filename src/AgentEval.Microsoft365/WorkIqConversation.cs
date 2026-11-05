@@ -9,6 +9,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using A2A;
+using AgentEval.Microsoft365.Auth;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Evidence;
 using AgentEval.Microsoft365.Evidence.Decoders;
@@ -155,6 +156,10 @@ public sealed class WorkIqConversation : IWorkIqConversation
             if (await TryDiscoverAsync(ctx, cancellationToken).ConfigureAwait(false))
             {
                 using var tokens = CreateTurnTokens(cancellationToken);
+
+                // A device-code sign-in that starts inside the turn (a token that can no longer be refreshed silently) is
+                // bounded by its code's expiry, not by the turn deadline meant for the network; the deadline restarts after it.
+                using var signInWait = WorkIqSignInWait.Enter(new TurnSignInWait(this, ctx, tokens));
                 await SendBlockingAsync(ctx, tokens, cancellationToken).ConfigureAwait(false);
                 if (ctx.Snapshot is { State: WorkIqTaskState.Submitted or WorkIqTaskState.Working } && ctx.Failure is null && !ctx.Stopped)
                 {
@@ -1545,7 +1550,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
             WorkIqTurnOutcome.Failed => result.Failure is { } ff ? WorkIqA2AClient.SuggestedCauseOf(ff) : "The task ended failed on the service side.",
             _ => result.Failure is { } fi ? WorkIqA2AClient.SuggestedCauseOf(fi) : "The remote state is unknown; the task handle on the result can be read with GetTask.",
         };
-        Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Outcome, category, "turn." + result.Outcome.ToString().ToLowerInvariant(), message, cause)
+        Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Outcome, category, OutcomeIssueCode(result.Outcome), message, cause)
         {
             CaseId = ctx.Request.CaseId,
             TurnId = ctx.Request.TurnId,
@@ -1556,6 +1561,29 @@ public sealed class WorkIqConversation : IWorkIqConversation
             RpcErrorCode = result.Failure?.RpcErrorCode,
             A2AState = ctx.Snapshot?.RawState,
         }, level);
+    }
+
+    /// <summary>
+    /// The issue code of a turn that did not complete: <c>turn.</c> and the outcome in snake case (<c>turn.input_required</c>,
+    /// <c>turn.auth_required</c>, <c>turn.failed</c>, <c>turn.indeterminate</c>…), the same spelling
+    /// <see cref="WorkIqIssueClassifier"/> uses for a turn result.
+    /// </summary>
+    /// <param name="outcome">The outcome.</param>
+    internal static string OutcomeIssueCode(WorkIqTurnOutcome outcome)
+    {
+        var name = outcome.ToString();
+        var code = new StringBuilder("turn.", 5 + name.Length + 4);
+        for (var i = 0; i < name.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(name[i]))
+            {
+                code.Append('_');
+            }
+
+            code.Append(char.ToLowerInvariant(name[i]));
+        }
+
+        return code.ToString();
     }
 
     private void ThrowIfStoppedLocally(TurnContext ctx, WorkIqTurnResult result, CancellationToken callerToken)
@@ -1794,7 +1822,70 @@ public sealed class WorkIqConversation : IWorkIqConversation
         var linked = deadline is null
             ? CancellationTokenSource.CreateLinkedTokenSource(callerToken, abandon)
             : CancellationTokenSource.CreateLinkedTokenSource(callerToken, abandon, deadline.Token);
-        return new TurnTokens(linked, deadline, abandon, callerToken);
+        return new TurnTokens(linked, deadline, abandon, callerToken) { DeadlineDue = deadline is null ? null : Clock.GetUtcNow() + Options.TurnDeadline };
+    }
+
+    /// <summary>
+    /// The sign-in listener of one blocking turn: when a device-code sign-in starts inside the turn, the turn deadline is
+    /// moved to the code's expiry (plus <see cref="WorkIqSignInWait.Grace"/>) when that is later, so the person has the
+    /// code's whole lifetime; when the sign-in ends, the deadline restarts at <see cref="WorkIqOptions.TurnDeadline"/> for
+    /// the network part of the turn. Both moves are traced (<c>turn.sign_in_wait</c>, <c>turn.sign_in_done</c>). A turn
+    /// without a deadline, or whose deadline already fired, is left alone.
+    /// </summary>
+    private sealed class TurnSignInWait : IWorkIqSignInWaitListener
+    {
+        private readonly WorkIqConversation _owner;
+        private readonly TurnContext _ctx;
+        private readonly TurnTokens _tokens;
+        private int _extended;
+
+        public TurnSignInWait(WorkIqConversation owner, TurnContext ctx, TurnTokens tokens)
+        {
+            _owner = owner;
+            _ctx = ctx;
+            _tokens = tokens;
+        }
+
+        public void SignInStarted(DateTimeOffset expiresOn)
+        {
+            var now = _owner.Clock.GetUtcNow();
+            var until = expiresOn + WorkIqSignInWait.Grace;
+            if (until <= now || !_tokens.MoveDeadline(until, now, extendOnly: true))
+            {
+                return;
+            }
+
+            Volatile.Write(ref _extended, 1);
+            _owner.Diagnostics.Trace(
+                WorkIqTraceStage.Auth,
+                "turn.sign_in_wait",
+                $"a device-code sign-in started during the turn: the turn now waits until the code expires at {expiresOn.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} UTC " +
+                $"(up to {(until - now).TotalSeconds.ToString("0", CultureInfo.InvariantCulture)} s) instead of its {Options.TurnDeadline} deadline, which bounds network calls only; nothing is sent before the sign-in finishes",
+                WorkIqTraceLevel.Warning,
+                caseId: _ctx.Request.CaseId,
+                turnId: _ctx.Request.TurnId);
+        }
+
+        public void SignInEnded()
+        {
+            if (Interlocked.Exchange(ref _extended, 0) == 0)
+            {
+                return;
+            }
+
+            var now = _owner.Clock.GetUtcNow();
+            if (_tokens.MoveDeadline(now + Options.TurnDeadline, now, extendOnly: false))
+            {
+                _owner.Diagnostics.Trace(
+                    WorkIqTraceStage.Auth,
+                    "turn.sign_in_done",
+                    $"the sign-in wait ended: the turn deadline restarts ({Options.TurnDeadline}) for the network part of the turn",
+                    caseId: _ctx.Request.CaseId,
+                    turnId: _ctx.Request.TurnId);
+            }
+        }
+
+        private WorkIqOptions Options => _owner.Options;
     }
 
     private void AcquireTurnGate()
@@ -1836,6 +1927,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
     {
         private readonly CancellationTokenSource _linked;
         private readonly CancellationTokenSource? _deadline;
+        private readonly object _deadlineGate = new();
 
         public TurnTokens(CancellationTokenSource linked, CancellationTokenSource? deadline, CancellationToken abandon, CancellationToken caller = default)
         {
@@ -1853,6 +1945,36 @@ public sealed class WorkIqConversation : IWorkIqConversation
         public CancellationToken Caller { get; }
 
         public bool DeadlineFired => _deadline?.IsCancellationRequested == true;
+
+        /// <summary>When the deadline fires (clock time); null when the turn has none.</summary>
+        public DateTimeOffset? DeadlineDue { get; set; }
+
+        /// <summary>
+        /// Moves the deadline to <paramref name="until"/> (with <paramref name="extendOnly"/>, only when that is later than
+        /// the current deadline); false when the turn has no deadline, it already fired, nothing changed, or the turn is over.
+        /// </summary>
+        public bool MoveDeadline(DateTimeOffset until, DateTimeOffset now, bool extendOnly)
+        {
+            lock (_deadlineGate)
+            {
+                if (_deadline is null || _deadline.IsCancellationRequested || DeadlineDue is not { } due || (extendOnly && until <= due))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    var delay = until - now;
+                    _deadline.CancelAfter(delay > TimeSpan.Zero ? delay : TimeSpan.Zero);
+                    DeadlineDue = until;
+                    return true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return false;
+                }
+            }
+        }
 
         public void Dispose()
         {

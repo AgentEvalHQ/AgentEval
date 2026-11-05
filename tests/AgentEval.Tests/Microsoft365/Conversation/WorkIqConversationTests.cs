@@ -385,7 +385,7 @@ public sealed class WorkIqConversationTests
 
             Assert.Equal("Allow", WorkIqInteractionResponse.ForOption(pending, "Allow").SelectedOption);
             Assert.Throws<ArgumentException>(() => WorkIqInteractionResponse.ForOption(pending, "Yes"));
-            Assert.Contains(h.Issues.Issues, i => i.Code == "turn.inputrequired");
+            Assert.Contains(h.Issues.Issues, i => i.Code == "turn.input_required");
             Assert.Equal(WorkIqTraceLevel.Warning, Assert.Single(h.Events("turn.outcome")).Level);
         }
     }
