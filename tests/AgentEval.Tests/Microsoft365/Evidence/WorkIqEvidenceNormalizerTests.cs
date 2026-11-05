@@ -17,7 +17,8 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 /// <summary>
 /// <see cref="WorkIqEvidenceNormalizer"/>: citations only from the terminal status message, compound markers with
 /// both keys, raw text untouched while the display text drops unresolved markers, determinism, the profile
-/// switch (NotRequested vs NotProvided/Provided), the answer states (present, empty, missing, ambiguous, not
+/// switch of the tool and retrieval channels (NotRequested vs NotProvided/Provided; approval intents are decoded
+/// under both profiles), the answer states (present, empty, missing, ambiguous, not
 /// final), the identity/version stamps, and the trace/issue events it emits.
 /// </summary>
 public sealed class WorkIqEvidenceNormalizerTests
@@ -196,7 +197,7 @@ public sealed class WorkIqEvidenceNormalizerTests
     // ---------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public void Normalize_PublicAnswerOnly_ChannelsAreNotRequestedAndCitationsStillDecoded()
+    public void Normalize_PublicAnswerOnly_ToolAndRetrievalChannelsAreNotRequestedAndCitationsStillDecoded()
     {
         var evidence = Normalize(SnapshotFromEnvelope(DevRetrievalFixture), profile: DiagnosticProfile.PublicAnswerOnly);
 
@@ -205,7 +206,6 @@ public sealed class WorkIqEvidenceNormalizerTests
                      (evidence.ToolSelections.Availability, evidence.ToolSelections.Scope),
                      (evidence.ToolExecutions.Availability, evidence.ToolExecutions.Scope),
                      (evidence.RetrievalExecutions.Availability, evidence.RetrievalExecutions.Scope),
-                     (evidence.ApprovalIntents.Availability, evidence.ApprovalIntents.Scope),
                      (evidence.SkillActivations.Availability, evidence.SkillActivations.Scope),
                  })
         {
@@ -213,11 +213,59 @@ public sealed class WorkIqEvidenceNormalizerTests
             Assert.Equal(EvidenceScope.Turn, scope);
         }
 
+        // Approval intents are decoded under both profiles (the card arrives with the input-required status, not
+        // through a requested mode): a completed task without an interaction part has none, so NotProvided, never
+        // NotRequested.
+        Assert.Equal(EvidenceAvailability.NotProvided, evidence.ApprovalIntents.Availability);
+        Assert.Empty(evidence.ApprovalIntents.Items);
         Assert.Empty(evidence.ToolExecutions.Items);
-        Assert.Contains(evidence.Issues, i => i.Code == WorkIqEvidenceNormalizer.PublicAnswerOnlyIssueCode);
+        var publicIssue = Assert.Single(evidence.Issues, i => i.Code == WorkIqEvidenceNormalizer.PublicAnswerOnlyIssueCode);
+        Assert.DoesNotContain("approval channels were not requested", publicIssue.SafeMessage, StringComparison.Ordinal);
+        Assert.Contains("Approval intents are still decoded", publicIssue.SafeMessage, StringComparison.Ordinal);
         Assert.Contains(evidence.Issues, i => i.Code == WorkIqEvidenceNormalizer.SkillsIssueCode);
         Assert.Equal(2, evidence.CitationSources.Items.Length);
         Assert.NotNull(evidence.Answer);
+    }
+
+    [Theory]
+    [InlineData(DiagnosticProfile.PublicAnswerOnly)]
+    [InlineData(DiagnosticProfile.Native118Diagnostics)]
+    public void Normalize_ConfirmationFixture_ApprovalIntentsDecodedUnderBothProfiles(DiagnosticProfile profile)
+    {
+        var evidence = Normalize(SnapshotFromEnvelope(ConfirmationFixture), profile: profile);
+
+        Assert.Equal(EvidenceAvailability.Provided, evidence.ApprovalIntents.Availability);
+        var intent = Assert.Single(evidence.ApprovalIntents.Items);
+        Assert.Equal("call-0a1b2c3d4e5f", intent.ProposedProviderInvocationId.Value);
+        Assert.Equal("CreateDemoEvent", intent.Tool.FunctionDisplayName.Value);
+        Assert.Equal("Pending", intent.Decision);
+        Assert.Equal(
+            profile == DiagnosticProfile.PublicAnswerOnly ? EvidenceAvailability.NotRequested : EvidenceAvailability.NotProvided,
+            evidence.ToolExecutions.Availability);
+    }
+
+    [Fact]
+    public void Normalize_ConfirmationFixture_ApprovalChannelIsIdenticalUnderBothProfiles()
+    {
+        var snapshot = SnapshotFromEnvelope(ConfirmationFixture);
+
+        var underPublic = Normalize(snapshot, profile: DiagnosticProfile.PublicAnswerOnly).ApprovalIntents;
+        var underNative = Normalize(snapshot, profile: DiagnosticProfile.Native118Diagnostics).ApprovalIntents;
+
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(underNative, Microsoft365EvidenceJson.Options),
+            System.Text.Json.JsonSerializer.Serialize(underPublic, Microsoft365EvidenceJson.Options));
+    }
+
+    [Fact]
+    public void Normalize_DirectMessageUnderPublicAnswerOnly_ApprovalIntentsAreNotProvidedNeverNotRequested()
+    {
+        var evidence = Normalize(null, MessageFromEnvelope(DirectFixture), profile: DiagnosticProfile.PublicAnswerOnly);
+
+        Assert.Equal(EvidenceAvailability.NotProvided, evidence.ApprovalIntents.Availability);
+        Assert.Equal(EvidenceScope.Unknown, evidence.ApprovalIntents.Scope);
+        Assert.Equal("", Assert.Single(evidence.ApprovalIntents.Sources).JsonPointer);
+        Assert.Equal(EvidenceAvailability.NotRequested, evidence.ToolExecutions.Availability);
     }
 
     [Fact]

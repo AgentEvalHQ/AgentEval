@@ -27,7 +27,7 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **groups (A–O)**. Select a group letter, then a sample number.
+The interactive menu organises samples into **groups (A–P, then R; Q quits the menu)**. Select a group letter, then a sample number.
 You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
@@ -43,6 +43,7 @@ dotnet run -- 102  # Judge vs Judge          (N3)
 dotnet run -- 103  # Memory Judge vs Judge   (N4)
 dotnet run -- 104  # Judge Reference Experiment (N5)
 dotnet run -- 105  # Healthcare Safety Pack  (O1)
+dotnet run -- 109  # Microsoft 365 Hello World (R1)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -376,6 +377,41 @@ a `--calibrate` mode that measures the judges against the author's gold labels, 
 
 ```bash
 dotnet run -- 105   # Healthcare Safety Pack  (O1)
+```
+
+### R — Microsoft 365  🔑 real Microsoft 365 agent via Work IQ A2A — set `M365_CONFIG_PATH` + `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`
+
+Evaluates a **live Microsoft 365 agent** (the default Work IQ agent, or a declarative agent by id) over Work IQ
+A2A 1.0 — see [docs/microsoft365.md](../../docs/microsoft365.md) for the provider doc, the config file, the
+consent rationale and the evidence model, and [docs/microsoft365-tester-guide.md](../../docs/microsoft365-tester-guide.md)
+for a step-by-step run on a tenant. The group key skips `Q`, which the menu reads as Quit.
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 0 | **Hello World** | Build the live provider (`Microsoft365AgentFactory.BuildLive`), send ONE read-only prompt, ONE assertion (`NotBeEmpty`), and ONE printed line of evidence availability (citation markers, citation sources, tool executions) — printed, not asserted | No (a Microsoft 365 tenant instead) | 1 min |
+| 1 | **Live Walkthrough** | Verbose diagnostics (where the trace and the issue register are written), the evidence per channel (`Provided` / `NotProvided` / `NotRequested`, never inferred) with citation links and raw vs display text, fresh vs continued server context (`ConversationPolicy.ContinueContext`, `ResetSessionAsync`), an opt-in action-shaped prompt (`M365_ALLOW_ACTION_PROMPT=true`) where an `InputRequired` pause is reported as not completed with its proposed calls listed and nothing approved, and `MaxTurns` refusing a turn before anything is sent | No (a Microsoft 365 tenant instead) | 5 min |
+
+What you need: Work IQ enabled in the tenant, a Microsoft 365 Copilot licence for the test user, and a public-client
+Entra app (*Allow public client flows* = Yes) with the delegated `WorkIQAgent.Ask` permission and admin consent. The
+tenant id and the app id go in a config file (template:
+[`samples/datasets/m365-config.template.json`](../datasets/m365-config.template.json)). The first run prints a
+device-code sign-in prompt; later runs reuse an encrypted token cache. Both samples print where their trace
+(`m365-trace-<run id>.jsonl`) and issue register (`m365-issues.jsonl`) are written; when something fails, the issue
+register names the stage, the HTTP / JSON-RPC / AADSTS codes and a suggested cause. Without both variables each sample
+stops with exit 11; there is no mock path. A turn that does not complete (an approval pause, a failure, an unknown
+remote state) is reported with its outcome, task id and context id, never as an answer. R2 without
+`M365_ALLOW_ACTION_PROMPT=true` records its action-prompt scene as not measured, so a run whose other scenes pass
+exits 11, not 0.
+
+```powershell
+$env:M365_CONFIG_PATH = "C:\path\to\workiq.json"     # tenantId, appClientId; optional endpoint, agentId, agentName, …
+$env:M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS = "true"    # NON-PROD identity only: the permission covers reads AND writes
+$env:M365_ALLOW_ACTION_PROMPT = "true"               # optional: R2's action-shaped prompt scene (off by default)
+```
+
+```bash
+dotnet run -- 109   # Microsoft 365 Hello World       (R1)
+dotnet run -- 110   # Microsoft 365 Live Walkthrough  (R2)
 ```
 
 ---

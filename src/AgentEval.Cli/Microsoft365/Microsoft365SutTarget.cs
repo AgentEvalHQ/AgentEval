@@ -6,10 +6,12 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Nodes;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Core;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
+using AgentEval.Microsoft365.Evidence;
 
 namespace AgentEval.Cli.Microsoft365;
 
@@ -129,6 +131,83 @@ internal sealed class Microsoft365SutTarget : ISutTarget
 
     /// <summary>The turn sink of the live agent built by <see cref="Build"/>; null until a live build, and with a <c>sutOverride</c>.</summary>
     internal CliTurnSink? TurnSink { get; private set; }
+
+    /// <summary>AEF run setting (HLD D15): the A2A protocol version the provider speaks.</summary>
+    internal const string A2AVersionSetting = "a2aVersion";
+
+    /// <summary>AEF run setting (HLD D15): the diagnostic profile in effect (the <see cref="DiagnosticProfile"/> member name).</summary>
+    internal const string ProfileSetting = "m365Profile";
+
+    /// <summary>AEF run setting (HLD D15): the evidence normaliser version (<see cref="Microsoft365Evidence.NormalizerVersion"/>).</summary>
+    internal const string NormalizerVersionSetting = "normalizerVersion";
+
+    /// <summary>AEF run setting (HLD D15): the provider profile / decoder version (<see cref="Microsoft365Evidence.ProviderProfileVersion"/>).</summary>
+    internal const string ProviderProfileVersionSetting = "providerProfileVersion";
+
+    /// <summary>AEF run setting (HLD D15): the config's identity hash (<see cref="Microsoft365Config.ComputeIdentitySha256"/>).</summary>
+    internal const string ConfigSha256Setting = "m365ConfigSha256";
+
+    /// <summary>AEF run setting (HLD D15): the opaque agent id, or <see cref="DefaultAgentIdSettingValue"/>.</summary>
+    internal const string AgentIdSetting = "m365AgentId";
+
+    /// <summary>The <see cref="AgentIdSetting"/> value when the config targets the default Work IQ agent (no agent id).</summary>
+    internal const string DefaultAgentIdSettingValue = "default";
+
+    /// <summary>AEF run setting (HLD D15): the host of the configured endpoint (where the agent card is discovered).</summary>
+    internal const string EndpointHostSetting = "m365EndpointHost";
+
+    /// <summary>AEF run setting: the <see cref="EvidenceContentPolicy"/> the per-case evidence documents are projected under, when known.</summary>
+    internal const string ContentPolicySetting = "m365ContentPolicy";
+
+    /// <summary>
+    /// The turn sink of <paramref name="agent"/>: the sink <see cref="Build"/> wired into the live agent, else the sink a
+    /// caller attached to a <c>sutOverride</c> stand-in (<see cref="CliTurnSink.AttachTo"/>), else null — then no turn
+    /// result can be read back and no per-case evidence document is written.
+    /// </summary>
+    /// <param name="agent">The agent the command evaluates (what <see cref="Build"/> returned).</param>
+    internal CliTurnSink? SinkFor(IEvaluableAgent agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        return TurnSink ?? CliTurnSink.AttachedTo(agent);
+    }
+
+    /// <summary>
+    /// The run provenance this target adds to an AEF run's <c>config</c> settings (HLD D15, M31), all of it content-free:
+    /// <c>a2aVersion</c> (the only protocol version spoken), <c>m365Profile</c> (the diagnostic profile in effect, from
+    /// <c>--m365-profile</c>), <c>normalizerVersion</c> and <c>providerProfileVersion</c> (the normaliser and decoder
+    /// versions that shape the evidence documents), <c>m365ConfigSha256</c> (the config's identity hash, the same
+    /// <c>configSha256</c> every Work IQ issue carries; the config holds no secret), <c>m365AgentId</c> (the opaque agent
+    /// id, or <c>default</c>), <c>m365EndpointHost</c> (the configured endpoint's host, where the card is discovered) and,
+    /// when <paramref name="contentPolicy"/> is known, <c>m365ContentPolicy</c>. Null until <see cref="Validate"/> has loaded
+    /// the config. It describes the target the CLI validated: with a <c>sutOverride</c> stand-in (a run recorded as mocked)
+    /// the identity and profile are those of <c>--m365-config</c> and <c>--m365-profile</c>.
+    /// </summary>
+    /// <param name="contentPolicy">The content policy of the agent's evidence documents, when known.</param>
+    internal JsonObject? AefRunSettings(EvidenceContentPolicy? contentPolicy)
+    {
+        var config = _config;
+        if (config is null)
+        {
+            return null;
+        }
+
+        var settings = new JsonObject
+        {
+            [A2AVersionSetting] = Microsoft365Evidence.A2AVersion,
+            [ProfileSetting] = (_profile ?? config.ResolveProfile()).ToString(),
+            [NormalizerVersionSetting] = Microsoft365Evidence.NormalizerVersion,
+            [ProviderProfileVersionSetting] = Microsoft365Evidence.ProviderProfileVersion,
+            [ConfigSha256Setting] = config.ComputeIdentitySha256(),
+            [AgentIdSetting] = string.IsNullOrWhiteSpace(config.AgentId) ? DefaultAgentIdSettingValue : config.AgentId.Trim(),
+            [EndpointHostSetting] = config.ResolveEndpointUri().Host,
+        };
+        if (contentPolicy is { } policy)
+        {
+            settings[ContentPolicySetting] = policy.ToString();
+        }
+
+        return settings;
+    }
 
     /// <summary>
     /// Adds the six <c>--m365-*</c> options. NEVER the consent flag: <see cref="SutTargetResolver.AddOptionsTo"/> registers

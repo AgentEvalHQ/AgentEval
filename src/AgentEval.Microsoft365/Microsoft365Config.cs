@@ -236,6 +236,15 @@ public sealed record Microsoft365Config
         return new Uri(path, UriKind.Absolute);
     }
 
+    /// <summary>
+    /// Lower-case hex SHA-256 of this config's canonical identity: endpoint, agent id, tenant id, app client id, scope
+    /// and the config's own diagnostic profile (trimmed, serialized in that order). The config holds no secret, so
+    /// nothing is excluded. The value is the <c>configSha256</c> every Work IQ issue carries, so an AEF run that
+    /// records it can be matched with the trace and issue files of the same configuration. A profile override given in
+    /// <see cref="WorkIqOptions.ProfileOverride"/> is not part of the identity; record the profile in effect beside it.
+    /// </summary>
+    public string ComputeIdentitySha256() => Diagnostics.WorkIqDiagnosticsFactory.ComputeConfigSha256(this);
+
     private bool TryResolveProfile(out Profile profile)
     {
         if (string.IsNullOrWhiteSpace(DiagnosticProfile))

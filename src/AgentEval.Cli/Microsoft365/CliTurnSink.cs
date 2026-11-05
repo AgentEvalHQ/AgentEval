@@ -3,7 +3,9 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
+using AgentEval.Core;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Evidence;
 
@@ -13,13 +15,16 @@ namespace AgentEval.Cli.Microsoft365;
 /// The per-case turn sink of <c>--sut microsoft365</c>: receives every <see cref="WorkIqTurnResult"/> the agent produces
 /// (completed or not: the agent invokes it before it returns or throws), keeps the last result per case and every result
 /// in arrival order, and with <c>--m365-verbose</c> prints one stderr line per turn. The AEF evidence document (M31)
-/// reads <see cref="LastByCase"/>. Thread-safe: the batch harness may run cases concurrently. Nothing is inferred: a
+/// reads <see cref="LatestFor"/> (the case's turn since the case started). Thread-safe: the batch harness may run cases concurrently. Nothing is inferred: a
 /// missing answer prints its completeness (<c>None</c>), never <c>0 chars</c>; an absent evidence channel prints its
 /// availability (<c>NotRequested</c> / <c>NotProvided</c> …), never a count; a non-completed turn prints its outcome,
 /// ids and the safe failure summary, never partial text.
 /// </summary>
 internal sealed class CliTurnSink
 {
+    /// <summary>Sinks attached to stand-in agents (<see cref="AttachTo"/>); weak keys, so no agent is kept alive.</summary>
+    private static readonly ConditionalWeakTable<IEvaluableAgent, CliTurnSink> AttachedSinks = new();
+
     private readonly object _gate = new();
     private readonly Dictionary<string, WorkIqTurnResult> _lastByCase = new(StringComparer.Ordinal);
     private readonly List<WorkIqTurnResult> _all = [];
@@ -71,6 +76,55 @@ internal sealed class CliTurnSink
                 return _all.Count;
             }
         }
+    }
+
+    /// <summary>
+    /// The last result recorded for <paramref name="caseId"/> at or after arrival index <paramref name="since"/> (the
+    /// <see cref="Count"/> taken just before the case started), or null when the case produced no turn result since then
+    /// (for example a turn refused before any send). <see cref="LastByCase"/> keeps a case's last result for the whole
+    /// run, so when one case id runs several times (the trials of <c>--runs</c>) a trial that never reached the service
+    /// would otherwise be handed the turn of an earlier trial; the cursor rules that out.
+    /// </summary>
+    /// <param name="caseId">The case id the turn identity carries (compared trimmed, as the agent records it).</param>
+    /// <param name="since">The arrival index the case started at.</param>
+    public WorkIqTurnResult? LatestFor(string caseId, int since)
+    {
+        ArgumentNullException.ThrowIfNull(caseId);
+        var key = caseId.Trim();
+        lock (_gate)
+        {
+            for (var i = _all.Count - 1; i >= Math.Max(0, since); i--)
+            {
+                if (string.Equals(_all[i].Identity.CaseId, key, StringComparison.Ordinal))
+                {
+                    return _all[i];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Associates this sink with the agent whose <c>onTurn</c> callback feeds it, so a command that holds only the agent
+    /// can read the agent's turn results back. Used for a <c>sutOverride</c> stand-in built in code: the credential-free
+    /// seam of <see cref="Microsoft365SutTarget.Build"/> returns the stand-in untouched and so creates no sink of its own
+    /// (<see cref="Microsoft365SutTarget.SinkFor"/> reads the target's sink first, then this association). The association
+    /// is weak (it never keeps the agent alive), and a sink the agent does not feed yields no results, never invented ones.
+    /// </summary>
+    /// <param name="agent">The agent whose <c>onTurn</c> callback is <see cref="Record"/> of this sink.</param>
+    public void AttachTo(IEvaluableAgent agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        AttachedSinks.AddOrUpdate(agent, this);
+    }
+
+    /// <summary>The sink attached to <paramref name="agent"/> by <see cref="AttachTo"/>, or null when none was.</summary>
+    /// <param name="agent">The agent.</param>
+    public static CliTurnSink? AttachedTo(IEvaluableAgent agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        return AttachedSinks.TryGetValue(agent, out var sink) ? sink : null;
     }
 
     /// <summary>Records one turn result (the <c>onTurn</c> callback of the agent) and, when verbose, prints its line.</summary>

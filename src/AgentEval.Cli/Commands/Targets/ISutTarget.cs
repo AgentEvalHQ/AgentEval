@@ -28,8 +28,8 @@ internal interface ISutTargetOptions { }
 /// <remarks>
 /// <b>Deliberate scope decision (matches the design doc):</b> <c>gatekeeper-demo</c> is NOT part of this
 /// interface — it stays <c>redteam</c>-only, because it requires an <c>AgentTrace</c> for its whole
-/// point (recording <c>gate.tool.*</c> evidence), which `eval`/`bench` have no use for. Only
-/// <c>copilot-studio</c> gets the shared treatment.
+/// point (recording <c>gate.tool.*</c> evidence), which `eval`/`bench` have no use for. The built-in
+/// targets with the shared treatment are <c>copilot-studio</c> and <c>microsoft365</c>.
 /// </remarks>
 internal interface ISutTarget
 {
@@ -77,7 +77,7 @@ internal sealed record CommonTargetOptions
 
     /// <summary>
     /// <c>--i-understand-live-side-effects</c>: the common consent flag for ANY live built-in target under this
-    /// seam (<c>copilot-studio</c> today). Registered ONCE per verb by <see cref="SutTargetResolver.AddOptionsTo"/>
+    /// seam (<c>copilot-studio</c> and <c>microsoft365</c>). Registered ONCE per verb by <see cref="SutTargetResolver.AddOptionsTo"/>
     /// rather than by each target, so a second live target can never re-declare the same alias on the same
     /// command (a System.CommandLine duplicate-alias error). A live target's <see cref="ISutTarget.Validate"/>
     /// reads this for its consent gate and refuses before any network call while it is <see langword="false"/>.
@@ -113,7 +113,7 @@ internal sealed record CommonTargetOptions
 /// </summary>
 internal static class SutTargetResolver
 {
-    /// <summary>The built-in targets available under this shared seam. Only `copilot-studio` today (see <see cref="ISutTarget"/>'s scope note).</summary>
+    /// <summary>The built-in targets available under this shared seam: <c>copilot-studio</c> and <c>microsoft365</c> (see <see cref="ISutTarget"/>'s scope note).</summary>
     internal static IReadOnlyList<ISutTarget> BuiltInTargets() =>
         [new global::AgentEval.Cli.CopilotStudio.CopilotStudioRedTeamTarget(), new global::AgentEval.Cli.Microsoft365.Microsoft365SutTarget()];
 
@@ -145,7 +145,7 @@ internal static class SutTargetResolver
         // Validate reads for its consent gate.
         var ackOpt = new Option<bool>("--i-understand-live-side-effects")
         {
-            Description = "Required consent for a live built-in --sut target (copilot-studio today): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent. Without this the command refuses before any network call.",
+            Description = "Required consent for a live built-in --sut target (copilot-studio, microsoft365): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent. Without this the command refuses before any network call.",
         };
         if (targets.Count > 0)
         {

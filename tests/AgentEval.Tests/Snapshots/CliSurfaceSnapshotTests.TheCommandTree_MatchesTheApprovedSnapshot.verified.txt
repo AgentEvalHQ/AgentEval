@@ -547,6 +547,19 @@
         command to-fixture
             argument <captured> FileInfo [1..1]
             option --out FileInfo [1..1] required
+    command m365
+        command doctor
+            option --continue Boolean [0..1] default=false
+            option --i-understand-live-side-effects Boolean [0..1] default=false
+            option --m365-capture-raw DirectoryInfo [1..1]
+            option --m365-config FileInfo [1..1] required
+            option --m365-profile String [1..1] default="public"
+            option --m365-trace FileInfo [1..1]
+            option --m365-verbose Boolean [0..1] default=true
+            option --probe Boolean [0..1] default=false
+            option --report DirectoryInfo [1..1]
+            option --stage String [1..1] default="all"
+            option --timeout-seconds Int32 [1..1] default=120
     command mc
         command doctor
         command serve

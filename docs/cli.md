@@ -249,12 +249,12 @@ LLM-as-judge, named metrics (`--metrics`), and AEF evidence under `--output-dir`
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
 | `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](copilot-studio.md). |
-| `--sut microsoft365` | Evaluate a live Microsoft 365 agent (Microsoft 365 Copilot or a declarative agent) over Work IQ A2A 1.0 instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--m365-config`/`--i-understand-live-side-effects`. A turn that does not complete is an error row (exit `11` when nothing failed), never a graded answer. Experimental: the live path is validated by an external tester. See [Microsoft 365](microsoft365.md). |
+| `--sut microsoft365` | Evaluate a live Microsoft 365 agent (Microsoft 365 Copilot or a declarative agent) over Work IQ A2A 1.0 instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--m365-config`/`--i-understand-live-side-effects`. A turn that does not complete is an error row (exit `11` when nothing failed), never a graded answer. A missing consent flag or an invalid config stops the command before anything is sent (exit `3`). Experimental: the maintainers have not run the live path; an external tester validates it on their tenant. Run [`agenteval m365 doctor`](#agenteval-m365-doctor) first. See [Microsoft 365](microsoft365.md). |
 | `--m365-config <file>` | With `--sut microsoft365`: the JSON connection file — `tenantId`, `appClientId`; optional `endpoint`, `agentId`, `scope`, `agentName`, `diagnosticProfile`, `timeZone`, `trustedHosts`. It holds no secret; the token is acquired at run time by MSAL device-code sign-in with a persisted, OS-encrypted cache. Validated before any network call. |
-| `--m365-max-turns <n>` | With `--sut microsoft365`: cap the completed turns of the run (default `0` = no cap). Turns are counted, consumption is not metered — Work IQ exposes no per-turn cost. The turn that would exceed the cap never fires; the run stops with exit `3`. |
+| `--m365-max-turns <n>` | With `--sut microsoft365`: cap the agent turns of the run (default `0` = no cap). Every turn that came back with a result counts, completed or not. Turns are counted, consumption is not metered — Work IQ exposes no per-turn cost. The turn that would exceed the cap never fires; the run stops with exit `3`. |
 | `--m365-profile public\|native118` | With `--sut microsoft365`: which output modes to request. `public` (default) asks for the answer only, so tool and retrieval channels are reported `NotRequested`. `native118` additionally requests the two diagnostic modes observed in Microsoft's native evaluator 1.18.0 — experimental, not a documented contract. Overrides the config file's `diagnosticProfile`. |
 | `--m365-capture-raw <dir>` | With `--sut microsoft365`: retain the raw request/response bytes and SSE frames of every turn under `<dir>` (the `FullEvidence` content policy). May contain tenant data; keep it out of version control. `Authorization`, cookies and tokens are redacted before anything is written. |
-| `--m365-verbose` | With `--sut microsoft365`: print every trace event to stderr (`[m365 HH:mm:ss.fff Stage/Level code] message …`) in addition to the JSONL trace file under the workspace's `.agenteval/m365/`. |
+| `--m365-verbose` | With `--sut microsoft365`: print every trace event to stderr (`[m365 HH:mm:ss.fff Stage/Level code] message …`) and one `[m365 turn] case=… outcome=… …` line per turn. The JSONL trace and issue files are written either way (under the workspace's `.agenteval/m365/`, else `<temp>/agenteval-m365/`); their paths are printed at the start. |
 | `--m365-trace <file>` | With `--sut microsoft365`: write the JSONL trace to this file instead of the default `.agenteval/m365/m365-trace-<run id>.jsonl`. |
 | `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. A `--system-prompt-file` that does not exist is ignored. |
 | `--temperature <value>` | Sampling temperature sent with every agent call. Omitted: nothing is sent and the provider's default applies. Given: the value is sent as given, `0` included. `0` narrows sampling; it does not guarantee identical outputs. |
@@ -571,7 +571,7 @@ a pass supported by only some requested trials becomes a warning. `--sut mock` s
 - **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--from-env` (the configured provider; `--azure-from-env`, its old name, still works), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`, plus `--reference`/`--reference-file` (the expected answer) and `--context`/`--context-file` (the retrieved context) for the checks that grade against them (`rag-quality`); without them those checks report not measured. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
 - **`owasp`/`mitre`/`nist` grade judge first, as `redteam --judge` does.** The judge model comes from the environment (the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects); there is no option to pick it. With no provider configured the command exits **3**; `--sut mock` needs none and grades with the oracles alone. Before the scan the command makes one short call to the judge and exits **3** if it does not answer. The semantic attacks are graded by Composite Judges (several judge calls per probe); the other attacks by their per-attack oracle, which asks the judge only when it is inconclusive, and the judge may then only raise the probe to "attack succeeded". If a judge call fails during the scan, or the scan runs out of time, the run is INCOMPLETE: stored as `WARN` and exit **11**, never a pass — unless what it did measure already fails it,
 which stays a fail (`FAIL`, exit **9**). See the [OWASP](benchmarks/owasp/getting-started.md#presets) and [MITRE](benchmarks/mitre/getting-started.md#presets) pages for probe counts.
-- **`--sut microsoft365`** drives a live Microsoft 365 agent over Work IQ A2A 1.0 for `gdpr`, `eu-ai-act`, `owasp`, `mitre` and `nist`, with the same options as `eval` (`--m365-config`, `--m365-max-turns`, `--m365-profile`, `--m365-capture-raw`, `--m365-verbose`, `--m365-trace`) behind the common `--i-understand-live-side-effects` consent flag; the judge comes from the environment as for any `bench` run. Experimental — the live path is validated by an external tester. See [Microsoft 365](microsoft365.md#running-standard-benchmarks-agenteval-bench).
+- **`--sut microsoft365`** drives a live Microsoft 365 agent over Work IQ A2A 1.0 for `gdpr`, `eu-ai-act`, `owasp`, `mitre` and `nist`, with the same options as `eval` (`--m365-config`, `--m365-max-turns`, `--m365-profile`, `--m365-capture-raw`, `--m365-verbose`, `--m365-trace`) behind the common `--i-understand-live-side-effects` consent flag (missing, or with an invalid config: exit **2**, nothing sent); the judge comes from the environment as for any `bench` run. `eu-ai-act` still requires `--input` (recorded with the run; each scenario sends its own prompt). Experimental — the maintainers have not run the live path; an external tester validates it. See [Microsoft 365](microsoft365.md#running-standard-benchmarks-agenteval-bench).
 
 ---
 
@@ -1019,45 +1019,48 @@ Prints `Errors: N | Warnings: N | OK: N` and exits `2` on any error.
 
 ### `agenteval m365 doctor`
 
-> **Lands with the next checkpoint** of the Microsoft 365 work; this section documents its contract. Everything else on this page describes what exists now.
-
-Staged readiness check of a Microsoft 365 (Work IQ A2A) connection — the first thing to run with a new tenant, before `eval --sut microsoft365`. Sibling to `agenteval doctor` (workspace data) and `agenteval mc doctor` (portal binaries). See [Microsoft 365 — Readiness check](microsoft365.md#readiness-check-agenteval-m365-doctor) and the [tester guide](microsoft365-tester-guide.md).
+Staged readiness check of a Microsoft 365 (Work IQ A2A 1.0) connection — the first thing to run with a new tenant, before `eval --sut microsoft365`. Sibling to `agenteval doctor` (workspace data) and `agenteval mc doctor` (portal binaries). See [Microsoft 365 — Readiness check](microsoft365.md#readiness-check-agenteval-m365-doctor) and the [tester guide](microsoft365-tester-guide.md).
 
 **Synopsis**
 
 ```
-agenteval m365 doctor --m365-config <file> [--stage config|auth|discovery|protocol|probe|census|all] [--probe] [--continue] [--report <dir>] [--m365-profile public|native118] [--m365-capture-raw <dir>]
+agenteval m365 doctor --m365-config <file> [--stage config|auth|discovery|protocol|probe|census|all] [--probe] [--i-understand-live-side-effects] [--continue] [--report <dir>] [--m365-profile public|native118] [--m365-capture-raw <dir>] [--m365-verbose false] [--m365-trace <file>] [--timeout-seconds <n>]
 ```
 
 | Option | Description |
 |---|---|
-| `--m365-config <file>` | Required. The connection JSON (see [`agenteval eval`](#agenteval-eval)). |
-| `--stage <name>` | Run one stage, or `all` (default: `all` minus `probe`). Stages run in order and stop at the first FAIL. |
-| `--probe` | Also send one benign turn (`Reply with the single word READY.`) and run the capability census. Requires `--i-understand-live-side-effects`; without it the stage is SKIPPED and the command exits `11`. |
-| `--continue` | Keep running the remaining stages after a FAIL. |
-| `--report <dir>` | Where the report goes (default `.agenteval/m365/doctor-<utc>/`). |
-| `--m365-profile public\|native118` | The profile to probe with; `native118` makes the census report whether the diagnostic modes are accepted. |
-| `--m365-capture-raw <dir>` | Retain the raw bytes of the probe (may contain tenant data). |
+| `--m365-config <file>` | Required. The connection JSON (see [`agenteval eval`](#agenteval-eval) and [the config table](microsoft365.md#authoring-the-config-json)). |
+| `--stage <stage>` | `config`, `auth`, `discovery`, `protocol`, `probe`, `census` or `all` (default `all`: `config`, `auth`, `discovery` and `protocol`, plus `probe` and `census` with `--probe`). A single stage runs together with `config` (and `census` with `probe`); a single network stage acquires its own token and card. |
+| `--probe` | Also run the probe (one real prompt: `Reply with the single word READY.`) and the capability census. Needs `--i-understand-live-side-effects`; without it both are SKIPPED, no prompt reaches the agent, and the command exits `11`. |
+| `--i-understand-live-side-effects` | Consent for the probe and the census. The config, sign-in, discovery and protocol stages run without it. |
+| `--continue` | Run the remaining stages after a FAIL instead of stopping. |
+| `--report <dir>` | The folder for `readiness.md`, `readiness.json` and the trace and issue files (default `.agenteval/m365/doctor-<yyyyMMdd-HHmmss>Z` when an `.agenteval/` folder is found walking up from the current directory, else `<temp>/agenteval-m365/doctor-<stamp>`). |
+| `--m365-profile public\|native118` | Default `public`. With `native118` the probe runs under the experimental profile and the census reuses that turn; with `public` the census sends the probe prompt a second time under `native118`. |
+| `--m365-capture-raw <dir>` | Retain the raw A2A bytes and stream frames under `<dir>` (may contain tenant data). |
+| `--m365-verbose` | On by default for the doctor: every trace event is printed to stderr. `--m365-verbose false` turns it off. |
+| `--m365-trace <file>` | Write the JSONL trace to this file instead of the report folder. |
+| `--timeout-seconds <n>` | Default `120`. The most one stage may take (also the HTTP timeout and the probe's turn deadline); the device-code sign-in must be finished within it. |
 
 **What it checks**
 
-1. `config` — loads and validates the file; prints the resolved endpoint, card URI, agent id, tenant, app id, scope, profile, trusted hosts, time zone and the config's SHA-256.
-2. `auth` — silent token, then device code (the sign-in message is printed); reports the cache path, account found, token acquired, expiry, and the `tid`/`aud` claims parsed locally. The token is never printed. An MSAL failure is mapped to its `AADSTS` code and a plain-language cause.
-3. `discovery` — GET of the agent card: HTTP status, `request-id`, bytes, interfaces (binding, version, host), the interface chosen or the trust/version failure, capabilities, skills count, card SHA-256.
-4. `protocol` — `GetTask` with a random id; the expected answer is JSON-RPC error `-32001` (task not found), which proves A2A 1.0 JSON-RPC and an accepted token. A 401/403 here is the permission or licence verdict.
-5. `probe` (opt-in) — one blocking `SendMessage`; reports outcome, task/context ids, answer length, attribution count, elapsed.
-6. `census` — whether the `native118` modes are accepted and the *Developer Info* / *Retrieval Info* artifacts appeared; the citation marker format observed; the state `CancelTask` returns on the completed task.
+1. `config` — loads and validates the file (no network); records the config file and its SHA-256, the endpoint, card URI, agent, tenant, app id, scope, profile, trusted hosts, time zone, the config's identity SHA-256, the adapter and A2A versions, the OS and .NET.
+2. `auth` — a silent token from the OS-encrypted cache, else a device-code sign-in (the sign-in message is printed); records the cache file, whether a token was acquired and how, its expiry, the tenant id in the token and whether it matches the config, the masked account and the scopes. The token is never shown. An MSAL failure is mapped to its `AADSTS` code with a cause and a fix.
+3. `discovery` — fetches the agent card: HTTP status, `request-id`, bytes, card name and version, every interface (binding, version, host), the one chosen or the trust/version failure, `capabilities.streaming` / `pushNotifications`, skills count, card SHA-256.
+4. `protocol` — `GetTask` for a random task id; the expected answer is JSON-RPC `-32001` (TaskNotFound), which proves A2A 1.0 JSON-RPC and an accepted token. A 401/403 here is the permission, consent, licence or enablement verdict.
+5. `probe` (opt-in, consent) — one turn with `Reply with the single word READY.` in a fresh context; records outcome, transport, task and context ids, the states observed, the answer's length and first 80 characters, attribution and citation-marker counts, `GetTask` polls, elapsed. Passes only on a completed turn; a pause is never answered.
+6. `census` (after a probe, consent) — whether the `native118` diagnostic modes are accepted or refused, whether the *Developer Info* / *Retrieval Info* artifacts appeared, the citation marker format, what `CancelTask` returns on a completed task. Informational: refusal is recorded, not a failure.
 
-Writes `readiness.md` (stage · result · evidence · what it means · what to do), `readiness.json`, and the run's `m365-trace-<run id>.jsonl` and `m365-issues.jsonl` into the report folder. Verbose console output is on by default. Nothing written contains a token, an auth code or the `Authorization` header.
+Stops at the first FAIL unless `--continue`; a stage that does not run is SKIPPED with its reason. Prints one line per stage (`[PASS]`, `[FAIL]`, `[SKIPPED]`, with `issue:`, `meaning:` and `do:` under a failure), `Result: PASS|FAIL|INCOMPLETE`, and the paths. Writes `readiness.md` (stage · result · summary · what it means · what to do, then every stage's evidence), `readiness.json` (schema `agenteval.m365.readiness/v1`), `m365-trace-<run id>.jsonl` and `m365-issues.jsonl` into the report folder. Nothing written contains a token, an auth code or the `Authorization` header.
 
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
-| `0` | Every stage PASS. |
-| `1` | A stage FAILED; `readiness.md` names it with the exact code. |
-| `2` | Usage error (a missing `--m365-config`, an unknown `--stage` or profile). |
-| `11` | A stage was SKIPPED for consent (`--probe` without `--i-understand-live-side-effects`) and nothing failed. |
+| `0` | Every requested stage passed. |
+| `1` | A stage failed; the console and `readiness.md` name it with the exact code, what it means and what to do. |
+| `2` | Usage error (a missing `--m365-config`, an unknown `--stage` or `--m365-profile` value, `--timeout-seconds` below 1); nothing created, nothing sent. |
+| `3` | The report folder or files could not be written, or the check could not start. |
+| `11` | Nothing failed, but a requested stage did not run: the probe and the census were SKIPPED for consent (`--probe` without `--i-understand-live-side-effects`). |
 
 ---
 

@@ -70,25 +70,9 @@ public static class Microsoft365AgentFactory
         var diagnostics = WorkIqDiagnosticsFactory.Create(config, options, clock);
         try
         {
-            var policy = new WorkIqTrustPolicy(config.TrustedHosts);
             tokenProvider ??= new WorkIqDeviceCodeTokenProvider(config.TenantId, config.AppClientId, config.Scope) { Diagnostics = diagnostics };
 
-            var inner = innerHandler ?? new SocketsHttpHandler { PooledConnectionLifetime = PooledConnectionLifetime };
-            var capture = new RawCaptureHandler { InnerHandler = inner, Diagnostics = diagnostics };
-            var auth = new WorkIqAuthHandler(tokenProvider)
-            {
-                InnerHandler = capture,
-                Diagnostics = diagnostics,
-                Policy = policy,
-                ExpectedScope = config.Scope,
-            };
-            var http = new HttpClient(auth, disposeHandler: true)
-            {
-                // Zero means "no cap", like the other zero-valued options; HttpClient needs the explicit infinite value.
-                Timeout = options.SendTimeout == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : options.SendTimeout,
-            };
-
-            var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics);
+            var (http, client) = CreateTransport(config, options, tokenProvider, diagnostics, clock, innerHandler);
             var conversation = new WorkIqConversation(client, config, options, clock, diagnostics);
             var agent = new WorkIqEvaluableAgent(conversation, config.DisplayName, options, onTurn, diagnostics);
             agent.Owned.Add(new SyncDisposableAdapter(http));
@@ -108,6 +92,54 @@ public static class Microsoft365AgentFactory
             diagnostics.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Builds the authenticated transport of a live connection — <c>HttpClient(WorkIqAuthHandler → RawCaptureHandler →
+    /// inner)</c> with the trust policy from <see cref="Microsoft365Config.TrustedHosts"/> and the HTTP timeout from
+    /// <see cref="WorkIqOptions.SendTimeout"/> — and the A2A client over it. Shared by <see cref="BuildLive"/> and the
+    /// readiness check (<c>agenteval m365 doctor</c>) so both reach Work IQ through exactly the same handler chain.
+    /// Makes no network call. The returned <see cref="HttpClient"/> owns (and disposes) the handler chain, including
+    /// <paramref name="innerHandler"/>.
+    /// </summary>
+    /// <param name="config">The validated config.</param>
+    /// <param name="options">The validated options.</param>
+    /// <param name="tokenProvider">The token source the auth handler calls on every request.</param>
+    /// <param name="diagnostics">The diagnostics every handler and the client trace through.</param>
+    /// <param name="clock">The clock of the client.</param>
+    /// <param name="innerHandler">The innermost handler; null uses a <see cref="SocketsHttpHandler"/>.</param>
+    internal static (HttpClient Http, WorkIqA2AClient Client) CreateTransport(
+        Microsoft365Config config,
+        WorkIqOptions options,
+        IWorkIqTokenProvider tokenProvider,
+        WorkIqDiagnostics diagnostics,
+        TimeProvider clock,
+        HttpMessageHandler? innerHandler)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(tokenProvider);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        ArgumentNullException.ThrowIfNull(clock);
+
+        var policy = new WorkIqTrustPolicy(config.TrustedHosts);
+        var inner = innerHandler ?? new SocketsHttpHandler { PooledConnectionLifetime = PooledConnectionLifetime };
+        var capture = new RawCaptureHandler { InnerHandler = inner, Diagnostics = diagnostics };
+        var auth = new WorkIqAuthHandler(tokenProvider)
+        {
+            InnerHandler = capture,
+            Diagnostics = diagnostics,
+            Policy = policy,
+            ExpectedScope = config.Scope,
+        };
+        var http = new HttpClient(auth, disposeHandler: true)
+        {
+            // Zero means "no cap", like the other zero-valued options; HttpClient needs the explicit infinite value.
+            Timeout = options.SendTimeout == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : options.SendTimeout,
+        };
+
+        var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics);
+        return (http, client);
     }
 
     /// <summary>

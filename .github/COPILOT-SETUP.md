@@ -8,8 +8,14 @@ This folder contains AI agent instructions for GitHub Copilot in VS Code.
 .github/
 ├── copilot-instructions.md    # Global instructions (always active)
 ├── agents/                    # Custom Copilot agents
-│   ├── agenteval-dev.agent.md     # Development & implementation
-│   └── agenteval-planner.agent.md # Feature planning
+│   ├── agenteval-dev.agent.md        # Development & implementation
+│   ├── agenteval-planner.agent.md    # Feature planning
+│   ├── agenteval-docwriter.agent.md  # Documentation
+│   ├── agenteval-samples.agent.md    # Samples & demos
+│   └── agenteval-m365.agent.md       # Evaluating Microsoft 365 agents (Work IQ A2A)
+├── skills/                    # Procedural skills the agents load
+│   ├── dotnet-inspect/SKILL.md       # Query .NET APIs across NuGet packages
+│   └── m365-eval/SKILL.md            # Evaluate a Microsoft 365 agent: doctor → benchmark → evidence
 ├── instructions/              # File-scoped instructions (auto-apply)
 │   ├── testing.instructions.md     # → tests/**/*.cs
 │   ├── metrics.instructions.md     # → src/AgentEval/Metrics/**/*.cs
@@ -57,6 +63,28 @@ Invoke custom agents using `@` in Copilot Chat:
 ```
 @agenteval-dev Implement the FaithfulnessMetric changes
 ```
+
+| Agent | Use it for |
+|---|---|
+| `@agenteval-planner` (AgentEval Planner) | Planning a feature without changing code |
+| `@agenteval-dev` (AgentEval Dev) | Implementing, reviewing and debugging code |
+| `@agenteval-docwriter` (AgentEval DocWriter) | Writing and reviewing documentation |
+| `@agenteval-samples` (AgentEval Samples) | Reviewing and improving samples and demos |
+| `@agenteval-m365` (AgentEval M365) | Evaluating a Microsoft 365 agent over Work IQ A2A: `agenteval m365 doctor`, custom and standard benchmarks with `--sut microsoft365`, reading the evidence. It follows the `m365-eval` skill and never runs a live step without a non-production identity and the consent flag. |
+
+```
+@agenteval-m365 Check that we can reach our test tenant, then write a smoke benchmark for our HR Copilot
+```
+
+#### **Skills**
+
+`.github/skills/<name>/SKILL.md` holds a step-by-step procedure (frontmatter `name`, `version`, `description`) that an agent loads
+when a task matches its description:
+
+- `dotnet-inspect` — query .NET library APIs (types, members, diffs) instead of guessing them.
+- `m365-eval` — evaluate a Microsoft 365 agent: config, `agenteval m365 doctor`, one real prompt, a judged dataset, standard
+  benchmarks, the evidence, and what each failure means. Live steps need a non-production identity and
+  `--i-understand-live-side-effects`; judge runs spend money and are asked for first.
 
 #### **Agent Workflows**
 
@@ -146,6 +174,10 @@ Edit `copilot-instructions.md`
 ### **To add new custom agents:**
 1. Create `{name}.agent.md` in `.github/agents/`
 2. Follow the chatagent format with tools and handoffs
+
+### **To add a new skill:**
+1. Create `.github/skills/{name}/SKILL.md`
+2. Start it with frontmatter `name`, `version` and `description` (when to use it), then a decision tree and exact commands
 
 ---
 

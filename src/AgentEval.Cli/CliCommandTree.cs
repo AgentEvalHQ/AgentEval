@@ -1013,6 +1013,12 @@ internal static class CliCommandTree
             await McDoctorCommand.RunAsync());
         mcCmd.Add(mcDoctorCmd);
 
+        // ─── m365 — Microsoft 365 (Work IQ A2A) connector (M37, HLD D21) ─────────────
+        // m365 doctor — the staged readiness check an external tester runs first on their own tenant: config, sign-in,
+        // agent card, protocol handshake, and (with --probe + consent) one real prompt and the capability census.
+        var m365Cmd = new Command("m365", "Microsoft 365 (Work IQ A2A 1.0) connector commands");
+        m365Cmd.Add(AgentEval.Cli.Microsoft365.M365DoctorCommand.Create());
+
         // ─── root ─────────────────────────────────────────────────────────────────────
         var rootCmd = new RootCommand("AgentEval CLI — evaluate AI agents, run benchmark suites, manage the .agenteval/ output store, and serve Mission Control.");
 
@@ -1061,6 +1067,7 @@ internal static class CliCommandTree
         rootCmd.Add(complianceCmd);
         rootCmd.Add(renderBenchCmd);
         rootCmd.Add(mcCmd);
+        rootCmd.Add(m365Cmd);                         // m365 doctor — Microsoft 365 readiness check (exit 0/1/11/2)
 
         // Gatekeeper CLI interop bridge — invoke gates from any language via a versioned verdict JSON.
         rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());

@@ -18,10 +18,14 @@ namespace AgentEval.Microsoft365.Evidence;
 /// through <see cref="WorkIqAnswerSelector"/>, citation sources via <see cref="AttributionDecoder"/> (the terminal
 /// status message's metadata for a task, the message's metadata for a direct reply — never an artifact's or a
 /// history message's), citation markers via <see cref="CitationMarkerParser"/>, marker-to-source links (all
-/// <see cref="CitationBinding.Unresolved"/> unless a source carries an explicit provider key), and the diagnostic
-/// channels (<c>NotRequested</c> under <see cref="DiagnosticProfile.PublicAnswerOnly"/>;
-/// <c>NotProvided</c>/<c>Provided</c> via <see cref="Native118DiagnosticsDecoder"/> under
-/// <see cref="DiagnosticProfile.Native118Diagnostics"/>). It never invents arguments or results, matches calls by
+/// <see cref="CitationBinding.Unresolved"/> unless a source carries an explicit provider key), the approval intents
+/// via <see cref="InteractionDecoder"/> under <b>both</b> profiles (the confirmation card arrives in-band with the
+/// input-required status message, not through a requested diagnostic output mode, so it is decoded whatever the
+/// profile: <c>Provided</c> when the status message carries an input-required data part, else <c>NotProvided</c>),
+/// and the diagnostic channels — tool selections, tool executions, retrieval executions — (<c>NotRequested</c>
+/// under <see cref="DiagnosticProfile.PublicAnswerOnly"/>; <c>NotProvided</c>/<c>Provided</c> via
+/// <see cref="Native118DiagnosticsDecoder"/> under <see cref="DiagnosticProfile.Native118Diagnostics"/>). It never
+/// invents arguments or results, matches calls by
 /// name, or turns missing telemetry into an empty success. JSON pointers in the document are relative to the
 /// reduced task object (<c>/status/message/…</c>, <c>/artifacts/{i}/…</c>) or to the direct message object, not to
 /// a JSON-RPC envelope, because a streamed task has no single envelope. Every run is traced on the
@@ -41,7 +45,7 @@ internal sealed class WorkIqEvidenceNormalizer
     /// <summary>The JSON pointer of a direct message's parts, relative to the message object.</summary>
     public const string MessagePartsPointer = "/parts";
 
-    /// <summary>Issue (informational): the profile did not request the diagnostic channels.</summary>
+    /// <summary>Issue (informational): the profile did not request the tool and retrieval diagnostic channels (approval intents are still decoded).</summary>
     public const string PublicAnswerOnlyIssueCode = "profile.public_answer_only";
 
     /// <summary>Issue (informational): Work IQ A2A 1.0 has no supported skill-activation channel.</summary>
@@ -219,11 +223,18 @@ internal sealed class WorkIqEvidenceNormalizer
             }
         }
 
-        // 6. Diagnostic channels by profile.
+        // 6. Approval intents under BOTH profiles: the confirmation card arrives in-band with the input-required status
+        //    message, not through a requested diagnostic output mode, so NotRequested under PublicAnswerOnly would be
+        //    untrue. The same decoder and source pointer the native118 decoder uses for its own approval channel.
+        var absence = messageSource is null ? default : ImmutableArray.Create(messageSource);
+        var approvalIntents = task is not null
+            ? InteractionDecoder.DecodeApprovalIntents(task.StatusMessage, messageSource!)
+            : EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, absence);
+
+        // 7. Diagnostic channels by profile.
         EvidenceSet<ToolSelectionObservation> toolSelections;
         EvidenceSet<ToolExecutionObservation> toolExecutions;
         EvidenceSet<RetrievalExecutionObservation> retrievalExecutions;
-        EvidenceSet<ApprovalIntentObservation> approvalIntents;
         switch (profile)
         {
             case DiagnosticProfile.Native118Diagnostics when task is not null:
@@ -231,24 +242,20 @@ internal sealed class WorkIqEvidenceNormalizer
                 toolSelections = decoded.ToolSelections;
                 toolExecutions = decoded.ToolExecutions;
                 retrievalExecutions = decoded.RetrievalExecutions;
-                approvalIntents = decoded.ApprovalIntents;
                 issues.AddRange(decoded.Issues);
                 break;
             case DiagnosticProfile.Native118Diagnostics:
-                var absence = messageSource is null ? default : ImmutableArray.Create(messageSource);
                 toolSelections = EvidenceSet<ToolSelectionObservation>.NotProvided(EvidenceScope.Unknown, absence);
                 toolExecutions = EvidenceSet<ToolExecutionObservation>.NotProvided(EvidenceScope.Unknown, absence);
                 retrievalExecutions = EvidenceSet<RetrievalExecutionObservation>.NotProvided(EvidenceScope.Unknown, absence);
-                approvalIntents = EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, absence);
                 break;
             default:
                 toolSelections = EvidenceSet<ToolSelectionObservation>.NotRequested(EvidenceScope.Turn);
                 toolExecutions = EvidenceSet<ToolExecutionObservation>.NotRequested(EvidenceScope.Turn);
                 retrievalExecutions = EvidenceSet<RetrievalExecutionObservation>.NotRequested(EvidenceScope.Turn);
-                approvalIntents = EvidenceSet<ApprovalIntentObservation>.NotRequested(EvidenceScope.Turn);
                 issues.Add(new EvidenceIssue(
                     PublicAnswerOnlyIssueCode,
-                    "Diagnostic profile PublicAnswerOnly: the tool, retrieval and approval channels were not requested (acceptedOutputModes text/plain only); their absence is not evidence of absence.",
+                    "Diagnostic profile PublicAnswerOnly: the tool and retrieval channels were not requested (acceptedOutputModes text/plain only); their absence is not evidence of absence. Approval intents are still decoded: the confirmation card arrives with the input-required status.",
                     ImmutableArray<SourceRef>.Empty));
                 break;
         }
