@@ -1,0 +1,68 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0401",
+  "result": {
+    "id": "task-7b3f9d1e-6a2c-4e5b-8f0a-1d4c7b9e3a62",
+    "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+    "status": {
+      "state": "TASK_STATE_COMPLETED",
+      "timestamp": "2026-11-05T14:12:29.447813Z",
+      "message": {
+        "messageId": "msg-agent-a7c1e3f5-0401",
+        "role": "ROLE_AGENT",
+        "parts": [],
+        "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+        "taskId": "task-7b3f9d1e-6a2c-4e5b-8f0a-1d4c7b9e3a62",
+        "metadata": {
+          "attributions": [
+            {
+              "attributionType": "citation",
+              "attributionSource": "OneDriveAndSharePoint",
+              "providerDisplayName": "Project Atlas - Status report 2026-11-03.docx",
+              "seeMoreWebUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx"
+            },
+            {
+              "attributionType": "citation",
+              "attributionSource": "Outlook",
+              "providerDisplayName": "RE: Atlas vendor contract - open items",
+              "seeMoreWebUrl": "https://outlook.example.invalid/mail/inbox/id/AAMkAGY2ZDc3NzUxLTAwMDAtNDk5Zi1hYzE2LWY3YjE2YzE4ZTMwMA%3D%3D"
+            }
+          ]
+        }
+      }
+    },
+    "artifacts": [
+      {
+        "artifactId": "artifact-answer-6b2d9f4a-0401",
+        "name": "Answer",
+        "parts": [
+          {
+            "text": "Project Atlas is on schedule: the design review closed on 3 November 2026 and the pilot starts on 17 November 2026.citeturn0search1"
+          },
+          {
+            "text": " Two risks stay open: the vendor contract and the data-residency sign-off.citeturn0search1turn0search2"
+          }
+        ]
+      }
+    ],
+    "history": [
+      {
+        "messageId": "msg-user-3e8f1a2c-0401",
+        "role": "ROLE_USER",
+        "parts": [
+          {
+            "text": "Summarize the status of Project Atlas and cite the sources."
+          }
+        ],
+        "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+        "taskId": "task-7b3f9d1e-6a2c-4e5b-8f0a-1d4c7b9e3a62",
+        "metadata": {
+          "Location": {
+            "timeZone": "Europe/Zurich",
+            "timeZoneOffset": 60
+          }
+        }
+      }
+    ]
+  }
+}

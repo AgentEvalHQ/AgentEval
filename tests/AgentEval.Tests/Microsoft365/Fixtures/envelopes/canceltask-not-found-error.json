@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0402",
+  "error": {
+    "code": -32001,
+    "message": "Task not found",
+    "data": {
+      "taskId": "task-00000000-0000-4000-8000-000000000000"
+    }
+  }
+}

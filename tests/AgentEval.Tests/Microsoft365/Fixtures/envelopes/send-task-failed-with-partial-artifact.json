@@ -1,0 +1,55 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0006",
+  "result": {
+    "task": {
+      "id": "task-4d8b2f6e-1a3c-4b7d-9e0f-5c2a8d6b1e37",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_FAILED",
+        "timestamp": "2026-11-05T13:47:33.210877Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0006",
+          "role": "ROLE_AGENT",
+          "parts": [
+            {
+              "text": "The request could not be completed: the Demo Files connector returned an error (HTTP 503) while reading the status report."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-4d8b2f6e-1a3c-4b7d-9e0f-5c2a8d6b1e37"
+        }
+      },
+      "artifacts": [
+        {
+          "artifactId": "artifact-answer-6b2d9f4a-0006",
+          "name": "Answer",
+          "parts": [
+            {
+              "text": "Project Atlas is on schedule: the design review closed on 3 November 2026 and "
+            }
+          ]
+        }
+      ],
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0006",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Summarize the status of Project Atlas and cite the sources."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-4d8b2f6e-1a3c-4b7d-9e0f-5c2a8d6b1e37",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

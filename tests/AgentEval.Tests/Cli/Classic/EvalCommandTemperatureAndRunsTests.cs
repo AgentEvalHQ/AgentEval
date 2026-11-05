@@ -76,6 +76,7 @@ public class EvalCommandTemperatureAndRunsTests
             {
                 Dataset = plain.Dataset,
                 Sut = plain.Sut,
+                AckLiveSideEffects = plain.AckLiveSideEffects,
                 TargetOptions = plain.TargetOptions,
                 Format = "json",
                 Output = output,
@@ -106,7 +107,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var options = new EvalOptions
             {
-                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
                 Aef = new DirectoryInfo(aef), Subject = "agent:benign", SubjectVersion = "1.2.3",
             };
 
@@ -144,7 +145,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var options = new EvalOptions
             {
-                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
                 Aef = new DirectoryInfo(aef),
             };
 
@@ -171,7 +172,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var options = new EvalOptions
             {
-                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
                 Aef = new DirectoryInfo(aef), Runs = 3, SuccessThreshold = 0.5,
             };
 
@@ -204,7 +205,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var options = new EvalOptions
             {
-                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
                 Aef = new DirectoryInfo(notAFolder.FullName),
             };
 
@@ -227,7 +228,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var options = new EvalOptions
             {
-                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output, NoAef = true,
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions, Format = "json", Output = output, NoAef = true,
             };
 
             var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
@@ -494,9 +495,10 @@ public class EvalCommandTemperatureAndRunsTests
     {
         Dataset = dataset,
         Sut = "copilot-studio",
+        AckLiveSideEffects = true,
         TargetOptions = new Dictionary<string, ISutTargetOptions?>
         {
-            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = config, AckLiveSideEffects = true, MaxCredits = 0 },
+            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = config, MaxCredits = 0 },
         },
         Format = "json",
         Output = output,

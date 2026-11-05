@@ -39,7 +39,13 @@ internal interface ISutTarget
     /// <summary>Which verbs currently know how to drive this target — a target registers ONCE, not once per verb's own hand-maintained list.</summary>
     IReadOnlySet<string> SupportedVerbs { get; }
 
-    /// <summary>Register this target's own CLI options on <paramref name="command"/>. No-op if the target has none.</summary>
+    /// <summary>
+    /// Register this target's own CLI options on <paramref name="command"/>. No-op if the target has none. The
+    /// live-side-effects consent flag is NOT a target's own option: <see cref="SutTargetResolver.AddOptionsTo"/>
+    /// registers <c>--i-understand-live-side-effects</c> once per verb, and a live target reads
+    /// <see cref="CommonTargetOptions.AckLiveSideEffects"/> in <see cref="Validate"/> instead of re-declaring it
+    /// (two targets adding the same alias to one command is a System.CommandLine duplicate-alias error).
+    /// </summary>
     void AddOptionsTo(Command command);
 
     /// <summary>Bind THIS target's flags from the parse result; <c>null</c> if the target has no flags.</summary>
@@ -68,6 +74,16 @@ internal sealed record CommonTargetOptions
     public string? DeploymentName { get; init; }
     public string? ApiKey { get; init; }
     public string? Sut { get; init; }
+
+    /// <summary>
+    /// <c>--i-understand-live-side-effects</c>: the common consent flag for ANY live built-in target under this
+    /// seam (<c>copilot-studio</c> today). Registered ONCE per verb by <see cref="SutTargetResolver.AddOptionsTo"/>
+    /// rather than by each target, so a second live target can never re-declare the same alias on the same
+    /// command (a System.CommandLine duplicate-alias error). A live target's <see cref="ISutTarget.Validate"/>
+    /// reads this for its consent gate and refuses before any network call while it is <see langword="false"/>.
+    /// </summary>
+    public bool AckLiveSideEffects { get; init; }
+
     public IReadOnlyDictionary<string, ISutTargetOptions?> TargetOptions { get; init; }
         = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase);
 
@@ -101,8 +117,14 @@ internal static class SutTargetResolver
     internal static IReadOnlyList<ISutTarget> BuiltInTargets() =>
         [new global::AgentEval.Cli.CopilotStudio.CopilotStudioRedTeamTarget()];
 
-    /// <summary>Registers <c>--sut</c> plus every applicable target's own options on <paramref name="command"/>, filtered to targets that support <paramref name="verb"/>.</summary>
-    internal static (Option<string?> SutOption, IReadOnlyList<ISutTarget> Targets) AddOptionsTo(Command command, string verb)
+    /// <summary>
+    /// Registers <c>--sut</c>, the common <c>--i-understand-live-side-effects</c> consent flag, and every applicable
+    /// target's own options on <paramref name="command"/>, filtered to targets that support <paramref name="verb"/>.
+    /// The consent flag is created once per call and added to the command only when at least one target supports
+    /// the verb (a verb with no live target grows no consent option); it is returned either way, so every caller
+    /// binds it the same way — on a command it was not added to, <c>ParseResult.GetValue</c> yields <c>false</c>.
+    /// </summary>
+    internal static (Option<string?> SutOption, Option<bool> AckOption, IReadOnlyList<ISutTarget> Targets) AddOptionsTo(Command command, string verb)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(verb);
@@ -116,12 +138,26 @@ internal static class SutTargetResolver
                 (verb == "bench" ? $" ({MockTarget.SutHelp}.)" : ""),
         };
         command.Options.Add(sutOpt);
+
+        // ONE consent flag per verb, owned here rather than by each live target (M03): two targets each
+        // registering "--i-understand-live-side-effects" on the same command would be a duplicate-alias error.
+        // Bound by the calling verb into CommonTargetOptions.AckLiveSideEffects, which each live target's
+        // Validate reads for its consent gate.
+        var ackOpt = new Option<bool>("--i-understand-live-side-effects")
+        {
+            Description = "Required consent for a live built-in --sut target (copilot-studio today): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent. Without this the command refuses before any network call.",
+        };
+        if (targets.Count > 0)
+        {
+            command.Options.Add(ackOpt);
+        }
+
         foreach (var t in targets)
         {
             t.AddOptionsTo(command);
         }
 
-        return (sutOpt, targets);
+        return (sutOpt, ackOpt, targets);
     }
 
     /// <summary>

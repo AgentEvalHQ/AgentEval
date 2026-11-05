@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0201",
+  "error": {
+    "code": -32009,
+    "message": "Version not supported",
+    "data": {
+      "requestedVersion": "1.0",
+      "supportedVersions": [
+        "0.3"
+      ]
+    }
+  }
+}

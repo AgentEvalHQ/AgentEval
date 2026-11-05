@@ -36,6 +36,11 @@
          Microsoft.Agents.AI.Harness reaches its first STABLE release at 1.17.0 (was preview-only at 1.13.0). -->
     <PackageVersion Include="Microsoft.Agents.AI" Version="1.24.0" />
     <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.23.0-preview.260928.1" /><!-- preview-only; A2A boundary sample + tests -->
+    <!-- A2A .NET SDK (a2aproject/a2a-dotnet). 1.0.0-preview2 is exactly what Microsoft.Agents.AI.A2A 1.23.0-preview
+         resolves (its nuspec declares A2A >= 1.0.0-preview2) and what the Work IQ .NET sample references; pinned
+         explicitly because AgentEval.Microsoft365 depends on it directly. Do not raise it without checking
+         Microsoft.Agents.AI.A2A still restores to one A2A version. -->
+    <PackageVersion Include="A2A" Version="1.0.0-preview2" />
     <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.24.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.24.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.24.0" />

@@ -36,6 +36,11 @@ internal static class BenchTier1SutResolver
     /// <param name="sut">The parsed <c>--sut</c> value, or <see langword="null"/> if not set.</param>
     /// <param name="targetOptions">Every registered target's own bound options, keyed by <see cref="ISutTarget.Sut"/>.</param>
     /// <param name="targets">The built-in targets registered for this verb (<c>bench</c>).</param>
+    /// <param name="ackLiveSideEffects">
+    /// The parsed common <c>--i-understand-live-side-effects</c> flag (registered once per verb by
+    /// <see cref="SutTargetResolver.AddOptionsTo"/>, M03), forwarded as <see cref="CommonTargetOptions.AckLiveSideEffects"/>;
+    /// a live <c>--sut</c> target's <see cref="ISutTarget.Validate"/> refuses without it.
+    /// </param>
     /// <param name="endpoint">The parsed <c>--endpoint</c> value, or <see langword="null"/> if not set.</param>
     /// <param name="model">The parsed <c>--model</c> value (required when <paramref name="endpoint"/> is set).</param>
     /// <param name="apiKey">The parsed <c>--api-key</c> value, or <see langword="null"/> to fall back to <c>OPENAI_API_KEY</c>.</param>
@@ -50,6 +55,7 @@ internal static class BenchTier1SutResolver
         string? sut,
         IReadOnlyDictionary<string, ISutTargetOptions?> targetOptions,
         IReadOnlyList<ISutTarget> targets,
+        bool ackLiveSideEffects,
         string? endpoint,
         string? model,
         string? apiKey,
@@ -64,7 +70,7 @@ internal static class BenchTier1SutResolver
                 return (null, $"Unknown --sut value: '{sut}'. Valid: {string.Join(", ", targets.Select(t => t.Sut).Append(MockTarget.Sut))}.");
             }
 
-            var common = new CommonTargetOptions { Sut = sut, TargetOptions = targetOptions };
+            var common = new CommonTargetOptions { Sut = sut, AckLiveSideEffects = ackLiveSideEffects, TargetOptions = targetOptions };
             try
             {
                 var (sutAgent, _) = SutTargetResolver.TryResolve(common, targets, sutOverride);

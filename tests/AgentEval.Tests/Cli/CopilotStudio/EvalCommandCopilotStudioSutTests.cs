@@ -139,9 +139,10 @@ public class EvalCommandCopilotStudioSutTests
     {
         Dataset = dataset,
         Sut = sut,
+        AckLiveSideEffects = ackConsent,   // M03: the common consent flag lives on EvalOptions, not on the target's own options
         TargetOptions = new Dictionary<string, ISutTargetOptions?>
         {
-            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = config, AckLiveSideEffects = ackConsent, MaxCredits = 0 },
+            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = config, MaxCredits = 0 },
         },
         Format = "json",
         Quiet = true,

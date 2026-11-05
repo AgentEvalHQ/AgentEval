@@ -1,0 +1,58 @@
+{
+  "name": "Work IQ",
+  "description": "Microsoft 365 work intelligence agent (synthetic fixture card; not a captured card).",
+  "version": "2026.11.05",
+  "documentationUrl": "https://learn.microsoft.com/microsoft-365/copilot/extensibility/work-iq/a2a/overview",
+  "supportedInterfaces": [
+    {
+      "url": "https://workiq.svc.cloud.microsoft/a2a/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    },
+    {
+      "url": "https://workiq.svc.cloud.microsoft/a2a/rest/",
+      "protocolBinding": "HTTP+JSON",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "workiq-ask",
+      "name": "Ask about my work",
+      "description": "Answers questions grounded in the signed-in user's Microsoft 365 content (mail, files, meetings, chats) with citations.",
+      "tags": [
+        "microsoft-365",
+        "search",
+        "citations"
+      ],
+      "examples": [
+        "Summarize the status of Project Atlas and cite the sources.",
+        "What did I agree to in yesterday's design sync?"
+      ]
+    },
+    {
+      "id": "workiq-act",
+      "name": "Act on my behalf",
+      "description": "Proposes actions such as creating calendar events; each action requires explicit confirmation before it runs.",
+      "tags": [
+        "microsoft-365",
+        "actions",
+        "confirmation"
+      ]
+    }
+  ],
+  "provider": {
+    "organization": "Synthetic Fixture Provider",
+    "url": "https://example.invalid/synthetic-provider"
+  }
+}

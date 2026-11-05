@@ -128,7 +128,7 @@ internal static class CliCommandTree
         benchGdprCmd.Add(benchAefOpt);
         benchGdprCmd.Add(benchNoAefOpt);
         benchGdprCmd.Add(benchSubjectVersionOpt);
-        var (benchGdprSutOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
+        var (benchGdprSutOpt, benchGdprAckOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
         benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
@@ -159,6 +159,7 @@ internal static class CliCommandTree
                 sut,
                 benchGdprSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchGdprSutTargets,
+                parseResult.GetValue(benchGdprAckOpt),
                 endpoint: null,
                 model: null,
                 apiKey: null,
@@ -227,7 +228,7 @@ internal static class CliCommandTree
         benchEuAiActCmd.Add(benchEuAiActAefOpt);
         benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
         benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
-        var (benchEuAiActSutOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
+        var (benchEuAiActSutOpt, benchEuAiActAckOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
         benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -260,6 +261,7 @@ internal static class CliCommandTree
                 sut,
                 benchEuAiActSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchEuAiActSutTargets,
+                parseResult.GetValue(benchEuAiActAckOpt),
                 endpoint: null,
                 model: null,
                 apiKey: null,
@@ -417,7 +419,7 @@ internal static class CliCommandTree
         benchOwaspCmd.Add(benchOwaspEndpointOpt);
         benchOwaspCmd.Add(benchOwaspModelOpt);
         benchOwaspCmd.Add(benchOwaspApiKeyOpt);
-        var (benchOwaspSutOpt, benchOwaspSutTargets) = SutTargetResolver.AddOptionsTo(benchOwaspCmd, "bench");
+        var (benchOwaspSutOpt, benchOwaspAckOpt, benchOwaspSutTargets) = SutTargetResolver.AddOptionsTo(benchOwaspCmd, "bench");
         benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchOwaspPresetOpt) ?? "top10";
@@ -443,6 +445,7 @@ internal static class CliCommandTree
                 sut,
                 benchOwaspSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchOwaspSutTargets,
+                parseResult.GetValue(benchOwaspAckOpt),
                 parseResult.GetValue(benchOwaspEndpointOpt),
                 parseResult.GetValue(benchOwaspModelOpt),
                 parseResult.GetValue(benchOwaspApiKeyOpt),
@@ -487,7 +490,7 @@ internal static class CliCommandTree
         benchMitreCmd.Add(benchMitreEndpointOpt);
         benchMitreCmd.Add(benchMitreModelOpt);
         benchMitreCmd.Add(benchMitreApiKeyOpt);
-        var (benchMitreSutOpt, benchMitreSutTargets) = SutTargetResolver.AddOptionsTo(benchMitreCmd, "bench");
+        var (benchMitreSutOpt, benchMitreAckOpt, benchMitreSutTargets) = SutTargetResolver.AddOptionsTo(benchMitreCmd, "bench");
         benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchMitrePresetOpt) ?? "atlas-baseline";
@@ -513,6 +516,7 @@ internal static class CliCommandTree
                 sut,
                 benchMitreSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchMitreSutTargets,
+                parseResult.GetValue(benchMitreAckOpt),
                 parseResult.GetValue(benchMitreEndpointOpt),
                 parseResult.GetValue(benchMitreModelOpt),
                 parseResult.GetValue(benchMitreApiKeyOpt),
@@ -556,7 +560,7 @@ internal static class CliCommandTree
         benchNistCmd.Add(benchNistEndpointOpt);
         benchNistCmd.Add(benchNistModelOpt);
         benchNistCmd.Add(benchNistApiKeyOpt);
-        var (benchNistSutOpt, benchNistSutTargets) = SutTargetResolver.AddOptionsTo(benchNistCmd, "bench");
+        var (benchNistSutOpt, benchNistAckOpt, benchNistSutTargets) = SutTargetResolver.AddOptionsTo(benchNistCmd, "bench");
         benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchNistPresetOpt) ?? "rmf-baseline";
@@ -582,6 +586,7 @@ internal static class CliCommandTree
                 sut,
                 benchNistSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchNistSutTargets,
+                parseResult.GetValue(benchNistAckOpt),
                 parseResult.GetValue(benchNistEndpointOpt),
                 parseResult.GetValue(benchNistModelOpt),
                 parseResult.GetValue(benchNistApiKeyOpt),
@@ -871,7 +876,7 @@ internal static class CliCommandTree
                 presetCmd.Add(benchPerfAefOpt);
                 presetCmd.Add(benchPerfNoAefOpt);
                 presetCmd.Add(benchPerfSubjectVersionOpt);
-                var (presetSutOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
+                var (presetSutOpt, presetAckOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
                 var capturedPreset = presetName;
                 presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
                 {
@@ -897,6 +902,7 @@ internal static class CliCommandTree
                         sut,
                         presetSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                         presetSutTargets,
+                        parseResult.GetValue(presetAckOpt),
                         parseResult.GetValue(benchPerfEndpointOpt),
                         parseResult.GetValue(benchPerfModelOpt),
                         parseResult.GetValue(benchPerfApiKeyOpt),

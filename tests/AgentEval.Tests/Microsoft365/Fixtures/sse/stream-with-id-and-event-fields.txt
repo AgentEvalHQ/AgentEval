@@ -1,0 +1,17 @@
+id: evt-0110-0001
+event: message
+retry: 3000
+data: {"jsonrpc":"2.0","id":"rpc-0110","result":{"task":{"id":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","status":{"state":"TASK_STATE_SUBMITTED","timestamp":"2026-11-05T14:29:00.100000Z"},"history":[{"messageId":"msg-user-ab12cd34-0001","role":"ROLE_USER","parts":[{"text":"Summarize the status of Project Atlas and cite the sources."}],"contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","taskId":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","metadata":{"Location":{"timeZone":"Europe/Zurich","timeZoneOffset":60}}}]}}}
+
+id: evt-0110-0002
+event: message
+data: {"jsonrpc":"2.0","id":"rpc-0110","result":{"artifactUpdate":{"taskId":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","artifact":{"artifactId":"artifact-answer-ab12cd34-0001","name":"Answer","parts":[{"text":"Project Atlas is on schedule: the design review closed on 3 November 2026 and "}]},"append":false,"lastChunk":false}}}
+
+id: evt-0110-0003
+event: message
+data: {"jsonrpc":"2.0","id":"rpc-0110","result":{"artifactUpdate":{"taskId":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","artifact":{"artifactId":"artifact-answer-ab12cd34-0001","parts":[{"text":"the pilot starts on 17 November 2026.citeturn0search1"}]},"append":true,"lastChunk":true}}}
+
+id: evt-0110-0004
+event: message
+data: {"jsonrpc":"2.0","id":"rpc-0110","result":{"statusUpdate":{"taskId":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","status":{"state":"TASK_STATE_COMPLETED","timestamp":"2026-11-05T14:29:02.900000Z","message":{"messageId":"msg-agent-ab12cd34-0110","role":"ROLE_AGENT","parts":[],"contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","taskId":"task-ab12cd34-ef56-4a78-9b01-23c45d67e89f","metadata":{"attributions":[{"attributionType":"citation","attributionSource":"OneDriveAndSharePoint","providerDisplayName":"Project Atlas - Status report 2026-11-03.docx","seeMoreWebUrl":"https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx"},{"attributionType":"citation","attributionSource":"Outlook","providerDisplayName":"RE: Atlas vendor contract - open items","seeMoreWebUrl":"https://outlook.example.invalid/mail/inbox/id/AAMkAGY2ZDc3NzUxLTAwMDAtNDk5Zi1hYzE2LWY3YjE2YzE4ZTMwMA%3D%3D"}]}}}}}}
+

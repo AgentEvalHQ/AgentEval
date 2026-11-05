@@ -52,8 +52,9 @@ internal static class EvalCommand
 
         // Built-in SUT targets (Track 2 PR2): --sut copilot-studio evaluates a live Copilot Studio agent
         // with your --dataset's prompts + judge criteria, via the same shared seam `redteam` already uses.
-        // Each target owns its own options/validation/construction (ISutTarget).
-        var (sutOpt, sutTargets) = SutTargetResolver.AddOptionsTo(command, "eval");
+        // Each target owns its own options/validation/construction (ISutTarget); the live-side-effects consent
+        // flag is common to every live target and registered once, here, by the resolver (M03).
+        var (sutOpt, ackOpt, sutTargets) = SutTargetResolver.AddOptionsTo(command, "eval");
 
         // Model / Deployment
         var modelOpt = new Option<string?>("--model")
@@ -175,6 +176,7 @@ internal static class EvalCommand
                 DeploymentName = parseResult.GetValue(deploymentNameOpt),
                 ApiKey = parseResult.GetValue(apiKeyOpt),
                 Sut = parseResult.GetValue(sutOpt),
+                AckLiveSideEffects = parseResult.GetValue(ackOpt),
                 // Bind every built-in target's own flags polymorphically (keyed by --sut value) — mirrors
                 // RedTeamCommand's convention so a target's flags never need a per-verb special case.
                 TargetOptions = sutTargets.ToDictionary(
@@ -315,6 +317,7 @@ internal static class EvalCommand
             DeploymentName = opts.DeploymentName,
             ApiKey = opts.ApiKey,
             Sut = opts.Sut,
+            AckLiveSideEffects = opts.AckLiveSideEffects,
             TargetOptions = opts.TargetOptions,
         };
         var (sutAgent, sutResolvedName) = SutTargetResolver.TryResolve(commonTargetOptions, sutTargets, sutOverride);
@@ -1054,6 +1057,14 @@ internal sealed class EvalOptions
 
     /// <summary>Built-in SUT selector (<c>--sut</c>, Track 2 PR2); <c>copilot-studio</c> is the only built-in target today.</summary>
     public string? Sut { get; init; }
+
+    /// <summary>
+    /// <c>--i-understand-live-side-effects</c>: consent for a live built-in <see cref="Sut"/> target — the common
+    /// flag registered once per verb by <see cref="SutTargetResolver.AddOptionsTo"/> (M03), forwarded as
+    /// <see cref="CommonTargetOptions.AckLiveSideEffects"/>; a live target's own <see cref="ISutTarget.Validate"/>
+    /// refuses before any network call without it. Not read when <see cref="Sut"/> is unset.
+    /// </summary>
+    public bool AckLiveSideEffects { get; init; }
 
     /// <summary>
     /// Per-built-in-target bound options, keyed by <see cref="ISutTarget.Sut"/> — mirrors

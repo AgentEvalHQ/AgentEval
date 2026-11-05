@@ -1,0 +1,2 @@
+data: {"jsonrpc":"2.0","id":"rpc-0112","result":{"message":{"messageId":"msg-agent-ab12cd34-0112","role":"ROLE_AGENT","parts":[{"text":"Your next meeting is the Atlas design sync at 14:00 (Europe/Zurich) today.citeturn0search1"}],"contextId":"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55","metadata":{"attributions":[{"attributionType":"citation","attributionSource":"Calendar","providerDisplayName":"Atlas design sync","seeMoreWebUrl":"https://outlook.example.invalid/calendar/item/AAMkAGY2ZDc3NzUxLTAwMDAtNDk5Zi1hYzE2LWY3YjE2YzE4ZTMwMQ%3D%3D"}]}}}}
+

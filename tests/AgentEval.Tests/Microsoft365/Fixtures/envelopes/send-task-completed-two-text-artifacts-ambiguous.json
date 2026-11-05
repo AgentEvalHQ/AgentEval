@@ -1,0 +1,70 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0012",
+  "result": {
+    "task": {
+      "id": "task-5a9d3e1f-2c7b-4a8e-b0f4-9d6c2a1e7f35",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "timestamp": "2026-11-05T14:01:07.238514Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0012",
+          "role": "ROLE_AGENT",
+          "parts": [],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-5a9d3e1f-2c7b-4a8e-b0f4-9d6c2a1e7f35",
+          "metadata": {
+            "attributions": [
+              {
+                "attributionType": "citation",
+                "attributionSource": "OneDriveAndSharePoint",
+                "providerDisplayName": "Project Atlas - Status report 2026-11-03.docx",
+                "seeMoreWebUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx"
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifactId": "artifact-answer-6b2d9f4a-0012a",
+          "name": "Answer",
+          "parts": [
+            {
+              "text": "The Atlas pilot starts on 17 November 2026.citeturn0search1"
+            }
+          ]
+        },
+        {
+          "artifactId": "artifact-answer-6b2d9f4a-0012b",
+          "name": "Answer",
+          "parts": [
+            {
+              "text": "The Atlas pilot starts on 24 November 2026."
+            }
+          ]
+        }
+      ],
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0012",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "When does the Atlas pilot start?"
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-5a9d3e1f-2c7b-4a8e-b0f4-9d6c2a1e7f35",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -54,6 +54,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Interop.AssertAi\AgentEval.Interop.AssertAi.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
     <!-- S1: the AGENT-HOOKS-0.1 interceptor adapter. Targets net8.0 only (the SDK ships lib/net8.0
          exclusively); net9.0/net10.0 test runs consume it through normal framework compatibility. -->
     <ProjectReference Include="..\..\src\AgentEval.MAF.AgentHooks\AgentEval.MAF.AgentHooks.csproj" />
@@ -82,6 +83,12 @@
     <EmbeddedResource Include="Agentic/Calibration/Golden/*.jsonl" />
     <EmbeddedResource Include="MAF/Gatekeeper/Fixtures/gatekeeper-replay-v1.jsonl"
                       LogicalName="AgentEval.Tests.GatekeeperReplayCorpus.jsonl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Microsoft 365 (Work IQ A2A) normalisation fixtures and synthetic A2A envelopes, read by the protocol,
+         reducer and normaliser tests as embedded resources. -->
+    <EmbeddedResource Include="Microsoft365/Fixtures/**/*.json;Microsoft365/Fixtures/**/*.txt" />
   </ItemGroup>
 
   <ItemGroup>

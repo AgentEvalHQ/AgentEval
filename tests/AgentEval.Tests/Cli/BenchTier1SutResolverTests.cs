@@ -30,7 +30,7 @@ public class BenchTier1SutResolverTests
     public void Resolve_NeitherSutNorEndpoint_ReturnsNullAgentNullError()
     {
         var (agent, error) = BenchTier1SutResolver.Resolve(
-            sut: null, NoTargetOptions, targets: [], endpoint: null, model: null, apiKey: null, subject: "MyAgent");
+            sut: null, NoTargetOptions, targets: [], ackLiveSideEffects: false, endpoint: null, model: null, apiKey: null, subject: "MyAgent");
 
         Assert.Null(agent);
         Assert.Null(error);
@@ -42,7 +42,7 @@ public class BenchTier1SutResolverTests
     public void Resolve_EndpointWithoutModel_ReturnsError()
     {
         var (agent, error) = BenchTier1SutResolver.Resolve(
-            sut: null, NoTargetOptions, targets: [], endpoint: "http://localhost:11434/v1", model: null, apiKey: null, subject: "MyAgent");
+            sut: null, NoTargetOptions, targets: [], ackLiveSideEffects: false, endpoint: "http://localhost:11434/v1", model: null, apiKey: null, subject: "MyAgent");
 
         Assert.Null(agent);
         Assert.NotNull(error);
@@ -56,7 +56,7 @@ public class BenchTier1SutResolverTests
         // agent eval --endpoint does — the exact same EndpointFactory.CreateOpenAICompatible + AsEvaluableAgent
         // pattern, reused, not reinvented (BuildFromOpenAiEndpoint delegates directly to it).
         var (agent, error) = BenchTier1SutResolver.Resolve(
-            sut: null, NoTargetOptions, targets: [], endpoint: "http://localhost:11434/v1", model: "llama3", apiKey: "test-key", subject: "MyAgent");
+            sut: null, NoTargetOptions, targets: [], ackLiveSideEffects: false, endpoint: "http://localhost:11434/v1", model: "llama3", apiKey: "test-key", subject: "MyAgent");
 
         Assert.Null(error);
         Assert.NotNull(agent);
@@ -76,7 +76,7 @@ public class BenchTier1SutResolverTests
     {
         var targets = SutTargetResolver.BuiltInTargets().Where(t => t.SupportedVerbs.Contains("bench")).ToList();
         var (agent, error) = BenchTier1SutResolver.Resolve(
-            sut: "bogus", NoTargetOptions, targets, endpoint: null, model: null, apiKey: null, subject: "MyAgent");
+            sut: "bogus", NoTargetOptions, targets, ackLiveSideEffects: true, endpoint: null, model: null, apiKey: null, subject: "MyAgent");
 
         Assert.Null(agent);
         Assert.NotNull(error);
@@ -91,11 +91,11 @@ public class BenchTier1SutResolverTests
         var targets = SutTargetResolver.BuiltInTargets().Where(t => t.SupportedVerbs.Contains("bench")).ToList();
         var targetOptions = new Dictionary<string, ISutTargetOptions?>
         {
-            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = null, AckLiveSideEffects = false, MaxCredits = 0 },
+            ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = null, MaxCredits = 0 },
         };
 
         var (agent, error) = BenchTier1SutResolver.Resolve(
-            sut: "copilot-studio", targetOptions, targets, endpoint: null, model: null, apiKey: null, subject: "MyAgent");
+            sut: "copilot-studio", targetOptions, targets, ackLiveSideEffects: false, endpoint: null, model: null, apiKey: null, subject: "MyAgent");
 
         Assert.Null(agent);
         Assert.NotNull(error);
@@ -113,14 +113,14 @@ public class BenchTier1SutResolverTests
         {
             var targetOptions = new Dictionary<string, ISutTargetOptions?>
             {
-                ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = cfg, AckLiveSideEffects = true, MaxCredits = 0 },
+                ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = cfg, MaxCredits = 0 },
             };
 
             AIAgent inner = new ChatClientAgent(new AlwaysHelpfulChatClient(), new ChatClientAgentOptions { Name = "cs-fake" });
             IEvaluableAgent sut = CopilotStudioAgentFactory.FromAgent(inner);
 
             var (agent, error) = BenchTier1SutResolver.Resolve(
-                sut: "copilot-studio", targetOptions, targets, endpoint: null, model: null, apiKey: null, subject: "MyAgent",
+                sut: "copilot-studio", targetOptions, targets, ackLiveSideEffects: true, endpoint: null, model: null, apiKey: null, subject: "MyAgent",
                 sutOverride: sut);
 
             Assert.Null(error);

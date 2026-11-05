@@ -1,0 +1,44 @@
+{
+  "name": "Work IQ (legacy 0.3 card)",
+  "description": "A card that only advertises protocol version 0.3 (synthetic). Legacy top-level url/protocolVersion fields are present on purpose; the provider must not select a 0.3 interface.",
+  "version": "2026.11.05",
+  "url": "https://workiq.svc.cloud.microsoft/a2a/",
+  "protocolVersion": "0.3",
+  "supportedInterfaces": [
+    {
+      "url": "https://workiq.svc.cloud.microsoft/a2a/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "0.3"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "workiq-ask",
+      "name": "Ask about my work",
+      "description": "Answers questions grounded in the signed-in user's Microsoft 365 content (mail, files, meetings, chats) with citations.",
+      "tags": [
+        "microsoft-365",
+        "search",
+        "citations"
+      ],
+      "examples": [
+        "Summarize the status of Project Atlas and cite the sources.",
+        "What did I agree to in yesterday's design sync?"
+      ]
+    }
+  ],
+  "provider": {
+    "organization": "Synthetic Fixture Provider",
+    "url": "https://example.invalid/synthetic-provider"
+  }
+}

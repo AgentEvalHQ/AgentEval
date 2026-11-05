@@ -1,0 +1,408 @@
+{
+  "synthetic": true,
+  "schema": "agenteval.microsoft365.normalization-fixture-catalog/v1",
+  "description": "Invented data for the design document. Not captured from Microsoft services. Expected output is a semantic test projection, not the entire evidence schema.",
+  "fixtures": [
+    {
+      "id": "selection-is-not-execution",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "developerInfo": {
+          "plugins": {
+            "selectedFunctions": [
+              {
+                "plugin": {
+                  "name": "Demo Calendar"
+                },
+                "functionDisplayName": "CreateDemoEvent"
+              }
+            ],
+            "executions": [
+              {
+                "function": {
+                  "plugin": {
+                    "name": "Demo Files"
+                  },
+                  "functionDisplayName": "ReadDemoFile"
+                },
+                "executionStatus": {
+                  "responseStatus": 200
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "toolSelections": {
+          "availability": "Provided",
+          "validation": "Valid",
+          "count": 1,
+          "names": [
+            "CreateDemoEvent"
+          ]
+        },
+        "toolExecutions": {
+          "availability": "Provided",
+          "validation": "Valid",
+          "coverage": "Unknown",
+          "count": 1,
+          "rows": [
+            {
+              "plugin": "Demo Files",
+              "function": "ReadDemoFile",
+              "providerInvocationIdState": "Missing",
+              "argumentsState": "Missing",
+              "resultState": "Missing",
+              "responseStatus": 200,
+              "outcome": "Unknown"
+            }
+          ]
+        },
+        "legacyToolUsageReport": null,
+        "legacyToolTimeline": null
+      }
+    },
+    {
+      "id": "explicit-empty-selection-absent-executions",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "developerInfo": {
+          "plugins": {
+            "selectedFunctions": []
+          }
+        }
+      },
+      "expected": {
+        "toolSelections": {
+          "availability": "Provided",
+          "validation": "Valid",
+          "count": 0,
+          "observedEmpty": true
+        },
+        "toolExecutions": {
+          "availability": "NotProvided",
+          "count": 0,
+          "observedEmpty": false
+        },
+        "legacyToolUsageReport": null,
+        "legacyToolTimeline": null
+      }
+    },
+    {
+      "id": "retrieval-preserves-unranked-hit-and-unknown-status",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "retrievalInfo": {
+          "executions": [
+            {
+              "name": "OneDriveAndSharePoint",
+              "debugInfo": {
+                "totalResultCount": 100,
+                "maximumNumberOfResults": 2,
+                "retrievalHits": [
+                  {
+                    "webUrl": "https://example.invalid/docs/demo-a",
+                    "extracts": [
+                      {
+                        "text": "Synthetic passage: the demo launch is Tuesday."
+                      }
+                    ],
+                    "resourceMetadata": {
+                      "synthetic": true
+                    }
+                  },
+                  {
+                    "webUrl": "https://example.invalid/docs/demo-b",
+                    "rank": 2,
+                    "extracts": [
+                      {
+                        "text": "Synthetic passage: the demo review is Wednesday."
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "retrievalExecutions": {
+          "availability": "Provided",
+          "count": 1,
+          "rows": [
+            {
+              "capability": "OneDriveAndSharePoint",
+              "providerStatusState": "Missing",
+              "outcome": "Unknown",
+              "queryTextState": "Missing",
+              "maximumNumberOfResults": 2,
+              "totalResultCount": 100,
+              "returnedHitCount": 2,
+              "hits": [
+                {
+                  "rankState": "Missing",
+                  "passages": [
+                    "Synthetic passage: the demo launch is Tuesday."
+                  ]
+                },
+                {
+                  "rankState": "Present",
+                  "rank": 2,
+                  "passages": [
+                    "Synthetic passage: the demo review is Wednesday."
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "metricEligibility": {
+          "retrievalRankAtK": false,
+          "retrievalCorpusRecall": false
+        }
+      }
+    },
+    {
+      "id": "malformed-tool-data-is-not-observed-empty",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "developerInfo": {
+          "plugins": {
+            "selectedFunctions": "wrong-type",
+            "executions": [
+              null,
+              {
+                "function": {
+                  "plugin": {
+                    "name": "Demo Tool"
+                  },
+                  "functionDisplayName": "Read"
+                },
+                "executionStatus": {
+                  "responseStatus": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "toolSelections": {
+          "availability": "Provided",
+          "validation": "Malformed",
+          "observedEmpty": false
+        },
+        "toolExecutions": {
+          "availability": "Provided",
+          "validation": "Partial",
+          "count": 2,
+          "rows": [
+            {
+              "pluginState": "Invalid",
+              "functionState": "Invalid",
+              "providerInvocationIdState": "Missing"
+            },
+            {
+              "plugin": "Demo Tool",
+              "function": "Read",
+              "responseStatusState": "Invalid",
+              "outcome": "Unknown"
+            }
+          ]
+        },
+        "legacyToolUsageReport": null
+      }
+    },
+    {
+      "id": "native-empty-retrieval-import-has-unknown-coverage",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "NativeEvaluationImport",
+      "input": {
+        "nativeDiagnostics": {
+          "retrieval_executions": []
+        }
+      },
+      "expected": {
+        "retrievalExecutions": {
+          "availability": "Provided",
+          "coverage": "Unknown",
+          "count": 0,
+          "observedEmpty": true
+        },
+        "metricEligibility": {
+          "assertNoRetrievalPerformed": false
+        },
+        "losses": [
+          "native_import_may_collapse_missing_or_malformed_to_empty"
+        ]
+      }
+    },
+    {
+      "id": "identical-execution-rows-are-not-replay-dedup",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "developerInfo": {
+          "plugins": {
+            "selectedFunctions": [],
+            "executions": [
+              {
+                "function": {
+                  "plugin": {
+                    "name": "Demo Search"
+                  },
+                  "functionDisplayName": "Find"
+                },
+                "executionStatus": {
+                  "responseStatus": 200
+                }
+              },
+              {
+                "function": {
+                  "plugin": {
+                    "name": "Demo Search"
+                  },
+                  "functionDisplayName": "Find"
+                },
+                "executionStatus": {
+                  "responseStatus": 200
+                }
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "toolExecutions": {
+          "count": 2,
+          "distinctLocalObservationIds": 2,
+          "providerInvocationIdStates": [
+            "Missing",
+            "Missing"
+          ]
+        },
+        "metricEligibility": {
+          "fullTurnExecutionCount": false
+        }
+      }
+    },
+    {
+      "id": "compound-markers-preserve-turn-and-remain-unresolved",
+      "profile": {
+        "id": "synthetic-workiq-native-1.18.0-shapes-v1",
+        "developerInfoRequested": true,
+        "retrievalInfoRequested": true
+      },
+      "capture": {
+        "complete": true,
+        "declaredScope": "Unknown",
+        "synthetic": true
+      },
+      "origin": "A2AArtifact",
+      "input": {
+        "answerText": "A citeturn0search1turn1search1. B citeturn0search1.",
+        "attributions": [
+          {
+            "attributionType": "citation",
+            "providerDisplayName": "Synthetic source A",
+            "seeMoreWebUrl": "https://example.invalid/a"
+          },
+          {
+            "attributionType": "citation",
+            "providerDisplayName": "Synthetic source B",
+            "seeMoreWebUrl": "https://example.invalid/b"
+          }
+        ]
+      },
+      "expected": {
+        "citations": {
+          "markerCount": 2,
+          "referenceOccurrenceCount": 3,
+          "distinctReferenceKeys": [
+            "turn0search1",
+            "turn1search1"
+          ],
+          "markerKeys": [
+            [
+              "turn0search1",
+              "turn1search1"
+            ],
+            [
+              "turn0search1"
+            ]
+          ],
+          "bindings": [
+            "Unresolved",
+            "Unresolved",
+            "Unresolved"
+          ]
+        },
+        "rawAnswerUnchanged": true,
+        "metricEligibility": {
+          "citationPresence": true,
+          "citationCorrectness": false
+        }
+      }
+    }
+  ]
+}

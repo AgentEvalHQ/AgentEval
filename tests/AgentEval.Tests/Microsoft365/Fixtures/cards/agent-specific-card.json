@@ -1,0 +1,43 @@
+{
+  "name": "Atlas Project Assistant",
+  "description": "Declarative agent scoped to the Project Atlas site (synthetic fixture card). The agent id in the URL path is opaque: keep it whole, including its prefix and dot.",
+  "version": "2026.11.05",
+  "supportedInterfaces": [
+    {
+      "url": "https://workiq.svc.cloud.microsoft/a2a/U_abc123.def456/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0",
+      "tenant": "rt-8d3f2a1c"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "workiq-ask",
+      "name": "Ask about my work",
+      "description": "Answers questions grounded in the signed-in user's Microsoft 365 content (mail, files, meetings, chats) with citations.",
+      "tags": [
+        "microsoft-365",
+        "search",
+        "citations"
+      ],
+      "examples": [
+        "Summarize the status of Project Atlas and cite the sources.",
+        "What did I agree to in yesterday's design sync?"
+      ]
+    }
+  ],
+  "provider": {
+    "organization": "Synthetic Fixture Provider",
+    "url": "https://example.invalid/synthetic-provider"
+  }
+}

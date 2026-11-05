@@ -7,6 +7,7 @@
 // IRedTeamBuiltInTarget.Validate and ISutTarget.Validate must agree on the same accept/reject truth table
 // for the checks they SHARE (consent, config-required, max-credits >= 0) — the one real ongoing-sync cost
 // the design doc calls out, since the two method bodies have no compiler-enforced sync.
+using System.CommandLine;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.RedTeamTargets;
@@ -73,9 +74,10 @@ public class SutTargetResolverTests
             var opts = new CommonTargetOptions
             {
                 Sut = "copilot-studio",
+                AckLiveSideEffects = true,   // M03: the common consent flag, not the target's own option
                 TargetOptions = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile, AckLiveSideEffects = true, MaxCredits = 0 },
+                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile, MaxCredits = 0 },
                 },
             };
 
@@ -102,9 +104,10 @@ public class SutTargetResolverTests
             var opts = new CommonTargetOptions
             {
                 Sut = "copilot-studio",
+                AckLiveSideEffects = false,   // the common consent flag (M03) withheld
                 TargetOptions = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile, AckLiveSideEffects = false },
+                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile },
                 },
             };
 
@@ -124,9 +127,10 @@ public class SutTargetResolverTests
         var opts = new CommonTargetOptions
         {
             Sut = "copilot-studio",
+            AckLiveSideEffects = true,
             TargetOptions = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase)
             {
-                ["copilot-studio"] = new CopilotStudioSutOptions { AckLiveSideEffects = true },
+                ["copilot-studio"] = new CopilotStudioSutOptions(),
             },
         };
 
@@ -144,9 +148,10 @@ public class SutTargetResolverTests
             var opts = new CommonTargetOptions
             {
                 Sut = "copilot-studio",
+                AckLiveSideEffects = true,
                 TargetOptions = new Dictionary<string, ISutTargetOptions?>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile, AckLiveSideEffects = true, MaxCredits = -1 },
+                    ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = configFile, MaxCredits = -1 },
                 },
             };
 
@@ -157,6 +162,69 @@ public class SutTargetResolverTests
         {
             TryDelete(configFile);
         }
+    }
+
+    // ── M03: the live-side-effects consent flag is COMMON — registered once per verb by the resolver, never by
+    //    a live target (two targets each adding the same alias to one command would be a duplicate-alias error). ──
+
+    [Fact]
+    public void AddOptionsTo_VerbWithLiveTarget_RegistersConsentFlagExactlyOnce()
+    {
+        var command = new Command("eval-test");
+
+        var (sutOpt, ackOpt, targets) = SutTargetResolver.AddOptionsTo(command, "eval");
+
+        Assert.NotEmpty(targets);
+        Assert.Contains(command.Options, o => ReferenceEquals(o, sutOpt));
+        var consent = command.Options.Where(o => o.Name == "--i-understand-live-side-effects").ToList();
+        Assert.Single(consent);                 // exactly one: no target re-declared it
+        Assert.Same(ackOpt, consent[0]);        // ...and it is the resolver's own
+        Assert.Contains(command.Options, o => o.Name == "--copilotstudio-config");   // the target's OWN flags still arrive
+        Assert.Contains(command.Options, o => o.Name == "--max-credits");
+    }
+
+    [Fact]
+    public void AddOptionsTo_VerbWithNoTarget_RegistersNoConsentFlag()
+    {
+        var command = new Command("no-live-target-test");
+
+        var (sutOpt, ackOpt, targets) = SutTargetResolver.AddOptionsTo(command, "no-such-verb");
+
+        Assert.Empty(targets);
+        Assert.Contains(command.Options, o => ReferenceEquals(o, sutOpt));
+        Assert.DoesNotContain(command.Options, o => o.Name == "--i-understand-live-side-effects");
+        Assert.NotNull(ackOpt);                                 // still returned, so every caller binds the same way...
+        Assert.False(command.Parse("").GetValue(ackOpt));       // ...and it reads false on a command it was not added to
+    }
+
+    [Theory]
+    [InlineData("--sut copilot-studio --i-understand-live-side-effects", true)]
+    [InlineData("--sut copilot-studio", false)]
+    public void AddOptionsTo_ConsentFlag_BindsFromTheCommandLine(string commandLine, bool expected)
+    {
+        var command = new Command("eval-test");
+        var (_, ackOpt, _) = SutTargetResolver.AddOptionsTo(command, "eval");
+
+        var parsed = command.Parse(commandLine);
+
+        Assert.Empty(parsed.Errors);
+        Assert.Equal(expected, parsed.GetValue(ackOpt));
+    }
+
+    [Fact]
+    public void CopilotStudio_ISutTargetAddOptionsTo_DoesNotRegisterTheConsentFlag_RedteamHalfStillDoes()
+    {
+        // The shared half must not add the flag (the resolver's own registration would collide with it); the redteam
+        // half still owns it, because RedTeamCommand has no shared resolver to hoist it into.
+        var shared = new Command("shared");
+        ((ISutTarget)new CopilotStudioRedTeamTarget()).AddOptionsTo(shared);
+        Assert.DoesNotContain(shared.Options, o => o.Name == "--i-understand-live-side-effects");
+        Assert.Contains(shared.Options, o => o.Name == "--copilotstudio-config");
+        Assert.Contains(shared.Options, o => o.Name == "--max-credits");
+
+        var redteam = new Command("redteam");
+        ((IRedTeamBuiltInTarget)new CopilotStudioRedTeamTarget()).AddOptionsTo(redteam);
+        Assert.Single(redteam.Options, o => o.Name == "--i-understand-live-side-effects");
     }
 
     // ── Validate-drift contract: IRedTeamBuiltInTarget.Validate vs ISutTarget.Validate must agree on
@@ -189,8 +257,11 @@ public class SutTargetResolverTests
 
             // ── shared eval/bench path ──
             var sutTarget = new CopilotStudioRedTeamTarget();
-            ISutTargetOptions sutOwn = new CopilotStudioSutOptions { ConfigFile = configFile, AckLiveSideEffects = consent, MaxCredits = maxCredits };
-            var sutAccepted = TryValidate(() => ((ISutTarget)sutTarget).Validate(new CommonTargetOptions { Sut = "copilot-studio" }, sutOwn));
+            // M03: the shared half takes consent through the COMMON options (CommonTargetOptions.AckLiveSideEffects),
+            // where the redteam half above reads it from its own target options — one truth table, two seams.
+            ISutTargetOptions sutOwn = new CopilotStudioSutOptions { ConfigFile = configFile, MaxCredits = maxCredits };
+            var sutAccepted = TryValidate(() => ((ISutTarget)sutTarget).Validate(
+                new CommonTargetOptions { Sut = "copilot-studio", AckLiveSideEffects = consent }, sutOwn));
 
             Assert.Equal(expectAccept, redteamAccepted);
             Assert.Equal(expectAccept, sutAccepted);

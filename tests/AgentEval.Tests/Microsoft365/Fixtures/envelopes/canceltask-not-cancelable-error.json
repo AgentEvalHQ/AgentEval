@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0403",
+  "error": {
+    "code": -32002,
+    "message": "Task cannot be canceled",
+    "data": {
+      "taskId": "task-7b3f9d1e-6a2c-4e5b-8f0a-1d4c7b9e3a62",
+      "state": "TASK_STATE_COMPLETED"
+    }
+  }
+}

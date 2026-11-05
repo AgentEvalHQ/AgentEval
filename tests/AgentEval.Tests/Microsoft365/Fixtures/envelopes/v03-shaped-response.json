@@ -1,0 +1,38 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0301",
+  "result": {
+    "kind": "task",
+    "id": "task-legacy-0e7c3a9b-1d5f-4b2e-8c6a-3f9d7b1e5a40",
+    "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+    "status": {
+      "state": "completed",
+      "timestamp": "2026-11-05T14:10:03.771256Z"
+    },
+    "artifacts": [
+      {
+        "artifactId": "artifact-legacy-6b2d9f4a-0301",
+        "name": "Answer",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Project Atlas is on schedule.citeturn0search1"
+          }
+        ]
+      }
+    ],
+    "history": [
+      {
+        "kind": "message",
+        "messageId": "msg-user-3e8f1a2c-0301",
+        "role": "user",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Summarize the status of Project Atlas and cite the sources."
+          }
+        ]
+      }
+    ]
+  }
+}
