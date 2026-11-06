@@ -587,6 +587,12 @@ internal sealed class RawCaptureSink
 
         _truncationReported = true;
         _diagnostics.Trace(WorkIqTraceStage.Capture, "capture.truncated", $"capture {CaptureId} truncated: {reason}", WorkIqTraceLevel.Warning);
+        if (!RetainsBodies)
+        {
+            // Nothing is retained under this policy (state NotRetained), so no capture is missing: traced only.
+            return;
+        }
+
         _diagnostics.Issue(
             WorkIqIssue.Create(
                 WorkIqTraceStage.Capture,
@@ -606,6 +612,13 @@ internal sealed class RawCaptureSink
 
         _interrupted = true;
         _diagnostics.Trace(WorkIqTraceStage.Capture, "capture.interrupted", $"capture {CaptureId} interrupted: {reason}", WorkIqTraceLevel.Warning);
+        if (!RetainsBodies)
+        {
+            // Nothing is retained under this policy, so no capture is missing. The failure that stopped the exchange is
+            // registered once, by the layer that ends the operation: traced only.
+            return;
+        }
+
         _diagnostics.Issue(
             WorkIqIssue.Create(
                 WorkIqTraceStage.Capture,

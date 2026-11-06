@@ -12,8 +12,9 @@
     <!-- The Microsoft 365 provider is experimental (assembly-level [Experimental]); this demo uses it on purpose. -->
     <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
     <!-- The tester's demo for the Microsoft 365 (Work IQ A2A 1.0) provider: readiness, one prompt, a small benchmark
-         through MAFEvaluationHarness, and a run folder with every trace and issue. Consumes AgentEval; does not modify
-         it. Versions come from Directory.Packages.props (Central Package Management). -->
+         through MAFEvaluationHarness, and a run folder with every trace and issue and the benchmark as a sealed AEF run.
+         Consumes AgentEval; does not modify it. Versions come from Directory.Packages.props (Central Package
+         Management). -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,11 +23,13 @@
 
   <ItemGroup>
     <!-- The provider references Abstractions and Core with PrivateAssets=all, so the demo references both itself.
-         MAF brings MAFEvaluationHarness, the batch harness every benchmark case runs through. -->
+         MAF brings MAFEvaluationHarness, the batch harness every benchmark case runs through. Results.Adapters brings
+         AefEvalWriter, the writer the agenteval CLI's eval uses: the benchmark is written as a sealed AEF run. -->
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Results.Adapters\AgentEval.Results.Adapters.csproj" />
   </ItemGroup>
 
   <ItemGroup>

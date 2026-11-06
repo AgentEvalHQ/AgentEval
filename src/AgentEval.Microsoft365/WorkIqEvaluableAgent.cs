@@ -74,10 +74,11 @@ public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAg
     public WorkIqOptions Options { get; }
 
     /// <summary>
-    /// Turns counted so far (the quantity <see cref="WorkIqOptions.MaxTurns"/> caps): every turn that returned a typed
-    /// result, completed or not — a failed, paused, canceled or indeterminate turn, and also one that failed before its
-    /// prompt went out (a sign-in or discovery failure). Only a turn refused before it started (the cap itself, a disposed
-    /// agent) is not counted. Turns are counted, consumption is not metered.
+    /// Turns counted so far (the quantity <see cref="WorkIqOptions.MaxTurns"/> caps): every turn the conversation started,
+    /// completed or not. That includes a failed, paused, canceled or indeterminate turn, one that failed before its prompt
+    /// went out (a sign-in or discovery failure), and one that ended in an exception with no turn result (its prompt may
+    /// have gone out). Only a turn refused before it started is not counted: the cap itself, a disposed agent or
+    /// conversation, or another turn still active on the conversation. Turns are counted, consumption is not metered.
     /// </summary>
     public int TurnsUsed { get; private set; }
 
@@ -130,20 +131,40 @@ public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAg
 
         var request = new WorkIqTurnRequest(prompt, caseId, turnId);
         WorkIqTurnResult result;
+
+        // Counted before the call: a turn whose prompt may have gone out counts even when it ends in an exception that
+        // carries no result (an evidence normaliser that throws after the send). The cap bounds sends, so only a turn the
+        // conversation refused before it started is taken back.
+        TurnsUsed++;
         try
         {
             result = await Conversation.RunTurnAsync(request, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IWorkIqTurnResultCarrier carrier)
         {
-            // The turn reached the service (a typed result exists): it counts, and the sink sees it before the throw.
-            TurnsUsed++;
+            // A typed result exists: the sink sees it before the throw.
             Observe(carrier.TurnResult, caseId, turnId);
             Diagnostics.Trace(WorkIqTraceStage.Outcome, "agent.turn_mapped", $"turn ended with {carrier.TurnResult.Outcome}; rethrowing {ex.GetType().Name}", WorkIqTraceLevel.Warning, caseId: caseId, turnId: turnId, taskId: carrier.TurnResult.Task?.TaskId, contextId: carrier.TurnResult.ContextId);
             throw;
         }
+        catch (Exception ex) when (ex is WorkIqTurnRefusedException or ObjectDisposedException or ArgumentException)
+        {
+            // Refused before the turn started (another turn is active, the conversation is disposed, a bad argument): nothing was sent.
+            TurnsUsed--;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Trace(
+                WorkIqTraceStage.Outcome,
+                "agent.turn_failed",
+                $"the turn threw {ex.GetType().Name} without a turn result; it counts toward MaxTurns because its prompt may have gone out",
+                WorkIqTraceLevel.Error,
+                caseId: caseId,
+                turnId: turnId);
+            throw;
+        }
 
-        TurnsUsed++;
         Observe(result, caseId, turnId);
 
         if (result.IsCompleted)
@@ -252,7 +273,15 @@ public sealed class WorkIqEvaluableAgent : IEvaluableAgent, ISessionResettableAg
         }
         catch (Exception ex)
         {
-            Diagnostics.Trace(WorkIqTraceStage.Outcome, "agent.sink_failed", $"the onTurn sink threw {ex.GetType().Name}; the turn result is still on the exception/response", WorkIqTraceLevel.Error, caseId: caseId, turnId: turnId);
+            Diagnostics.Trace(
+                WorkIqTraceStage.Outcome,
+                "agent.sink_failed",
+                $"the onTurn sink threw {ex.GetType().Name}; the sink's exception replaces the response or the turn's exception, so the caller does not get this turn's result (outcome {result.Outcome})",
+                WorkIqTraceLevel.Error,
+                caseId: caseId,
+                turnId: turnId,
+                taskId: result.Task?.TaskId,
+                contextId: result.ContextId);
             throw;
         }
     }

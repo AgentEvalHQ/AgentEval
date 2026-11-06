@@ -14,8 +14,9 @@ namespace AgentEval.Microsoft365Demo;
 /// <summary>
 /// The run folder of one demo run and every path in it. Created whatever the screen verbosity: <c>console.log</c>,
 /// <c>trace.jsonl</c>, <c>issues.jsonl</c>, <c>readiness.md</c>, <c>readiness.json</c>, <c>turns.jsonl</c>,
-/// <c>evidence/&lt;caseId&gt;.json</c>, <c>results.md</c>, <c>results.json</c>, <c>summary.md</c>, <c>raw/</c> with
-/// <c>--capture-raw</c>, and <c>&lt;folder&gt;.zip</c> beside it with <c>--zip</c>.
+/// <c>evidence/&lt;caseId&gt;.json</c>, <c>aef/</c> (the benchmark as a sealed AEF run), <c>results.md</c>,
+/// <c>results.json</c>, <c>summary.md</c>, <c>raw/</c> with <c>--capture-raw</c>, and <c>&lt;folder&gt;.zip</c> beside it
+/// with <c>--zip</c>.
 /// </summary>
 internal sealed class RunFolder
 {
@@ -39,6 +40,9 @@ internal sealed class RunFolder
 
     /// <summary>The folder of the per-turn evidence documents.</summary>
     public const string EvidenceFolderName = "evidence";
+
+    /// <summary>The folder of the benchmark's AEF run (<c>aef/&lt;yyyy&gt;/&lt;MM&gt;/&lt;runId&gt;/</c>).</summary>
+    public const string AefFolderName = "aef";
 
     /// <summary>The per-case results (Markdown).</summary>
     public const string ResultsMarkdownName = "results.md";
@@ -96,6 +100,9 @@ internal sealed class RunFolder
 
     /// <summary>evidence/.</summary>
     public DirectoryInfo EvidenceFolder => new(Path.Combine(Root.FullName, EvidenceFolderName));
+
+    /// <summary>aef/.</summary>
+    public DirectoryInfo AefFolder => new(Path.Combine(Root.FullName, AefFolderName));
 
     /// <summary>results.md.</summary>
     public FileInfo ResultsMarkdown => File(ResultsMarkdownName);

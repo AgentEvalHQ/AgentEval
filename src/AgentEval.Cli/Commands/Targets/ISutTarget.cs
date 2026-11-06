@@ -7,6 +7,7 @@ using System.CommandLine.Parsing;
 using System.Text.Json.Nodes;
 using AgentEval.Core;
 using AgentEval.Models;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Commands.Targets;
@@ -80,6 +81,14 @@ internal interface ISutTarget
     /// </summary>
     /// <param name="agent">The agent the command evaluates.</param>
     ISutCaseEvidence? CaseEvidenceFor(IEvaluableAgent agent) => null;
+
+    /// <summary>
+    /// The agent a <c>bench</c> family that grades the answer text drives, built from the agent <see cref="Build"/>
+    /// returned. A target whose agent can complete a turn without an answer wraps it, so the family never grades a
+    /// stand-in text as the agent's answer. The default returns <paramref name="agent"/> unchanged.
+    /// </summary>
+    /// <param name="agent">The agent <see cref="Build"/> returned.</param>
+    IEvaluableAgent ForGradedBench(IEvaluableAgent agent) => agent;
 }
 
 /// <summary>
@@ -102,11 +111,19 @@ internal interface ISutCaseEvidence
 
     /// <summary>
     /// Applies what the target observed during the case to its result before the result is recorded: a case the target
-    /// knows was not measured is marked not measured (<see cref="TestResult.Error"/>), never left as a failure.
+    /// knows was not measured is marked not measured (<see cref="TestResult.Error"/>), never left as a failure or a pass.
     /// </summary>
     /// <param name="result">The case's (or trial's) result, as the harness produced it.</param>
     /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>
-    void ReviewResult(TestResult result, string caseId);
+    /// <param name="criteriaNotGraded">
+    /// True when the case declares evaluation criteria and the run has no judge: the harness then only checked that the
+    /// answer is not empty. A target that measures agents treats such a case as not measured.
+    /// </param>
+    /// <returns>
+    /// The AEF absence for a case the target marked not measured, so the AEF run records its true state and cause;
+    /// otherwise null.
+    /// </returns>
+    AefCaseAbsence? ReviewResult(TestResult result, string caseId, bool criteriaNotGraded = false);
 
     /// <summary>The case's evidence document, or null when there is none.</summary>
     /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>

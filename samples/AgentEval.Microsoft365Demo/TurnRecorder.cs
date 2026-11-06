@@ -16,8 +16,9 @@ namespace AgentEval.Microsoft365Demo;
 /// The <c>onTurn</c> sink of the live agent (<see cref="Microsoft365AgentFactory.BuildLive"/>): for every turn result,
 /// completed or not, it appends one metadata line to <c>turns.jsonl</c> (ids, outcome, timing, failure category, codes
 /// and request-id; never the answer text), writes the evidence document to <c>evidence/&lt;caseId&gt;.json</c> under the
-/// run's content policy, shows one line per turn, and keeps the result for the benchmark's verdicts. It never throws:
-/// the agent rethrows a sink's exception, which would turn a recording problem into a failed turn.
+/// run's content policy, shows one line per turn, and keeps the result and its document for the benchmark's verdicts and
+/// its AEF run. It never throws: the agent rethrows a sink's exception, which would turn a recording problem into a failed
+/// turn.
 /// </summary>
 internal sealed class TurnRecorder
 {
@@ -29,6 +30,7 @@ internal sealed class TurnRecorder
     private readonly EvidenceContentPolicy _policy;
     private readonly List<WorkIqTurnResult> _turns = [];
     private readonly Dictionary<WorkIqTurnResult, string> _evidenceFiles = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<string, string> _documents = new(StringComparer.Ordinal);
     private readonly object _gate = new();
 
     /// <summary>Creates the recorder.</summary>
@@ -83,6 +85,21 @@ internal sealed class TurnRecorder
         }
     }
 
+    /// <summary>
+    /// The evidence document of a recorded turn, as <see cref="Microsoft365EvidenceProjector.ToAefDocument"/> projected it
+    /// under the run's content policy (the AEF run attaches it to the turn's case). Found by the turn's id, so the turn
+    /// result an exception carries finds it too. Null when the turn was not recorded or its document could not be serialized.
+    /// </summary>
+    /// <param name="turn">The turn.</param>
+    public string? DocumentOf(WorkIqTurnResult turn)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+        lock (_gate)
+        {
+            return _documents.TryGetValue(turn.Identity.TurnId, out var document) ? document : null;
+        }
+    }
+
     /// <summary>The <c>onTurn</c> callback.</summary>
     /// <param name="result">The turn result.</param>
     public void OnTurn(WorkIqTurnResult result)
@@ -105,7 +122,12 @@ internal sealed class TurnRecorder
             string document;
             try
             {
-                document = Indent(Microsoft365EvidenceProjector.ToAefDocument(result.Evidence, _policy));
+                var projected = Microsoft365EvidenceProjector.ToAefDocument(result.Evidence, _policy);
+                document = Indent(projected);
+                lock (_gate)
+                {
+                    _documents[result.Identity.TurnId] = projected;
+                }
             }
             catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException or InvalidOperationException)
             {

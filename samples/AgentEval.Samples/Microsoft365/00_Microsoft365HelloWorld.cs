@@ -85,7 +85,16 @@ public static class Microsoft365HelloWorld
         }
 
         Console.WriteLine($"   Reply: \"{Microsoft365SampleSupport.Trunc(reply.Text)}\"");
-        Check(() => reply.Text.Should().NotBeEmpty(), "NotBeEmpty()");
+        if (Microsoft365Evidence.IsAnswerMeasured(reply))
+        {
+            Check(() => reply.Text.Should().NotBeEmpty(), "NotBeEmpty()");
+        }
+        else
+        {
+            // Several answer candidates and none selected: the empty text is not the agent's answer, so it is not graded.
+            Console.WriteLine("   No answer was selected among several candidates: not measured.");
+            SampleOutcome.Skip("no answer was selected among several candidates: not measured");
+        }
 
         // What the tenant emitted, per channel — printed, never asserted: availability is a fact about this run.
         Console.WriteLine($"   Evidence (printed, not asserted): {Microsoft365SampleSupport.EvidenceLine(reply.Evidence())}");

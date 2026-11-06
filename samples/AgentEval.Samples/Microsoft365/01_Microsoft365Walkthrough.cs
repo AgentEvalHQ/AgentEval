@@ -187,6 +187,14 @@ public static class Microsoft365Walkthrough
             SampleOutcome.Skip("the reply carried no evidence document, so the evidence channels were not shown");
         }
 
+        if (!Microsoft365Evidence.IsAnswerMeasured(reply))
+        {
+            // Several answer candidates and none selected: the empty text is not the agent's answer, so it is not graded.
+            Console.WriteLine("   No answer was selected among several candidates: not measured.");
+            SampleOutcome.Skip("no answer was selected among several candidates: not measured");
+            return;
+        }
+
         reply.Text.Should().NotBeEmpty();
         Console.WriteLine("   ✅ NotBeEmpty passed");
     }

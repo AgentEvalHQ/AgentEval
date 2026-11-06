@@ -2,7 +2,7 @@
 
 ## Release Candidate and API Stability
 
-AgentEval **1.0.0-rc.1 is a release candidate**, intended for feedback before 1.0.0. APIs and behavior
+AgentEval **1.0.0-rc.2 is a release candidate**, intended for feedback before 1.0.0. APIs and behavior
 can still change during this prerelease period; changes are recorded in the [CHANGELOG](CHANGELOG.md).
 
 From **1.0.0**, the stable public API of the `AgentEval` library and the CLI's documented commands,

@@ -416,6 +416,7 @@ internal static class IssueText
         WorkIqIssueCategory.Service => "the Work IQ service (note the request-id)",
         WorkIqIssueCategory.Capture => "the raw capture settings (the run itself is unaffected)",
         WorkIqIssueCategory.Budget => "the run's limits (--max-turns, --timeout-seconds)",
+        WorkIqIssueCategory.Case => "the benchmark case (the agent paused for a confirmation)",
         _ => "not classified",
     };
 
@@ -439,6 +440,8 @@ internal static class IssueText
             "Nothing for the run itself; raw/ may be incomplete. Send the folder back if the maintainers asked for raw/.",
         WorkIqIssueCategory.Budget =>
             "Raise --max-turns or --timeout-seconds only if you meant the run to go further; otherwise send the run folder back.",
+        WorkIqIssueCategory.Case =>
+            "Rephrase the case so it asks for information only. Nothing was approved.",
         _ => "Send the run folder back.",
     };
 

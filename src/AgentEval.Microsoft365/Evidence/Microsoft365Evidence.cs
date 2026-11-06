@@ -34,6 +34,14 @@ public static class Microsoft365Evidence
     /// </summary>
     public const string AnswerCompletenessKey = "AgentEval.Microsoft365.AnswerCompleteness";
 
+    /// <summary>
+    /// The content-free reason a host records for a case whose turn completed with several answer candidates and none
+    /// selected (<see cref="IsAnswerMeasured(WorkIqTurnResult)"/> is false): the AEF <c>not_measured</c> reason of the
+    /// agenteval CLI and of the tester demo. One text, so the two hosts cannot drift apart.
+    /// </summary>
+    public const string NoAnswerSelectedReason =
+        "the Work IQ turn completed with several answer candidates and none selected, so no answer was measured";
+
     /// <summary>The evidence document schema id (an AgentEval schema, not a Microsoft wire contract).</summary>
     public const string SchemaVersion = "agenteval.microsoft365.turn-evidence/v1";
 

@@ -229,18 +229,20 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     /// <summary>
     /// A new capture sink for one operation (from the options), under the call's capture folder. A blocking call
     /// attaches it to its own requests (<see cref="RawCaptureHandler.SinkOption"/>); a stream makes it the capture
-    /// handler's <see cref="RawCaptureHandler.CurrentSink"/>, because the SDK builds the stream's request.
+    /// handler's <see cref="RawCaptureHandler.CurrentSink"/>, because the SDK builds the stream's request. The sink
+    /// reports through this client's <see cref="Diagnostics"/>, so its <c>capture.*</c> events and issues reach the
+    /// run's trace and issue files.
     /// </summary>
     /// <param name="op">The operation the capture belongs to (part of the capture id).</param>
-    /// <param name="call">The per-call context (its <see cref="WorkIqCallContext.CaptureScope"/>).</param>
+    /// <param name="call">The per-call context (its <see cref="WorkIqCallContext.CaptureScope"/>, which already starts with the run id).</param>
     internal RawCaptureSink NewCaptureSink(WorkIqOperation op, WorkIqCallContext? call)
     {
         var sequence = Interlocked.Increment(ref _captureSequence);
         var captureId = string.Create(CultureInfo.InvariantCulture, $"{op.ToString().ToLowerInvariant()}-{sequence:D4}");
         var directory = Options.RawCaptureDirectory is null
             ? null
-            : new DirectoryInfo(Path.Combine(Options.RawCaptureDirectory.FullName, Diagnostics.RunId, call?.CaptureScope ?? "no-turn"));
-        return new RawCaptureSink(captureId, Options.ContentPolicy, Options.MaxCaptureBytes, Options.MaxCaptureFrames, directory);
+            : new DirectoryInfo(Path.Combine(Options.RawCaptureDirectory.FullName, call?.CaptureScope ?? Conversation.TurnContext.CaptureScopeFor(Diagnostics.RunId, "no-turn")));
+        return new RawCaptureSink(captureId, Options.ContentPolicy, Options.MaxCaptureBytes, Options.MaxCaptureFrames, directory, Diagnostics);
     }
 
     /// <summary>Completes a capture opened by <see cref="NewCaptureSink"/>, detaches it from the handler when it is the current sink and returns its reference.</summary>
@@ -910,12 +912,12 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         catch (JsonException ex)
         {
             var failure = Classify(ex, rpc.Op, exchange.RequestId, rpc.TaskId, rpc.ContextId) with { Capture = capture, RpcRequestId = rpc.RpcId, HttpStatus = exchange.HttpStatus };
-            throw Fail(rpc, failure, elapsedMs, ex);
+            throw Fail(rpc, UnusableReply(failure), elapsedMs, ex);
         }
 
         if (response is null)
         {
-            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC envelope deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+            throw Fail(rpc, UnusableReply(Malformed(rpc.Op, "the JSON-RPC envelope deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture)), elapsedMs);
         }
 
         if (response.Error is { } error)
@@ -937,7 +939,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
         if (response.Result is null)
         {
-            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC envelope carries neither result nor error", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+            throw Fail(rpc, UnusableReply(Malformed(rpc.Op, "the JSON-RPC envelope carries neither result nor error", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture)), elapsedMs);
         }
 
         if (DetectLegacyShape(response.Result) is { } legacy)
@@ -950,10 +952,10 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
                 HttpStatus: exchange.HttpStatus,
                 RequestId: exchange.RequestId,
                 RpcRequestId: rpc.RpcId,
-                TaskId: rpc.TaskId,
+                TaskId: rpc.TaskId ?? LegacyTaskId(response.Result),
                 ContextId: rpc.ContextId,
                 Capture: capture);
-            throw Fail(rpc, failure, elapsedMs);
+            throw Fail(rpc, UnusableReply(failure), elapsedMs);
         }
 
         return response.Result;
@@ -971,17 +973,17 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         catch (JsonException ex)
         {
             var failure = Classify(ex, rpc.Op, exchange.RequestId, rpc.TaskId, rpc.ContextId) with { Capture = capture, RpcRequestId = rpc.RpcId, HttpStatus = exchange.HttpStatus };
-            throw Fail(rpc, failure, elapsedMs, ex);
+            throw Fail(rpc, UnusableReply(failure), elapsedMs, ex);
         }
 
         if (value is null)
         {
-            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC result deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+            throw Fail(rpc, UnusableReply(Malformed(rpc.Op, "the JSON-RPC result deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture)), elapsedMs);
         }
 
         if (ValidateResult(value, rpc.Op, rpc.TaskId, exchange, rpc.RpcId, rpc.ContextId, capture) is { } invalid)
         {
-            throw Fail(rpc, invalid, elapsedMs);
+            throw Fail(rpc, UnusableReply(invalid), elapsedMs);
         }
 
         return value;
@@ -992,6 +994,30 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     {
         ReportFailure(failure, rpc.Stage, rpc.RpcId, elapsedMs, rpc.Call);
         return new WorkIqProtocolException(failure, inner);
+    }
+
+    /// <summary>
+    /// A failure built from a 2xx reply this client could not use (it does not parse, has an A2A 0.3 shape or breaks a
+    /// one-of rule). The service answered, so for a send it accepted the input and may have created a task: the remote
+    /// state is unknown, never "no task exists". A read keeps its certainty.
+    /// </summary>
+    /// <param name="failure">The failure.</param>
+    internal static WorkIqFailure UnusableReply(WorkIqFailure failure) =>
+        failure.Operation is WorkIqOperation.Send or WorkIqOperation.Stream
+            ? failure with { Certainty = OutcomeCertainty.Indeterminate }
+            : failure;
+
+    /// <summary>The task id an A2A 0.3-shaped result carries (<c>result.id</c> of a task, or <c>result.task.id</c>); null when none.</summary>
+    /// <param name="result">The JSON-RPC <c>result</c> node.</param>
+    private static string? LegacyTaskId(JsonNode result)
+    {
+        if (result is not JsonObject obj)
+        {
+            return null;
+        }
+
+        var task = obj["task"] as JsonObject ?? (obj.ContainsKey("status") ? obj : null);
+        return task?["id"] is JsonValue value && value.TryGetValue<string>(out var id) && !string.IsNullOrWhiteSpace(id) ? id : null;
     }
 
     private static WorkIqFailure Malformed(WorkIqOperation op, string what, HttpExchange exchange, string rpcId, string? taskId, string? contextId, RawCaptureRef capture) =>

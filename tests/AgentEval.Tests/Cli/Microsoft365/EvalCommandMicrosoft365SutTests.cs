@@ -234,7 +234,7 @@ public class EvalCommandMicrosoft365SutTests
                     .Where(l => (string?)l["kind"] == "document")
                     .ToArray();
                 Assert.Single(evidence);
-                Assert.Equal(1, conversation.Turns.Count);
+                Assert.Single(conversation.Turns);
             }
         }
         finally
@@ -291,13 +291,26 @@ public class EvalCommandMicrosoft365SutTests
                     Assert.Contains("no selected answer", (string?)row["error"], StringComparison.Ordinal);
                     var line = Assert.Single(results);   // no judge: the case line alone, with no graded child
                     Assert.Equal("test1", (string?)line["caseId"]);
-                    Assert.Equal("error", (string?)line["state"]);
+                    // AEF's typed absence for it, with the true cause: nothing threw, so it is not an error line.
+                    Assert.Equal("not_measured", (string?)line["state"]);
+                    Assert.Equal(AgentEval.Microsoft365.Evidence.Microsoft365Evidence.NoAnswerSelectedReason, (string?)line["reason"]);
+                    Assert.Null(line["scores"]);
+
+                    // The empty stand-in text is not the agent's output, so no output is recorded; the document is.
+                    var kinds = EvidenceKindsOf(root, line);
+                    Assert.DoesNotContain("output", kinds);
+                    Assert.Contains("document", kinds);
                 }
                 else
                 {
                     var trials = results.Where(l => l["trial"] is not null).ToList();
                     Assert.Equal(runs, trials.Count);
-                    Assert.All(trials, t => Assert.Equal("error", (string?)t["state"]));
+                    Assert.All(trials, t => Assert.Equal("not_measured", (string?)t["state"]));
+                    Assert.All(trials, t => Assert.Equal(AgentEval.Microsoft365.Evidence.Microsoft365Evidence.NoAnswerSelectedReason, (string?)t["reason"]));
+                    // No trial was measured, so whether the case passes is undecided: its rollup is an error, never a failure.
+                    var rollup = Assert.Single(results, l => l["trials"] is not null);
+                    Assert.Equal("error", (string?)rollup["state"]);
+                    Assert.StartsWith($"{runs} of {runs} trials were not measured", (string?)rollup["reason"], StringComparison.Ordinal);
                     Assert.DoesNotContain(results, l => (string?)l["state"] == "failed");
                 }
             }
@@ -393,7 +406,138 @@ public class EvalCommandMicrosoft365SutTests
         }
     }
 
+    // ── criteria that no judge graded are NOT MEASURED, never a pass ──
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Eval_Microsoft365_CriteriaWithoutAJudge_AreNotMeasuredExit11_AndTheAnswerIsKept(int runs)
+    {
+        // Without --judge the harness only checks that the answer is not empty. Its pass says nothing about the criteria.
+        var dataset = CreateTempDataset("""
+            - id: test1
+              input: "When does the pilot start?"
+              evaluation_criteria:
+                - "Gives one date"
+            """);
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-nojudge-");
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation();
+            var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-no-judge", onTurn: sink.Record);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+
+                var exit = await RunWithContentCaptureAsync(OptionsWithAef(dataset, cfg, report, root, runs), agent, sink);
+
+                Assert.Equal(ExitCodes.GateIndeterminate, exit);   // never 0: no criterion was graded
+                var results = AefResultLines(root);
+                Assert.DoesNotContain(results, l => (string?)l["state"] is "passed" or "failed");
+                var lines = runs == 1 ? results.Where(l => (string?)l["path"] == "case").ToList() : results.Where(l => l["trial"] is not null).ToList();
+                Assert.Equal(runs, lines.Count);
+                Assert.All(lines, l =>
+                {
+                    Assert.Equal("not_measured", (string?)l["state"]);
+                    Assert.Contains("no judge", (string?)l["reason"], StringComparison.Ordinal);
+                    Assert.Null(l["scores"]);
+                    // The agent's real answer is kept as its output.
+                    Assert.Contains("output", EvidenceKindsOf(root, l));
+                });
+                if (runs == 1)
+                {
+                    var row = Assert.Single(System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(report.FullName))!["results"]!.AsArray())!;
+                    Assert.False((bool)row["passed"]!);
+                    Assert.Contains("Not measured", (string?)row["error"], StringComparison.Ordinal);
+                }
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task Eval_Microsoft365_ADatasetOutsideTheWorkingFolder_IsNamedByItsFileName_NeverByAPathToTheUsersFolders()
+    {
+        // The temp dataset lives outside the working folder (and outside any repository): its path names the user's folders.
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-suite-");
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation();
+            var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-suite", onTurn: sink.Record);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+
+                await RunWithContentCaptureAsync(OptionsWithAef(dataset, cfg, report, root, runs: 1), agent, sink);
+
+                var runFile = Assert.Single(Directory.GetFiles(Path.Combine(root.FullName, "aef"), "run.json", SearchOption.AllDirectories));
+                var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(runFile))!;
+                var suiteRef = (string?)header["suite"]!["ref"];
+                Assert.Equal(AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("dataset", dataset.Name), suiteRef);
+                Assert.DoesNotContain("..", suiteRef, StringComparison.Ordinal);
+                Assert.DoesNotContain(Environment.UserName, suiteRef, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public void DatasetName_InsideTheWorkingFolder_RelativeToIt_ElseRelativeToItsRepository_ElseItsFileName()
+    {
+        var root = Directory.CreateTempSubdirectory("agenteval-dataset-name-");
+        try
+        {
+            var repository = Directory.CreateDirectory(Path.Combine(root.FullName, "repo"));
+            Directory.CreateDirectory(Path.Combine(repository.FullName, ".git"));
+            var inRepository = new FileInfo(Path.Combine(repository.FullName, "samples", "datasets", "cases.yaml"));
+            var elsewhere = new FileInfo(Path.Combine(root.FullName, "loose", "cases.yaml"));
+            var work = Path.Combine(repository.FullName, "samples");
+
+            Assert.Equal("datasets/cases.yaml", EvalCommand.DatasetName(inRepository, work));
+            Assert.Equal("samples/datasets/cases.yaml", EvalCommand.DatasetName(inRepository, Path.Combine(root.FullName, "loose")));
+            Assert.Equal("cases.yaml", EvalCommand.DatasetName(elsewhere, work));
+        }
+        finally
+        {
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
     // ── helpers ──
+
+    /// <summary>The kinds of the evidence entries <paramref name="line"/> references (<c>output</c>, <c>document</c>, …).</summary>
+    private static IReadOnlyList<string> EvidenceKindsOf(DirectoryInfo root, System.Text.Json.Nodes.JsonNode line)
+    {
+        var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(root.FullName, "aef"), "run.json", SearchOption.AllDirectories)))!;
+        var ids = line["evidence"]?.AsArray().Select(e => (string)e!).ToHashSet(StringComparer.Ordinal) ?? [];
+        var path = Path.Combine(run, "evidence.ndjson");
+        if (ids.Count == 0 || !File.Exists(path))
+        {
+            return [];
+        }
+
+        return File.ReadAllLines(path)
+            .Where(l => l.Length > 0)
+            .Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!)
+            .Where(e => ids.Contains((string)e["evidenceId"]!))
+            .Select(e => (string)e["kind"]!)
+            .ToArray();
+    }
 
     /// <summary>
     /// Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on</c>, the way the CLI invokes it, with the
@@ -454,10 +598,10 @@ public class EvalCommandMicrosoft365SutTests
         Metrics = metrics,
     };
 
-    private static FileInfo CreateTempDataset()
+    private static FileInfo CreateTempDataset(string? yaml = null)
     {
         var path = Path.Combine(Path.GetTempPath(), "agenteval-eval-m365-dataset-" + Guid.NewGuid().ToString("N") + ".yaml");
-        File.WriteAllText(path, """
+        File.WriteAllText(path, yaml ?? """
             - id: test1
               input: "Hello"
               expectedOutput: "Hi"

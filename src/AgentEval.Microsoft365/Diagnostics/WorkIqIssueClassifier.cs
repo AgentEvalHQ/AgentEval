@@ -438,8 +438,8 @@ internal static partial class WorkIqIssueClassifier
     /// <summary>The category and cause of a turn outcome when no structured failure says more.</summary>
     private static (WorkIqIssueCategory Category, string Cause) ForOutcome(WorkIqTurnOutcome outcome) => outcome switch
     {
-        WorkIqTurnOutcome.InputRequired => (WorkIqIssueCategory.Service, CauseInputRequired),
-        WorkIqTurnOutcome.AuthRequired => (WorkIqIssueCategory.Service, CauseAuthRequired),
+        WorkIqTurnOutcome.InputRequired => (WorkIqIssueCategory.Case, CauseInputRequired),
+        WorkIqTurnOutcome.AuthRequired => (WorkIqIssueCategory.Authentication, CauseAuthRequired),
         WorkIqTurnOutcome.Failed => (WorkIqIssueCategory.Service, CauseTaskFailed),
         WorkIqTurnOutcome.Rejected => (WorkIqIssueCategory.Service, CauseTaskRejected),
         WorkIqTurnOutcome.Canceled => (WorkIqIssueCategory.Service, CauseTaskCanceled),

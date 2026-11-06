@@ -187,6 +187,12 @@ internal sealed partial class WorkIqA2AClient
         // The static classifier (behind ClassifyException) is used directly so the caller's token tells a local
         // cancellation from an HttpClient timeout: both surface as TaskCanceledException mid-stream.
         var failure = Classify(exception, run.Operation, requestId: null, run.Tracker.TaskId, run.Tracker.ContextId, callerToken: cancellationToken, scope: Config.Scope);
+        if (exception is JsonException)
+        {
+            // A frame of an accepted stream that does not parse: the service answered, so a streamed send may have created a task.
+            failure = UnusableReply(failure);
+        }
+
         if (failure.Capture is null && run.Capture is not null)
         {
             failure = failure with { Capture = run.Capture };

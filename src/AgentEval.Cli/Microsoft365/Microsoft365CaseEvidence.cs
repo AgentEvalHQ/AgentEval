@@ -8,13 +8,16 @@ using AgentEval.Core;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Evidence;
 using AgentEval.Models;
+using AgentEval.Results.Adapters.Native;
+using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Microsoft365;
 
 /// <summary>
 /// The <c>--sut microsoft365</c> side of an <c>eval</c> run's AEF evidence: the content-free provenance the target adds
-/// to the run's config settings (with the agent's content policy), the not-measured rule for a turn that completed with
-/// several answer candidates and none selected, and, with content capture on, each case's evidence document. All three
+/// to the run's config settings (with the agent's content policy), the not-measured rules (a turn that completed with
+/// several answer candidates and none selected, and criteria that no judge graded), and, with content capture on, each
+/// case's evidence document. All three
 /// read the turn result the agent's turn sink recorded (the sink <see cref="Microsoft365SutTarget.Build"/> wired into the
 /// live agent, or <see cref="Microsoft365SutTarget.TurnSinkForTests"/> for a stand-in). A case is matched to its turn by
 /// its AEF case id: before the case (or trial) runs, the agent is told to record that id in its turn identity
@@ -78,33 +81,60 @@ internal sealed class Microsoft365CaseEvidence : ISutCaseEvidence
     }
 
     /// <summary>
-    /// Records a case whose turn completed with several answer candidates and none selected
-    /// (<see cref="Microsoft365Evidence.IsAnswerMeasured(WorkIqTurnResult)"/> is false) as not measured, the way the
-    /// command records a turn that did not complete: an error row with no score, so it is neither a pass nor a failure.
-    /// The harness graded the empty text that stands in for the answer, and that grade (its judge criteria and its
-    /// failure report) is not a measurement of the agent, so it is dropped. A result that already carries an error, and
-    /// a case with no turn result, are left as they are.
+    /// Records a case the run did not measure as not measured, the way the command records a turn that did not
+    /// complete: an error row with no score, so it is neither a pass nor a failure. Two cases qualify, in this order:
+    /// <list type="bullet">
+    /// <item>The case's turn completed with several answer candidates and none selected
+    /// (<see cref="Microsoft365Evidence.IsAnswerMeasured(WorkIqTurnResult)"/> is false). The harness graded the empty text
+    /// that stands in for the answer. That grade is not a measurement of the agent, so it is dropped, and the empty text
+    /// is not recorded as the agent's output. The reason is <see cref="Microsoft365Evidence.NoAnswerSelectedReason"/>.</item>
+    /// <item>The case declares criteria and no judge graded them (<paramref name="criteriaNotGraded"/>). Without a judge
+    /// the harness only checks that the answer is not empty, so its pass says nothing about the criteria. The answer is
+    /// kept. The reason is <see cref="NoJudgeReason"/>.</item>
+    /// </list>
+    /// A result that already carries an error is left as it is. The AEF run records the case as <c>not_measured</c>.
     /// </summary>
     /// <param name="result">The case's (or trial's) result.</param>
     /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>
-    public void ReviewResult(TestResult result, string caseId)
+    /// <param name="criteriaNotGraded">True when the case declares evaluation criteria and the run has no judge.</param>
+    /// <returns>The case's AEF absence when it was marked not measured; otherwise null.</returns>
+    public AefCaseAbsence? ReviewResult(TestResult result, string caseId, bool criteriaNotGraded = false)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(caseId);
-        if (result.Error is not null
-            || _sink?.LatestFor(caseId, _since) is not { } turn
-            || Microsoft365Evidence.IsAnswerMeasured(turn))
+        if (result.Error is not null)
         {
-            return;
+            return null;
         }
 
-        var error = new Microsoft365NoAnswerSelectedException(turn);
+        if (_sink?.LatestFor(caseId, _since) is { } turn && !Microsoft365Evidence.IsAnswerMeasured(turn))
+        {
+            // The empty text is not the agent's answer: no output is recorded for it (the evidence document keeps the candidates).
+            result.ActualOutput = null;
+            MarkNotMeasured(result, new Microsoft365NoAnswerSelectedException(turn));
+            return new AefCaseAbsence(AefState.NotMeasured, Microsoft365Evidence.NoAnswerSelectedReason);
+        }
+
+        if (criteriaNotGraded)
+        {
+            MarkNotMeasured(result, new Microsoft365CriteriaNotGradedException());
+            return new AefCaseAbsence(AefState.NotMeasured, NoJudgeReason);
+        }
+
+        return null;
+    }
+
+    /// <summary>The AEF reason of a case whose criteria were not graded because the run has no judge (no <c>--judge</c>).</summary>
+    internal const string NoJudgeReason = "no judge was configured, so the case's criteria were not graded";
+
+    private static void MarkNotMeasured(TestResult result, Exception mark)
+    {
         result.Passed = false;
         result.Score = 0;
         result.CriteriaResults = null;
         result.Failure = null;
-        result.Error = error;
-        result.Details = "Error: " + error.Message;
+        result.Error = mark;
+        result.Details = "Error: " + mark.Message;
     }
 
     /// <summary>The case's evidence document under the agent's content policy, or null when the case left no turn result.</summary>
@@ -132,9 +162,10 @@ internal sealed class Microsoft365CaseEvidence : ISutCaseEvidence
 }
 
 /// <summary>
-/// The not-measured mark of an <c>eval</c> case whose Work IQ turn completed with several answer candidates and none
-/// selected: the response text was an empty string that is not the agent's answer. Set as the case's
-/// <see cref="TestResult.Error"/> (an error row, not a failure); never thrown.
+/// The not-measured mark of a case whose Work IQ turn completed with several answer candidates and none selected: the
+/// response text was an empty string that is not the agent's answer. <c>eval</c> sets it as the case's
+/// <see cref="TestResult.Error"/> (an error row, not a failure). A <c>bench</c> run's agent
+/// (<see cref="Microsoft365BenchAgent"/>) throws it, so the family records an error instead of grading the empty text.
 /// </summary>
 internal sealed class Microsoft365NoAnswerSelectedException : Exception
 {
@@ -145,6 +176,12 @@ internal sealed class Microsoft365NoAnswerSelectedException : Exception
     {
     }
 
+    /// <summary>Creates the mark for a response whose turn result is not at hand (the <c>bench</c> path).</summary>
+    public Microsoft365NoAnswerSelectedException()
+        : base("Not measured: the Work IQ turn completed with several answer candidates and none selected, so its empty text is not the agent's answer and was not graded.")
+    {
+    }
+
     private static string MessageFor(WorkIqTurnResult turn)
     {
         ArgumentNullException.ThrowIfNull(turn);
@@ -152,5 +189,20 @@ internal sealed class Microsoft365NoAnswerSelectedException : Exception
         return $"Not measured: the Work IQ turn completed with no selected answer (answer {turn.AnswerCompleteness}, " +
             $"task={(string.IsNullOrEmpty(taskId) ? "none" : taskId)}), so its empty text is not the agent's answer. " +
             "The evidence document (--aef-content on) and the m365 trace keep the candidates.";
+    }
+}
+
+/// <summary>
+/// The not-measured mark of an <c>eval</c> case that declares evaluation criteria in a run without <c>--judge</c>: the
+/// harness only checked that the answer is not empty, so no criterion was graded. Set as the case's
+/// <see cref="TestResult.Error"/> (an error row, not a pass); never thrown.
+/// </summary>
+internal sealed class Microsoft365CriteriaNotGradedException : Exception
+{
+    /// <summary>Creates the mark.</summary>
+    public Microsoft365CriteriaNotGradedException()
+        : base("Not measured: the case declares evaluation criteria and no judge graded them (run eval with --judge to grade them). " +
+            "The agent's answer is kept.")
+    {
     }
 }

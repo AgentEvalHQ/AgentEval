@@ -150,19 +150,21 @@ internal static class DemoCommandLine
         "  4. send back the .zip the run prints (read summary.md first)\n" +
         "\n" +
         "Run folder (always written, whatever --verbosity): console.log (everything printed, plus every trace event in full), trace.jsonl, issues.jsonl, " +
-        "readiness.md, readiness.json, turns.jsonl, evidence/<case>.json, results.md, results.json, summary.md; raw/ with --capture-raw; " +
+        "readiness.md, readiness.json, turns.jsonl, evidence/<case>.json, results.md, results.json, summary.md; " +
+        "aef/ (the benchmark as a sealed AEF run, when the benchmark ran); raw/ with --capture-raw; " +
         "<run folder>.zip with --zip. No file contains a token, an auth code or the Authorization header.\n" +
         "\n" +
-        "Judge: the benchmark's criteria are graded by the model AI_INFERENCE_PROVIDER selects (bitdeer, openai, azure, foundry or openai-compatible, " +
-        "with that provider's variables, the same as the AgentEval samples). A judge call costs money on that provider. Without a judge, or with " +
+        "Judge: the benchmark's criteria are graded by the model AI_INFERENCE_PROVIDER selects (azure, bitdeer, openai, foundry or openai-compatible, " +
+        "with that provider's variables, the same as the AgentEval samples). Without AI_INFERENCE_PROVIDER, the first of those providers whose " +
+        "variables are set is used: an exported OPENAI_API_KEY is enough. A judge call costs money on that provider. Without a judge, or with " +
         "--no-judge, every criterion is NOT MEASURED; the deterministic checks (turn completed, answer non-empty, response time recorded, " +
         "evidence availability recorded) always run.\n" +
         "\n" +
         "Exit codes: 0 every stage that ran passed and everything requested was measured (--readiness-only: readiness passed); " +
-        "1 a stage failed (a readiness stage, or the prompt did not complete) or a case FAILED a check; 2 usage error; " +
-        "3 runtime error, or a file could not be written (the run folder is still written); " +
-        "11 nothing failed but something was not measured (no consent past readiness, no judge for the criteria, a turn that did not complete, " +
-        "a case stopped by --max-turns, or no config file).";
+        "1 a stage failed (a readiness stage, or the prompt: an empty answer or a turn that did not complete) or a case FAILED a check; " +
+        "2 usage error; 3 runtime error, or a file could not be written (the run folder is still written); " +
+        "11 nothing failed but something was not measured (no consent past readiness, no judge for the criteria, a case ERROR, " +
+        "the prompt or a case NOT MEASURED, a case stopped by --max-turns, or no config file).";
 
     /// <summary>The options of the command, created once per parse.</summary>
     internal sealed class Definition

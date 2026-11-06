@@ -1,9 +1,9 @@
-# Microsoft 365 connector — tester results template
+# Microsoft 365 connector: tester results template
 
-Copy this file to `./m365-results/RESULTS.md`, fill it in while you follow the
-[tester guide](microsoft365-tester-guide.md), and include it in the zip you send back. Leave a cell empty when a step
-did not run, and say why under "Free text". Write values exactly as the tool printed them; do not paraphrase codes.
-Never paste a token, a key, the device code or the content of `workiq.json`.
+Copy this file to `RESULTS.md` in the repository root, fill it in while you follow the
+[demo README](../samples/AgentEval.Microsoft365Demo/README.md), and send it with the zip. Write values exactly as the
+tool printed them. Leave a cell empty when a step did not run, and say why under *Free text*. Never paste a token, a
+key, the device code or the content of `workiq.json`.
 
 ---
 
@@ -12,33 +12,28 @@ Never paste a token, a key, the device code or the content of `workiq.json`.
 | Item | Value |
 |---|---|
 | Date and time of the runs (UTC) | |
-| Branch and commit (`git log -1 --oneline`) | |
-| CLI version (`agenteval --version`) | |
-| How the CLI was run (dotnet run function / local tool) | |
+| Commit (`git log -1 --oneline`) | |
 | Operating system and shell | |
-| Agent (`default` or the agent id) and `agentName` | |
-| Profile used for Step 3 (`public` unless you changed it) | |
-| Tenant type (test tenant / other) — a production identity was **not** used: yes / no | |
-| Network: proxy in use? yes / no | |
-| Judge for Step 3 (endpoint host and model; no key) | |
-| Judge for Step 4 (provider and deployment; no key) | |
+| Agent (`default`, or the agent id) | |
+| A test tenant, and no production identity (yes / no) | |
+| Proxy in use (yes / no) | |
+| Demo judge: the `judge:` line the demo printed, or `none` (no key) | |
 
-## 2. Prerequisites confirmed
+## 2. Prerequisites
 
-| Prerequisite | Confirmed (yes / no / unsure) | Note |
-|---|---|---|
-| Work IQ enabled in the tenant | | |
-| Microsoft 365 Copilot licence on the test user | | |
-| App registration: *Allow public client flows* = Yes | | |
-| Delegated `WorkIQAgent.Ask` added, admin consent granted | | |
-| "Demo Q3 Planning" document present in the test user's files | | |
+| Prerequisite | Confirmed (yes / no / unsure) |
+|---|---|
+| Work IQ enabled in the tenant | |
+| Microsoft 365 Copilot licence on the test user | |
+| App registration: *Allow public client flows* = Yes | |
+| Delegated `WorkIQAgent.Ask` with admin consent | |
+| "Demo Q3 Planning" document in the test user's files | |
 
-## 2b. Demo run (`samples/AgentEval.Microsoft365Demo`)
+## 3. Demo run
 
-Fill this in when you ran the [demo project](../samples/AgentEval.Microsoft365Demo/README.md) (the "Start here" path of
-the tester guide); copy the values from the final table on screen or from `summary.md`.
+Copy the values from the final table on screen or from `summary.md`.
 
-Command (options only, no paths you consider private): ___ · Exit code: ___ · Zip name (`<yyyyMMdd-HHmmss>Z.zip`): ___
+Command (options only): ___ · Exit code: ___ · `Result:` line: ___ · Zip name: ___
 
 | Stage | Result (PASS / FAIL / SKIPPED / NOT MEASURED) | Detail, as printed |
 |---|---|---|
@@ -49,7 +44,7 @@ Command (options only, no paths you consider private): ___ · Exit code: ___ · 
 | prompt | | |
 | benchmark | | |
 
-| Case | Verdict (PASS / FAIL / ERROR / NOT MEASURED) | Outcome (`Completed`, `InputRequired`, …) | Judge score, if graded | Reason, as printed |
+| Case | Verdict (PASS / FAIL / ERROR / NOT MEASURED) | Turn outcome (`Completed`, `InputRequired`, …) | Judge score | Reason, as printed |
 |---|---|---|---|---|
 | identity_disclosure | | | | |
 | capability_summary | | | | |
@@ -57,116 +52,99 @@ Command (options only, no paths you consider private): ___ · Exit code: ___ · 
 | explicit_date_reasoning | | | | |
 | out_of_scope_live_data | | | | |
 
-Judge used (provider and model, or `none` / `--no-judge`): ___ · `Issues:` line of the final table: ___
+`Issues:` line of the final table: ___ · `AEF run:` line of the final table: ___
 
-## 3. Step 1 — readiness check (no prompt)
+| Redaction of the zip | Value |
+|---|---|
+| The README's commands run (e-mails, URLs, tenant id): yes / no | |
+| Names replaced by hand: yes / no | |
+| `aef/` left out because it could not be shared: yes / no | |
 
-Exit code: ___ · Report folder name (`doctor-…Z`): ___
+---
 
-| Stage | Result (PASS / FAIL / SKIPPED) | Summary line, as printed | Code shown (AADSTS / HTTP / JSON-RPC), if any | Elapsed ms (`readiness.md`) |
+## CLI path: fill in only if the maintainers asked
+
+### 4. Install
+
+CLI version (`agenteval --version`): ___ · Build succeeded: yes / no
+
+### 5. Step 1: readiness check
+
+Exit code: ___ · Report folder (`doctor-…Z`): ___
+
+| Stage | Result | Summary line, as printed | Code shown (AADSTS / HTTP / JSON-RPC) |
+|---|---|---|---|
+| config | | | |
+| auth | | | |
+| discovery | | | |
+| protocol | | | |
+
+From `readiness.md`, `discovery` evidence: interfaces advertised (binding, version, host): ___ · interface chosen: ___ ·
+`capabilities.streaming` / `capabilities.pushNotifications`: ___
+
+If a stage failed: its `meaning:` and `do:` lines, what you did, and whether it fixed it:
+
+### 6. Step 1b: the token cache
+
+Exit code: ___ · `auth` said `token acquired silently from the cache`: yes / no
+
+### 7. Step 2: probe and census
+
+Exit code: ___ · Report folder: ___
+
+| Fact, from `readiness.md` | Value |
+|---|---|
+| `probe` result and summary line | |
+| observed task states (for example `TASK_STATE_WORKING → TASK_STATE_COMPLETED`) | |
+| `GetTask` polls (`0`: the send returned the final state) | |
+| answer is the word READY (yes / no) | |
+| attributions and citation markers, as printed | |
+| `census` result and summary line | |
+| diagnostic modes accepted (yes / no / unknown, with the reason) | |
+| `CancelTask` on a completed task | |
+
+### 8. Step 3: the smoke benchmark
+
+Exit code: ___ · Passed / failed / not measured: ___ · Judge (endpoint host and model; no key): ___
+
+`agenteval aef verify` result (intact / unsealed / invalid): ___ · `--aef-content on` used: yes / no (why not):
+
+| Case id | Outcome (`Completed`, `InputRequired`, `Indeterminate`, …) | Verdict (pass / fail / not measured) | Score | Note |
 |---|---|---|---|---|
-| config | | | | |
-| auth | | | | |
-| discovery | | | | |
-| protocol | | | | |
+| identity_disclosure | | | | |
+| capability_summary | | | | |
+| grounded_summary_with_citation | | | | |
+| explicit_date_reasoning | | | | |
+| out_of_scope_live_data | | | | |
+| prompt_injection_resist | | | | |
+| pii_restraint | | | | |
+| action_restraint_read_only | | | | |
 
-From `readiness.md`, the evidence of the `discovery` stage:
+A `[m365] WARNING … no answer was selected` line appeared (case ids): ___ · A sign-in message appeared: yes / no
 
-- Interfaces advertised by the card (binding, version, host): 
-- Interface chosen: 
-- `capabilities.streaming` / `capabilities.pushNotifications`: 
-- Card SHA-256: 
-- HTTP status and `request-id` of the card fetch: 
+### 9. Step 4: OWASP smoke (optional)
 
-From the `auth` stage: acquired by device-code sign-in or silently: ___ · tenant matches the config: ___ · any warning: ___
+Ran it: yes / no · Exit code: ___ · Gate verdict (PASS / WARN / FAIL / INCOMPLETE): ___ · Judge (provider and
+deployment; no key): ___
 
-If a stage failed: the `meaning:` and `do:` lines, what you did, and whether it fixed it:
-
-## 4. Step 1b — second run (the token cache)
-
-Exit code: ___ · The `auth` line said `token acquired silently from the cache`: yes / no · A sign-in message appeared again: yes / no
-
-## 5. Step 2 — one real prompt (probe and census)
-
-Exit code: ___ · Report folder name: ___
-
-| Stage | Result | Summary line, as printed |
-|---|---|---|
-| probe | | |
-| census | | |
-
-From `readiness.md`, the probe's evidence:
-
-| Fact | Value |
+| Attack | Verdict as printed |
 |---|---|
-| outcome / transport | |
-| task id received (yes / no; do not paste it if you consider it sensitive) | |
-| observed states (for example `TASK_STATE_WORKING → TASK_STATE_COMPLETED`) | |
-| recovery polls (GetTask) — `0` means the blocking send returned the final state directly | |
-| answer completeness and length | |
-| answer preview is the word READY: yes / no | |
-| attributions (count or availability) | |
-| citation markers (count or availability) | |
-| elapsed ms | |
-| warnings, if any | |
+| PromptInjection | |
+| Jailbreak | |
+| PIILeakage | |
 
-The census's evidence:
+### 10. What is in the CLI zip
 
-| Fact | Value |
-|---|---|
-| census turn (the probe turn, or a second turn under native118) | |
-| diagnostic modes accepted (yes / no / unknown, with the reason printed) | |
-| Developer Info artifact | |
-| Retrieval Info artifact | |
-| citation marker format | |
-| CancelTask on a completed task | |
-| streaming (card) / pushNotifications (card) | |
-
-## 6. Step 3 — the smoke benchmark
-
-Exit code: ___ · Summary as printed (passed / failed / not measured): ___ · Elapsed (approx.): ___
-
-`agenteval aef verify <run folder>` result (intact / unsealed / invalid) and exit code: ___
-
-Per case, from `m365-smoke.json` (`passed`, `score`, `error`). For a case without a verdict, the outcome is in its
-`error` (`outcome=InputRequired`, `Indeterminate`, …). The citation columns are optional: the trace file has them per
-case (search it for `normalize.citations`).
-
-| Case id | Outcome (Completed / InputRequired / AuthRequired / Failed / Rejected / Canceled / Indeterminate) | Verdict (pass / fail / no verdict) | Score | Citation sources (optional) | Citation markers (optional) | Note |
-|---|---|---|---|---|---|---|
-| identity_disclosure | | | | | | |
-| capability_summary | | | | | | |
-| grounded_summary_with_citation | | | | | | |
-| explicit_date_reasoning | | | | | | |
-| out_of_scope_live_data | | | | | | |
-| prompt_injection_resist | | | | | | |
-| pii_restraint | | | | | | |
-| action_restraint_read_only | | | | | | |
-
-Did a sign-in message appear during Step 3? yes / no · Was `--aef-content on` used? yes / no (if no, why):
-
-## 7. Step 4 — OWASP smoke (optional)
-
-Ran it: yes / no · Exit code: ___ · Gate verdict (PASS / WARN / FAIL / INCOMPLETE): ___ · Elapsed (approx.): ___
-
-| Attack | Verdict as printed | Note |
+| Item | Included (yes / no) | Redacted (yes / no) |
 |---|---|---|
-| PromptInjection | | |
-| Jailbreak | | |
-| PIILeakage | | |
-
-INCOMPLETE? If yes, the reason printed and how far it got:
-
-## 8. Redaction and what is in the zip
-
-| Item | Included (yes / no) | Redaction applied (e-mails / URLs / tenant id / user name / names by hand / none) |
-|---|---|---|
-| `.agenteval/m365/` (doctor folders, traces, issues) | | |
+| `.agenteval/m365/` | | |
 | `./m365-results/m365-smoke.json` | | |
-| `./m365-results/aef/` (never edited; leave it out if it cannot be shared) | | not editable |
-| `./m365-raw/` (only if the maintainers asked) | | |
+| `./m365-results/aef/` (never edited) | | not editable |
+| `./m365-raw/` (only if asked) | | |
 
-## 9. Free text
+---
+
+## Free text
 
 What surprised you, what took long, what you had to work around, and any message that did not tell you what to do:
 

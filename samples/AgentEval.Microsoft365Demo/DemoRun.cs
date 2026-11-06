@@ -215,6 +215,7 @@ internal sealed class DemoRun
         Stages = _record.Stages.ToArray(),
         PromptTurn = _record.PromptTurn,
         Benchmark = _record.Benchmark,
+        Aef = _record.Aef,
         CaseSet = _caseSet,
         JudgeDescription = _judge.Description,
         Issues = _context.IssueSink.Issues,

@@ -70,7 +70,7 @@ Invoke custom agents using `@` in Copilot Chat:
 | `@agenteval-dev` (AgentEval Dev) | Implementing, reviewing and debugging code |
 | `@agenteval-docwriter` (AgentEval DocWriter) | Writing and reviewing documentation |
 | `@agenteval-samples` (AgentEval Samples) | Reviewing and improving samples and demos |
-| `@agenteval-m365` (AgentEval M365) | Evaluating a Microsoft 365 agent over Work IQ A2A: `agenteval m365 doctor`, custom and standard benchmarks with `--sut microsoft365`, reading the evidence. It follows the `m365-eval` skill and never runs a live step without a non-production identity and the consent flag. |
+| `@agenteval-m365` (AgentEval M365) | Evaluating a Microsoft 365 agent over Work IQ A2A with `agenteval m365 doctor` and `--sut microsoft365`. It follows the `m365-eval` skill. |
 
 ```
 @agenteval-m365 Check that we can reach our test tenant, then write a smoke benchmark for our HR Copilot
@@ -81,33 +81,29 @@ Invoke custom agents using `@` in Copilot Chat:
 `.github/skills/<name>/SKILL.md` holds a step-by-step procedure (frontmatter `name`, `version`, `description`) that an agent loads
 when a task matches its description:
 
-- `dotnet-inspect` — query .NET library APIs (types, members, diffs) instead of guessing them.
-- `m365-eval` — evaluate a Microsoft 365 agent: config, `agenteval m365 doctor`, one real prompt, a judged dataset, standard
-  benchmarks, the evidence, and what each failure means. Live steps need a non-production identity and
-  `--i-understand-live-side-effects`; judge runs spend money and are asked for first.
+- `dotnet-inspect`: query .NET library APIs (types, members, diffs) instead of guessing them.
+- `m365-eval`: evaluate a Microsoft 365 agent, from the config file to the evidence. It also holds the rules for live
+  steps: a non-production identity, the user's consent, and a yes before a judge spends.
 
 #### **A sample with its own Copilot setup: the Microsoft 365 demo**
 
-`samples/AgentEval.Microsoft365Demo/.github/` is a second, self-contained Copilot setup for the Microsoft 365 demo
-project, written for an external tester who opens **only that folder** in VS Code (*File* → *Open Folder* →
-`samples/AgentEval.Microsoft365Demo`). Copilot loads a folder's `.github/` only when that folder is the workspace root,
-so these files are invisible when the repository root is open — and the repository's files are invisible to the
-tester:
+`samples/AgentEval.Microsoft365Demo/.github/` is a second Copilot setup, for an external tester who opens only that
+folder in VS Code. Copilot loads a folder's `.github/` only when that folder is the workspace root. So these files are
+not loaded when the repository root is open.
 
 ```
 samples/AgentEval.Microsoft365Demo/.github/
-├── copilot-instructions.md                  # the demo's rules and conventions
-├── agents/m365-demo.agent.md                # the m365-demo agent: rules + routing to the three skills
+├── copilot-instructions.md                  # the demo's rules (always loaded)
+├── agents/m365-demo.agent.md                # the m365-demo agent: routes to the three skills
 ├── skills/
-│   ├── m365-demo-setup/SKILL.md             # tenant prerequisites → workiq.json → --readiness-only → full run → --zip
-│   ├── m365-demo-customize/SKILL.md         # another agent, prompt, cases, a deterministic check, verbosity, profile
-│   └── m365-demo-triage/SKILL.md            # read a run folder: stage, category, codes → cause → action
-├── instructions/m365-demo.instructions.md   # → **/*.cs (the demo and its tests)
+│   ├── m365-demo-setup/SKILL.md             # from zero to a first zipped run
+│   ├── m365-demo-customize/SKILL.md         # another agent, prompt, cases, a check, the profile or the limits
+│   └── m365-demo-triage/SKILL.md            # read a run folder: where, why, who can fix it
+├── instructions/m365-demo.instructions.md   # code rules for **/*.cs
 └── prompts/                                 # /run-demo, /triage-run, /add-case
 ```
 
-From the repository root, `@agenteval-m365` points at the demo. When the demo's options, run folder or exit codes
-change, update its README and these files together.
+When the demo's options, run folder or exit codes change, update its README and these files in the same change.
 
 #### **Agent Workflows**
 

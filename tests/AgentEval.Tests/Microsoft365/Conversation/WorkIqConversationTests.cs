@@ -625,7 +625,7 @@ public sealed class WorkIqConversationTests
     }
 
     [Fact]
-    public async Task RunTurn_V03ShapedReply_FailedProtocolVersionMismatch()
+    public async Task RunTurn_V03ShapedReply_IndeterminateProtocolVersionMismatchNamingTheTask()
     {
         var (h, conversation) = Real();
         using (h)
@@ -635,9 +635,18 @@ public sealed class WorkIqConversationTests
 
             var result = await conversation.RunTurnAsync(Turn());
 
-            Assert.Equal(WorkIqTurnOutcome.Failed, result.Outcome);
+            // HTTP 200 with a task: the service accepted the input and a task may exist, so the turn is never "Failed,
+            // no task exists" (a host could then resend the case). The failure names the task the reply carried.
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, result.Outcome);
             Assert.Equal(WorkIqFailureCategory.ProtocolVersionMismatch, result.Failure!.Category);
+            Assert.Equal(OutcomeCertainty.Indeterminate, result.Failure.Certainty);
+            Assert.Equal("task-legacy-0e7c3a9b-1d5f-4b2e-8c6a-3f9d7b1e5a40", result.Failure.TaskId);
             Assert.Null(result.AnswerText);
+            Assert.Equal(1, h.Handler.CountOf("SendMessage"));
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Protocol, issue.Category);
+            Assert.Equal("task-legacy-0e7c3a9b-1d5f-4b2e-8c6a-3f9d7b1e5a40", issue.TaskId);
         }
     }
 
@@ -655,8 +664,10 @@ public sealed class WorkIqConversationTests
             var first = conversation.RunTurnAsync(Turn(caseId: "first"));
             await Task.Yield();
 
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => conversation.RunTurnAsync(Turn(caseId: "second")));
+            // An InvalidOperationException a caller can catch; its own type tells the agent nothing was sent.
+            var ex = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => conversation.RunTurnAsync(Turn(caseId: "second")));
 
+            Assert.IsType<WorkIqTurnRefusedException>(ex);
             Assert.Contains("one active turn per conversation", ex.Message, StringComparison.Ordinal);
             Assert.True(conversation.IsTurnActive);
             Assert.Single(client.Sends);
@@ -967,12 +978,300 @@ public sealed class WorkIqConversationTests
 
             Assert.False(receipt.Quiesced);
             Assert.Contains(trace.Events, e => e.Code == "turn.abandon_not_quiesced" && e.Level == WorkIqTraceLevel.Error);
-            Assert.Contains(issues.Issues, i => i.Code == "turn.abandon_not_quiesced");
+            Assert.Contains(issues.Issues, i => i.Code == "turn.abandon_not_quiesced" && i.Category == WorkIqIssueCategory.Budget);
             Assert.Null(conversation.ContextId);
             var ex = await Assert.ThrowsAsync<WorkIqTurnCanceledException>(() => pending);
             Assert.Contains("abandoned", ex.TurnResult.Failure!.SafeMessage, StringComparison.Ordinal);
             Assert.Equal(0, client.CancelCalls);
         }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AbandonAndReset_WhileTheCardIsFetched_TheTurnSendsNothingAndEndsAbandoned(bool signInFinishesAnyway)
+    {
+        // The first turn of a run can wait in a device-code sign-in inside discovery. An abandonment there must stop the
+        // turn: whether the wait honours the abandonment or the person finishes the sign-in afterwards, nothing is sent.
+        var (client, conversation, trace, _, _) = Fake();
+        await using (conversation)
+        {
+            client.DiscoverGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.DiscoverIgnoresToken = signInFinishesAnyway;
+            var pending = conversation.RunTurnAsync(Turn());
+            await WaitUntilAsync(() => client.DiscoverCalls == 1);
+
+            var abandon = conversation.AbandonAndResetAsync("tester gave up during the sign-in");
+            if (signInFinishesAnyway)
+            {
+                client.DiscoverGate.SetResult();
+            }
+
+            // A turn that kept waiting for its card goes on once the card arrives (and would send).
+            await Task.WhenAny(abandon, Task.Delay(TimeSpan.FromSeconds(5)));
+            client.DiscoverGate.TrySetResult();
+            var receipt = await abandon.WaitAsync(RecoveryWatchdog);
+
+            var ex = await Assert.ThrowsAsync<WorkIqTurnCanceledException>(() => pending);
+            Assert.Empty(client.Sends);
+            Assert.True(receipt.Quiesced);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, ex.TurnResult.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Canceled, ex.TurnResult.Failure!.Category);
+            Assert.Contains("abandoned", ex.TurnResult.Failure.SafeMessage, StringComparison.Ordinal);
+            Assert.Contains("nothing was sent", ex.TurnResult.Failure.SafeMessage, StringComparison.Ordinal);
+            Assert.Contains(trace.Events, e => e.Code == "turn.abandoned");
+        }
+    }
+
+    [Fact]
+    public async Task AbandonAndReset_ASecondTurnWithATaskId_TheReceiptNamesThatTurnsTaskAndOutcome()
+    {
+        var (client, conversation, trace, _, _) = Fake();
+        await using (conversation)
+        {
+            client.OnSend = (_, _) => Task.FromResult(FakeWorkIqA2AClient.SendReply("envelopes/send-task-completed-with-answer-and-attributions.json"));
+            var first = await conversation.RunTurnAsync(Turn());
+            Assert.Equal(WorkIqTurnOutcome.Completed, first.Outcome);
+            Assert.NotEqual(SubmittedTaskId, first.Task!.TaskId);
+
+            // The second turn's task is still submitted: the turn waits to poll it when the host abandons it.
+            client.OnSend = (_, _) => Task.FromResult(FakeWorkIqA2AClient.SendReply("envelopes/send-task-submitted.json"));
+            var pending = conversation.RunTurnAsync(Turn());
+            await WaitUntilAsync(() => trace.Events.Any(e => e.Code == "recovery.waiting"));
+
+            var receipt = await conversation.AbandonAndResetAsync("tester gave up").WaitAsync(RecoveryWatchdog);
+
+            // The receipt names the abandoned turn's task and outcome, never the previous turn's finished task.
+            Assert.True(receipt.Quiesced);
+            Assert.Equal(SubmittedTaskId, receipt.PriorTask?.TaskId);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, receipt.LastOutcome);
+            Assert.Contains(trace.Events, e => e.Code == "turn.abandoned" && e.TaskId == SubmittedTaskId && e.Message.Contains("last outcome Indeterminate", StringComparison.Ordinal));
+            await Assert.ThrowsAsync<WorkIqTurnCanceledException>(() => pending);
+        }
+    }
+
+    [Fact]
+    public async Task AbandonAndReset_ATurnThatDoesNotStopInTime_TheReceiptStillNamesItsRunningTask()
+    {
+        // A zero recovery budget: the turn sends the opt-in CancelTask at once, the reply does not come, and the
+        // abandonment does not wait. The turn cannot record its result any more, so the receipt names its running task.
+        var (client, conversation, _, _, _) = Fake(new WorkIqOptions { RecoveryBudget = TimeSpan.Zero, CancelRemoteTaskOnTimeout = true });
+        await using (conversation)
+        {
+            client.OnSend = (_, _) => Task.FromResult(FakeWorkIqA2AClient.SendReply("envelopes/send-task-completed-with-answer-and-attributions.json"));
+            await conversation.RunTurnAsync(Turn());
+
+            var cancelReply = new TaskCompletionSource<WorkIqRpcResult<AgentTask>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.OnSend = (_, _) => Task.FromResult(FakeWorkIqA2AClient.SendReply("envelopes/send-task-submitted.json"));
+            client.OnCancelTask = (_, _) => cancelReply.Task;
+            var pending = conversation.RunTurnAsync(Turn());
+            await WaitUntilAsync(() => client.CancelCalls == 1);
+
+            var receipt = await conversation.AbandonAndResetAsync("no time to wait").WaitAsync(RecoveryWatchdog);
+
+            Assert.False(receipt.Quiesced);
+            Assert.Equal(SubmittedTaskId, receipt.PriorTask?.TaskId);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, receipt.LastOutcome);
+
+            // The late turn ends, but cannot bring the abandoned context back.
+            cancelReply.SetResult(FakeWorkIqA2AClient.TaskReply("envelopes/gettask-working.json"));
+            var late = await pending.WaitAsync(RecoveryWatchdog);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, late.Outcome);
+            Assert.Null(conversation.ContextId);
+            Assert.Null(conversation.ActiveTask);
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_RecoveryBudgetExhausted_CancelRemoteShowsTheTaskFailed_TheTurnFailsWithTheRemoteError()
+    {
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(2), CancelRemoteTaskOnTimeout = true };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            var failed = FixtureLoader.Text("envelopes/gettask-working.json").Replace("TASK_STATE_WORKING", "TASK_STATE_FAILED", StringComparison.Ordinal);
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .OnRpc("GetTask", "envelopes/gettask-working.json")
+                .OnRpc("CancelTask", failed);
+
+            var result = await PumpRecoveryAsync(conversation.RunTurnAsync(Turn()), h, Step);
+
+            // The service reported the task failed: that is the outcome and its cause, not the local budget.
+            Assert.Equal(WorkIqTurnOutcome.Failed, result.Outcome);
+            Assert.Equal(TransportOutcome.Recovered, result.Transport);
+            Assert.Equal(WorkIqFailureCategory.RemoteError, result.Failure!.Category);
+            Assert.Null(result.Failure.LocalBudget);
+            Assert.Equal("TASK_STATE_FAILED", result.Failure.RemoteTaskState);
+            var issue = Assert.Single(h.Issues.Issues, i => i.Code == "turn.failed");
+            Assert.Equal(WorkIqIssueCategory.Service, issue.Category);
+            Assert.Equal(WorkIqIssueClassifier.CauseTaskFailed, issue.SuggestedCause);
+            Assert.Single(h.Events("budget.recovered_after_cancel"));
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_TurnDeadline_CancelRemoteShowsTheTaskRejected_TheTurnIsRejectedWithTheRemoteError()
+    {
+        var options = new WorkIqOptions
+        {
+            RecoveryPollInterval = TimeSpan.FromSeconds(1),
+            RecoveryBudget = TimeSpan.FromMinutes(10),
+            TurnDeadline = TimeSpan.FromSeconds(3),
+            CancelRemoteTaskOnTimeout = true,
+        };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            var rejected = FixtureLoader.Text("envelopes/gettask-working.json").Replace("TASK_STATE_WORKING", "TASK_STATE_REJECTED", StringComparison.Ordinal);
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .OnRpc("GetTask", "envelopes/gettask-working.json")
+                .OnRpc("CancelTask", rejected);
+
+            var result = await PumpRecoveryAsync(conversation.RunTurnAsync(Turn()), h, Step);
+
+            Assert.Equal(1, h.Handler.CountOf("CancelTask"));
+            Assert.Equal(WorkIqTurnOutcome.Rejected, result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.RemoteError, result.Failure!.Category);
+            Assert.Null(result.Failure.LocalBudget);
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.rejected", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Service, issue.Category);
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_AGetTaskPollRetriedPastTheRecoveryBudget_IsCutAtTheBudget()
+    {
+        // The client retries a 429 GetTask after Retry-After (30 s, three times). The recovery budget still bounds it.
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(3), TurnDeadline = TimeSpan.Zero };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            h.Handler
+                .OnRpc("SendMessage", "envelopes/send-task-submitted.json")
+                .FailWith("GetTask", HttpStatusCode.TooManyRequests, headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Retry-After"] = "30" });
+            var started = h.Clock.GetUtcNow();
+
+            var result = await WorkIqClientHarness.PumpAsync(conversation.RunTurnAsync(Turn()), h.Clock, Step);
+
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Timeout, result.Failure!.Category);
+            Assert.Equal(WorkIqLocalBudget.RecoveryBudget, result.Failure.LocalBudget);
+            var spent = h.Clock.GetUtcNow() - started;
+            Assert.True(spent <= options.RecoveryBudget + Step, $"the recovery ran {spent}, past its {options.RecoveryBudget} budget");
+            Assert.Single(h.Events("recovery.poll_cut"));
+            Assert.Equal(1, h.Handler.CountOf("SendMessage"));
+        }
+    }
+
+    [Fact]
+    public async Task StreamTurnAsync_AMessageAfterATaskInOneStream_MalformedIndeterminateWithoutAGetTask()
+    {
+        // A stream holds one message or one task. A message after a task is malformed: the message is not graded as the
+        // answer, the evidence document is not built from another source, and no GetTask poll follows the message.
+        var options = new WorkIqOptions { RecoveryPollInterval = TimeSpan.FromSeconds(1), RecoveryBudget = TimeSpan.FromSeconds(3), TurnDeadline = TimeSpan.Zero };
+        var (h, conversation) = Real(options);
+        using (h)
+        await using (conversation)
+        {
+            const string StreamTaskId = "task-ab12cd34-ef56-4a78-9b01-23c45d67e89f";
+            var taskFrame = FixtureLoader.Text("sse/stream-eof-before-terminal.txt").Split('\n')[0].TrimEnd('\r');
+            const string MessageFrame =
+                "data: {\"jsonrpc\":\"2.0\",\"id\":\"rpc-0105\",\"result\":{\"message\":{\"messageId\":\"msg-agent-stray-1\",\"role\":\"ROLE_AGENT\"," +
+                "\"parts\":[{\"text\":\"A stray answer.\"}],\"contextId\":\"ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55\",\"taskId\":\"" + StreamTaskId + "\"}}}";
+            Assert.Contains(StreamTaskId, taskFrame, StringComparison.Ordinal);
+            h.Handler
+                .OnSse("SendStreamingMessage", taskFrame + "\n\n" + MessageFrame + "\n\n")
+                .OnRpc("GetTask", "envelopes/gettask-completed.json");
+
+            var events = await WorkIqClientHarness.PumpAsync(CollectAsync(conversation.StreamTurnAsync(Turn())), h.Clock, Step);
+
+            var finished = Assert.IsType<WorkIqStreamEvent.TurnFinished>(events[^1]);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, finished.Result.Outcome);
+            Assert.Equal(WorkIqFailureCategory.Malformed, finished.Result.Failure!.Category);
+            Assert.Null(finished.Result.AnswerText);
+            Assert.Equal(StreamTaskId, finished.Result.Task?.TaskId);
+            Assert.Equal(0, h.Handler.CountOf("GetTask"));
+            Assert.Contains(events, e => e is WorkIqStreamEvent.ProtocolWarning { Code: "stream.message_in_task_stream" });
+        }
+    }
+
+    [Fact]
+    public async Task StreamTurnAsync_AFrameOfTheAcceptedStreamThatDoesNotParse_IsIndeterminateNeverFailedWithNoTask()
+    {
+        // The stream opened with HTTP 200, so the service accepted the input: a frame that does not parse leaves the
+        // remote state unknown, never "Failed, no task exists" (a host could then resend the case).
+        var (h, conversation) = Real(new WorkIqOptions { TurnDeadline = TimeSpan.Zero });
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnSse("SendStreamingMessage", "data: {\"jsonrpc\":\"2.0\",\"id\":\"rpc-1\",\"result\":{\"task\":{\"id\":\n\n");
+
+            var events = await CollectAsync(conversation.StreamTurnAsync(Turn()));
+
+            var finished = Assert.IsType<WorkIqStreamEvent.TurnFinished>(events[^1]);
+            Assert.Equal(WorkIqTurnOutcome.Indeterminate, finished.Result.Outcome);
+            Assert.Equal(OutcomeCertainty.Indeterminate, finished.Result.Failure!.Certainty);
+            Assert.Equal(1, h.Handler.CountOf("SendStreamingMessage"));
+        }
+    }
+
+    [Fact]
+    public async Task RunTurn_TheTurnsCapturesLandUnderTheRunAndTurnFolder()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "agenteval-m365-capture-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var options = new WorkIqOptions { ContentPolicy = EvidenceContentPolicy.FullEvidence, RawCaptureDirectory = new DirectoryInfo(root) };
+            var (h, conversation) = Real(options);
+            using (h)
+            await using (conversation)
+            {
+                h.Handler.OnRpc("SendMessage", "envelopes/send-direct-message.json");
+
+                var result = await conversation.RunTurnAsync(Turn(turnId: "turn-capture-1"));
+
+                // <dir>/<runId>/<turnId>/<captureId>: the run id once, never twice.
+                var send = Assert.Single(result.Evidence!.RawCaptures, c => c.CaptureId.StartsWith("send-", StringComparison.Ordinal));
+                var expected = Path.Combine(root, WorkIqClientHarness.RunId, "turn-capture-1", send.CaptureId);
+                Assert.Equal(Path.GetFullPath(expected), Path.GetFullPath(send.ProtectedLocation!));
+                Assert.True(File.Exists(Path.Combine(expected, "manifest.json")));
+            }
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var watchdog = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (watchdog.Elapsed > RecoveryWatchdog)
+            {
+                throw new TimeoutException($"The condition did not hold within {RecoveryWatchdog} of real time.");
+            }
+
+            await Task.Delay(1);
+        }
+    }
+
+    private static async Task<List<WorkIqStreamEvent>> CollectAsync(IAsyncEnumerable<WorkIqStreamEvent> stream)
+    {
+        var events = new List<WorkIqStreamEvent>();
+        await foreach (var e in stream)
+        {
+            events.Add(e);
+        }
+
+        return events;
     }
 
     [Fact]

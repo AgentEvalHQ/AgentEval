@@ -47,11 +47,25 @@ internal sealed class FakeWorkIqA2AClient : IWorkIqA2AClient
 
     public int CancelCalls => Volatile.Read(ref _cancelCalls);
 
-    public Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null)
+    /// <summary>
+    /// When set, <see cref="DiscoverAsync"/> waits for it before replying, as a discovery that waits for a sign-in does.
+    /// It honours the token unless <see cref="DiscoverIgnoresToken"/> is set (a sign-in that finishes anyway).
+    /// </summary>
+    public TaskCompletionSource? DiscoverGate { get; set; }
+
+    /// <summary>Whether a gated discovery ignores the token and completes once the gate opens.</summary>
+    public bool DiscoverIgnoresToken { get; set; }
+
+    public async Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         Interlocked.Increment(ref _discoverCalls);
         cancellationToken.ThrowIfCancellationRequested();
-        return DiscoverFailure is null ? Task.FromResult(Card) : Task.FromException<RawAgentCard>(DiscoverFailure);
+        if (DiscoverGate is { } gate)
+        {
+            await (DiscoverIgnoresToken ? gate.Task : gate.Task.WaitAsync(cancellationToken));
+        }
+
+        return DiscoverFailure is null ? Card : throw DiscoverFailure;
     }
 
     public async Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null)

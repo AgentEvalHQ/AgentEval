@@ -81,6 +81,9 @@ internal sealed record DemoReport
     /// <summary>The benchmark's outcome; null when it did not run.</summary>
     public BenchmarkOutcome? Benchmark { get; init; }
 
+    /// <summary>The benchmark's AEF run; null when the benchmark did not run or its AEF run could not be written.</summary>
+    public AefRunRecord? Aef { get; init; }
+
     /// <summary>The cases and where they came from.</summary>
     public DemoCaseSet? CaseSet { get; init; }
 
@@ -114,6 +117,16 @@ internal static class Summary
 
     /// <summary>The statement every report ends its file list with.</summary>
     public const string NoTokenStatement = "No file in the run folder contains a token, an auth code or the Authorization header.";
+
+    /// <summary>
+    /// The command that checks the AEF run, in the form a tester who follows only the demo can run: the CLI from this
+    /// repository, from the repository root. The folder follows it, quoted.
+    /// </summary>
+    public const string VerifyCommand = "dotnet run --project src/AgentEval.Cli --framework net10.0 -- aef verify";
+
+    /// <summary>What summary.md says about <c>aef/</c> when the tester must remove content: it is sealed, so it is deleted, never edited.</summary>
+    public const string AefRedactionRule =
+        "`aef/` holds the same answers and is sealed: never edit it. Delete it if it holds anything you cannot share, and say so.";
 
     /// <summary>The demo's informational version.</summary>
     public static string DemoVersion { get; } =
@@ -204,6 +217,13 @@ internal static class Summary
         text.Append("Run folder: ").Append(report.Folder.Root.FullName).Append('\n');
         text.Append("  read first: ").Append(RunFolder.SummaryName).Append("; the full screen log: ").Append(RunFolder.ConsoleLogName)
             .Append("; trace: ").Append(RunFolder.TraceName).Append("; issues: ").Append(RunFolder.IssuesName).Append('\n');
+        if (report.Aef is { } aef)
+        {
+            text.Append("  AEF run: ").Append(aef.Folder).Append(aef.AbortReason is null ? " (sealed)" : $" (sealed, closed aborted: {aef.AbortReason})")
+                .Append("; check it from the repository root with: ").Append(VerifyCommand).Append(" \"")
+                .Append(Path.GetFullPath(Path.Combine(report.Folder.Root.FullName, aef.Folder))).Append("\"\n");
+        }
+
         return text.ToString();
     }
 
@@ -286,6 +306,7 @@ internal static class Summary
             }
 
             md.Append("\nPer-check detail: `").Append(RunFolder.ResultsMarkdownName).Append("` and `").Append(RunFolder.ResultsJsonName).Append("`.\n\n");
+            md.Append(AefParagraph(report)).Append('\n');
         }
         else
         {
@@ -360,6 +381,11 @@ internal static class Summary
         FileRow(md, RunFolder.ReadinessMarkdownName + ", " + RunFolder.ReadinessJsonName, "the readiness report (stage by stage, with evidence)", "tenant, app and agent ids, a masked account name");
         FileRow(md, RunFolder.TurnsName, "one line per agent turn: outcome, ids, timing, failure codes and request-id", "no answer text");
         FileRow(md, RunFolder.EvidenceFolderName + "/<case>.json", $"the evidence document of each turn ({s.ContentPolicy})", "yes: answers, citation names and URLs");
+        if (report.Aef is not null)
+        {
+            FileRow(md, RunFolder.AefFolderName + "/", "the benchmark as a sealed AEF run: the run settings, each case's state, and each turn's evidence document", $"yes: prompts, answers and the evidence documents ({s.ContentPolicy})");
+        }
+
         FileRow(md, RunFolder.ResultsMarkdownName + ", " + RunFolder.ResultsJsonName, "per case: verdict, every check and what ran", "the judge's explanations");
         if (s.CaptureRaw)
         {
@@ -373,7 +399,9 @@ internal static class Summary
             ? "1. The zip written next to this folder: `" + report.Folder.ZipFile.Name + "`.\n"
             : "1. This whole folder, zipped (or run again with `--zip`).\n");
         md.Append("2. Read `").Append(RunFolder.EvidenceFolderName).Append("/` and `").Append(RunFolder.ConsoleLogName)
-            .Append("` first: they hold the agent's answers. Remove what you cannot share and say so.\n");
+            .Append("` first: they hold the agent's answers. Remove what you cannot share and say so.")
+            .Append(report.Aef is null ? "" : " " + AefRedactionRule)
+            .Append('\n');
         if (s.CaptureRaw)
         {
             md.Append("3. `").Append(RunFolder.RawFolderName).Append("/` holds everything the service sent: send it only if the maintainers asked for it.\n");
@@ -404,6 +432,8 @@ internal static class Summary
         {
             md.Append("The benchmark stopped early: ").Append(Cell(benchmark.StopReason)).Append(".\n\n");
         }
+
+        md.Append(AefParagraph(report)).Append('\n');
 
         foreach (var c in benchmark.Cases)
         {
@@ -460,6 +490,7 @@ internal static class Summary
             dataset = report.CaseSet?.Source,
             benchmarkRan = report.Benchmark is not null,
             stopReason = report.Benchmark?.StopReason,
+            aef = report.Aef is not { } written ? null : new { run = written.Folder, runHash = written.RunHash, abortReason = written.AbortReason },
             counts = new
             {
                 pass = report.Benchmark?.Count(CaseVerdict.Pass) ?? 0,
@@ -503,6 +534,34 @@ internal static class Summary
                 },
             }).ToArray(),
         };
+    }
+
+    /// <summary>
+    /// The paragraph on the benchmark's AEF run, for summary.md and results.md: where it is, how to check it, how the
+    /// verdicts map to its states, and why it closed aborted when it did.
+    /// </summary>
+    private static string AefParagraph(DemoReport report)
+    {
+        if (report.Aef is not { } aef)
+        {
+            return "AEF run: not written. summary.md lists the error under \"Errors of the run itself\".\n";
+        }
+
+        var md = new StringBuilder(512)
+            .Append("AEF run: `").Append(aef.Folder).Append("`, the benchmark in AgentEval's record format, sealed")
+            .Append(aef.RunHash is null ? "" : " (run hash `" + aef.RunHash + "`)").Append(". ")
+            // The run folder's own path stays out of the file: it can name the tester's user folder.
+            .Append("To check it, run `").Append(VerifyCommand).Append(" \"<run folder>/").Append(aef.Folder)
+            .Append("\"` from the repository root. ")
+            .Append("Each case's state there is its verdict: PASS is `passed`, FAIL is `failed`, ERROR is `error`, and NOT MEASURED is ")
+            .Append("`not_measured` (`error` when the judge's call failed or gave no verdict). Neither is ever a pass or a fail.");
+        if (aef.AbortReason is not null)
+        {
+            md.Append(" The benchmark stopped early, so the run closed aborted (`").Append(aef.AbortReason)
+                .Append("`): a case it did not reach has no line.");
+        }
+
+        return md.Append('\n').ToString();
     }
 
     /// <summary>The issues grouped by <see cref="IssueText.GroupOf"/>, in group order (the categories, then the judge).</summary>

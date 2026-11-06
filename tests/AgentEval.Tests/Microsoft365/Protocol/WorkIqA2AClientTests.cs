@@ -346,6 +346,85 @@ public sealed class WorkIqA2AClientTests
         Assert.Equal(WorkIqFailureCategory.ProtocolVersionMismatch, ex.Failure.Category);
         Assert.Contains("kind", ex.Failure.SafeMessage, StringComparison.Ordinal);
         Assert.Equal(200, ex.Failure.HttpStatus);
+
+        // The service answered the send with HTTP 200 and a task: the input was accepted and a task may exist, so the
+        // remote state is unknown, and the failure names the task the reply carried.
+        Assert.Equal(OutcomeCertainty.Indeterminate, ex.Failure.Certainty);
+        Assert.Equal("task-legacy-0e7c3a9b-1d5f-4b2e-8c6a-3f9d7b1e5a40", ex.Failure.TaskId);
+    }
+
+    [Fact]
+    public async Task Send_Http200ReplyWithBothTaskAndMessage_MalformedIndeterminateNamingTheTask()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        var both = FixtureLoader.Text("envelopes/send-task-submitted.json").Replace(
+            "\"result\": {",
+            "\"result\": {\"message\":{\"messageId\":\"msg-agent-both-1\",\"role\":\"ROLE_AGENT\",\"parts\":[{\"text\":\"also a message\"}]},",
+            StringComparison.Ordinal);
+        Assert.Contains("also a message", both, StringComparison.Ordinal);
+        h.Handler.OnRpc("SendMessage", both);
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.SendAsync(NewSend(), CancellationToken.None));
+
+        Assert.Equal(WorkIqFailureCategory.Malformed, ex.Failure.Category);
+        Assert.Equal(OutcomeCertainty.Indeterminate, ex.Failure.Certainty);
+        Assert.Equal(SubmittedTaskId, ex.Failure.TaskId);
+    }
+
+    [Fact]
+    public async Task GetTask_Http200ReplyThatDoesNotParse_KeepsItsKnownCertainty()
+    {
+        // A read changes nothing remotely: an unusable reply to it keeps the certainty a send loses.
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler.OnRpc("GetTask", "{\"jsonrpc\":\"2.0\",\"id\":\"rpc-x\",\"result\":\"not a task\"}");
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.GetTaskAsync("t-1", null, CancellationToken.None));
+
+        Assert.Equal(WorkIqFailureCategory.Malformed, ex.Failure.Category);
+        Assert.Equal(OutcomeCertainty.Known, ex.Failure.Certainty);
+    }
+
+    [Fact]
+    public async Task Send_FullEvidenceIntoAFolderThatCannotBeCreated_RegistersCaptureWriteFailedThroughTheClient()
+    {
+        // The client builds every capture sink with its own diagnostics, so a capture that cannot be written reaches the
+        // run's trace and issue files (a hand-built sink in a unit test would hide a sink that reports to nowhere).
+        var root = Path.Combine(Path.GetTempPath(), "agenteval-m365-capture-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var blocker = Path.Combine(root, "a-file-not-a-folder");
+        File.WriteAllText(blocker, "a file stands where the capture folder should be");
+        try
+        {
+            var options = new WorkIqOptions { ContentPolicy = EvidenceContentPolicy.FullEvidence, RawCaptureDirectory = new DirectoryInfo(blocker) };
+            using var h = WorkIqClientHarness.Create(options: options).WithDefaultCard();
+            h.Handler.OnRpc("SendMessage", "envelopes/send-direct-message.json");
+
+            var reply = await h.Client.SendAsync(NewSend(), CancellationToken.None);
+
+            Assert.Null(reply.Capture.ProtectedLocation);
+            Assert.Contains(h.Issues.Issues, i => i.Code == "capture.write_failed" && i.Category == WorkIqIssueCategory.Capture);
+            Assert.Contains(h.Events("capture.write_failed"), e => e.Level == WorkIqTraceLevel.Error);
+            Assert.NotEmpty(h.Events("capture.completed"));
+            h.AssertNoSecretInDiagnostics();
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    [Fact]
+    public async Task Send_DroppedUnderSelectedContent_TracesTheInterruptedCaptureWithoutASecondIssue()
+    {
+        // One failure, one issue: nothing is retained under SelectedContent, so the interrupted capture is traced only.
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler.Throw("SendMessage", new HttpRequestException("socket reset"));
+
+        await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.SendAsync(NewSend(), CancellationToken.None));
+
+        Assert.NotEmpty(h.Events("capture.interrupted"));
+        Assert.Single(h.Issues.Issues);
+        Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "capture.interrupted");
     }
 
     [Fact]

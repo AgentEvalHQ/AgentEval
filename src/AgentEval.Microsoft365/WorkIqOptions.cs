@@ -60,32 +60,40 @@ public enum EvidenceContentPolicy
 /// <summary>
 /// Runtime options of a Work IQ conversation/agent: timeouts and budgets, conversation isolation, the turn cap,
 /// content policy and raw capture bounds. Every default is conservative; <see cref="Validate"/> rejects negative
-/// values. The options carry no secret and no network setting beyond timeouts.
+/// values, durations above <see cref="MaxDuration"/>, and a zero poll interval while recovery is on. The options carry
+/// no secret and no network setting beyond timeouts.
 /// </summary>
 public sealed record WorkIqOptions
 {
-    /// <summary>HTTP timeout of one blocking <c>SendMessage</c> call (the native evaluator's default is also 300 s).</summary>
+    /// <summary>
+    /// The longest duration any timeout or budget accepts: 24 days. Timers and <see cref="HttpClient.Timeout"/> cannot
+    /// wait longer. For no limit, use 0 where the option allows it (<see cref="SendTimeout"/>, <see cref="TurnDeadline"/>).
+    /// </summary>
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromDays(24);
+
+    /// <summary>HTTP timeout of one blocking <c>SendMessage</c> call (the native evaluator's default is also 300 s). 0 means no HTTP timeout.</summary>
     public TimeSpan SendTimeout { get; init; } = TimeSpan.FromSeconds(300);
 
-    /// <summary>Total wall-clock deadline of one turn including recovery; when exceeded the outcome is <c>Indeterminate</c> unless the task state is known.</summary>
+    /// <summary>Total wall-clock deadline of one turn including recovery; when exceeded the outcome is <c>Indeterminate</c> unless the task state is known. 0 means no deadline.</summary>
     public TimeSpan TurnDeadline { get; init; } = TimeSpan.FromMinutes(10);
 
-    /// <summary>Budget for <c>GetTask</c>/<c>Subscribe</c> reconciliation after a stream drop or a non-terminal blocking reply; a send is never repeated inside it.</summary>
+    /// <summary>Budget for <c>GetTask</c>/<c>Subscribe</c> reconciliation after a stream drop or a non-terminal blocking reply; a send is never repeated inside it. 0 means no polling.</summary>
     public TimeSpan RecoveryBudget { get; init; } = TimeSpan.FromMinutes(2);
 
-    /// <summary>Interval between <c>GetTask</c> polls while a task is <c>submitted</c>/<c>working</c>.</summary>
+    /// <summary>Interval between <c>GetTask</c> polls while a task is <c>submitted</c>/<c>working</c>. It must be above 0 while <see cref="RecoveryBudget"/> is above 0.</summary>
     public TimeSpan RecoveryPollInterval { get; init; } = TimeSpan.FromSeconds(2);
 
     /// <summary>How consecutive invocations relate to the server context; the CLI always uses <see cref="ConversationPolicy.FreshContextPerInvocation"/>.</summary>
     public ConversationPolicy ConversationPolicy { get; init; } = ConversationPolicy.FreshContextPerInvocation;
 
     /// <summary>
-    /// Maximum number of turns per agent instance (0 = no cap). Every turn that returned a typed result counts, whether
-    /// it completed or not — a failed, paused, canceled or indeterminate turn, and also one that failed before its prompt
-    /// went out (a sign-in or discovery failure); only a turn refused before it started (this cap, a disposed agent)
-    /// does not (see <see cref="WorkIqEvaluableAgent.TurnsUsed"/>). Turns are counted; consumption is not metered — the
-    /// service exposes no cost. Reaching the cap throws <see cref="WorkIqTurnBudgetExceededException"/> before the send
-    /// that would cross it.
+    /// Maximum number of turns per agent instance (0 = no cap). Every turn the conversation started counts, whether it
+    /// completed or not: a failed, paused, canceled or indeterminate turn, one that failed before its prompt went out (a
+    /// sign-in or discovery failure), and one that ended in an exception with no turn result. Only a turn refused before
+    /// it started does not count: this cap, a disposed agent, or another turn still active (see
+    /// <see cref="WorkIqEvaluableAgent.TurnsUsed"/>). Turns are counted; consumption is not metered, because the service
+    /// exposes no cost. Reaching the cap throws <see cref="WorkIqTurnBudgetExceededException"/> before the send that would
+    /// cross it.
     /// </summary>
     public int MaxTurns { get; init; }
 
@@ -174,10 +182,12 @@ public sealed record WorkIqOptions
     public IReadOnlyList<Diagnostics.IWorkIqIssueSink>? IssueSinks { get; init; }
 
     /// <summary>
-    /// Throws when any duration, count or bound is negative (naming every offending option), or when
-    /// <see cref="TraceSinks"/> or <see cref="IssueSinks"/> contains a null entry.
+    /// Throws when any duration, count or bound is negative, when a duration is above <see cref="MaxDuration"/>, or when
+    /// <see cref="RecoveryPollInterval"/> is 0 while <see cref="RecoveryBudget"/> is above 0 (that would poll
+    /// <c>GetTask</c> back to back). It names every offending option. It also throws when <see cref="TraceSinks"/> or
+    /// <see cref="IssueSinks"/> contains a null entry.
     /// </summary>
-    /// <exception cref="InvalidOperationException">One or more options are negative, or a sink list has a null entry.</exception>
+    /// <exception cref="InvalidOperationException">One or more options are out of range, or a sink list has a null entry.</exception>
     public void Validate()
     {
         if (TraceSinks?.Any(s => s is null) == true || IssueSinks?.Any(s => s is null) == true)
@@ -186,21 +196,44 @@ public sealed record WorkIqOptions
                 "WorkIqOptions.TraceSinks and WorkIqOptions.IssueSinks must not contain a null entry (pass an empty list or null for none).");
         }
 
-        var invalid = new List<string>();
-        if (SendTimeout < TimeSpan.Zero) { invalid.Add(nameof(SendTimeout)); }
-        if (TurnDeadline < TimeSpan.Zero) { invalid.Add(nameof(TurnDeadline)); }
-        if (RecoveryBudget < TimeSpan.Zero) { invalid.Add(nameof(RecoveryBudget)); }
-        if (RecoveryPollInterval < TimeSpan.Zero) { invalid.Add(nameof(RecoveryPollInterval)); }
-        if (MaxTurns < 0) { invalid.Add(nameof(MaxTurns)); }
-        if (MaxCaptureBytes < 0) { invalid.Add(nameof(MaxCaptureBytes)); }
-        if (MaxCaptureFrames < 0) { invalid.Add(nameof(MaxCaptureFrames)); }
-        if (HistoryLength is < 0) { invalid.Add(nameof(HistoryLength)); }
+        var negative = new List<string>();
+        if (SendTimeout < TimeSpan.Zero) { negative.Add(nameof(SendTimeout)); }
+        if (TurnDeadline < TimeSpan.Zero) { negative.Add(nameof(TurnDeadline)); }
+        if (RecoveryBudget < TimeSpan.Zero) { negative.Add(nameof(RecoveryBudget)); }
+        if (RecoveryPollInterval < TimeSpan.Zero) { negative.Add(nameof(RecoveryPollInterval)); }
+        if (MaxTurns < 0) { negative.Add(nameof(MaxTurns)); }
+        if (MaxCaptureBytes < 0) { negative.Add(nameof(MaxCaptureBytes)); }
+        if (MaxCaptureFrames < 0) { negative.Add(nameof(MaxCaptureFrames)); }
+        if (HistoryLength is < 0) { negative.Add(nameof(HistoryLength)); }
 
-        if (invalid.Count > 0)
+        var tooLong = new List<string>();
+        if (SendTimeout > MaxDuration) { tooLong.Add(nameof(SendTimeout)); }
+        if (TurnDeadline > MaxDuration) { tooLong.Add(nameof(TurnDeadline)); }
+        if (RecoveryBudget > MaxDuration) { tooLong.Add(nameof(RecoveryBudget)); }
+        if (RecoveryPollInterval > MaxDuration) { tooLong.Add(nameof(RecoveryPollInterval)); }
+
+        var problems = new List<string>();
+        if (negative.Count > 0)
         {
-            throw new InvalidOperationException(
-                "WorkIqOptions has negative value(s): " + string.Join(", ", invalid) +
-                ". Every timeout, budget, cap and bound must be zero or positive (0 = no cap for MaxTurns).");
+            problems.Add("negative value(s): " + string.Join(", ", negative) +
+                ". Every timeout, budget, cap and bound must be zero or positive (0 = no cap for MaxTurns)");
+        }
+
+        if (tooLong.Count > 0)
+        {
+            problems.Add("duration(s) above the 24-day maximum: " + string.Join(", ", tooLong) +
+                ". Use 0 for no limit where the option allows it (SendTimeout, TurnDeadline)");
+        }
+
+        if (RecoveryPollInterval == TimeSpan.Zero && RecoveryBudget > TimeSpan.Zero)
+        {
+            problems.Add("RecoveryPollInterval is 0 while RecoveryBudget is above 0, which would poll GetTask back to back. " +
+                "Set a poll interval above 0, or set RecoveryBudget to 0 for no polling");
+        }
+
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException("WorkIqOptions has " + string.Join("; ", problems) + ".");
         }
     }
 }

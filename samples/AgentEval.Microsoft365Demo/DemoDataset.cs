@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Core;
@@ -44,7 +45,17 @@ internal sealed record DemoCase(
 /// Which cases carry a field the demo does not run (<c>expected</c>, or a field it does not read), per field, and why;
 /// null when none does. The banner and summary.md print it, so no field is dropped without a word.
 /// </param>
-internal sealed record DemoCaseSet(IReadOnlyList<DemoCase> Cases, string Source, string? IgnoredFieldsNote = null);
+internal sealed record DemoCaseSet(IReadOnlyList<DemoCase> Cases, string Source, string? IgnoredFieldsNote = null)
+{
+    /// <summary>
+    /// The name of the AEF run's suite: the file name of <c>--dataset</c>, or <see cref="DemoDataset.EmbeddedName"/>.
+    /// Never a full path, so the run folder names no local folder of the tester.
+    /// </summary>
+    public string Name { get; init; } = DemoDataset.EmbeddedName;
+
+    /// <summary>The bytes the cases were read from; the AEF run's suite digest is computed from them.</summary>
+    public byte[] Bytes { get; init; } = [];
+}
 
 /// <summary>
 /// Reads the benchmark cases: the embedded default (five read-only cases from <c>samples/datasets/m365-smoke.json</c>,
@@ -71,6 +82,9 @@ internal static partial class DemoDataset
     /// <summary>How the embedded default is named in reports.</summary>
     public const string EmbeddedSource = "embedded: 5 read-only cases from samples/datasets/m365-smoke.json";
 
+    /// <summary>The embedded default's file name (<c>Data/m365-demo-cases.json</c>), the name of its AEF suite.</summary>
+    public const string EmbeddedName = "m365-demo-cases.json";
+
     /// <summary>The field of the shared dataset format the demo accepts and ignores (the CLI reads it).</summary>
     public const string IgnoredField = "expected";
 
@@ -83,8 +97,10 @@ internal static partial class DemoDataset
     {
         using var stream = typeof(DemoDataset).Assembly.GetManifestResourceStream(EmbeddedResourceName)
             ?? throw new InvalidDataException($"The embedded default dataset '{EmbeddedResourceName}' is missing from the demo assembly.");
-        using var reader = new StreamReader(stream);
-        return Parse(reader.ReadToEnd(), "the embedded default dataset", EmbeddedSource);
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        return Parse(Decode(bytes), "the embedded default dataset", EmbeddedSource) with { Name = EmbeddedName, Bytes = bytes };
     }
 
     /// <summary>Loads a <c>--dataset</c> file.</summary>
@@ -93,17 +109,24 @@ internal static partial class DemoDataset
     public static DemoCaseSet Load(FileInfo file)
     {
         ArgumentNullException.ThrowIfNull(file);
-        string json;
+        byte[] bytes;
         try
         {
-            json = File.ReadAllText(file.FullName);
+            bytes = File.ReadAllBytes(file.FullName);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new InvalidDataException($"--dataset {file.FullName} could not be read: {ex.Message}", ex);
         }
 
-        return Parse(json, "--dataset " + file.FullName, file.FullName);
+        return Parse(Decode(bytes), "--dataset " + file.FullName, file.FullName) with { Name = file.Name, Bytes = bytes };
+    }
+
+    /// <summary>The text of <paramref name="bytes"/>: UTF-8 unless a byte order mark says otherwise, as <see cref="File.ReadAllText(string)"/> reads it.</summary>
+    private static string Decode(byte[] bytes)
+    {
+        using var reader = new StreamReader(new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     /// <summary>Parses the case array.</summary>

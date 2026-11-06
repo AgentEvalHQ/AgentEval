@@ -1,100 +1,89 @@
 # AgentEval.Microsoft365
 
-A Microsoft 365 provider for [AgentEval](https://github.com/AgentEvalHQ/AgentEval): it evaluates a Microsoft 365
-Copilot or declarative agent through the Work IQ A2A 1.0 endpoint, as an `IEvaluableAgent` in code or via
-`agenteval --sut microsoft365` in the CLI. It has no Microsoft Agent Framework dependency.
+A Microsoft 365 provider for [AgentEval](https://github.com/AgentEvalHQ/AgentEval). It evaluates Microsoft 365 Copilot
+or a declarative agent over the Work IQ A2A 1.0 endpoint, as an `IEvaluableAgent` in code. The CLI reaches the same
+agent with `agenteval eval --sut microsoft365` and the `agenteval bench` families. It has no Microsoft Agent Framework
+dependency.
 
-> **Status: Experimental.** The live path (delegated device-code auth, A2A 1.0 transport, evidence
-> normalisation) has **not** been independently verified against a real Microsoft 365 tenant yet.
+> **Status: Experimental.** The live path (device-code sign-in, A2A 1.0 transport, evidence) has not been verified
+> against a real Microsoft 365 tenant yet. Every public type is `[Experimental("AGENTEVAL_M365_PREVIEW001")]` and may
+> change in any release.
 
-> **Under construction.** The transport, conversation and agent layers exist; streaming, evidence normalisation
-> and the CLI target are being built in parallel lanes and may still be stubs in a given commit.
+## Documentation
+
+- [Microsoft 365 guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/microsoft365.md): prerequisites, the
+  config file, the evidence model, the trace and issue files, and the troubleshooting table of every issue code.
+- [Tester guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/microsoft365-tester-guide.md): the live
+  validation on a tenant.
+- [Demo project](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md):
+  readiness, one prompt and a small benchmark in one command.
 
 ## Install
 
-> **Not published to NuGet yet.** The project sets `IsPackable=true`, but `.github/workflows/release.yml` does
-> not pack or publish it. Its code reaches users only inside the `AgentEval.Cli` tool until a release-cut
-> decision publishes it. Until then, reference the project directly or build from source.
+The package is not on NuGet yet. Build from source and reference three projects, because this provider references
+`AgentEval.Abstractions` and `AgentEval.Core` privately. The build fails with `AGENTEVAL_M365_PREVIEW001` until you
+suppress it:
 
-```bash
-# Future, once published:
-# dotnet add package AgentEval.Microsoft365 --prerelease
+```xml
+<PropertyGroup>
+  <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
+</PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Core\AgentEval.Core.csproj" />
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
+</ItemGroup>
 ```
 
 ## Usage
 
+<!-- snippet: m365-in-code -->
 ```csharp
-using AgentEval.Microsoft365;
+using AgentEval.Core;                  // AgentResponse
+using AgentEval.Microsoft365;          // Microsoft365Config, Microsoft365AgentFactory, WorkIqOptions, Evidence()
+using AgentEval.Microsoft365.Evidence; // Microsoft365Evidence, Microsoft365TurnEvidence
 
-var config = Microsoft365Config.Load(new FileInfo("workiq.json"));   // tenantId, appClientId, optional agentId; no secrets
+var config = Microsoft365Config.Load(new FileInfo("workiq.json"));
 
-var options = new WorkIqOptions
-{
-    MaxTurns = 20,                                   // counted sends per agent instance (0 = no cap); nothing is metered
-    ConversationPolicy = ConversationPolicy.FreshContextPerInvocation,   // default: every InvokeAsync starts a new server context
-    DiagnosticsDirectory = new DirectoryInfo(".agenteval/m365"),         // JSONL trace + issue register land here
-};
-
-// iUnderstandLiveSideEffects is required and has no default: a Microsoft 365 agent works on REAL tenant data
-// and may act on it. Pass true only once you accept that. BuildLive makes no network call; the device-code
-// sign-in and the agent-card discovery run on the first turn.
-await using var agent = Microsoft365AgentFactory.BuildLive(
+// No default: the agent acts as the signed-in user on real Microsoft 365 data.
+// Pass true only for a non-production tenant and identity.
+await using WorkIqEvaluableAgent agent = Microsoft365AgentFactory.BuildLive(
     config,
     iUnderstandLiveSideEffects: true,
-    options,
-    onTurn: result => Console.Error.WriteLine($"{result.Identity.TurnId}: {result.Outcome}"));   // sees every result, even before a throw
+    options: new WorkIqOptions { MaxTurns = 10 });
 
-agent.NextCaseId = "q3-planning-summary";   // optional: correlate the turn with your own case id (one-shot)
 try
 {
-    var reply = await agent.InvokeAsync("Summarise the Contoso Q3 planning document and cite your sources.");
-    Console.WriteLine(reply.Text);                 // the selected answer text, citation markers kept
-    var evidence = reply.Evidence();               // Microsoft365TurnEvidence: answer sources, citations, captures
+    AgentResponse reply = await agent.InvokeAsync("In one sentence, what can you help me with?");
+    if (!Microsoft365Evidence.IsAnswerMeasured(reply))
+    {
+        Console.WriteLine("Not measured: several answer candidates, and none was selected.");
+        return;
+    }
+
+    Console.WriteLine(reply.Text);
+    Microsoft365TurnEvidence? evidence = reply.Evidence();
+    Console.WriteLine($"citation markers: {evidence?.CitationMarkers.Describe("marker(s)")}");
+    Console.WriteLine($"tool executions:  {evidence?.ToolExecutions.Describe("execution(s)")}");
 }
-catch (WorkIqTurnNotCompletedException ex)         // input/auth required, failed, rejected, canceled, indeterminate
+catch (WorkIqTurnNotCompletedException ex)
 {
-    Console.Error.WriteLine(ex.Message);           // safe summary: outcome, ids, failure category
-    var result = ex.TurnResult;                    // the typed result: task handle, pending interaction, evidence
-}
-catch (WorkIqTurnCanceledException ex)             // your cancellation token fired; the remote task was NOT canceled
-{
-    var result = ex.TurnResult;
-}
-catch (WorkIqTurnBudgetExceededException)          // MaxTurns reached: a FatalEvaluationException, every loop stops
-{
+    // Only a completed turn becomes an AgentResponse. Nothing was approved or resent.
+    Console.Error.WriteLine($"not completed: {ex.TurnResult.Outcome}");
 }
 ```
 
-What the live path does, in order, on each turn:
+`BuildLive` makes no network call: the device-code sign-in and the agent card discovery run on the first turn. The
+config file holds no secret. A send is never retried. Every run writes a redacted JSONL trace and an issue register;
+neither ever contains a token. `agent.Conversation` gives the rich API (`IWorkIqConversation`), and
+`Microsoft365AgentFactory.FromConversation` wraps a fake conversation for tests.
 
-1. `WorkIqDeviceCodeTokenProvider` acquires a delegated token (silent from the OS-encrypted MSAL cache, else a
-   device-code prompt on stderr) for `api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask`.
-2. `WorkIqAuthHandler` attaches `Authorization: Bearer`, `A2A-Version: 1.0` and a `User-Agent`, and records the
-   service `request-id`; `RawCaptureHandler` tees the bytes under the content policy.
-3. `WorkIqA2AClient` fetches the agent card once (`{endpoint}/{agentId}/.well-known/agent-card.json`), selects the
-   `JSONRPC` 1.0 interface on a trusted host (anything else is refused before a token goes there), then posts a
-   blocking `SendMessage`; a `submitted`/`working` task is polled with `GetTask` under `RecoveryBudget`.
-   A send is never retried; 429/503 backoff applies to discovery, `GetTask` and `CancelTask` only.
-4. `WorkIqConversation` turns the reply into a `WorkIqTurnResult` (outcome, transport, answer completeness,
-   evidence, pending interaction, failure) and `WorkIqEvaluableAgent` applies the completion gate: only a
-   `Completed` turn becomes an `AgentResponse`.
+## What this does not do yet
 
-Every stage writes trace events (`auth.*`, `discovery.*`, `rpc.*`, `task.state`, `turn.outcome`, `budget.*`)
-to `m365-trace-<runId>.jsonl` and warnings/errors to `m365-issues.jsonl` with a category and a suggested cause,
-so a tester can see exactly which stage failed and why. Tokens never appear in them. The MSAL device-code message
-(where to sign in, which code to enter) is the one auth text that is shown.
-
-The rich API (`IWorkIqConversation`: `RunTurnAsync`, `GetTaskAsync`, `CancelTaskAsync`, `AbandonAndResetAsync`,
-`StreamTurnAsync`, `SubscribeAsync`) is reachable through `agent.Conversation`; tests wrap a fake conversation
-with `Microsoft365AgentFactory.FromConversation`.
-
-## What this does NOT do (yet)
-
-- **Not live-verified.** No run against a real tenant has been independently checked.
-- **No streaming through `IStreamableAgent` yet.** Turns are blocking sends; streaming is not surfaced.
-- **No interaction continuation yet.** A turn that pauses for confirmation or input ends as
-  `InputRequired`/`AuthRequired` with the pending interaction preserved on the result; `ContinueAsync` is not
-  supported until a later wave. Nothing is ever approved automatically.
-- **Tool and retrieval evidence only as the tenant emits it.** Citations, attributions and tool activity are
-  recorded only when Work IQ returns them; nothing is inferred, and AgentEval's generic tool-usage report stays
-  empty for this provider.
+- **No live verification.** No run against a real tenant has been checked.
+- **No streaming through `IStreamableAgent`.** The agent sends blocking turns.
+- **No continuation of a paused task.** A turn that pauses for a confirmation or input ends as `InputRequired` or
+  `AuthRequired`, with the pause kept on the result. `IWorkIqConversation.ContinueAsync` always throws
+  `NotSupportedException`. Nothing is ever approved automatically.
+- **No inferred evidence.** Citations, tool activity and retrieval are recorded only when Work IQ returns them.
+  AgentEval's generic tool-usage report stays empty for this provider.

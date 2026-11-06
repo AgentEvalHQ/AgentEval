@@ -482,7 +482,7 @@ internal static class EvalCommand
                 var index = completed.Count;
                 completed.Add(result);
                 // Before the result is recorded: the target may know the case was not measured.
-                caseEvidence?.ReviewResult(result, caseIds[index]);
+                var absence = caseEvidence?.ReviewResult(result, caseIds[index], CriteriaNotGraded(opts, testCases[index]));
                 evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
                     AefCliOptions.ContentCapture == AefContentCapture.On
                         ? new AefNativeContent
@@ -492,7 +492,7 @@ internal static class EvalCommand
                             Document = caseEvidence?.DocumentFor(caseIds[index]),
                         }
                         : null,
-                    caseUsage: true);
+                    caseUsage: true, absence: absence);
             }, index =>
             {
                 caseEvidence?.BeginCase(caseIds[index]);
@@ -503,9 +503,10 @@ internal static class EvalCommand
             // 6d. --metrics: score every selected metric against each test case's REAL captured response
             // (never re-invokes the agent) and attach the results to TestResult.MetricResults, which
             // TestSummaryExtensions.MapTestResult projects into the exported report's MetricScores. The harness's
-            // own pass/fail gate above is unchanged. A case with an error has no measured response (the run threw,
-            // or the target recorded it as not measured): its metrics are recorded as not measured, never scored
-            // on the text that stands in for an answer.
+            // own pass/fail gate above is unchanged. A case with an error and no output has no measured response (the
+            // run threw, or the target recorded its stand-in text as not the answer): its metrics are recorded as not
+            // measured, never scored on the text that stands in for an answer. A case the target marked not measured for
+            // another reason (criteria with no judge) keeps the agent's real answer, and its metrics score it.
             if (selectedMetricInstances is not null)
             {
                 var metricsBuilder = AgentEvalBuilder.Create();
@@ -517,7 +518,7 @@ internal static class EvalCommand
                 await using var metricRunner = await metricsBuilder.BuildAsync(ct);
                 for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
                 {
-                    if (summary.Results[i].HasError)
+                    if (summary.Results[i].HasError && summary.Results[i].ActualOutput is null)
                     {
                         summary.Results[i].MetricResults = NotMeasuredMetrics(selectedMetrics!, summary.Results[i]);
                         evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
@@ -706,6 +707,16 @@ internal static class EvalCommand
     }
 
     /// <summary>
+    /// Whether the case declares evaluation criteria in a run without <c>--judge</c>. The harness then only checks that
+    /// the answer is not empty, so no criterion is graded. A built-in target that measures agents
+    /// (<see cref="ISutCaseEvidence.ReviewResult"/>) records such a case as not measured.
+    /// </summary>
+    /// <param name="opts">The command options.</param>
+    /// <param name="testCase">The dataset case.</param>
+    internal static bool CriteriaNotGraded(EvalOptions opts, DatasetTestCase testCase) =>
+        opts.JudgeEndpoint is null && testCase.EvaluationCriteria is { Count: > 0 };
+
+    /// <summary>
     /// The exit code of a single-run <c>eval</c> whose verdict is <paramref name="passed"/>: 1 when something failed;
     /// else 11 (<see cref="ExitCodes.GateIndeterminate"/>) when <c>--metrics</c> was given and a requested metric was not
     /// measured on some case, or, against <c>--golden</c>, a test case has no verdict in the golden trace or in this run
@@ -813,7 +824,7 @@ internal static class EvalCommand
                 perCase[ids[i]] = new System.Text.Json.Nodes.JsonObject { ["op"] = ">=", ["value"] = scores[i] };
             settings["caseThresholds"] = perCase;
         }
-        var datasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/');
+        var datasetName = DatasetName(opts.Dataset, Directory.GetCurrentDirectory());
         var definitionSettings = new System.Text.Json.Nodes.JsonObject
         {
             ["pipeline"] = "eval", ["runs"] = opts.Runs,
@@ -861,6 +872,40 @@ internal static class EvalCommand
             Definition = definition,
         };
     }
+    /// <summary>
+    /// The dataset's name in the AEF run's suite ref: its path relative to <paramref name="workingDirectory"/> when it is
+    /// inside it; else relative to the root of the git repository that holds it; else its file name. The name never
+    /// carries a path outside the working folder or the repository, which can name the tester's user folder.
+    /// </summary>
+    /// <param name="dataset">The dataset file.</param>
+    /// <param name="workingDirectory">The working directory.</param>
+    internal static string DatasetName(FileInfo dataset, string workingDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(dataset);
+        if (RelativeInside(workingDirectory, dataset.FullName) is { } inWorkingDirectory)
+        {
+            return inWorkingDirectory;
+        }
+
+        for (var directory = dataset.Directory; directory is not null; directory = directory.Parent)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) || File.Exists(Path.Combine(directory.FullName, ".git")))
+            {
+                return RelativeInside(directory.FullName, dataset.FullName) ?? dataset.Name;
+            }
+        }
+
+        return dataset.Name;
+
+        static string? RelativeInside(string root, string path)
+        {
+            var relative = Path.GetRelativePath(root, path);
+            return Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith("../", StringComparison.Ordinal) || relative.StartsWith("..\\", StringComparison.Ordinal)
+                ? null
+                : relative.Replace('\\', '/');
+        }
+    }
+
     private static AefUsage? AefJudgeUsage(EvalOptions opts, string resolvedName, JudgeCallLedger? judge) =>
         judge is { ReportedUsage: true }
             ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
@@ -1025,7 +1070,7 @@ internal static class EvalCommand
                             if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
                                 ct.ThrowIfCancellationRequested();
                             // Before the trial is recorded and counted: the target may know it was not measured.
-                            caseEvidence?.ReviewResult(trial, caseId);
+                            var absence = caseEvidence?.ReviewResult(trial, caseId, CriteriaNotGraded(opts, datasetTestCase));
                             evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
                                 ? new AefNativeContent
                                 {
@@ -1034,7 +1079,7 @@ internal static class EvalCommand
                                     Document = caseEvidence?.DocumentFor(caseId),
                                 }
                                 : null,
-                                trialUsage: usageHarness.TakeUsage(trial));
+                                trialUsage: usageHarness.TakeUsage(trial), absence: absence);
                             stochasticOptions.OnProgress?.Invoke(progress);
                         }
                         finally

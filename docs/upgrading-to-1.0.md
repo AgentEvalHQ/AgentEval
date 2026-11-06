@@ -1,17 +1,35 @@
-# Upgrading from 0.43 to 1.0.0-rc.1
+# Upgrading to 1.0
+
+Update the library and the CLI together:
+
+```powershell
+dotnet add package AgentEval --version 1.0.0-rc.2
+dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.2
+```
+
+Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, then the rc.2 section.
+
+## From 1.0.0-rc.1 to 1.0.0-rc.2
+
+The second candidate adds the experimental Microsoft 365 provider and moves to Microsoft Agent Framework 1.27. See
+the [full changelog](../CHANGELOG.md#100-rc2).
+
+| Area | What changes | Update your consumer |
+|---|---|---|
+| Microsoft Agent Framework | The core packages are 1.27.0. The A2A, Foundry and AgentHooks previews stay on 1.23. | If your application references `Microsoft.Agents.AI` packages directly, use 1.27.0 or later. |
+| Tool approvals | MAF 1.25+ rejects an approval request left unanswered when the session runs again; on 1.24 that run threw. MAF 1.26+ throws when one response repeats an approval request id. AgentEval's tool reports never count a rejected call as executed. | Do not rely on the old exception to detect an unanswered approval. Read the rejection in the response, or the tool report's approval state. |
+| Workflows | Cases after an executor initialization failure on one adapter now run. Handoff hand-backs give the returning agent a continuation prompt. A repeated fan-out target runs once. Nested agents wrapped with `UseOpenTelemetry` are recorded. | Re-baseline handoff evaluations that include hand-backs. |
+| CLI subject | `eval --sut copilot-studio` without `--subject` records the AEF subject `agent:<display name>`; it was `model:<name>`. | Pass `--subject` if you compare runs across the two versions. |
+| AEF writer | `AefEvalWriter.Session.Add` takes an optional `AefCaseAbsence` and `scoreMeasured`. | Nothing; both are additive. |
+| Microsoft 365 provider | New and experimental: every public type is `[Experimental("AGENTEVAL_M365_PREVIEW001")]`. | Add `<NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>` to a project that uses it. See [Microsoft 365](microsoft365.md). |
+
+## From 0.43 to 1.0.0-rc.1
 
 This candidate makes unavailable measurements explicit and uses AEF as the CLI's default run record.
 It includes breaking changes before the stable 1.0 promise begins. See the
 [maturity policy](../README.md#feature-maturity) and [full changelog](../CHANGELOG.md#100-rc1).
 
-Once the candidate is published, update the library and CLI together:
-
-```powershell
-dotnet add package AgentEval --version 1.0.0-rc.1
-dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.1
-```
-
-## Measurements and comparisons
+### Measurements and comparisons
 
 | Area | What changes | Update your consumer |
 |---|---|---|
@@ -42,7 +60,7 @@ not meet it, and is otherwise undecided. No measured run yields `NotMeasured`. F
 known passes out of five planned runs meet an 80% threshold even if the fifth is unavailable.
 The library and shipped demos use `StochasticResult.DecideVerdict` for this rule.
 
-## Workflow recording and timing — breaking
+### Workflow recording and timing — breaking
 
 Step counts describe recorded executor activations/agent turns rather than every MAF delivery event.
 Update assertions and baselines that counted repeated message/turn-token deliveries as separate steps.
@@ -74,7 +92,7 @@ A tool exception remains an executed failure even when the agent catches it and 
 records complete token usage only after natural stream completion. Accounting consumers treat absent
 usage as unavailable, including after trace save/reload.
 
-## Model identity, pricing and reasoning
+### Model identity, pricing and reasoning
 
 An explicit `EvaluationOptions.ModelName` selects the pricing model. Otherwise the harness can use
 `IModelIdentifiable`; the chat-client adapter takes an explicit request model before client-default
@@ -96,7 +114,7 @@ Older baselines may have used a different reasoning policy or judge prompt finge
 and evaluation-policy comparability before interpreting a score difference as a regression.
 Embedding scores also depend on the selected model: see [embedding configuration and threshold guidance](embedding-metrics.md).
 
-## CLI exits, output and existing results
+### CLI exits, output and existing results
 
 - Treat exit **11** as incomplete/not measured. Requested named metrics that are unavailable make an
   otherwise successful `eval` exit 11; a known test failure still takes its failure exit. Follow the

@@ -233,7 +233,7 @@ internal static class WorkIqDiagnosticsFactory
     /// <param name="clock">The clock.</param>
     /// <param name="setup">The host's hooks.</param>
     /// <exception cref="InvalidOperationException">A diagnostics file could not be opened; the message names the path.</exception>
-    public static WorkIqDiagnostics Create(string? configSha256, WorkIqOptions options, TimeProvider clock, WorkIqDiagnosticsSetup setup)
+    public static WorkIqDiagnostics Create(string? configSha256, WorkIqOptions options, TimeProvider clock, WorkIqDiagnosticsSetup setup) // DevSkim: ignore DS197836 - configSha256 is the config file's hash and the clock is a separate parameter; nothing hashes a time value
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);

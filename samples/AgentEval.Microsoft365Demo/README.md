@@ -1,258 +1,209 @@
-# Microsoft 365 demo — check, prompt and benchmark a Microsoft 365 agent in one run
+# Microsoft 365 demo: check, prompt and benchmark a Microsoft 365 agent
 
-This console app connects to a Microsoft 365 agent over **Work IQ A2A 1.0**, checks the connection stage by stage,
-sends one read-only prompt, runs a small AgentEval benchmark, and writes everything it saw into **one run folder** that
-you can zip and send back. It is built for the person who validates the connector against a real tenant: one command
-per step, every trace event and issue on screen at the verbosity you choose, and the full record on disk whatever the
-screen shows. It uses the real provider (`src/AgentEval.Microsoft365`) through its public API. It never falls back to a
-mock: without a config file it stops and says what is missing, and without your consent it stops after the readiness
-check.
+This console app tests a Microsoft 365 agent over **Work IQ A2A 1.0**: a connection check, one read-only prompt and a
+five-case benchmark. It writes everything into **one run folder** that you zip and send back. It uses the real provider
+and never a mock.
 
-> **Status: Experimental.** The maintainers have no Microsoft 365 tenant and have not run this against one. The
-> offline tests (`samples/AgentEval.Microsoft365Demo.Tests`) drive it through the real provider with an in-test HTTP
-> handler and a fake sign-in, which is not a live result: your run is the first live evidence. Use a
-> **non-production** tenant and test user only.
+> **Testers start here.** Read [Before you start](#before-you-start), [Quick start](#quick-start) and
+> [What to send back](#what-to-send-back). The [tester guide](../../docs/microsoft365-tester-guide.md) has the portal
+> steps for the prerequisites, and a command-line path only for when the maintainers ask.
 
-## Which agent it talks to
-
-With no agent id the demo talks to Work IQ's **default agent**: Microsoft 365 Copilot's own built-in agent, whose card
-is `https://workiq.svc.cloud.microsoft/a2a/.well-known/agent-card.json`. It is **not** a declarative agent.
-
-A **declarative agent** is a custom agent an organisation builds on Microsoft 365 Copilot (a manifest with
-instructions, knowledge and actions). Each one has its own opaque agent id and its own card
-(`https://workiq.svc.cloud.microsoft/a2a/{agent-id}/.well-known/agent-card.json`). To target one, pass
-`--agent-id <id>` (it overrides `agentId` in the config file). Find the id with the experimental `workiq list-agents`
-command of Microsoft's WorkIQ CLI, or in the agent's Copilot Chat URL; ids look like `U_abc.def` — pass the whole
-string exactly as shown. Word, Excel and PowerPoint agents are bound to their application and do not answer usefully
-headlessly.
-
-Start with the default agent. The readiness report prints the card's name and version, so you see exactly which agent
-answered.
+> **Status: Experimental.** The maintainers have no tenant and have not run this demo live. Your run is the first live
+> evidence. Use a **non-production** tenant and test user only.
 
 ## Before you start
 
-You need, in a **non-production** tenant (the [setup skill](.github/skills/m365-demo-setup/SKILL.md) and the
-[tester guide](../../docs/microsoft365-tester-guide.md#2-what-you-need) walk through each one):
+You need, in a non-production tenant:
 
-- **Work IQ enabled** in the tenant, and a **Microsoft 365 Copilot licence** on the test user (without either the
-  service answers HTTP 403);
-- an **Entra app registration** configured as a **public client** (*Authentication* → *Allow public client flows* =
-  **Yes**; no secret is ever used), with the **delegated permission `WorkIQAgent.Ask`** and **admin consent**;
-- the tenant id and the app's client id;
-- the **.NET 10 SDK** and git;
-- optionally, a judge model for the benchmark's criteria (see [The judge](#the-judge-optional)).
+- Work IQ enabled, and a Microsoft 365 Copilot licence on the test user;
+- an Entra app registration that is a public client, with the delegated permission `WorkIQAgent.Ask` and admin
+  consent; its tenant id and client id;
+- a document titled **"Demo Q3 Planning"** in the test user's OneDrive or SharePoint ([why](#the-grounding-case));
+- the .NET 10 SDK and git;
+- optionally, a judge model for the benchmark's criteria ([The judge](#the-judge-optional)).
 
-The permission covers reads **and writes** of the signed-in user's Microsoft 365 data, and a prompt can make the agent
-propose a real action. The demo never approves an action and never resends a prompt, but it cannot undo what the agent
-does with a prompt it accepted: that is why every step after the readiness check needs your explicit consent.
+The tester guide's [What you need](../../docs/microsoft365-tester-guide.md#what-you-need) gives the portal steps.
+
+The permission covers reads **and writes** of the test user's data. The demo never approves an action or resends a
+prompt, and every step after the readiness check needs your consent.
 
 ## Quick start
 
-From the repository root (the commands the demo's own help and messages use):
+Run every command from the repository root: the `AgentEval` folder the clone creates. The demo reads `./workiq.json`
+there and writes its run folders to `./m365-demo-runs/`. From another folder, add `--config <path to workiq.json>`.
 
 ```bash
-git clone --branch work/dev https://github.com/AgentEvalHQ/AgentEval.git
+git clone https://github.com/AgentEvalHQ/AgentEval.git
 cd AgentEval
-cp samples/datasets/m365-config.template.json workiq.json        # then put your tenantId and appClientId in it
+cp samples/datasets/m365-config.template.json workiq.json     # then fill in tenantId and appClientId
 dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only
 dotnet run --project samples/AgentEval.Microsoft365Demo -- --i-understand-live-side-effects --zip
 ```
 
-1. The first `dotnet run` builds the project. `--readiness-only` checks the config, signs you in, fetches the agent
-   card and checks the protocol: **no prompt is sent**. During the sign-in the console prints a message such as
-   *"To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code …"*: open the
-   page on any device, enter the code and sign in **as the test user**. The token is cached (OS-encrypted, outside the
-   repository), so later runs sign in silently.
-2. The second run repeats readiness, sends one prompt and runs the benchmark, then zips the run folder and prints the
-   zip's path: that zip is what you send back. Read [What to send back](#what-to-send-back) first.
+If the maintainers gave you a branch or a tag, run `git checkout <name>` right after `cd AgentEval`. If `dotnet run`
+cannot find `samples/AgentEval.Microsoft365Demo`, the checkout has no demo: ask the maintainers which branch to use.
 
-The demo reads `./workiq.json` and writes `./m365-demo-runs/` in the folder you run it from. Run from this folder
-instead and the commands are `dotnet run -- --readiness-only` and so on, with `workiq.json` here
-(`cp workiq.example.json workiq.json`: the example is a copy of the template); `--config <file>` or `M365_CONFIG_PATH`
-point anywhere else. Without a config file the demo prints what is missing and how to create one, contacts nothing,
-and exits `11`.
+1. `--readiness-only` checks the config, signs you in, fetches the agent card and checks the protocol. **No prompt is
+   sent.** The first time, a message asks you to open `https://microsoft.com/devicelogin` and enter a code. Do it on any
+   device and sign in **as the test user**. The token is cached outside the repository, so later runs sign in silently.
+   This step must exit `0`. If a stage fails, `summary.md` in the run folder says what to do, and the
+   [troubleshooting catalogue](../../docs/microsoft365.md#troubleshooting) lists every message.
+2. The second run repeats the check, sends one prompt and runs the benchmark. It prints the judge it will use before
+   any judge call, then zips the run folder and prints the zip's path. An exported judge key spends money on each
+   case: add `--no-judge` if you do not want that ([The judge](#the-judge-optional)).
+3. Send back the zip and the exit code. Read [What to send back](#what-to-send-back) first.
 
-### The config file
+Without a config file the demo says how to create one, contacts nothing and exits `11`.
 
-`workiq.json` holds **no secret**. Fill in the two required values from the app registration's *Overview* page and
-leave the rest as the template has it:
+**The config file.** `workiq.json` holds no secret. From the app registration's *Overview* page, put the *Directory
+(tenant) ID* in `tenantId` and the *Application (client) ID* in `appClientId`. Set `timeZone` to your IANA time zone,
+such as `Europe/Zurich`, and leave the rest. A `REPLACE-WITH-…` value is refused before anything is sent. Git ignores
+`workiq.json`; never send it back.
 
-| Field | Value |
-|---|---|
-| `tenantId` | **Required.** The *Directory (tenant) ID*. |
-| `appClientId` | **Required.** The *Application (client) ID* of your public-client app registration. |
-| `agentId` | `null` for the default agent, or a declarative agent's id (or pass `--agent-id`). |
-| `agentName` | Any label; it appears in the reports. |
-| `timeZone` | Your IANA time zone (`Europe/Zurich`, `America/New_York`); sent with every prompt so date questions are deterministic. |
-| `diagnosticProfile` | Leave `PublicAnswerOnly` (`--profile` overrides it). |
-| `endpoint`, `scope`, `trustedHosts` | Leave the defaults. A token is only ever sent to a host in `trustedHosts`. |
-
-A value still reading `REPLACE-WITH-…` is refused before anything is sent, with a message naming the field. **Never
-commit `workiq.json`** and never send it back: it names your tenant.
+**Which agent.** With `agentId` `null`, the demo talks to Microsoft 365 Copilot itself. To test a declarative agent,
+pass `--agent-id <id>` (an id such as `U_abc.def`). When it differs from the config's `agentId`, the run names the
+agent by that id, not by the config's `agentName`.
 
 ## What a run does
 
-| Step | What happens | Needs |
-|---|---|---|
-| 1. Banner | The run id and folder, the config file, which agent (the default agent or the id, and where the id came from), the tenant and app, the trusted hosts, the profile, the plan (which steps will run, or why not), the judge, the turn cap and timeout. | — |
-| 2. Readiness | The provider's readiness check: `config` → `auth` (silent from the cache, else device-code sign-in; the sign-in waits until the code expires, about 15 minutes, not `--timeout-seconds`) → `discovery` (the agent card) → `protocol` (`GetTask` on a random task id must come back as JSON-RPC `-32001` TaskNotFound). **No prompt reaches the agent.** One sign-in serves the whole run: the prompt and the benchmark use the same token source, and a sign-in they need (a token that can no longer be refreshed) prints the same message and also waits for the code, not the turn's timeout. | a config file |
-| 3. One prompt | `--prompt` (default *"In one sentence, what can you help me with?"*) as one turn in a fresh conversation. Passes only if the turn completes; a turn that does not complete fails this step (exit `1`). | consent |
-| 4. Benchmark | The dataset (default: 5 read-only cases taken from `samples/datasets/m365-smoke.json`: identity, capabilities, a grounded summary of a "Demo Q3 Planning" document, date arithmetic, out-of-scope live data) through AgentEval's `MAFEvaluationHarness`, one fresh conversation per case. Deterministic checks always; judge criteria only when a judge is configured. | consent; a judge for the criteria |
-| 5. Summary | The final table on screen and every file of the run folder. | — |
+1. **Banner**: the plan, with the agent, the tenant, the judge and the limits.
+2. **Readiness**: `config`, `auth` (the sign-in), `discovery` (the agent card) and `protocol` (a handshake). No prompt
+   reaches the agent.
+3. **Prompt**: `--prompt` as one turn.
+4. **Benchmark**: five read-only cases from `samples/datasets/m365-smoke.json` through `MAFEvaluationHarness`, one
+   fresh conversation each.
+5. **Summary**: the final table and the run folder.
 
-Without `--i-understand-live-side-effects` (or `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`) the run stops after step 2
-and exits `11`: nothing was measured past readiness, and nothing was sent to the agent. `--readiness-only` stops after
-step 2 on purpose and exits `0` when readiness passed. `--no-benchmark` skips step 4. A failed readiness stage skips
-steps 3 and 4, and a failed prompt skips step 4 (the benchmark would only send its turns into the same failure).
+Steps 3 and 4 need consent: `--i-understand-live-side-effects` or `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`. Without
+it the run stops after readiness and exits `11`. A failed readiness stage skips steps 3 and 4; a failed prompt skips
+step 4.
 
-**The prompt step and the benchmark read a non-completed turn differently, on purpose.** The prompt step is the
-connectivity check of the live path: if one plain read-only prompt does not complete (`InputRequired`, `Failed`,
-`Indeterminate`, …), the agent cannot be evaluated at all, so the step **fails** (exit `1`) and the benchmark is not run.
-In the benchmark the same outcome is an `ERROR` row, **not measured** (exit `11` when nothing failed): one case's turn
-that did not complete says nothing about the answers the agent gives, it is never graded and never counted as a
-`FAIL` score. Both name the outcome, the failure codes and the `request-id`.
+**The prompt step** passes when the turn completes with an answer. It fails (exit `1`) on an empty answer or a turn
+that does not complete. It is NOT MEASURED when several answer candidates came and none was selected.
 
-Every case gets one of four verdicts, and only one of them is a grade:
+**Every benchmark case** gets one verdict. Each case runs the checks *turn completed*, *answer non-empty*, *response
+time recorded*, *evidence availability recorded* and *criteria (judge)*; `results.md` shows what each observed.
 
 | Verdict | Meaning |
 |---|---|
-| `PASS` | Every check that applies ran and passed. |
-| `FAIL` | A check ran and failed — an empty answer, no answer at all, or the judge's score below the case's passing score. A result about the agent, not an error. |
-| `ERROR` | The turn did not complete (`InputRequired`, `AuthRequired`, `Failed`, `Rejected`, `Canceled` or `Indeterminate`), or the agent failed before a turn result. The row names the outcome and the failure (codes, `request-id`). It is never graded: no partial text is scored. |
-| `NOT MEASURED` | Nothing failed, but a check that applies could not be measured: no judge for the criteria, the judge gave no verdict, the judge call failed, no answer was selected, or the turn cap stopped the case before it ran. Never counted as a pass. |
+| `PASS` | Every check that applies passed. |
+| `FAIL` | A check failed: an empty answer, no answer, or a judge score below the passing score. A result about the agent. |
+| `ERROR` | The turn did not complete (`InputRequired`, `AuthRequired`, `Failed`, `Rejected`, `Canceled`, `Indeterminate`), or the agent failed before a turn result. Partial text is never graded. |
+| `NOT MEASURED` | Nothing failed, but a check was not measured: no judge, a judge failure, no answer selected among several, or the turn cap. Never a pass. |
 
-The checks of every case (`results.md` / `results.json` list each one as `PASS`, `FAIL`, `NOT MEASURED` or `NOT RUN`
-with what was observed): **turn completed**; **answer non-empty**; **response time recorded** (client side: network
-and service, not model latency); **evidence availability recorded** (every channel's `NotRequested` / `NotProvided` /
-`Provided`); and **criteria (judge)** when the case declares criteria. A turn that completed with several answer
-candidates and none selected (`answerCompleteness` `Ambiguous` in `turns.jsonl`) makes *answer non-empty* and the
-criteria `NOT MEASURED` — its empty text is not the agent's answer, and `evidence/<case>.json` keeps every candidate;
-a completed turn with no answer artifact at all fails *answer non-empty*.
+### The grounding case
 
-## Options
+`grounded_summary_with_citation` asks for a summary of "Demo Q3 Planning" with a citation. It also passes when the agent
+says plainly that it cannot find the document, and then grounding and citations are not measured. Create the document
+for this case to mean anything.
 
-Every option `dotnet run --project samples/AgentEval.Microsoft365Demo -- --help` lists:
+## The judge (optional)
 
-| Option | Default | What it does |
-|---|---|---|
-| `--config <file>` | `./workiq.json` (or the path in `M365_CONFIG_PATH`) | The connection file. It holds no secret. |
-| `--agent-id <id>` | the config's `agentId`; when that is `null` too, the default agent | The agent to test, as its opaque id (overrides the config's `agentId`). |
-| `-v`, `--verbosity <level>` | `normal` | `quiet`, `normal`, `detailed` or `diagnostic` — the screen only; see [Verbosity](#verbosity). |
-| `--i-understand-live-side-effects` | off (or `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`) | Consent for everything after readiness: the prompt and the benchmark drive the live agent as the signed-in user. Non-production identities only. Without it the demo runs readiness only and exits `11`. |
-| `--readiness-only` | off | Run the readiness check only; no prompt is sent and no consent is needed. Exit `0` when every stage passed. |
-| `--prompt <text>` | *In one sentence, what can you help me with?* | The one prompt of step 3. Keep it read-only. |
-| `--dataset <file>` | the 5 embedded cases | The benchmark cases: a JSON array of objects with `id` and `input`, and optional `evaluation_criteria` (strings), `passing_score` (0–100, default 70), `category` and `tags` — the format of `samples/datasets/m365-smoke.json`. Ids use letters, digits, `.`, `_` or `-`. |
-| `--no-benchmark` | off | Skip the benchmark: readiness and the one prompt only. |
-| `--no-judge` | off | Do not grade the criteria even when a judge model is configured (no judge calls, no judge cost). The criteria are then `NOT MEASURED`. |
-| `--profile <profile>` | `public` | `public` (answer only) or `native118` (EXPERIMENTAL: also requests the two diagnostic output modes observed in Microsoft's native evaluator 1.18.0; not a documented contract). |
-| `--out <dir>` | `./m365-demo-runs/<yyyyMMdd-HHmmss>Z` (UTC) | The run folder. It must not exist yet, or be empty. |
-| `--capture-raw` | off | Also keep the raw A2A requests, responses and stream frames under `raw/` (authorization headers and tokens are removed). They contain tenant content: read them before you send them. |
-| `--zip` | off | Also write `<run folder>.zip` next to the run folder, ready to send back. |
-| `--max-turns <n>` | `12` | The most agent turns this run may send: the prompt plus every case (at least 1). The run stops before a turn that would cross it; the cases it did not run are `NOT MEASURED`. Turns are counted; cost is not metered. |
-| `--timeout-seconds <n>` | `120` | The most one readiness stage or one agent turn may take (at least 1). A device-code sign-in is not cut short by it: it waits for the sign-in code's own expiry (about 15 minutes). |
+A judge model grades each case's `evaluation_criteria`. The demo reads it from the environment, like every AgentEval
+sample:
 
-## Verbosity
-
-`--verbosity` changes the screen only. The run folder always gets the full record.
-
-| Level | On screen |
+| `AI_INFERENCE_PROVIDER` | Variables |
 |---|---|
-| `quiet` | The final table and errors (and the sign-in message, which you must see). |
-| `normal` (default) | One line per stage (`✓` passed, `✗` failed, `–` skipped), one line per turn, one line per issue (`! issue <category> <code> (<stage>) HTTP … · JSON-RPC … · AADSTS… request-id=… — message`), then the final table. |
-| `detailed` | Also every trace event in the provider's one-line format (`[m365 HH:mm:ss.fff Stage/Level code] message …` with the known ids, HTTP status, JSON-RPC code and A2A state), and a DETAIL block per issue (`! ISSUE <category> <code>`): stage, category and who can fix it, code, HTTP / JSON-RPC / AADSTS codes, `request-id`, task and context ids, case, A2A state, message, cause and action. A failed readiness stage's own issue (`doctor.<stage>.failed`) stays one line: the stage's `FAILED` block below it has the detail. |
-| `diagnostic` | Also each event's data payload and elapsed time — the view `console.log` always holds. |
+| `azure` | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` |
+| `bitdeer` | `BITDEER_API_KEY` (`BITDEER_ENDPOINT`, `BITDEER_MODEL` optional) |
+| `openai` | `OPENAI_API_KEY` (`OPENAI_BASE_URL`, `OPENAI_MODEL` optional) |
+| `foundry` | `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL` |
+| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT`, `OPENAI_COMPATIBLE_MODEL` (`OPENAI_COMPATIBLE_API_KEY` optional) |
 
-The screen shows each distinct issue (stage, code and message) once; when it occurs again (the same judge failure on
-every case, for example) it is counted, and a `Repeated issues` list before the final table gives each count
-(`×N`). `console.log` and `issues.jsonl` keep every occurrence.
+With `AI_INFERENCE_PROVIDER` unset, the first provider in this table whose required variables are set is used. **An
+exported `OPENAI_API_KEY` is enough: the demo uses it, and each judge call costs money.** `--no-judge` makes no judge
+call. The CLI's `--judge` option and `AZURE_OPENAI_JUDGE_*` variables are not read here.
 
-Colours are used only when the console is interactive; `console.log` has none. When the output is redirected (a file,
-a pipe, a CI log) or the console cannot show the symbols, the screen uses ASCII markers instead — `[PASS]`, `[FAIL]`,
-`[SKIP]` for `✓ ✗ –`, and `-`, `->`, `...`, `|` for the other symbols — so nothing prints as `?`; `console.log` is
-always UTF-8 with the symbols.
+Before any judge call, at every verbosity, the demo prints the judge and why it chose it, for example
+`judge: OpenAI, model … (auto-detected from OPENAI_API_KEY; AI_INFERENCE_PROVIDER is not set)`. The key is never shown.
+
+Without a judge, the criteria are NOT MEASURED and the run exits `11` when nothing failed. A failed judge call (HTTP
+401, 403, 404, an outage) is the judge's problem: the case keeps its other checks, and its criteria are NOT MEASURED.
+Each failed call registers a `judge.call_failed` issue, which `summary.md` and the final table list under **Judge**.
 
 ## The run folder
 
-Default `./m365-demo-runs/<yyyyMMdd-HHmmss>Z/` (`--out` to choose). Once the command line is valid and a config file
-is found, it is written on every run, whatever the verbosity and whatever failed (a usage error or a missing config
-file creates none):
+`./m365-demo-runs/<yyyyMMdd-HHmmss>Z/` (UTC) unless `--out` says otherwise. It is written on every run once the command
+line is valid and a config file exists, whatever failed.
 
 | File | What it holds |
 |---|---|
-| `summary.md` | **Read this first.** The header (tenant, app, agent, profile, versions), the stage table, the per-case table, the issues grouped by category with cause and action, and what to send back. |
-| `console.log` | Everything printed, plus every trace event at diagnostic detail. No colours. |
-| `readiness.md`, `readiness.json` | The readiness report: per stage PASS / FAIL / SKIPPED, what it means, what to do, and the evidence (schema `agenteval.m365.readiness/v1`). |
-| `trace.jsonl` | Every trace event of the run, one JSON object per line (stage, level, code, message, ids, HTTP status, JSON-RPC code, A2A state, elapsed). |
-| `issues.jsonl` | Every warning and error of the run — the readiness check writes it, the prompt and the benchmark append to it — with its category, code, suggested cause, AADSTS code, `request-id` and the config hash. |
-| `turns.jsonl` | One line per turn (metadata only, never the answer text): case id (`prompt` for the prompt step), outcome, answer completeness, task and context ids, answer length, timings, the evidence availability, and for a turn that did not complete its failure category, codes and `request-id`. |
-| `evidence/<caseId>.json` | The connector's evidence document of each turn (`agenteval.microsoft365.turn-evidence/v1`, under the run's content policy): the answer, citations and the availability of every evidence channel. |
-| `results.md`, `results.json` | Per case: the verdict (`PASS` / `FAIL` / `ERROR` / `NOT MEASURED`), every check with what was observed, and the judge's score and explanation when it graded. |
-| `raw/` | With `--capture-raw` only: the raw protocol traffic. |
-| `<run folder>.zip` | With `--zip` only: the whole folder, next to it. |
+| `summary.md` | **Read this first.** The result, the settings, the stages, the cases, the issues grouped by who can fix them. |
+| `console.log` | Everything printed, plus every trace event in full. |
+| `readiness.md`, `readiness.json` | The readiness report: each stage's result, meaning, action and evidence. |
+| `trace.jsonl` | Every trace event, one per line. |
+| `issues.jsonl` | Every warning and error with its category, code, cause, AADSTS code and `request-id`. |
+| `turns.jsonl` | One line per turn: case id (`prompt` for the prompt step), outcome, answer completeness, ids, timings, the evidence line, failure codes. Never the answer text. |
+| `evidence/<case>.json` | Each turn's evidence document: the answer, citations and every evidence channel. |
+| `results.md`, `results.json` | Per case: the verdict, every check, and the judge's score and explanation. |
+| `aef/` | When the benchmark ran: the benchmark as a sealed AEF run under `aef/<yyyy>/<MM>/<run id>/`, with each case's prompt, answer, state and evidence document. Never edit it. |
+| `raw/` | With `--capture-raw`: the raw protocol traffic. |
+| `<run folder>.zip` | With `--zip`, next to the run folder. |
+
+**The AEF run** is the benchmark in AgentEval's evidence format. Each case's state is its verdict: PASS is `passed`,
+FAIL is `failed`, ERROR is `error`, and NOT MEASURED is `not_measured` (`error` when the judge's call failed or gave no
+verdict). A benchmark that stops early closes the run aborted (`turn-cap-reached`, `cancelled` or `evaluation-failed`),
+and the cases it did not reach have no line. Checking it is optional. The demo installs no `agenteval` command, so run
+this from the repository root, with the quoted path the final table prints after `aef verify`. It must print `intact`.
+
+```bash
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- aef verify "<AEF run folder>"
+```
+
+The evidence line in `turns.jsonl`, `results.json` and `summary.md` gives the state of each evidence channel:
+
+```text
+answer Present; citation markers Provided (2 marker(s)); citation sources NotProvided; tool selections NotRequested; …
+```
+
+`NotRequested`: the demo did not ask. `NotProvided`: nothing came. `Provided (observed empty: 0 source(s) in this
+snapshot)`: the channel came empty. A word after the count, such as `Conflicting`, `Partial` or `Malformed`, means the
+channel came but is not fully valid.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| `0` | Every stage that ran passed and everything requested was measured (`--readiness-only`: readiness passed). |
-| `1` | A stage **failed** (a readiness stage, or the one prompt did not complete), or a case **failed** a check. |
-| `2` | A command-line mistake (an unknown option or value, a missing `--dataset` file, a non-empty `--out` folder, `--max-turns` or `--timeout-seconds` below 1). Nothing is created or sent. |
-| `3` | A runtime error, or a file could not be written. The run folder is still written. |
-| `11` | Nothing failed, but something was **not measured**: no consent for the steps after readiness, no judge (or `--no-judge`) for the criteria, a benchmark turn that did not complete (an `ERROR` row), a case stopped by `--max-turns`, or no config file (the demo then prints what is missing and how to create it, and contacts nothing). |
+| `0` | Everything that ran passed and was measured (`--readiness-only`: readiness passed). |
+| `1` | A stage failed (readiness or the prompt), or a case failed a check. |
+| `2` | A command-line mistake, such as an unknown option, a missing or invalid `--dataset` file, or a non-empty `--out` folder. Nothing is created or sent. |
+| `3` | A runtime error, or a file of the run (or the zip) could not be written. |
+| `11` | Nothing failed, but something was not measured: no consent, no judge, a case `ERROR`, the prompt or a case `NOT MEASURED`, the turn cap, or no config file. |
 
-## The judge (optional)
-
-The criteria of a case (`evaluation_criteria` in the dataset) are graded by a judge model only when one is configured.
-The judge is read from the same environment variables as every AgentEval sample, resolved by
-`InferenceProviderEnvironment` (AgentEval.Core):
-
-| `AI_INFERENCE_PROVIDER` | Set |
-|---|---|
-| `azure` | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` |
-| `openai` | `OPENAI_API_KEY` (`OPENAI_BASE_URL`, `OPENAI_MODEL` optional) |
-| `foundry` | `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY`, `FOUNDRY_MODEL` |
-| `bitdeer` | `BITDEER_API_KEY` (`BITDEER_ENDPOINT`, `BITDEER_MODEL` optional) |
-| `openai-compatible` | `OPENAI_COMPATIBLE_ENDPOINT`, `OPENAI_COMPATIBLE_MODEL` (`OPENAI_COMPATIBLE_API_KEY` optional) |
-
-With the selector unset, the first provider whose variables are set is used. Without any, or with `--no-judge`, every
-criterion is `NOT MEASURED` (never passed) and the run exits `11` when nothing failed; the deterministic checks still
-run. Each judge call costs money on your provider: use `--no-judge` to make none even when a provider is configured.
-
-A judge call that fails (a mistyped key: HTTP 401; a wrong deployment: 403/404; a network error or an outage) is the
-**judge's** problem, not the agent's: the case keeps its measured checks (the turn completed, the answer, the timing,
-the evidence), its criteria are `NOT MEASURED` with `the judge call failed: <type>: <message>`, and one issue
-`judge.call_failed` names the judge (category `Authentication` for 401/403, else `Service`) with what to check — the
-judge provider's variables. Nothing is resent to the agent.
+The exit code is decided once, in that order: `3`, then `1`, then `11`, else `0`. `results.json`, `results.md`,
+`summary.md` and the final table all show it. A later failure to write `console.log` or the zip turns it into `3`: the
+reports are written again, and the screen says `The result is now ERROR (exit 3) …`.
 
 ## What to send back
 
-1. The zip the run printed (`--zip`), or the whole run folder.
-2. The exit code and anything that surprised you, in a few lines (or the
-   [results template](../../docs/microsoft365-tester-RESULTS-TEMPLATE.md)).
+1. The zip the run printed, or the run folder zipped.
+2. The exit code and anything that surprised you. The
+   [results template](../../docs/microsoft365-tester-RESULTS-TEMPLATE.md) helps if you have time.
 
-What the run folder contains, and what it never contains:
+The run folder holds your tenant, app and agent ids, `request-id`s and file paths with your user name. It holds the
+agent's **answers** in `evidence/`, `aef/` and `console.log`, and with `--capture-raw` everything the service sent. The
+judge's explanations in `results.md` and `results.json` may quote the answers. `trace.jsonl`, `issues.jsonl` and
+`turns.jsonl` hold no prompt or answer. No file holds a token, an auth code, the `Authorization` header, `workiq.json`
+or the token cache. The device code shows as `[redacted]`.
 
-| May contain | Never contains |
-|---|---|
-| Your tenant id, app id and agent id; a masked account name; the card's URLs; HTTP statuses, AADSTS and JSON-RPC codes; the service's `request-id`s; the config's SHA-256; file paths on your machine (they include your user name). | A token, an auth code, the `Authorization` header or a client secret. `console.log` and the trace keep the device-code sign-in message with the code masked (`[redacted]`); only the screen shows it in full. |
-| The prompts and the agent's **answers**, citation names and URLs (`evidence/`, and the prompt step's answer in `console.log`); the judge's explanations (`results.*`); everything the service sent under `raw/` with `--capture-raw`. `trace.jsonl`, `issues.jsonl` and `turns.jsonl` hold ids, codes and timings, never a prompt or an answer. | `workiq.json` itself, the token cache. |
-
-If something cannot be shared, redact the **unzipped** folder and zip it yourself (do not send a zip made before the
-redaction). These replace e-mail addresses, URLs and your tenant id in every text file of one run folder; they edit in
-place, so keep a copy:
+If something cannot be shared, redact the **unzipped** folder, then zip it yourself. The commands below replace e-mail
+addresses, URLs and your tenant id in every text file of one run folder, in place: keep a copy. They skip `aef/`,
+because it is sealed and any edit makes it invalid. If `aef/` holds something you cannot share, delete it and say so.
 
 ```bash
-# Bash (Linux, macOS, Git Bash on Windows); RUN is the run folder the demo printed
+# Bash (Linux, macOS, Git Bash). RUN is the run folder the demo printed, with no trailing slash.
 export TENANT="<your-tenant-guid>" RUN="m365-demo-runs/<run folder>"
-find "$RUN" -type f \( -name '*.jsonl' -o -name '*.json' -o -name '*.md' -o -name '*.log' \) -print0 \
+find "$RUN" -path "$RUN/aef" -prune -o -type f \( -name '*.jsonl' -o -name '*.json' -o -name '*.md' -o -name '*.log' -o -name '*.sse' \) -print0 \
   | xargs -0 perl -pi -e 's/[A-Za-z0-9._%+*-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[email]/g; s#https?://[^"\s)\x60]+#[url]#g; s/\Q$ENV{TENANT}\E/[tenant]/gi'
 ```
 
 ```powershell
-# PowerShell
+# PowerShell. $run is the run folder the demo printed.
 $tenant = "<your-tenant-guid>"; $run = "m365-demo-runs\<run folder>"
+$aef = (Join-Path (Resolve-Path $run).Path 'aef') + [IO.Path]::DirectorySeparatorChar
 $utf8 = New-Object System.Text.UTF8Encoding($false)
-foreach ($f in Get-ChildItem $run -Recurse -File -Include *.jsonl, *.json, *.md, *.log) {
+foreach ($f in Get-ChildItem $run -Recurse -File -Include *.jsonl, *.json, *.md, *.log, *.sse) {
+  if ($f.FullName.StartsWith($aef, [StringComparison]::OrdinalIgnoreCase)) { continue }
   $t = [IO.File]::ReadAllText($f.FullName)
   $t = $t -replace '[A-Za-z0-9._%+*-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '[email]'
   $t = $t -replace 'https?://[^"\s)\x60]+', '[url]'
@@ -261,42 +212,67 @@ foreach ($f in Get-ChildItem $run -Recurse -File -Include *.jsonl, *.json, *.md,
 }
 ```
 
-Then read the answers in `evidence/` and `console.log` and replace by hand, with `[name]`, any person or document name
-you cannot share; say so when you send it. `request-id` values stay: they let Microsoft support find a call.
+Then read `evidence/`, `console.log`, `results.md` and `results.json`, and replace by hand any name you cannot share
+with `[name]`.
+Keep the `request-id` values: Microsoft support uses them to find a call.
+
+## Options
+
+`dotnet run --project samples/AgentEval.Microsoft365Demo -- --help` describes each option in full.
+
+| Option | What it does |
+|---|---|
+| `--config <file>` | The connection file. Default `./workiq.json`, or the path in `M365_CONFIG_PATH`. |
+| `--agent-id <id>` | The agent to test. Default: the config's `agentId`. |
+| `-v`, `--verbosity <level>` | The screen only: see [Verbosity](#verbosity). Default `normal`. |
+| `--i-understand-live-side-effects` | Consent for the prompt and the benchmark. `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true` also gives it. |
+| `--readiness-only` | The readiness check only. |
+| `--prompt <text>` | The prompt of step 3. Keep it read-only. |
+| `--dataset <file>` | Cases in the `samples/datasets/m365-smoke.json` format. A broken rule is a usage error. Fields the demo does not read, such as `expected`, are ignored and named in the banner and `summary.md`. Default: the 5 embedded cases. |
+| `--no-benchmark` | Readiness and the prompt only. |
+| `--no-judge` | No judge call; the criteria are NOT MEASURED. |
+| `--profile <profile>` | `public` (answer only, the default) or the experimental `native118` (also asks for two undocumented diagnostic modes). |
+| `--out <dir>` | The run folder. It must be new or empty. |
+| `--capture-raw` | Also keep the raw protocol traffic in `raw/`, without tokens. It holds tenant content. |
+| `--zip` | Also write `<run folder>.zip`. |
+| `--max-turns <n>` | The most agent turns, default `12`. Cases past the cap are NOT MEASURED. |
+| `--timeout-seconds <n>` | The most one readiness stage or turn may take, default `120`. A sign-in waits for its code instead. |
+
+## Verbosity
+
+`--verbosity` changes the screen only; `console.log` always holds the `diagnostic` view. `quiet` shows the sign-in
+message, the judge line, a failed stage, errors and the final table. `normal`, the default, adds the banner and one line
+per stage (`✓`, `✗`, `–`), turn and issue. `detailed` adds every trace event, each case's checks and a detail block per
+issue. `diagnostic` adds each event's data and timing. A repeated issue shows once and is counted in a
+`Repeated issues` list. A redirected screen prints `[PASS]`, `[FAIL]` and `[SKIP]` instead of the symbols.
 
 ## GitHub Copilot: open this folder in VS Code
 
-This folder carries its own GitHub Copilot setup in [`.github/`](.github/). Open **this folder** (not the repository
-root) in VS Code — *File* → *Open Folder* → `samples/AgentEval.Microsoft365Demo` — and Copilot Chat loads it:
+This folder has its own Copilot setup in [`.github/`](.github/). Open **this folder** in VS Code, not the repository
+root. Pick the **`m365-demo`** agent in Copilot Chat. It routes to three skills:
+[m365-demo-setup](.github/skills/m365-demo-setup/SKILL.md) (from zero to the zip),
+[m365-demo-customize](.github/skills/m365-demo-customize/SKILL.md) (another agent, prompt or case) and
+[m365-demo-triage](.github/skills/m365-demo-triage/SKILL.md) (read a run folder). The prompts `/run-demo`,
+`/triage-run` and `/add-case` are shortcuts. From this folder, add `--config ../../workiq.json` to use the config at the
+repository root. The run folders then land in this folder's `m365-demo-runs/`.
 
-| What | Use it for |
-|---|---|
-| The **`m365-demo`** agent ([agents/m365-demo.agent.md](.github/agents/m365-demo.agent.md)) | Pick it in the Chat view's agent list. It knows the rules (non-production identity, consent, never resend a prompt, never approve an action, no tenant data in git) and routes to the three skills. |
-| [m365-demo-setup](.github/skills/m365-demo-setup/SKILL.md) | From zero to the first run: tenant prerequisites, the app registration, the config file, `--readiness-only`, reading `readiness.md`, the full run, `--zip`. |
-| [m365-demo-customize](.github/skills/m365-demo-customize/SKILL.md) | Target another agent, change the prompt or the cases, add a deterministic check, change the verbosity or the profile. |
-| [m365-demo-triage](.github/skills/m365-demo-triage/SKILL.md) | Read a run folder and say what failed, why, and what to do next. |
-| Prompts `/run-demo`, `/triage-run`, `/add-case` ([prompts/](.github/prompts/)) | One-click versions of the commonest requests. |
-| [copilot-instructions.md](.github/copilot-instructions.md) and [instructions/m365-demo.instructions.md](.github/instructions/m365-demo.instructions.md) | The project's rules, loaded automatically (the second one when you edit a `.cs` file). |
+## For developers
 
-Opened from the repository root instead, Copilot uses the repository's own setup; the `AgentEval M365` agent there
-points back here.
-
-## Tests
-
-`samples/AgentEval.Microsoft365Demo.Tests` tests the demo offline: through the real provider, with an in-test HTTP
-handler and a fake sign-in (the `DemoHostOverrides` seams), never a tenant and never a paid judge. Run them from the
-repository root with every provider variable unset, so nothing can reach a paid model:
+`samples/AgentEval.Microsoft365Demo.Tests` tests the demo offline, through the real provider, with an in-test HTTP
+handler and a fake sign-in (`DemoHostOverrides`). Run them from the repository root with every provider variable
+unset, so nothing reaches a paid model:
 
 ```bash
 for v in $(env | grep -iE '^(AZURE|AZUREOPENAI|OPENAI|FOUNDRY|MS_FOUNDRY|BITDEER|AI_INFERENCE|OPENROUTER|TYPESAFE|JEV_|COPILOTSTUDIO|ANTHROPIC|GEMINI|MISTRAL|OLLAMA|M365_|AGENTEVAL_M365|AGENTEVAL_A2A|APPLICATIONINSIGHTS|MAFARTCOMP)' | cut -d= -f1); do unset "$v"; done
 dotnet test samples/AgentEval.Microsoft365Demo.Tests
 ```
 
+`DemoRun.cs` orders the steps (`ReadinessStep.cs`, `PromptStep.cs`, `LiveSteps.cs`). The cases and their checks are in
+`Benchmark.cs`, the AEF run in `BenchmarkAef.cs` and the exit decision in `DemoExitCodes.cs`.
+
 ## See also
 
-- [Microsoft 365 tester guide](../../docs/microsoft365-tester-guide.md) — the same validation with the `agenteval`
-  CLI (`m365 doctor`, `eval`, `bench`), and its [results template](../../docs/microsoft365-tester-RESULTS-TEMPLATE.md).
-- [Microsoft 365 (`--sut microsoft365`)](../../docs/microsoft365.md) — the provider: config, profiles, the evidence
-  model, the trace and issue files, troubleshooting.
-- `samples/datasets/m365-smoke.json` (the 8-case dataset the default cases come from) and
-  `samples/datasets/m365-config.template.json` (the config template).
+- [Microsoft 365 tester guide](../../docs/microsoft365-tester-guide.md): the prerequisites, the CLI path and the
+  [results template](../../docs/microsoft365-tester-RESULTS-TEMPLATE.md).
+- [Microsoft 365 (`--sut microsoft365`)](../../docs/microsoft365.md): the provider, the config, the evidence model and
+  the [troubleshooting catalogue](../../docs/microsoft365.md#troubleshooting).

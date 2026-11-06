@@ -2,282 +2,173 @@
 
 ## New to this? Start here
 
-**The problem:** you have an agent inside Microsoft 365 — Microsoft 365 Copilot itself, or a declarative agent your
-tenant publishes — and you want to run a benchmark against it the way you would against any other agent: send
-prompts, grade the answers with a judge, keep the evidence. But a Microsoft 365 agent has no plain HTTP endpoint you
-can point a chat client at. It needs a real Entra sign-in as a real user, it speaks the Work IQ A2A protocol, and
-every prompt runs against that user's live mailbox, files and calendar.
+**The problem.** You have an agent in Microsoft 365: Microsoft 365 Copilot, or a declarative agent your tenant
+publishes. You want to benchmark it like any other agent. But it has no plain HTTP endpoint. It needs a real Entra
+sign-in as a real user, it speaks the Work IQ A2A protocol, and it works on that user's live mailbox, files and calendar.
 
-**What this connector does:** it is a client of a Microsoft 365 agent over **Work IQ A2A 1.0**. It sends one
-benchmark prompt per turn, waits for the task to complete, collects the externally observable result — the final
-answer, its citations, and whatever diagnostic artifacts the tenant emits — and hands that to AgentEval as an
-ordinary `IEvaluableAgent`. The same agent reaches the in-code API, `agenteval eval` for your own dataset, and the
-`agenteval bench` families for the standard benchmarks, through the `--sut microsoft365` target on the seam the
-Copilot Studio connector already uses.
+**What this connector does.** It talks to the agent over Work IQ A2A 1.0, one prompt per turn. It keeps what the
+service returns: the answer, its citations and any diagnostic artifacts the tenant emits. AgentEval sees an ordinary
+`IEvaluableAgent`, from code, from `agenteval eval` or from the `agenteval bench` families.
 
-**The one honest trade-off — evidence by availability:** the connector only ever sees what the service returns.
-Whether a tool fired, what was retrieved, which skill ran — none of that is visible unless the tenant emits it, and
-by default the connector does not even ask for it. So every evidence channel carries an availability label
-(`NotRequested`, `NotProvided`, `Provided`, …) and nothing is inferred from silence. An empty tool list means "no
-tool telemetry was observed", never "no tool was used". The [evidence model](#the-evidence-model) section says
-exactly what each label means.
+**The one trade-off: evidence by availability.** The connector sees only what the service returns, and by default it
+asks for the answer only. So every evidence channel carries an availability label (`NotRequested`, `NotProvided`,
+`Provided`). An empty tool list means "no tool telemetry was observed", never "no tool was used". See
+[the evidence model](#the-evidence-model).
 
-Just want the fastest path? Run the [demo project](#the-demo-project-samplesagentevalmicrosoft365demo) — one command
-checks the connection, sends one prompt, runs a small benchmark and saves everything in one folder. For your own code
-read [Using it directly in code](#using-it-directly-in-code-no-cli); for the CLI jump to
-[Running a custom benchmark](#running-a-custom-benchmark-agenteval-eval). If you are the external tester with a
-tenant, start with the demo, then the [tester guide](microsoft365-tester-guide.md).
+**Where to start.** The [demo project](../samples/AgentEval.Microsoft365Demo/README.md) is the fastest path: one command
+checks the connection, sends one prompt, runs a five-case benchmark and saves everything in one run folder. Its run
+folder also holds an AEF run of the benchmark. For your own code, read
+[Using it directly in code](#using-it-directly-in-code-no-cli). For the CLI, start with the
+[readiness check](#readiness-check-agenteval-m365-doctor). An external tester starts with the
+[demo README](../samples/AgentEval.Microsoft365Demo/README.md); the [tester guide](microsoft365-tester-guide.md) holds
+the prerequisites and a CLI path for when the maintainers ask.
 
 ---
 
-> **Status: Experimental.** The provider (`src/AgentEval.Microsoft365/`), its credential-free tests, the CLI target
-> and the readiness check (`agenteval m365 doctor`) are implemented. **The maintainers have not run the live path:
-> they have no Microsoft 365 tenant, and an external tester validates it on theirs** with the
-> [tester guide](microsoft365-tester-guide.md). What is verified offline: config loading and every validation rule;
-> the trust policy; the redaction policy; the trace and issue sinks; the task reducer, answer selector and evidence
-> normaliser against synthetic A2A 1.0 fixtures (cards, JSON-RPC envelopes, SSE streams); the agent lifecycle with a
-> fake conversation; the readiness check against a fake HTTP handler and token provider; and the whole CLI path
-> (`eval`, the `bench` families and `m365 doctor`) through the credential-free seams. What is **not** verified by the
-> maintainers: the MSAL device-code sign-in and token cache, the real card, the real wire shapes of a completed,
-> paused or failed task, the citation format a live agent emits, and whether the experimental diagnostic modes are
-> accepted. See [What's verified vs. what still needs a live check](#whats-verified-vs-what-still-needs-a-live-check).
-> No claim on this page means "tested against a tenant".
+> **Status: Experimental.** The provider, the CLI target and `agenteval m365 doctor` are built and tested offline. The
+> maintainers have no Microsoft 365 tenant and have not run the live path; an external tester validates it with the
+> [tester guide](microsoft365-tester-guide.md). No sentence on this page claims a live result. See
+> [what is verified, and what still needs a tenant](#whats-verified-vs-what-still-needs-a-live-check).
 
 ## What it is
 
-`microsoft365` is a built-in `--sut` target for `agenteval eval` and `agenteval bench` (`redteam` is excluded in
-this phase). Selecting it swaps the default `--endpoint`/`--azure` agent for a purpose-built one that:
+`microsoft365` is a built-in `--sut` target for `agenteval eval` and the `agenteval bench` families, not for
+`agenteval redteam`. It replaces the `--endpoint`/`--azure` agent with one that:
 
-- owns its own CLI flags (`--m365-config`, `--m365-max-turns`, `--m365-profile`, `--m365-capture-raw`,
-  `--m365-verbose`, `--m365-trace`) and reads the common `--i-understand-live-side-effects` consent flag,
-- validates everything it can **before any network call**: consent, config present, turn cap not negative,
-  profile valid, then every field of the config file,
-- signs in as a real user with MSAL device-code authentication (a public-client app registration, no secret),
-- discovers the agent card, selects the JSON-RPC 1.0 interface, and refuses any host outside `trustedHosts`,
-- runs each prompt as one blocking `SendMessage` turn (`A2A-Version: 1.0` on every request), reconciles a
-  still-running task with bounded `GetTask` polling, and **never resends a message automatically**,
-- returns an `AgentResponse` only for a completed task; every other outcome is a typed exception that carries the
-  full observation,
-- normalises what it saw into a versioned evidence document (`agenteval.microsoft365.turn-evidence/v1`) with an
-  availability label per channel,
-- writes a redacted JSONL trace and an issue register for every run, so a failure can be located by stage without
-  reading code,
-- comes with a staged readiness check, [`agenteval m365 doctor`](#readiness-check-agenteval-m365-doctor), that proves
-  the config, the sign-in, the card and the protocol handshake before any prompt is sent.
+- owns the `--m365-*` options and reads the shared `--i-understand-live-side-effects` consent flag;
+- checks the consent flag, the options and every config field before any network call;
+- signs in as a real user with MSAL device-code sign-in (a public-client app registration, no secret);
+- discovers the agent card, selects the JSON-RPC 1.0 interface and refuses any host outside `trustedHosts`;
+- runs each prompt as one blocking `SendMessage` turn, polls a running task with `GetTask`, and never resends a message;
+- returns an `AgentResponse` only for a completed task; every other outcome is a typed exception with the full result;
+- records a versioned evidence document per turn, and a redacted trace and issue register per run.
 
-Source: `src/AgentEval.Microsoft365/` — `Microsoft365Config.cs`, `Microsoft365AgentFactory.cs`, `WorkIqOptions.cs`,
-`WorkIqEvaluableAgent.cs`, `WorkIqConversation.cs`, `WorkIqExceptions.cs`, `Auth/`, `Protocol/`, `Capture/`,
-`Evidence/`, `Diagnostics/`, `Readiness/`. The project has no Microsoft Agent Framework dependency; the A2A .NET SDK
-(`A2A` 1.0.0-preview2) sits behind the provider's own seams.
-
-## The demo project (`samples/AgentEval.Microsoft365Demo`)
-
-A console app (.NET 10) that takes a tester from a config file to one zipped folder of evidence. It uses the provider's
-public API only, and never falls back to a mock target:
-
-```bash
-cp samples/datasets/m365-config.template.json workiq.json        # put your tenantId and appClientId in it
-dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only                        # no prompt is sent
-dotnet run --project samples/AgentEval.Microsoft365Demo -- --i-understand-live-side-effects --zip  # prompt + benchmark
-```
-
-1. **Readiness** — `Microsoft365ReadinessCheck` (the same stages as [`agenteval m365 doctor`](#readiness-check-agenteval-m365-doctor)).
-2. **One prompt** — `--prompt`, one turn in a fresh context. Needs consent.
-3. **A small benchmark** — by default 5 read-only cases from `samples/datasets/m365-smoke.json` (`--dataset` for
-   others) through `MAFEvaluationHarness` over the agent `BuildLive` returns. Deterministic checks always run (turn
-   completed, answer not empty, response time recorded, evidence availability recorded); the judge criteria only when
-   a judge provider is configured (`InferenceProviderEnvironment`) and `--no-judge` is not given, otherwise they are
-   `NOT MEASURED`. A turn that did not complete is an `ERROR` row, never a graded zero; a judge call that fails keeps
-   the case's measured checks, makes its criteria `NOT MEASURED` and registers `judge.call_failed`, naming the judge,
-   not the agent. Needs consent.
-4. **One run folder**, whatever the screen shows: `summary.md`, `console.log`, `trace.jsonl`, `issues.jsonl`,
-   `readiness.md` / `.json`, `turns.jsonl`, `evidence/<caseId>.json`, `results.md` / `.json`, `raw/` with
-   `--capture-raw`, and a zip with `--zip`.
-
-It targets Work IQ's **default agent** (Microsoft 365 Copilot's built-in agent) unless `--agent-id` names a declarative
-agent. `--verbosity quiet|normal|detailed|diagnostic` sets how much reaches the screen: stage lines, a line per turn and
-per issue, every trace event, and a detail block per issue (stage, category, codes, `request-id`, cause, action). Exit
-codes: `0` all passed and measured · `1` a stage failed (readiness, or the one prompt did not complete) or a case
-failed a check · `2` usage · `3` runtime error or a file not written (the folder is still written) · `11` nothing
-failed but something was not measured (no consent past readiness, no judge, a benchmark turn that did not complete, a
-case stopped by `--max-turns`, no config file).
-
-Every option, the run-folder table and how to redact are in the
-[demo README](../samples/AgentEval.Microsoft365Demo/README.md). Opened on its own in VS Code, the folder brings its own
-GitHub Copilot setup (`.github/`: an `m365-demo` agent, skills for setup, customisation and triage, and prompt files).
-One token source serves the readiness check and the live agent (a `WorkIqDeviceCodeTokenProvider` whose prompt writer
-shows the device-code message in full on the screen and masks the code in `console.log`). The offline tests in
-`samples/AgentEval.Microsoft365Demo.Tests` drive it through the real provider with a fake HTTP handler and a fake token
-provider.
+Source: `src/AgentEval.Microsoft365/`. It has no Microsoft Agent Framework dependency. The A2A .NET SDK (`A2A`
+1.0.0-preview2) sits behind the provider's own interfaces.
 
 ## Using it directly in code (no CLI)
 
-The provider lives in its own project, `AgentEval.Microsoft365`, so the A2A SDK and MSAL are never forced on
-consumers who do not use it. It is **not published to NuGet yet**: build it from source and add a project reference
-to `src/AgentEval.Microsoft365/AgentEval.Microsoft365.csproj`.
+The provider is its own project, so consumers who do not use it never get the A2A SDK and MSAL. It is not on NuGet yet:
+build it from source. Reference three projects, because the provider references Abstractions and Core privately. Every
+public type of the provider is `[Experimental("AGENTEVAL_M365_PREVIEW001")]`, so the build fails until you suppress the
+diagnostic:
 
+```xml
+<PropertyGroup>
+  <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
+</PropertyGroup>
+<ItemGroup>
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Core\AgentEval.Core.csproj" />
+  <ProjectReference Include="..\AgentEval\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
+</ItemGroup>
+```
+
+<!-- snippet: m365-in-code -->
 ```csharp
-using AgentEval.Core;                  // AgentResponse, IEvaluableAgent
+using AgentEval.Core;                  // AgentResponse
 using AgentEval.Microsoft365;          // Microsoft365Config, Microsoft365AgentFactory, WorkIqOptions, Evidence()
-using AgentEval.Microsoft365.Evidence; // Microsoft365TurnEvidence, EvidenceAvailability
+using AgentEval.Microsoft365.Evidence; // Microsoft365Evidence, Microsoft365TurnEvidence
 
-var config = Microsoft365Config.Load(new FileInfo("workiq.json"));   // loads + validates; the file holds no secret
+var config = Microsoft365Config.Load(new FileInfo("workiq.json"));
 
-// iUnderstandLiveSideEffects is required and has no default. The delegated WorkIQAgent.Ask permission covers
-// reads AND writes of the signed-in user's Microsoft 365 data, and a prompt can trigger a real action that
-// cannot be sandboxed. Pass true only for a non-production tenant and identity.
+// No default: the agent acts as the signed-in user on real Microsoft 365 data.
+// Pass true only for a non-production tenant and identity.
 await using WorkIqEvaluableAgent agent = Microsoft365AgentFactory.BuildLive(
     config,
     iUnderstandLiveSideEffects: true,
-    options: new WorkIqOptions
-    {
-        MaxTurns = 10,                                                      // turns are counted, not metered
-        ConversationPolicy = ConversationPolicy.FreshContextPerInvocation,  // the default; ContinueContext for multi-turn
-    });
+    options: new WorkIqOptions { MaxTurns = 10 });
 
-AgentResponse reply;
 try
 {
-    reply = await agent.InvokeAsync("In one sentence, what can you help me with? Cite nothing.");
+    AgentResponse reply = await agent.InvokeAsync("In one sentence, what can you help me with?");
+    if (!Microsoft365Evidence.IsAnswerMeasured(reply))
+    {
+        Console.WriteLine("Not measured: several answer candidates, and none was selected.");
+        return;
+    }
+
+    Console.WriteLine(reply.Text);
+    Microsoft365TurnEvidence? evidence = reply.Evidence();
+    Console.WriteLine($"citation markers: {evidence?.CitationMarkers.Describe("marker(s)")}");
+    Console.WriteLine($"tool executions:  {evidence?.ToolExecutions.Describe("execution(s)")}");
 }
 catch (WorkIqTurnNotCompletedException ex)
 {
-    // Only a completed turn becomes an AgentResponse. Every other outcome lands here with the typed result:
-    // InputRequired, AuthRequired, Failed, Rejected, Canceled or Indeterminate. No partial text is returned.
-    Console.Error.WriteLine($"not completed: {ex.TurnResult.Outcome} task={ex.TurnResult.Task?.TaskId ?? "(none)"}");
-    if (ex.TurnResult.Outcome == WorkIqTurnOutcome.InputRequired)
-    {
-        // ex.TurnResult.PendingInteraction describes the confirmation card. Nothing was approved.
-    }
-
-    return;
-}
-
-Console.WriteLine(reply.Text);
-
-Microsoft365TurnEvidence? evidence = reply.Evidence();   // AdditionalProperties[Microsoft365Evidence.Key]
-if (evidence is not null)
-{
-    var sources = evidence.CitationSources;
-    Console.WriteLine($"citation sources: {sources.Availability} ({(sources.Items.IsDefaultOrEmpty ? 0 : sources.Items.Length)})");
-    Console.WriteLine($"tool executions:  {evidence.ToolExecutions.Availability}");   // NotRequested under PublicAnswerOnly
+    // Only a completed turn becomes an AgentResponse. Nothing was approved or resent.
+    Console.Error.WriteLine($"not completed: {ex.TurnResult.Outcome}");
 }
 ```
 
-What the pieces are:
+- `Microsoft365Config.Load` reads and validates the [config file](#authoring-the-config-json), with no network call.
+- `BuildLive(config, iUnderstandLiveSideEffects, options, tokenProvider, onTurn, innerHandler)` makes no network call
+  either: sign-in and card discovery happen on the first turn. `iUnderstandLiveSideEffects` has no default; `false`
+  throws.
+- Sign-in uses MSAL device code with an OS-encrypted token cache, and prints its message on stderr. To print it
+  elsewhere, pass `new WorkIqDeviceCodeTokenProvider(tenantId, appClientId, scope, deviceCodePrompt)` as
+  `tokenProvider`, and the same instance to the readiness check. A sign-in during a turn waits until its code expires
+  (about 15 minutes), not until `TurnDeadline`.
+- `onTurn` receives every `WorkIqTurnResult`, completed or not, before the agent returns or throws.
+- `WorkIqOptions` holds the timeouts (`SendTimeout` 300 s, `TurnDeadline` 10 min, `RecoveryBudget` 2 min), `MaxTurns`
+  (0 = no cap), the conversation and content policies, raw capture and the diagnostics settings.
+- A turn that completes with several answer candidates and none selected is **not measured**:
+  `Microsoft365Evidence.IsAnswerMeasured` returns `false`. Its `Text` is empty. Only `IsAnswerMeasured` tells it apart:
+  a completed turn with no answer at all has the same `FinishReason`, `completed-no-answer`, and is measured, and fails.
+- `reply.Evidence()` returns the turn's evidence document, or `null` for a reply from another provider.
+  `TryGetEvidence` is the `bool` form. `TokenUsage`, `ModelId` and `RawMessages` stay `null`.
+- Three exceptions end a turn. `WorkIqTurnNotCompletedException` carries the result of a turn that did not complete.
+  `WorkIqTurnCanceledException`, an `OperationCanceledException`, means your token stopped the wait.
+  `WorkIqTurnBudgetExceededException`, a `FatalEvaluationException`, stops the batch at the `MaxTurns` cap. Their
+  messages carry ids and categories, never a prompt, an answer or a token.
+- For several turns in one conversation, set `ConversationPolicy.ContinueContext`. `ResetSessionAsync()` starts a new
+  context, locally. Concurrent turns on one agent throw `InvalidOperationException`.
+- `agent.Conversation` is the rich API (`IWorkIqConversation`). Its `ContinueAsync` is not supported in this preview:
+  it always throws `NotSupportedException`, so a paused task cannot be continued.
+- `Microsoft365AgentFactory.FromConversation` wraps any `IWorkIqConversation`, such as a test fake, as the same agent.
 
-- `Microsoft365Config.Load(FileInfo)` reads and validates the JSON file (see [the config table](#authoring-the-config-json)).
-  `Validate()`, `ResolveProfile()`, `ResolveEndpointUri()` and `ResolveCardUri()` are pure; nothing touches the
-  network.
-- `Microsoft365AgentFactory.BuildLive(config, iUnderstandLiveSideEffects, options, tokenProvider, onTurn, innerHandler)`
-  builds the authenticated transport and returns a `WorkIqEvaluableAgent` (`IEvaluableAgent`,
-  `ISessionResettableAgent`, `IAsyncDisposable`). It makes **no network call**; sign-in and card discovery run on
-  the first turn. `tokenProvider` defaults to `WorkIqDeviceCodeTokenProvider` (MSAL public client, silent then
-  device code, OS-encrypted persisted cache, the device-code message on stderr); pass your own `IWorkIqTokenProvider`
-  to own the sign-in policy. To keep MSAL but choose where the message goes (a screen that shows it and a log that
-  masks the code, as the demo does), pass `new WorkIqDeviceCodeTokenProvider(tenantId, appClientId, scope, promptWriter)`
-  — and the same instance to the readiness check, so one sign-in serves both. Its `auth.*` events go to the agent's
-  trace (the agent attaches its diagnostics unless you set the provider's `Diagnostics`). A device-code sign-in that
-  starts inside a blocking turn (a token that can no longer be refreshed silently) waits for the code's expiry, not
-  for `TurnDeadline`: the trace says so (`turn.sign_in_wait`), and the deadline restarts when the sign-in ends
-  (`turn.sign_in_done`).
-  `onTurn` receives every `WorkIqTurnResult`, completed or not, before the agent returns or throws — use it to
-  persist the evidence of interrupted turns.
-- `WorkIqOptions` carries the timeouts (`SendTimeout` 300 s, `TurnDeadline` 10 min, `RecoveryBudget` 2 min,
-  `RecoveryPollInterval` 2 s), the `ConversationPolicy`, `MaxTurns` (0 = no cap), the `ContentPolicy`
-  (`SelectedContent` by default; `MetadataOnly` and `FullEvidence` opt-in), `RawCaptureDirectory`, the capture bounds
-  (`MaxCaptureBytes` 8 MiB, `MaxCaptureFrames` 10 000), `CancelRemoteTaskOnTimeout` (off: a local stop never implies
-  a remote cancel), `ProfileOverride`, and the diagnostics settings (`Verbose`, `TraceFile`, `IssueFile`,
-  `DiagnosticsDirectory`, `RunId`, and `TraceSinks` / `IssueSinks`: extra `IWorkIqTraceSink` / `IWorkIqIssueSink`
-  instances that receive every event and issue the JSONL files receive, already stamped and redacted; the caller owns
-  their lifetime). `Validate()` rejects any negative value and a null sink entry.
-- `reply.Evidence()` (extension in `AgentEval.Microsoft365`) returns the `Microsoft365TurnEvidence` carried under
-  `AgentResponse.AdditionalProperties[Microsoft365Evidence.Key]`, or `null` when the response did not come from
-  this provider. `reply.TryGetEvidence(out var evidence)` is the non-throwing form. `AgentResponse.RawMessages`,
-  `TokenUsage` and `ModelId` stay `null`: the service reports none of them, and nothing is invented.
-  `AgentResponse.FinishReason` is `completed` (`WorkIqEvaluableAgent.CompletedFinishReason`), or
-  `completed-no-answer` (`CompletedNoAnswerFinishReason`) when the task completed but no answer could be selected —
-  several answer candidates and none named as the answer (`Ambiguous`), or none at all (`None`). The text is then an
-  empty string that is **not** the agent's answer, `AdditionalProperties[Microsoft365Evidence.NoAnswerSelectedKey]`
-  is `true`, and the evidence keeps every candidate. `eval --sut microsoft365` prints a
-  `[m365] WARNING … the turn COMPLETED but no answer was selected …` line for such a case, even without
-  `--m365-verbose`.
-- `WorkIqTurnNotCompletedException.TurnResult` is the immutable `WorkIqTurnResult`: `Outcome` (`WorkIqTurnOutcome`),
-  `Transport` (`TransportOutcome`), `AnswerCompleteness` (`OutputCompleteness`), `Telemetry`, `Task`
-  (`WorkIqTaskHandle` with `TaskId` and `ContextId`), `AnswerText`, `Evidence` (always present), `PendingInteraction`,
-  `Failure` (`WorkIqFailure`: `Category`, `SafeMessage`, `Certainty`, `Operation`, `HttpStatus`, `RpcErrorCode`,
-  `RemoteTaskState`, `RequestId`, …), `Timing` and `Identity`. The exception message carries ids and categories
-  only — never a prompt, an answer or a token.
-- Two more exceptions: `WorkIqTurnCanceledException` (an `OperationCanceledException`; your token stopped the local
-  wait, the remote state is on `TurnResult`) and `WorkIqTurnBudgetExceededException` (a `FatalEvaluationException`;
-  the `MaxTurns` cap was reached **before** the send that would cross it, so every batch loop stops once).
-  `WorkIqProtocolException` carries a `WorkIqFailure` when the transport fails before any turn result exists.
-- Multi-turn in code: set `ConversationPolicy.ContinueContext`, keep one agent per conversation, and call
-  `ResetSessionAsync()` to start a new context (local only; it cancels nothing remotely). Concurrent turns on one
-  agent are rejected with `InvalidOperationException`.
-- The credential-free seam: `Microsoft365AgentFactory.FromConversation(IWorkIqConversation conversation, string name, …)`
-  wraps any conversation implementation — a fake in tests — as the same `WorkIqEvaluableAgent`. It is test-only as a
-  target: the CLI never substitutes it for a live agent.
-
-For a judge-graded batch use `MAFEvaluationHarness` (namespace `AgentEval.MAF`) with a judge `IChatClient` and
-`RunBatchAsync`, exactly as for any other agent; see [LLM as a Judge](llm-as-judge.md).
-
-The readiness check is public too (`AgentEval.Microsoft365.Readiness`):
-`Microsoft365ReadinessCheck.RunAsync(config, configFile, options)` takes exactly one of a `Microsoft365Config` and a
-config `FileInfo`, runs the stages `ReadinessCheckOptions.Stages` selects (null = the default set; `Probe` and
-`IUnderstandLiveSideEffects` add the probe and the census), and returns a `ReadinessReport` (`Stages`, `Verdict`,
-`AllPassed`, `AnyFailed`, `AnySkippedForConsent`, `TraceFile`, `IssueFile`, `ConfigSha256`). Runtime failures become
-failed stages, not exceptions. `ReadinessCheckOptions.TraceSinks` / `IssueSinks` stream every event and issue to your
-own sinks while the check runs (the demo project uses them to print the trace live). `ReadinessCheckOptions.IssueFile`
-puts the issue register where the host wants it (the demo's `issues.jsonl`, which its live agent then appends to; the
-report and the trace name that path), and `ProfileSource` names where `Profile` came from in the config stage's
-evidence (`--m365-profile` for the doctor, `--profile` for the demo; "the options" when unset). For hosts and tests, the overload
-`RunAsync(config, configFile, options, innerHandler, tokenProvider, cancellationToken)` runs the check over your own
-innermost `HttpMessageHandler` and `IWorkIqTokenProvider` (null for either keeps the default), the same seams
-`BuildLive` takes.
-`ReadinessReportRenderer.ToMarkdown`, `ToJson` and `WriteConsole` render it exactly as
-the CLI does. To know the trace and issue paths before a live run, mint the run id first:
-`new WorkIqOptions { RunId = Microsoft365Diagnostics.NewRunId() }`, then `Microsoft365Diagnostics.Describe(options)`
-returns the `TraceFile` and `IssueFile` the run will write (namespace `AgentEval.Microsoft365.Diagnostics`).
+For a judge-graded batch, use `MAFEvaluationHarness` as for any other agent ([LLM as a Judge](llm-as-judge.md)); it
+needs a reference to `src/AgentEval.MAF` too. `Microsoft365ReadinessCheck.RunAsync` (namespace
+`AgentEval.Microsoft365.Readiness`) runs the doctor's stages and returns a `ReadinessReport`; a runtime failure becomes
+a failed stage. `ReadinessReportRenderer` writes the report as the CLI does. The XML docs of `ReadinessCheckOptions`
+describe the rest.
 
 ## Prerequisites
 
-- **Work IQ enabled** in the tenant by an administrator, and a **Microsoft 365 Copilot licence** for the test user.
-  Without both, the service answers 403 and the connector reports `Forbidden`.
-- An **Entra app registration configured as a public client**: in the app's *Authentication* blade set
-  *Allow public client flows* to **Yes**. There is no client secret anywhere; device-code sign-in needs this setting
-  (otherwise Entra returns `AADSTS7000218`).
-- The **delegated permission `WorkIQAgent.Ask`** (`api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask`) on that app,
-  with **admin consent** granted. Without consent the first sign-in fails with `AADSTS65001`. The permission covers
-  reads **and writes** of the signed-in user's Microsoft 365 data.
-- The **Entra tenant id** and the app's **client id** for the config file.
+- **Work IQ enabled** in the tenant, and a **Microsoft 365 Copilot licence** for the test user. Without either one,
+  the service answers HTTP 403.
+- An **Entra app registration configured as a public client**: *Allow public client flows* set to **Yes** on its
+  *Authentication* page. No client secret is used. Without the setting, Entra refuses the sign-in (`AADSTS7000218`).
+- The **delegated permission `WorkIQAgent.Ask`** on that app, with **admin consent**. Without consent the first sign-in
+  fails with `AADSTS65001`. The permission covers reads **and writes** of the user's Microsoft 365 data.
+- The **tenant id** and the app's **client id**.
 - A **non-production identity**: a test user in a test tenant, with a small synthetic corpus (for example a document
-  named "Demo Q3 Planning"). The consent flag below exists because there is no sandbox.
-- Optional: the **agent id** of a declarative agent the test user can reach. `null` targets the default Work IQ
-  agent (Microsoft 365 Copilot). Word, Excel and PowerPoint agents are bound to their application UI and do not
-  answer usefully headlessly.
-- The **.NET 10 SDK** (the repository pins it in `global.json`) to build the CLI from source.
+  named "Demo Q3 Planning").
+- Optional: the **agent id** of a declarative agent the user can reach. Without one, the connector talks to the default
+  Work IQ agent (Microsoft 365 Copilot). Word, Excel and PowerPoint agents need their application and do not answer
+  usefully here.
+- The **.NET 10 SDK**.
+
+The [tester guide](microsoft365-tester-guide.md) gives the click-by-click steps.
 
 ## Authoring the config JSON
 
-`--m365-config <file.json>` (and `Microsoft365Config.Load` in code) point at a connection file. It carries **no
-secret** — the token is acquired at run time by MSAL device-code sign-in (first run: a browser sign-in with a
-printed code; later runs: silently from a persisted, OS-encrypted cache) and is never stored in this file.
+`--m365-config <file.json>` and `Microsoft365Config.Load` read a connection file. It holds **no secret**. The token
+comes from MSAL device-code sign-in at run time: the first run prints a code to enter in a browser, and later runs sign
+in silently from an OS-encrypted cache.
 
 | Field | Required | Default | Notes |
 |---|:--:|---|---|
-| `tenantId` | yes | — | The Entra tenant id the app registration lives in. |
-| `appClientId` | yes | — | The app registration's client id — a **public client**, never a secret. |
-| `endpoint` | no | `https://workiq.svc.cloud.microsoft/a2a/` | The Work IQ A2A service root. Must be an absolute `https` URL without query string or fragment; its host must be in `trustedHosts`. |
-| `agentId` | no | `null` (the default Work IQ agent) | An opaque id such as `U_abc.def`, passed as-is, never parsed. The card is discovered at `{endpoint}/{agentId}/.well-known/agent-card.json`. Must be one path segment: no `/`, `\`, `?`, `#`, whitespace or control characters. |
-| `scope` | no | `api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask` | The delegated token scope. The audience is Work IQ, not Microsoft Graph. |
-| `agentName` | no | — | Display name for reports. `DisplayName` falls back to `agentId`, then to `Work IQ default agent`. |
-| `diagnosticProfile` | no | `PublicAnswerOnly` | `PublicAnswerOnly` or `Native118Diagnostics` (case-insensitive). See [Diagnostic profiles](#diagnostic-profiles). The CLI's `--m365-profile` overrides it. |
-| `timeZone` | no | — | An IANA id such as `Europe/Zurich`. When set, every user message carries `metadata.Location { timeZone, timeZoneOffset }` with a DST-aware offset for the evaluation instant, so date prompts are deterministic. |
-| `trustedHosts` | no | `["workiq.svc.cloud.microsoft"]` | The only hosts a bearer token may be sent to (card discovery and every advertised interface URL). Must include the endpoint's host; a blank entry is rejected. |
+| `tenantId` | yes | none | The Entra tenant id of the app registration. |
+| `appClientId` | yes | none | The app registration's client id: a public client, never a secret. |
+| `endpoint` | no | `https://workiq.svc.cloud.microsoft/a2a/` | An absolute `https` URL without query or fragment. Its host must be in `trustedHosts`. |
+| `agentId` | no | none: the default Work IQ agent | An opaque id such as `U_abc.def`, passed as is. One path segment: no `/`, `\`, `?`, `#`, whitespace or control characters. |
+| `scope` | no | `api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask` | The delegated scope. The audience is Work IQ, not Microsoft Graph. |
+| `agentName` | no | none | The name in reports. Without it: the agent id, then `Work IQ default agent`. |
+| `diagnosticProfile` | no | `PublicAnswerOnly` | Or `Native118Diagnostics`, in any case. See [Diagnostic profiles](#diagnostic-profiles). `--m365-profile` overrides it. |
+| `timeZone` | no | none | An IANA id such as `Europe/Zurich`. Each message then carries the time zone and its offset, so date prompts are deterministic. |
+| `trustedHosts` | no | `["workiq.svc.cloud.microsoft"]` | The only hosts a token may go to. Must include the endpoint's host. |
 
-Property names are matched case-insensitively; the convention is camelCase. A ready template is
-`samples/datasets/m365-config.template.json`:
+Property names match in any case. The template is `samples/datasets/m365-config.template.json`:
 
 ```json
 {
@@ -293,115 +184,59 @@ Property names are matched case-insensitively; the convention is camelCase. A re
 }
 ```
 
-If a required field is missing, `Microsoft365Config.Load` throws before anything else runs:
-
-```text
-Microsoft 365 config is missing required field(s): tenantId, appClientId. Required: tenantId, appClientId
-(endpoint and scope have defaults and must not be blank when set).
-```
-
-A missing file, an unreadable file, malformed JSON and every bad field value each produce their own clear,
-field-scoped `InvalidOperationException` — see [Troubleshooting](#troubleshooting) for the exact texts. A value
-still reading `REPLACE-WITH-…` (the template's placeholders, in any field) is refused, naming the field:
-
-```text
-Microsoft 365 config field 'tenantId' still holds the template placeholder 'REPLACE-WITH-ENTRA-TENANT-GUID': replace
-it with the Directory (tenant) ID from the app registration's Overview page. Nothing was sent; a placeholder would
-only fail later, at sign-in.
-```
-
-Validation does not check that `tenantId` and `appClientId` name a real tenant and app; that is the sign-in's job.
-The doctor's `config` stage adds a warning when `tenantId` is neither a GUID nor a domain name (the sign-in would
-fail with `AADSTS90002`) or `appClientId` is not a GUID (`AADSTS700016`).
+`Load` checks the file before anything else runs. A missing or unreadable file, malformed JSON, a missing field and a
+bad value each throw an `InvalidOperationException` that names the field and the fix. A value that still reads
+`REPLACE-WITH-…` is refused too. Whether `tenantId` and `appClientId` name a real tenant and app is the sign-in's job.
+The doctor's `config` stage warns when `tenantId` is neither a GUID nor a domain name, or `appClientId` is not a GUID.
 
 ## The consent flag and why it's required
 
-`--i-understand-live-side-effects` is checked **first** — before the config file, before the turn cap, before
-anything that could lead to a network call. Omit it and the command refuses immediately, says so and sends nothing:
-`eval` exits `3` (`Error: --sut microsoft365 drives a LIVE Microsoft 365 agent … (nothing was sent).`), a `bench`
-family exits `2`. `agenteval m365 doctor` reads the same flag for its probe and census only (see
-[Readiness check](#readiness-check-agenteval-m365-doctor)). In code the same acknowledgment is the
-`iUnderstandLiveSideEffects` parameter of `BuildLive`, which has no default; passing `false` throws:
+`--i-understand-live-side-effects` is checked before the config file and before anything that could reach the network.
+Without it the command refuses and sends nothing: `eval` exits `3`, a `bench` family exits `2`. `agenteval m365 doctor`
+needs it only for its probe and census. The CLI reads only the flag. In code it is the `iUnderstandLiveSideEffects`
+parameter of `BuildLive`.
 
-```text
-BuildLive drives a LIVE Microsoft 365 agent over Work IQ as the signed-in user: the delegated WorkIQAgent.Ask
-permission covers reads AND writes of that user's Microsoft 365 data, and a prompt can trigger REAL actions that
-cannot be sandboxed. Pass iUnderstandLiveSideEffects: true only after confirming config points at a NON-PROD tenant
-and identity (nothing was sent).
-```
-
-The reasoning is structural: the agent acts as the signed-in user, with that user's permissions, on that user's real
-mailbox, files and calendar. A benchmark prompt such as "schedule a meeting" can make the agent propose a real action.
-The connector never approves a confirmation card and never resends a message, but it cannot undo what the agent
-does with a prompt it accepted. The flag is your acknowledgment that the config points at a **non-production**
-identity, not a promise the tool can enforce.
-
-For `eval` and the `bench` families the flag is registered once per verb by the shared `--sut` resolver (it was
-hoisted from the Copilot Studio target; no behaviour changed for that target), so `copilot-studio` and `microsoft365`
-share one flag.
+The agent acts as the signed-in user, on that user's real mailbox, files and calendar. A prompt such as "schedule a
+meeting" can make it propose a real action. The connector never approves a confirmation card and never resends a
+message, but it cannot undo what the agent does with a prompt it accepted. The flag records your statement that the
+config points at a **non-production** identity; the tool cannot check it. `copilot-studio` and `microsoft365` share the
+one flag.
 
 ## Readiness check: `agenteval m365 doctor`
 
-The first thing to run with a new tenant, before `eval --sut microsoft365`. It checks the connection stage by stage
-and tells whoever reads the report which stage failed, why, and what to do next — without reading code. The
-[tester guide](microsoft365-tester-guide.md) walks through it step by step.
+Run it first with a new tenant. It checks the connection stage by stage, and for a failed stage says what failed, why
+and what to do. Its options and exit codes are in the [CLI reference](cli.md#agenteval-m365-doctor).
+
+A published `agenteval` tool may not have the Microsoft 365 target yet. If `agenteval m365 doctor --help` reports an
+unknown command, run the CLI from a clone: `agenteval …` on this page means
+`dotnet run --project src/AgentEval.Cli --framework net10.0 -- …`, from the repository root. The tester guide's
+[Install](microsoft365-tester-guide.md#install) defines it once per terminal.
 
 ```bash
 agenteval m365 doctor --m365-config ./workiq.json                                         # no prompt is sent
 agenteval m365 doctor --m365-config ./workiq.json --probe --i-understand-live-side-effects # one real, read-only prompt
 ```
 
-Options (exactly as `agenteval m365 doctor --help` lists them):
-
-| Option | Default | What it does |
-|---|---|---|
-| `--m365-config <file>` | required | The connection JSON ([the config table](#authoring-the-config-json)). |
-| `--stage <stage>` | `all` | `config`, `auth`, `discovery`, `protocol`, `probe`, `census` or `all`. `all` runs `config`, `auth`, `discovery` and `protocol`, plus `probe` and `census` with `--probe`. A single stage runs with `config` (and `census` with `probe`); a network stage acquires its own token and card as needed. |
-| `--probe` | off | Adds the probe and the census. They need `--i-understand-live-side-effects`; without it both are SKIPPED, nothing reaches the agent, and the command exits `11`. |
-| `--i-understand-live-side-effects` | off | Consent for the probe and the census. The other stages run without it. |
-| `--continue` | off | Runs the remaining stages after a FAIL instead of stopping (a stage still needs a config that loaded). |
-| `--report <dir>` | see below | The folder for `readiness.md`, `readiness.json` and the trace and issue files. |
-| `--m365-profile public\|native118` | `public` | The profile of the auth, discovery, protocol and probe stages. With `native118` the probe already runs under the experimental profile and the census sends no second prompt. |
-| `--m365-capture-raw <dir>` | off | Retains the raw A2A bytes and stream frames under `<dir>` (may contain tenant data). |
-| `--m365-verbose` | **on** | Prints every trace event to stderr. `--m365-verbose false` turns it off; the trace and issue files are written either way. |
-| `--m365-trace <file>` | in the report folder | Writes the JSONL trace there instead. |
-| `--timeout-seconds <n>` | `120` | The most one stage may take for its network calls: also the HTTP timeout and the probe's turn deadline. A device-code sign-in is not cut short by it: once the sign-in prompt is shown, the `auth` stage waits until the code expires (about 15 minutes). |
-
-The stages, in order. The check stops at the first FAIL unless `--continue`; a stage that does not run is SKIPPED
+The stages run in order and stop at the first FAIL unless you pass `--continue`. A stage that does not run is SKIPPED
 with its reason, never a pass.
 
-| # | Stage | What it does | Evidence it records | PASS means |
-|---|---|---|---|---|
-| 1 | `config` | Loads and validates the file. No network. | The file path and SHA-256, the endpoint, card URI, agent (or "default Work IQ agent"), display name, tenant id, app id, scope, profile and where it came from, trusted hosts, time zone, the config's identity SHA-256, the adapter and A2A versions, the OS, .NET and machine time zone. | Every validation rule passed (a template placeholder fails it). A warning when `tenantId` is neither a GUID nor a domain name, or `appClientId` is not a GUID, or the profile is `native118`. |
-| 2 | `auth` | Gets a delegated token: silently from the OS-encrypted cache, else by device-code sign-in (the MSAL sign-in message is printed; it is the one auth text shown, and the trace keeps it with the code masked). Once the prompt is shown the stage waits until the code expires, not just `--timeout-seconds`. | The token cache file and whether it existed, whether a token was acquired and how (silently or by sign-in), its expiry, the tenant id in the token and whether it matches the config, the masked account, the scopes; on failure the AADSTS code, the MSAL error code, the Entra HTTP status and correlation id. The token never appears. | A token for the Work IQ scope was acquired. |
-| 3 | `discovery` | Fetches the agent card through the same handler chain a live run uses and selects the A2A 1.0 JSON-RPC interface on a trusted host. | The card URI, trusted hosts, HTTP status, `request-id`, byte count, card name and version, every advertised interface (binding, version, host), the one chosen, `capabilities.streaming` and `capabilities.pushNotifications`, the skills count, the card SHA-256. | A JSON-RPC 1.0 interface on a trusted host was selected, and the token was accepted for the card. |
-| 4 | `protocol` | Sends `GetTask` for a random task id (`doctor-<guid>`). | The endpoint, HTTP status, JSON-RPC code, `request-id`, elapsed. | The service answered JSON-RPC `-32001` (TaskNotFound): it speaks A2A 1.0 JSON-RPC and accepted the token. (A task returned for the random id also passes, with a warning.) |
-| 5 | `probe` | Opt-in, needs consent: one turn with the prompt `Reply with the single word READY.` in a fresh context. Never answers a pause. | The prompt, profile, outcome, transport, task and context ids, the task states observed, the answer's completeness, length and first 80 characters, attribution and citation-marker counts, elapsed, `GetTask` recovery polls, `request-id`; on failure the HTTP status, JSON-RPC code and failure. | The turn completed. An empty answer or an answer that is not READY adds a warning. |
-| 6 | `census` | After a probe, needs consent: under the `public` profile it sends the same prompt **a second time** under `native118`; then it calls `CancelTask` on a completed task. | Whether the diagnostic modes were accepted (or refused, with the reason), whether *Developer Info* and *Retrieval Info* artifacts appeared, the citation marker format, what `CancelTask` returned, the card's streaming and push-notification declarations. | Informational: it passes whether the tenant accepts or refuses `native118`; it fails only when it could not be measured. |
+| Stage | What it does | PASS means |
+|---|---|---|
+| `config` | Loads and validates the file. No network. | Every rule passed. It warns when an id cannot be right, or the profile is `native118`. |
+| `auth` | Gets a token from the cache, else by device-code sign-in. Once the prompt shows, it waits until the code expires. | A token for the Work IQ scope was acquired. The token never appears in any output. |
+| `discovery` | Fetches the agent card through the handlers a live run uses, and selects the A2A 1.0 JSON-RPC interface on a trusted host. | The interface was selected, and the service accepted the token. |
+| `protocol` | Sends `GetTask` for a random task id (`doctor-<guid>`). | The service answered JSON-RPC `-32001` (TaskNotFound): it speaks A2A 1.0 and accepted the token. |
+| `probe` | Needs `--probe` and consent. Sends `Reply with the single word READY.` in a fresh context. Never answers a pause. | The turn completed. An answer that is empty or not READY adds a warning. |
+| `census` | Runs after the probe. Under `public` it sends the same prompt again under `native118`, then calls `CancelTask` on the finished task. | It records what the tenant supports. A refusal of `native118` still passes; it fails only when it could not measure. |
 
-**Output.** The console view prints one line per stage — `[PASS]`, `[FAIL]` or `[SKIPPED]`, the stage, a one-line
-summary — and, under a failed stage, `issue:` (category, code, AADSTS code, HTTP status, JSON-RPC code), `meaning:`
-and `do:`; then `Result: PASS`, `FAIL` or `INCOMPLETE` with one sentence, the report folder and the file paths. The
-report folder (`--report`, default `.agenteval/m365/doctor-<yyyyMMdd-HHmmss>Z/` in a workspace — the first
-`.agenteval/` found walking up from the current directory — else `<temp>/agenteval-m365/doctor-<yyyyMMdd-HHmmss>Z/`)
-holds:
+The console prints one line per stage: `[PASS]`, `[FAIL]` or `[SKIPPED]`, the stage and a summary. Under a failed stage
+it prints `issue:`, `meaning:` and `do:`, and it ends with `Result: PASS`, `FAIL` or `INCOMPLETE`. The report folder
+holds `readiness.md` (every stage's evidence, and what to send back), `readiness.json` (schema
+`agenteval.m365.readiness/v1`) and the run's trace and issue files.
 
-- `readiness.md` — the run facts, the stage table (stage · result · summary · what it means · what to do), the
-  evidence of every stage, and what to send back;
-- `readiness.json` — the same, schema `agenteval.m365.readiness/v1`;
-- `m365-trace-<run id>.jsonl` and `m365-issues.jsonl` — the trace and the issue register of this run (unless
-  `--m365-trace` points the trace elsewhere).
-
-Every stage is traced on the `Doctor` stage as `doctor.<stage>.start`, then `.pass`, `.fail` or `.skipped`, next to
-the events of the seams it drives, and every failed stage is registered as a `doctor.<stage>.failed` issue. The two
-replies the doctor provokes on purpose — TaskNotFound on the random id and TaskNotCancelable on the finished task —
-are kept out of the issue register; the trace records them and says so. Nothing written contains a token, an auth
-code or the `Authorization` header; the trace never carries the prompt or the answer.
-
-**Exit codes.** `0` every requested stage passed; `1` a stage failed; `11` nothing failed but a requested stage did
-not run — `--probe` without `--i-understand-live-side-effects`; `2` usage (missing `--m365-config`, an unknown
-`--stage` or `--m365-profile` value, `--timeout-seconds` below 1), nothing created and nothing sent; `3` the report
-folder or files could not be written, or the check could not start.
+One failure gives one issue. When a lower layer already registered a stage's failure (for example `http.403`), the
+stage verdict `doctor.<stage>.failed` goes to the trace only; otherwise the stage registers it. The replies the doctor
+provokes on purpose (TaskNotFound on the random id, TaskNotCancelable on the finished task) are never issues.
 
 ## Running a custom benchmark (`agenteval eval`)
 
@@ -413,57 +248,43 @@ agenteval eval --sut microsoft365 --m365-config ./workiq.json --i-understand-liv
   --format json -o ./m365-results/m365-smoke.json
 ```
 
-What the command does, in order:
+Before any network call, the command checks the dataset file, the consent flag, the `--m365-*` options and the config
+file. A refusal prints `Error: …`, exits `3` and sends nothing. Then a badge line on stderr says what the target
+observes and names this run's trace and issue files. The first turn signs in; with no cached token, the console shows
+the device-code message. Every case runs in a fresh server context.
 
-1. Refuses if the dataset file does not exist, then if `--i-understand-live-side-effects` is absent.
-2. Refuses if `--m365-config` is absent, if `--m365-max-turns` is negative, or if `--m365-profile` is not `public`
-   or `native118`.
-3. Loads and validates the config (fail fast, before anything is sent). Each refusal prints `Error: …` and exits
-   `3`; nothing was sent.
-4. Prints a one-line note to stderr if you also passed `--temperature`, `--max-tokens`, `--system-prompt` or
-   `--system-prompt-file` — the target configures its own model, so they are ignored (not printed with `--quiet`).
-5. Prints the target badge to stderr: *Note: --sut microsoft365 observes the agent's final answer and the evidence
-   the tenant emits; tool and retrieval evidence is reported as NotRequested / NotProvided / Provided per channel,
-   never inferred.* The same line names the trace and issue file paths of this run (`Trace: … · Issues: …`), the
-   experimental-profile statement when `native118` is in effect, and the turn cap when one is set.
-6. Builds the live agent — still no network call.
-7. Runs the dataset. The **first** turn is where sign-in and card discovery happen; with no cached token the
-   console prints the device-code message (open the URL, enter the code). Every case runs in a fresh server
-   context (`ConversationPolicy.FreshContextPerInvocation`; the CLI always uses it), so cases are independent even
-   though the batch reuses one agent.
+**The dataset** is the ordinary [`eval` dataset](cli.md#agenteval-eval). `samples/datasets/m365-smoke.json` has 8
+read-only cases: identity, capabilities, a grounded summary with citation, date reasoning, out-of-scope live data,
+prompt injection, PII restraint and action restraint. Keep prompts read-only, with explicit dates instead of "today".
 
-The dataset is the ordinary `eval` dataset (`id`, `input`, `expected`, `evaluation_criteria`, `tags`,
-`passing_score`; see [`agenteval eval`](cli.md#agenteval-eval)). `samples/datasets/m365-smoke.json` is an 8-case
-example: identity disclosure, capability summary, grounded summary with citation, explicit date reasoning,
-out-of-scope live data, prompt-injection resistance, PII restraint and read-only action restraint. Keep prompts
-read-only and give explicit dates instead of "today".
+**The judge.** `--judge <url> --judge-model <model>` names an OpenAI-compatible judge; its key comes from `--api-key`,
+else `OPENAI_API_KEY`. Always pass `--judge-model`: its default is the target's name. Without `--judge`, `expected`
+becomes a contains check, and a case with `evaluation_criteria` is **NOT MEASURED** (exit `11`, AEF `not_measured`):
+no judge graded it. The answer is kept, and `--metrics` still score it.
 
-The judge: `--judge <endpoint> --judge-model <model>` is an OpenAI-compatible endpoint; its key is `--api-key`
-(falls back to `OPENAI_API_KEY`, which keeps it out of the shell history). Pass `--judge-model` explicitly — its
-default is the target's name, which is not a model. Without `--judge`, `expected` degrades to a case-insensitive
-contains check and `evaluation_criteria` is ignored, so a run without a judge proves reachability only.
+**Results.** A case is never graded on something that is not the agent's answer:
 
-Exit codes are `eval`'s, unchanged: `0` every case passed; `1` a case failed; `2` usage; `3` runtime or
-configuration error (including a refused consent flag or config, and the turn cap being hit); `11` nothing failed
-but a case has no verdict. **A turn that did not complete is an error row** (`InputRequired`, `AuthRequired`,
-`Failed`, `Rejected`, `Canceled` or `Indeterminate` in its error, `Work IQ turn did not complete: outcome=…`), never
-a graded zero: the run exits `11` when nothing else failed. The JSON export (`--format json`) carries each case's
-error and answer; the Markdown export shows every case's status but the error only of a case that failed with a
-verdict. See
-[Exit codes](cli.md#exit-codes).
+- A turn that did not complete is an error row (`Work IQ turn did not complete: outcome=…`).
+- A turn that completed with several answer candidates and none selected is **NOT MEASURED**: an error row that starts
+  `Not measured:`, with no score. `--metrics` records each metric for it as not measured. The AEF run records the case
+  as `not_measured`, with that cause as its reason.
+- A turn that completed with no answer at all is graded on the empty text, and fails.
+- Both completed cases print an `[m365] WARNING … no answer was selected` line, even without `--m365-verbose`.
 
-Evidence: `--aef <dir>` writes the sealed AEF run (`TargetMode = Live`). Its run settings record the provenance of
-this target, never a secret: `a2aVersion`, `m365Profile`, `normalizerVersion`, `providerProfileVersion`,
-`m365ConfigSha256` (the same hash every issue carries), `m365AgentId` (or `default`) and `m365EndpointHost`. With
-`--aef-content on` each case also records its prompt, expected answer, the agent's answer and its
-`Microsoft365TurnEvidence` document (`m365ContentPolicy` names the content policy it was projected under); with the
-default `--aef-content off` the run holds no prompt, answer or evidence document. The document is projected under
-`SelectedContent` by default: answer text, citation names and URLs, counts and states are kept, while tool arguments
-and results, approval argument text, query and filter text, retrieval hit URLs, passages and resource metadata become
-`Redacted` (their source pointers stay). With `--m365-capture-raw` it is projected under `FullEvidence`. The trace and
-issue files use the AEF case id as their `caseId`, so a case in the AEF run and its events in the trace match. Add
-`--m365-capture-raw <dir>` to also retain the raw request/response bytes and SSE frames (opt-in; may contain tenant
-data; keep the folder out of version control).
+When nothing failed but a case was not measured, `eval` exits `11` ([exit codes](cli.md#exit-codes)).
+
+**The AEF run.** `--aef <dir>` writes the sealed AEF run. Without `--subject`, the subject is `agent:<display name>`. The
+run settings record the provenance, never a secret: `a2aVersion`, `m365Profile`, `normalizerVersion`,
+`providerProfileVersion`, `m365ConfigSha256` (the hash every issue carries), `m365AgentId` (or `default`),
+`m365EndpointHost` and `m365ContentPolicy`. The keys come from the provider's public
+`Microsoft365RunSettings.For(config, profile, contentPolicy)`; the demo's AEF run records the same keys. With
+`--aef-content on`, each case also records its prompt, the expected answer, the agent's answer and the turn's evidence
+document. The trace and issue files use the AEF case id as `caseId`.
+
+The evidence document keeps the answer text, citation names and URLs, counts and states (`SelectedContent`). Tool
+arguments and results, approval argument text, query text, retrieval hit URLs, passages and resource metadata become
+`Redacted`, with their source pointers kept. `--m365-capture-raw <dir>` switches to `FullEvidence` and keeps the raw
+bytes and stream frames under `<dir>`. They may hold tenant data: keep the folder out of version control.
 
 ## Running standard benchmarks (`agenteval bench`)
 
@@ -476,319 +297,257 @@ agenteval bench owasp --preset smoke --subject m365-default-copilot --m365-max-t
   --sut microsoft365 --m365-config ./workiq.json --i-understand-live-side-effects
 ```
 
-The target is registered once on the shared `--sut` seam, so the `bench` commands take it without any change of
-their own. Each scenario's prompt is sent to the live agent as one turn; set `--m365-max-turns` to the scenario count
-you accept (the OWASP `smoke` preset sends 23 probes and has a 10-minute limit; `top10` sends 73). `--subject` is
-required by every family. `bench eu-ai-act` also requires `--input` even with `--sut`: each scenario still sends its
-own prompt, and the text is recorded with the run.
+Each scenario's prompt goes to the agent as one turn, with the same `--m365-*` options as `eval`. Set `--m365-max-turns`
+to the number of scenarios you accept: the OWASP `smoke` preset sends 23 probes within 10 minutes. Every family requires
+`--subject`. `bench eu-ai-act` also requires `--input`, which is recorded with the run.
 
-| Family | Takes `--sut microsoft365` | Judge |
+| Family | `--sut microsoft365` | Judge |
 |---|---|---|
-| `gdpr`, `eu-ai-act` | Yes — each scenario's prompt is sent to the live agent (same `--m365-*` flags as `eval`). Presets `smoke`, `standard` (default), `audit`, plus domain packs (GDPR `standard+healthcare`, `+hr`, `+childrens`; EU AI Act `standard+high-risk-employment`, `+high-risk-credit`, `+high-risk-education`). | From the environment: the `AZURE_OPENAI_JUDGE_*` trio when all three are set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. No provider: exit `3`. See [GDPR](benchmarks/gdpr/getting-started.md) and [EU AI Act](benchmarks/eu-ai-act/getting-started.md). |
-| `owasp`, `mitre`, `nist` | Yes — same `--m365-*` flags as `eval`. OWASP presets `top10` (default), `smoke`, `audit`, `top10-rag`. | Judge first, from the environment as above; the semantic attacks are graded by Composite Judges, the others by their per-attack oracle. The command checks the judge with one short call first (exit `3` if it does not answer). A judge failure mid-scan, or running out of time, makes the run INCOMPLETE (`WARN`, exit `11`), never a pass. See [OWASP](benchmarks/owasp/getting-started.md) and [MITRE](benchmarks/mitre/getting-started.md). |
-| `perf` (`cost`, `latency`, `throughput`) | The subcommands carry the same seam. This target was not part of the offline matrix for `perf`; treat a `perf` run as unverified. | Not applicable (no judge). |
-| `agentic` | No — it grades a supplied `--response`/`--response-file`. | — |
-| `memory`, `longmemeval`, `typedmemeval` | No — they need their own agent interfaces over a memory corpus. | — |
-| `trace-fidelity`, `workflow-trace-fidelity` | No — they reconcile traces. | — |
-| `autoaudit` | No — it audits the configured models. | — |
+| `gdpr`, `eu-ai-act` | Yes. Presets `smoke`, `standard` (default), `audit`, and the domain packs. | The `AZURE_OPENAI_JUDGE_*` trio when all three are set, else the provider `AI_INFERENCE_PROVIDER` selects. No judge: exit `3`. |
+| `owasp`, `mitre`, `nist` | Yes. OWASP presets `top10` (default), `smoke`, `audit`, `top10-rag`. | As above. A judge failure or a timeout makes the run INCOMPLETE (exit `11`), never a pass. |
+| `perf` (`cost`, `latency`, `throughput`) | Accepted, but not tested with this target: treat a run as unverified. | None. |
+| `agentic`, `memory`, `longmemeval`, `typedmemeval`, `trace-fidelity`, `workflow-trace-fidelity`, `autoaudit` | No. | Not applicable. |
 
-Exit codes are the family's: `0` PASS, `9` FAIL, `10` WARN, `11` indeterminate, `3` judge not configured, `2` usage —
-which, for `bench`, includes a missing consent flag, a missing or invalid `--m365-config` and an unknown preset. The
-AEF run of a `bench` family with `--sut microsoft365` records the same content-free run settings as `eval`
-(`a2aVersion`, `m365Profile`, `normalizerVersion`, `providerProfileVersion`, `m365ConfigSha256`, `m365AgentId`,
-`m365EndpointHost`); the per-case `Microsoft365TurnEvidence` document is an `eval` feature (`--aef-content on`).
-`agenteval redteam --sut microsoft365` is not available in this phase.
+A missing consent flag or a bad config is exit `2`. The AEF run records the same settings as `eval`, without
+`m365ContentPolicy`, and no per-case evidence document. On `bench`, a turn that completed with several answer
+candidates and none selected is never graded: `gdpr` and `eu-ai-act` record it as an error, `owasp`, `mitre` and
+`nist` as inconclusive, and the `[m365] WARNING` line says the case is not measured. See the [GDPR](benchmarks/gdpr/getting-started.md),
+[EU AI Act](benchmarks/eu-ai-act/getting-started.md), [OWASP](benchmarks/owasp/getting-started.md) and
+[MITRE](benchmarks/mitre/getting-started.md) guides.
 
 ## What `--m365-max-turns` does
 
-`--m365-max-turns <n>` (code: `WorkIqOptions.MaxTurns`) caps the number of turns one agent instance makes; `0` (the
-default) means no cap. Every turn that reached the service and came back with a result counts, **completed or not**
-(an `InputRequired` or `Indeterminate` turn counts too); a send that failed in transport before any result does not.
-**Turns are counted; consumption is not metered.** The Work IQ A2A service exposes no per-turn cost and no token
-usage, and Copilot Credits are metered elsewhere, so the cap bounds the number of sends, not spend. The check runs
-before each send: the turn that would exceed the cap never fires, and `WorkIqTurnBudgetExceededException` (a
-`FatalEvaluationException`) stops the whole batch once instead of repeating the same error for every remaining case.
-`eval` then exits `3`; a `bench` run stops once with a non-zero exit, never a pass (`bench gdpr` exits `1` and writes
-an `aborted` AEF run). The message says it plainly:
+`--m365-max-turns <n>` (in code, `WorkIqOptions.MaxTurns`) caps the turns one agent makes; `0`, the default, means no
+cap. Every turn that starts counts, completed or not, including one that ends in an exception. A turn refused because
+another turn is active does not count. **Turns are counted, consumption is not
+metered**: Work IQ reports no per-turn cost, so the cap bounds the sends, not the spend.
 
-```text
-Work IQ evaluation stopped: 10 turn(s) already used; the next turn would exceed MaxTurns (10). Turns are counted,
-consumption is not metered — the Work IQ A2A service exposes no per-turn cost, so this cap bounds the number of
-sends, not spend. Check the tenant's own usage reporting before raising the cap.
-```
-
-Stochastic runs (`--runs N`) multiply the turns; raise the cap accordingly. `WorkIqEvaluableAgent.TurnsUsed` exposes
-the count in code.
+The check runs before each send, so the turn that would cross the cap never fires. The batch stops once with
+`Work IQ evaluation stopped: N turn(s) already used; the next turn would exceed MaxTurns (N).` `eval` exits `3`; a
+`bench` run stops with a non-zero exit (`bench gdpr` exits `1` and writes an aborted AEF run). `--runs N` multiplies the
+turns. `WorkIqEvaluableAgent.TurnsUsed` gives the count in code.
 
 ## Diagnostic profiles
 
-Which output modes a turn requests, and therefore which evidence channels can be `Provided` at all. Requesting
-diagnostics is a visible choice, never a default.
+The profile sets which output modes a turn requests, and so which channels can be `Provided` at all.
 
-| Profile | CLI value | What it requests | Channels |
+| Profile | CLI value | Requests | Channels |
 |---|---|---|---|
-| `PublicAnswerOnly` (default) | `--m365-profile public` | `acceptedOutputModes: ["text/plain"]` — the final answer, its citations and attributions. | Tool selections, tool executions, retrieval executions and skill activations are `NotRequested`. |
-| `Native118Diagnostics` | `--m365-profile native118` | Additionally the two `application/vnd.ms-workiq…` diagnostic modes observed in Microsoft's native evaluator 1.18.0 (*Developer Info*, *Retrieval Info*). | Those channels become `Provided` or `NotProvided`, as the service answers. |
+| `PublicAnswerOnly` (default) | `--m365-profile public` | `text/plain`: the answer, citations and attributions. | Tools, retrieval and skills are `NotRequested`. |
+| `Native118Diagnostics` | `--m365-profile native118` | Also the two diagnostic modes of Microsoft's native evaluator 1.18.0 (*Developer Info*, *Retrieval Info*). | Those channels become `Provided` or `NotProvided`. |
 
-`Native118Diagnostics` is **experimental: observed in the native evaluator 1.18.0, not a documented Microsoft
-contract.** If the service rejects the request, the failure is surfaced; the turn is never silently retried in
-answer-only mode. The CLI flag overrides the config file's `diagnosticProfile`; in code, `WorkIqOptions.ProfileOverride`
-does the same. Whether a live tenant accepts the modes is one of the facts the doctor's `census` stage records.
+`Native118Diagnostics` is **experimental**: Microsoft's native evaluator 1.18.0 uses these modes, but no Microsoft
+document defines them. If the service refuses them, the turn reports the failure and is never retried in answer-only
+mode. `--m365-profile` overrides the config's `diagnosticProfile` (in code, `WorkIqOptions.ProfileOverride`). The
+doctor's `census` stage records whether a tenant accepts the modes.
 
 ## The evidence model
 
 Every turn yields one `Microsoft365TurnEvidence` (schema `agenteval.microsoft365.turn-evidence/v1`, normaliser
-`1.0.0`, provider profile `workiq-a2a-1.0/native118-shapes-v1`). It is carried on
-`AgentResponse.AdditionalProperties["AgentEval.Microsoft365.Evidence"]` (key `Microsoft365Evidence.Key`), on
-`WorkIqTurnResult.Evidence` (also for a failed or indeterminate turn), and, with `eval --aef-content on`, into the AEF
-run as each case's evidence document (projected by `Microsoft365EvidenceProjector.ToAefDocument` under the content
-policy; `Microsoft365EvidenceJson.Serialize` and `Deserialize` round-trip the whole document). Same capture plus same versions always yield
-the same document. Each channel is an `EvidenceSet<T>` with `Availability`, `Validation`, `Coverage`, `Scope`, `Items`,
-`Sources` (JSON pointers into the capture) and `Issues`.
+`1.0.0`, provider profile `workiq-a2a-1.0/native118-shapes-v1`). It travels on the `AgentResponse` (key
+`Microsoft365Evidence.Key`), on `WorkIqTurnResult.Evidence` (also when the turn did not complete), and with
+`eval --aef-content on` into the AEF run. The same capture and versions always give the same document.
 
-| Channel | Field | Under `public` | Under `native118` | Notes |
-|---|---|---|---|---|
-| Final answer | `Answer` (`RawText`, `DisplayText`, `IsFinal`) | Present for a completed task or a direct message. | Same. | `RawText` keeps the original citation markers; `DisplayText` never alters it. |
-| Citation sources | `CitationSources` | `Provided` or `NotProvided`. | Same. | The attribution objects as sent (`Url`, `DisplayName`, `ProviderType`, `ProviderReferenceKey`); absent fields are `Missing`. |
-| Citation markers | `CitationMarkers` | `Provided` or `NotProvided`. | Same. | Parsed from the answer text: the Unicode `cite(turnXsearchY)` block (every compound key kept) and markdown `[n]` anchors (`MarkerFormat = markdown-numeric`). A parser projection, never a provider fact. |
-| Citation links | `CitationLinks` | Mostly `Binding = Unresolved`. | Same. | A marker is bound to a source only on an explicit provider key or reference URI; positional guesses are labelled `HeuristicDisplayOnly`, never silently applied. |
-| Tool selections | `ToolSelections` | `NotRequested` | `Provided` or `NotProvided` | From *Developer Info*; ids, arguments and results that were not sent stay `Missing`. |
-| Tool executions | `ToolExecutions` | `NotRequested` | `Provided` or `NotProvided` | Selection is not execution; a missing status is not success. |
-| Retrieval executions | `RetrievalExecutions` | `NotRequested` | `Provided` or `NotProvided` | From *Retrieval Info*; `totalResultCount` is not the returned count; unranked hits are kept unranked. |
-| Approval intents | `ApprovalIntents` | `Provided` only when the task paused on a confirmation card (the turn then ends `InputRequired`). | Same. | Evidence of a request for consent, not of execution; every proposed call is kept, verbatim. |
-| Skill activations | `SkillActivations` | As reported. | As reported. | Only positive activation observations; the card's advertised skills are never counted. |
-| Raw captures | `RawCaptures` | References (`CaptureState`, SHA-256, byte count, policy id). | Same. | Bytes are on disk only under `FullEvidence` (`--m365-capture-raw`). |
+Seven channels are `EvidenceSet<T>` values, with `Availability`, `Validation`, `Coverage`, `Scope`, `Items`, `Sources`
+(JSON pointers into the capture) and `Issues`. `Answer`, `CitationLinks` and `RawCaptures` are plain values.
 
-What each `EvidenceAvailability` value means — and nothing more:
+| Channel | Under `public` | Under `native118` | Notes |
+|---|---|---|---|
+| `Answer` | The selected answer. | Same. | `RawText` keeps the citation markers. |
+| `CitationSources` | `Provided` or `NotProvided`. | Same. | Attribution objects as sent. A field not sent is `Missing`. |
+| `CitationMarkers` | `Provided` or `NotProvided`. | Same. | Parsed from the answer text (`cite(…)` blocks, markdown `[n]`): a parser result, not a provider fact. |
+| `CitationLinks` | `Unresolved`, unless an explicit provider key binds marker and source. | Same. | Never a positional guess. |
+| `ToolSelections`, `ToolExecutions` | `NotRequested`. | `Provided` or `NotProvided`. | Selection is not execution; a missing status is not success. |
+| `RetrievalExecutions` | `NotRequested`. | `Provided` or `NotProvided`. | `totalResultCount` is not the returned count. |
+| `ApprovalIntents` | `Provided` only for a pause on a confirmation card. | Same. | A request, not an execution. Several pause parts, one asking for input, make it `Conflicting`. |
+| `SkillActivations` | As reported. | Same. | Advertised skills never count. |
+| `RawCaptures` | References: state, SHA-256, size. | Same. | Bytes on disk only with `--m365-capture-raw`. |
 
-| Value | Meaning |
+| Availability | Meaning |
 |---|---|
-| `NotRequested` | The connector did not ask for this channel (the profile did not request it). Says nothing about what the service did. |
-| `NotProvided` | The channel was requested and the service returned nothing for it. Still not "did not happen". |
-| `Provided` | The service returned data for this channel. `Validation` says whether it could be interpreted (`Valid`, `Partial`, `Malformed`, `Conflicting`); `IsObservedEmpty` means a valid, empty collection for the declared scope — zero rows in this snapshot, not zero activity inside the service. |
-| `Unsupported` | The service explicitly declared the channel unsupported, with a source pointer. Silence never maps here. |
-| `Disabled` | You or the profile deliberately disabled capture of this channel. |
-| `Redacted` | Local content policy removed data that was available; the removed content is not retained. |
+| `NotRequested` | The profile did not ask for the channel. It says nothing about what the service did. |
+| `NotProvided` | Requested, and the service returned nothing. Still not "did not happen". |
+| `Provided` | The service returned data. `Validation` says whether it was readable: `Valid`, `Partial`, `Malformed` or `Conflicting`. |
 
-Other document facts: `TaskState` is the raw final `TASK_STATE_*` (null for a direct message); `CaptureState` says
-whether the retained material can reproduce the document (`Complete`, `Interrupted`, `Truncated`, `NotRetained`);
-`Issues` lists normalisation problems. On the `AgentResponse`, `RawMessages`, `TokenUsage` and `ModelId` stay null,
-and AgentEval's generic tool-usage report and timeline stay empty for this provider: the generic tool metrics do not
-read Work IQ diagnostics, and no provider value is copied into a field whose meaning it does not match.
+`EvidenceSet<T>.Describe(noun)` is the one text form of a channel, in the CLI, the demo and the samples:
+`NotRequested`; `Provided (observed empty: 0 execution(s) in this snapshot)` for a valid, empty channel (zero rows in
+this snapshot, not zero activity); `Provided (2 marker(s))`; and `Provided (0 execution(s), Conflicting)` for a channel
+that could not be read.
+
+Schema v1 also defines the availabilities `Unsupported`, `Disabled` and `Redacted`, the `CoverageBasis` field and the
+bindings `ExplicitReferenceUri` and `HeuristicDisplayOnly`. This version never emits them; the content policy marks
+single fields `Redacted`, never a whole channel. `TaskState` is the raw final `TASK_STATE_*`. `CaptureState` says whether
+the kept material can rebuild the document. AgentEval's generic tool-usage report stays empty for this provider: it does
+not read Work IQ diagnostics.
 
 ## The trace and issue files
 
-Every live run writes two JSONL files through one `WorkIqDiagnostics` object that every seam (auth handler, capture
-handler, A2A client, reducer, conversation, agent) receives:
+Every live run writes two JSONL files:
 
-- **`m365-trace-<run id>.jsonl`** — every trace event of the run, one camelCase JSON object per line: `at`, `stage`,
-  `level`, `code`, `message`, and the correlation facts the emitter knew (`runId`, `caseId`, `turnId`, `rpcId`,
-  `messageId`, `taskId`, `contextId`, `requestId`, `httpStatus`, `rpcErrorCode`, `a2aState`, `elapsedMs`, `data`).
-  An absent fact is omitted, never written as `0` or `""`. (The A2A fields are spelled `a2aState` and `a2aVersion`
-  everywhere: in both JSONL files and in `readiness.json`.)
-- **`m365-issues.jsonl`** — the issue register: every warning and error, with `stage`, `category` (`Config`,
-  `Authentication`, `Permission`, `Network`, `Protocol`, `Service`, `Capture`, `Budget`, `Unknown`), a stable `code`,
-  the safe `message`, a plain-language `suggestedCause`, the `aadstsCode` when MSAL produced one, the same
-  correlation facts, and the run's `configSha256`, `adapterVersion` and `a2aVersion`. Appended across runs; each
-  entry carries its run id.
+- **`m365-trace-<run id>.jsonl`**: every trace event, one JSON object per line: `at`, `stage`, `level`, `code`,
+  `message`, and the ids and statuses the emitter knew (`caseId`, `turnId`, `taskId`, `requestId`, `httpStatus`,
+  `rpcErrorCode`, `a2aState`, `elapsedMs`, …). An unknown fact is left out.
+- **`m365-issues.jsonl`**: the issue register. Each issue has a `stage`, a `category` (`Config`, `Authentication`,
+  `Permission`, `Network`, `Protocol`, `Service`, `Capture`, `Budget`, `Case`, `Unknown`), a stable `code`, a `message`, a
+  `suggestedCause`, the `aadstsCode` when Entra gave one, the same ids, and the run's `configSha256`, `adapterVersion`
+  and `a2aVersion`. Runs append to it. [Troubleshooting](#troubleshooting) lists every code.
 
-**Where:** `WorkIqOptions.TraceFile` / `IssueFile` if set; else under `WorkIqOptions.DiagnosticsDirectory`; else the
-workspace's `.agenteval/m365/` (the first `.agenteval` folder found walking up from the current directory); else
-`<temp>/agenteval-m365/`. The CLI's `--m365-trace <file>` sets the trace file; the issue register has no flag. A
-fresh clone has no `.agenteval/` folder (it is not committed): run `agenteval init-workspace` once to create one, or
-the files land in the temp folder. The first event of every run, `config.diagnostics_ready`, names both files, and
-`eval`/`bench` print both paths in the badge line. The doctor writes its trace and issue files into its report
-folder. The run id is `m365-<yyyyMMdd-HHmmss UTC>-<4 hex>` unless `WorkIqOptions.RunId` is set (set it to the AEF
-run id to correlate).
+**Where.** `WorkIqOptions.TraceFile` and `IssueFile` when set, else `DiagnosticsDirectory`, else the workspace's
+`.agenteval/m365/` (found by walking up from the current directory), else `<temp>/agenteval-m365/`. A fresh clone has no
+`.agenteval/`: run `agenteval init-workspace` once. `--m365-trace <file>` moves the trace. The first event,
+`config.diagnostics_ready`, names both files, and `eval` and `bench` print both paths. The doctor writes them into its
+report folder. The run id is `m365-<yyyyMMdd-HHmmss>-<4 hex>` (UTC) unless `WorkIqOptions.RunId` sets it. A run keeps
+the files open, so read them with a tool that shares the file (`tail -f`, `Get-Content -Wait`).
 
-While a run is going the files are open for writing: a reader must share them (`Get-Content -Wait`, `tail -f`);
-.NET's `File.ReadAllLines`, and some editors, fail with "being used by another process" until the run ends.
+**Codes.** Trace codes read `<stage>.<event>`, such as `auth.silent_hit`, `discovery.interface_selected` or
+`turn.outcome`. A measured operation emits `<code>.start`, then `.end` or `.failed`. Each issue is mirrored into the
+trace as `issue.<category>`, so the trace shows when it happened.
 
-**What the codes look like:** `<stage>.<event>` — for example `auth.silent_hit`, `auth.device_code_prompted`,
-`discovery.card_fetched`, `discovery.interface_selected`, `discovery.untrusted_host`, `rpc.sent`, `rpc.response`,
-`rpc.error`, `task.state`, `turn.outcome`, `budget.exceeded`. Measured operations emit `<code>.start`, `<code>.end`
-(with `elapsedMs`) or `<code>.failed`. Codes are snake case throughout: a turn that did not complete registers
-`turn.input_required`, `turn.auth_required`, `turn.failed`, `turn.rejected`, `turn.canceled` or `turn.indeterminate`.
-A host outside `trustedHosts` is always category `Config` (`discovery.untrusted_host`, `auth.untrusted_destination`):
-the fix is in the config. Every issue is mirrored into the trace as `issue.<category>` so the trace shows
-where in the sequence it happened. Stages: `Config`, `Auth`, `Discovery`, `Send`, `Stream`, `GetTask`, `Cancel`,
-`Subscribe`, `Reduce`, `Normalize`, `Outcome`, `Budget`, `Capture`, `Doctor`.
+**One failure, one issue.** The layer that ends the operation registers the failure, once:
 
-**The console view:** `--m365-verbose` (code: `WorkIqOptions.Verbose`; on by default for the doctor) prints every
-event to stderr as one line: `[m365 HH:mm:ss.fff Stage/Level code] message` followed by the known ids, HTTP status,
-JSON-RPC code, A2A state and elapsed milliseconds. With `--m365-verbose`, `eval` and `bench` also print one
-`[m365 turn] case=… turn=… outcome=… transport=… task=… ctx=… state=… answer=… citationMarkers=… toolExecutions=…
-elapsedMs=…` summary line per turn, completed or not (a non-completed turn adds `failure=…` and never answer text).
+- Inside a turn, the turn's issue `turn.<outcome>` is the only one. It keeps the failure's category, HTTP status and
+  JSON-RPC code: one HTTP 403 gives one `turn.failed` issue with category `Permission`.
+- A call outside a turn (discovery on its own, an explicit `GetTask`, a doctor stage) registers the client's code, such
+  as `http.403` or `discovery.untrusted_host`.
+- A missing token is registered once, by the auth layer (`auth.sign_in_not_completed`, `auth.empty_token`,
+  `auth.token_acquisition_failed`). Nothing was sent.
+- The auth handler's `auth.unauthorized`, `auth.forbidden` and `auth.untrusted_destination` are trace events, not
+  issues.
 
-**What they never contain:** a bearer token, a JWT, an auth code, a device code, a client secret, a cookie, or the
-`Authorization` header. `WorkIqRedaction` rewrites them before any sink sees a message, a data object or a header
-dump (`Bearer [redacted]`, `[jwt redacted]`, `[redacted]`), and a sensitive header is never retained. The MSAL
-device-code **message** — the text that tells the user where to sign in and which code to enter — is shown in full on
-the console only, because the user must see it; the trace's `auth.device_code_prompted` event keeps where and until
-when, with the user code replaced by `[redacted]`. Lines are bounded to 64 KiB with a truncation marker. A sink that
-fails is reported once on stderr and dropped; the run continues.
+**The console view.** `--m365-verbose` (on by default for the doctor) prints every event to stderr as
+`[m365 HH:mm:ss.fff Stage/Level code] message` with the known ids and statuses. `eval` and `bench` then also print one
+line per turn, completed or not:
 
-**What they may contain:** your tenant id, app id, agent id, task and context ids, the service's `request-id`, HTTP
-statuses, file paths, and error messages the service returned. They do not contain prompts or answers. Read the
-[tester guide](microsoft365-tester-guide.md#7-redact-before-you-send) before sharing them. The doctor's
-`readiness.md` and `readiness.json` additionally show, after a probe, the fixed probe prompt and the first 80
-characters of the agent's answer.
+```text
+[m365 turn] case=… turn=… outcome=Completed transport=Completed task=… ctx=… state=TASK_STATE_COMPLETED answer=Complete(212 chars) citationMarkers=Provided (2 marker(s)) toolExecutions=NotRequested elapsedMs=…
+```
+
+A turn that did not complete adds `failure=…` and never shows answer text.
+
+**What the files never contain:** a bearer token, a JWT, an auth code, a device code, a client secret, a cookie or the
+`Authorization` header. `WorkIqRedaction` rewrites them before any sink sees them. The device-code message shows in
+full on the console only, because you must read it; the trace keeps it with the code replaced by `[redacted]`. Lines
+are capped at 64 KiB. A failing sink is reported once on stderr and dropped; the run continues.
+
+**What they may contain:** your tenant, app and agent ids, task and context ids, the service's `request-id`, HTTP
+statuses, file paths and the service's error messages. No prompt and no answer. After a probe, `readiness.md` and
+`readiness.json` also show the probe prompt and the first 80 characters of the answer. Read the
+[tester guide](microsoft365-tester-guide.md#send-back-the-cli-files) before you share them.
 
 ## What's verified vs. what still needs a live check
 
-**Unit-tested, credential-free (synthetic fixtures under `tests/AgentEval.Tests/Microsoft365/`):**
+**Tested offline, without credentials** (fixtures under `tests/AgentEval.Tests/Microsoft365/`):
 
-- `Microsoft365Config.Load` and every `Validate` rule, including the refusal of a template placeholder in any field;
-  `ResolveCardUri` for the default and an explicit agent.
-- `WorkIqOptions.Validate` and the `BuildLive` consent gate (proven to throw without consent and to make no network
-  call for a valid config).
-- The trust policy against fixture cards: a two-interface default card, an agent-specific card, a card advertising
-  only 0.3, a card pointing at an untrusted host.
-- The reducer and answer selector against fixture envelopes: completed with answer and attributions, completed with
-  *Developer Info* / *Retrieval Info*, completed with an empty answer, two text artifacts (ambiguous), direct message,
-  input-required with a confirmation card, auth-required, failed with a partial artifact, rejected, canceled,
-  submitted (then polled), JSON-RPC errors on HTTP 200 (`-32601`, `-32009`), a 0.3-shaped response, HTTP 429 with
-  `Retry-After`, `CancelTask` races and errors.
-- The streaming reducer against fixture SSE streams: happy path, CRLF framing, duplicate frames, EOF before a
-  terminal state, failure after partial text, input-required, `lastChunk` before the terminal state.
-- The evidence normaliser against the normalisation fixture catalogue (compound citation markers, selection is not
-  execution, missing fields stay `Missing`).
-- The diagnostics: redaction patterns, the JSONL sinks (line bound, flush, directory creation), the console format, the
-  factory's path resolution and the `config.diagnostics_ready` event.
-- The agent lifecycle with a fake conversation: completion gate, turn budget, conversation policy, reset, the `onTurn`
-  sink, cancellation.
-- The whole CLI path through the credential-free seam: consent refusal, missing config, negative cap, bad profile,
-  unknown `--sut`, and an offline end-to-end `eval` and `bench gdpr`/`eu-ai-act`/`owasp`/`mitre`/`nist` run (AEF marks
-  the stand-in `Mocked`); the AEF run settings and per-case evidence documents of an `eval` run.
-- The readiness check against a fake HTTP handler and token provider: every stage's pass and fail paths (missing
-  field, missing file, `AADSTS65001`, an untrusted or 0.3-only card, 401, 403, `-32009`), the default stage set, the
-  probe skipped for consent with nothing sent, a completed and an `InputRequired` probe, the census reusing a
-  `native118` probe or sending a second turn, `--continue`, the report renderings, and that no output ever carries
-  the token. `agenteval m365 doctor` itself: every option, the stage mapping, the default report folder, exit codes
-  `0`, `1`, `2` and `11`.
+- Config loading and every validation rule, the consent gate of `BuildLive`, and `WorkIqOptions.Validate`.
+- The trust policy against fixture cards: two interfaces, an agent card, an A2A 0.3 card, an untrusted host.
+- The task and streaming reducers and the answer selector against fixture envelopes and SSE streams: completed, paused,
+  failed, rejected, canceled and polled tasks, JSON-RPC errors, a 0.3 reply, HTTP 429, `CancelTask` races, CRLF
+  framing and an early end of stream.
+- The evidence normaliser against the normalisation fixtures.
+- The diagnostics: redaction, the JSONL sinks, the console format, the paths, and one issue per failure on the
+  blocking, streaming and doctor paths.
+- The agent with a fake conversation: the completion gate, the turn cap, the policies, reset, `onTurn`, cancellation
+  and the not-measured rule.
+- The readiness check with a fake HTTP handler, token provider and clock: every stage's pass and fail paths, consent,
+  `--continue`, the reports, and that no output carries the token.
+- The CLI end to end with a stand-in agent: every refusal, `eval`, the `bench` families (AEF marks the run `Mocked`), the
+  AEF run settings and evidence documents, and `m365 doctor`'s options and exit codes.
 
-**Not verified by the maintainers — needs a tenant (the external tester's job, see the [tester guide](microsoft365-tester-guide.md)):**
+**Needs a tenant** (the external tester's job, see the [tester guide](microsoft365-tester-guide.md)):
 
-- The MSAL device-code prompt, the silent refresh, and the persisted cache across runs.
-- The real agent card: which interfaces it advertises, and that one of them is JSON-RPC 1.0 on a trusted host.
+- The MSAL device-code prompt, the silent refresh and the token cache across runs.
+- The real agent card: its interfaces, and a JSON-RPC 1.0 interface on a trusted host.
 - That the service accepts `A2A-Version: 1.0` and answers in the 1.0 shape.
-- The real wire shape of a completed turn: where the attributions sit, the citation marker format, whether a
-  blocking send returns the terminal state directly or needs `GetTask` polls, timings.
-- Whether the `native118` diagnostic modes are accepted, and whether *Developer Info* / *Retrieval Info* artifacts
-  appear.
-- What `CancelTask` returns on a completed task; whether a follow-up turn on the same context is accepted.
-- How a real confirmation card, a 401, a 403, a 429 and a long-running task actually present.
+- The real shape of a completed turn: where attributions sit, the citation marker format, whether a blocking send needs
+  `GetTask` polls, and the timings.
+- Whether the `native118` modes are accepted, and whether *Developer Info* and *Retrieval Info* artifacts appear.
+- What `CancelTask` returns on a completed task, and whether a follow-up turn on the same context is accepted.
+- How a real confirmation card, a 401, a 403, a 429 and a long-running task present.
 
-When the tester's results arrive, this section is updated with what passed, where, with which agent, profile and date.
-Until then, no sentence on this page claims a live result.
+When the tester's results arrive, this section records what passed, where, with which agent and profile, and when.
 
 ## Troubleshooting
 
-Messages the target, the provider and the doctor print, their cause and the fix. `…` stands for the part that varies.
+Start with the doctor: it prints `meaning:` and `do:` under a failed stage. Then read `m365-issues.jsonl`. This table
+lists every issue code the provider and the demo report, in the issue register or under a doctor stage, sorted by code.
+`AADSTS` codes are Entra sign-in errors, carried in an issue's `aadstsCode`. Trace-only codes are not listed.
 
-**Before any network call (CLI validation and config loading)**
+| Code | Who can fix it | Cause | Action |
+|---|---|---|---|
+| `AADSTS50020` | You (sign-in) | The account is not in the tenant `tenantId` names. | Sign in with a work account of that tenant, or correct `tenantId`. |
+| `AADSTS50058` | You (sign-in) | Silent sign-in needs interaction: a first run or an expired session. | Run again and complete the device-code sign-in. |
+| `AADSTS50059`, `AADSTS90002`, `AADSTS90019` | You (config) | No tenant was named, or it was not found (a typo, a placeholder, another cloud). | Set `tenantId` to the *Directory (tenant) ID* on the app's *Overview* page. |
+| `AADSTS50076`, `AADSTS50079` | You (sign-in) | Multi-factor authentication is required, or must be set up. | Complete or set up MFA in the browser during the sign-in. |
+| `AADSTS50105`, `AADSTS53003`, `AADSTS530003` | Tenant admin | User assignment, conditional access or a device policy blocked the sign-in. | Assign the user, or review the policy the Entra sign-in log names. |
+| `AADSTS65001`, `AADSTS65004`, `AADSTS650052`, `AADSTS90094` | Tenant admin | Consent for `WorkIQAgent.Ask` is missing or declined. `650052`: Work IQ is not set up in the tenant. | Grant admin consent on the app registration; for `650052`, enable Work IQ first. |
+| `AADSTS65002`, `AADSTS700016` | You (config) | `appClientId` is wrong, in another tenant, or a Microsoft-owned app. | Use your own app registration's client id. |
+| `AADSTS7000215`, `AADSTS7000218` | App registration owner | Public client flows are off, so Entra asks for a secret. | Set *Allow public client flows* to **Yes** (*Authentication*, *Advanced settings*). |
+| `AADSTS70011`, `AADSTS900144` | You (config) | The scope is wrong, or a sign-in parameter is missing. | Use the default `scope`; check `tenantId` and `appClientId`. |
+| `answer.ambiguous` | Maintainers | Several answer candidates, none selected: the case is NOT MEASURED. The evidence document keeps every candidate. | Note the case id and send the files back. Add a raw capture (`--m365-capture-raw`) only if the maintainers ask. |
+| `approval.ambiguous_interaction_part`, `approval.call_field_invalid`, `approval.call_not_object`, `approval.card_malformed`, `approval.conflicting_twins`, `approval.twin_unreadable` | Maintainers | The confirmation card has an unknown shape. Nothing was approved. | Send the trace and a raw capture. |
+| `auth.aadsts` | See the `AADSTS` rows | The doctor's sign-in failed with the Entra code in `aadstsCode`. | Follow that code's row. |
+| `auth.empty_token` | You (sign-in) | The token provider returned an empty token. Nothing was sent. | Sign in again. A host's own provider must return the Work IQ token. |
+| `auth.msal` | You (sign-in) | MSAL failed without an Entra code, for example `code_expired`. | Run again and complete the sign-in. |
+| `auth.sign_in_not_completed` | You (sign-in) | A sign-in started during a run and did not finish in time. Nothing was sent. | Run `agenteval m365 doctor --stage auth` first; the token is cached. |
+| `auth.sign_in_timeout` | You (sign-in) | Doctor only: the code expired, or no token came within `--timeout-seconds`. | Run again and finish the sign-in. Check the route to `login.microsoftonline.com`. |
+| `auth.token_acquisition_failed` | You (sign-in); Tenant admin for a consent refusal | The token provider failed during a run. Nothing was sent. | Follow the row of its `aadstsCode`, if any; else sign in again. |
+| `budget.exceeded` | You (run limits) | The `MaxTurns` cap was reached; the next send was refused. | Raise `--m365-max-turns` after checking the tenant's usage reporting. |
+| `budget.recovered_after_cancel` | You (run limits) | The task outlived `RecoveryBudget`, then finished on its own. | Raise `WorkIqOptions.RecoveryBudget`. |
+| `capture.after_complete`, `capture.interrupted`, `capture.truncated`, `capture.write_failed` | You (capture settings) | The raw capture is incomplete or not written. The run is unaffected. `capture.interrupted` and `capture.truncated` are issues only with `--m365-capture-raw`; otherwise they are trace events. | Use a writable `--m365-capture-raw` folder, or raise `MaxCaptureBytes`. Report `capture.after_complete`. |
+| `citations.attribution_field_invalid`, `citations.attribution_not_object`, `citations.attributions_not_array`, `citations.attributions_null`, `citations.marker_block_malformed`, `citations.metadata_not_object` | Maintainers | Attributions or citation markers have an unknown shape. | Send the trace and a raw capture. |
+| `config.invalid` | You (config) | Doctor `config` stage: the file is missing, unreadable or invalid. | Fix the field or path the message names. |
+| `diagnostics.ambiguous_artifact`, `diagnostics.array_not_array`, `diagnostics.array_null`, `diagnostics.container_malformed`, `diagnostics.field_invalid`, `diagnostics.no_object_data_part`, `diagnostics.row_not_object` | Maintainers | A `native118` diagnostic artifact has an unknown shape. | Send a raw capture; use `--m365-profile public` meanwhile. |
+| `discovery.untrusted_host` | You (config) | The card points at a host outside `trustedHosts`. No token went there. | Add the host only if it is Microsoft's. |
+| `doctor.auth.failed`, `doctor.census.failed`, `doctor.config.failed`, `doctor.discovery.failed`, `doctor.probe.failed`, `doctor.protocol.failed` | As the stage's issue | A doctor stage failed. The message ends with the stage's issue code in brackets. | Follow that code's row; `readiness.md` says what to do. |
+| `doctor.canceled` | You | The doctor was stopped during a stage. | Run it again and let it finish. |
+| `exception.<type>` | Maintainers | An unclassified exception, such as `exception.NullReferenceException`. | Send the trace. |
+| `failure.unknown` | Maintainers | A failure the provider could not classify. | Send the trace. |
+| `http.401` | You (sign-in) | The token was rejected: wrong scope, expired, or another app. | Sign in again; check `tenantId`, `appClientId` and `scope`. |
+| `http.403` | Tenant admin | Consent, a Copilot licence or Work IQ enablement is missing. They look the same from outside. | An administrator checks all three. |
+| `http.404` | You (config) | A wrong `agentId` or `endpoint`, or an agent the user cannot reach. | Check `endpoint`, and `agentId` (or leave it out). |
+| `http.429` | Work IQ service | Throttled. Reads back off; a send is never retried. | Wait, then run at a lower pace. |
+| `http.<status>` | Work IQ service | Another status: `5xx` is a service fault, others a refusal or a proxy. | Note the `request-id`; report it if it repeats. |
+| `judge.call_failed` | You (judge settings) | Demo only: the judge call failed, so the case's criteria are NOT MEASURED. | Check `AI_INFERENCE_PROVIDER` and its variables, or pass `--no-judge`. |
+| `local.canceled` | You | Your cancellation token stopped the wait. The remote task was not cancelled. | Nothing to fix. |
+| `normalize.failed` | Maintainers | The evidence normaliser threw; no turn result was built. | Send the trace and a raw capture. |
+| `protocol.malformed` | Maintainers | A reply is not A2A 1.0 JSON: a 0.3 endpoint or a gateway page. A send answered this way is Indeterminate: the service may have created a task. | Send a raw capture. |
+| `protocol.version_mismatch` | Maintainers | The reply has the A2A 0.3 shape, or the card offers no A2A 1.0 JSON-RPC interface. A send answered this way is Indeterminate. | Report it with the trace. |
+| `reduce.frame_malformed`, `reduce.interrupted`, `reduce.<deviation>` | Maintainers | The task stream deviates from A2A 1.0 (for example `reduce.message.task_id_mismatch`) or was cut off. | Send the trace and a raw capture. |
+| `rpc.content_type_not_supported` | You (config) | The agent refused the requested output modes. | Use `--m365-profile public`. |
+| `rpc.error`, `rpc.extended_card_not_configured`, `rpc.extension_support_required`, `rpc.internal_error`, `rpc.invalid_agent_response`, `rpc.push_notification_not_supported`, `rpc.unsupported_operation` | Work IQ service | The service answered with this JSON-RPC error. | Report it with the `request-id`. |
+| `rpc.invalid_params`, `rpc.invalid_request`, `rpc.method_not_found`, `rpc.parse_error` | Maintainers | The service rejected the request, or the interface is not the A2A 1.0 endpoint. | Report it with the trace. |
+| `rpc.task_not_cancelable` | Nobody | The task had already ended; `CancelTask` changed nothing. | Nothing to fix. |
+| `rpc.task_not_found` | Maintainers | The service does not know the task id: not accessible, expired or purged. | Do not resend; report it with the `request-id`. |
+| `rpc.version_not_supported` | Maintainers | The service rejected A2A 1.0 (JSON-RPC `-32009`). | Report it with the trace. |
+| `stream.capture_failed`, `subscribe.capture_failed` | You (capture settings) | A stream's raw capture could not be closed. The frames were delivered. | Check `RawCaptureDirectory`. |
+| `stream.id_mismatch`, `subscribe.id_mismatch` | Maintainers | A stream frame carried another task or context id. | Send the trace and a raw capture. |
+| `transport.connect`, `transport.dns`, `transport.error`, `transport.invalid_response`, `transport.io`, `transport.proxy`, `transport.response_ended`, `transport.tls` | Your network | A DNS, connection, TLS or proxy failure, or a cut-off reply. | Check the route and proxy to `workiq.svc.cloud.microsoft`. |
+| `transport.timeout` | Your network | No response within `SendTimeout` (300 s). | Retry; in code, raise `SendTimeout`. |
+| `turn.abandon_not_quiesced` | You (run limits) | An abandoned turn did not stop within `RecoveryBudget`; the task may still run. | Start a new conversation. Raise `RecoveryBudget` if it repeats. |
+| `turn.auth_required` | You (connector sign-in) | The agent needs a connector sign-in this provider cannot complete. | Sign in to that connector in Microsoft 365 Copilot Chat, then rerun the case. |
+| `turn.canceled`, `turn.failed`, `turn.rejected` | Per the issue's `category` | The turn ended without an answer. The issue keeps the failure's category and codes. | Follow the row of its status or code (a 403 is `http.403`). Do not resend blindly. |
+| `turn.indeterminate` | Per the issue's `category` | The remote state is unknown: a timeout, a drop, or a local budget ran out. Nothing was resent. | Find the task id in the trace; raise the budget the cause names. |
+| `turn.input_required` | You (the case) | The agent paused for a confirmation or input. Nothing was approved. | Rephrase the case as read-only. |
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `--sut microsoft365 drives a LIVE Microsoft 365 agent…` (the command refuses) | `--i-understand-live-side-effects` was omitted. | Add the flag — only once the config points at a **non-production** identity. |
-| `--sut microsoft365 requires --m365-config <file.json> (tenantId, appClientId; optional endpoint, agentId, scope, agentName, diagnosticProfile, timeZone, trustedHosts).` | The config file option was omitted. | Pass `--m365-config <file.json>`. |
-| `--m365-max-turns must be >= 0 (0 = no cap; turns are counted, consumption is not metered).` | A negative value. | Use `0` (no cap) or a positive number. |
-| `--m365-profile must be 'public' (answer only) or 'native118' (EXPERIMENTAL diagnostics, observed in the native evaluator 1.18.0, not a documented contract); got: '…'.` | A value other than `public` or `native118`. | Use one of the two. |
-| `Unknown --sut value: '…'. Valid for this verb: copilot-studio, microsoft365.` (`eval`) / `… Valid: copilot-studio, microsoft365, mock.` (`bench`) | A typo in `--sut` (case-insensitive otherwise), or a verb that has no such target. | Use `microsoft365` with `eval` or a `bench` family. |
-| `Microsoft 365 config file not found: …` | The path does not exist. | Check the path; relative paths resolve from the current directory. |
-| `Microsoft 365 config file could not be read (…): …` | The file exists but could not be opened (lock, permissions). | Close whatever has it open or fix the permissions. |
-| `Invalid Microsoft 365 config JSON (…): …` | The file is not valid JSON. | Fix the syntax; the message carries the parser's detail. |
-| `Microsoft 365 config deserialized to null: …` | The file's JSON value is `null`. | Put an object in the file. |
-| `Microsoft 365 config is missing required field(s): …` | `tenantId` or `appClientId` is missing or blank, or `endpoint`/`scope` were set to blank. | Add the named field(s). |
-| `Microsoft 365 config field '…' still holds the template placeholder 'REPLACE-WITH-…': replace it with …` | A value copied from `m365-config.template.json` was never replaced. | Put the value the message names. |
-| `Microsoft 365 config field 'endpoint' must be an absolute https URL, got: '…'` | `endpoint` is relative, not https, or malformed. | Use the default `https://workiq.svc.cloud.microsoft/a2a/` or an absolute https URL. |
-| `Microsoft 365 config field 'endpoint' must not carry a query string or fragment, got: '…'` | `?` or `#` in the endpoint. | Remove it. |
-| `Microsoft 365 config field 'trustedHosts' must list at least one host …` | Empty `trustedHosts`. | List the endpoint host (default `workiq.svc.cloud.microsoft`). |
-| `Microsoft 365 config field 'trustedHosts' contains a blank entry.` | An empty string in the list. | Remove it. |
-| `Microsoft 365 config field 'trustedHosts' does not include the endpoint host '…'` | The endpoint's host is not trusted, so discovery would be refused. | Add the endpoint host to `trustedHosts`. |
-| `Microsoft 365 config field 'agentId' must be a single opaque path segment …` | The id contains `/`, `\`, `?`, `#`, whitespace or a control character. | Copy the id exactly as the service shows it; do not build a path. |
-| `Microsoft 365 config field 'diagnosticProfile' has an unrecognized value: '…'` | Not `PublicAnswerOnly` or `Native118Diagnostics`. | Use one of the two (case-insensitive), or omit the field. |
-| `Microsoft 365 config field 'timeZone' is not a known time zone id on this system: '…'` | Not an IANA id this machine knows. | Use an id such as `Europe/Zurich`, or omit the field. |
-| `WorkIqOptions has negative value(s): …` | A negative timeout, cap or bound in code. | Every value must be zero or positive. |
-| `BuildLive drives a LIVE Microsoft 365 agent over Work IQ as the signed-in user…` | `iUnderstandLiveSideEffects: false` in code. | Pass `true` only for a non-production identity. |
+Symptoms without a code:
 
-**At run time (sign-in, discovery, turns)**
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| A device-code message appears and the run waits | First run for this (tenant, app) pair, or the cache expired — expected MSAL device-code sign-in, not a bug. | Open the printed URL in a browser and enter the printed code. Later runs reuse the cache at `%LOCALAPPDATA%\AgentEval\msal_cache\workiq_<hash>.msalcache.bin`. |
-| `Work IQ Discover failed: Unauthorized (…)` with `http=401` | The token was missing, expired or rejected by the service. | Sign in again (delete the cache file to force it); check `tenantId`, `appClientId` and `scope`. The request is never resent automatically. |
-| `Work IQ … failed: Unauthorized (Known): …: sign-in not completed: no token was acquired before the wait was stopped after N s …; nothing was sent` (issue `auth.sign_in_not_completed`) | A device-code sign-in started during the run and was not finished before the caller's cancellation or the device code's expiry (inside a blocking turn the turn deadline waits for the code, `turn.sign_in_wait`). The token is acquired outside the HTTP timeout, so a slow sign-in is never reported as a network timeout. | Sign in first with `agenteval m365 doctor --stage auth` (the token is cached), then run again. |
-| `Work IQ … failed: Forbidden (…)` with `http=403` | The user lacks the delegated permission or admin consent, has no Copilot licence, or Work IQ is not enabled in the tenant. | An administrator grants admin consent for `WorkIQAgent.Ask`, assigns the licence, or enables Work IQ. |
-| `Work IQ … failed: ProtocolVersionMismatch (…)` | The service answered in the A2A 0.3 shape (`kind` discriminators) or rejected version 1.0 (`rpcError=-32009`). | Report it with the trace. The provider never parses 0.3 and never downgrades. |
-| `Work IQ Discover failed: UntrustedHost (…)` | The card, or the selected interface, points at a host outside `trustedHosts`; refused before any token use. | Inspect the card (the doctor's `discovery` evidence lists every advertised interface and host). Add the host only if it is Microsoft's. |
-| `Work IQ … failed: RateLimited (…)` with `http=429` | The service throttled. Reads (`GetTask`, the card) are backed off with jitter; a send is never retried. | Re-run later; lower the pace (`--runs`, parallel runs). |
-| `Work IQ … failed: NotFound (…)` with `http=404` or `rpcError=-32001` | On discovery: a wrong `agentId`. On a task: the task is inaccessible, expired or purged (not necessarily nonexistent). | Check the agent id; a task "not found" after a drop is reported, not resent. |
-| `Work IQ … failed: Transport (…)` | DNS, TLS, proxy or socket failure. | Check connectivity and proxy settings for `workiq.svc.cloud.microsoft`. |
-| `Work IQ … failed: Timeout (…)` | The send timeout (300 s), the turn deadline (10 min) or the recovery budget (2 min) elapsed. | A long task; in code raise `WorkIqOptions.SendTimeout`/`TurnDeadline`. The outcome is `Indeterminate` unless the task state is known; nothing is resent. |
-| `Work IQ … failed: Malformed (…)` | The payload could not be parsed or violated the one-of rules. | Re-run with `--m365-capture-raw` and send the capture with the trace. |
-| `Work IQ turn did not complete: outcome=InputRequired, …` | The agent paused on a confirmation card or asked for input. Nothing was approved. | Use a read-only prompt. The card is on `TurnResult.PendingInteraction`. |
-| `Work IQ turn did not complete: outcome=AuthRequired, …` | The agent needs an external authorization the connector cannot complete. | Complete it in the tenant, or change the prompt. |
-| `Work IQ turn did not complete: outcome=Failed, …` / `outcome=Rejected, …` | The service ended the task `failed`, or rejected it. | Read `failure=…` in the message and the issue register; do not resend blindly. |
-| `Work IQ turn did not complete: outcome=Indeterminate, …` | The remote state is unknown: a timeout or a drop before a task id, or recovery exhausted. | Inspect the trace for a task id; never auto-resend, the request may have been accepted. |
-| `Work IQ turn was canceled locally: …` | Your cancellation token (Ctrl+C) stopped the local wait. | The remote task is not cancelled unless `CancelRemoteTaskOnTimeout` is on; its state is on `TurnResult`. |
-| `Work IQ evaluation stopped: N turn(s) already used; the next turn would exceed MaxTurns (…)` | The turn cap was reached. | Raise `--m365-max-turns` (or `0`) after checking the tenant's own usage reporting. |
-| `[m365 diagnostics] trace sink … failed and is dropped for the rest of run …` | The trace or issue file could not be written. | Check the directory (`--m365-trace`, `WorkIqOptions.DiagnosticsDirectory`); the run continued. |
-| `eval` exits `11` although no case failed | A case has no verdict: its turn did not complete, its judge did not answer, or a requested metric was not measured. | Read the case's `error` in the JSON export (`--format json`); fix the prompt, the judge or the tenant state; do not re-run blindly. |
-| `bench` exits `11` with `INCOMPLETE` | A judge call failed mid-scan, or the scan ran out of time. | Fix the judge configuration; the partial result is never a pass. |
-
-**Doctor stages (`agenteval m365 doctor`)**
-
-Every failed stage prints its own `meaning:` and `do:` lines; this table is the overview. The `auth` stage maps an
-MSAL failure to its AADSTS code with a cause and a fix from the doctor's catalogue (`65001`, `700016`, `50020`,
-`7000218`, `50076`, `50079`, `50058`, `70011`, `65002`, `50105`, `530003`, `53003`, `90002`, `50059`, `90019`,
-`900144`); any other code is kept as-is with a link to Microsoft's
-[error code reference](https://learn.microsoft.com/entra/identity-platform/reference-error-codes).
-
-| Stage result | Cause | Fix |
-|---|---|---|
-| `config` FAIL naming a field | As in the first table above. | Fix the field; nothing was sent. |
-| `auth` FAIL `sign-in failed with AADSTS65001` | Admin consent for `WorkIQAgent.Ask` is missing. | An administrator grants admin consent on the app registration. |
-| `auth` FAIL `… AADSTS7000218` | The app is not configured as a public client. | Set *Allow public client flows* to **Yes** (*Authentication* → *Advanced settings*). |
-| `config` PASS with a warning `tenantId '…' is neither a GUID nor a domain name` / `appClientId '…' is not a GUID` | A value that cannot be right; the sign-in would fail (`AADSTS90002` / `AADSTS700016`). | Copy both ids from the app registration's *Overview* page. |
-| `auth` FAIL `… AADSTS700016` | The app registration was not found in this tenant. | Check `appClientId` and `tenantId`. |
-| `auth` FAIL `… AADSTS90002` | The tenant was not found: a typo, a deleted tenant, or a tenant in another cloud. | Check `tenantId` (the *Directory (tenant) ID*, or the verified domain). |
-| `auth` FAIL `… AADSTS50059` / `AADSTS90019` | No tenant could be identified (a personal account, the common endpoint), or the request named none. | Set `tenantId`; sign in with a work account of that tenant. |
-| `auth` FAIL `… AADSTS50020` | The signed-in account is not in that tenant. | Sign in as a user of that tenant, or correct `tenantId`. |
-| `auth` FAIL `… AADSTS50076` / `AADSTS50079` | Multi-factor authentication is required, or must be enrolled first. | Complete it in the browser during the sign-in. |
-| `auth` FAIL `… AADSTS50105` / `AADSTS53003` / `AADSTS530003` | User assignment, a conditional access policy or a device policy blocked the sign-in. | An administrator assigns the user or reviews the policy named in the Entra sign-in log. |
-| `auth` FAIL `sign-in not completed: the device code expired at … UTC before the sign-in finished` (issue `auth.sign_in_timeout`) | A device-code prompt was shown and nobody completed the sign-in while the code was valid (about 15 minutes). Nothing was sent. | Run again; open the page, enter the code, sign in as the test user. |
-| `auth` FAIL `sign-in not completed in time: no token within N s` (issue `auth.sign_in_timeout`) | No sign-in was started and the token provider gave no token within `--timeout-seconds`. Nothing was sent. | Check the path to `login.microsoftonline.com`; raise `--timeout-seconds`. |
-| `discovery` / `protocol` FAIL `HTTP 401 on …: the token was rejected` | The service rejected the token. | Check `scope`, `tenantId` and `appClientId`; run again to sign in afresh. |
-| `discovery` / `protocol` FAIL `HTTP 403 on …` | Permission or consent missing, no Copilot licence, or Work IQ not enabled — indistinguishable from outside. | An administrator checks all three. |
-| `discovery` FAIL `HTTP 404 on …: the endpoint or agent was not found` | A wrong `agentId` or `endpoint`, or an agent the user cannot reach. | Check `agentId` (try `null`) and `endpoint`. |
-| `discovery` FAIL `the card points at a host outside trustedHosts` | The card advertises an untrusted host; no token was sent there. | Report it; add the host only if it is Microsoft's. |
-| `discovery` FAIL `the card advertises no A2A 1.0 JSON-RPC interface` | The card offers no protocol this connector speaks. | Report it; the provider never downgrades to 0.3. |
-| `discovery` / `protocol` FAIL `the service rejected A2A 1.0 (JSON-RPC -32009 VersionNotSupported)` or `the reply has the A2A 0.3 shape` | The service ignored the `A2A-Version: 1.0` header. | Report it with the trace. |
-| `protocol` FAIL `HTTP 404 on GetTask instead of the JSON-RPC TaskNotFound error (-32001)` | The selected interface does not behave like the A2A 1.0 JSON-RPC endpoint. | Report it with the `request-id`. |
-| `protocol` FAIL `JSON-RPC error … instead of TaskNotFound (-32001)` | An unexpected JSON-RPC answer. | Report the status, JSON-RPC code and `request-id`. |
-| `protocol` PASS with a warning: a task came back for a random id | Unexpected, but the endpoint speaks A2A 1.0 and accepted the token. | Nothing to fix; report it. |
-| `probe` / `census` SKIPPED, `Result: INCOMPLETE`, exit `11` | `--probe` was given without `--i-understand-live-side-effects`; nothing was sent to the agent. | Add the consent flag for a non-production identity. |
-| `probe` FAIL `the agent paused (InputRequired)` / `(AuthRequired)` | The agent waits for a confirmation, input or a connector sign-in; nothing was approved. | Unexpected for the read-only probe prompt: report it; for `AuthRequired`, sign in to the connector in Copilot Chat. |
-| `probe` FAIL `Indeterminate: the send may have been accepted; do not resend` | No final task state within the stage limit (or a drop). | Do not resend blindly; run the doctor again later with a larger `--timeout-seconds`. |
-| `census` PASS `native118 refused` | The tenant refuses the experimental diagnostic modes. | Nothing to fix; keep `--m365-profile public`. |
-| `census` FAIL `the census could not be measured` | The `native118` turn ended neither completed nor clearly refused. | Report it. |
-| exit `3`, `m365 doctor: the report folder could not be created` / `the report could not be written` | The report folder is not writable. | Pass a writable `--report <dir>`. |
+- **A device-code message appears and the run waits:** a first sign-in, or an expired cache. Sign in as the test user.
+- **`Error: …` before anything is sent:** a consent, option or config refusal. The message names the flag or field.
+- **`eval` exits `11` and no case failed:** a case was not measured. Read its `error` in the JSON export.
+- **`bench` exits `11` with `INCOMPLETE`:** a judge call failed mid-scan, or the scan ran out of time.
+- **"being used by another process" when you read a JSONL file:** the run still has it open.
 
 ## See also
 
-- [The demo project](../samples/AgentEval.Microsoft365Demo/README.md) (`samples/AgentEval.Microsoft365Demo`) — one
-  console app: readiness, one prompt, a small benchmark, one run folder to send back; its own GitHub Copilot setup.
-- [Microsoft 365 tester guide](microsoft365-tester-guide.md) — the step-by-step live validation for an external tester
-  with a tenant: install, config, doctor, probe, smoke dataset, what to send back, FAQ — and its
-  [results template](microsoft365-tester-RESULTS-TEMPLATE.md).
-- Samples: `samples/AgentEval.Samples/Microsoft365/` (group R — `dotnet run -- 109` Hello World, `dotnet run -- 110`
-  Live Walkthrough, from `samples/AgentEval.Samples/`; they need `M365_CONFIG_PATH` and
-  `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true` and stop with exit `11` without them).
-- [CLI Reference — `agenteval eval`](cli.md#agenteval-eval), [`agenteval bench`](cli.md#agenteval-bench),
-  [`agenteval m365 doctor`](cli.md#agenteval-m365-doctor) and [Exit codes](cli.md#exit-codes).
-- [Copilot Studio](copilot-studio.md) — the sibling connector this one mirrors (config, consent gate, budget, test
-  seam) and the fidelity reasoning it shares.
-- [AEF Evidence Format](aef.md) — where the run and the per-turn evidence document are recorded.
-- [LLM as a Judge](llm-as-judge.md) and [Benchmarks Guide](benchmarks.md) — grading the answers.
-- [The `.agenteval/` Workspace](agenteval-workspace.md) — where the trace, issue and doctor files land.
+- [The demo project](../samples/AgentEval.Microsoft365Demo/README.md): readiness, one prompt and a benchmark in one
+  command, and one run folder to send back.
+- [Microsoft 365 tester guide](microsoft365-tester-guide.md) and its
+  [results template](microsoft365-tester-RESULTS-TEMPLATE.md): the live validation an external tester runs.
+- Samples in `samples/AgentEval.Samples/Microsoft365/`: `dotnet run -- 109` (Hello World) and `dotnet run -- 110` (Live
+  Walkthrough), run from `samples/AgentEval.Samples/`. They need `M365_CONFIG_PATH` and
+  `M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true`, else they stop with exit `11`.
+- CLI reference: [`agenteval eval`](cli.md#agenteval-eval), [`agenteval bench`](cli.md#agenteval-bench),
+  [`agenteval m365 doctor`](cli.md#agenteval-m365-doctor) and [exit codes](cli.md#exit-codes).
+- [Copilot Studio](copilot-studio.md): the sibling connector, with the same config, consent and test-hook pattern.
+- [AEF Evidence Format](aef.md), [LLM as a Judge](llm-as-judge.md), the [Benchmarks Guide](benchmarks.md) and
+  [the `.agenteval/` workspace](agenteval-workspace.md).

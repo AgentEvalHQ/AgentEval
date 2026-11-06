@@ -126,10 +126,16 @@ internal sealed class RunRecord
 
     /// <summary>The benchmark's outcome; null when it did not run.</summary>
     public BenchmarkOutcome? Benchmark { get; set; }
+
+    /// <summary>The benchmark's AEF run; null when the benchmark did not run or its AEF run could not be written.</summary>
+    public AefRunRecord? Aef { get; set; }
 }
 
 /// <summary>The config as the run loaded it.</summary>
-/// <param name="Config">The validated config (with the <c>--agent-id</c> override); null when it did not load.</param>
+/// <param name="Config">
+/// The validated config (with the <c>--agent-id</c> override, which drops the config's <c>agentName</c> when it names
+/// another agent); null when it did not load.
+/// </param>
 /// <param name="Overridden">
 /// The config with the <c>--agent-id</c> override, as loaded and before validation: the readiness check gets it, so an
 /// override that breaks the config fails the check's config stage. Null without the option, or when the file did not load.
@@ -151,7 +157,10 @@ internal sealed record LoadedConfig(Microsoft365Config? Config, Microsoft365Conf
             var config = Microsoft365Config.Load(settings.ConfigFile);
             if (settings.AgentId is not null)
             {
-                overridden = config with { AgentId = settings.AgentId };
+                // The config's agentName names the config's agent. For another agent it would name the wrong one in the
+                // banner and in the AEF subject, so it is dropped and the tested id becomes the display name.
+                var sameAgent = string.Equals(config.AgentId?.Trim(), settings.AgentId.Trim(), StringComparison.Ordinal);
+                overridden = config with { AgentId = settings.AgentId, AgentName = sameAgent ? config.AgentName : null };
                 overridden.Validate();
                 config = overridden;
             }

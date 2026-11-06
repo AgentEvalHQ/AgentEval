@@ -11,7 +11,6 @@ using AgentEval.Cli.Commands.Targets;
 using AgentEval.Core;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
-using AgentEval.Microsoft365.Evidence;
 using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Microsoft365;
@@ -138,70 +137,16 @@ internal sealed class Microsoft365SutTarget : ISutTarget
     /// <summary>Test seam of the live <see cref="Build"/> path: the diagnostics directory; null resolves the workspace's <c>.agenteval/m365</c>.</summary>
     internal DirectoryInfo? DiagnosticsDirectoryForTests { get; init; }
 
-    /// <summary>AEF run setting: the A2A protocol version the provider speaks.</summary>
-    internal const string A2AVersionSetting = "a2aVersion";
-
-    /// <summary>AEF run setting: the diagnostic profile in effect (the <see cref="DiagnosticProfile"/> member name).</summary>
-    internal const string ProfileSetting = "m365Profile";
-
-    /// <summary>AEF run setting: the evidence normaliser version (<see cref="Microsoft365Evidence.NormalizerVersion"/>).</summary>
-    internal const string NormalizerVersionSetting = "normalizerVersion";
-
-    /// <summary>AEF run setting: the provider profile / decoder version (<see cref="Microsoft365Evidence.ProviderProfileVersion"/>).</summary>
-    internal const string ProviderProfileVersionSetting = "providerProfileVersion";
-
-    /// <summary>AEF run setting: the config's identity hash (<see cref="Microsoft365Config.ComputeIdentitySha256"/>).</summary>
-    internal const string ConfigSha256Setting = "m365ConfigSha256";
-
-    /// <summary>AEF run setting: the opaque agent id, or <see cref="DefaultAgentIdSettingValue"/>.</summary>
-    internal const string AgentIdSetting = "m365AgentId";
-
-    /// <summary>The <see cref="AgentIdSetting"/> value when the config targets the default Work IQ agent (no agent id).</summary>
-    internal const string DefaultAgentIdSettingValue = "default";
-
-    /// <summary>AEF run setting: the host of the configured endpoint (where the agent card is discovered).</summary>
-    internal const string EndpointHostSetting = "m365EndpointHost";
-
-    /// <summary>AEF run setting: the <see cref="EvidenceContentPolicy"/> the per-case evidence documents are projected under, when known.</summary>
-    internal const string ContentPolicySetting = "m365ContentPolicy";
-
     /// <summary>
-    /// The run provenance this target adds to an AEF run's <c>config</c> settings, all of it content-free:
-    /// <c>a2aVersion</c> (the only protocol version spoken), <c>m365Profile</c> (the diagnostic profile in effect, from
-    /// <c>--m365-profile</c>), <c>normalizerVersion</c> and <c>providerProfileVersion</c> (the normaliser and decoder
-    /// versions that shape the evidence documents), <c>m365ConfigSha256</c> (the config's identity hash, the same
-    /// <c>configSha256</c> every Work IQ issue carries; the config holds no secret), <c>m365AgentId</c> (the opaque agent
-    /// id, or <c>default</c>), <c>m365EndpointHost</c> (the configured endpoint's host, where the card is discovered) and,
-    /// when <paramref name="contentPolicy"/> is known, <c>m365ContentPolicy</c>. Null until <see cref="Validate"/> has loaded
-    /// the config. It describes the target the CLI validated: with a <c>sutOverride</c> stand-in (a run recorded as mocked)
-    /// the identity and profile are those of <c>--m365-config</c> and <c>--m365-profile</c>.
+    /// The run provenance this target adds to an AEF run's <c>config</c> settings: the provider's shared
+    /// <see cref="Microsoft365RunSettings.For"/>, for the config and the profile <see cref="Validate"/> loaded (from
+    /// <c>--m365-config</c> and <c>--m365-profile</c>), with <c>m365ContentPolicy</c> only when
+    /// <paramref name="contentPolicy"/> is known. Null until <see cref="Validate"/> has loaded the config. With a
+    /// <c>sutOverride</c> stand-in (a run recorded as mocked) it still describes the target the CLI validated.
     /// </summary>
     /// <param name="contentPolicy">The content policy of the agent's evidence documents, when known.</param>
-    internal JsonObject? AefRunSettings(EvidenceContentPolicy? contentPolicy)
-    {
-        var config = _config;
-        if (config is null)
-        {
-            return null;
-        }
-
-        var settings = new JsonObject
-        {
-            [A2AVersionSetting] = Microsoft365Evidence.A2AVersion,
-            [ProfileSetting] = (_profile ?? config.ResolveProfile()).ToString(),
-            [NormalizerVersionSetting] = Microsoft365Evidence.NormalizerVersion,
-            [ProviderProfileVersionSetting] = Microsoft365Evidence.ProviderProfileVersion,
-            [ConfigSha256Setting] = config.ComputeIdentitySha256(),
-            [AgentIdSetting] = string.IsNullOrWhiteSpace(config.AgentId) ? DefaultAgentIdSettingValue : config.AgentId.Trim(),
-            [EndpointHostSetting] = config.ResolveEndpointUri().Host,
-        };
-        if (contentPolicy is { } policy)
-        {
-            settings[ContentPolicySetting] = policy.ToString();
-        }
-
-        return settings;
-    }
+    internal JsonObject? AefRunSettings(EvidenceContentPolicy? contentPolicy) =>
+        _config is { } config ? Microsoft365RunSettings.For(config, _profile ?? config.ResolveProfile(), contentPolicy) : null;
 
     /// <summary>
     /// The run provenance of a run that writes no per-case evidence document (a <c>bench</c> run):
@@ -212,11 +157,28 @@ internal sealed class Microsoft365SutTarget : ISutTarget
 
     /// <summary>
     /// The per-case evidence of an <c>eval</c> run against <paramref name="agent"/>: the run provenance with the agent's
-    /// content policy, the not-measured rule for a turn with no selected answer, and each case's evidence document
-    /// (<see cref="Microsoft365CaseEvidence"/>).
+    /// content policy, the not-measured rules (a turn with no selected answer, criteria no judge graded), and each case's
+    /// evidence document (<see cref="Microsoft365CaseEvidence"/>).
     /// </summary>
     /// <param name="agent">The agent <see cref="Build"/> returned.</param>
     public ISutCaseEvidence? CaseEvidenceFor(IEvaluableAgent agent) => Microsoft365CaseEvidence.For(this, agent);
+
+    /// <summary>
+    /// The agent a <c>bench</c> family that grades answers drives: <paramref name="agent"/> behind
+    /// <see cref="Microsoft365BenchAgent"/>, so a turn that completed with several answer candidates and none selected
+    /// throws instead of handing its empty text to the grader. The family then records the case as an error or as
+    /// inconclusive, never as a measurement of the agent, and the turn's warning line says the case is not measured.
+    /// </summary>
+    /// <param name="agent">The agent <see cref="Build"/> returned.</param>
+    public IEvaluableAgent ForGradedBench(IEvaluableAgent agent)
+    {
+        if (TurnSink is { } sink)
+        {
+            sink.UnselectedAnswerIsNotMeasured = true;
+        }
+
+        return new Microsoft365BenchAgent(agent);
+    }
 
     /// <summary>
     /// Adds the six <c>--m365-*</c> options. NEVER the consent flag: <see cref="SutTargetResolver.AddOptionsTo"/> registers

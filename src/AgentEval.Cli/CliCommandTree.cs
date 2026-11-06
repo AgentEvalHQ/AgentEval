@@ -911,7 +911,9 @@ internal static class CliCommandTree
                         parseResult.GetValue(benchPerfEndpointOpt),
                         parseResult.GetValue(benchPerfModelOpt),
                         parseResult.GetValue(benchPerfApiKeyOpt),
-                        subject);
+                        subject,
+                        // perf measures time, not the answer: a turn with no selected answer is still a timed turn.
+                        gradesAnswers: false);
                     if (error is not null)
                     {
                         Console.Error.WriteLine($"Error: {error}");

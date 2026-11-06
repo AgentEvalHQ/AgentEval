@@ -375,7 +375,7 @@ in `.agenteval/aef/runs/<yyyy>/<MM>/<runId>/`, and the command prints its folder
 | `--aef-content on\|off` | Persist observed content as linked evidence blobs. Default `off`; incompatible with `--no-aef` when `on`. |
 | `--aef-key <pkcs8.pem>` | Sign the native run's seal with an unencrypted ECDSA P-256 private key. The key is loaded before execution. |
 | `--aef-unsealed` | Close and verify the native run without sealing it, for a host to seal later. No run hash is reported. Incompatible with `--aef-key`. |
-| `--subject <kind:name>` | `eval` and `redteam`: the subject's ref, such as `agent:support-bot` (default `model:<model>`; a built-in redteam target is `agent:<target>`). Bench families use `--subject` as the agent's name. |
+| `--subject <kind:name>` | `eval` and `redteam`: the subject's ref, such as `agent:support-bot` (default `model:<model>`; `agent:<display name>` for `eval --sut microsoft365` and `eval --sut copilot-studio`; a built-in redteam target is `agent:<target>`). Bench families use `--subject` as the agent's name. |
 | `--subject-version <v>` | The subject's exact version. A checkpoint lane only counts runs that name one. |
 
 Without a workspace and without `--aef`, the command says so and writes no run. Without `--aef`, a run that cannot be

@@ -69,6 +69,12 @@ internal sealed record CaseOutcome(
 {
     /// <summary>The judge call that failed after the agent's turn completed, when one did (the criteria are then NOT MEASURED).</summary>
     public JudgeFailure? JudgeFailure { get; init; }
+
+    /// <summary>
+    /// What the harness returned for the case (or, for a case it refused, a result that carries that error); null when the
+    /// benchmark did not reach the case. The AEF run is written from it and from the verdict.
+    /// </summary>
+    public TestResult? Harness { get; init; }
 }
 
 /// <summary>A judge call that threw after the agent's turn completed: the judge's problem, never the agent's.</summary>
@@ -160,6 +166,21 @@ internal sealed record JudgeFailure(string ErrorType, string SafeMessage, int? H
 /// </param>
 internal sealed record BenchmarkOutcome(IReadOnlyList<CaseOutcome> Cases, string? StopReason, string? CriteriaNotGraded = null)
 {
+    /// <summary>The cap on agent turns stopped the benchmark (<see cref="StopCode"/>).</summary>
+    public const string TurnCapReached = "turn-cap-reached";
+
+    /// <summary>The run was canceled (<see cref="StopCode"/>).</summary>
+    public const string Canceled = "cancelled";
+
+    /// <summary>The evaluation stopped on a condition every later case would meet too (<see cref="StopCode"/>).</summary>
+    public const string EvaluationFailed = "evaluation-failed";
+
+    /// <summary>
+    /// <see cref="StopReason"/> as a short code without content: <see cref="TurnCapReached"/>, <see cref="Canceled"/> or
+    /// <see cref="EvaluationFailed"/>. The AEF run closes aborted with it. Null when the benchmark ran every case.
+    /// </summary>
+    public string? StopCode { get; init; }
+
     /// <summary>How many cases got <paramref name="verdict"/>.</summary>
     /// <param name="verdict">The verdict.</param>
     public int Count(CaseVerdict verdict) => Cases.Count(c => c.Verdict == verdict);
@@ -229,6 +250,7 @@ internal static class Benchmark
 
         var outcomes = new List<CaseOutcome>(cases.Count);
         string? stopReason = null;
+        string? stopCode = null;
         for (var index = 0; index < cases.Count; index++)
         {
             var demoCase = cases[index];
@@ -250,14 +272,17 @@ internal static class Benchmark
             catch (WorkIqTurnBudgetExceededException ex)
             {
                 stopReason = $"the --max-turns cap ({ex.MaxTurns.ToString(CultureInfo.InvariantCulture)}) was reached after {ex.TurnsUsed.ToString(CultureInfo.InvariantCulture)} turn(s); nothing more was sent";
+                stopCode = BenchmarkOutcome.TurnCapReached;
             }
             catch (FatalEvaluationException ex)
             {
                 stopReason = "the run stopped: " + WorkIqRedaction.Redact(ex.Message);
+                stopCode = BenchmarkOutcome.EvaluationFailed;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 stopReason = "the run was canceled";
+                stopCode = BenchmarkOutcome.Canceled;
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -269,7 +294,10 @@ internal static class Benchmark
                     [new CheckOutcome(TurnCompleted, CheckResult.NotRun, "nothing was sent")],
                     null,
                     null,
-                    null));
+                    null)
+                {
+                    Harness = new TestResult { TestName = demoCase.Id, Error = ex },
+                });
                 continue;
             }
 
@@ -299,6 +327,7 @@ internal static class Benchmark
             if (cancellationToken.IsCancellationRequested)
             {
                 stopReason = "the run was canceled";
+                stopCode = BenchmarkOutcome.Canceled;
             }
         }
 
@@ -307,7 +336,7 @@ internal static class Benchmark
             console.Line(DemoVerbosity.Quiet, "  benchmark stopped early: " + stopReason, Tint.Warn);
         }
 
-        return new BenchmarkOutcome(outcomes, stopReason, CriteriaNotGraded(outcomes, judge));
+        return new BenchmarkOutcome(outcomes, stopReason, CriteriaNotGraded(outcomes, judge)) { StopCode = stopCode };
     }
 
     /// <summary>
@@ -367,7 +396,7 @@ internal static class Benchmark
             }
             else
             {
-                return ErrorOutcome(demoCase, error, fromAgent ?? turn, protocolFailure, judgeCalled);
+                return ErrorOutcome(demoCase, error, fromAgent ?? turn, protocolFailure, judgeCalled) with { Harness = result };
             }
         }
 
@@ -431,7 +460,11 @@ internal static class Benchmark
             CaseVerdict.NotMeasured => "not measured: " + string.Join("; ", list.Where(c => c.Result == CheckResult.NotMeasured).Select(c => $"{c.Name} ({c.Detail})")),
             _ => "every check passed" + (score is { } s ? $" (judge score {s.ToString(CultureInfo.InvariantCulture)}/100)" : ""),
         };
-        return new CaseOutcome(demoCase, verdict, WorkIqRedaction.Redact(reason), list, turn, score, criteria) { JudgeFailure = judgeFailure };
+        return new CaseOutcome(demoCase, verdict, WorkIqRedaction.Redact(reason), list, turn, score, criteria)
+        {
+            JudgeFailure = judgeFailure,
+            Harness = result,
+        };
     }
 
     /// <summary>

@@ -258,6 +258,26 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
     }
 
     [Fact]
+    public void AefRunSettings_AreTheProvidersSharedRunSettings_NotACopy()
+    {
+        var config = WriteConfig(
+            $$"""{ "tenantId": "{{TenantId}}", "appClientId": "{{AppClientId}}", "agentId": "T_contoso.sales-agent", "endpoint": "https://workiq.contoso.example/a2a/", "trustedHosts": ["workiq.contoso.example"] }""");
+        var target = new Microsoft365SutTarget(TextWriter.Null);
+        target.Validate(
+            new CommonTargetOptions { Sut = Microsoft365SutTarget.SutName, AckLiveSideEffects = true },
+            new Microsoft365SutOptions { ConfigFile = config, Profile = "native118" });
+
+        var shared = Microsoft365RunSettings.For(
+            Microsoft365Config.Load(config), DiagnosticProfile.Native118Diagnostics, EvidenceContentPolicy.SelectedContent);
+
+        // The CLI and the demo record the same keys with the same values: both take them from the provider's helper.
+        Assert.True(JsonNode.DeepEquals(shared, target.AefRunSettings(EvidenceContentPolicy.SelectedContent)));
+        Assert.True(JsonNode.DeepEquals(
+            Microsoft365RunSettings.For(Microsoft365Config.Load(config), DiagnosticProfile.Native118Diagnostics, contentPolicy: null),
+            target.RunSettings()));
+    }
+
+    [Fact]
     public void ComputeIdentitySha256_IsTheConfigHashTheIssuesCarry()
     {
         var config = Microsoft365Config.Load(WriteConfig());
@@ -336,25 +356,56 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
             TestName = "case-1",
             Passed = false,
             Score = 40,
+            ActualOutput = "",
             CriteriaResults = [new AgentEval.Core.CriterionResult { Criterion = "answers the question", Met = false, Explanation = "empty" }],
             Failure = new AgentEval.Models.FailureReport { WhyItFailed = "empty output" },
         };
 
-        evidence.ReviewResult(graded, "case-1");
+        var absence = evidence.ReviewResult(graded, "case-1");
 
         Assert.Equal(notMeasured, graded.HasError);
+        Assert.Equal(notMeasured, absence is not null);
         if (notMeasured)
         {
+            Assert.Equal(AgentEval.Results.Writing.AefState.NotMeasured, absence!.State);
+            Assert.Equal(AgentEval.Microsoft365.Evidence.Microsoft365Evidence.NoAnswerSelectedReason, absence.Reason);
             Assert.IsType<Microsoft365NoAnswerSelectedException>(graded.Error);
             Assert.Null(graded.CriteriaResults);   // a judge grade of the empty text is not a grade of the agent
             Assert.Null(graded.Failure);
             Assert.Equal(0, graded.Score);
+            Assert.Null(graded.ActualOutput);      // the empty stand-in text is not recorded as the agent's output
         }
         else
         {
             Assert.Equal(40, graded.Score);       // a measured turn keeps the harness's verdict
             Assert.NotNull(graded.CriteriaResults);
+            Assert.Equal("", graded.ActualOutput);
         }
+    }
+
+    [Fact]
+    public void CaseEvidence_ReviewResult_CriteriaNoJudgeGraded_NotMeasuredWithTheAnswerKept()
+    {
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+        var evidence = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }.CaseEvidenceFor(new FakeEvaluableAgent())!;
+        evidence.BeginCase("case-1");
+        sink.Record(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(new WorkIqTurnRequest("prompt", "case-1", "turn-1")));
+        var passedWithoutJudge = new AgentEval.Models.TestResult { TestName = "case-1", Passed = true, Score = 100, ActualOutput = "The pilot starts on 17 November." };
+
+        var absence = evidence.ReviewResult(passedWithoutJudge, "case-1", criteriaNotGraded: true);
+
+        Assert.NotNull(absence);
+        Assert.Equal(AgentEval.Results.Writing.AefState.NotMeasured, absence.State);
+        Assert.Contains("no judge", absence.Reason, StringComparison.Ordinal);
+        Assert.False(passedWithoutJudge.Passed);
+        Assert.Equal(0, passedWithoutJudge.Score);
+        Assert.True(passedWithoutJudge.HasError);
+        Assert.Equal("The pilot starts on 17 November.", passedWithoutJudge.ActualOutput);
+
+        // A case without criteria, or with a judge, keeps the harness's verdict.
+        var withJudge = new AgentEval.Models.TestResult { TestName = "case-1", Passed = true, Score = 90, ActualOutput = "x" };
+        Assert.Null(evidence.ReviewResult(withJudge, "case-1", criteriaNotGraded: false));
+        Assert.True(withJudge.Passed);
     }
 
     [Fact]
@@ -368,8 +419,8 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
         var errored = new AgentEval.Models.TestResult { TestName = "case-1", Error = new InvalidOperationException("earlier error") };
         var noTurn = new AgentEval.Models.TestResult { TestName = "case-2", Passed = false };
 
-        evidence.ReviewResult(errored, "case-1");
-        evidence.ReviewResult(noTurn, "case-2");
+        Assert.Null(evidence.ReviewResult(errored, "case-1"));
+        Assert.Null(evidence.ReviewResult(noTurn, "case-2"));
 
         Assert.IsType<InvalidOperationException>(errored.Error);
         Assert.False(noTurn.HasError);

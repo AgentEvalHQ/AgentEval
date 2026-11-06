@@ -413,8 +413,8 @@ public sealed class WorkIqIssueClassifierTests
     }
 
     [Theory]
-    [InlineData(WorkIqTurnOutcome.InputRequired, WorkIqIssueCategory.Service, "turn.input_required", "nothing was approved")]
-    [InlineData(WorkIqTurnOutcome.AuthRequired, WorkIqIssueCategory.Service, "turn.auth_required", "authorization")]
+    [InlineData(WorkIqTurnOutcome.InputRequired, WorkIqIssueCategory.Case, "turn.input_required", "nothing was approved")]
+    [InlineData(WorkIqTurnOutcome.AuthRequired, WorkIqIssueCategory.Authentication, "turn.auth_required", "authorization")]
     [InlineData(WorkIqTurnOutcome.Failed, WorkIqIssueCategory.Service, "turn.failed", "never an answer")]
     [InlineData(WorkIqTurnOutcome.Rejected, WorkIqIssueCategory.Service, "turn.rejected", "refused")]
     [InlineData(WorkIqTurnOutcome.Canceled, WorkIqIssueCategory.Service, "turn.canceled", "confirmed")]
@@ -501,7 +501,8 @@ public sealed class WorkIqIssueClassifierTests
     {
         var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(outcome, Failure(WorkIqFailureCategory.RemoteError)));
 
-        Assert.Equal(WorkIqIssueCategory.Service, category);
+        // A pause points at who can act on it: the case for a confirmation, the sign-in for a connector authorization.
+        Assert.Equal(outcome == WorkIqTurnOutcome.AuthRequired ? WorkIqIssueCategory.Authentication : WorkIqIssueCategory.Case, category);
         Assert.Equal(WorkIqConversation.OutcomeIssueCode(outcome), code);
         Assert.Equal(outcome == WorkIqTurnOutcome.AuthRequired ? WorkIqIssueClassifier.CauseAuthRequired : WorkIqIssueClassifier.CauseInputRequired, cause);
     }

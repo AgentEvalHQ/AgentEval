@@ -8,13 +8,13 @@
          never forced on every AgentEval consumer — the same reason AgentEval.MAF.CopilotStudio is its own project.
          This provider talks to Work IQ over A2A 1.0 directly and has NO Microsoft Agent Framework dependency, so
          it references Abstractions + Core only, never AgentEval.MAF. -->
-    <!-- NOTE: not yet wired into .github/workflows/release.yml's pack/publish steps, so it is NOT on NuGet. Like
-         the Copilot Studio bridge, its code reaches users only inside the AgentEval.Cli tool (sut=microsoft365)
-         until a release-cut decision publishes it. See this project's README "Not published to NuGet yet". -->
+    <!-- Not in the pack and publish steps of .github/workflows/release.yml, so it is not on NuGet. Like the
+         Copilot Studio bridge, its code reaches users only inside the AgentEval.Cli tool (sut=microsoft365) until
+         a release publishes it. See the "Install" section of this project's README. -->
     <IsPackable>true</IsPackable>
     <PackageId>AgentEval.Microsoft365</PackageId>
     <!-- Version is centralized in Directory.Build.props, same lockstep convention as AgentEval/AgentEval.Cli. -->
-    <Description>Microsoft 365 (Work IQ A2A 1.0) provider for AgentEval — evaluate a Microsoft 365 Copilot or declarative agent as an IEvaluableAgent in code or via agenteval --sut microsoft365. The live path is NOT independently verified against a tenant yet — see the package README.</Description>
+    <Description>Microsoft 365 (Work IQ A2A 1.0) provider for AgentEval. It evaluates Microsoft 365 Copilot or a declarative agent as an IEvaluableAgent, in code or with agenteval --sut microsoft365. Experimental (AGENTEVAL_M365_PREVIEW001); not yet verified on a live tenant.</Description>
     <PackageTags>ai;agent;evaluation;microsoft-365;copilot;work-iq;a2a</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>Per-version release notes: https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md</PackageReleaseNotes>

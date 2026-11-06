@@ -102,6 +102,75 @@ public class BenchMicrosoft365SutTests
                 sutOverride: fake);
 
             Assert.Null(error);
+            var bench = Assert.IsType<Microsoft365BenchAgent>(agent);
+            Assert.Same(fake, bench.Inner);
+            Assert.Equal(fake.Name, bench.Name);
+        }
+        finally { TryDelete(cfg); }
+    }
+
+    // ── a turn with no selected answer is never graded by a bench family ──
+
+    [Fact]
+    public void ForGradedBench_TellsTheTurnSink_SoTheWarningSaysNotMeasured_NotGradedOnAnEmptyText()
+    {
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+        var target = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink };
+
+        Assert.False(sink.UnselectedAnswerIsNotMeasured);
+        _ = target.ForGradedBench(new FakeEvaluableAgent());
+
+        Assert.True(sink.UnselectedAnswerIsNotMeasured);
+    }
+
+    [Fact]
+    public async Task Resolve_Microsoft365_ATurnWithNoSelectedAnswer_ThrowsInsteadOfHandingItsEmptyTextToTheFamily()
+    {
+        // The rule every host follows: a completed turn with several answer candidates and none selected is not measured.
+        // A bench family grades the text it gets, so the agent it drives throws, and the family records an error.
+        var cfg = WriteValidConfig();
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation
+            {
+                OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(request) with
+                {
+                    AnswerText = null,
+                    AnswerCompleteness = AgentEval.Microsoft365.OutputCompleteness.Ambiguous,
+                }),
+            };
+            var real = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-ambiguous");
+            await using (real)
+            {
+                var (agent, error) = BenchTier1SutResolver.Resolve(
+                    sut: "microsoft365", Options(cfg), BenchTargets(), ackLiveSideEffects: true, endpoint: null, model: null, apiKey: null, subject: "MyAgent",
+                    sutOverride: real);
+
+                Assert.Null(error);
+                await Assert.ThrowsAsync<Microsoft365NoAnswerSelectedException>(() => agent!.InvokeAsync("When does the pilot start?"));
+
+                // A turn with a selected answer passes through unchanged.
+                conversation.OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(request));
+                Assert.Equal("The pilot starts on 17 November.", (await agent!.InvokeAsync("When does the pilot start?")).Text);
+            }
+        }
+        finally { TryDelete(cfg); }
+    }
+
+    [Fact]
+    public void Resolve_Microsoft365_ForPerf_TheAgentIsNotWrapped()
+    {
+        // perf measures time: a turn with no selected answer is still a timed turn, so its agent is left as built.
+        var cfg = WriteValidConfig();
+        try
+        {
+            IEvaluableAgent fake = new FakeEvaluableAgent();
+
+            var (agent, error) = BenchTier1SutResolver.Resolve(
+                sut: "microsoft365", Options(cfg), BenchTargets(), ackLiveSideEffects: true, endpoint: null, model: null, apiKey: null, subject: "MyAgent",
+                sutOverride: fake, gradesAnswers: false);
+
+            Assert.Null(error);
             Assert.Same(fake, agent);
         }
         finally { TryDelete(cfg); }

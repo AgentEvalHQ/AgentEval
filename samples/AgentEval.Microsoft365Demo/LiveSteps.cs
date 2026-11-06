@@ -11,7 +11,7 @@ namespace AgentEval.Microsoft365Demo;
 /// The live steps after readiness. They run only when readiness passed and the consent was given; otherwise their stage
 /// rows say why not. When they run: the live agent is built once (fresh context per turn, the turn cap, the run's sinks
 /// and token source), then the prompt step (<see cref="PromptStep"/>) and the benchmark (<see cref="Benchmark"/>) run
-/// through it.
+/// through it. The benchmark is then written as a sealed AEF run (<see cref="BenchmarkAef"/>).
 /// </summary>
 internal static class LiveSteps
 {
@@ -107,7 +107,7 @@ internal static class LiveSteps
         }
 
         var cases = caseSet ?? throw new InvalidOperationException("The benchmark runs without its cases.");
-        await RunBenchmarkAsync(context, agent, cases, judge, record, cancellationToken).ConfigureAwait(false);
+        await RunBenchmarkAsync(context, agent, loaded, cases, judge, record, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>The benchmark's row when it does not run: skipped with <c>--no-benchmark</c>, else <paramref name="result"/> with <paramref name="why"/>.</summary>
@@ -115,7 +115,7 @@ internal static class LiveSteps
         ? new StageRow(StageNames.Benchmark, StageResult.Skipped, "not requested (--no-benchmark)")
         : new StageRow(StageNames.Benchmark, result, why);
 
-    private static async Task RunBenchmarkAsync(DemoContext context, WorkIqEvaluableAgent agent, DemoCaseSet caseSet, JudgeChoice judge, RunRecord record, CancellationToken cancellationToken)
+    private static async Task RunBenchmarkAsync(DemoContext context, WorkIqEvaluableAgent agent, Microsoft365Config config, DemoCaseSet caseSet, JudgeChoice judge, RunRecord record, CancellationToken cancellationToken)
     {
         var console = context.Console;
         var cases = caseSet.Cases;
@@ -125,8 +125,10 @@ internal static class LiveSteps
         // that chose it), or that none does. A judge call costs money on the provider the environment selects.
         console.Line(DemoVerbosity.Quiet, "  judge: " + judge.Description, judge.IsAvailable ? Tint.Accent : Tint.Warn);
 
+        var startedAt = context.Now();
         var benchmark = await Benchmark.RunAsync(agent, cases, judge, context.Turns, console, cancellationToken).ConfigureAwait(false);
         record.Benchmark = benchmark;
+        record.Aef = BenchmarkAef.Write(context, config, caseSet, judge, benchmark, startedAt);
         var fail = benchmark.Count(CaseVerdict.Fail);
         var error = benchmark.Count(CaseVerdict.Error);
         var notMeasured = benchmark.Count(CaseVerdict.NotMeasured);

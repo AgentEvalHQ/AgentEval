@@ -51,6 +51,10 @@ internal static class BenchTier1SutResolver
     /// (always <see langword="null"/> in production); tests drive the real <c>CopilotStudioRedTeamTarget</c>
     /// end to end with a benign fake agent instead of a fake <see cref="ISutTarget"/>.
     /// </param>
+    /// <param name="gradesAnswers">
+    /// Whether the bench family grades the agent's answer text (every family but <c>perf</c>, which measures time). A
+    /// <c>--sut</c> agent then goes through <see cref="ISutTarget.ForGradedBench"/>, so a stand-in text is never graded.
+    /// </param>
     public static (IEvaluableAgent? Agent, string? Error) Resolve(
         string? sut,
         IReadOnlyDictionary<string, ISutTargetOptions?> targetOptions,
@@ -60,7 +64,8 @@ internal static class BenchTier1SutResolver
         string? model,
         string? apiKey,
         string subject,
-        IEvaluableAgent? sutOverride = null)
+        IEvaluableAgent? sutOverride = null,
+        bool gradesAnswers = true)
     {
         if (sut is not null)
         {
@@ -74,7 +79,8 @@ internal static class BenchTier1SutResolver
             try
             {
                 var (sutAgent, _) = SutTargetResolver.TryResolve(common, targets, sutOverride);
-                return (sutAgent, null);
+                var target = SutTargetResolver.Find(targets, sut);
+                return (gradesAnswers && sutAgent is not null && target is not null ? target.ForGradedBench(sutAgent) : sutAgent, null);
             }
             catch (InvalidOperationException ex)
             {

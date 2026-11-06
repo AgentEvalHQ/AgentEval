@@ -521,3 +521,7 @@ m365-demo-runs/
 **/m365-demo-runs/
 m365-demo-runs*.zip
 **/m365-demo-runs*.zip
+m365-results/
+**/m365-results/
+m365-raw/
+**/m365-raw/

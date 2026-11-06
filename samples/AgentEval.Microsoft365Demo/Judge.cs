@@ -29,6 +29,12 @@ internal sealed record JudgeChoice(IChatClient? Client, string Description, stri
     /// <summary>Whether the criteria are graded.</summary>
     public bool IsAvailable => Client is not null;
 
+    /// <summary>The judge's model, when the demo resolved it; null for a host's client, whose model the demo does not know.</summary>
+    public string? Model { get; init; }
+
+    /// <summary>The judge's provider tag (<c>azure</c>, <c>openai</c>, <c>bitdeer</c>, …), when the demo resolved it.</summary>
+    public string? Provider { get; init; }
+
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -90,7 +96,11 @@ internal static class JudgeResolver
             IChatClient client = settings.UsesAzureProtocol
                 ? new AzureOpenAIClient(endpoint, new AzureKeyCredential(key)).GetChatClient(model).AsIChatClient().WithMinimalReasoning()
                 : new OpenAIClient(new ApiKeyCredential(key), new OpenAIClientOptions { Endpoint = endpoint }).GetChatClient(model).AsIChatClient().WithMinimalReasoning();
-            return new JudgeChoice(client, $"{settings.DisplayName}, model {model} ({ChosenBy(settings)}); judge calls cost money on that provider", "", Owned: true);
+            return new JudgeChoice(client, $"{settings.DisplayName}, model {model} ({ChosenBy(settings)}); judge calls cost money on that provider", "", Owned: true)
+            {
+                Model = model,
+                Provider = settings.ProviderTag,
+            };
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UriFormatException)
         {

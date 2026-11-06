@@ -240,20 +240,25 @@ public sealed class WorkIqEvaluableAgentTests
         {
             await Assert.ThrowsAsync<IOException>(() => agent.InvokeAsync("x"));
 
-            Assert.Contains(trace.Events, e => e.Code == "agent.sink_failed" && e.Level == WorkIqTraceLevel.Error);
+            // The sink's exception replaces the response: the trace says the caller lost the result, never that it is still there.
+            var failed = Assert.Single(trace.Events, e => e.Code == "agent.sink_failed" && e.Level == WorkIqTraceLevel.Error);
+            Assert.Contains("does not get this turn's result", failed.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("still on", failed.Message, StringComparison.Ordinal);
         }
     }
 
     [Fact]
-    public async Task InvokeAsync_ProtocolExceptionFromConversation_PropagatesWithoutCounting()
+    public async Task InvokeAsync_ProtocolExceptionFromConversation_PropagatesAndCountsWithoutASinkCall()
     {
+        // No turn result exists, so the sink sees nothing. The turn started, so it counts: only a turn the conversation
+        // refused before it started is not counted (MaxTurns bounds sends, and an exception cannot prove none went out).
         var (conversation, agent, sink, _) = Build();
         conversation.OnRun = (_, _) => throw new WorkIqProtocolException(new WorkIqFailure(WorkIqFailureCategory.UntrustedHost, "refused", OutcomeCertainty.Known, WorkIqOperation.Discover));
         await using (agent)
         {
             await Assert.ThrowsAsync<WorkIqProtocolException>(() => agent.InvokeAsync("x"));
 
-            Assert.Equal(0, agent.TurnsUsed);
+            Assert.Equal(1, agent.TurnsUsed);
             Assert.Empty(sink);
         }
     }
@@ -295,6 +300,62 @@ public sealed class WorkIqEvaluableAgentTests
             await Assert.ThrowsAsync<WorkIqTurnBudgetExceededException>(() => agent.InvokeAsync("two"));
 
             Assert.Single(conversation.Turns);
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ATurnThatThrowsWithoutAResult_StillCountsTowardTheBudget()
+    {
+        // A reply shape that crashes the evidence normaliser: the prompt went out, then the turn threw with no result.
+        var (conversation, agent, _, trace) = Build(new WorkIqOptions { MaxTurns = 1 });
+        conversation.OnRun = (_, _) => Task.FromException<WorkIqTurnResult>(new InvalidDataException("the normaliser could not read the reply"));
+        await using (agent)
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => agent.InvokeAsync("one"));
+
+            Assert.Equal(1, agent.TurnsUsed);
+            Assert.Contains(trace.Events, e => e.Code == "agent.turn_failed" && e.Level == WorkIqTraceLevel.Error);
+            await Assert.ThrowsAsync<WorkIqTurnBudgetExceededException>(() => agent.InvokeAsync("two"));
+            Assert.Single(conversation.Turns);
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ATurnTheConversationRefusedBeforeItStarted_IsNotCounted()
+    {
+        var (conversation, agent, _, _) = Build(new WorkIqOptions { MaxTurns = 1 });
+        conversation.OnRun = (_, _) => Task.FromException<WorkIqTurnResult>(new WorkIqTurnRefusedException("another turn owns the conversation"));
+        await using (agent)
+        {
+            var refused = await Assert.ThrowsAsync<WorkIqTurnRefusedException>(() => agent.InvokeAsync("one"));
+            Assert.IsAssignableFrom<InvalidOperationException>(refused);
+            Assert.Equal(0, agent.TurnsUsed);
+
+            conversation.OnRun = (request, _) => Task.FromResult(TurnResults.Completed(request));
+            await agent.InvokeAsync("two");
+            Assert.Equal(1, agent.TurnsUsed);
+        }
+    }
+
+    [Fact]
+    public async Task InvokeAsync_TheConversationsTurnGate_RefusesWithTheTypeTheAgentDoesNotCount()
+    {
+        // The real gate: a turn that is still running holds the conversation, so the next turn is refused unsent.
+        var client = new AgentEval.Tests.Microsoft365.Conversation.FakeWorkIqA2AClient
+        {
+            Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
+        };
+        var conversation = new WorkIqConversation(client, WorkIqClientHarness.DefaultConfig(), new WorkIqOptions(), TimeProvider.System);
+        var agent = new WorkIqEvaluableAgent(conversation, "gated", new WorkIqOptions { ConversationPolicy = ConversationPolicy.ContinueContext, MaxTurns = 5 });
+        await using (agent)
+        {
+            var running = conversation.RunTurnAsync(new WorkIqTurnRequest("first", "case-0", "turn-0"));
+
+            await Assert.ThrowsAsync<WorkIqTurnRefusedException>(() => agent.InvokeAsync("second"));
+
+            Assert.Equal(0, agent.TurnsUsed);
+            client.Gate.SetResult();
+            await running;
         }
     }
 

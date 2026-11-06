@@ -95,4 +95,7 @@ public enum WorkIqIssueCategory
 
     /// <summary>Not classified; the message says what is known.</summary>
     Unknown,
+
+    /// <summary>The evaluation case: the agent paused for a confirmation or input that a run never gives. Rephrase the case.</summary>
+    Case,
 }

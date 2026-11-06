@@ -335,7 +335,7 @@ public sealed class WorkIqDiagnosticsFactoryTests : IDisposable
             ReportName = "the readiness report",
         };
 
-        using (var diagnostics = WorkIqDiagnosticsFactory.Create(configSha256: null, options, new FakeTimeProvider(Start), setup))
+        using (var diagnostics = WorkIqDiagnosticsFactory.Create(configSha256: null, options, new FakeTimeProvider(Start), setup)) // DevSkim: ignore DS197836 - configSha256 is the config file's hash and the clock is a separate parameter; nothing hashes a time value
         {
             diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Discovery, WorkIqIssueCategory.Permission, "http.403", "Forbidden", "Consent missing."));
 
