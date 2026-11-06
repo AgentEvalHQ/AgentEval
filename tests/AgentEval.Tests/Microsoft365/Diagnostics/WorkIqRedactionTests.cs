@@ -32,9 +32,9 @@ public sealed class WorkIqRedactionTests
         { "client_secret=s3cr3t&access_token=tok&refresh_token=ref&id_token=idt", "client_secret=[redacted]&access_token=[redacted]&refresh_token=[redacted]&id_token=[redacted]" },
         { "error_code=42 http_code=401", "error_code=42 http_code=401" },
         { "code= nothing", "code= nothing" },
-        { "Set-Cookie: session=abc; Path=/; HttpOnly", "Set-Cookie: [redacted]" },
+        { "Set-Cookie: session=abc; Path=/; HttpOnly", "Set-Cookie: [redacted]" }, // DevSkim: ignore DS610001 - test input for the Set-Cookie redaction, not a cookie this code sets
         { "Cookie: a=1; b=2", "Cookie: [redacted]" },
-        { "HTTP/1.1 200 OK\r\nSet-Cookie: a=b\r\nrequest-id: 123", "HTTP/1.1 200 OK\r\nSet-Cookie: [redacted]\r\nrequest-id: 123" },
+        { "HTTP/1.1 200 OK\r\nSet-Cookie: a=b\r\nrequest-id: 123", "HTTP/1.1 200 OK\r\nSet-Cookie: [redacted]\r\nrequest-id: 123" }, // DevSkim: ignore DS610001 - test input for the Set-Cookie redaction, not a cookie this code sets
         { "{\"access_token\":\"opaque.token.value\",\"refresh_token\": \"0.AXoA-refresh\",\"token_type\":\"Bearer\"}", "{\"access_token\":\"[redacted]\",\"refresh_token\": \"[redacted]\",\"token_type\":\"Bearer\"}" },
         { "{\"Authorization\":\"Bearer abc\",\"Cookie\":\"a=1\",\"A2A-Version\":\"1.0\"}", "{\"Authorization\":\"[redacted]\",\"Cookie\":\"[redacted]\",\"A2A-Version\":\"1.0\"}" },
         { "{\"error\":{\"code\":\"TooManyRequests\",\"message\":\"slow down\"}}", "{\"error\":{\"code\":\"TooManyRequests\",\"message\":\"slow down\"}}" },
@@ -133,7 +133,7 @@ public sealed class WorkIqRedactionTests
         {
             Content = new StringContent("{}", Encoding.UTF8, "application/json"),
         };
-        response.Headers.TryAddWithoutValidation("Set-Cookie", "session=abc; HttpOnly");
+        response.Headers.TryAddWithoutValidation("Set-Cookie", "session=abc; HttpOnly"); // DevSkim: ignore DS610001 - test input for the Set-Cookie redaction, not a cookie this code sets
         response.Headers.TryAddWithoutValidation("request-id", "4c2e9a7b");
         response.Headers.TryAddWithoutValidation("Retry-After", "7");
 

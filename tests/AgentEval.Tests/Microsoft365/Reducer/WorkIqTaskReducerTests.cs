@@ -53,7 +53,7 @@ public sealed class WorkIqTaskReducerTests
         var clock = new FakeTimeProvider(ClockStart);
         var trace = new ListTraceSink();
         var issues = new ListIssueSink();
-        var diagnostics = new WorkIqDiagnostics("run-reduce", "sha-1", [trace], [issues], clock);
+        var diagnostics = new WorkIqDiagnostics("run-reduce", "config-hash-1", [trace], [issues], clock);
         var reducer = new WorkIqTaskReducer(template ?? SseFixtureFrames.Template(), clock, diagnostics, caseId, turnId);
         return (reducer, trace, issues, clock);
     }

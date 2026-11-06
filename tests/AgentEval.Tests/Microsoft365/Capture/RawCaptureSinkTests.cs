@@ -51,7 +51,7 @@ public sealed class RawCaptureSinkTests : IDisposable
     {
         var trace = new ListTraceSink();
         var issues = new ListIssueSink();
-        return (new WorkIqDiagnostics("run-1", "sha-1", [trace], [issues], new FakeTimeProvider(Start)), trace, issues);
+        return (new WorkIqDiagnostics("run-1", "config-hash-1", [trace], [issues], new FakeTimeProvider(Start)), trace, issues);
     }
 
     private static HttpRequestMessage Request(string body = RequestJson)

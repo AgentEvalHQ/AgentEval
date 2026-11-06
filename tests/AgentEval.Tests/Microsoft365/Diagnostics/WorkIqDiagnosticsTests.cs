@@ -19,7 +19,7 @@ public sealed class WorkIqDiagnosticsTests
     private const string Jws = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
 
     private static (WorkIqDiagnostics Diagnostics, ListTraceSink Trace, ListIssueSink Issues, FakeTimeProvider Clock) Build(
-        string runId = "run-1", string? sha = "sha-1", IWorkIqTraceSink? extraTrace = null, TextWriter? fallback = null)
+        string runId = "run-1", string? sha = "config-hash-1", IWorkIqTraceSink? extraTrace = null, TextWriter? fallback = null)
     {
         var clock = new FakeTimeProvider(Start);
         var trace = new ListTraceSink();
@@ -221,7 +221,7 @@ public sealed class WorkIqDiagnosticsTests
         var issue = Assert.Single(issues.Issues);
         Assert.Equal(Start, issue.At);
         Assert.Equal("run-1", issue.RunId);
-        Assert.Equal("sha-1", issue.ConfigSha256);
+        Assert.Equal("config-hash-1", issue.ConfigSha256);
         Assert.Equal(WorkIqDiagnostics.AdapterVersion, issue.AdapterVersion);
         Assert.Equal("1.0", issue.A2AVersion);
         Assert.Equal(1, diagnostics.IssueCount);
