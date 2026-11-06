@@ -23,7 +23,12 @@ public sealed class GatekeeperOptions
     private readonly List<ToolContract> _toolContracts = new();
     private MemoryProtectionOptions? _memoryProtection;
 
-    /// <summary>Tool gates, run in order on every tool call (via <c>UseAgentEvalToolGate</c>).</summary>
+    /// <summary>
+    /// Tool gates, run in order (via <c>UseAgentEvalToolGate</c>) on every function the agent passes to the
+    /// function-invoking client through <c>ChatOptions.Tools</c> (agent, constructor or per-run tools). They do not
+    /// see functions on <c>FunctionInvokingChatClient.AdditionalTools</c> or tools from an <c>AIContextProvider</c>
+    /// registered on the chat-client pipeline (<c>UseAIContextProviders</c>); MAF documents both since 1.26.
+    /// </summary>
     public IList<IToolGate> ToolGates { get; } = new List<IToolGate>();
 
     /// <summary>

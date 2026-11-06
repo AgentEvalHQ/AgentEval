@@ -28,7 +28,7 @@ namespace AgentEval.MAF;
 /// <b>ChatProtocol requirement:</b> MAF's <c>AIAgentHostExecutor</c> (created by
 /// <c>BindAsExecutor</c>) uses <c>ChatProtocolExecutor</c> internally, which requires:
 /// (1) Input as <see cref="ChatMessage"/> (a plain string is accepted only when the executor sets a string
-/// message role, as MAF 1.24's <c>AIAgentHostExecutor</c> does; a <c>ChatProtocolExecutor</c> without one drops it), and
+/// message role, as MAF 1.24-1.27's <c>AIAgentHostExecutor</c> does; a <c>ChatProtocolExecutor</c> without one drops it), and
 /// (2) A <see cref="MAFWorkflows.TurnToken"/> to trigger actual LLM processing.
 /// This bridge sends both automatically. The <c>TurnToken</c> is forwarded downstream
 /// through the workflow chain, so only the initial send is needed.
@@ -122,7 +122,7 @@ public static partial class MAFWorkflowEventBridge
         if (isChatProtocol)
         {
             // Send a ChatMessage: every ChatProtocolExecutor accumulates one, while a plain string is accepted
-            // only when the executor sets a string message role (AIAgentHostExecutor does in MAF 1.24).
+            // only when the executor sets a string message role (AIAgentHostExecutor does in MAF 1.24-1.27).
             inputMessage = new ChatMessage(ChatRole.User, input);
             using var timingScope = timing.Enter();
             run = await MAFWorkflows.InProcessExecution

@@ -138,6 +138,11 @@ detection quality. The scripted path remains the deterministic evidence, and the
 - **The AgentHooks adapter rejects run-scoped gates** (`RunBudgetGate`, `SequenceGate`, anything declaring `GateRequirements.RunScope`). An AGENT-HOOKS host establishes no run scope, so their state would be shared across sessions. Use them inside a MAF agent built with `UseGatekeeper`.
 - **Without `messages`, conversation-correlating gates have nothing to check.** The adapter still evaluates the call, and its allow carries a `no_conversation` warning.
 - **Inline semantic judges need a certificate for the model in use.** Calibration on the calibration set is not evidence of generalisation.
+- **Tool gates see only the functions the agent passes to the function-invoking client through `ChatOptions.Tools`** (agent, constructor or per-run tools). Two tool sources bypass `UseAgentEvalToolGate`, so no tool gate runs on them:
+  - functions placed on `FunctionInvokingChatClient.AdditionalTools`;
+  - tools from an `AIContextProvider` registered on the chat-client pipeline (`UseAIContextProviders`), as opposed to one registered on the agent.
+
+  This is existing MAF behaviour, not a change in 1.27. MAF documented both in 1.26 (#9409, #9429): its function-invocation callbacks, the seam the gates use, must not be relied on for checks on those tools. `GatekeeperCoverageAnalyzer` reads only `ChatOptions.Tools`, so it does not list `AdditionalTools`.
 
 ## Deferred and demand-gated work
 

@@ -15,6 +15,10 @@ AgentEval stops being an offline evaluation harness and plugs into a live agent 
   `gate.*` trace evidence.
   - **Tool gates** — `UseAgentEvalToolGate` over the function-invocation seam: `ForbiddenToolGate`,
     `ArgumentPatternGate`, `SequenceGate`, enforced by `ToolGatePolicy` (WarnOnly / ReplaceResult / Terminate).
+    They run on every function the agent passes to the function-invoking client through `ChatOptions.Tools`
+    (agent, constructor or per-run tools). Functions on `FunctionInvokingChatClient.AdditionalTools` and tools
+    from an `AIContextProvider` registered on the chat-client pipeline bypass them; see the
+    [known limitations](../../docs/gatekeeper/implementation-status.md#gatekeeper-v1-2026-10-01).
   - **Run gates** — `UseAgentEvalGate` inspects the run's input (incoming attack) and output (leak) text.
   - **Session gates** — `OperatorAuthGate`, `RateLimitGate`, `QuarantineGate` (fail-closed).
   - **Shadow judge** — `UseAgentEvalShadowJudge` runs the expensive LLM/network checks the inline gates reject,

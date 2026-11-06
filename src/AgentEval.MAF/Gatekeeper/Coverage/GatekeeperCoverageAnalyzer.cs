@@ -18,11 +18,18 @@ namespace AgentEval.MAF.Gatekeeper;
 /// back out of a built <see cref="AIAgent"/>. Pass the SAME list you registered (mirrors how <c>ShadowJudgePump</c>
 /// is caller-owned elsewhere in Gatekeeper).</para>
 /// <para><b>Coverage is structural, not semantic.</b> Every registered <see cref="IToolGate"/> sees every
-/// local <see cref="AIFunction"/> call (there is no per-tool gate targeting yet — see the review's finding #8),
+/// function the agent passes to the function-invoking client through <c>ChatOptions.Tools</c> (agent, constructor
+/// or per-run tools; there is no per-tool gate targeting yet — see the review's finding #8),
 /// so "protected" here means "at least one tool gate is wired into the pipeline for this tool's execution
 /// model," not "a gate specifically defends this exact tool." That is still the honest, useful question: it
 /// answers "is the interception seam even reachable for this tool," which is exactly what today's silent gaps
 /// (provider-hosted tools, an agent with zero gates registered) hide.</para>
+/// <para><b>Two tool sources bypass the gate seam.</b> Functions on <c>FunctionInvokingChatClient.AdditionalTools</c>
+/// and tools from an <c>AIContextProvider</c> registered on the chat-client pipeline (<c>UseAIContextProviders</c>)
+/// do not go through the function-invocation callbacks <c>UseAgentEvalToolGate</c> registers, so no tool gate sees
+/// them. This is existing MAF behaviour, which MAF documented in 1.26 (#9409, #9429). This analyzer reads only
+/// <c>ChatOptions.Tools</c>, so it does not list <c>AdditionalTools</c>, and "protected" in its report never extends
+/// to either source.</para>
 /// <para><b>Blind to tools an <see cref="Microsoft.Agents.AI.AIContextProvider"/> injects at invocation time.</b>
 /// <see cref="Analyze(AIAgent,IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/> reads <c>ChatOptions.Tools</c> off
 /// the agent — the STATIC, build-time tool list. A tool an <c>AIContextProvider</c> (e.g. Agent Skills, a memory
@@ -115,7 +122,7 @@ public static class GatekeeperCoverageAnalyzer
         IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates, AnalyzeOptions? options, bool hasDynamicProvider)
     {
         options ??= AnalyzeOptions.Default;
-        var hasToolGate = toolGates is { Count: > 0 };   // every registered gate sees every local-function call (structural, see class doc)
+        var hasToolGate = toolGates is { Count: > 0 };   // every registered gate sees every ChatOptions.Tools function call; AdditionalTools and chat-client provider tools bypass it (structural, see class doc)
 
         var entries = new List<ToolCoverageEntry>();
         foreach (var tool in tools)

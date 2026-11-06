@@ -649,7 +649,7 @@ public partial class MAFWorkflowEventBridgeTests : IDisposable
     }
 
     // ── Exact MAF event orderings (TranslateEventsAsync) ────────────────
-    // These feed the translator the event shapes MAF 1.24 raises (one ExecutorInvokedEvent per delivered
+    // These feed the translator the event shapes MAF 1.24-1.27 raises (one ExecutorInvokedEvent per delivered
     // message, bracketed by SuperStepStarted/Completed), including orderings a live run produces only
     // nondeterministically, and read the result back through the adapter exactly as FromMAFWorkflow does.
 

@@ -3,14 +3,17 @@
 // Licensed under the MIT License.
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREVIEW: agent.EvaluateAsync() extension method
+// SAMPLE SHIM: an agent.EvaluateAsync() extension method of this sample's own
 //
-// MAF's ADR-0020 defines AgentEvaluationExtensions.EvaluateAsync() as extension
-// methods on AIAgent. That API is not yet shipped in Microsoft.Agents.AI.
+// MAF ships its own AgentEvaluationExtensions.EvaluateAsync() in
+// Microsoft.Agents.AI (five overloads in 1.27.0, see
+// docs/using-agenteval-with-maf-evals.md). This file is NOT that API.
 //
-// This preview implementation provides the same developer experience today.
-// When MAF ships the official version, swap this using for theirs — the call
-// sites remain identical.
+// This sample keeps its own shim on purpose. It passes the MEAI evaluator the
+// full conversation: the query plus every response message, tool turns
+// included. MAF's built-in MEAI overload passes only the query and the final
+// response, and it needs a ChatConfiguration. Sample A5 calls these methods
+// without one, so its calls bind here, not to MAF.
 //
 // This file lives in SAMPLES, not in the AgentEval production package.
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -25,8 +28,8 @@ using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult
 namespace AgentEval.Samples;
 
 /// <summary>
-/// Preview of MAF's <c>agent.EvaluateAsync()</c> from ADR-0020.
-/// Runs the agent per query, passes conversation to MEAI evaluator, aggregates results.
+/// This sample's own <c>agent.EvaluateAsync()</c> shim, not MAF's API (see the file header).
+/// Runs the agent per query, passes the full conversation to the MEAI evaluator, aggregates results.
 /// </summary>
 public static class EvaluateAsyncPreview
 {

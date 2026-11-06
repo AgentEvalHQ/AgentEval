@@ -30,7 +30,7 @@ simply:
 *final answer*. Grading with `IAgentEvaluator` is like having the full worked solution in front of
 you — every step (every tool call) is visible.
 
-**Why this changes tool-metric results (.NET MAF 1.24.0).** When you pass an `IEvaluator` to
+**Why this changes tool-metric results (.NET MAF 1.24.0-1.27.0; the evaluation source is unchanged).** When you pass an `IEvaluator` to
 `agent.EvaluateAsync`, MAF wraps it in an internal
 adapter that *splits* each conversation and forwards only the query half + the final response — the
 middle, where the agent actually **called the tools**, is dropped. So a code-based metric that checks
@@ -42,8 +42,10 @@ evidence lose that evidence too; this affects misinformation and groundedness ch
 
 The projection has two parts: MAF's orchestration retains the transcript in `EvalItem.Conversation`
 but builds `RawResponse` from its last returned message; its MEAI adapter sends the split's query
-messages and that response. A local synthetic transcript containing an assistant function call,
-tool result and final assistant reply confirmed the following with the pinned package:
+messages and that response. An offline test,
+`tests/AgentEval.Tests/MAF/MAFEvaluateAsyncProjectionTests.cs`, pins the following on the package
+version this repository references, with a scripted agent whose transcript holds an assistant
+function call, a tool result and a final assistant reply:
 
 | Route | Messages received by the wrapped MEAI evaluator | Current turn's tool call/result |
 |---|---|---|
@@ -55,8 +57,8 @@ This is a projection check, not a model-quality test or proof that a real tool e
 invoking an MEAI evaluator directly, supplying a different `RawResponse`, or implementing a custom
 splitter can provide different evidence. The loss described here is in the built-in orchestration
 and adapter, not an AgentEval removal of tool turns. See the upstream
-[orchestration](https://github.com/microsoft/agent-framework/blob/4982e4c61ec81cc4f9ba0cbdb5594ed530dbbcfe/dotnet/src/Microsoft.Agents.AI/Evaluation/AgentEvaluationExtensions.cs)
-and [MEAI adapter](https://github.com/microsoft/agent-framework/blob/4982e4c61ec81cc4f9ba0cbdb5594ed530dbbcfe/dotnet/src/Microsoft.Agents.AI/Evaluation/MeaiEvaluatorAdapter.cs).
+[orchestration](https://github.com/microsoft/agent-framework/blob/dotnet-1.27.0/dotnet/src/Microsoft.Agents.AI/Evaluation/AgentEvaluationExtensions.cs)
+and [MEAI adapter](https://github.com/microsoft/agent-framework/blob/dotnet-1.27.0/dotnet/src/Microsoft.Agents.AI/Evaluation/MeaiEvaluatorAdapter.cs).
 
 **Recommendation:** use the native path.
 

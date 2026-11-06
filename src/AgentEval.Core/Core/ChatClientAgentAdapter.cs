@@ -106,6 +106,10 @@ public class ChatClientAgentAdapter
         var messages = BuildMessages(prompt);
         var textBuilder = new StringBuilder();
         var usageAccumulator = new StreamingUsageAccumulator();
+        // A call re-created for a rejected approval decision never ran: it is reported neither as started nor as
+        // completed (MAF 1.25+ #9152; the same rule as ToolUsageExtractor's default path). A chunk carries no drop
+        // count, so unlike the default extractor the stream omits the call without counting a drop or warning.
+        var rejectedApprovals = new RejectedApprovalCallTracker();
 
         await foreach (var update in _chatClient.GetStreamingResponseAsync(messages, EffectiveChatOptions(), cancellationToken))
         {
@@ -125,6 +129,11 @@ public class ChatClientAgentAdapter
             {
                 foreach (var content in update.Contents)
                 {
+                    if (rejectedApprovals.IsRejectedCallPart(content))
+                    {
+                        continue;
+                    }
+
                     if (content is UsageContent usage)
                     {
                         usageAccumulator.Add(usage.Details);
