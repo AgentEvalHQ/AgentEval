@@ -5,7 +5,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
-    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
+    <!-- The Microsoft 365 provider is experimental as a whole assembly (AGENTEVAL_M365_PREVIEW001); its samples use it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001;AGENTEVAL_M365_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +16,8 @@
     <ProjectReference Include="..\..\src\AgentEval.Evals.Agentic\AgentEval.Evals.Agentic.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
+    <!-- Group R (Microsoft 365): the Work IQ A2A provider is its own opt-in project, not part of the AgentEval umbrella. -->
+    <ProjectReference Include="..\..\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MissionControl\AgentEval.MissionControl.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />

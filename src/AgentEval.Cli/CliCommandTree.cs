@@ -128,7 +128,7 @@ internal static class CliCommandTree
         benchGdprCmd.Add(benchAefOpt);
         benchGdprCmd.Add(benchNoAefOpt);
         benchGdprCmd.Add(benchSubjectVersionOpt);
-        var (benchGdprSutOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
+        var (benchGdprSutOpt, benchGdprAckOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
         benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
@@ -159,6 +159,7 @@ internal static class CliCommandTree
                 sut,
                 benchGdprSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchGdprSutTargets,
+                parseResult.GetValue(benchGdprAckOpt),
                 endpoint: null,
                 model: null,
                 apiKey: null,
@@ -173,7 +174,8 @@ internal static class CliCommandTree
             if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
             return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
                 aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
-                agentIsLive: agentOverride is not null);
+                agentIsLive: agentOverride is not null,
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut));
         });
 
         // bench gdpr calibrate
@@ -227,7 +229,7 @@ internal static class CliCommandTree
         benchEuAiActCmd.Add(benchEuAiActAefOpt);
         benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
         benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
-        var (benchEuAiActSutOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
+        var (benchEuAiActSutOpt, benchEuAiActAckOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
         benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -260,6 +262,7 @@ internal static class CliCommandTree
                 sut,
                 benchEuAiActSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchEuAiActSutTargets,
+                parseResult.GetValue(benchEuAiActAckOpt),
                 endpoint: null,
                 model: null,
                 apiKey: null,
@@ -275,7 +278,8 @@ internal static class CliCommandTree
             return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
                 aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
-                runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1);
+                runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1,
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut));
         });
         // bench eu-ai-act calibrate
         var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -417,7 +421,7 @@ internal static class CliCommandTree
         benchOwaspCmd.Add(benchOwaspEndpointOpt);
         benchOwaspCmd.Add(benchOwaspModelOpt);
         benchOwaspCmd.Add(benchOwaspApiKeyOpt);
-        var (benchOwaspSutOpt, benchOwaspSutTargets) = SutTargetResolver.AddOptionsTo(benchOwaspCmd, "bench");
+        var (benchOwaspSutOpt, benchOwaspAckOpt, benchOwaspSutTargets) = SutTargetResolver.AddOptionsTo(benchOwaspCmd, "bench");
         benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchOwaspPresetOpt) ?? "top10";
@@ -443,6 +447,7 @@ internal static class CliCommandTree
                 sut,
                 benchOwaspSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchOwaspSutTargets,
+                parseResult.GetValue(benchOwaspAckOpt),
                 parseResult.GetValue(benchOwaspEndpointOpt),
                 parseResult.GetValue(benchOwaspModelOpt),
                 parseResult.GetValue(benchOwaspApiKeyOpt),
@@ -457,7 +462,8 @@ internal static class CliCommandTree
                 agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct,
                 aef: parseResult.GetValue(benchOwaspAefOpt), noAef: parseResult.GetValue(benchOwaspNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null,
-                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspEndpointOpt) : null);
+                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspEndpointOpt) : null,
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchOwaspSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchOwaspCmd);
@@ -487,7 +493,7 @@ internal static class CliCommandTree
         benchMitreCmd.Add(benchMitreEndpointOpt);
         benchMitreCmd.Add(benchMitreModelOpt);
         benchMitreCmd.Add(benchMitreApiKeyOpt);
-        var (benchMitreSutOpt, benchMitreSutTargets) = SutTargetResolver.AddOptionsTo(benchMitreCmd, "bench");
+        var (benchMitreSutOpt, benchMitreAckOpt, benchMitreSutTargets) = SutTargetResolver.AddOptionsTo(benchMitreCmd, "bench");
         benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchMitrePresetOpt) ?? "atlas-baseline";
@@ -513,6 +519,7 @@ internal static class CliCommandTree
                 sut,
                 benchMitreSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchMitreSutTargets,
+                parseResult.GetValue(benchMitreAckOpt),
                 parseResult.GetValue(benchMitreEndpointOpt),
                 parseResult.GetValue(benchMitreModelOpt),
                 parseResult.GetValue(benchMitreApiKeyOpt),
@@ -527,7 +534,8 @@ internal static class CliCommandTree
                 agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct,
                 aef: parseResult.GetValue(benchMitreAefOpt), noAef: parseResult.GetValue(benchMitreNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null,
-                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreEndpointOpt) : null);
+                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreEndpointOpt) : null,
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchMitreSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchMitreCmd);
@@ -556,7 +564,7 @@ internal static class CliCommandTree
         benchNistCmd.Add(benchNistEndpointOpt);
         benchNistCmd.Add(benchNistModelOpt);
         benchNistCmd.Add(benchNistApiKeyOpt);
-        var (benchNistSutOpt, benchNistSutTargets) = SutTargetResolver.AddOptionsTo(benchNistCmd, "bench");
+        var (benchNistSutOpt, benchNistAckOpt, benchNistSutTargets) = SutTargetResolver.AddOptionsTo(benchNistCmd, "bench");
         benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchNistPresetOpt) ?? "rmf-baseline";
@@ -582,6 +590,7 @@ internal static class CliCommandTree
                 sut,
                 benchNistSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 benchNistSutTargets,
+                parseResult.GetValue(benchNistAckOpt),
                 parseResult.GetValue(benchNistEndpointOpt),
                 parseResult.GetValue(benchNistModelOpt),
                 parseResult.GetValue(benchNistApiKeyOpt),
@@ -596,7 +605,8 @@ internal static class CliCommandTree
                 agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct,
                 aef: parseResult.GetValue(benchNistAefOpt), noAef: parseResult.GetValue(benchNistNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null,
-                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistEndpointOpt) : null);
+                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistEndpointOpt) : null,
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchNistSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchNistCmd);
@@ -871,7 +881,7 @@ internal static class CliCommandTree
                 presetCmd.Add(benchPerfAefOpt);
                 presetCmd.Add(benchPerfNoAefOpt);
                 presetCmd.Add(benchPerfSubjectVersionOpt);
-                var (presetSutOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
+                var (presetSutOpt, presetAckOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
                 var capturedPreset = presetName;
                 presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
                 {
@@ -897,10 +907,13 @@ internal static class CliCommandTree
                         sut,
                         presetSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                         presetSutTargets,
+                        parseResult.GetValue(presetAckOpt),
                         parseResult.GetValue(benchPerfEndpointOpt),
                         parseResult.GetValue(benchPerfModelOpt),
                         parseResult.GetValue(benchPerfApiKeyOpt),
-                        subject);
+                        subject,
+                        // perf measures time, not the answer: a turn with no selected answer is still a timed turn.
+                        gradesAnswers: false);
                     if (error is not null)
                     {
                         Console.Error.WriteLine($"Error: {error}");
@@ -912,7 +925,8 @@ internal static class CliCommandTree
                     return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct,
                         aef: parseResult.GetValue(benchPerfAefOpt), noAef: parseResult.GetValue(benchPerfNoAefOpt),
                         subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null,
-                        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfEndpointOpt) : null);
+                        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfEndpointOpt) : null,
+                        subjectSettings: SutTargetResolver.RunSettingsFor(presetSutTargets, sut));
                 });
                 benchPerfCmd.Add(presetCmd);
             }
@@ -1007,6 +1021,12 @@ internal static class CliCommandTree
             await McDoctorCommand.RunAsync());
         mcCmd.Add(mcDoctorCmd);
 
+        // ─── m365 — Microsoft 365 (Work IQ A2A) connector ─────────────────────────────
+        // m365 doctor — the staged readiness check an external tester runs first on their own tenant: config, sign-in,
+        // agent card, protocol handshake, and (with --probe + consent) one real prompt and the capability census.
+        var m365Cmd = new Command("m365", "Microsoft 365 (Work IQ A2A 1.0) connector commands");
+        m365Cmd.Add(AgentEval.Cli.Microsoft365.M365DoctorCommand.Create());
+
         // ─── root ─────────────────────────────────────────────────────────────────────
         var rootCmd = new RootCommand("AgentEval CLI — evaluate AI agents, run benchmark suites, manage the .agenteval/ output store, and serve Mission Control.");
 
@@ -1055,6 +1075,7 @@ internal static class CliCommandTree
         rootCmd.Add(complianceCmd);
         rootCmd.Add(renderBenchCmd);
         rootCmd.Add(mcCmd);
+        rootCmd.Add(m365Cmd);                         // m365 doctor — Microsoft 365 readiness check (exit 0/1/11/2)
 
         // Gatekeeper CLI interop bridge — invoke gates from any language via a versioned verdict JSON.
         rootCmd.Add(AgentEval.Cli.Commands.Gatekeeper.GatekeeperCommand.Create());

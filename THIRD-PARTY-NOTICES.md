@@ -6,7 +6,7 @@ One part of AgentEval itself has a different licence: the AEF evidence format in
 
 This file is packed at the root of both published NuGet packages, `AgentEval` and `AgentEval.Cli`, so it travels with the binaries. The licence texts that must accompany redistributed copies are reproduced in [Licence texts](#licence-texts) at the end.
 
-How this list was made: the package lists come from each packable project's `PackageReference` items, the project references it builds on, and the dependency graph NuGet restores for it (`obj/project.assets.json`), for the versions pinned in `Directory.Packages.props`. Each licence was read from that package version's `.nuspec` in the local NuGet cache (the `<license>` element, or `<licenseUrl>` where there is no `<license>`). Last checked: 2026-10-02.
+How this list was made: the package lists come from each packable project's `PackageReference` items, the project references it builds on, and the dependency graph NuGet restores for it (`obj/project.assets.json`), for the versions pinned in `Directory.Packages.props`. Each licence was read from that package version's `.nuspec` in the local NuGet cache (the `<license>` element, or `<licenseUrl>` where there is no `<license>`). Last checked: 2026-10-02. On 2026-11-06 the stable Microsoft Agent Framework rows were moved to 1.27.0, the version in `Directory.Packages.props` and in the restored graph; their 1.27.0 `.nuspec` files still say MIT. The preview Agent Framework packages (A2A, Foundry, AgentHooks) stay on 1.23. The other rows keep the 2026-10-02 date.
 
 ## What is published
 
@@ -27,8 +27,8 @@ Direct dependencies, declared in the package:
 
 | Package | Version | Licence | Source |
 |---------|---------|---------|--------|
-| Microsoft.Agents.AI | 1.23.0 | MIT | https://github.com/microsoft/agent-framework |
-| Microsoft.Agents.AI.Workflows | 1.23.0 | MIT | https://github.com/microsoft/agent-framework |
+| Microsoft.Agents.AI | 1.27.0 | MIT | https://github.com/microsoft/agent-framework |
+| Microsoft.Agents.AI.Workflows | 1.27.0 | MIT | https://github.com/microsoft/agent-framework |
 | Microsoft.Extensions.AI | 10.10.0 | MIT | https://github.com/dotnet/extensions |
 | Microsoft.Extensions.AI.Evaluation.Quality | 10.10.0 | MIT | https://github.com/dotnet/extensions |
 | Microsoft.Extensions.DependencyInjection | 10.0.8 | MIT | https://github.com/dotnet/dotnet |
@@ -49,7 +49,7 @@ Transitive dependencies. The versions are the ones this repository restores with
 | Humanizer.Core (via JsonPointer.Net) | 2.14.1 | MIT |
 | Json.More.Net | 2.1.1 | MIT |
 | JsonPointer.Net | 5.3.1 | MIT |
-| Microsoft.Agents.AI.Abstractions | 1.23.0 | MIT |
+| Microsoft.Agents.AI.Abstractions | 1.27.0 | MIT |
 | Microsoft.ML.Tokenizers | 2.0.0 | MIT |
 | PDFsharp | 6.2.4 | MIT |
 | Microsoft.Extensions.AI.Abstractions | 10.10.1 | MIT |
@@ -59,7 +59,9 @@ Transitive dependencies. The versions are the ones this repository restores with
 | Microsoft.Extensions.Caching.Abstractions, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.Extensions.FileSystemGlobbing, Microsoft.Extensions.Logging.Abstractions, Microsoft.Extensions.Primitives | 10.0.12 | MIT |
 | Microsoft.Extensions.ObjectPool | 8.0.31 / 9.0.20 / 10.0.12 (per target framework) | MIT |
 | System.Diagnostics.DiagnosticSource, System.IO.Hashing, System.IO.Pipelines, System.Text.Encodings.Web, System.Text.Json, System.Threading.Channels | 10.0.12 | MIT |
-| System.Security.Cryptography.Pkcs | 8.0.1 | MIT |
+| System.Security.Cryptography.Pkcs | 8.0.2 | MIT |
+
+PKCS version verified on 2026-10-25 against the published `AgentEval` 1.0.0-rc.1 dependency metadata and resolved consumer graph. PDFsharp requests a minimum of 8.0.1; AgentEval requires the patched 8.0.2 release for [GHSA-846f-f764-76mx](https://github.com/advisories/GHSA-846f-f764-76mx) and [GHSA-2fmv-rv2c-59x7](https://github.com/advisories/GHSA-2fmv-rv2c-59x7). This version floor does not waive advisory checks. The notices bundled in the immutable RC.1 packages list 8.0.1 in error; their actual AgentEval dependency metadata requires 8.0.2. The rest of this inventory retains the last-checked date above.
 
 ## AgentEval.Cli (.NET tool)
 
@@ -180,9 +182,9 @@ Referenced with `PrivateAssets="All"`, so they are used during the build and shi
 
 | Package | Version | Licence | Source |
 |---------|---------|---------|--------|
-| Microsoft.Agents.AI.OpenAI | 1.23.0 | MIT | https://github.com/microsoft/agent-framework |
-| Microsoft.Agents.AI.Harness | 1.23.0 | MIT | https://github.com/microsoft/agent-framework |
-| Microsoft.Agents.AI.Workflows.Generators | 1.23.0 | MIT | https://github.com/microsoft/agent-framework |
+| Microsoft.Agents.AI.OpenAI | 1.27.0 | MIT | https://github.com/microsoft/agent-framework |
+| Microsoft.Agents.AI.Harness | 1.27.0 | MIT | https://github.com/microsoft/agent-framework |
+| Microsoft.Agents.AI.Workflows.Generators | 1.27.0 | MIT | https://github.com/microsoft/agent-framework |
 | Microsoft.Agents.AI.Foundry | 1.23.0-preview.260928.1 | MIT | https://github.com/microsoft/agent-framework |
 | Microsoft.Agents.AI.A2A | 1.23.0-preview.260928.1 | MIT | https://github.com/microsoft/agent-framework |
 | Azure.AI.Projects | 3.0.0-beta.3 | MIT | https://github.com/Azure/azure-sdk-for-net |

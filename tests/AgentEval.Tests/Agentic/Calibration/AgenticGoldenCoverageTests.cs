@@ -33,7 +33,7 @@ using AgentEval.Evals.Agentic.Adversarial;
 using AgentEval.Evals.Agentic.Calibration;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Meta;
-using System.Text.RegularExpressions;
+using AgentEval.Tests.TestHelpers;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic.Calibration;
@@ -73,26 +73,10 @@ public class AgenticGoldenCoverageTests
     }
 
     // The pattern regexes carry a wall-clock timeout (a ReDoS guard). On a loaded parallel test host it can fire
-    // on ordinary input, and the evaluators now report that as "could not check" instead of a pass. The tests
-    // below are about what the deterministic path DECIDES, so they run the same patterns with no time limit;
-    // the timeout path itself is covered deterministically by RegexTimeoutIsNotAPassTests.
-    private static readonly Func<Regex, string, Match> s_untimedMatch = static (regex, input) =>
-        Regex.Match(input, regex.ToString(), regex.Options & ~RegexOptions.Compiled, Regex.InfiniteMatchTimeout);
-
-    /// <summary>
-    /// Resolves <paramref name="key"/> as the registry does, then swaps in an untimed pattern matcher for the
-    /// evaluators whose deterministic path scans with regexes. The registry builds each of these with the judge
-    /// and default options only (see <c>AgenticEvalRegistration</c>), so the rebuilt instance is equivalent.
-    /// </summary>
-    private static IEval? ResolveUntimed(EvalRegistry registry, string key, IEvaluator judge) =>
-        registry.Resolve(key, judge, judgeModel: null) switch
-        {
-            JailbreakResistanceEval  => new JailbreakResistanceEval(judge)  { RegexMatch = s_untimedMatch },
-            DirectInjectionEval      => new DirectInjectionEval(judge)      { RegexMatch = s_untimedMatch },
-            PersonaAttackEval        => new PersonaAttackEval(judge)        { RegexMatch = s_untimedMatch },
-            SensitiveDataLeakageEval => new SensitiveDataLeakageEval(judge) { RegexMatch = s_untimedMatch },
-            var other                => other,
-        };
+    // on ordinary input, and the evaluators report that as "could not check" instead of a pass. The tests below
+    // are about what the deterministic path DECIDES, so they resolve through UntimedRegex.Resolve, which runs the
+    // same patterns with a 30 s budget; the timeout path itself is covered deterministically by
+    // RegexTimeoutIsNotAPassTests.
 
     // ── The census, both directions ──────────────────────────────────────────
 
@@ -303,7 +287,7 @@ public class AgenticGoldenCoverageTests
             foreach (var entry in entries)
             {
                 var judge = new RecordingJudge();
-                var eval = ResolveUntimed(registry, key, judge);
+                var eval = UntimedRegex.Resolve(registry, key, judge);
                 Assert.NotNull(eval);
 
                 var result = await eval!.EvaluateAsync(entry.ToEvalInput());
@@ -913,7 +897,7 @@ public class AgenticGoldenCoverageTests
         foreach (var entry in entries.Where(e => dispatched.Contains(e.EvaluatorKey)))
         {
             var judge = new RecordingJudge();
-            var eval = ResolveUntimed(registry, entry.EvaluatorKey, judge);
+            var eval = UntimedRegex.Resolve(registry, entry.EvaluatorKey, judge);
             Assert.NotNull(eval);
 
             var result = await eval!.EvaluateAsync(entry.ToEvalInput());

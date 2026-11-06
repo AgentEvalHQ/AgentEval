@@ -16,7 +16,8 @@ namespace AgentEval.Samples;
 /// Sample A5: Light Path — AgentEval metrics as MEAI IEvaluator
 ///
 /// This demonstrates:
-/// - agent.EvaluateAsync() with AgentEval metrics (the slide 2 demo)
+/// - agent.EvaluateAsync() with AgentEval metrics (the slide 2 demo), through this sample's own
+///   EvaluateAsyncPreview shim, not MAF's overload
 /// - Mixing AgentEval + MEAI evaluators
 /// - Preset bundles: Quality(), Safety(), Agentic()
 /// - AssertAllPassed() for CI/CD gates
@@ -41,7 +42,7 @@ public static class LightPathMAFIntegration
         // ════════════════════════════════════════════════════════════
 
         Console.WriteLine("━━━ DEMO 1: agent.EvaluateAsync() with AgentEval ━━━━━━━━━━━━━\n");
-        Console.WriteLine("   CODE:");
+        Console.WriteLine("   CODE (this sample's EvaluateAsyncPreview shim, not MAF's overload):");
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("   var results = await agent.EvaluateAsync(queries,");
         Console.WriteLine("       AgentEvalEvaluators.Agentic([\"SearchFlights\"]));");
@@ -87,7 +88,7 @@ public static class LightPathMAFIntegration
         // ════════════════════════════════════════════════════════════
 
         Console.WriteLine("━━━ DEMO 2: Multiple evaluators in one call ━━━━━━━━━━━━━━━━━\n");
-        Console.WriteLine("   CODE:");
+        Console.WriteLine("   CODE (this sample's EvaluateAsyncPreview shim, not MAF's overload):");
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("   var results = await agent.EvaluateAsync(queries, [");
         Console.WriteLine("       AgentEvalEvaluators.ToolSuccess(),              // individual metric");
@@ -136,7 +137,7 @@ public static class LightPathMAFIntegration
         {
                         var judgeClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
-            Console.WriteLine("   CODE:");
+            Console.WriteLine("   CODE (this sample's EvaluateAsyncPreview shim, not MAF's overload):");
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("   var results = await agent.EvaluateAsync(queries,");
             Console.WriteLine("       AgentEvalEvaluators.Quality(judgeClient));");
@@ -351,7 +352,8 @@ public static class LightPathMAFIntegration
     private static void PrintKeyTakeaways()
     {
         Console.WriteLine("\n\n💡 KEY TAKEAWAYS:");
-        Console.WriteLine("   • agent.EvaluateAsync(queries, evaluator) — one line to evaluate");
+        Console.WriteLine("   • agent.EvaluateAsync(queries, evaluator) — one line to evaluate (this sample's shim; MAF's");
+        Console.WriteLine("     own overloads: docs/using-agenteval-with-maf-evals.md)");
         Console.WriteLine("   • results.AssertAllPassed() — CI/CD gate in one call");
         Console.WriteLine("   • AgentEval + MEAI + Foundry evaluators all share the same IEvaluator interface");
         Console.WriteLine("   • Code-based metrics (tool success/selection) run instantly, no LLM");

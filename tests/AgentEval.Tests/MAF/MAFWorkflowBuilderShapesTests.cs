@@ -44,9 +44,12 @@ public sealed class MAFWorkflowBuilderShapesTests(Xunit.Abstractions.ITestOutput
             "handoff" => ["HandoffStart", "Left", "Right", "HandoffEnd"],
             _ => ["GroupChatHost", "Left", "Right"]
         };
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        // Hang guards, not a latency check: the clients are in memory, so a real hang never finishes and still fails here.
+        // The token was 10 s, and on a starved Windows runner the handoff case was cancelled after 26 s
+        // (CI run 42036004655). 60 s follows the SignTest precedent; the WaitAsync sits above the token.
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, shape, order)
-            .ExecuteWorkflowAsync("builder input marker", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+            .ExecuteWorkflowAsync("builder input marker", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(90));
 
         output.WriteLine(JsonSerializer.Serialize(new
         {

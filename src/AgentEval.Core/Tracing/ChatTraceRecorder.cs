@@ -40,6 +40,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
     private readonly List<ChatTurn> _turns = new();
     private readonly Stopwatch _sessionStopwatch;
     private readonly ToolUsageReport _combinedToolUsage = new();
+    private int _droppedApprovalRequests;
     private int _totalPromptTokens;
     private int _totalCompletionTokens;
     private int _turnIndex;
@@ -169,11 +170,14 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
     /// <see cref="ToolUsageExtractor"/> (pairing FunctionCallContent with FunctionResultContent),
     /// accumulates each into <see cref="_combinedToolUsage"/> with a conversation-global 1-based
     /// order, and returns them as <see cref="TraceToolCall"/>s for the turn. Returns
-    /// <see langword="null"/> when the response made no tool calls.
+    /// <see langword="null"/> when the response made no tool calls. The turn's
+    /// <see cref="ToolUsageReport.DroppedApprovalRequestCount"/> is added up, and <see cref="GetResult"/> puts the
+    /// total on <see cref="ChatExecutionResult.CombinedToolUsage"/>, so a reader can see it is incomplete.
     /// </summary>
     private IReadOnlyList<TraceToolCall>? CaptureToolCalls(AgentResponse response)
     {
         var report = ToolUsageExtractor.Extract(response);
+        _droppedApprovalRequests += report.DroppedApprovalRequestCount;
         if (report.Count == 0)
             return null;
 
@@ -209,6 +213,16 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
         return traceToolCalls;
     }
 
+    // DroppedApprovalRequestCount is init-only, so the combined report is built here, from the calls so far (the same
+    // records, in order) and the dropped approval requests of every turn so far.
+    private ToolUsageReport BuildCombinedToolUsage()
+    {
+        var combined = new ToolUsageReport { DroppedApprovalRequestCount = _droppedApprovalRequests };
+        foreach (var call in _combinedToolUsage.Calls)
+            combined.AddCall(call);
+        return combined;
+    }
+
     /// <summary>
     /// Adds a system message at the beginning of the conversation.
     /// </summary>
@@ -232,6 +246,11 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
     /// <summary>
     /// Gets the complete chat execution result.
     /// </summary>
+    /// <remarks>
+    /// <see cref="ChatExecutionResult.CombinedToolUsage"/> is built when this is called and carries the dropped
+    /// approval-gated calls of every turn so far: a snapshot, so calls of later turns are not added to a result
+    /// taken earlier. Call this again after more turns.
+    /// </remarks>
     public ChatExecutionResult GetResult()
     {
         _sessionStopwatch.Stop();
@@ -249,7 +268,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             Turns = _turns.AsReadOnly(),
             TotalDuration = _sessionStopwatch.Elapsed,
             AggregatePerformance = aggregatePerformance,
-            CombinedToolUsage = _combinedToolUsage,
+            CombinedToolUsage = BuildCombinedToolUsage(),
             ConversationId = _conversationId
         };
     }

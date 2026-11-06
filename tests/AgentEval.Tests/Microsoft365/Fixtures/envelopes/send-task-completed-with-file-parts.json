@@ -1,0 +1,71 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0014",
+  "result": {
+    "task": {
+      "id": "task-c2e8a4f6-7b1d-4e3a-9f5c-0d6b2a8e4c17",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "timestamp": "2026-11-05T14:06:12.556901Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0014",
+          "role": "ROLE_AGENT",
+          "parts": [],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-c2e8a4f6-7b1d-4e3a-9f5c-0d6b2a8e4c17",
+          "metadata": {
+            "attributions": [
+              {
+                "attributionType": "citation",
+                "attributionSource": "OneDriveAndSharePoint",
+                "providerDisplayName": "Project Atlas - Status report 2026-11-03.docx",
+                "seeMoreWebUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx"
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifactId": "artifact-answer-6b2d9f4a-0014",
+          "name": "Answer",
+          "parts": [
+            {
+              "text": "Here is the Atlas pilot plan.citeturn0search1"
+            },
+            {
+              "url": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Pilot%20plan.pdf",
+              "mediaType": "application/pdf",
+              "filename": "Pilot plan.pdf"
+            },
+            {
+              "raw": "UGlsb3Qga2lja29mZjogMjAyNi0xMS0xNyAwOTowMCBFdXJvcGUvWnVyaWNoCg==",
+              "mediaType": "text/plain",
+              "filename": "pilot-kickoff.txt"
+            }
+          ]
+        }
+      ],
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0014",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Share the Atlas pilot plan."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-c2e8a4f6-7b1d-4e3a-9f5c-0d6b2a8e4c17",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

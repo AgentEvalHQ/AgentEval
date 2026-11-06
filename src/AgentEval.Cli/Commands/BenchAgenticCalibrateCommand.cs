@@ -269,6 +269,9 @@ public static class BenchAgenticCalibrateCommand
     // evaluatorOverrideIdentity: the provider and model behind evaluatorOverride, for the report header and the
     // per-case records. Without it a supplied evaluator is reported as unknown; it is ignored when evaluatorOverride
     // is null.
+    // evalResolver: builds the evaluator for a key from the run's judge and judge model. Null resolves from
+    // EvalRegistry.Shared. Tests pass one that runs the pattern scans without their wall-clock budget, so a loaded
+    // test host cannot turn a scan into "could not check". Carved-out keys never reach it.
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
@@ -276,7 +279,8 @@ public static class BenchAgenticCalibrateCommand
         CancellationToken ct = default,
         string? recordsPath = null,
         int? limitPerCategory = null,
-        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null,
+        Func<string, IEvaluator, string?, IEval?>? evalResolver = null)
     {
         if (limitPerCategory is < 1)
         {
@@ -331,13 +335,14 @@ public static class BenchAgenticCalibrateCommand
         // and CalibrationRunner calls the resolver once per ENTRY. Without this
         // cache a 500-entry dataset would construct 500 evaluators.
         var resolved = new Dictionary<string, IEval?>(StringComparer.OrdinalIgnoreCase);
+        var resolveEval = evalResolver ?? (static (k, j, m) => EvalRegistry.Shared.Resolve(k, j, m));
 
         IEval? Resolver(string key)
         {
             if (!resolved.TryGetValue(key, out var eval))
             {
                 // Not dispatched on these goldens (B6c-7): left out by key, counted as carved_out in the report.
-                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
+                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : resolveEval(key, judge, judgeModelName);
                 resolved[key] = eval;
             }
             return eval;

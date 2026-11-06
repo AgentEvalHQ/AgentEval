@@ -39,7 +39,8 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
-    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
+    <!-- The Microsoft 365 provider is experimental as a whole assembly (AGENTEVAL_M365_PREVIEW001); the CLI target uses it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001;AGENTEVAL_M365_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -90,6 +91,10 @@
          does not pack or publish it, so it is not on NuGet: its code reaches users only inside this CLI tool.
          CopilotStudioRedTeamTarget consumes it here for the sut=copilot-studio target. -->
     <ProjectReference Include="..\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
+    <!-- The Microsoft 365 (Work IQ A2A) provider: the sut=microsoft365 target. Like the Copilot Studio bridge
+         above it sets IsPackable=true but is not packed or published by the release workflow, so it ships only
+         inside this CLI tool. -->
+    <ProjectReference Include="..\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
   </ItemGroup>
 
   <!-- Plan-08 MC1.7.1: AgentEval.MissionControl is net10-only (Hot Chocolate 16

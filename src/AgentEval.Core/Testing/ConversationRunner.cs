@@ -2,8 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using ToolCallRecord = AgentEval.Models.ToolCallRecord;
 
 namespace AgentEval.Testing;
 
@@ -264,6 +264,11 @@ public class ConversationRunner
         return results;
     }
 
+    // The calls the response made, in order. Read through ToolUsageExtractor's approval-aware path so that a call
+    // whose approval was rejected is left out: it never ran. MAF 1.25+ (#9152) returns such a call, re-created with a
+    // "rejected" result, on the run after an approval request that nobody answered, and it must not satisfy
+    // ExpectedTools. A request still waiting for a decision stays out, as before (it carries no FunctionCallContent of
+    // its own); an approved call is listed.
     private static List<ToolCallInfo> ExtractToolCalls(AgentResponse response)
     {
         var toolCalls = new List<ToolCallInfo>();
@@ -271,26 +276,21 @@ public class ConversationRunner
         if (response.RawMessages == null)
             return toolCalls;
 
-        foreach (var rawMsg in response.RawMessages)
+        var report = ToolUsageExtractor.Extract(response.RawMessages, includeApprovalGatedCalls: true);
+        foreach (var call in report.Calls)
         {
-            if (rawMsg is ChatMessage chatMessage && chatMessage.Contents != null)
+            if (call.ApprovalState is not (null or ToolCallRecord.ApprovalApproved))
+                continue;
+
+            var args = new Dictionary<string, object?>();
+            if (call.Arguments != null)
             {
-                foreach (var content in chatMessage.Contents)
+                foreach (var kvp in call.Arguments)
                 {
-                    if (content is FunctionCallContent fcc)
-                    {
-                        var args = new Dictionary<string, object?>();
-                        if (fcc.Arguments != null)
-                        {
-                            foreach (var kvp in fcc.Arguments)
-                            {
-                                args[kvp.Key] = kvp.Value;
-                            }
-                        }
-                        toolCalls.Add(new ToolCallInfo(fcc.Name, args, fcc.CallId));
-                    }
+                    args[kvp.Key] = kvp.Value;
                 }
             }
+            toolCalls.Add(new ToolCallInfo(call.Name, args, call.CallId));
         }
 
         return toolCalls;

@@ -101,7 +101,7 @@ public static class Demo02_TripPlannerWorkflow
                     case ExecutorInvokedEvent:
                         break;  // a message delivery that only queues input for the agent's turn
 
-                    // MAF 1.24: AgentResponseUpdateEvent derives from WorkflowOutputEvent, so it must be matched
+                    // MAF 1.24-1.27: AgentResponseUpdateEvent derives from WorkflowOutputEvent, so it must be matched
                     // BEFORE the WorkflowOutputEvent case — the old order made that case (the itinerary) unreachable.
                     case AgentResponseUpdateEvent agentUpdate:
                         if (!string.IsNullOrEmpty(agentUpdate.Update.Text))
@@ -145,7 +145,7 @@ public static class Demo02_TripPlannerWorkflow
 
                     case WorkflowOutputEvent output:
                         // A non-streamed output (an agent bound with EmitAgentResponseEvents). Not raised by this
-                        // workflow on MAF 1.24, which streams; kept so the itinerary still prints if that changes.
+                        // workflow on MAF 1.24-1.27, which streams; kept so the itinerary still prints if that changes.
                         nonStreamedOutput = output.Data?.ToString();
                         break;
 

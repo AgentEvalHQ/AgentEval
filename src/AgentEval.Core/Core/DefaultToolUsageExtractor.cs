@@ -16,8 +16,9 @@ namespace AgentEval.Core;
 /// the application. For custom extraction logic, implement <see cref="IToolUsageExtractor"/> directly.
 /// </para>
 /// <para>
-/// By default it is <b>blind to approval-gated tool calls</b> (MAF's <c>ToolApprovalRequestContent</c>) and,
-/// when given a logger, <b>warns every time it sees and drops one</b> — a report that silently omits the
+/// By default it is <b>blind to approval-gated tool calls</b> (MAF's <c>ToolApprovalRequestContent</c>, and the
+/// <c>ToolApprovalResponseContent</c> decision on one whose request is not in the messages) and,
+/// when given a logger, <b>warns every time it sees and drops one</b>, naming the tool — a report that silently omits the
 /// calls a human was asked to approve makes <c>NeverCallTool</c> unfailable (ADR-030 Slice 0.5). Construct
 /// with <c>includeApprovalGatedCalls: true</c> to record them instead.
 /// </para>
@@ -94,10 +95,15 @@ public sealed class DefaultToolUsageExtractor : IToolUsageExtractor
     /// <param name="optInHint">How the caller opts in (defaults to the extractor overload).</param>
     public static string FormatDropWarning(int droppedCount, IReadOnlyList<string> toolNames, string? optInHint = null)
     {
+        // The count and names include a decision whose request is not in the messages. When that decision is an
+        // approval, the call re-created for it IS recorded (as a plain call); the count has always included it.
         var names = toolNames.Count > 0 ? $" [{string.Join(", ", toolNames)}]" : string.Empty;
         return $"⚠️ Tool usage is INCOMPLETE: {droppedCount} approval-gated tool call(s){names} were seen and NOT recorded. " +
-               "MAF wraps an approval-required call in ToolApprovalRequestContent, which the default extractor does not read; " +
-               "absence-based policies (NeverCallTool) evaluated on this report cannot fail. " +
+               "MAF wraps an approval-required call in ToolApprovalRequestContent, and a decision on it (including the " +
+               "rejection MAF 1.25+ generates for an unanswered request) in ToolApprovalResponseContent. The default extractor " +
+               "records neither the request nor the call re-created for a rejected decision; only a call re-created for an " +
+               "approved decision is recorded, as a plain call. Absence-based policies (NeverCallTool) evaluated on this " +
+               "report cannot fail on the calls it left out. " +
                $"Opt in with {optInHint ?? "ToolUsageExtractor.Extract(rawMessages, includeApprovalGatedCalls: true)"} to record them (ADR-030 Slice 0.5).";
     }
 }

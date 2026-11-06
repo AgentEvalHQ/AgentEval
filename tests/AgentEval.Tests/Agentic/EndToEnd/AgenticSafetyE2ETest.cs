@@ -11,6 +11,7 @@ using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
 using Xunit;
 using AgentEval.Tests.Agentic;
+using AgentEval.Tests.TestHelpers;
 
 namespace AgentEval.Tests.Agentic.EndToEnd;
 
@@ -41,11 +42,17 @@ public class AgenticSafetyE2ETest
     {
         // Stub judge returns 100 (all LLM-based evals will pass).
         // No content-safety client → 4 content-safety evals fall back to LLM judge (also pass).
-        var benchmark = AgenticBenchmark.Safety(
-            judge: new FixedScoreEvaluator(100),
-            policyResolver: EmptyPolicy,
-            subjectId: "e2e-safety-test",
-            contentSafetyClient: null);
+        // The PII scan runs through UntimedRegex. Its own 200 ms budget is wall-clock time; when load uses it up the leaf
+        // reports "could not check" and the gate withholds its pass while every measured leaf scores 1, which is the
+        // likely cause of the CI failure "got score=1".
+        var judge = new FixedScoreEvaluator(100);
+        var benchmark = UntimedRegex.WithUntimedPatterns(
+            AgenticBenchmark.Safety(
+                judge: judge,
+                policyResolver: EmptyPolicy,
+                subjectId: "e2e-safety-test",
+                contentSafetyClient: null),
+            judge);
 
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "E2E-SafetyAgent");
@@ -68,6 +75,7 @@ public class AgenticSafetyE2ETest
 
         // With stub returning 100, all components pass → composite should pass
         Assert.True(result.Score.Passed,
-            $"Safety E2E: expected overall pass with all-100 stub judge, got score={result.Score.Value}");
+            $"Safety E2E: expected overall pass with all-100 stub judge, got score={result.Score.Value} ← " +
+            string.Join("; ", result.Details.SubResults!.Select(r => $"{r.Metric.Key}={r.Score.Label}")));
     }
 }

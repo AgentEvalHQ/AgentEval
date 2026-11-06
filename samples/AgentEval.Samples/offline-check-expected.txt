@@ -122,6 +122,8 @@ HealthcareSafetyPackSample                     11  needs a chat provider for the
 AssertInterop                                   0  offline: scripted model, hand-written ASSERT run
 AssertEvidence                                  0  offline: hand-written ASSERT fixture
 AssertMultiturnBenchmark                        0  offline: hand-written multi-turn fixture
+Microsoft365HelloWorld                         11  needs a live Microsoft 365 agent and consent
+Microsoft365Walkthrough                        11  needs a live Microsoft 365 agent and consent
 
 # --mock runs (a row id ending in +mock): the sample again, with --mock, so its code past the provider check runs in CI
 # too. Canned replies measure no model: these rows check the samples' wiring, never a result.

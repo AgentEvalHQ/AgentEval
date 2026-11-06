@@ -1,0 +1,44 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0009",
+  "result": {
+    "task": {
+      "id": "task-6f2c8a4e-0d1b-4c9f-a3e7-2b5d8c1f4a96",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_REJECTED",
+        "timestamp": "2026-11-05T13:53:12.391745Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0009",
+          "role": "ROLE_AGENT",
+          "parts": [
+            {
+              "text": "This request can't be handled: the selected agent doesn't support changing mailbox rules."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-6f2c8a4e-0d1b-4c9f-a3e7-2b5d8c1f4a96"
+        }
+      },
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0009",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Create a mailbox rule that deletes every message from the vendor."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-6f2c8a4e-0d1b-4c9f-a3e7-2b5d8c1f4a96",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -28,7 +28,13 @@ public static class AgentEvalToolGateExtensions
     /// throws (fail-closed).
     /// </summary>
     /// <param name="builder">The agent builder.</param>
-    /// <param name="gates">The gates to run, in order, on every tool call. Rejected if any has a Network/Llm cost.</param>
+    /// <param name="gates">
+    /// The gates to run, in order, on every function the agent passes to the function-invoking client through
+    /// <c>ChatOptions.Tools</c> (agent, constructor or per-run tools). Two tool sources bypass this seam:
+    /// functions on <c>FunctionInvokingChatClient.AdditionalTools</c>, and tools from an <c>AIContextProvider</c>
+    /// registered on the chat-client pipeline (<c>UseAIContextProviders</c>). This is existing MAF behaviour, which
+    /// MAF documented in 1.26 (#9409, #9429). Rejected if any gate has a Network/Llm cost.
+    /// </param>
     /// <param name="policy">
     /// How a block is enforced. Phase 1, P0-2: REQUIRED — there is no default. A prior version of this method
     /// defaulted to <see cref="ToolGatePolicy.WarnOnly"/>, so a gate that returned <c>Block</c> was, by

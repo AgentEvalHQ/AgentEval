@@ -149,6 +149,15 @@ public sealed class MemoryWriteAdmissionGate : IMemoryGate, IConfigurationFinger
     public MemoryWriteAdmissionGate(MemoryWriteAdmissionOptions? options = null)
         => _options = options ?? new MemoryWriteAdmissionOptions();
 
+    /// <summary>
+    /// Applies one redaction pattern: (pattern, input, replacement) to the redacted text. Tests replace it with a
+    /// replacer that throws <see cref="RegexMatchTimeoutException"/>, so the timeout path runs deterministically, or with
+    /// one that has a long budget, so a decision does not depend on how loaded the machine is. Production uses the
+    /// patterns' own wall-clock budget.
+    /// </summary>
+    internal Func<Regex, string, string, string> RegexReplace { get; init; } =
+        static (pattern, input, replacement) => pattern.Replace(input, replacement);
+
     public string PolicyName => "memory.write.admission";
     public GateCost Cost => GateCost.Bounded;
     public MemoryGateStage Stages => MemoryGateStage.BeforeWrite | MemoryGateStage.BeforePromotion;
@@ -225,8 +234,9 @@ public sealed class MemoryWriteAdmissionGate : IMemoryGate, IConfigurationFinger
             string sanitized;
             try
             {
-                sanitized = EmailPattern.Replace(
-                    CredentialPattern.Replace(context.Content, "$1=[REDACTED]"),
+                sanitized = RegexReplace(
+                    EmailPattern,
+                    RegexReplace(CredentialPattern, context.Content, "$1=[REDACTED]"),
                     "[REDACTED_EMAIL]");
             }
             catch (RegexMatchTimeoutException)

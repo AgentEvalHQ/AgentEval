@@ -50,10 +50,11 @@ internal static class EvalCommand
         var endpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL" };
         var azureFlag = new Option<bool>("--azure") { Description = "Use Azure OpenAI (requires --endpoint and --deployment-name)" };
 
-        // Built-in SUT targets (Track 2 PR2): --sut copilot-studio evaluates a live Copilot Studio agent
-        // with your --dataset's prompts + judge criteria, via the same shared seam `redteam` already uses.
-        // Each target owns its own options/validation/construction (ISutTarget).
-        var (sutOpt, sutTargets) = SutTargetResolver.AddOptionsTo(command, "eval");
+        // Built-in SUT targets: --sut copilot-studio or microsoft365 evaluates a live agent with your --dataset's
+        // prompts + judge criteria, via the same shared seam `redteam` already uses.
+        // Each target owns its own options/validation/construction (ISutTarget); the live-side-effects consent
+        // flag is common to every live target and registered once, here, by the resolver.
+        var (sutOpt, ackOpt, sutTargets) = SutTargetResolver.AddOptionsTo(command, "eval");
 
         // Model / Deployment
         var modelOpt = new Option<string?>("--model")
@@ -175,6 +176,7 @@ internal static class EvalCommand
                 DeploymentName = parseResult.GetValue(deploymentNameOpt),
                 ApiKey = parseResult.GetValue(apiKeyOpt),
                 Sut = parseResult.GetValue(sutOpt),
+                AckLiveSideEffects = parseResult.GetValue(ackOpt),
                 // Bind every built-in target's own flags polymorphically (keyed by --sut value) — mirrors
                 // RedTeamCommand's convention so a target's flags never need a per-verb special case.
                 TargetOptions = sutTargets.ToDictionary(
@@ -232,13 +234,15 @@ internal static class EvalCommand
     /// is not set. <paramref name="agentClientOverride"/>, when non-null, replaces the chat client the
     /// <c>--endpoint</c>/<c>--azure</c> path would build — the same kind of seam for that path. Every validation
     /// still runs and the agent is still built from <paramref name="opts"/>; only the client construction is
-    /// replaced. It has no effect when <c>--sut</c> is set.
+    /// replaced. It has no effect when <c>--sut</c> is set. <paramref name="sutTargetsOverride"/>, when non-null,
+    /// replaces <see cref="SutTargetResolver.BuiltInTargets"/> (tests hand in a target carrying its own test seams).
     /// Returns exit code: 0 = all passed, 1 = test failure, 2 = usage error (<c>--runs</c>, the golden-trace options),
     /// 3 = runtime error. With <c>--golden</c>, 1 means a regression against the golden trace (or, with
     /// <c>--fail-on-tool-change</c>, a tool change) rather than any failing test.
     /// </summary>
     internal static async Task<int> ExecuteAsync(
-        EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? agentClientOverride = null)
+        EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? agentClientOverride = null,
+        IReadOnlyList<ISutTarget>? sutTargetsOverride = null)
     {
         // --runs (and, in stochastic mode, --success-threshold) are checked before anything else: a value the
         // command cannot honour is a usage error, exit 2. Before this check, 0 and negative values silently ran
@@ -284,7 +288,7 @@ internal static class EvalCommand
         if (opts.Sut is not null && !opts.Dataset.Exists)
             throw new FileNotFoundException($"Dataset not found: {opts.Dataset.FullName}");
 
-        // 0. Parse + validate --metrics NAMES (Item 4, D1 bridge) as early as possible, before any network
+        // 0. Parse + validate --metrics NAMES as early as possible, before any network
         // call — an unknown metric name fails fast here, the same way a bad --dataset path already does.
         // Resolving to actual IMetric INSTANCES happens later (needs an evaluator client, built below).
         IReadOnlyList<string>? selectedMetrics = null;
@@ -303,10 +307,10 @@ internal static class EvalCommand
                     $"Unknown metric name(s): {string.Join(", ", unknown)}. Available: {string.Join(", ", MetricCatalog.AvailableNames)}.");
         }
 
-        // 1. Resolve --sut (Track 2 PR2), if set — the same shared seam `redteam`/`bench` use. Built-in
+        // 1. Resolve --sut, if set — the same shared seam `redteam`/`bench` use. Built-in
         // targets own their own validation (consent gates, required config, etc.) via ISutTarget.Validate,
         // invoked inside TryResolve.
-        var sutTargets = SutTargetResolver.BuiltInTargets().Where(t => t.SupportedVerbs.Contains("eval")).ToList();
+        var sutTargets = (sutTargetsOverride ?? SutTargetResolver.BuiltInTargets()).Where(t => t.SupportedVerbs.Contains("eval")).ToList();
         var commonTargetOptions = new CommonTargetOptions
         {
             Endpoint = opts.Endpoint,
@@ -315,9 +319,16 @@ internal static class EvalCommand
             DeploymentName = opts.DeploymentName,
             ApiKey = opts.ApiKey,
             Sut = opts.Sut,
+            AckLiveSideEffects = opts.AckLiveSideEffects,
             TargetOptions = opts.TargetOptions,
         };
         var (sutAgent, sutResolvedName) = SutTargetResolver.TryResolve(commonTargetOptions, sutTargets, sutOverride);
+        // What the --sut target adds to the AEF evidence: its subject kind, its run provenance, and (for some targets) a
+        // review of each case's result and each case's evidence document.
+        var sutTarget = sutAgent is null ? null : SutTargetResolver.Find(sutTargets, opts.Sut);
+        var caseEvidence = sutAgent is null ? null : sutTarget?.CaseEvidenceFor(sutAgent);
+        var subjectSettings = caseEvidence is not null ? caseEvidence.RunSettings : sutTarget?.RunSettings();
+        var subjectKind = sutTarget?.SubjectKind ?? AefSubjectKind.Model;
 
         string resolvedName;
         IEvaluableAgent agent;
@@ -401,14 +412,14 @@ internal static class EvalCommand
             ? new MAFEvaluationHarness(judgeClient, verbose: opts.Verbose && !opts.Quiet)
             : new MAFEvaluationHarness(verbose: opts.Verbose && !opts.Quiet);
 
-        // 5b. --metrics (Item 4, D1 bridge): resolve every selected name to a real IMetric instance NOW,
+        // 5b. --metrics: resolve every selected name to a real IMetric instance NOW,
         // before the (possibly expensive) scan runs — a metric that needs an LLM judge but has none
         // available fails here, not after wastefully running the whole batch. --judge wins as the
         // evaluator when set; otherwise falls back to the SUT's own chatClient (null for a --sut target).
         // Skipped entirely for the stochastic path (opts.Runs > 1, step 6b below): that path never
         // consumes selectedMetricInstances at all (--metrics scoring isn't wired to it yet), so resolving
         // here was both wasted work AND could THROW for a reason (no evaluator client available) that
-        // --runs > 1 is supposed to just warn-and-ignore, not fail the whole run on (review).
+        // --runs > 1 is supposed to just warn-and-ignore, not fail the whole run on.
         IReadOnlyList<IMetric>? selectedMetricInstances = null;
         // Meter the fallback only in its judging role; the agent keeps its original client.
         if (judgeLedger is null && chatClient is not null && opts.Runs <= 1
@@ -452,7 +463,7 @@ internal static class EvalCommand
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName,
-                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, judgeLedger, datasetSnapshot, ct);
+                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, judgeLedger, datasetSnapshot, ct, caseEvidence, subjectSettings, subjectKind);
         }
 
         // 6c. Standard single-run evaluation path
@@ -461,7 +472,8 @@ internal static class EvalCommand
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases, datasetSnapshot,
-                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null, embeddingSettings),
+                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : caseEvidence?.SubjectProvider, embeddingSettings,
+                subjectSettings, subjectKind),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -469,18 +481,33 @@ internal static class EvalCommand
             {
                 var index = completed.Count;
                 completed.Add(result);
+                // Before the result is recorded: the target may know the case was not measured.
+                var absence = caseEvidence?.ReviewResult(result, caseIds[index])
+                    ?? NotMeasuredCases.ReviewCriteria(result, CriteriaNotGraded(opts, testCases[index]));
                 evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
                     AefCliOptions.ContentCapture == AefContentCapture.On
-                        ? new AefNativeContent { Input = testCases[index].Input, Expected = testCases[index].ExpectedOutput } : null,
-                    caseUsage: true);
-            }, index => CliUsageMeter.Attribute(caseId: caseIds[index]));
+                        ? new AefNativeContent
+                        {
+                            Input = testCases[index].Input,
+                            Expected = testCases[index].ExpectedOutput,
+                            Document = caseEvidence?.DocumentFor(caseIds[index]),
+                        }
+                        : null,
+                    caseUsage: true, absence: absence);
+            }, index =>
+            {
+                caseEvidence?.BeginCase(caseIds[index]);
+                return CliUsageMeter.Attribute(caseId: caseIds[index]);
+            });
             ct.ThrowIfCancellationRequested();
 
-            // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
-            // case's REAL captured response (never re-invokes the agent) and attach the results to
-            // TestResult.MetricResults — an existing, already-wired field (TestSummaryExtensions.MapTestResult
-            // already projects it into the exported report's MetricScores) that nothing previously populated.
-            // Purely additive: the harness's own pass/fail gate above is completely unchanged.
+            // 6d. --metrics: score every selected metric against each test case's REAL captured response
+            // (never re-invokes the agent) and attach the results to TestResult.MetricResults, which
+            // TestSummaryExtensions.MapTestResult projects into the exported report's MetricScores. The harness's
+            // own pass/fail gate above is unchanged. A case with an error and no output has no measured response (the
+            // run threw, or the target recorded its stand-in text as not the answer): its metrics are recorded as not
+            // measured, never scored on the text that stands in for an answer. A case the target marked not measured for
+            // another reason (criteria with no judge) keeps the agent's real answer, and its metrics score it.
             if (selectedMetricInstances is not null)
             {
                 var metricsBuilder = AgentEvalBuilder.Create();
@@ -492,6 +519,13 @@ internal static class EvalCommand
                 await using var metricRunner = await metricsBuilder.BuildAsync(ct);
                 for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
                 {
+                    if (summary.Results[i].HasError && summary.Results[i].ActualOutput is null)
+                    {
+                        summary.Results[i].MetricResults = NotMeasuredMetrics(selectedMetrics!, summary.Results[i]);
+                        evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
+                        continue;
+                    }
+
                     using var usageAttribution = CliUsageMeter.Attribute(AefUsageRole.Judge, caseIds[i]);
                     var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
                     try
@@ -544,7 +578,7 @@ internal static class EvalCommand
             // trace, 1 = a regression (or a tool change with --fail-on-tool-change), 11 = no regression but a test case with
             // no verdict on either side; a test that was already failing in the golden trace does not fail the run.
             // Without a golden trace only a measured failure fails the run; a case whose judge gave no verdict or whose
-            // run threw has no verdict, and SingleRunExitCode reads it as 11 (D-14, D-21).
+            // run threw has no verdict, and SingleRunExitCode reads it as 11.
             var passed = comparison is not null
                 ? !comparison.HasRegression && !(opts.FailOnToolChange && comparison.HasToolChange)
                 : summary.FailedCount == 0;
@@ -661,6 +695,29 @@ internal static class EvalCommand
     };
 
     /// <summary>
+    /// The <c>--metrics</c> results of a case with an error (<see cref="TestResult.HasError"/>): every selected metric not
+    /// measured (<see cref="NotMeasuredCause.MissingInput"/>: the case has no measured response to score). The reason
+    /// names the error's type only, never its message.
+    /// </summary>
+    /// <param name="metricNames">The selected metric names.</param>
+    /// <param name="testResult">The case's result.</param>
+    internal static IReadOnlyList<MetricResult> NotMeasuredMetrics(IReadOnlyList<string> metricNames, TestResult testResult)
+    {
+        var reason = $"not measured: the case has no measured response ({testResult.Error?.GetType().Name ?? "error"}); the metric was not scored";
+        return metricNames.Select(name => MetricResult.NotMeasured(name, NotMeasuredCause.MissingInput, reason)).ToList();
+    }
+
+    /// <summary>
+    /// Whether the case declares evaluation criteria in a run without <c>--judge</c>. The harness then only checks that
+    /// the answer is not empty, so no criterion is graded. A built-in target that measures agents
+    /// (<see cref="ISutCaseEvidence.ReviewResult"/>) records such a case as not measured.
+    /// </summary>
+    /// <param name="opts">The command options.</param>
+    /// <param name="testCase">The dataset case.</param>
+    internal static bool CriteriaNotGraded(EvalOptions opts, DatasetTestCase testCase) =>
+        opts.JudgeEndpoint is null && testCase.EvaluationCriteria is { Count: > 0 };
+
+    /// <summary>
     /// The exit code of a single-run <c>eval</c> whose verdict is <paramref name="passed"/>: 1 when something failed;
     /// else 11 (<see cref="ExitCodes.GateIndeterminate"/>) when <c>--metrics</c> was given and a requested metric was not
     /// measured on some case, or, against <c>--golden</c>, a test case has no verdict in the golden trace or in this run
@@ -706,10 +763,37 @@ internal static class EvalCommand
         ExitCode = ExitCodes.GateIndeterminate,
     };
 
+    /// <summary>
+    /// The AEF subject ref of a run without <c>--subject</c>: <c>&lt;kind&gt;:&lt;resolved name&gt;</c>, where the kind is the
+    /// <c>--sut</c> target's <see cref="ISutTarget.SubjectKind"/> (<c>agent</c> for <c>microsoft365</c> and
+    /// <c>copilot-studio</c>, named by the config's display name) and <c>model</c> for the <c>--endpoint</c>/<c>--azure</c>
+    /// path (the model or deployment the run called). An explicit <c>--subject</c> is always kept as given.
+    /// </summary>
+    /// <param name="kind">What the subject is.</param>
+    /// <param name="resolvedName">The subject's resolved name.</param>
+    internal static string DefaultSubjectRef(AefSubjectKind kind, string resolvedName) =>
+        AefEvalWriter.Ref(AefNames.Of(kind), resolvedName);
+
+    /// <summary>The AEF run options of an eval run.</summary>
+    /// <param name="opts">The command options.</param>
+    /// <param name="resolvedName">The subject's resolved name.</param>
+    /// <param name="targetMode">How the run drove its target.</param>
+    /// <param name="judge">The judge ledger, when a judge graded.</param>
+    /// <param name="cases">The dataset cases.</param>
+    /// <param name="datasetSnapshot">The captured dataset bytes.</param>
+    /// <param name="subjectProvider">The subject's provider (also the metric judge's when no <c>--judge</c> is given).</param>
+    /// <param name="embeddingSettings">The embedding instrument, when an <c>embed_</c> metric runs.</param>
+    /// <param name="subjectSettings">
+    /// Content-free provenance a built-in target adds to the run's config settings (for <c>--sut microsoft365</c>: the
+    /// protocol, profile, normaliser and config-identity keys). Never part of the suite definition: a different
+    /// subject is a comparison candidate, not a different instrument.
+    /// </param>
+    /// <param name="subjectKind">What the subject is when <c>--subject</c> is not given (<see cref="DefaultSubjectRef"/>).</param>
     internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null,
-        EmbeddingProviderSettings? embeddingSettings = null)
+        EmbeddingProviderSettings? embeddingSettings = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null,
+        AefSubjectKind subjectKind = AefSubjectKind.Model)
     {
-        var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
+        var subjectRef = opts.Subject ?? DefaultSubjectRef(subjectKind, resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
         if (opts.Runs > 1) settings["successThreshold"] = opts.SuccessThreshold;
         if (opts.Sut is null)
@@ -725,6 +809,9 @@ internal static class EvalCommand
             settings["embeddingModel"] = embeddingSettings.Model;
             settings["embeddingProvider"] = embeddingSettings.ProviderTag;
         }
+        // A target's keys never replace the command's own (Add throws on a clash, which the evidence writer reports).
+        foreach (var (key, value) in subjectSettings ?? [])
+            settings.Add(key, value?.DeepClone());
         var scores = cases.Select(c => c.ToTestCase().PassingScore).ToArray();
         IReadOnlyDictionary<string, AefThreshold>? thresholds = null;
         if (scores.Length > 0 && scores.Distinct().Count() == 1)
@@ -738,7 +825,7 @@ internal static class EvalCommand
                 perCase[ids[i]] = new System.Text.Json.Nodes.JsonObject { ["op"] = ">=", ["value"] = scores[i] };
             settings["caseThresholds"] = perCase;
         }
-        var datasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/');
+        var datasetName = DatasetName(opts.Dataset, Directory.GetCurrentDirectory());
         var definitionSettings = new System.Text.Json.Nodes.JsonObject
         {
             ["pipeline"] = "eval", ["runs"] = opts.Runs,
@@ -786,6 +873,40 @@ internal static class EvalCommand
             Definition = definition,
         };
     }
+    /// <summary>
+    /// The dataset's name in the AEF run's suite ref: its path relative to <paramref name="workingDirectory"/> when it is
+    /// inside it; else relative to the root of the git repository that holds it; else its file name. The name never
+    /// carries a path outside the working folder or the repository, which can name the tester's user folder.
+    /// </summary>
+    /// <param name="dataset">The dataset file.</param>
+    /// <param name="workingDirectory">The working directory.</param>
+    internal static string DatasetName(FileInfo dataset, string workingDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(dataset);
+        if (RelativeInside(workingDirectory, dataset.FullName) is { } inWorkingDirectory)
+        {
+            return inWorkingDirectory;
+        }
+
+        for (var directory = dataset.Directory; directory is not null; directory = directory.Parent)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")) || File.Exists(Path.Combine(directory.FullName, ".git")))
+            {
+                return RelativeInside(directory.FullName, dataset.FullName) ?? dataset.Name;
+            }
+        }
+
+        return dataset.Name;
+
+        static string? RelativeInside(string root, string path)
+        {
+            var relative = Path.GetRelativePath(root, path);
+            return Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith("../", StringComparison.Ordinal) || relative.StartsWith("..\\", StringComparison.Ordinal)
+                ? null
+                : relative.Replace('\\', '/');
+        }
+    }
+
     private static AefUsage? AefJudgeUsage(EvalOptions opts, string resolvedName, JudgeCallLedger? judge) =>
         judge is { ReportedUsage: true }
             ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
@@ -908,7 +1029,10 @@ internal static class EvalCommand
         AefTargetMode targetMode,
         JudgeCallLedger? judgeLedger,
         byte[] datasetSnapshot,
-        CancellationToken ct)
+        CancellationToken ct,
+        ISutCaseEvidence? caseEvidence = null,
+        System.Text.Json.Nodes.JsonObject? subjectSettings = null,
+        AefSubjectKind subjectKind = AefSubjectKind.Model)
     {
         var usageHarness = new CliUsageEvaluationHarness(harness);
         var runner = new StochasticRunner(usageHarness, statisticsCalculator: null, evalOptions);
@@ -920,7 +1044,8 @@ internal static class EvalCommand
         var results = new List<StochasticResult>();
         var startTime = DateTimeOffset.UtcNow;
         var caseIds = EvalAef.CaseIds(datasetTestCases);
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases, datasetSnapshot),
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases, datasetSnapshot,
+                caseEvidence?.SubjectProvider, subjectSettings: subjectSettings, subjectKind: subjectKind),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
             opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 
@@ -935,17 +1060,35 @@ internal static class EvalCommand
                 if (!opts.Quiet)
                     Console.Error.WriteLine($"\n  Test: {testCase.Name ?? "unnamed"}");
 
+                caseEvidence?.BeginCase(caseId);
                 var result = await runner.RunStochasticTestAsync(agent, testCase, stochasticOptions with
                 {
                     OnProgress = progress =>
                     {
-                        if (progress.LastResult is not { } trial) return;
-                        if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
-                            ct.ThrowIfCancellationRequested();
-                        evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
-                            ? new AefNativeContent { Input = datasetTestCase.Input, Expected = datasetTestCase.ExpectedOutput } : null,
-                            trialUsage: usageHarness.TakeUsage(trial));
-                        stochasticOptions.OnProgress?.Invoke(progress);
+                        try
+                        {
+                            if (progress.LastResult is not { } trial) return;
+                            if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
+                                ct.ThrowIfCancellationRequested();
+                            // Before the trial is recorded and counted: the target may know it was not measured.
+                            var absence = caseEvidence?.ReviewResult(trial, caseId)
+                                ?? NotMeasuredCases.ReviewCriteria(trial, CriteriaNotGraded(opts, datasetTestCase));
+                            evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
+                                ? new AefNativeContent
+                                {
+                                    Input = datasetTestCase.Input,
+                                    Expected = datasetTestCase.ExpectedOutput,
+                                    Document = caseEvidence?.DocumentFor(caseId),
+                                }
+                                : null,
+                                trialUsage: usageHarness.TakeUsage(trial), absence: absence);
+                            stochasticOptions.OnProgress?.Invoke(progress);
+                        }
+                        finally
+                        {
+                            // Trials run one after another (MaxParallelism 1): arm the next trial of this case.
+                            caseEvidence?.BeginCase(caseId);
+                        }
                     },
                 }, ct);
                 results.Add(result);
@@ -1052,8 +1195,16 @@ internal sealed class EvalOptions
     public string? DeploymentName { get; init; }
     public string? ApiKey { get; init; }
 
-    /// <summary>Built-in SUT selector (<c>--sut</c>, Track 2 PR2); <c>copilot-studio</c> is the only built-in target today.</summary>
+    /// <summary>Built-in SUT selector (<c>--sut</c>); the built-in targets are <c>copilot-studio</c> and <c>microsoft365</c>.</summary>
     public string? Sut { get; init; }
+
+    /// <summary>
+    /// <c>--i-understand-live-side-effects</c>: consent for a live built-in <see cref="Sut"/> target — the common
+    /// flag registered once per verb by <see cref="SutTargetResolver.AddOptionsTo"/>, forwarded as
+    /// <see cref="CommonTargetOptions.AckLiveSideEffects"/>; a live target's own <see cref="ISutTarget.Validate"/>
+    /// refuses before any network call without it. Not read when <see cref="Sut"/> is unset.
+    /// </summary>
+    public bool AckLiveSideEffects { get; init; }
 
     /// <summary>
     /// Per-built-in-target bound options, keyed by <see cref="ISutTarget.Sut"/> — mirrors

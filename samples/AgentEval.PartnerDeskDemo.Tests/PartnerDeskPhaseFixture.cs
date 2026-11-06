@@ -47,20 +47,27 @@ public sealed class PartnerDeskPhaseFixture : IAsyncLifetime
             OutboxPath,
             Register);
 
+        DemoPhase? currentPhase = null;
         try
         {
             foreach (var phase in new[] { DemoPhase.Clean, DemoPhase.Compromised, DemoPhase.Level1, DemoPhase.Level2 })
             {
+                currentPhase = phase;
                 _outcomes[phase] = await _runner.RunAsync(phase, Program.StandardQuestion, CancellationToken.None)
                     .ConfigureAwait(false);
             }
         }
-        catch
+        catch (Exception exception)
         {
             // xunit does not call DisposeAsync when InitializeAsync throws, so release the MCP child and temp dir
             // here rather than leaking them for the life of the test process.
-            await DisposeAsync().ConfigureAwait(false);
-            throw;
+            try { await DisposeAsync().ConfigureAwait(false); }
+            catch (Exception cleanup) { exception.Data["PartnerDesk.CleanupFailure"] = cleanup; }
+            var diagnostics = string.Join("; ", exception.Data.Cast<System.Collections.DictionaryEntry>()
+                .Where(item => item.Key is string key && key.StartsWith("PartnerIntel.", StringComparison.Ordinal))
+                .Select(item => $"{item.Key}={item.Value}"));
+            throw new InvalidOperationException(
+                $"PartnerDesk fixture failed during phase {currentPhase}. {diagnostics}", exception);
         }
     }
 

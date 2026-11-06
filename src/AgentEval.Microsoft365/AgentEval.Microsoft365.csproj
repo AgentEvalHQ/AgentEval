@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>AgentEval</RootNamespace>
+
+    <!-- A separate, opt-in package (not embedded in AgentEval.csproj) so the A2A SDK + MSAL dependency tree is
+         never forced on every AgentEval consumer — the same reason AgentEval.MAF.CopilotStudio is its own project.
+         This provider talks to Work IQ over A2A 1.0 directly and has NO Microsoft Agent Framework dependency, so
+         it references Abstractions + Core only, never AgentEval.MAF. -->
+    <!-- Not in the pack and publish steps of .github/workflows/release.yml, so it is not on NuGet. Like the
+         Copilot Studio bridge, its code reaches users only inside the AgentEval.Cli tool (sut=microsoft365) until
+         a release publishes it. See the "Install" section of this project's README. -->
+    <IsPackable>true</IsPackable>
+    <PackageId>AgentEval.Microsoft365</PackageId>
+    <!-- Version is centralized in Directory.Build.props, same lockstep convention as AgentEval/AgentEval.Cli. -->
+    <Description>Microsoft 365 (Work IQ A2A 1.0) provider for AgentEval. It evaluates Microsoft 365 Copilot or a declarative agent as an IEvaluableAgent, in code or with agenteval --sut microsoft365. Experimental (AGENTEVAL_M365_PREVIEW001); not yet verified on a live tenant.</Description>
+    <PackageTags>ai;agent;evaluation;microsoft-365;copilot;work-iq;a2a</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>Per-version release notes: https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Include sub-project DLLs in the NuGet package (AgentEval.Core/.Abstractions are internal, not separately
+         published) — same IncludeSubProjectDlls pattern as AgentEval.csproj. -->
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeSubProjectDlls</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <!-- MSBuild target: embed all ProjectReference DLLs into the NuGet lib/ folder (verbatim copy of
+       AgentEval.csproj's own target — see its comment for why this is needed for a non-packable
+       ProjectReference chain). -->
+  <Target Name="IncludeSubProjectDlls" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)"
+          Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference'" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Re-declared explicitly because PrivateAssets=all above suppresses transitive propagation — same
+         discipline AgentEval.csproj already documents for its own embedded sub-projects. These four are
+         AgentEval.Core's complete runtime PackageReference set, so a consumer of this package gets every
+         assembly the embedded Core.dll loads. -->
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="System.Numerics.Tensors" />
+    <!-- Work IQ transport: the A2A .NET SDK (pinned to 1.0.0-preview2 in Directory.Packages.props — the same
+         version Microsoft.Agents.AI.A2A resolves) behind IWorkIqA2AClient. -->
+    <PackageReference Include="A2A" />
+    <!-- MSAL delegated auth (device code) + the cross-platform persisted token cache, same packages as the
+         Copilot Studio provider. -->
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
+    <!-- IHttpClientFactory for the A2A client's HttpClient and the raw-capture DelegatingHandler. -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Grant the test assembly access to internal protocol/evidence helpers exercised directly in tests. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>AgentEval.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

@@ -22,6 +22,7 @@ public static partial class MAFWorkflowEventBridge
         private readonly List<Activation> _ready = [];
         private readonly List<Activation> _emitted = [];
         private readonly Dictionary<(string Executor, string Call), PendingCall> _pendingCalls = [];
+        private readonly Dictionary<string, RejectedApprovalCallTracker> _rejectedApprovals = new(StringComparer.Ordinal);
         private readonly Dictionary<string, BranchSummary> _branches = new(StringComparer.Ordinal);
         private readonly HashSet<string> _reportedPendingRequests = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Edge, int Source), int> _barrierDeliveries = [];
@@ -50,6 +51,14 @@ public static partial class MAFWorkflowEventBridge
                 if (parents?.TryGetValue(rawId, out var parent) == true) activation.Parent = Get(parent);
             }
             return activation;
+        }
+
+        // One tracker per executor for the whole run: its rejected approval decisions, and the calls re-created for them.
+        private RejectedApprovalCallTracker RejectedApprovals(string rawId)
+        {
+            if (!_rejectedApprovals.TryGetValue(rawId, out var tracker))
+                _rejectedApprovals[rawId] = tracker = new RejectedApprovalCallTracker();
+            return tracker;
         }
 
         public IEnumerable<WorkflowEvent> Add(MAFWorkflows.WorkflowEvent evt)
@@ -90,13 +99,30 @@ public static partial class MAFWorkflowEventBridge
                     activation.Inputs.Add(invoked.Data!);
                     activation.HasTurn |= !activation.IsChat || !IsChatProtocolAccumulation(invoked.Data);
                     activation.PairedReturn = null;
+                    // An answer to the executor's approval request (a request responder's, sent by this bridge). MAF
+                    // resumes the agent with it as input, and the resumed run streams the call
+                    // FunctionInvokingChatClient re-creates for it and that call's result, but not the decision. A
+                    // rejected decision is registered here so neither is recorded as a tool call: the tool never ran.
+                    if (invoked.Data is MAFWorkflows.ExternalResponse decisionAnswer
+                        && decisionAnswer.TryGetDataAs<ToolApprovalResponseContent>(out var answeredDecision)
+                        && answeredDecision is not null)
+                        _ = RejectedApprovals(activation.RawId).IsRejectedCallPart(answeredDecision);   // records a rejected decision
                     break;
 
                 case MAFWorkflows.AgentResponseUpdateEvent update:
                     var updateOwner = Get(update.ExecutorId);
                     if (update.Update.MessageId is { } messageId) updateOwner.MessageIds.Add(messageId);
+                    // MAF 1.25+ (#9152): the run after an approval request that nobody answered streams a generated
+                    // rejection, then the call FunctionInvokingChatClient re-creates for it and a "rejected" result.
+                    // That tool never ran, so neither part is recorded as a tool call. Per executor; decisions are
+                    // read before calls and calls before results, as the loops below already order one update. A
+                    // responder's rejection was registered when it was delivered (ExecutorInvokedEvent above).
+                    var updateRejections = RejectedApprovals(updateOwner.RawId);
+                    foreach (var decision in update.Update.Contents.OfType<ToolApprovalResponseContent>())
+                        _ = updateRejections.IsRejectedCallPart(decision);   // records a rejected decision
                     foreach (var call in update.Update.Contents.OfType<FunctionCallContent>())
                     {
+                        if (updateRejections.IsRejectedCallPart(call)) continue;
                         var id = call.CallId ?? Guid.NewGuid().ToString();
                         var pending = new PendingCall(updateOwner, id, call.Name, call.Arguments, now());
                         updateOwner.Calls.Add(pending);
@@ -104,6 +130,7 @@ public static partial class MAFWorkflowEventBridge
                     }
                     foreach (var result in update.Update.Contents.OfType<FunctionResultContent>())
                     {
+                        if (updateRejections.IsRejectedCallPart(result)) continue;
                         var id = result.CallId;
                         if (string.IsNullOrEmpty(id))
                             id = _pendingCalls.Values.Where(call => call.Owner.RawId == updateOwner.RawId)

@@ -85,28 +85,36 @@ public sealed partial class MAFWorkflowShapesTests
     {
         var starts = 0;
         var bothStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        async Task<WorkflowExecutionResult> Run(int delay)
+        async Task<(WorkflowExecutionResult Result, TimeSpan Work, TimeSpan Envelope)> Run(int delay)
         {
+            var work = TimeSpan.Zero;
             var worker = ((Func<string, CancellationToken, ValueTask<string>>)(async (_, ct) =>
             {
+                var workStart = Stopwatch.GetTimestamp();
                 if (Interlocked.Increment(ref starts) == 2) bothStarted.TrySetResult();
                 await bothStarted.Task.WaitAsync(ct);
                 await Task.Delay(delay, ct);
+                work = Stopwatch.GetElapsedTime(workStart);
                 return delay.ToString();
             })).BindAsExecutor<string, string>("Worker");
             var workflow = new MAFWorkflows.WorkflowBuilder(worker).WithOutputFrom(worker).BuildWithTiming(_timing);
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            return await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "isolated", ["Worker"]).ExecuteWorkflowAsync("input", cancellation.Token);
+            var started = Stopwatch.GetTimestamp();
+            var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "isolated", ["Worker"]).ExecuteWorkflowAsync("input", cancellation.Token);
+            return (result, work, Stopwatch.GetElapsedTime(started));
         }
         var results = await Task.WhenAll(Run(40), Run(180)).WaitAsync(TimeSpan.FromSeconds(15));
-        var fast = Assert.Single(results[0].Steps);
-        var slow = Assert.Single(results[1].Steps);
-        Assert.Null(fast.TimingNotMeasuredReason);
-        Assert.Null(slow.TimingNotMeasuredReason);
-        Assert.Equal("40", fast.Output);
-        Assert.Equal("180", slow.Output);
-        Assert.True(slow.Duration >= TimeSpan.FromMilliseconds(150));
-        Assert.True(slow.Duration > fast.Duration);
+        foreach (var (run, index) in results.Select((run, index) => (run, index)))
+        {
+            Assert.True(run.Result.IsSuccess);
+            var step = Assert.Single(run.Result.Steps);
+            Assert.Null(step.TimingNotMeasuredReason);
+            Assert.Equal(index == 0 ? "40" : "180", step.Output);
+            var facts = $"Run {index}: step={step.Duration}, delegate={run.Work}, envelope={run.Envelope}.";
+            Assert.True(run.Work >= TimeSpan.FromMilliseconds(index == 0 ? 30 : 150), facts);
+            Assert.True(step.Duration >= run.Work, facts);
+            Assert.True(step.Duration <= run.Envelope, facts);
+        }
     }
 
     [Theory]
@@ -154,6 +162,40 @@ public sealed partial class MAFWorkflowShapesTests
 
 public partial class MAFWorkflowEventBridgeTests
 {
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void TimingCapture_SameExecutorId_RequiresMatchingSourceAndSession(bool matchingSource, bool matchingSession)
+    {
+        using var source = new ActivitySource("Microsoft.Agents.AI.Workflows");
+        using var foreign = new ActivitySource("Microsoft.Agents.AI.Workflows");
+        var origin = TimeProvider.System.GetTimestamp();
+        using var capture = new MAFWorkflowTimingCapture(origin,
+            new Dictionary<string, ActivitySource> { ["Worker"] = source, ["Other"] = foreign });
+        using var scope = capture.Enter();
+        using var session = source.StartActivity("workflow.session");
+        session!.SetTag("session.id", matchingSession ? capture.SessionId : "foreign-session");
+        var beforeStart = TimeProvider.System.GetElapsedTime(origin);
+        using var activity = (matchingSource ? source : foreign).StartActivity("executor.process Worker");
+        Assert.NotNull(activity);
+        var afterStart = TimeProvider.System.GetElapsedTime(origin);
+        var beforeStop = TimeProvider.System.GetElapsedTime(origin);
+        activity.Stop();
+        var afterStop = TimeProvider.System.GetElapsedTime(origin);
+        var delivery = capture.Take("Worker");
+        if (matchingSource && matchingSession)
+        {
+            Assert.NotNull(delivery);
+            Assert.InRange(delivery.Start, beforeStart, afterStart);
+            Assert.NotNull(delivery.End);
+            Assert.InRange(delivery.End.Value, beforeStop, afterStop);
+        }
+        else Assert.Null(delivery);
+        Assert.Null(capture.Take("Worker"));
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

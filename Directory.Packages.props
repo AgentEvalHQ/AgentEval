@@ -8,8 +8,22 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <!-- Microsoft Agent Framework — core packages on 1.24.0 (stable), within the currency gate.
-         The 1.24 package manifests retain the existing Extensions.AI/OpenAI dependency floors.
+    <!-- Microsoft Agent Framework — core packages on 1.27.0 (stable), within the currency gate.
+         The 1.27 package manifests keep the existing Extensions.AI/OpenAI dependency floors (10.10.0 / 10.10.1).
+         Upgrade validation (1.24 to 1.27, 2026-11-06): restore without conflicts; a build of the solution had
+         0 errors on net8/9/10 and no warning from a MAF API; every test project passed on net10 offline. The
+         1.25-1.27 breaking changes are in Cosmos, AgentServer, the DefaultHttpRequestHandler redirect callback,
+         the Tools.Shell docker parameter rename (#9453, .NET) and Python, none used here.
+         Three tool-approval changes are not marked breaking but change results. MAF 1.25 #9152 rejects an approval
+         request left unanswered when the session runs again (on 1.24 that run threw) and returns the rejection,
+         with a re-created call and its rejected result, in the response. AgentEval's tool reports now treat such a
+         call as not executed. MAF 1.26 #9542 throws InvalidOperationException when one response repeats an
+         approval request id. In a workflow, MAF 1.27's AIAgentHostExecutor (CreateCompletedApprovalResponse, not
+         in 1.24) throws InvalidOperationException when the agent returns no call and result for an approval answer
+         it forwards (read from the 1.27 source, not run). The offline approval invariants pass on 1.27 (Gatekeeper offline samples, CI);
+         NO live re-verification was run on 1.27. The A2A, Foundry and AgentHooks previews stay on 1.23: Microsoft.Agents.AI.A2A
+         1.25+ requires the A2A SDK 1.0.0-preview3 (#9386), and AgentEval.Microsoft365 is built and tested on
+         preview2 (see the A2A pin below); their dependency floors accept the 1.27 core.
          Preview-only sample integrations remain pinned separately below.
          Previous upgrade validation (1.17 to 1.23, 2026-10):
          1.17→1.23 needed NO source changes: a trial build had 0 errors on net8/9/10 and the same warning set as 1.17.
@@ -34,13 +48,18 @@
              1.14.0, which is why AgentEval's own AEGK001 experimental marker and every MAAI001 suppression
              around the approval bridge were removed.
          Microsoft.Agents.AI.Harness reaches its first STABLE release at 1.17.0 (was preview-only at 1.13.0). -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.24.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.27.0" />
     <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.23.0-preview.260928.1" /><!-- preview-only; A2A boundary sample + tests -->
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.24.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.24.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.24.0" />
+    <!-- A2A .NET SDK (a2aproject/a2a-dotnet). 1.0.0-preview2 is exactly what Microsoft.Agents.AI.A2A 1.23.0-preview
+         resolves (its nuspec declares A2A >= 1.0.0-preview2) and what the Work IQ .NET sample references; pinned
+         explicitly because AgentEval.Microsoft365 depends on it directly. Do not raise it without checking
+         Microsoft.Agents.AI.A2A still restores to one A2A version. -->
+    <PackageVersion Include="A2A" Version="1.0.0-preview2" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.27.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.27.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.27.0" />
     <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.23.0-preview.260928.1" /><!-- preview-only; sample-only -->
-    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.24.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
+    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.27.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
     <PackageVersion Include="Azure.AI.Projects" Version="3.0.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry 1.23.0-preview.260928.1, whose nuspec declares exactly 3.0.0-beta.3 (a major beta with breaking changes; referenced only by the Foundry SAMPLES, which build against it) -->
     <!-- S1: AGENT-HOOKS-0.1 interceptor contract (MIT, zero dependencies, lib/net8.0 + native FFI for
          win-x64/linux-x64/osx-x64/osx-arm64). Used ONLY by src/AgentEval.MAF.AgentHooks; deliberately not
@@ -51,8 +70,8 @@
          0.1.0-alpha.5 pinned above, so there is no diamond. No shipped package references it. -->
     <PackageVersion Include="Microsoft.Agents.AI.AgentHooks" Version="1.23.0-alpha.260928.1" />
     
-    <!-- Microsoft Extensions AI — 10.10.0 is the floor Microsoft.Agents.AI 1.23.0 requires.
-         Microsoft.Extensions.AI.OpenAI is pinned to 10.10.1, NOT 10.10.0: Microsoft.Agents.AI.OpenAI 1.23.0 and the
+    <!-- Microsoft Extensions AI — 10.10.0 is the floor Microsoft.Agents.AI 1.27.0 requires (the same since 1.23.0).
+         Microsoft.Extensions.AI.OpenAI is pinned to 10.10.1, NOT 10.10.0: Microsoft.Agents.AI.OpenAI 1.27.0 and the
          Foundry preview declare >= 10.10.1, yet with transitive pinning a 10.10.0 pin restores WITHOUT a warning, and
          MAF #8730 reports that 10.10.0 throws TypeLoadException on every Responses call that carries a tool. -->
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
@@ -91,10 +110,10 @@
     <!-- Pin the transitive PKCS dependency to the .NET 8 servicing fix for
          GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7; compatible with all target frameworks. -->
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
-    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.12" /><!-- floor raised by Microsoft.Extensions.AI 10.10.0 (required by MAF 1.23.0) -->
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.12" /><!-- floor raised by Microsoft.Extensions.AI 10.10.0 (required by MAF 1.27.0, as since 1.23.0) -->
     <PackageVersion Include="System.Memory.Data" Version="10.0.10" /><!-- floor raised by Azure.Core (transitive via Azure.AI.Projects 3.0.0-beta.3, required by Microsoft.Agents.AI.Foundry 1.23.0-preview) -->
     <!-- Security: originally pinned to 1.15.3, the patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF).
-         Microsoft.Agents.AI.Workflows 1.23.0 itself declares OpenTelemetry.Api >= 1.18.0, which is past that patch,
+         Microsoft.Agents.AI.Workflows 1.27.0 itself declares OpenTelemetry.Api >= 1.18.0 (as 1.23.0 did), past that patch,
          so the pin now follows MAF's floor; it is kept so the transitive version cannot fall back below the fix. -->
     <PackageVersion Include="OpenTelemetry.Api" Version="1.18.0" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />

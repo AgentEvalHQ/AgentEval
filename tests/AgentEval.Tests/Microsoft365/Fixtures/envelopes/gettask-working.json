@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0005",
+  "result": {
+    "id": "task-7a1e3c5b-9d2f-4e8a-b1c6-3f5d7e9a0b21",
+    "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+    "status": {
+      "state": "TASK_STATE_WORKING",
+      "timestamp": "2026-11-05T13:45:04.602318Z",
+      "message": {
+        "messageId": "msg-agent-progress-0005",
+        "role": "ROLE_AGENT",
+        "parts": [
+          {
+            "text": "Searching SharePoint and Outlook for Project Atlas updates..."
+          }
+        ],
+        "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+        "taskId": "task-7a1e3c5b-9d2f-4e8a-b1c6-3f5d7e9a0b21"
+      }
+    },
+    "history": [
+      {
+        "messageId": "msg-user-3e8f1a2c-0003",
+        "role": "ROLE_USER",
+        "parts": [
+          {
+            "text": "Summarize the status of Project Atlas and cite the sources."
+          }
+        ],
+        "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+        "taskId": "task-7a1e3c5b-9d2f-4e8a-b1c6-3f5d7e9a0b21",
+        "metadata": {
+          "Location": {
+            "timeZone": "Europe/Zurich",
+            "timeZoneOffset": 60
+          }
+        }
+      }
+    ]
+  }
+}

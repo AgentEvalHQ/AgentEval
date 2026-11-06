@@ -59,6 +59,9 @@ public class JsonSchemaNetComparisonTests
                     beyondDecimal++;
                     continue;
                 }
+                // A RegexMatchTimeoutException from JsonSchema.Net's pattern keyword is deliberately not caught: a check
+                // that did not finish is not agreement. Its wall-clock budget ran out once under load (CI run 38124973726,
+                // Windows); if that recurs, run this class in its own serial CI step after the parallel run.
 
                 if (mine != other)
                 {

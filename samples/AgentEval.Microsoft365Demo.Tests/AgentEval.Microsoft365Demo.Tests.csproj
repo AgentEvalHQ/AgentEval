@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <RootNamespace>AgentEval.Microsoft365Demo.Tests</RootNamespace>
+    <!-- The Microsoft 365 provider is experimental (assembly-level [Experimental]); these tests use it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The demo under test: its internal host seam (DemoHost.RunAsync with DemoHostOverrides) is visible to this
+         assembly through the demo's InternalsVisibleTo. -->
+    <ProjectReference Include="..\AgentEval.Microsoft365Demo\AgentEval.Microsoft365Demo.csproj" />
+    <!-- The provider's public API (IWorkIqTokenProvider, the diagnostics and evidence types), referenced directly rather
+         than only through the demo. -->
+    <ProjectReference Include="..\..\src\AgentEval.Microsoft365\AgentEval.Microsoft365.csproj" />
+    <!-- The AEF writer's helpers and the AEF verifier (AgentEval.Results, through the adapters), to check the run the
+         demo writes under aef/. -->
+    <ProjectReference Include="..\..\src\AgentEval.Results.Adapters\AgentEval.Results.Adapters.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- One source of truth with the provider's own tests: the scripted Work IQ transport and the fixture reader are
+         compiled from tests/AgentEval.Tests, not copied. -->
+    <Compile Include="..\..\tests\AgentEval.Tests\Microsoft365\TestHelpers\FakeWorkIqHandler.cs" Link="Shared\FakeWorkIqHandler.cs" />
+    <Compile Include="..\..\tests\AgentEval.Tests\Microsoft365\TestHelpers\FixtureLoader.cs" Link="Shared\FixtureLoader.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The synthetic Work IQ fixtures, embedded under the manifest names FixtureLoader expects
+         (AgentEval.Tests.Microsoft365.Fixtures.<folder>.<file>), the same names AgentEval.Tests embeds them under. -->
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Microsoft365\Fixtures\cards\*.json"
+                      LogicalName="AgentEval.Tests.Microsoft365.Fixtures.cards.%(Filename)%(Extension)"
+                      Link="Shared\Fixtures\cards\%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Microsoft365\Fixtures\envelopes\*.json;..\..\tests\AgentEval.Tests\Microsoft365\Fixtures\envelopes\*.txt"
+                      LogicalName="AgentEval.Tests.Microsoft365.Fixtures.envelopes.%(Filename)%(Extension)"
+                      Link="Shared\Fixtures\envelopes\%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Microsoft365\Fixtures\sse\*.txt"
+                      LogicalName="AgentEval.Tests.Microsoft365.Fixtures.sse.%(Filename)%(Extension)"
+                      Link="Shared\Fixtures\sse\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

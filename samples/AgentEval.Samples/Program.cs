@@ -243,6 +243,14 @@ public static class Program
             new("ASSERT evidence", "Offline direct ASSERT import and sealed per-case composite evidence from the hand-authored billing fixture", AssertEvidence.RunAsync),
             new("ASSERT multi-turn benchmark", "Offline saved conversations and case-level benchmark rates with missing/error outcomes", AssertMultiturnBenchmark.RunAsync),
         ]),
+
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: R1 = 109, R2 = 110. The key skips Q on purpose: the
+        //   group menu reads Q as Quit, so a group 'Q' could never be selected there.
+        new('R', "Microsoft 365", "🔑 real Microsoft 365 agent via Work IQ A2A — set M365_CONFIG_PATH + M365_I_UNDERSTAND_LIVE_SIDE_EFFECTS=true",
+        [
+            new("Hello World",               "★ start here — build the live provider, ONE prompt, ONE assertion, the evidence availability line", Microsoft365HelloWorld.RunAsync),
+            new("Live Walkthrough",          "evidence per channel, fresh vs continued context, a non-completed turn handled honestly, the turn budget", Microsoft365Walkthrough.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────

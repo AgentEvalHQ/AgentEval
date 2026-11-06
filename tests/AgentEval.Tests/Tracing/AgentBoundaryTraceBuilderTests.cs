@@ -4,6 +4,7 @@
 
 using AgentEval.Benchmarks;
 using AgentEval.Testing;
+using AgentEval.Tests.TestHelpers;
 using AgentEval.Tracing;
 using Microsoft.Extensions.AI;
 
@@ -124,5 +125,67 @@ public class AgentBoundaryTraceBuilderTests
         Assert.Equal(0, report.Discrepancies.Single(d => d.ClassKey == TraceFidelityRubric.HiddenRetries).Count);
         Assert.Equal(0, report.Discrepancies.Single(d => d.ClassKey == TraceFidelityRubric.TokenUnderReporting).Count);
         Assert.True(report.OverallScore >= 0.99, $"expected ~perfect fidelity on an honest run, got {report.OverallScore:P0}");
+    }
+
+    // Fails on HEAD 143696a9: the call MAF re-created for the rejected request was listed as an agent-reported call.
+    // Synthetic messages in the MAF 1.27 shape (#9152), not a recorded run.
+    [Fact]
+    public void FromAgentResponse_CallRecreatedForARejectedApproval_IsNotListed()
+    {
+        var trace = AgentBoundaryTraceBuilder.FromAgentResponse(UnansweredApprovalRun.Messages());
+
+        var entry = Assert.Single(trace.Entries);
+        Assert.Null(entry.ToolCalls);
+        Assert.Contains(UnansweredApprovalRun.Answer, entry.Text);
+    }
+
+    // Guard (passes on HEAD 143696a9 too): after an approved decision the call ran, and it is listed as before.
+    [Fact]
+    public void FromAgentResponse_CallAfterAnApprovedDecision_IsListed()
+    {
+        var trace = AgentBoundaryTraceBuilder.FromAgentResponse(UnansweredApprovalRun.Messages(approved: true));
+
+        Assert.Equal(UnansweredApprovalRun.ToolName, Assert.Single(Assert.Single(trace.Entries).ToolCalls!).Name);
+    }
+
+    // Fails on HEAD 143696a9: the agent side listed the re-created call, which the chat boundary never saw (a phantom
+    // tool call). Pins MAF #9152 (1.25+): a real ChatClientAgent over a scripted model (offline), with the chat recorder
+    // inner of MAF's function invocation, pauses on an approval request, then runs again on the same session with new
+    // text; MAF rejects the request itself. The model is not asked for the call in that run.
+    [Fact]
+    public async Task Reconcile_RunAfterAnUnansweredApproval_NoPhantomToolCall()
+    {
+        var executed = 0;
+        var refund = AIFunctionFactory.Create(
+            (int amount) => { Interlocked.Increment(ref executed); return $"refunded {amount}"; }, UnansweredApprovalRun.ToolName);
+        var chatTrace = new AgentTrace();
+        var model = new ScriptedChatClient()
+            .AddToolCall(UnansweredApprovalRun.CallId, UnansweredApprovalRun.ToolName, UnansweredApprovalRun.RefundArgs())
+            .AddText(UnansweredApprovalRun.Answer)
+            .AsBuilder()
+            .UseTraceRecording("agent", chatTrace)
+            .Build();
+        var agent = new Microsoft.Agents.AI.ChatClientAgent(model, new Microsoft.Agents.AI.ChatClientAgentOptions
+        {
+            Name = "Support",
+            ChatOptions = new ChatOptions { Tools = [new ApprovalRequiredAIFunction(refund)] },
+        });
+        var session = await agent.CreateSessionAsync();
+        await agent.RunAsync(UnansweredApprovalRun.Pause, session);
+        var firstRunEntries = chatTrace.Entries.Count;
+
+        var second = await agent.RunAsync(UnansweredApprovalRun.NewText, session);
+        var secondRunChat = new AgentTrace();
+        foreach (var chatEntry in chatTrace.Entries.Skip(firstRunEntries))
+            secondRunChat.Entries.Add(chatEntry);
+        var agentTrace = AgentBoundaryTraceBuilder.FromAgentResponse(second.Messages, second.Usage, null, "agent");
+        var report = new TraceFidelityRunner().Reconcile(agentTrace, secondRunChat);
+
+        UnansweredApprovalRun.AssertMafAutoRejected(second.Messages.SelectMany(m => m.Contents));
+        Assert.Equal(0, executed);
+        Assert.NotEmpty(secondRunChat.Entries);
+        Assert.Null(Assert.Single(agentTrace.Entries).ToolCalls);
+        Assert.Equal(0, report.Discrepancies.Single(d => d.ClassKey == TraceFidelityRubric.PhantomToolCalls).Count);
+        Assert.Equal(0, report.Discrepancies.Single(d => d.ClassKey == TraceFidelityRubric.MissingToolCalls).Count);
     }
 }

@@ -120,6 +120,75 @@ public class ToolApprovalBridgeTests
         Assert.Equal(1, executed);   // approved ⇒ the tool finally ran
     }
 
+    // Pins MAF #9152 (1.25+): the session runs again while a saved approval request was never answered. MAF's
+    // ApprovalResponseBindingChatClient (on unless DisableApprovalResponseBinding) rejects it and returns the generated
+    // decision in the response. On MAF 1.24 this second run threw InvalidOperationException.
+    [Fact]
+    public async Task UnansweredApproval_NextRunOnSameSession_IsRejectedByMaf_ToolNeverRuns()
+    {
+        var gate = new CountingApprovalGate(new ArgumentPatternApprovalGate(EscalateLargeRefund));
+        var (agent, executed) = BuildGatedAgent([gate], new Dictionary<string, object?> { ["amount"] = 5000 });
+        var session = await agent.CreateSessionAsync();
+
+        var paused = await agent.RunAsync("refund $5000", session);
+        var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().Single();
+        Assert.Equal(1, gate.Calls);
+
+        // No decision: the caller sends new text on the same session.
+        var next = await agent.RunAsync("Never mind. What are your opening hours?", session);
+
+        Assert.Equal(0, executed());   // the unanswered call never ran
+        var decision = Assert.Single(next.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalResponseContent>());
+        Assert.False(decision.Approved);
+        Assert.Equal(request.RequestId, decision.RequestId);
+        var call = Assert.IsType<FunctionCallContent>(decision.ToolCall);
+        Assert.Equal("call_1", call.CallId);
+        Assert.Equal("issue_refund", call.Name);
+        Assert.Equal(1, gate.Calls);   // MAF rejected the request itself; the Gatekeeper rule was not asked again
+    }
+
+    // The human rejects, and the run resumes on the same session with that decision: the tool never runs. Guards the
+    // reject path of MAF 1.27's rewritten approval binding (the saved call is copied and bound to the decision).
+    [Fact]
+    public async Task RejectThenResume_ToolNeverRuns()
+    {
+        var gate = new CountingApprovalGate(new ArgumentPatternApprovalGate(EscalateLargeRefund));
+        var (agent, executed) = BuildGatedAgent([gate], new Dictionary<string, object?> { ["amount"] = 5000 });
+        var session = await agent.CreateSessionAsync();
+
+        var paused = await agent.RunAsync("refund $5000", session);
+        Assert.Equal(0, executed());   // escalated: paused for the human
+        var request = paused.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().Single();
+
+        var decisionMessage = new ChatMessage(ChatRole.User, [request.CreateResponse(approved: false, reason: "Amount too large.")]);
+        var resumed = await agent.RunAsync([decisionMessage], session);
+
+        Assert.Equal(0, executed());   // rejected: the tool never ran
+        Assert.DoesNotContain(resumed.Messages.SelectMany(m => m.Contents), c => c is ToolApprovalRequestContent);
+        Assert.Equal(1, gate.Calls);   // the decision came from the human; the rule ran only for the first request
+
+        // Known limitation, pinned so it is not mistaken for fixed: MAF does not return a decision the caller sent as
+        // input, only the call it re-created and that call's "rejected" result. Read alone, the response gives the
+        // extractor nothing to key on, so it reports the call as executed, as on MAF 1.24.
+        var contents = resumed.Messages.SelectMany(m => m.Contents).ToList();
+        Assert.DoesNotContain(contents, c => c is ToolApprovalResponseContent);
+        Assert.Contains(contents, c => c is FunctionCallContent { CallId: "call_1" });
+        Assert.Contains(contents, c => c is FunctionResultContent { CallId: "call_1" });
+        var responseOnly = resumed.Messages.Cast<object>().ToList();
+        Assert.True(Assert.Single(AgentEval.Core.ToolUsageExtractor.Extract(responseOnly).Calls).WasExecuted);
+
+        // With the caller's decision passed ahead of the response, the rule applies. Fails on HEAD 143696a9, where the
+        // default path recorded the re-created call as executed even then.
+        var withDecision = new List<object> { decisionMessage };
+        withDecision.AddRange(responseOnly);
+        var blind = AgentEval.Core.ToolUsageExtractor.Extract(withDecision);
+        Assert.Empty(blind.Calls);
+        Assert.Equal(1, blind.DroppedApprovalRequestCount);
+        var opted = Assert.Single(AgentEval.Core.ToolUsageExtractor.Extract(withDecision, includeApprovalGatedCalls: true).Calls);
+        Assert.Equal(AgentEval.Models.ToolCallRecord.ApprovalRejected, opted.ApprovalState);
+        Assert.False(opted.WasExecuted);
+    }
+
     [Fact]
     public async Task GateThrows_FailsClosed_EscalatesToHuman_ToolDoesNotRun()
     {
@@ -193,5 +262,21 @@ public class ToolApprovalBridgeTests
         public string PolicyName => "throwing-gate";
         public ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("boom");
+    }
+
+    // Counts how often MAF's auto-approval rule consults the gate, then defers to the wrapped gate.
+    private sealed class CountingApprovalGate(IToolApprovalGate inner) : IToolApprovalGate
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public string PolicyName => inner.PolicyName;
+
+        public ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return inner.IsAutoApprovableAsync(call, cancellationToken);
+        }
     }
 }

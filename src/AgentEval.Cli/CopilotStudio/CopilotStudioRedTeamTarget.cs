@@ -51,15 +51,20 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 
 /// <summary>
 /// Parsed <c>--sut copilot-studio</c> options under the shared <c>eval</c>/<c>bench</c> seam (Track 2) —
-/// mirrors <see cref="CopilotStudioTargetOptions"/>'s 3 fields exactly. Deliberately duplicated rather than
-/// shared: the two option TYPES (<see cref="IRedTeamTargetOptions"/> vs <see cref="ISutTargetOptions"/>)
+/// mirrors <see cref="CopilotStudioTargetOptions"/>'s config and max-credits fields exactly. The consent flag
+/// is deliberately NOT here: under this seam it is common to every live target and travels on
+/// <see cref="CommonTargetOptions.AckLiveSideEffects"/>, registered once per verb by <c>SutTargetResolver</c>;
+/// only the redteam path keeps it on <see cref="CopilotStudioTargetOptions"/>. Deliberately duplicated rather
+/// than shared: the two option TYPES (<see cref="IRedTeamTargetOptions"/> vs <see cref="ISutTargetOptions"/>)
 /// are intentionally distinct marker interfaces so `eval`/`bench`'s option shape never implicitly couples
 /// to redteam's — see the design doc's "accepted, deliberate duplication" note.
 /// </summary>
 internal sealed record CopilotStudioSutOptions : ISutTargetOptions
 {
+    /// <summary><c>--copilotstudio-config</c>: the MCS connection JSON.</summary>
     public FileInfo? ConfigFile { get; init; }
-    public bool AckLiveSideEffects { get; init; }
+
+    /// <summary><c>--max-credits</c>: Copilot Credit spend cap (0 = no cap). Enforced during a live run.</summary>
     public int MaxCredits { get; init; }
 }
 
@@ -80,6 +85,8 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret is stored here; the token is acquired at run time via MSAL device-code auth + a persisted cache. Required by --sut copilot-studio.",
     };
 
+    // Registered by the REDTEAM AddOptionsTo only: under the shared eval/bench seam the consent flag is
+    // SutTargetResolver's, bound by the verb into CommonTargetOptions.AckLiveSideEffects.
     private readonly Option<bool> _ackOpt = new("--i-understand-live-side-effects")
     {
         Description = "Required consent for --sut copilot-studio: acknowledge that scanning a LIVE agent can fire real connector/flow actions. Use a NON-PROD agent. Without this the command refuses before any network call.",
@@ -117,18 +124,16 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     public void AddOptionsTo(Command command)
     {
-        AddCommonOptionsTo(command);
+        // The redteam path owns the consent flag itself (RedTeamCommand has no shared resolver to hoist it into),
+        // so _ackOpt is registered HERE, in its original order — and only here: the shared
+        // ISutTarget.AddOptionsTo below never adds it.
+        command.Options.Add(_configOpt);
+        command.Options.Add(_ackOpt);
+        command.Options.Add(_maxCreditsOpt);
         // P6 item A: redteam-only — NOT added by ISutTarget.AddOptionsTo (see that explicit override below).
         command.Options.Add(_saveConfigBaselineOpt);
         command.Options.Add(_configBaselineOpt);
         command.Options.Add(_failOnConfigDriftOpt);
-    }
-
-    private void AddCommonOptionsTo(Command command)
-    {
-        command.Options.Add(_configOpt);
-        command.Options.Add(_ackOpt);
-        command.Options.Add(_maxCreditsOpt);
     }
 
     /// <summary>Bind the CS options from the parse result (called by RedTeamCommand for every built-in target, unconditionally).</summary>
@@ -324,14 +329,22 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     IReadOnlySet<string> ISutTarget.SupportedVerbs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "eval", "bench" };
 
-    // P6 item A's config-baseline options are redteam-ONLY (design doc's explicit scope) — this calls
-    // AddCommonOptionsTo, NOT the public AddOptionsTo (which also registers those 3 extra flags for redteam).
-    void ISutTarget.AddOptionsTo(Command command) => AddCommonOptionsTo(command);
+    /// <summary>A Copilot Studio agent is an agent, not a model: without <c>--subject</c> the run's subject is <c>agent:&lt;display name&gt;</c>.</summary>
+    AgentEval.Results.Writing.AefSubjectKind ISutTarget.SubjectKind => AgentEval.Results.Writing.AefSubjectKind.Agent;
+
+    // P6 item A's config-baseline options are redteam-ONLY (design doc's explicit scope), and the consent flag
+    // is COMMON under this seam — SutTargetResolver.AddOptionsTo registers --i-understand-live-side-effects once
+    // per verb — so this adds exactly the two Copilot-Studio-specific flags and never _ackOpt (a second
+    // live target on the same command would otherwise collide with it: a duplicate-alias error).
+    void ISutTarget.AddOptionsTo(Command command)
+    {
+        command.Options.Add(_configOpt);
+        command.Options.Add(_maxCreditsOpt);
+    }
 
     ISutTargetOptions? ISutTarget.BindOptions(ParseResult parseResult) => new CopilotStudioSutOptions
     {
         ConfigFile = parseResult.GetValue(_configOpt),
-        AckLiveSideEffects = parseResult.GetValue(_ackOpt),
         MaxCredits = parseResult.GetValue(_maxCreditsOpt),
     };
 
@@ -339,7 +352,10 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     {
         var cs = own as CopilotStudioSutOptions ?? new CopilotStudioSutOptions();
 
-        if (!cs.AckLiveSideEffects)
+        // Consent gate — the COMMON flag (CommonTargetOptions.AckLiveSideEffects, bound by the calling verb from
+        // the resolver's --i-understand-live-side-effects), checked FIRST, before any build/network call. Same
+        // message as the redteam half above; the Validate-drift contract test keeps the two in step.
+        if (!common.AckLiveSideEffects)
         {
             throw new InvalidOperationException(
                 "--sut copilot-studio drives a LIVE Copilot Studio agent whose connectors/flows can fire REAL " +

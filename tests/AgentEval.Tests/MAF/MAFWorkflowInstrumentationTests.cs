@@ -70,6 +70,55 @@ public sealed class MAFWorkflowInstrumentationTests
         Assert.True(step.Duration >= TimeSpan.FromMilliseconds(30));
     }
 
+    // Pins MAF #9585 (1.27): a run whose executor fails to initialize releases the workflow, so the next case on the
+    // same adapter runs. On 1.24 every later run failed with "already owned". MAF creates the target inside the sender's
+    // send, so the failure is reported against the sender or "workflow", never "Target": the failed case asserts
+    // neither an executor id nor an error count.
+    [Fact]
+    public async Task ExecuteWorkflowAsync_ExecutorInitializationFails_NextCaseOnSameAdapterRuns()
+    {
+        using var timing = new MAFWorkflowInstrumentation();
+        var start = ((Func<string, string>)(value => value)).BindAsExecutor<string, string>("Start");
+        var target = new InitializationFailsOnceExecutor("Target");
+        var workflow = timing.Build(new WorkflowBuilder(start).AddEdge(start, target).WithOutputFrom(target));
+        var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "init failure", ["Start", "Target"]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var failed = await adapter.ExecuteWorkflowAsync("first", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+        var recovered = await adapter.ExecuteWorkflowAsync("second", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+
+        Assert.False(failed.IsSuccess);
+        Assert.Contains(failed.Errors!, error => error.Message.Contains(InitializationFailure, StringComparison.Ordinal));
+        Assert.True(recovered.IsSuccess, string.Join("; ", recovered.Errors?.Select(error => error.Message) ?? []));
+        Assert.Equal("handled second", recovered.FinalOutput);
+        Assert.DoesNotContain(recovered.Errors ?? [],
+            error => error.Message.Contains("already owned", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Pins MAF #9585 (1.27), start-executor variant: RunStreamingAsync throws while it creates the start executor, and
+    // MAF now ends that run before the error propagates. The adapter records the throw as one "workflow" error.
+    [Fact]
+    public async Task ExecuteWorkflowAsync_StartExecutorInitializationFails_NextCaseOnSameAdapterRuns()
+    {
+        using var timing = new MAFWorkflowInstrumentation();
+        var start = new InitializationFailsOnceExecutor("Start");
+        var workflow = timing.Build(new WorkflowBuilder(start).WithOutputFrom(start));
+        var adapter = MAFWorkflowAdapter.FromMAFWorkflow(workflow, "start init failure", ["Start"]);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var failed = await adapter.ExecuteWorkflowAsync("first", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+        var recovered = await adapter.ExecuteWorkflowAsync("second", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+
+        Assert.False(failed.IsSuccess);
+        var error = Assert.Single(failed.Errors!);
+        Assert.Equal("workflow", error.ExecutorId);
+        Assert.Contains(InitializationFailure, error.Message, StringComparison.Ordinal);
+        Assert.True(recovered.IsSuccess, string.Join("; ", recovered.Errors?.Select(e => e.Message) ?? []));
+        Assert.Equal("handled second", recovered.FinalOutput);
+        Assert.DoesNotContain(recovered.Errors ?? [],
+            e => e.Message.Contains("already owned", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void Build_InvalidOrDisposedOwner_RefusesUse()
     {
@@ -144,5 +193,24 @@ public sealed class MAFWorkflowInstrumentationTests
             using (source.StartActivity("executor.process Worker")) { }
         }
         Assert.Null(capture.Take("Worker"));
+    }
+
+    private const string InitializationFailure = "Connecting to the backend timed out.";
+
+    // Its first initialization throws; later ones succeed. Each run creates the executor again, so a second run
+    // initializes it a second time.
+    private sealed class InitializationFailsOnceExecutor(string id) : Executor<string, string>(id)
+    {
+        private int _initializations;
+
+        protected override async ValueTask InitializeAsync(IWorkflowContext context, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            if (Interlocked.Increment(ref _initializations) == 1)
+                throw new InvalidOperationException(InitializationFailure);
+        }
+
+        public override ValueTask<string> HandleAsync(string message, IWorkflowContext context, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult("handled " + message);
     }
 }

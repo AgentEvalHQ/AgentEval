@@ -2,6 +2,8 @@
 
 > Demonstrates how to work with the **published AgentEval NuGet package** in real applications.
 
+This sample targets **AgentEval 1.0.0-rc.1** from NuGet, with **MAF 1.24.0**. It uses package references rather than AgentEval source projects. Explicit OpenTelemetry.Api 1.18.0 and System.Security.Cryptography.Pkcs 8.0.2 references retain the published RC's security floors; they do not suppress advisory auditing.
+
 This sample showcases **advanced, production-ready usage patterns** for AI agent evaluation and testing using AgentEval as an external dependency.
 
 ## 🚀 Quick Start

@@ -53,9 +53,13 @@ public static class AgentBoundaryTraceBuilder
         var messages = finalMessages as IReadOnlyList<ChatMessage> ?? finalMessages.ToList();
 
         // Every tool call the framework's final account retains — duplicates preserved so the occurrence
-        // count matches the chat boundary (a name called twice yields two entries, not a deduped one).
+        // count matches the chat boundary (a name called twice yields two entries, not a deduped one). A call
+        // re-created for a rejected approval decision in these messages (MAF 1.25+ #9152) is left out, as
+        // TraceRecordingAgent does: the tool never ran and the model did not request it in this run.
+        var rejectedApprovals = new AgentEval.Core.RejectedApprovalCallTracker();
         var toolCalls = messages
             .SelectMany(m => m.Contents)
+            .Where(c => !rejectedApprovals.IsRejectedCallPart(c))
             .OfType<FunctionCallContent>()
             .Select(TraceMapping.ToToolCall)
             .ToList();

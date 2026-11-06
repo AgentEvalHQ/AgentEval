@@ -173,6 +173,46 @@ jobs:
         # that forgot to scrub into a paid model call. Live tests run in llm-integration-tests.yml.
         VSTEST_CONNECTION_TIMEOUT: '300'
 
+    # Each failed test by name, with its test host and the first line of its error, read from the TRX files into the
+    # run summary. With --verbosity normal the parallel test hosts interleave their console output, so a "Failed X" line
+    # in the log can sit above another test's error; the TRX files record each result separately. This step only
+    # reports: it retries nothing, and a fault in it never fails the job.
+    - name: Summarise failed tests (Linux)
+      if: always()
+      continue-on-error: true
+      shell: pwsh
+      env:
+        TRX_DIR: coverage
+      run: |
+        function Cell([string] $text) {
+          $line = ($text -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
+          if (-not $line) { $line = '(no message)' }
+          $line = $line.Trim()
+          if ($line.Length -gt 300) { $line = $line.Substring(0, 300) + '...' }
+          return $line.Replace('|', '\|').Replace('<', '&lt;').Replace('>', '&gt;')
+        }
+        $files = @(Get-ChildItem -Path $env:TRX_DIR -Filter *.trx -Recurse -ErrorAction SilentlyContinue)
+        $failed = @(foreach ($file in $files) {
+          try { $trx = [xml](Get-Content -LiteralPath $file.FullName -Raw) }
+          catch { [pscustomobject]@{ Test = '(unreadable TRX)'; TestHost = $file.Name; Error = $_.Exception.Message }; continue }
+          $storage = @{}
+          foreach ($test in $trx.SelectNodes("//*[local-name()='UnitTest']")) { $storage[$test.GetAttribute('id')] = $test.GetAttribute('storage') }
+          foreach ($result in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
+            if ($result.GetAttribute('outcome') -notin @('Failed', 'Error', 'Timeout', 'Aborted')) { continue }
+            $path = $storage[$result.GetAttribute('testId')]
+            $testHost = if ($path) { "$(Split-Path $path -Leaf) ($(Split-Path (Split-Path $path -Parent) -Leaf))" } else { $file.Name }
+            $message = $result.SelectSingleNode("*[local-name()='Output']/*[local-name()='ErrorInfo']/*[local-name()='Message']")
+            [pscustomobject]@{ Test = $result.GetAttribute('testName'); TestHost = $testHost; Error = $(if ($message) { $message.InnerText } else { '' }) }
+          }
+        })
+        $lines = @('### Failed tests', '', "$($files.Count) TRX file(s), $($failed.Count) failed test result(s).")
+        if ($failed.Count -gt 0) {
+          $lines += @('', '| Test | Test host | First error line |', '| --- | --- | --- |')
+          $lines += @($failed | Select-Object -First 200 | ForEach-Object { "| $(Cell $_.Test) | $(Cell $_.TestHost) | $(Cell $_.Error) |" })
+          if ($failed.Count -gt 200) { $lines += @('', "The first 200 of $($failed.Count) are shown.") }
+        }
+        $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
     - name: Upload test results (Linux)
       if: always()
       uses: actions/upload-artifact@v4
@@ -205,8 +245,9 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    # Full three-framework tests took ten minutes after restore/build on the hosted Windows runner.
-    timeout-minutes: 25
+    # The three-framework tests take 13-19 minutes after a 4-5 minute restore/build on the hosted Windows runner
+    # (measured 2026-10-25 to 2026-11-06; the whole job took 24-25 minutes). 35 leaves room for runner variance.
+    timeout-minutes: 35
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
 
     steps:
@@ -246,6 +287,43 @@ jobs:
         # host that never comes up still fails the job, just with the real reason in the log.
         # No provider secrets, as on Linux.
         VSTEST_CONNECTION_TIMEOUT: '300'
+
+    # The same summary as on Linux; see the comment there. Windows is where the interleaved log misattributed failures.
+    - name: Summarise failed tests (Windows)
+      if: always()
+      continue-on-error: true
+      shell: pwsh
+      env:
+        TRX_DIR: TestResults
+      run: |
+        function Cell([string] $text) {
+          $line = ($text -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
+          if (-not $line) { $line = '(no message)' }
+          $line = $line.Trim()
+          if ($line.Length -gt 300) { $line = $line.Substring(0, 300) + '...' }
+          return $line.Replace('|', '\|').Replace('<', '&lt;').Replace('>', '&gt;')
+        }
+        $files = @(Get-ChildItem -Path $env:TRX_DIR -Filter *.trx -Recurse -ErrorAction SilentlyContinue)
+        $failed = @(foreach ($file in $files) {
+          try { $trx = [xml](Get-Content -LiteralPath $file.FullName -Raw) }
+          catch { [pscustomobject]@{ Test = '(unreadable TRX)'; TestHost = $file.Name; Error = $_.Exception.Message }; continue }
+          $storage = @{}
+          foreach ($test in $trx.SelectNodes("//*[local-name()='UnitTest']")) { $storage[$test.GetAttribute('id')] = $test.GetAttribute('storage') }
+          foreach ($result in $trx.SelectNodes("//*[local-name()='UnitTestResult']")) {
+            if ($result.GetAttribute('outcome') -notin @('Failed', 'Error', 'Timeout', 'Aborted')) { continue }
+            $path = $storage[$result.GetAttribute('testId')]
+            $testHost = if ($path) { "$(Split-Path $path -Leaf) ($(Split-Path (Split-Path $path -Parent) -Leaf))" } else { $file.Name }
+            $message = $result.SelectSingleNode("*[local-name()='Output']/*[local-name()='ErrorInfo']/*[local-name()='Message']")
+            [pscustomobject]@{ Test = $result.GetAttribute('testName'); TestHost = $testHost; Error = $(if ($message) { $message.InnerText } else { '' }) }
+          }
+        })
+        $lines = @('### Failed tests', '', "$($files.Count) TRX file(s), $($failed.Count) failed test result(s).")
+        if ($failed.Count -gt 0) {
+          $lines += @('', '| Test | Test host | First error line |', '| --- | --- | --- |')
+          $lines += @($failed | Select-Object -First 200 | ForEach-Object { "| $(Cell $_.Test) | $(Cell $_.TestHost) | $(Cell $_.Error) |" })
+          if ($failed.Count -gt 200) { $lines += @('', "The first 200 of $($failed.Count) are shown.") }
+        }
+        $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
 
     - name: Upload test results (Windows)
       if: always()

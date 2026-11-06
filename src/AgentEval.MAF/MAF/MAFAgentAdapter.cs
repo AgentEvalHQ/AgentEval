@@ -97,11 +97,21 @@ public class MAFAgentAdapter : IStreamableAgent, ISessionResettableAgent, IHisto
         // ensures it is used for exactly one invocation even if streaming throws or is cancelled.
         var messages = BuildMessages(prompt);
         _injectedHistory.Clear();
+
+        // MAF 1.25+ (#9152): on the run after an approval request that nobody answered, MAF streams a generated
+        // rejection, then the call FunctionInvokingChatClient re-creates for it and a "rejected" result. That tool
+        // never ran, so neither part is reported as a tool call (the same rule as ToolUsageExtractor's default path).
+        // A chunk carries no drop count, so unlike the default extractor the stream omits the call without counting a
+        // drop or warning.
+        var rejectedApprovals = new RejectedApprovalCallTracker();
         
         await foreach (var update in _agent.RunStreamingAsync(messages, _session, cancellationToken: cancellationToken).ConfigureAwait(false))
         {
             foreach (var content in update.Contents)
             {
+                if (rejectedApprovals.IsRejectedCallPart(content))
+                    continue;
+
                 switch (content)
                 {
                     case TextContent text when !string.IsNullOrEmpty(text.Text):

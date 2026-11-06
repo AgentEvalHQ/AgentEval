@@ -1,0 +1,160 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0011",
+  "result": {
+    "task": {
+      "id": "task-8c4f2a6d-1e3b-4f9a-b7d2-6a0c3e5f8b19",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "timestamp": "2026-11-05T13:58:21.905633Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0011",
+          "role": "ROLE_AGENT",
+          "parts": [],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-8c4f2a6d-1e3b-4f9a-b7d2-6a0c3e5f8b19",
+          "metadata": {
+            "attributions": [
+              {
+                "attributionType": "citation",
+                "attributionSource": "OneDriveAndSharePoint",
+                "providerDisplayName": "Project Atlas - Status report 2026-11-03.docx",
+                "seeMoreWebUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx"
+              },
+              {
+                "attributionType": "citation",
+                "attributionSource": "Outlook",
+                "providerDisplayName": "RE: Atlas vendor contract - open items",
+                "seeMoreWebUrl": "https://outlook.example.invalid/mail/inbox/id/AAMkAGY2ZDc3NzUxLTAwMDAtNDk5Zi1hYzE2LWY3YjE2YzE4ZTMwMA%3D%3D"
+              }
+            ]
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "artifactId": "artifact-answer-6b2d9f4a-0011",
+          "name": "Answer",
+          "parts": [
+            {
+              "text": "Project Atlas is on schedule: the design review closed on 3 November 2026 and the pilot starts on 17 November 2026.citeturn0search1"
+            },
+            {
+              "text": " Two risks stay open: the vendor contract and the data-residency sign-off.citeturn0search1turn0search2"
+            }
+          ]
+        },
+        {
+          "artifactId": "artifact-devinfo-5c7e1a3f-0011",
+          "name": "Developer Info",
+          "parts": [
+            {
+              "data": {
+                "plugins": {
+                  "selectedFunctions": [
+                    {
+                      "plugin": {
+                        "name": "Demo Calendar"
+                      },
+                      "functionDisplayName": "ListDemoEvents"
+                    },
+                    {
+                      "plugin": {
+                        "name": "Demo Files"
+                      },
+                      "functionDisplayName": "ReadDemoFile"
+                    }
+                  ],
+                  "executions": [
+                    {
+                      "function": {
+                        "plugin": {
+                          "name": "Demo Files"
+                        },
+                        "functionDisplayName": "ReadDemoFile"
+                      },
+                      "executionStatus": {
+                        "responseStatus": 200
+                      }
+                    }
+                  ]
+                }
+              },
+              "mediaType": "application/vnd.ms-workiq.developer-info"
+            }
+          ]
+        },
+        {
+          "artifactId": "artifact-retrieval-9d2b4f6a-0011",
+          "name": "Retrieval Info",
+          "parts": [
+            {
+              "data": {
+                "executions": [
+                  {
+                    "name": "OneDriveAndSharePoint",
+                    "status": "Success",
+                    "debugInfo": {
+                      "queryString": "Project Atlas status report",
+                      "maximumNumberOfResults": 5,
+                      "totalResultCount": 42,
+                      "latencyMs": 318,
+                      "retrievalHits": [
+                        {
+                          "rank": 1,
+                          "webUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Status%20report%202026-11-03.docx",
+                          "extracts": [
+                            {
+                              "text": "Design review closed on 3 November 2026. Pilot start confirmed for 17 November 2026."
+                            },
+                            {
+                              "text": "Open risks: vendor contract (legal review), data-residency sign-off (pending)."
+                            }
+                          ],
+                          "resourceMetadata": {
+                            "title": "Status report 2026-11-03.docx",
+                            "lastModifiedDateTime": "2026-11-03T16:20:41Z"
+                          }
+                        },
+                        {
+                          "rank": 2,
+                          "webUrl": "https://sharepoint.example.invalid/sites/ProjectAtlas/Shared%20Documents/Risk%20register.xlsx",
+                          "extracts": [
+                            {
+                              "text": "R-07 vendor contract: owner Legal, due 2026-11-12. R-09 data residency: owner Security, due 2026-11-14."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "mediaType": "application/vnd.ms-workiq-internal.retrieval"
+            }
+          ]
+        }
+      ],
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0011",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "Summarize the status of Project Atlas and cite the sources."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-8c4f2a6d-1e3b-4f9a-b7d2-6a0c3e5f8b19",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

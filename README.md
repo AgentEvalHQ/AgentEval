@@ -625,7 +625,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 AgentEval ships as two packages released together on one version: the `AgentEval` library and the `AgentEval.Cli` tool (see [Installation](#installation)). Maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
 
-**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target). **1.0.0-rc.1 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
+**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target, the Microsoft 365 target). **1.0.0-rc.2 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
 
 | Front | Ships in | Maturity | Why |
 |---|---|---|---|
@@ -637,6 +637,7 @@ AgentEval ships as two packages released together on one version: the `AgentEval
 | AgentEval Evidence Format ([AEF](docs/aef.md)) | CLI | **Release candidate** | AEF 1.0 records evaluation evidence that anyone can check independently, with two implementations passing the conformance corpus. Integrity shows the evidence was not changed after the run; it does not prove that a judge's conclusion is correct. The format freezes at the `aef-1.0` tag, released with AgentEval 1.0.0. |
 | Mission Control | CLI | **Experimental** | The local read-only evidence viewer works. Multi-workspace aggregation and the full self-hosted control-plane modes are not implemented yet. |
 | Copilot Studio connector | CLI | **Experimental** | The connector and its credential-free tests are implemented, but the live path against a real tenant has not been independently verified. |
+| Microsoft 365 (Work IQ A2A) connector | library, CLI, sample | **Experimental** | The provider, its credential-free tests, the `--sut microsoft365` target, the `agenteval m365 doctor` readiness check and the [demo project](samples/AgentEval.Microsoft365Demo/README.md) are implemented. The demo is the tester's starting point: one command, one run folder to send back. Every public type of the provider is `[Experimental("AGENTEVAL_M365_PREVIEW001")]`. We have not run the live path: we have no Microsoft 365 tenant, and an external tester validates it on theirs. Evidence beyond the answer depends on undocumented diagnostic modes and is opt-in. See [docs/microsoft365.md](docs/microsoft365.md) and the [tester guide](docs/microsoft365-tester-guide.md). |
 
 ---
 

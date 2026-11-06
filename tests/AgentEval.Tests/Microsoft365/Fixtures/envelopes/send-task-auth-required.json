@@ -1,0 +1,55 @@
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-0008",
+  "result": {
+    "task": {
+      "id": "task-1b6d9f3a-7c4e-4a2b-8d5f-0e3c6a9b2d74",
+      "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+      "status": {
+        "state": "TASK_STATE_AUTH_REQUIRED",
+        "timestamp": "2026-11-05T13:51:40.058362Z",
+        "message": {
+          "messageId": "msg-agent-a7c1e3f5-0008",
+          "role": "ROLE_AGENT",
+          "parts": [
+            {
+              "text": "Sign in to the Demo Ticketing connector to continue."
+            },
+            {
+              "data": {
+                "auth-required": {
+                  "type": "authentication_required",
+                  "sourceRequestId": "req-9b4e2d7c-1f6a-4c3e-8d5b-7a0f2e9c4b16",
+                  "connectorDisplayName": "Demo Ticketing",
+                  "signInUrl": "https://login.example.invalid/connectors/demo-ticketing/consent?state=b2f7c1e9"
+                }
+              },
+              "mediaType": "application/vnd.ms-workiq.interaction+json"
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-1b6d9f3a-7c4e-4a2b-8d5f-0e3c6a9b2d74"
+        }
+      },
+      "history": [
+        {
+          "messageId": "msg-user-3e8f1a2c-0008",
+          "role": "ROLE_USER",
+          "parts": [
+            {
+              "text": "List my open tickets in Demo Ticketing."
+            }
+          ],
+          "contextId": "ctx-5e0c7a2b-91d4-4f8e-b6a3-0d2f8c1e7b55",
+          "taskId": "task-1b6d9f3a-7c4e-4a2b-8d5f-0e3c6a9b2d74",
+          "metadata": {
+            "Location": {
+              "timeZone": "Europe/Zurich",
+              "timeZoneOffset": 60
+            }
+          }
+        }
+      ]
+    }
+  }
+}

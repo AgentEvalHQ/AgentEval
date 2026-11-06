@@ -309,19 +309,27 @@ public static partial class AefEvalWriter
     private static AefState StateOf(TestResult result) =>
         result.Error is not null || result.JudgeFailed ? AefState.Error : result.Passed ? AefState.Passed : AefState.Failed;
 
+    // A case line is measured when it passed or failed; every other state it can take is a typed absence ([RES-1]).
+    private static bool IsMeasured(AefState state) => state is AefState.Passed or AefState.Failed;
+
     // A case's result over its trials ([RES-8]): passed when at least requirePasses trials passed; failed when they could
     // not have, even had every unmeasured trial passed; otherwise not decided, an error. Its score is the mean of the
-    // measured trials'. Usage and duration stay on the trial lines, so nothing is counted twice.
-    private static AefResult Rollup(IReadOnlyList<TestResult> trials, string caseId, int requirePasses, int? plannedTrials = null)
+    // measured trials' whose score was measured. Usage and duration stay on the trial lines, so nothing is counted twice.
+    // stateOf gives a trial's state when its host recorded an absence for it (AefCaseAbsence); by default the result's
+    // own. scoreMeasuredOf is false for a trial whose score is a placeholder (its judge call failed): it counts as
+    // measured for the verdict, but its score never enters the mean.
+    private static AefResult Rollup(IReadOnlyList<TestResult> trials, string caseId, int requirePasses, int? plannedTrials = null,
+        Func<TestResult, AefState>? stateOf = null, Func<TestResult, bool>? scoreMeasuredOf = null)
     {
-        var states = trials.Select(StateOf).ToList();
+        stateOf ??= StateOf;
+        var states = trials.Select(stateOf).ToList();
         var passed = states.Count(s => s == AefState.Passed);
-        var unmeasured = states.Count(s => s == AefState.Error);
+        var unmeasured = states.Count(s => !IsMeasured(s));
         var incomplete = plannedTrials is { } planned && trials.Count < planned;
         var state = incomplete ? AefState.Error : passed >= requirePasses ? AefState.Passed
             : passed + unmeasured >= requirePasses ? AefState.Error
             : AefState.Failed;
-        var measured = trials.Where(t => StateOf(t) != AefState.Error).ToList();
+        var scored = trials.Where(t => IsMeasured(stateOf(t)) && (scoreMeasuredOf?.Invoke(t) ?? true)).ToList();
         return new AefResult
         {
             CaseId = caseId,
@@ -331,7 +339,7 @@ public static partial class AefEvalWriter
             Reason = incomplete ? "The case was interrupted before all requested trials completed" : state == AefState.Error
                 ? $"{unmeasured} of {trials.Count} trials were not measured, so whether at least {requirePasses} pass is undecided"
                 : null,
-            Scores = state == AefState.Error || measured.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = measured.Average(t => (double)t.Score) }],
+            Scores = state == AefState.Error || scored.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = scored.Average(t => (double)t.Score) }],
             Lane = Lane,
             Trials = new AefTrials(trials.Count, passed, AefTrialAggregation.AtLeast, states.Distinct().Count() == 1),
         };
@@ -340,19 +348,24 @@ public static partial class AefEvalWriter
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
     // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
-    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore, AefNativeContent? content = null, string? judgeModel = null)
+    private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore, AefNativeContent? content = null, string? judgeModel = null, AefCaseAbsence? absence = null, bool scoreMeasured = true)
     {
-        var (root, children) = MapBaseCase(result, caseId, passingScore, judgeModel);
+        var (root, children) = MapBaseCase(result, caseId, passingScore, judgeModel, absence, scoreMeasured,
+            path => writer.ResultIdOf(caseId, path));
         root = AefNativeContent.Attach(writer, root, content);
         var handle = writer.AddResult(root);
         foreach (var child in children) writer.AddResult(child, handle);
         return (handle, root);
     }
 
-    private static (AefResult Root, List<AefResult> Children) MapBaseCase(TestResult result, string caseId, int? passingScore, string? judgeModel)
+    // resultIdOf turns a child's path into its result id, when the caller knows the run ([RES-4]); with it, a case a failed
+    // assertion decided names that assertion as decisive ([RES-5]). Without it (MapCase) decisive is left out, as it may be.
+    private static (AefResult Root, List<AefResult> Children) MapBaseCase(TestResult result, string caseId, int? passingScore, string? judgeModel, AefCaseAbsence? absence = null, bool scoreMeasured = true,
+        Func<string, string>? resultIdOf = null)
     {
         var children = new List<AefResult>();
-        var criteria = result.JudgeFailed ? [] : result.CriteriaResults ?? [];
+        // A case its host recorded as not measured has no graded criteria: whatever the judge graded was not the subject's.
+        var criteria = result.JudgeFailed || absence is not null ? [] : result.CriteriaResults ?? [];
         for (var n = 0; n < criteria.Count; n++)
         {
             children.Add(Child(caseId, $"{CasePath}/criteria/{n + 1}", "agenteval.judge.criterion", criteria[n].Met ? AefState.Passed : AefState.Failed) with
@@ -378,22 +391,38 @@ public static partial class AefEvalWriter
             });
         }
 
-        var root = Line(result, caseId, trial: null, judgeModel);
+        var root = Line(result, caseId, trial: null, judgeModel, absence, scoreMeasured);
         if (children.Count > 0)
         {
-            var measuredCase = root.State != AefState.Error;
+            var measuredCase = IsMeasured(root.State);
+            var scored = measuredCase && scoreMeasured;
+            // A failed case whose score did not fail its threshold (or that has no score) was failed by a check: one of its
+            // assertions. The record then says so, instead of a threshold its score met.
+            var failedByAssertion = root.State == AefState.Failed
+                && assertions.Any(a => a.Outcome == AssertionOutcome.Failed)
+                && !(scored && passingScore is { } threshold && result.Score < threshold);
+            var decisive = failedByAssertion && resultIdOf is not null
+                ? Enumerable.Range(0, assertions.Count)
+                    .Where(n => assertions[n].Outcome == AssertionOutcome.Failed)
+                    .Select(n => resultIdOf($"{CasePath}/assertions/{n + 1}"))
+                    .ToList()
+                : null;
             root = root with
             {
                 Annotator = null, // The children identify graders; this node records the harness decision.
                 Aggregation = new AefAggregation
                 {
                     Strategy = AefAggregationStrategy.Own,
-                    // An error case's verdict was never measured (the evaluation threw, or the judge gave none).
-                    RulePath = measuredCase ? AefRulePath.Threshold : AefRulePath.NothingMeasured,
-                    Score = measuredCase ? result.Score : null,
-                    Threshold = measuredCase ? passingScore : null,
+                    // An error or not-measured case's verdict was never measured (the evaluation threw, the judge gave
+                    // none, or the host recorded an absence).
+                    RulePath = !measuredCase ? AefRulePath.NothingMeasured
+                        : failedByAssertion ? AefRulePath.FailureEffect
+                        : AefRulePath.Threshold,
+                    Score = scored ? result.Score : null,
+                    Threshold = scored ? passingScore : null,
                     Measured = children.Count,   // passed, failed and inconclusive children are all measured (SUM-4)
                     Total = children.Count,
+                    Decisive = decisive,
                 },
             };
         }
@@ -466,18 +495,28 @@ public static partial class AefEvalWriter
         return root with
         {
             Annotator = null,
-            Aggregation = new AefAggregation
-            {
-                Strategy = AefAggregationStrategy.Own,
-                RulePath = root.State == AefState.Error ? AefRulePath.NothingMeasured : AefRulePath.Threshold,
-                Score = root.State == AefState.Error ? null : root.Scores![0].Value,
-                Threshold = root.State == AefState.Error ? null : passingScore,
-                Measured = (previous?.Measured ?? 0) + (metric.Measured ? 1 : 0),
-                Total = (previous?.Total ?? 0) + 1,
-                Unmeasured = unmeasured,
-            },
+            Aggregation = OwnDecision(root, previous, passingScore,
+                measured: (previous?.Measured ?? 0) + (metric.Measured ? 1 : 0),
+                total: (previous?.Total ?? 0) + 1,
+                unmeasured),
         };
     }
+
+    // The case's own decision, which its children never change: the one an earlier aggregation recorded (its rule path,
+    // score, threshold and decisive children), or, for a case with no children yet, its threshold or nothing measured.
+    private static AefAggregation OwnDecision(AefResult root, AefAggregation? previous, int? passingScore,
+        long measured, long total, AefUnmeasured? unmeasured) => new()
+    {
+        Strategy = AefAggregationStrategy.Own,
+        RulePath = previous?.RulePath ?? (IsMeasured(root.State) ? AefRulePath.Threshold : AefRulePath.NothingMeasured),
+        Score = previous is not null ? previous.Score : IsMeasured(root.State) ? root.Scores?[0].Value : null,
+        Threshold = previous is not null ? previous.Threshold
+            : IsMeasured(root.State) && root.Scores is not null ? passingScore : null,
+        Decisive = previous?.Decisive,
+        Measured = measured,
+        Total = total,
+        Unmeasured = unmeasured,
+    };
 
     private static AefResult Child(string caseId, string path, string evaluator, AefState state) => new()
     {
@@ -494,9 +533,9 @@ public static partial class AefEvalWriter
             ? new AefAnnotator { Kind = AefAnnotatorKind.Llm, Model = judgeModel, RubricDigest = result.JudgeRubricDigest }
             : null;
 
-    private static AefResult Line(TestResult result, string caseId, int? trial, string? judgeModel = null)
+    private static AefResult Line(TestResult result, string caseId, int? trial, string? judgeModel = null, AefCaseAbsence? absence = null, bool scoreMeasured = true)
     {
-        var state = StateOf(result);
+        var state = absence?.State ?? StateOf(result);
         var performance = result.Performance;
         var usage = performance is null || (performance.PromptTokens is null && performance.CompletionTokens is null && performance.EstimatedCost is null)
             ? null
@@ -519,14 +558,16 @@ public static partial class AefEvalWriter
             Evaluator = new AefEvaluator("agenteval.harness", AefConverter.Version),
             State = state,
             // An error's reason names its kind only: its message may quote the subject's or the judge's text ([RUN-11]).
-            Reason = result.Error is not null ? $"the evaluation threw {result.Error.GetType().Name}"
+            // A host's absence carries its own content-free reason.
+            Reason = absence is not null ? absence.Reason
+                : result.Error is not null ? $"the evaluation threw {result.Error.GetType().Name}"
                 : result.JudgeFailed ? "the judge produced no verdict (an evaluation-infrastructure failure, not a grade)"
                 : null,
-            Scores = state == AefState.Error ? null : [new AefScore { Metric = ScoreMetric, Value = result.Score }],
+            Scores = IsMeasured(state) && scoreMeasured ? [new AefScore { Metric = ScoreMetric, Value = result.Score }] : null,
             Lane = Lane,
             DurationMs = performance is { } p && p.EndTime > p.StartTime ? (p.EndTime - p.StartTime).TotalMilliseconds : null,
             Usage = usage,   // no test name: without a dataset id it is the start of the input ([RUN-11])
-            Annotator = state == AefState.Error ? null : HarnessAnnotator(result, judgeModel),
+            Annotator = IsMeasured(state) ? HarnessAnnotator(result, judgeModel) : null,
             Trial = trial,
         };
     }

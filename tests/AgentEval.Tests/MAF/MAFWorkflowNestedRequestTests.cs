@@ -335,6 +335,31 @@ public sealed class MAFWorkflowNestedRequestTests : IDisposable
         Assert.Null(Assert.Single(result.Steps, step => step.ExecutorId == "Sub").TimingNotMeasuredReason);
     }
 
+    // Pins MAF #8265 (1.25+): an agent wrapped with UseOpenTelemetry returns the inner agent's updates, AgentId included,
+    // so its nested output is attributed to its executor. On 1.24 the wrapper's updates had no AgentId and the run
+    // recorded a NotSupportedException in result.Errors; it did not throw, so "does not throw" would pin nothing.
+    [Fact]
+    public async Task FromMAFWorkflow_NestedOpenTelemetryAgent_PreservesChildOutputAndTools()
+    {
+        var calls = 0;
+        var tool = AIFunctionFactory.Create((int step) => { calls++; return "found"; }, "Lookup");
+        var child = new ChatClientAgent(new BridgeScriptedChatClient("Child", ["Lookup"]), name: "Child", tools: [tool])
+            .AsBuilder().UseOpenTelemetry(sourceName: "t").Build().BindAsExecutor(emitEvents: true);
+        var inner = new MAFWorkflows.WorkflowBuilder(child).WithOutputFrom(child).BuildWithTiming(_timing);
+        var host = new MAFWorkflows.SubworkflowBinding(inner, "Sub", null);
+        var workflow = new MAFWorkflows.WorkflowBuilder(host).WithOutputFrom(host).BuildWithTiming(_timing);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var result = await MAFWorkflowAdapter.FromMAFWorkflow(workflow, "nested otel agent", ["Sub", "Sub/Child"])
+            .ExecuteWorkflowAsync("input", cancellation.Token).WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.True(result.IsSuccess, string.Join("; ", result.Errors?.Select(error => error.Message) ?? []));
+        Assert.DoesNotContain(result.Errors ?? [], error => error.ExceptionType == "NotSupportedException");
+        var step = Assert.Single(result.Steps, step => step.ExecutorId == "Sub/Child");
+        Assert.Equal(BridgeScriptedChatClient.FinalReply("Child", 1), step.Output);
+        Assert.Equal(1, calls);
+        Assert.True(Assert.Single(step.ToolCalls!).WasExecuted);
+        Assert.Equal(step.Output, result.FinalOutput);
+    }
+
     [Fact]
     public async Task ExecuteWorkflowAsync_NestedChain_QualifiesChildrenAndMeasuresHostThroughCompletion()
     {

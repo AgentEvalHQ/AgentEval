@@ -31,6 +31,8 @@ public static partial class AefEvalWriter
         private readonly List<TestResult> _all = [];
         private readonly List<(string ResultId, AefState State)> _roots = [];
         private readonly Dictionary<string, List<TestResult>> _trials = new(StringComparer.Ordinal);
+        private readonly Dictionary<TestResult, AefCaseAbsence> _absences = new(ReferenceEqualityComparer.Instance);
+        private readonly HashSet<TestResult> _scoreUnmeasured = new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<string> _rolledUp = new(StringComparer.Ordinal);
         private readonly Dictionary<string, (AefResultHandle Handle, AefResult Root, int? PassingScore)> _cases = new(StringComparer.Ordinal);
         private readonly HashSet<(string CaseId, string Metric)> _caseMetrics = [];
@@ -120,17 +122,50 @@ public static partial class AefEvalWriter
             Add(result, caseId, passingScore, content, null);
 
         /// <summary>Appends a case or trial with observed usage replacing legacy totals for the observed roles.</summary>
-        public void Add(TestResult result, string caseId, int? passingScore, AefNativeContent? content, IReadOnlyList<AefUsage>? usage)
+        public void Add(TestResult result, string caseId, int? passingScore, AefNativeContent? content, IReadOnlyList<AefUsage>? usage) =>
+            Add(result, caseId, passingScore, content, usage, null);
+
+        /// <summary>
+        /// Appends a case or trial. With an <paramref name="absence"/>, the line takes its state and reason and carries no
+        /// score, no harness annotator and no judge criteria, and the judge is not named for it; a trial's absence also
+        /// counts as unmeasured in its case's rollup.
+        /// </summary>
+        /// <param name="result">The harness result.</param>
+        /// <param name="caseId">The case id.</param>
+        /// <param name="passingScore">The threshold of the judge's grade, or null when none applies.</param>
+        /// <param name="content">The case's content, written only with content capture on.</param>
+        /// <param name="usage">Observed usage that replaces legacy totals for its roles, or null.</param>
+        /// <param name="absence">Why the case was not measured, when its host knows it; null for the result's own state.</param>
+        /// <param name="scoreMeasured">
+        /// Whether the result's score is a measurement. False for a case its checks decided while no grade was produced
+        /// (the judge's call failed): the line then carries no score and its aggregation no score and no threshold, and a
+        /// trial's placeholder score stays out of its case's mean.
+        /// </param>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="scoreMeasured"/> is false with no <paramref name="absence"/>, and the result passed (a pass on a
+        /// grade nobody measured) or failed with no failed assertion to explain the failure.
+        /// </exception>
+        public void Add(TestResult result, string caseId, int? passingScore, AefNativeContent? content, IReadOnlyList<AefUsage>? usage,
+            AefCaseAbsence? absence, bool scoreMeasured = true)
         {
             EnsureOpen();
             ArgumentNullException.ThrowIfNull(result);
+            if (!scoreMeasured && absence is null)
+            {
+                var state = StateOf(result);
+                if (state == AefState.Passed)
+                    throw new ArgumentException("A result whose score was not measured cannot pass: a pass needs a measured grade, or an absence that says why there is none.", nameof(scoreMeasured));
+                if (state == AefState.Failed && result.AssertionResults?.Any(a => a.Outcome == AgentEval.Output.AssertionOutcome.Failed) != true)
+                    throw new ArgumentException("A failure whose score was not measured must be explained by a failed assertion, or recorded with an absence.", nameof(scoreMeasured));
+            }
+            var graded = absence is null && Graded(result);
             if (_options.Definition is { Frozen: true } definition && !definition.CaseIds.Contains(caseId, StringComparer.Ordinal))
                 throw new ArgumentException("Expected: a case in the frozen planned roster. Actual: undeclared case. Suggestions: declare the complete roster before execution. Because: observed outcomes cannot change suite identity.", nameof(caseId));
             content = _options.ContentCapture == AefContentCapture.On
                 ? (content ?? new AefNativeContent()) with
                 {
                     Output = result.ActualOutput,
-                    JudgeReasoning = Graded(result) && result.Details.Length > 0 ? result.Details : content?.JudgeReasoning,
+                    JudgeReasoning = graded && result.Details.Length > 0 ? result.Details : content?.JudgeReasoning,
                     ToolCalls = result.ToolUsage?.Calls.Select(call => System.Text.Json.JsonSerializer.Serialize(new
                     {
                         call.Name, call.CallId, call.Arguments, call.Result, call.WasExecuted,
@@ -140,7 +175,7 @@ public static partial class AefEvalWriter
                 : null;
             if (_requirePasses is null)
             {
-                var entry = AddCase(_writer, result, caseId, passingScore, content, _options.JudgeModel);
+                var entry = AddCase(_writer, result, caseId, passingScore, content, _options.JudgeModel, absence, scoreMeasured);
                 _roots.Add((entry.Handle.ResultId, entry.Root.State));
                 _cases.Add(caseId, (entry.Handle, entry.Root, passingScore));
                 UpdateCaseUsage(caseId, usage);
@@ -150,13 +185,15 @@ public static partial class AefEvalWriter
             {
                 if (!_trials.TryGetValue(caseId, out var trials)) _trials.Add(caseId, trials = []);
                 if (trials.Count >= _plannedTrials) throw new ArgumentException("A case cannot exceed its planned trial count.", nameof(caseId));
-                var line = Line(result, caseId, trials.Count, _options.JudgeModel);
+                var line = Line(result, caseId, trials.Count, _options.JudgeModel, absence, scoreMeasured);
                 _writer.AddResult(AefNativeContent.Attach(_writer, line with { Usage = AefNativeUsage.Merge(usage, line.Usage) }, content));
                 trials.Add(result);
+                if (absence is not null) _absences[result] = absence;
+                if (!scoreMeasured) _scoreUnmeasured.Add(result);
                 if (trials.Count == _plannedTrials) AddRollup(caseId, trials);
             }
             _all.Add(result);
-            if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge, _options.JudgeProvider, result.JudgeRubricDigest);
+            if (_options.JudgeModel is { } judge && graded) RecordJudge(judge, _options.JudgeProvider, result.JudgeRubricDigest);
         }
 
         /// <summary>Updates the single-run case root with cumulative case usage; child results do not repeat it.</summary>
@@ -217,7 +254,9 @@ public static partial class AefEvalWriter
 
         private void AddRollup(string caseId, IReadOnlyList<TestResult> trials)
         {
-            var rollup = Rollup(trials, caseId, _requirePasses!.Value, _plannedTrials);
+            var rollup = Rollup(trials, caseId, _requirePasses!.Value, _plannedTrials,
+                trial => _absences.TryGetValue(trial, out var absence) ? absence.State : StateOf(trial),
+                trial => !_scoreUnmeasured.Contains(trial));
             _roots.Add((_writer.AddResult(rollup).ResultId, rollup.State));
             _rolledUp.Add(caseId);
         }

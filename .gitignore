@@ -512,3 +512,16 @@ runs/
 # capture whatever page the browser had open, including third-party chat shares, so it must never
 # reach this public repo. Ignore the DIRECTORY; prove it on a FILE, per the note above.
 .playwright-mcp/
+
+# Microsoft 365 demo and tester files: tenant configuration and run folders hold tenant ids and tenant content.
+# Never commit them (the demo README and the tester guide say so; this makes it hold for git add . too).
+workiq.json
+**/workiq.json
+m365-demo-runs/
+**/m365-demo-runs/
+m365-demo-runs*.zip
+**/m365-demo-runs*.zip
+m365-results/
+**/m365-results/
+m365-raw/
+**/m365-raw/

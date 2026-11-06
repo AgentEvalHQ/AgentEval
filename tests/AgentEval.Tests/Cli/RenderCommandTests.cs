@@ -10,6 +10,11 @@ namespace AgentEval.Tests.Cli;
 /// <summary>
 /// Tests for <see cref="RenderCommand"/>.
 /// </summary>
+/// <remarks>
+/// Swaps the process-wide <see cref="Console.Error"/>, so it runs in the serial ConsoleTests collection: a parallel test
+/// that writes to the console would land in the capture, or this test's text in its capture.
+/// </remarks>
+[Collection("ConsoleTests")]
 public class RenderCommandTests
 {
     [Theory]

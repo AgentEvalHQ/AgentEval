@@ -48,7 +48,7 @@ public static class BenchPerfCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null)
+        bool agentIsLive = false, string? agentEndpoint = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
     {
         // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
         // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
@@ -157,7 +157,7 @@ public static class BenchPerfCommand
                 aef, agentEvalDir, "perf", preset, subject, subjectVersion, AgentEval.Results.Writing.AefTargetMode.Mocked,
                 mockResult ?? MockTarget.UnmeasuredResult($"perf.{preset}"), mockStarted, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason, emptyResults: mockResult is null,
-                definition: suiteDefinition);
+                definition: suiteDefinition, subjectSettings: subjectSettings);
             try
             {
                 mockResult = await family.EvaluateAsync!(input, null, ct);
@@ -193,7 +193,7 @@ public static class BenchPerfCommand
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
             abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null,
-            definition: suiteDefinition, comparisonName: comparisonName);
+            definition: suiteDefinition, comparisonName: comparisonName, subjectSettings: subjectSettings);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);

@@ -29,10 +29,16 @@ namespace AgentEval.Tracing;
 /// <see cref="AgentResponse.RawMessages"/> (every <c>FunctionCallContent</c>, with arguments serialized the same
 /// way the chat-boundary recorder serializes them, and each paired with its result by call id). An agent that
 /// surfaces no messages, or no finish reason, is recorded as reporting none. Approval-gated calls (wrapped in
-/// <c>ToolApprovalRequestContent</c>) are not recorded as calls. On the streaming path the tool calls come from
-/// each chunk's <see cref="AgentResponseChunk.ToolCallStarted"/> (name and arguments) and results are paired by
-/// call id; no finish reason is recorded, because <see cref="AgentResponseChunk"/> carries none, so reconciling a
-/// streaming trace counts every <c>content_filter</c>/<c>length</c> chat turn as a suppressed finish reason.
+/// <c>ToolApprovalRequestContent</c>) are not recorded as calls. Neither is a call that
+/// <c>FunctionInvokingChatClient</c> re-creates for a rejected approval decision (a <c>ToolApprovalResponseContent</c>
+/// that is not approved, same call id and name; MAF 1.25+ returns one on the run after an approval request that nobody
+/// answered), nor its "rejected" result: the tool never ran and the model did not request it in that run.
+/// MAFAgentAdapter and ChatClientAgentAdapter do not stream it either, so over them a streamed and a non-streamed
+/// trace of the same run have the same tool calls. On the streaming path the
+/// tool calls come from each chunk's <see cref="AgentResponseChunk.ToolCallStarted"/> (name and arguments) and
+/// results are paired by call id; no finish reason is recorded, because <see cref="AgentResponseChunk"/> carries none,
+/// so reconciling a streaming trace counts every <c>content_filter</c>/<c>length</c> chat turn as a suppressed finish
+/// reason.
 /// </para>
 /// </remarks>
 /// <example>
@@ -402,7 +408,9 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
     // The tool calls a non-streaming response reports: every FunctionCallContent in RawMessages (where
     // MAFAgentAdapter and ChatClientAgentAdapter put the run's messages), duplicates kept so the count matches
     // the chat boundary, each paired with its FunctionResultContent by call id. Null when the response carries
-    // no MEAI messages or no tool calls.
+    // no MEAI messages or no tool calls. A call re-created for a rejected approval decision (MAF 1.25+ #9152, the
+    // run after an approval request that nobody answered) and its result are left out, as on the streaming path:
+    // the tool never ran and the model did not request it in this run.
     private List<TraceToolCall>? ExtractToolCalls(IReadOnlyList<object>? rawMessages)
     {
         if (rawMessages == null || rawMessages.Count == 0)
@@ -410,10 +418,14 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
 
         List<TraceToolCall>? toolCalls = null;
         var unpairedToolCalls = new Dictionary<string, Stack<TraceToolCall>>(StringComparer.Ordinal);
+        var rejectedApprovals = new RejectedApprovalCallTracker();
         foreach (var message in rawMessages.OfType<MeaiChatMessage>())
         {
             foreach (var content in message.Contents)
             {
+                if (rejectedApprovals.IsRejectedCallPart(content))
+                    continue;
+
                 if (content is MeaiFunctionCallContent call)
                 {
                     var traceCall = TraceMapping.ToToolCall(call);

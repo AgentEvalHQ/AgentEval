@@ -39,7 +39,8 @@ internal static class OfflineSampleCheck
     // switches (--mock, --dry-run, --preset) that would change what a sample does. Matched as a name prefix.
     private static readonly Regex s_strippedVariables = new(
         "^(AZURE|AZUREOPENAI|OPENAI|FOUNDRY|MS_FOUNDRY|MAFARTCOMP|APPLICATIONINSIGHTS|OPENROUTER|TYPESAFE|JEV_|" +
-        "COPILOTSTUDIO|BITDEER|AI_INFERENCE|ANTHROPIC|GEMINI|MISTRAL|OLLAMA|LONGMEMEVAL_|AGENTEVAL_SAMPLES_|AGENTEVAL_A2A_)",
+        "COPILOTSTUDIO|M365_|AGENTEVAL_M365|BITDEER|AI_INFERENCE|ANTHROPIC|GEMINI|MISTRAL|OLLAMA|LONGMEMEVAL_|AGENTEVAL_SAMPLES_|" +
+        "AGENTEVAL_A2A_)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static readonly int[] s_expectableCodes =

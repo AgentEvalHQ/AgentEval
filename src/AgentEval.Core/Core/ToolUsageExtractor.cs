@@ -19,10 +19,11 @@ public static class ToolUsageExtractor
     /// <param name="rawMessages">The raw messages from an agent response.</param>
     /// <returns>A tool usage report containing all tool calls.</returns>
     /// <remarks>
-    /// This default path reads <c>FunctionCallContent</c> / <c>FunctionResultContent</c> only. An
+    /// This default path records <c>FunctionCallContent</c> / <c>FunctionResultContent</c> only. An
     /// approval-gated call (MAF's <c>ToolApprovalRequestContent</c>, which wraps the call) is <b>not</b>
     /// recorded; it is counted in <see cref="ToolUsageReport.DroppedApprovalRequestCount"/> so the
-    /// blindness is visible. Use <see cref="Extract(IReadOnlyList{object}?, bool)"/> with
+    /// blindness is visible. Neither is the call re-created for a rejected decision in these messages (see the
+    /// remarks on <see cref="Extract(IReadOnlyList{object}?, bool)"/>). Use <see cref="Extract(IReadOnlyList{object}?, bool)"/> with
     /// <c>includeApprovalGatedCalls: true</c> to record them (ADR-030 Slice 0.5).
     /// </remarks>
     public static ToolUsageReport Extract(IReadOnlyList<object>? rawMessages)
@@ -56,6 +57,22 @@ public static class ToolUsageExtractor
     /// before invoking it. A re-created call (same <c>CallId</c> and name as a still-unpaired approval
     /// record) is the same call, not a second one, and is folded into the existing record.
     /// </para>
+    /// <para>
+    /// MAF 1.25+ (#9152) rejects a saved approval request that was never answered when the session runs
+    /// again. That run's messages start with the generated <c>ToolApprovalResponseContent</c> (not approved),
+    /// then the <c>FunctionCallContent</c> <c>FunctionInvokingChatClient</c> re-creates for it, then a generated
+    /// rejection result. On the default path the rejected decision is dropped and counted, and the next
+    /// re-created call with its <c>CallId</c> and name is the same gated call: it is not recorded, and its
+    /// rejection result is ignored, so a tool that never ran never reads as executed. A result whose rejected
+    /// decision was read with no re-created call in between is ignored too. The match is on the decision's
+    /// <c>CallId</c> and name, never on the result text. Approved decisions are not affected.
+    /// </para>
+    /// <para>
+    /// <b>Limitation:</b> only a decision in <paramref name="rawMessages"/> is recognised. MAF returns the decision
+    /// it generates itself, but not one the caller sent as input (a human's rejection on resume): that response
+    /// holds only the re-created call and its "rejected" result, and both paths read it as an executed call, as on
+    /// MAF 1.24. Pass the input messages ahead of the response to have such a call recognised.
+    /// </para>
     /// </remarks>
     public static ToolUsageReport Extract(IReadOnlyList<object>? rawMessages, bool includeApprovalGatedCalls)
     {
@@ -71,6 +88,8 @@ public static class ToolUsageExtractor
         var records = new List<ToolCallRecord>();
         var unpairedByCallId = new Dictionary<string, Stack<ToolCallRecord>>(StringComparer.Ordinal);
         var droppedApprovalCallIds = new HashSet<string>(StringComparer.Ordinal);
+        // Default path only: the call re-created for a rejected decision, and its result (MAF 1.25+ #9152).
+        var rejectedApprovals = new RejectedApprovalCallTracker();
         int order = 0;
         int dropped = 0;
 
@@ -108,6 +127,12 @@ public static class ToolUsageExtractor
         {
             foreach (var content in message.Contents)
             {
+                // Default path: the call re-created for a dropped rejected decision is that gated call. It is already
+                // counted as dropped and it never ran, so neither it nor its generated result is recorded. The
+                // tracker returns false for the decision itself, so the decision is still counted below.
+                if (!includeApprovalGatedCalls && rejectedApprovals.IsRejectedCallPart(content))
+                    continue;
+
                 switch (content)
                 {
                     case FunctionCallContent call:
@@ -199,16 +224,33 @@ public static class ToolUsageExtractor
     /// Used to make a drop loud (the harness and <see cref="DefaultToolUsageExtractor"/> log them).
     /// </summary>
     /// <param name="rawMessages">The raw messages from an agent response.</param>
+    /// <remarks>
+    /// Counts the way the default path counts drops: every <c>ToolApprovalRequestContent</c>'s call, and every
+    /// <c>ToolApprovalResponseContent</c>'s call whose request (same <c>CallId</c>) is not earlier in these
+    /// messages. The second covers the decision MAF 1.25+ (#9152) generates for an unanswered request at the
+    /// start of the next run.
+    /// </remarks>
     public static IReadOnlyList<string> ApprovalGatedToolNames(IReadOnlyList<object>? rawMessages)
     {
         if (rawMessages is null || rawMessages.Count == 0) return Array.Empty<string>();
         var names = new List<string>();
+        var requestCallIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var message in rawMessages.OfType<ChatMessage>())
         {
             foreach (var content in message.Contents)
             {
-                if (content is ToolApprovalRequestContent { ToolCall: FunctionCallContent call })
-                    names.Add(call.Name);
+                switch (content)
+                {
+                    case ToolApprovalRequestContent { ToolCall: FunctionCallContent call }:
+                        names.Add(call.Name);
+                        if (!string.IsNullOrEmpty(call.CallId)) requestCallIds.Add(call.CallId);
+                        break;
+
+                    case ToolApprovalResponseContent { ToolCall: FunctionCallContent decided }
+                        when string.IsNullOrEmpty(decided.CallId) || !requestCallIds.Contains(decided.CallId):
+                        names.Add(decided.Name);
+                        break;
+                }
             }
         }
         return names;
