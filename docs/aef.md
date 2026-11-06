@@ -481,7 +481,7 @@ preflight/help side effects and verifies signed identity and unsealed evidence w
 
 | Command | Lane | One line per | Notes |
 |---|---|---|---|
-| `eval` | `eval` | test case (`case`) | Judge criteria at `case/criteria/<n>` and assertions at `case/assertions/<n>`, beside the case's own verdict. With `--runs N`, one line per run and a rollup per case: it passes when at least the number of runs that meets `--success-threshold` passed, fails when it could not have, and is `error` when runs that errored leave it undecided. |
+| `eval` | `eval` | test case (`case`) | Judge criteria at `case/criteria/<n>` and assertions at `case/assertions/<n>`, beside the case's own verdict. With `--runs N`, one line per run and a rollup per case: it passes when at least the number of runs that meets `--success-threshold` passed, fails when it could not have, and is `error` when runs that were not measured (errored, or recorded as not measured) leave it undecided. |
 | `redteam` | `redteam` | probe (`probe`, case `<attack>/<probe>`) | Resisted is `passed`; a successful attack is `failed` with `attack.success`, its severity and OWASP LLM / MITRE ATLAS ids; an attack that cannot be measured in the setup is `not_applicable`. Benign controls are lane `over-refusal`, path `control`. |
 | `bench gdpr`, `eu-ai-act`, `agentic` | the family | top-level part of the preset (`case`) | The preset's tree below each case: every part's weight, whether it is required and its failure effect, and for every composite the rule that decided it (threshold, severity, a required part that errored, …) and the parts that did. |
 | `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
@@ -615,6 +615,10 @@ without a definition retain dataset-byte identity. These compatibility scopes do
 definition equivalence. Native eval, dataset jobs and supported probe/composite producers capture the
 planned [suite definition](suite-identity.md), including declared configuration and hashed inputs,
 before execution and retain it through interruption. Check the recorded identity scope when comparing runs.
+An `eval` dataset's suite reference is its path relative to the working folder; for a dataset outside it, the path
+relative to its git repository root, else its file name (since 1.0.0-rc.2; rc.1 recorded a `../` path). Runs of one
+dataset across that change are not comparable on the suite axis, and two datasets outside any repository with the
+same file name share a reference.
 Agentic runs also record the applied `config.budgetTier`, normalized from the validated filter (`all` for no
 filter), including mocks and aborted evidence. Other benchmark families do not invent a budget tier.
 The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending

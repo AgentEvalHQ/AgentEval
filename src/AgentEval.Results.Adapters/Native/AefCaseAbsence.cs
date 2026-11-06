@@ -21,7 +21,10 @@ public sealed record AefCaseAbsence
     private const int MaxReasonLength = 1024;
 
     /// <summary>Creates an absence.</summary>
-    /// <param name="state"><see cref="AefState.NotMeasured"/>, <see cref="AefState.Error"/> or <see cref="AefState.Skipped"/>.</param>
+    /// <param name="state">
+    /// <see cref="AefState.NotMeasured"/> (the case ran and produced nothing to grade), <see cref="AefState.Error"/> (it failed
+    /// to run) or <see cref="AefState.Skipped"/> (it never started).
+    /// </param>
     /// <param name="reason">The content-free cause, at most 1,024 characters.</param>
     public AefCaseAbsence(AefState state, string reason)
     {

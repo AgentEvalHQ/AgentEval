@@ -510,6 +510,34 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [Theory]
     [InlineData(1)]
     [InlineData(3)]
+    public async Task Eval_CriteriaWithoutAJudge_AreNotMeasured_NeverAPassOnANonEmptyAnswer(int runs)
+    {
+        // Every eval target: without --judge the harness only checks that the answer is not empty, so a case that
+        // declares criteria would pass with score 100 on any reply. It is NOT MEASURED instead, and the run exits 11.
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
+        await using var agent = await LocalChatEndpoint.StartAsync("Hi");
+        var options = Options(agent.Endpoint, runs: runs);
+        File.WriteAllText(options.Dataset.FullName, "- id: c0\n  input: Greet\n  evaluation_criteria: [Greets politely]\n");
+
+        Assert.Equal(11, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var caseLines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Where(l => (string?)l["path"] == "case").ToArray();
+        Assert.DoesNotContain(caseLines, l => (string?)l["state"] is "passed" or "failed");
+        var notMeasured = caseLines.Where(l => (string?)l["state"] == "not_measured").ToArray();
+        Assert.Equal(runs, notMeasured.Length);
+        Assert.All(notMeasured, l =>
+        {
+            Assert.Equal(NotMeasuredCases.NoJudgeReason, (string?)l["reason"]);
+            Assert.Null(l["scores"]);
+        });
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
     public async Task Eval_ExplicitJudge_RecordsProviderForSingleAndRepeatedRuns(int runs)
     {
         using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();

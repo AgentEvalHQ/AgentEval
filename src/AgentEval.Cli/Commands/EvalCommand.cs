@@ -482,7 +482,8 @@ internal static class EvalCommand
                 var index = completed.Count;
                 completed.Add(result);
                 // Before the result is recorded: the target may know the case was not measured.
-                var absence = caseEvidence?.ReviewResult(result, caseIds[index], CriteriaNotGraded(opts, testCases[index]));
+                var absence = caseEvidence?.ReviewResult(result, caseIds[index])
+                    ?? NotMeasuredCases.ReviewCriteria(result, CriteriaNotGraded(opts, testCases[index]));
                 evidence.Add(result, caseIds[index], testCases[index].ToTestCase().PassingScore,
                     AefCliOptions.ContentCapture == AefContentCapture.On
                         ? new AefNativeContent
@@ -1070,7 +1071,8 @@ internal static class EvalCommand
                             if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
                                 ct.ThrowIfCancellationRequested();
                             // Before the trial is recorded and counted: the target may know it was not measured.
-                            var absence = caseEvidence?.ReviewResult(trial, caseId, CriteriaNotGraded(opts, datasetTestCase));
+                            var absence = caseEvidence?.ReviewResult(trial, caseId)
+                                ?? NotMeasuredCases.ReviewCriteria(trial, CriteriaNotGraded(opts, datasetTestCase));
                             evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
                                 ? new AefNativeContent
                                 {

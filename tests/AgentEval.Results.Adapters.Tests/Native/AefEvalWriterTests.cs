@@ -724,6 +724,83 @@ public sealed class AefEvalWriterTests : IDisposable
     }
 
     [Fact]
+    public void Session_ATrialWhoseScoreWasNotMeasured_StaysOutOfItsCasesMean()
+    {
+        // Two trials, one pass needed. The first failed on a check while its judge call failed: its 0 is a placeholder,
+        // not a grade, so the case's score is the measured trial's 90, not a mean of 45.
+        var placeholder = new TestResult
+        {
+            TestName = "t", Passed = false, Score = 0,
+            AssertionResults = [AgentEval.Output.AssertionResult.Fail("answer non-empty")],
+        };
+        using var session = AefEvalWriter.Start(_out, Options(), Start, plannedTrials: 2, requirePasses: 1);
+        session.Add(placeholder, "c1", 70, content: null, usage: null, absence: null, scoreMeasured: false);
+        session.Add(Pass(90), "c1");
+        var (dir, _) = session.Complete(Start.AddSeconds(2));
+
+        var rollup = AefTestRuns.Results(dir).Single(l => l["trials"] is not null);
+        Assert.Equal("passed", (string?)rollup["state"]);
+        Assert.Equal(90.0, (double)rollup["scores"]![0]!["value"]!, 6);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Fact]
+    public void Session_AScoreNobodyMeasured_CannotPass_NorFailWithoutAFailedAssertion()
+    {
+        using var session = AefEvalWriter.Start(_out, Options(), Start);
+        Assert.Throws<ArgumentException>(() => session.Add(Pass(), "c1", 70, null, null, null, scoreMeasured: false));
+        Assert.Throws<ArgumentException>(() => session.Add(Fail(), "c2", 70, null, null, null, scoreMeasured: false));
+
+        // An absence says why there is no grade, and a failed assertion explains a failure: both are accepted.
+        session.Add(Pass(), "c3", 70, null, null, new AefCaseAbsence(AefState.Error, "the judge call failed"), scoreMeasured: false);
+        session.Add(new TestResult
+        {
+            TestName = "t", Passed = false, Score = 0,
+            AssertionResults = [AgentEval.Output.AssertionResult.Fail("answer non-empty")],
+        }, "c4", 70, null, null, null, scoreMeasured: false);
+        var (dir, _) = session.Complete(Start.AddSeconds(1));
+
+        Assert.Equal(new[] { "c3", "c4" }, AefTestRuns.Results(dir).Where(l => (string?)l["path"] == "case").Select(l => (string?)l["caseId"]).ToArray());
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Session_AMetricOnACaseAFailedAssertionDecided_KeepsFailureEffect_AndNamesTheAssertionDecisive(bool metricLater)
+    {
+        // The judge graded 95 against 70 and a check failed the case. A named metric added to it, with the result or
+        // later, must not rewrite the deciding rule into a threshold the score met.
+        var result = new TestResult
+        {
+            TestName = "t", Passed = false, Score = 95,
+            AssertionResults =
+            [
+                AgentEval.Output.AssertionResult.Pass("turn completed"),
+                AgentEval.Output.AssertionResult.Fail("answer non-empty"),
+            ],
+            MetricResults = metricLater ? null : [AgentEval.Core.MetricResult.Pass("code_quality", 90)],
+        };
+        string dir;
+        using (var session = AefEvalWriter.Start(_out, Options(), Start))
+        {
+            session.Add(result, "c1", 70);
+            if (metricLater) session.AddMetrics("c1", [AgentEval.Core.MetricResult.Pass("code_quality", 90)]);
+            (dir, _) = session.Complete(Start.AddSeconds(1));
+        }
+
+        var lines = AefTestRuns.Results(dir);
+        var root = lines.Single(l => (string?)l["path"] == "case");
+        var failedCheck = lines.Single(l => (string?)l["path"] == "case/assertions/2");
+        Assert.Equal("failed", (string?)root["state"]);
+        Assert.Equal("failure-effect", (string?)root["aggregation"]!["rulePath"]);
+        Assert.Equal(95.0, (double)root["aggregation"]!["score"]!, 6);
+        var decisive = Assert.Single(root["aggregation"]!["decisive"]!.AsArray());
+        Assert.Equal((string?)failedCheck["resultId"], (string?)decisive);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
+    [Fact]
     public void Write_RecordsCriteriaAndAssertionsAsChildren_BesideTheCasesOwnVerdict()
     {
         var summary = new TestSummary("demo",

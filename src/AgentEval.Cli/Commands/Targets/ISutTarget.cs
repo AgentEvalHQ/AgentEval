@@ -115,15 +115,11 @@ internal interface ISutCaseEvidence
     /// </summary>
     /// <param name="result">The case's (or trial's) result, as the harness produced it.</param>
     /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>
-    /// <param name="criteriaNotGraded">
-    /// True when the case declares evaluation criteria and the run has no judge: the harness then only checked that the
-    /// answer is not empty. A target that measures agents treats such a case as not measured.
-    /// </param>
     /// <returns>
     /// The AEF absence for a case the target marked not measured, so the AEF run records its true state and cause;
     /// otherwise null.
     /// </returns>
-    AefCaseAbsence? ReviewResult(TestResult result, string caseId, bool criteriaNotGraded = false);
+    AefCaseAbsence? ReviewResult(TestResult result, string caseId);
 
     /// <summary>The case's evidence document, or null when there is none.</summary>
     /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>

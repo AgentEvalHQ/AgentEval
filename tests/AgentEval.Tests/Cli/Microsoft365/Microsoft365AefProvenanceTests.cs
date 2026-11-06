@@ -384,7 +384,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
     }
 
     [Fact]
-    public void CaseEvidence_ReviewResult_CriteriaNoJudgeGraded_NotMeasuredWithTheAnswerKept()
+    public void CriteriaNoJudgeGraded_IsTheCommandsRuleForEveryTarget_NotMeasuredWithTheAnswerKept()
     {
         var sink = new CliTurnSink(verbose: false, TextWriter.Null);
         var evidence = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }.CaseEvidenceFor(new FakeEvaluableAgent())!;
@@ -392,7 +392,11 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
         sink.Record(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(new WorkIqTurnRequest("prompt", "case-1", "turn-1")));
         var passedWithoutJudge = new AgentEval.Models.TestResult { TestName = "case-1", Passed = true, Score = 100, ActualOutput = "The pilot starts on 17 November." };
 
-        var absence = evidence.ReviewResult(passedWithoutJudge, "case-1", criteriaNotGraded: true);
+        // The target reviews only what it observed: a completed turn with an answer is left as it is.
+        Assert.Null(evidence.ReviewResult(passedWithoutJudge, "case-1"));
+        Assert.True(passedWithoutJudge.Passed);
+
+        var absence = NotMeasuredCases.ReviewCriteria(passedWithoutJudge, criteriaNotGraded: true);
 
         Assert.NotNull(absence);
         Assert.Equal(AgentEval.Results.Writing.AefState.NotMeasured, absence.State);
@@ -404,7 +408,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
 
         // A case without criteria, or with a judge, keeps the harness's verdict.
         var withJudge = new AgentEval.Models.TestResult { TestName = "case-1", Passed = true, Score = 90, ActualOutput = "x" };
-        Assert.Null(evidence.ReviewResult(withJudge, "case-1", criteriaNotGraded: false));
+        Assert.Null(NotMeasuredCases.ReviewCriteria(withJudge, criteriaNotGraded: false));
         Assert.True(withJudge.Passed);
     }
 
