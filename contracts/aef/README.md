@@ -7,8 +7,9 @@ signatures over the exact bytes, so anyone can check what they are told without 
 **Status: AEF 1.0 is a release candidate, unreleased.** It is AgentEval's evidence format (AgentEval
 [ADR-035](../../docs/adr/035-aef-is-the-evidence-format.md)) and becomes final at the `aef-1.0` tag, released together
 with AgentEval 1.0, its first producer. Until then it changes wherever implementation and independent review find a
-gap, each change with its vectors ([changelog](1/CHANGELOG.md)). AgentEval's command line still writes its older
-output directory (`.agenteval/`, "AgentEval store v1", which predates AEF; [§7.5](1/spec/07-versioning.md)), and
+gap, each change with its vectors ([changelog](1/CHANGELOG.md)). Since AgentEval 1.0.0-rc.1 its command line writes
+AEF by default. Its older output directory (`.agenteval/`, "AgentEval store v1", which predates AEF;
+[§7.5](1/spec/07-versioning.md)) is written only behind the hidden `--legacy-output` option, and
 `agenteval aef export` converts such a run into an imported AEF run.
 
 ## Where to start
