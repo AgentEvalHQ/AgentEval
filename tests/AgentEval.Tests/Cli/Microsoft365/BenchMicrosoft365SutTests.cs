@@ -12,7 +12,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M30: <c>bench … --sut microsoft365</c> through <c>BenchTier1SutResolver.Resolve</c> (the pure resolution every bench
+/// <c>bench … --sut microsoft365</c> through <c>BenchTier1SutResolver.Resolve</c> (the pure resolution every bench
 /// verb with a <c>--sut</c> seam calls). Mirrors <c>BenchTier1SutResolverTests</c>: a refused gate surfaces as a friendly
 /// error (exit 2 at the command), and the <c>sutOverride</c> seam drives the REAL target credential-free.
 /// </summary>

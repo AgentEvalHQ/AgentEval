@@ -28,8 +28,10 @@ namespace AgentEval.Microsoft365.Readiness;
 /// The check stops after the first failure unless <see cref="ReadinessCheckOptions.ContinueAfterFailure"/>; a stage
 /// that does not run is <see cref="ReadinessResult.Skipped"/> with its reason, never a pass. Every stage is traced on the
 /// <c>Doctor</c> stage (<c>doctor.&lt;stage&gt;.start</c>, then <c>.pass</c> / <c>.fail</c> / <c>.skipped</c>) next to
-/// the underlying seams' own events, and every failed stage is registered as a <c>doctor.&lt;stage&gt;.failed</c>
-/// issue. The two replies the doctor provokes on purpose — TaskNotFound on the random id, TaskNotCancelable on the
+/// the underlying seams' own events. One failure is one issue: when the layer that ended the call (the client, the
+/// auth handler, the probe's turn) registered the stage's failure, the stage's verdict is a <c>doctor.&lt;stage&gt;.failed</c>
+/// trace event; otherwise the stage registers it as a <c>doctor.&lt;stage&gt;.failed</c> issue. The two replies the
+/// doctor provokes on purpose — TaskNotFound on the random id, TaskNotCancelable on the
 /// finished task — are kept out of the issue register (the trace records them and says so). No output ever carries a
 /// token, an auth code or the <c>Authorization</c> header; the trace never carries the prompt or the answer (the
 /// report shows the probe's prompt and the first 80 characters of its answer).
@@ -81,22 +83,45 @@ public static class Microsoft365ReadinessCheck
     /// <exception cref="ArgumentException">Both or neither of <paramref name="config"/> and <paramref name="configFile"/> were given.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><see cref="ReadinessCheckOptions.StageTimeout"/> is not positive.</exception>
     /// <exception cref="InvalidOperationException">The trace or issue file could not be opened (the message names the path).</exception>
-    public static async Task<ReadinessReport> RunAsync(
+    public static Task<ReadinessReport> RunAsync(
         Microsoft365Config? config,
         FileInfo? configFile,
         ReadinessCheckOptions options,
         HttpMessageHandler? innerHandler,
         IWorkIqTokenProvider? tokenProvider,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        RunAsync(config, configFile, options, innerHandler, tokenProvider, TimeProvider.System, cancellationToken);
+
+    /// <summary>
+    /// <see cref="RunAsync(Microsoft365Config, FileInfo, ReadinessCheckOptions, HttpMessageHandler, IWorkIqTokenProvider, CancellationToken)"/>
+    /// on an injected clock: every stage timer, sign-in wait, timestamp and elapsed time runs on <paramref name="clock"/>
+    /// (tests drive it with a fake clock instead of waiting in real time).
+    /// </summary>
+    /// <param name="config">The config, when given in code; exactly one of this and <paramref name="configFile"/>.</param>
+    /// <param name="configFile">The config file; exactly one of this and <paramref name="config"/>.</param>
+    /// <param name="options">What to run and how.</param>
+    /// <param name="innerHandler">The innermost HTTP handler; null uses a socket handler.</param>
+    /// <param name="tokenProvider">The token source; null uses the MSAL device-code provider.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="cancellationToken">Stops the check: the running stage fails as canceled, the rest are skipped.</param>
+    internal static async Task<ReadinessReport> RunAsync(
+        Microsoft365Config? config,
+        FileInfo? configFile,
+        ReadinessCheckOptions options,
+        HttpMessageHandler? innerHandler,
+        IWorkIqTokenProvider? tokenProvider,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(clock);
         if ((config is null) == (configFile is null))
         {
             throw new ArgumentException("Pass exactly one of config and configFile.", config is null ? nameof(configFile) : nameof(config));
         }
 
         options.Validate();
-        await using var run = new ReadinessRun(config, configFile, options, innerHandler, tokenProvider, TimeProvider.System);
+        await using var run = new ReadinessRun(config, configFile, options, innerHandler, tokenProvider, clock);
         return await run.ExecuteAsync(cancellationToken).ConfigureAwait(false);
     }
 }

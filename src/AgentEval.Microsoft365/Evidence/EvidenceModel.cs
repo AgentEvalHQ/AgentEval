@@ -3,15 +3,17 @@
 // Licensed under the MIT License.
 
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AgentEval.Microsoft365.Evidence;
 
 // The typed evidence contract of the Microsoft 365 (Work IQ A2A) provider, schema
-// `agenteval.microsoft365.turn-evidence/v1`. Every enum and record below is the design's
-// "Proposed typed evidence contract" verbatim; the only additions are documentation, the validated
-// factory helpers on Observed<T> / EvidenceSet<T>, and small read-only convenience members.
+// `agenteval.microsoft365.turn-evidence/v1`. The enums and records below follow the design's
+// "Proposed typed evidence contract" (its stream-text-semantics enum is left out: nothing produces it);
+// the only additions are documentation, the validated factory helpers on Observed<T> / EvidenceSet<T>,
+// and small read-only convenience members.
 // The invariants these types enforce: a missing channel is never an empty success, a derived value
 // always names its rule, "complete" always names its basis, and nothing substitutes a default for
 // an absent value.
@@ -229,19 +231,6 @@ public enum CitationBinding
     Conflicting,
 }
 
-/// <summary>Whether a streamed text chunk is a delta or a snapshot of the whole artifact.</summary>
-public enum StreamTextSemantics
-{
-    /// <summary>Not declared by the protocol event.</summary>
-    Unknown,
-
-    /// <summary>The chunk appends to the artifact (<c>append: true</c>).</summary>
-    Delta,
-
-    /// <summary>The chunk replaces the artifact's content.</summary>
-    Snapshot,
-}
-
 /// <summary>
 /// A pointer into captured material: which capture, which event, and a JSON pointer inside it. A source
 /// reference says where a value was read; it does not say how the normalised value was derived (see
@@ -399,6 +388,33 @@ public sealed record EvidenceSet<T>(
     /// means zero rows in this diagnostic snapshot — not that the service did nothing internally.
     /// </summary>
     public bool IsObservedEmpty => IsProvided && Validation == EvidenceValidation.Valid && Items.IsDefaultOrEmpty;
+
+    /// <summary>
+    /// The channel in one line for a reader: the availability when it was not provided
+    /// (<c>NotRequested</c>, <c>NotProvided</c>, …); <c>Provided (observed empty: 0 {noun} in this snapshot)</c> when
+    /// <see cref="IsObservedEmpty"/>; otherwise <c>Provided ({count} {noun})</c>, with <c>, {Validation}</c> inside the
+    /// parentheses when the validation is not <see cref="EvidenceValidation.Valid"/>. A conflicting or malformed channel
+    /// (always zero items) therefore never reads like an observed-empty one.
+    /// </summary>
+    /// <param name="noun">What an item is called, for example <c>execution(s)</c>.</param>
+    /// <exception cref="ArgumentException"><paramref name="noun"/> is null or blank.</exception>
+    public string Describe(string noun)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(noun);
+        if (!IsProvided)
+        {
+            return Availability.ToString();
+        }
+
+        if (IsObservedEmpty)
+        {
+            return $"Provided (observed empty: 0 {noun} in this snapshot)";
+        }
+
+        var count = Items.IsDefault ? 0 : Items.Length;
+        var validation = Validation == EvidenceValidation.Valid ? "" : $", {Validation}";
+        return string.Create(CultureInfo.InvariantCulture, $"Provided ({count} {noun}{validation})");
+    }
 
     /// <summary>The adapter did not request this channel.</summary>
     /// <param name="scope">The scope the channel would have had.</param>
@@ -564,7 +580,34 @@ public sealed record ToolIdentity(
     Observed<ToolTransport> Transport,
     Observed<string> McpServerIdentity,
     Observed<string> McpToolName,
-    string? AliasMappingVersion);
+    string? AliasMappingVersion)
+{
+    /// <summary>
+    /// The rule id of the transport of a tool reported by names only: <see cref="ToolTransport.Mcp"/> only from an explicit
+    /// provenance field, of which the observed shapes (the native 1.18 diagnostic artifacts and the confirmation card)
+    /// define none, so the transport is <see cref="ToolTransport.Unknown"/>.
+    /// </summary>
+    internal const string NamesOnlyTransportRuleId = "tool-transport.native118/v1";
+
+    /// <summary>
+    /// The identity of a tool reported by names only: plugin and function names as sent, no provider tool id, no
+    /// canonical name, transport <see cref="ToolTransport.Unknown"/> by <see cref="NamesOnlyTransportRuleId"/>, no MCP
+    /// identity.
+    /// </summary>
+    /// <param name="pluginName">The plugin name observation.</param>
+    /// <param name="functionDisplayName">The function display name observation.</param>
+    /// <param name="sources">Where the identity was read.</param>
+    internal static ToolIdentity FromReportedNames(Observed<string> pluginName, Observed<string> functionDisplayName, ImmutableArray<SourceRef> sources) =>
+        new(
+            pluginName,
+            functionDisplayName,
+            Observed<string>.Missing(),
+            Observed<string>.Missing(),
+            Observed<ToolTransport>.Present(ToolTransport.Unknown, sources, EvidenceDerivation.ParserProjection, NamesOnlyTransportRuleId),
+            Observed<string>.Missing(),
+            Observed<string>.Missing(),
+            null);
+}
 
 /// <summary>A reported tool <b>selection</b>; selection is not execution.</summary>
 /// <param name="ObservationId">Local evidence id; never a provider call id.</param>

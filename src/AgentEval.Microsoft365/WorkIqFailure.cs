@@ -84,6 +84,19 @@ public enum WorkIqOperation
     Local,
 }
 
+/// <summary>Why no bearer token was available for a request, so nothing was sent (<see cref="WorkIqFailure.TokenFailure"/>).</summary>
+public enum WorkIqTokenFailure
+{
+    /// <summary>The wait for the token (a device-code sign-in included) was stopped before a token arrived: by the caller, an abandonment or the turn deadline.</summary>
+    SignInNotCompleted,
+
+    /// <summary>The token provider failed (an MSAL error, a refused consent, an expired device code, or another exception).</summary>
+    ProviderFailed,
+
+    /// <summary>The token provider returned an empty token.</summary>
+    EmptyToken,
+}
+
 /// <summary>
 /// A structured, safe description of why an operation failed or ended indeterminate. The message never contains
 /// tenant content, prompts, answers, tokens or auth URLs — only categories, codes and correlation ids; detailed
@@ -113,4 +126,27 @@ public sealed record WorkIqFailure(
     string? RpcRequestId = null,
     string? TaskId = null,
     string? ContextId = null,
-    RawCaptureRef? Capture = null);
+    RawCaptureRef? Capture = null)
+{
+    /// <summary>
+    /// Set when no bearer token was available, so nothing was sent: why. Null for every other failure. The auth layer
+    /// sets it and registers the issue for such a failure itself, because only it holds the sign-in or MSAL error.
+    /// </summary>
+    public WorkIqTokenFailure? TokenFailure { get; init; }
+
+    /// <summary>
+    /// Set on a <see cref="WorkIqFailureCategory.Timeout"/> that a local budget of the turn ended (the turn deadline or
+    /// the recovery budget), not the transport: which one. Null for every other failure.
+    /// </summary>
+    internal WorkIqLocalBudget? LocalBudget { get; init; }
+}
+
+/// <summary>The local budget that ended a turn (<see cref="WorkIqFailure.LocalBudget"/>).</summary>
+internal enum WorkIqLocalBudget
+{
+    /// <summary><see cref="WorkIqOptions.TurnDeadline"/> elapsed.</summary>
+    TurnDeadline,
+
+    /// <summary><see cref="WorkIqOptions.RecoveryBudget"/> ran out while the task was still submitted or working.</summary>
+    RecoveryBudget,
+}

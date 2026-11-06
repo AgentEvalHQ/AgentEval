@@ -37,11 +37,47 @@ internal sealed record WorkIqDiagnosticsPaths(
     WorkIqDiagnosticsDirectorySource DirectorySource);
 
 /// <summary>
-/// Builds the <see cref="WorkIqDiagnostics"/> of a live run from the config and options: run id, trace and issue
+/// The hooks a host other than the live agent (the readiness check) puts around the run's files when it opens its
+/// diagnostics through <see cref="WorkIqDiagnosticsFactory.Create(string, WorkIqOptions, TimeProvider, WorkIqDiagnosticsSetup)"/>.
+/// The defaults give the live agent's diagnostics.
+/// </summary>
+internal sealed record WorkIqDiagnosticsSetup
+{
+    /// <summary>Where the workspace search starts; null means the current directory.</summary>
+    public string? SearchStartDirectory { get; init; }
+
+    /// <summary>Where files go without a workspace; null means <c>&lt;temp&gt;/agenteval-m365</c>.</summary>
+    public string? FallbackDirectory { get; init; }
+
+    /// <summary>The verbose console destination; null means <see cref="System.Console.Error"/>.</summary>
+    public TextWriter? Console { get; init; }
+
+    /// <summary>Trace sinks placed before the JSONL trace file (the readiness check's in-memory list); disposed with the run when disposable.</summary>
+    public IReadOnlyList<IWorkIqTraceSink> LeadingTraceSinks { get; init; } = [];
+
+    /// <summary>Wraps the JSONL issue register before it is added (the readiness check's expected-reply filter); null adds it as is.</summary>
+    public Func<IWorkIqIssueSink, IWorkIqIssueSink>? WrapIssueRegister { get; init; }
+
+    /// <summary>
+    /// Wraps each caller-owned issue sink of <see cref="WorkIqOptions.IssueSinks"/>; the wrapper must not dispose it.
+    /// Null wraps it in a caller-owned sink.
+    /// </summary>
+    public Func<IWorkIqIssueSink, IWorkIqIssueSink>? WrapCallerIssueSink { get; init; }
+
+    /// <summary>What the ready event calls the run (<c>run</c>, <c>m365 doctor run</c>).</summary>
+    public string RunLabel { get; init; } = "run";
+
+    /// <summary>What the tester sends the two files back with (<c>a report</c>, <c>the readiness report</c>).</summary>
+    public string ReportName { get; init; } = "a report";
+}
+
+/// <summary>
+/// Builds the <see cref="WorkIqDiagnostics"/> of a run from the config and options: run id, trace and issue
 /// files (under <see cref="WorkIqOptions.DiagnosticsDirectory"/>, else the workspace's <c>.agenteval/m365/</c>,
 /// else the temp directory), the console sink when <see cref="WorkIqOptions.Verbose"/>, and the config identity
 /// hash. The first traced event, <c>config.diagnostics_ready</c>, names both files so the tester knows what to send
-/// back. <see cref="Describe"/> resolves the same paths without creating anything (the CLI prints them).
+/// back; it has one shape for the live agent and the readiness check. <see cref="Describe"/> resolves the same paths
+/// without creating anything (the CLI prints them).
 /// </summary>
 internal static class WorkIqDiagnosticsFactory
 {
@@ -176,13 +212,37 @@ internal static class WorkIqDiagnosticsFactory
         TextWriter? console)
     {
         ArgumentNullException.ThrowIfNull(config);
+        return Create(
+            ComputeConfigSha256(config),
+            options,
+            clock,
+            new WorkIqDiagnosticsSetup { SearchStartDirectory = searchStartDirectory, FallbackDirectory = fallbackDirectory, Console = console });
+    }
+
+    /// <summary>
+    /// The one way a run's diagnostics are opened, for the live agent and the readiness check: mints the run id when
+    /// <see cref="WorkIqOptions.RunId"/> is blank, puts <see cref="WorkIqDiagnosticsSetup.LeadingTraceSinks"/> first, opens
+    /// the JSONL trace and issue sinks (directories created; the issue register through
+    /// <see cref="WorkIqDiagnosticsSetup.WrapIssueRegister"/>), adds the console sink when <see cref="WorkIqOptions.Verbose"/>,
+    /// appends the caller's <see cref="WorkIqOptions.TraceSinks"/> and <see cref="WorkIqOptions.IssueSinks"/> (never
+    /// disposed with the run), stamps <paramref name="configSha256"/>, and traces <c>config.diagnostics_ready</c> with
+    /// both file paths as data.
+    /// </summary>
+    /// <param name="configSha256">The config identity hash (<see cref="ComputeConfigSha256"/>); null when no config was loaded.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="setup">The host's hooks.</param>
+    /// <exception cref="InvalidOperationException">A diagnostics file could not be opened; the message names the path.</exception>
+    public static WorkIqDiagnostics Create(string? configSha256, WorkIqOptions options, TimeProvider clock, WorkIqDiagnosticsSetup setup)
+    {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(setup);
 
         var runId = NormalizeRunId(options.RunId) ?? NewRunId(clock);
-        var paths = Describe(options, runId, searchStartDirectory, fallbackDirectory);
+        var paths = Describe(options, runId, setup.SearchStartDirectory, setup.FallbackDirectory);
 
-        var traceSinks = new List<IWorkIqTraceSink>();
+        var traceSinks = new List<IWorkIqTraceSink>(setup.LeadingTraceSinks);
         var issueSinks = new List<IWorkIqIssueSink>();
         JsonlTraceSink? traceSink = null;
         try
@@ -191,10 +251,11 @@ internal static class WorkIqDiagnosticsFactory
             traceSinks.Add(traceSink);
             if (options.Verbose)
             {
-                traceSinks.Add(new ConsoleTraceSink(console));
+                traceSinks.Add(new ConsoleTraceSink(setup.Console));
             }
 
-            issueSinks.Add(new JsonlIssueSink(paths.IssueFile));
+            IWorkIqIssueSink register = new JsonlIssueSink(paths.IssueFile);
+            issueSinks.Add(setup.WrapIssueRegister?.Invoke(register) ?? register);
         }
         catch (Exception)
         {
@@ -205,16 +266,27 @@ internal static class WorkIqDiagnosticsFactory
         // The caller's own sinks come last: they see exactly what the JSONL files see, after the same stamping and
         // redaction, and they are never disposed with the run (the caller owns them).
         CallerOwnedTraceSink.AppendTo(traceSinks, options.TraceSinks);
-        CallerOwnedIssueSink.AppendTo(issueSinks, options.IssueSinks);
+        if (setup.WrapCallerIssueSink is { } wrap)
+        {
+            foreach (var sink in options.IssueSinks ?? [])
+            {
+                issueSinks.Add(wrap(sink ?? throw new ArgumentException("A caller-owned issue sink list must not contain null.", nameof(options))));
+            }
+        }
+        else
+        {
+            CallerOwnedIssueSink.AppendTo(issueSinks, options.IssueSinks);
+        }
 
-        var diagnostics = new WorkIqDiagnostics(runId, ComputeConfigSha256(config), traceSinks, issueSinks, clock);
+        var diagnostics = new WorkIqDiagnostics(runId, configSha256, traceSinks, issueSinks, clock);
         diagnostics.Trace(new WorkIqTraceEvent(
             default,
             WorkIqTraceStage.Config,
             WorkIqTraceLevel.Info,
             ReadyEventCode,
-            $"Diagnostics ready for run {runId}: trace file {paths.TraceFile.FullName}; issue file {paths.IssueFile.FullName} " +
-            $"(directory from {DescribeSource(paths.DirectorySource)}; verbose console {(options.Verbose ? "on" : "off")}). Send both files back with a report.")
+            $"Diagnostics ready for {setup.RunLabel} {runId}: trace file {paths.TraceFile.FullName}; issue file {paths.IssueFile.FullName} " +
+            $"(directory from {DescribeSource(paths.DirectorySource)}; verbose console {(options.Verbose ? "on" : "off")}). " +
+            $"Send both files back with {setup.ReportName}; neither contains a token.")
         {
             Data = JsonSerializer.SerializeToElement(new ReadyData(
                 runId,

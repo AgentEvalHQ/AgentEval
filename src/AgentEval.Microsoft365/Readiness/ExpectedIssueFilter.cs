@@ -16,6 +16,7 @@ namespace AgentEval.Microsoft365.Readiness;
 internal sealed class ExpectedIssueFilter : IWorkIqIssueSink, IDisposable
 {
     private readonly IWorkIqIssueSink _inner;
+    private readonly List<string> _forwardedCodes = [];
     private Func<WorkIqIssue, bool>? _expected;
     private int _suppressed;
 
@@ -28,6 +29,38 @@ internal sealed class ExpectedIssueFilter : IWorkIqIssueSink, IDisposable
 
     /// <summary>How many issues were held back so far.</summary>
     public int Suppressed => Volatile.Read(ref _suppressed);
+
+    /// <summary>How many issues reached the issue register so far.</summary>
+    public int Forwarded
+    {
+        get
+        {
+            lock (_forwardedCodes)
+            {
+                return _forwardedCodes.Count;
+            }
+        }
+    }
+
+    /// <summary>Whether an issue with <paramref name="code"/> reached the issue register after the first <paramref name="mark"/> ones (an earlier <see cref="Forwarded"/>).</summary>
+    /// <param name="mark">How many issues had reached the register when the caller started looking.</param>
+    /// <param name="code">The issue code.</param>
+    public bool ForwardedSince(int mark, string code)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        lock (_forwardedCodes)
+        {
+            for (var i = Math.Max(0, mark); i < _forwardedCodes.Count; i++)
+            {
+                if (string.Equals(_forwardedCodes[i], code, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 
     /// <summary>Holds back the issues that match <paramref name="predicate"/> until the returned scope is disposed.</summary>
     /// <param name="predicate">Which issue is the expected answer.</param>
@@ -49,6 +82,10 @@ internal sealed class ExpectedIssueFilter : IWorkIqIssueSink, IDisposable
         }
 
         _inner.Write(i);
+        lock (_forwardedCodes)
+        {
+            _forwardedCodes.Add(i.Code);
+        }
     }
 
     /// <inheritdoc/>

@@ -22,8 +22,9 @@ namespace AgentEval.Microsoft365;
 /// serialises turns behind a single-active-turn guard, runs the blocking turn path (send → bounded
 /// <c>GetTask</c> reconciliation), the streaming path, recovery after a drop, reset and abandonment, and
 /// normalises evidence exactly once per turn. Card discovery runs once per conversation and the card digest is
-/// recorded. Constructed by <see cref="Microsoft365AgentFactory.BuildLive"/> (internal constructor); tests use the
-/// <see cref="IWorkIqConversation"/> seam instead.
+/// recorded. Constructed by <see cref="Microsoft365AgentFactory.BuildLive"/> and the readiness check; a host reaches
+/// it through <see cref="IWorkIqConversation"/> (<see cref="WorkIqEvaluableAgent.Conversation"/>), and tests use that
+/// seam too.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,8 +33,14 @@ namespace AgentEval.Microsoft365;
 /// whose state is unknown (connection loss, timeout, local stop before a task id) ends as
 /// <see cref="WorkIqTurnOutcome.Indeterminate"/>. The input is never resent. A stop driven by the caller's
 /// token (or by <see cref="AbandonAndResetAsync"/>) throws <see cref="WorkIqTurnCanceledException"/> carrying that
-/// result. Only a discovery failure on an explicit task read (<see cref="GetTaskAsync"/>, <see cref="CancelTaskAsync"/>)
-/// surfaces as <see cref="WorkIqProtocolException"/>, because no turn result exists there.
+/// result. A turn never throws <see cref="WorkIqProtocolException"/>; the explicit task reads
+/// (<see cref="GetTaskAsync"/>, <see cref="CancelTaskAsync"/>) do, for any discovery or transport failure, because no
+/// turn result exists there.
+/// </para>
+/// <para>
+/// Issues: a turn that did not complete registers one issue for its outcome (<see cref="OutcomeIssueCode"/>,
+/// classified by <see cref="WorkIqIssueClassifier"/>); its calls to the client trace their failures without registering
+/// them again. A turn that got no bearer token is the exception: the auth layer registered that failure already.
 /// </para>
 /// <para>
 /// Zero-valued budgets: a zero <see cref="WorkIqOptions.TurnDeadline"/> means no deadline; a zero
@@ -41,7 +48,7 @@ namespace AgentEval.Microsoft365;
 /// is then <see cref="WorkIqTurnOutcome.Indeterminate"/> with a timeout failure).
 /// </para>
 /// </remarks>
-public sealed class WorkIqConversation : IWorkIqConversation
+internal sealed class WorkIqConversation : IWorkIqConversation
 {
     /// <summary>The versioned interaction profile that recognises Work IQ pauses (confirmation cards, auth-required payloads); the evidence decoder's id.</summary>
     public const string InteractionProfileId = InteractionDecoder.ProfileId;
@@ -178,7 +185,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // Streaming turn + subscription (plumbing over lane C's streaming members)
+    // Streaming turn + subscription (over the client's streaming members)
     // ---------------------------------------------------------------------------------------------------------
 
     /// <inheritdoc/>
@@ -193,15 +200,19 @@ public sealed class WorkIqConversation : IWorkIqConversation
             if (await TryDiscoverAsync(ctx, cancellationToken).ConfigureAwait(false))
             {
                 using var tokens = CreateTurnTokens(cancellationToken);
+
+                // A device-code sign-in that starts inside the turn is bounded by its code's expiry, as in a blocking turn.
+                using var signInWait = WorkIqSignInWait.Enter(new TurnSignInWait(this, ctx, tokens));
                 var sendRequest = BuildSendRequest(ctx);
                 ctx.SentContextId = sendRequest.Message.ContextId;
                 TraceDispatch(ctx, sendRequest, "SendStreamingMessage");
 
+                // The SDK mints the stream's JSON-RPC id itself, so the call carries none.
+                var call = TurnCall(ctx);
                 IAsyncEnumerable<WorkIqStreamFrame>? frames = null;
                 try
                 {
-                    SetPendingRpcId(ctx);
-                    frames = Client.StreamAsync(sendRequest, tokens.Token);
+                    frames = Client.StreamAsync(sendRequest, tokens.Token, call);
                 }
                 catch (Exception ex)
                 {
@@ -215,7 +226,10 @@ public sealed class WorkIqConversation : IWorkIqConversation
                         yield return evt;
                     }
 
-                    AttachStreamCapture(ctx);
+                    // The scope above does not survive a yield: the iterator resumes on the consumer's flow. Enter it again
+                    // for the calls after the stream (the GetTask reconciliation), which may start a sign-in too.
+                    using var afterStream = WorkIqSignInWait.Enter(new TurnSignInWait(this, ctx, tokens));
+                    AttachStreamCapture(ctx, call);
                     await ReconcileAfterStreamAsync(ctx, tokens, cancellationToken, WorkIqOperation.Stream).ConfigureAwait(false);
                 }
             }
@@ -247,12 +261,16 @@ public sealed class WorkIqConversation : IWorkIqConversation
             {
                 ValidateHandle(task, ctx.Card!);
                 using var tokens = CreateTurnTokens(cancellationToken);
+
+                // A device-code sign-in that starts inside the subscription is bounded by its code's expiry, as in a turn.
+                using var signInWait = WorkIqSignInWait.Enter(new TurnSignInWait(this, ctx, tokens));
                 Diagnostics.Trace(WorkIqTraceStage.Subscribe, "subscribe.dispatch", "SubscribeToTask dispatched (never resubmits input; the first frame must be a task snapshot)", caseId: request.CaseId, turnId: request.TurnId, taskId: task.TaskId, contextId: task.ContextId);
 
+                var call = TurnCall(ctx);
                 IAsyncEnumerable<WorkIqStreamFrame>? frames = null;
                 try
                 {
-                    frames = Client.SubscribeAsync(task.TaskId, tokens.Token);
+                    frames = Client.SubscribeAsync(task.TaskId, tokens.Token, call);
                 }
                 catch (Exception ex)
                 {
@@ -266,7 +284,9 @@ public sealed class WorkIqConversation : IWorkIqConversation
                         yield return evt;
                     }
 
-                    AttachStreamCapture(ctx);
+                    // As in a streamed turn: the scope does not survive a yield, so the reconciliation enters it again.
+                    using var afterStream = WorkIqSignInWait.Enter(new TurnSignInWait(this, ctx, tokens));
+                    AttachStreamCapture(ctx, call);
                     if (ctx.Snapshot is null && ctx.DirectMessage is null && ctx.Failure is null)
                     {
                         ctx.Failure = new WorkIqFailure(
@@ -304,7 +324,9 @@ public sealed class WorkIqConversation : IWorkIqConversation
     {
         ArgumentNullException.ThrowIfNull(task);
         ThrowIfDisposed();
-        var card = await EnsureCardAsync(cancellationToken).ConfigureAwait(false);
+
+        // An explicit read is no turn: the client registers the issue of its failure itself, and captures go under no-turn.
+        var card = await DiscoverCardAsync(call: null, cancellationToken).ConfigureAwait(false);
         ValidateHandle(task, card);
 
         var reply = await Client.GetTaskAsync(task.TaskId, Options.HistoryLength, cancellationToken).ConfigureAwait(false);
@@ -319,7 +341,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
     {
         ArgumentNullException.ThrowIfNull(task);
         ThrowIfDisposed();
-        var card = await EnsureCardAsync(cancellationToken).ConfigureAwait(false);
+        var card = await DiscoverCardAsync(call: null, cancellationToken).ConfigureAwait(false);
         ValidateHandle(task, card);
 
         Diagnostics.Trace(WorkIqTraceStage.Cancel, "cancel.requested", "CancelTask requested explicitly (best effort: canceled only if the returned state says so)", taskId: task.TaskId, contextId: task.ContextId);
@@ -345,8 +367,12 @@ public sealed class WorkIqConversation : IWorkIqConversation
     {
         ArgumentNullException.ThrowIfNull(interaction);
         ArgumentNullException.ThrowIfNull(response);
-        throw new NotSupportedException("TODO(M53): interaction continuation lands in wave 5; the pending interaction is preserved on the turn result");
+        throw new NotSupportedException(ContinueNotSupportedMessage);
     }
+
+    /// <summary>The message of the <see cref="NotSupportedException"/> <see cref="ContinueAsync"/> throws.</summary>
+    internal const string ContinueNotSupportedMessage =
+        "Continuing a paused task is not supported in this preview; nothing was sent. The pending interaction stays on the turn result (WorkIqTurnResult.PendingInteraction).";
 
     // ---------------------------------------------------------------------------------------------------------
     // Reset, abandon, dispose
@@ -495,17 +521,15 @@ public sealed class WorkIqConversation : IWorkIqConversation
             request.TurnId,
             turnIndex,
             0,
-            NewRpcId(),
+            WorkIqA2AClient.NewRpcId(),
             Guid.NewGuid().ToString("D"),
             ProviderMessageId: null,
             ProviderTaskId: null,
             ProviderContextId: null);
-        var ctx = new TurnContext(request, identity, operation, Clock.GetUtcNow(), epoch, _abandonCts.Token);
-
-        if (Client is WorkIqA2AClient concrete)
+        var ctx = new TurnContext(request, identity, operation, Clock.GetUtcNow(), epoch, _abandonCts.Token)
         {
-            concrete.CaptureScope = SanitizePathSegment(Diagnostics.RunId) + "/" + SanitizePathSegment(request.TurnId);
-        }
+            CaptureScope = SanitizePathSegment(Diagnostics.RunId) + "/" + SanitizePathSegment(request.TurnId),
+        };
 
         var continues = Options.ConversationPolicy == ConversationPolicy.ContinueContext && reuse is not null;
         Diagnostics.Trace(
@@ -529,8 +553,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
 
         try
         {
-            var card = await Client.DiscoverAsync(cancellationToken).ConfigureAwait(false);
-            Volatile.Write(ref _card, card);
+            var card = await DiscoverCardAsync(TurnCall(ctx), cancellationToken).ConfigureAwait(false);
             ctx.Card = card;
             Diagnostics.Trace(
                 WorkIqTraceStage.Discovery,
@@ -557,17 +580,38 @@ public sealed class WorkIqConversation : IWorkIqConversation
         }
     }
 
-    private async Task<RawAgentCard> EnsureCardAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// The card of this conversation, discovered once through the client (which caches it too); this copy serves the
+    /// synchronous handle builders. A failure propagates as the client's <see cref="WorkIqProtocolException"/>.
+    /// </summary>
+    /// <param name="call">The per-call context: a turn's, or null for an explicit task read.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    private async Task<RawAgentCard> DiscoverCardAsync(WorkIqCallContext? call, CancellationToken cancellationToken)
     {
         if (Card is { } cached)
         {
             return cached;
         }
 
-        var card = await Client.DiscoverAsync(cancellationToken).ConfigureAwait(false);
+        var card = await Client.DiscoverAsync(cancellationToken, call).ConfigureAwait(false);
         Volatile.Write(ref _card, card);
         return card;
     }
+
+    /// <summary>
+    /// The per-call context of one client call the turn makes: the turn's capture folder, case and turn ids, and the
+    /// turn registers the one issue of its outcome itself, so the client only traces a failure.
+    /// </summary>
+    /// <param name="ctx">The turn.</param>
+    /// <param name="rpcId">The JSON-RPC id the call sends; null lets the client mint one.</param>
+    private static WorkIqCallContext TurnCall(TurnContext ctx, string? rpcId = null) => new()
+    {
+        RpcId = rpcId,
+        CaptureScope = ctx.CaptureScope,
+        CaseId = ctx.Request.CaseId,
+        TurnId = ctx.Request.TurnId,
+        CallerRegistersIssues = true,
+    };
 
     private SendMessageRequest BuildSendRequest(TurnContext ctx)
     {
@@ -586,13 +630,12 @@ public sealed class WorkIqConversation : IWorkIqConversation
             TaskId = null,
             Metadata = BuildLocationMetadata(Options.EvaluationReferenceInstant ?? ctx.StartedAt),
         };
-        var configuration = new SendMessageConfiguration
-        {
-            ReturnImmediately = false,
-            HistoryLength = Options.HistoryLength,
-            AcceptedOutputModes = WorkIqA2AClient.AcceptedOutputModesFor(Profile),
-        };
-        return new SendMessageRequest { Message = message, Configuration = configuration };
+        var request = new SendMessageRequest { Message = message };
+
+        // This conversation's profile and history length (they may differ from the client's options); the client fills
+        // in the routing tenant under the same rule.
+        WorkIqA2AClient.ApplySendConfiguration(request, Profile, Options.HistoryLength, routingTenant: null);
+        return request;
     }
 
     /// <summary>
@@ -629,22 +672,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
         });
     }
 
-    private void SetPendingRpcId(TurnContext ctx)
-    {
-        if (Client is WorkIqA2AClient concrete)
-        {
-            concrete.NextRpcId = ctx.Identity.RpcRequestId;
-        }
-    }
-
-    private void ClearPendingRpcId(TurnContext ctx)
-    {
-        if (Client is WorkIqA2AClient concrete && string.Equals(concrete.NextRpcId, ctx.Identity.RpcRequestId, StringComparison.Ordinal))
-        {
-            concrete.NextRpcId = null;
-        }
-    }
-
     private async Task SendBlockingAsync(TurnContext ctx, TurnTokens tokens, CancellationToken callerToken)
     {
         var request = BuildSendRequest(ctx);
@@ -654,17 +681,15 @@ public sealed class WorkIqConversation : IWorkIqConversation
         WorkIqRpcResult<SendMessageResponse> reply;
         try
         {
-            SetPendingRpcId(ctx);
-            reply = await Client.SendAsync(request, tokens.Token).ConfigureAwait(false);
+            // The send carries the turn identity's JSON-RPC id, so the identity names the id that went on the wire.
+            reply = await Client.SendAsync(request, tokens.Token, TurnCall(ctx, ctx.Identity.RpcRequestId)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            ClearPendingRpcId(ctx);
             RecordSendFailure(ctx, ex, tokens, callerToken, WorkIqOperation.Send);
             return;
         }
 
-        ClearPendingRpcId(ctx);
         ctx.FirstEventAt ??= reply.ReceivedAt;
         ctx.AddCapture(reply.Capture);
 
@@ -699,7 +724,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
         {
             failure = RefineLocalStop(ctx, failure, tokens, callerToken, operation, "before a reply");
         }
-        else if (global::AgentEval.Microsoft365.Capture.WorkIqAuthHandler.IsSignInNotCompleted(failure))
+        else if (WorkIqIssueClassifier.IsSignInNotCompleted(failure))
         {
             // The token wait before the call was stopped: nothing was sent, so the failure keeps its "sign-in not
             // completed" text (never a timeout that may have reached the service); only the stop's source is recorded,
@@ -716,7 +741,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
         ctx.Failure = failure;
         ctx.Transport = TransportOutcome.Failed;
         Diagnostics.Trace(
-            operation == WorkIqOperation.Send ? WorkIqTraceStage.Send : operation == WorkIqOperation.Subscribe ? WorkIqTraceStage.Subscribe : WorkIqTraceStage.Stream,
+            WorkIqIssueClassifier.StageFor(operation),
             "send.failed",
             $"{operation} failed before a task id was known: {failure.Category} ({failure.Certainty}): {failure.SafeMessage}; the input was NOT resent",
             WorkIqTraceLevel.Error,
@@ -749,6 +774,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
             return failure with
             {
                 Category = WorkIqFailureCategory.Timeout,
+                LocalBudget = WorkIqLocalBudget.TurnDeadline,
                 SafeMessage = $"{operation}: the turn deadline ({Options.TurnDeadline}) elapsed {phase}; the request may have reached the service and the input was not resent",
             };
         }
@@ -836,7 +862,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
         var taskId = handle.TaskId;
         var recoveryStart = Clock.GetUtcNow();
         var budget = Options.RecoveryBudget;
-        ClearPendingRpcId(ctx);
         Diagnostics.Trace(
             WorkIqTraceStage.GetTask,
             "recovery.started",
@@ -861,13 +886,16 @@ public sealed class WorkIqConversation : IWorkIqConversation
                     RpcRequestId: ctx.Identity.RpcRequestId,
                     TaskId: taskId,
                     ContextId: ctx.ContextId,
-                    Capture: ctx.LastCapture);
+                    Capture: ctx.LastCapture)
+                {
+                    LocalBudget = WorkIqLocalBudget.RecoveryBudget,
+                };
                 ctx.Transport = TransportOutcome.Interrupted;
                 var exhaustedMessage = ctx.Failure.SafeMessage;
                 Diagnostics.Trace(WorkIqTraceStage.Budget, "budget.exceeded", exhaustedMessage, WorkIqTraceLevel.Error, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId, a2aState: current.RawState);
 
-                // The issue is registered after the opt-in CancelTask: its reply may show the task had already finished
-                // on its own (the completed race), and then the register must not keep an Error for a turn that ended well.
+                // The opt-in CancelTask comes first: its reply may show the task had already finished on its own (the
+                // completed race), and then the register must not keep an Error for a turn that ended well.
                 await TryCancelRemoteOnTimeoutAsync(ctx).ConfigureAwait(false);
                 if (ctx.Snapshot is { State: not WorkIqTaskState.Canceled } finished && (finished.IsTerminal || finished.IsSuspended))
                 {
@@ -887,14 +915,9 @@ public sealed class WorkIqConversation : IWorkIqConversation
                 }
                 else
                 {
-                    Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Budget, WorkIqIssueCategory.Budget, "budget.recovery_exhausted", exhaustedMessage, "The task stayed submitted/working longer than RecoveryBudget allows; raise the budget or inspect the task with GetTask/CancelTask using the handle on the result.") with
-                    {
-                        CaseId = ctx.Request.CaseId,
-                        TurnId = ctx.Request.TurnId,
-                        TaskId = taskId,
-                        ContextId = ctx.ContextId,
-                        A2AState = ctx.Snapshot?.RawState ?? current.RawState,
-                    });
+                    // Traced only: the turn registers the one issue of its outcome, classified Budget with the
+                    // RecoveryBudget cause (the failure carries WorkIqLocalBudget.RecoveryBudget).
+                    Diagnostics.Trace(WorkIqTraceStage.Budget, "budget.recovery_exhausted", $"{exhaustedMessage}; the turn's outcome issue carries this failure", WorkIqTraceLevel.Error, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId, a2aState: ctx.Snapshot?.RawState ?? current.RawState);
                 }
 
                 return;
@@ -930,7 +953,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
 
             try
             {
-                var reply = await Client.GetTaskAsync(taskId, Options.HistoryLength, tokens.Token).ConfigureAwait(false);
+                var reply = await Client.GetTaskAsync(taskId, Options.HistoryLength, tokens.Token, TurnCall(ctx)).ConfigureAwait(false);
                 ctx.RecoveryRequests++;
                 ctx.AddCapture(reply.Capture);
                 ApplyTask(ctx, reply.Value, WorkIqSnapshotSource.GetTask, reply.Capture, reply.ReceivedAt);
@@ -992,7 +1015,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
 
         if (ctx.Snapshot is { State: WorkIqTaskState.Submitted or WorkIqTaskState.Working })
         {
-            Diagnostics.Trace(StageOf(operation == WorkIqOperation.Subscribe ? WorkIqSnapshotSource.Subscribe : WorkIqSnapshotSource.Stream), "stream.ended_before_terminal", $"the {operation} stream ended without a terminal state; reconciling through GetTask (intermediate events may be missing)", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: ctx.Handle?.TaskId, contextId: ctx.ContextId, a2aState: ctx.Snapshot.RawState);
+            Diagnostics.Trace(WorkIqIssueClassifier.StageFor(operation), "stream.ended_before_terminal", $"the {operation} stream ended without a terminal state; reconciling through GetTask (intermediate events may be missing)", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: ctx.Handle?.TaskId, contextId: ctx.ContextId, a2aState: ctx.Snapshot.RawState);
             await ReconcileAsync(ctx, tokens, callerToken).ConfigureAwait(false);
             if (ctx.Failure is null)
             {
@@ -1026,7 +1049,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
             Capture: ctx.LastCapture);
         ctx.Failure = RefineLocalStop(ctx, baseline, tokens, callerToken, operation, phase);
         ctx.Transport = TransportOutcome.Interrupted;
-        Diagnostics.Trace(StageOf(operation == WorkIqOperation.Subscribe ? WorkIqSnapshotSource.Subscribe : operation == WorkIqOperation.Stream ? WorkIqSnapshotSource.Stream : WorkIqSnapshotSource.GetTask), "turn.stopped_locally", $"{ctx.Failure.Category}: {ctx.Failure.SafeMessage}", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: ctx.Handle?.TaskId, contextId: ctx.ContextId, a2aState: ctx.Snapshot?.RawState);
+        Diagnostics.Trace(WorkIqIssueClassifier.StageFor(operation), "turn.stopped_locally", $"{ctx.Failure.Category}: {ctx.Failure.SafeMessage}", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: ctx.Handle?.TaskId, contextId: ctx.ContextId, a2aState: ctx.Snapshot?.RawState);
     }
 
     private async Task TryCancelRemoteOnTimeoutAsync(TurnContext ctx)
@@ -1037,12 +1060,12 @@ public sealed class WorkIqConversation : IWorkIqConversation
         }
 
         var taskId = ctx.Handle.TaskId;
-        ClearPendingRpcId(ctx);
         Diagnostics.Trace(WorkIqTraceStage.Cancel, "cancel.requested", $"CancelRemoteTaskOnTimeout: sending CancelTask under its own {RemoteCancelTimeout} bound (the outcome is Canceled only if the service confirms it)", WorkIqTraceLevel.Warning, caseId: ctx.Request.CaseId, turnId: ctx.Request.TurnId, taskId: taskId, contextId: ctx.ContextId);
         using var bound = new CancellationTokenSource(RemoteCancelTimeout, Clock);
         try
         {
-            var reply = await Client.CancelTaskAsync(taskId, bound.Token).ConfigureAwait(false);
+            // A failed CancelTask is traced (cancel.failed below); the turn registers the issue of its outcome.
+            var reply = await Client.CancelTaskAsync(taskId, bound.Token, TurnCall(ctx)).ConfigureAwait(false);
             ctx.RecoveryRequests++;
             ctx.AddCapture(reply.Capture);
             ApplyTask(ctx, reply.Value, WorkIqSnapshotSource.GetTask, reply.Capture, reply.ReceivedAt);
@@ -1090,7 +1113,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
         var enumerator = frames.GetAsyncEnumerator(tokens.Token);
         try
         {
-            var first = true;
             while (true)
             {
                 WorkIqStreamFrame? frame;
@@ -1134,12 +1156,11 @@ public sealed class WorkIqConversation : IWorkIqConversation
                 }
 
                 ctx.FirstEventAt ??= frame.ReceivedAt;
-                foreach (var evt in ReduceFrame(ctx, frame, source, first))
+                foreach (var evt in ReduceFrame(ctx, frame, source))
                 {
                     yield return evt;
                 }
 
-                first = false;
                 if (ctx.Failure is not null || ctx.DirectMessage is not null || ctx.Snapshot is { IsTerminal: true } or { IsSuspended: true })
                 {
                     yield break;
@@ -1152,7 +1173,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
         }
     }
 
-    private List<WorkIqStreamEvent> ReduceFrame(TurnContext ctx, WorkIqStreamFrame frame, WorkIqSnapshotSource source, bool isFirst)
+    private List<WorkIqStreamEvent> ReduceFrame(TurnContext ctx, WorkIqStreamFrame frame, WorkIqSnapshotSource source)
     {
         var events = new List<WorkIqStreamEvent>();
         var turnId = ctx.Request.TurnId;
@@ -1207,7 +1228,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
                     break;
                 }
 
-                case StreamResponseCase.StatusUpdate when response.StatusUpdate is { } status:
+                case StreamResponseCase.StatusUpdate when response.StatusUpdate is not null:
                 {
                     reducer.Apply(frame, source);
                     var snapshot = RefreshSnapshot(ctx, source, at);
@@ -1228,7 +1249,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
                         events.Add(new WorkIqStreamEvent.InteractionRequired(turnId, ctx.NextSequence(), at, BuildPendingInteraction(snapshot, captureId)));
                     }
 
-                    _ = status;
                     break;
                 }
 
@@ -1288,7 +1308,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
         }
 
         ctx.SchemaWarningsEmitted = Math.Max(ctx.SchemaWarningsEmitted, ctx.Snapshot?.SchemaWarnings.Length ?? 0);
-        _ = isFirst;
         return events;
     }
 
@@ -1540,17 +1559,15 @@ public sealed class WorkIqConversation : IWorkIqConversation
             return;
         }
 
-        var category = result.Failure is { } f ? WorkIqA2AClient.IssueCategoryOf(f.Category) ?? WorkIqIssueCategory.Service : WorkIqIssueCategory.Service;
-        var cause = result.Outcome switch
+        if (result.Failure?.TokenFailure is not null)
         {
-            WorkIqTurnOutcome.InputRequired => "The agent paused for confirmation or input; nothing was approved automatically. Use the rich API (ContinueAsync, wave 5) or rephrase the case so no action is proposed.",
-            WorkIqTurnOutcome.AuthRequired => "The agent needs an external connector sign-in that this provider cannot complete; sign in to the connector in Microsoft 365 first.",
-            WorkIqTurnOutcome.Rejected => "The service refused the task (policy, licence or content); see the status message in the capture.",
-            WorkIqTurnOutcome.Canceled => "The service confirmed cancellation of the task.",
-            WorkIqTurnOutcome.Failed => result.Failure is { } ff ? WorkIqA2AClient.SuggestedCauseOf(ff) : "The task ended failed on the service side.",
-            _ => result.Failure is { } fi ? WorkIqA2AClient.SuggestedCauseOf(fi) : "The remote state is unknown; the task handle on the result can be read with GetTask.",
-        };
-        Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Outcome, category, OutcomeIssueCode(result.Outcome), message, cause)
+            // No bearer token, nothing sent: the auth layer registered this failure's one issue already (it holds the
+            // sign-in or MSAL error), stamped with this turn's case and turn ids.
+            return;
+        }
+
+        var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(result);
+        Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Outcome, category, code, message, cause)
         {
             CaseId = ctx.Request.CaseId,
             TurnId = ctx.Request.TurnId,
@@ -1565,8 +1582,10 @@ public sealed class WorkIqConversation : IWorkIqConversation
 
     /// <summary>
     /// The issue code of a turn that did not complete: <c>turn.</c> and the outcome in snake case (<c>turn.input_required</c>,
-    /// <c>turn.auth_required</c>, <c>turn.failed</c>, <c>turn.indeterminate</c>…), the same spelling
-    /// <see cref="WorkIqIssueClassifier"/> uses for a turn result.
+    /// <c>turn.auth_required</c>, <c>turn.failed</c>, <c>turn.indeterminate</c>…). <see cref="WorkIqIssueClassifier"/>
+    /// gives a turn result the same code, whatever failure it carries (<see cref="WorkIqIssueClassifier.ForTurnOutcome"/>,
+    /// and <see cref="WorkIqIssueClassifier.FromException"/> for a turn's exception); only a token failure keeps its
+    /// <c>auth.*</c> code.
     /// </summary>
     /// <param name="outcome">The outcome.</param>
     internal static string OutcomeIssueCode(WorkIqTurnOutcome outcome)
@@ -1688,24 +1707,8 @@ public sealed class WorkIqConversation : IWorkIqConversation
             string.IsNullOrWhiteSpace(Config.AgentId) ? null : Config.AgentId.Trim(),
             taskId,
             string.IsNullOrWhiteSpace(contextId) ? null : contextId,
-            RoutingTenantOf(card),
+            card.RoutingTenant,
             PrincipalKey);
-
-    private static string? RoutingTenantOf(RawAgentCard card)
-    {
-        foreach (var candidate in card.Card.SupportedInterfaces ?? [])
-        {
-            if (candidate is not null
-                && Uri.TryCreate(candidate.Url, UriKind.Absolute, out var url)
-                && url == card.SelectedEndpoint
-                && !string.IsNullOrWhiteSpace(candidate.Tenant))
-            {
-                return candidate.Tenant;
-            }
-        }
-
-        return null;
-    }
 
     private WorkIqTaskSnapshot SnapshotOf(AgentTask task, WorkIqSnapshotSource source, RawCaptureRef capture)
     {
@@ -1753,10 +1756,10 @@ public sealed class WorkIqConversation : IWorkIqConversation
     private WorkIqTaskReducer CreateReducer(RawAgentCard card, string? caseId, string? turnId) =>
         new(BuildHandle(card, "", null), Clock, Diagnostics, caseId, turnId);
 
-    /// <summary>Attaches the capture of the stream that just ended (known only then) to the turn and its reducer.</summary>
-    private void AttachStreamCapture(TurnContext ctx)
+    /// <summary>Attaches the capture of the stream that just ended (the client hands it back on the call) to the turn and its reducer.</summary>
+    private static void AttachStreamCapture(TurnContext ctx, WorkIqCallContext call)
     {
-        if (Client is not WorkIqA2AClient concrete || concrete.LastStreamCapture is not { } capture)
+        if (call.StreamCapture is not { } capture)
         {
             return;
         }
@@ -1795,8 +1798,6 @@ public sealed class WorkIqConversation : IWorkIqConversation
         _ => WorkIqTraceStage.Send,
     };
 
-    private static string NewRpcId() => "rpc-" + Guid.NewGuid().ToString("N");
-
     private static string ComputePrincipalKey(string tenantId, string appClientId, string scope)
     {
         var bytes = Encoding.UTF8.GetBytes($"{tenantId.Trim()}|{appClientId.Trim()}|{scope.Trim()}");
@@ -1826,7 +1827,7 @@ public sealed class WorkIqConversation : IWorkIqConversation
     }
 
     /// <summary>
-    /// The sign-in listener of one blocking turn: when a device-code sign-in starts inside the turn, the turn deadline is
+    /// The sign-in listener of one turn (blocking, streamed or a subscription): when a device-code sign-in starts inside the turn, the turn deadline is
     /// moved to the code's expiry (plus <see cref="WorkIqSignInWait.Grace"/>) when that is later, so the person has the
     /// code's whole lifetime; when the sign-in ends, the deadline restarts at <see cref="WorkIqOptions.TurnDeadline"/> for
     /// the network part of the turn. Both moves are traced (<c>turn.sign_in_wait</c>, <c>turn.sign_in_done</c>). A turn
@@ -2009,6 +2010,9 @@ public sealed class WorkIqConversation : IWorkIqConversation
         public int Epoch { get; }
 
         public CancellationToken AbandonToken { get; }
+
+        /// <summary>The <c>&lt;runId&gt;/&lt;turnId&gt;</c> subfolder this turn's captures are written under.</summary>
+        public string? CaptureScope { get; init; }
 
         public RawAgentCard? Card { get; set; }
 

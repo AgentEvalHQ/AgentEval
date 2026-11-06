@@ -11,7 +11,8 @@ namespace AgentEval.Microsoft365.Diagnostics;
 /// <param name="Code">The raw code, for example <c>AADSTS65001</c>.</param>
 /// <param name="Cause">What went wrong, in plain words.</param>
 /// <param name="Fix">What the tester or an administrator must do.</param>
-internal sealed record WorkIqAadstsEntry(string Code, string Cause, string Fix)
+/// <param name="PermissionRefusal">Whether the code is a consent or permission refusal (a forbidden sign-in) rather than an authentication failure.</param>
+internal sealed record WorkIqAadstsEntry(string Code, string Cause, string Fix, bool PermissionRefusal = false)
 {
     /// <summary>The one-line form stamped into an issue's suggested cause: <c>CODE: cause → fix</c>.</summary>
     public string Describe() => $"{Code}: {Cause} → {Fix}";
@@ -21,8 +22,9 @@ internal sealed record WorkIqAadstsEntry(string Code, string Cause, string Fix)
 /// The Entra (<c>AADSTS…</c>) error codes that matter for a delegated device-code sign-in to Work IQ, each with a
 /// plain-language cause and the fix, so the issue register tells an external tester what to do without reading
 /// MSAL documentation. The raw code is always kept; a code outside the catalog gets a fallback that points at the
-/// public reference, and an MSAL failure without any AADSTS code gets a cause from the MSAL error code. Owned by
-/// lane B (M16).
+/// public reference, and an MSAL failure without any AADSTS code gets a cause from the MSAL error code. The one
+/// owner of AADSTS knowledge: the code extractor (<see cref="ExtractCode"/>) and which codes are consent or permission
+/// refusals (<see cref="IsPermissionRefusal"/>).
 /// </summary>
 internal static partial class WorkIqAadstsCatalog
 {
@@ -32,11 +34,17 @@ internal static partial class WorkIqAadstsCatalog
     /// <summary>The MSAL.NET exception reference, for errors that carry no AADSTS code.</summary>
     public const string MsalReferenceUrl = "https://aka.ms/msal-net-exceptions";
 
-    /// <summary>The only delegated scope Work IQ accepts.</summary>
-    public const string WorkIqScope = "api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask";
+    /// <summary>The only delegated scope Work IQ accepts (<see cref="Microsoft365Config.DefaultScope"/>).</summary>
+    public const string WorkIqScope = Microsoft365Config.DefaultScope;
 
     /// <summary>The prefix every catalogued code carries.</summary>
     public const string CodePrefix = "AADSTS";
+
+    /// <summary>The code of a tenant that was not found (<c>tenantId</c> is not an Entra tenant).</summary>
+    public const string TenantNotFoundCode = "AADSTS90002";
+
+    /// <summary>The code of an application that was not found in the tenant (<c>appClientId</c> is wrong or in another tenant).</summary>
+    public const string ApplicationNotFoundCode = "AADSTS700016";
 
     private static readonly IReadOnlyDictionary<string, WorkIqAadstsEntry> Catalog = Build();
     private static readonly IReadOnlyDictionary<string, string> MsalErrorCauses = BuildMsalErrorCauses();
@@ -97,6 +105,13 @@ internal static partial class WorkIqAadstsCatalog
     }
 
     /// <summary>
+    /// Whether <paramref name="code"/> (any accepted form) is a consent or permission refusal — the sign-in is forbidden
+    /// until an administrator or the user grants something — rather than an authentication failure.
+    /// </summary>
+    /// <param name="code">The code, or null.</param>
+    public static bool IsPermissionRefusal(string? code) => TryGet(code, out var entry) && entry.PermissionRefusal;
+
+    /// <summary>
     /// The plain-language cause and fix for <paramref name="code"/>: the catalog entry when known, otherwise the
     /// fallback that keeps the raw code and points at <see cref="ReferenceUrl"/>; a null or non-code value says so.
     /// </summary>
@@ -149,7 +164,28 @@ internal static partial class WorkIqAadstsCatalog
             new WorkIqAadstsEntry(
                 "AADSTS65001",
                 "the user or an administrator has not consented to the application: the WorkIQAgent.Ask delegated permission is not granted",
-                "an administrator grants admin consent for the app registration's WorkIQAgent.Ask permission (Entra admin center → App registrations → API permissions → Grant admin consent), or the user consents when prompted if user consent is allowed"),
+                "an administrator grants admin consent for the app registration's WorkIQAgent.Ask permission (Entra admin center → App registrations → API permissions → Grant admin consent), or the user consents when prompted if user consent is allowed",
+                PermissionRefusal: true),
+            new WorkIqAadstsEntry(
+                "AADSTS65004",
+                "the user declined to consent to the application's WorkIQAgent.Ask permission",
+                "sign in again and accept the consent prompt, or an administrator grants admin consent for the app registration's WorkIQAgent.Ask permission",
+                PermissionRefusal: true),
+            new WorkIqAadstsEntry(
+                "AADSTS650052",
+                "the application needs a service the tenant has no service principal for (the Work IQ API is not provisioned or consented in this tenant)",
+                "an administrator checks that Work IQ is enabled for the tenant and grants admin consent for the app registration's WorkIQAgent.Ask permission, which creates the service principal",
+                PermissionRefusal: true),
+            new WorkIqAadstsEntry(
+                "AADSTS90094",
+                "the requested permission needs administrator consent",
+                "an administrator grants admin consent for the app registration's WorkIQAgent.Ask permission (Entra admin center → App registrations → API permissions → Grant admin consent)",
+                PermissionRefusal: true),
+            new WorkIqAadstsEntry(
+                "AADSTS7000215",
+                "an invalid client secret was presented for the application",
+                "a device-code sign-in presents no secret: check that appClientId names an app registration with 'Allow public client flows' enabled (Authentication → Advanced settings), then run again",
+                PermissionRefusal: true),
             new WorkIqAadstsEntry(
                 "AADSTS700016",
                 "the application was not found in the tenant: appClientId is wrong, or the app is registered in a different tenant than tenantId",
@@ -193,7 +229,8 @@ internal static partial class WorkIqAadstsCatalog
             new WorkIqAadstsEntry(
                 "AADSTS53003",
                 "access was blocked by a conditional access policy",
-                "an administrator reviews the conditional access policies for this user, app and location (the Entra sign-in log names the policy)"),
+                "an administrator reviews the conditional access policies for this user, app and location (the Entra sign-in log names the policy)",
+                PermissionRefusal: true),
             new WorkIqAadstsEntry(
                 "AADSTS90002",
                 "the tenant named by tenantId was not found: it is not an Entra tenant (a template placeholder left in the config, a typo, a deleted tenant) or it lives in another cloud than the public Microsoft cloud",

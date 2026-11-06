@@ -14,6 +14,7 @@ using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Evidence;
 using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Integrity;
+using AgentEval.Results.Writing;
 using AgentEval.Tests.Microsoft365.Auth;
 using AgentEval.Tests.Microsoft365.TestHelpers;
 using Xunit;
@@ -21,9 +22,9 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M31: the AEF run of <c>eval --sut microsoft365</c>. Offline, through the real command and a REAL
+/// The AEF run of <c>eval --sut microsoft365</c>. Offline, through the real command and a REAL
 /// <see cref="WorkIqEvaluableAgent"/> stand-in (built by <see cref="Microsoft365AgentFactory.BuildLive"/>; only the token
-/// provider and the innermost HTTP handler are fakes): the run's config carries the provenance keys of HLD D15, with
+/// provider and the innermost HTTP handler are fakes): the run's config carries the Microsoft 365 provenance keys, with
 /// content capture on each case carries its evidence document (schema id inside), with capture off it carries none,
 /// and the in-process AEF verifier passes on the folder. The stand-in makes the run <c>mocked</c>, never <c>live</c>.
 /// </summary>
@@ -38,6 +39,9 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
     private const string InputRequiredFixture = "envelopes/send-task-input-required-confirmation.json";
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "agenteval-m365-aef-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>The turn sink each stand-in hands to the target (absent for a stand-in built without one).</summary>
+    private readonly Dictionary<WorkIqEvaluableAgent, CliTurnSink> _sinks = new(ReferenceEqualityComparer.Instance);
 
     public Microsoft365AefProvenanceTests() => Directory.CreateDirectory(_root);
 
@@ -112,7 +116,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
     [Fact]
     public async Task Eval_Microsoft365_NoSubjectOption_TheSubjectIsTheAgentByItsDisplayName_NotAModel()
     {
-        // Review L8 (owner's decision): an M365 agent is an agent; the run named it model:<name>.
+        // An M365 agent is an agent; the run used to name it model:<name>.
         var config = WriteConfig($$"""{ "tenantId": "{{TenantId}}", "appClientId": "{{AppClientId}}", "agentName": "HR Copilot (non-prod)" }""");
         var (agent, _, _) = StandIn(config, CompletedFixture);
         await using (agent)
@@ -147,10 +151,11 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
     [Theory]
     [InlineData("microsoft365", "agent:Contoso")]
     [InlineData(" Microsoft365 ", "agent:Contoso")]
+    [InlineData("copilot-studio", "agent:Contoso")]   // a Copilot Studio agent is an agent too; it was recorded as model:<name>
     [InlineData(null, "model:Contoso")]
-    [InlineData("copilot-studio", "model:Contoso")]
-    public void DefaultSubjectRef_IsAnAgentForMicrosoft365Only(string? sut, string expected) =>
-        Assert.Equal(expected, EvalCommand.DefaultSubjectRef(new EvalOptions { Dataset = new FileInfo("x.yaml"), Format = "json", Sut = sut }, "Contoso"));
+    public void DefaultSubjectRef_IsTheTargetsSubjectKind_AModelWithoutATarget(string? sut, string expected) =>
+        Assert.Equal(expected, EvalCommand.DefaultSubjectRef(
+            SutTargetResolver.Find(SutTargetResolver.BuiltInTargets(), sut)?.SubjectKind ?? AefSubjectKind.Model, "Contoso"));
 
     [Fact]
     public async Task Eval_Microsoft365_InputRequiredTurn_ErrorRowStillCarriesTheInterruptedTurnsDocument()
@@ -273,53 +278,121 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
         var (agent, _, sink) = StandIn(config, CompletedFixture);
         await using (agent)
         {
+            var turnIds = new List<string>();
             foreach (var id in new[] { "c1", "c1", "c2" })
             {
                 agent.NextCaseId = id;
                 await agent.InvokeAsync("Summarize the status of Project Atlas and cite the sources.");
+                turnIds.Add(sink.LatestFor(id, since: sink.Count - 1)!.Identity.TurnId);
             }
 
-            var all = sink.All;
-            Assert.Equal(3, all.Count);
-            Assert.Same(all[1], sink.LatestFor("c1", since: 0));   // the later of the two c1 turns
-            Assert.Same(all[1], sink.LatestFor("c1", since: 1));
+            Assert.Equal(3, sink.Count);
+            Assert.Equal(3, turnIds.Distinct(StringComparer.Ordinal).Count());
+            Assert.Equal(turnIds[1], sink.LatestFor("c1", since: 0)!.Identity.TurnId);   // the later of the two c1 turns
+            Assert.Equal(turnIds[1], sink.LatestFor("c1", since: 1)!.Identity.TurnId);
             Assert.Null(sink.LatestFor("c1", since: 2));         // c1's turns are older than the cursor
-            Assert.Same(all[2], sink.LatestFor(" c2 ", since: 0)); // compared trimmed, as the agent records it
+            Assert.Equal(turnIds[2], sink.LatestFor(" c2 ", since: 0)!.Identity.TurnId); // compared trimmed, as the agent records it
             Assert.Null(sink.LatestFor("c3", since: 0));
         }
     }
 
     [Fact]
-    public async Task SinkFor_StandIn_ReturnsTheAttachedSinkOrNull()
+    public void TurnSink_IsTheTestSeamsSinkUntilALiveBuild_ElseNull()
     {
-        var config = WriteConfig();
-        var (attached, _, sink) = StandIn(config, CompletedFixture);
-        var (detached, _, _) = StandIn(config, CompletedFixture, attachSink: false);
-        await using (attached)
-        await using (detached)
-        {
-            var target = new Microsoft365SutTarget(TextWriter.Null);
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
 
-            Assert.Same(sink, target.SinkFor(attached));
-            Assert.Same(sink, CliTurnSink.AttachedTo(attached));
-            Assert.Null(target.SinkFor(detached));
-            Assert.Null(CliTurnSink.AttachedTo(detached));
+        Assert.Same(sink, new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }.TurnSink);
+        Assert.Null(new Microsoft365SutTarget(TextWriter.Null).TurnSink);
+    }
+
+    [Fact]
+    public void CaseEvidence_TellsTheSinkThatAnUnselectedAnswerIsNotMeasured()
+    {
+        // The eval run's per-case evidence applies the not-measured rule, so the sink's warning must say so.
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+        var target = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink };
+
+        var evidence = target.CaseEvidenceFor(new FakeEvaluableAgent());
+
+        Assert.NotNull(evidence);
+        Assert.True(sink.UnselectedAnswerIsNotMeasured);
+        Assert.Equal(Microsoft365SutTarget.SutName, evidence.SubjectProvider);
+        Assert.Null(evidence.RunSettings);   // nothing validated yet: no provenance is claimed
+    }
+
+    [Theory]
+    [InlineData(OutputCompleteness.Ambiguous, true)]
+    [InlineData(OutputCompleteness.None, false)]
+    [InlineData(OutputCompleteness.Complete, false)]
+    public void CaseEvidence_ReviewResult_MarksOnlyAnUnselectedAnswerNotMeasured_AndDropsItsGrade(OutputCompleteness answer, bool notMeasured)
+    {
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+        var evidence = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }.CaseEvidenceFor(new FakeEvaluableAgent())!;
+        evidence.BeginCase("case-1");
+        var turn = AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(new WorkIqTurnRequest("prompt", "case-1", "turn-1"));
+        sink.Record(answer == OutputCompleteness.Complete ? turn : turn with { AnswerText = null, AnswerCompleteness = answer });
+        var graded = new AgentEval.Models.TestResult
+        {
+            TestName = "case-1",
+            Passed = false,
+            Score = 40,
+            CriteriaResults = [new AgentEval.Core.CriterionResult { Criterion = "answers the question", Met = false, Explanation = "empty" }],
+            Failure = new AgentEval.Models.FailureReport { WhyItFailed = "empty output" },
+        };
+
+        evidence.ReviewResult(graded, "case-1");
+
+        Assert.Equal(notMeasured, graded.HasError);
+        if (notMeasured)
+        {
+            Assert.IsType<Microsoft365NoAnswerSelectedException>(graded.Error);
+            Assert.Null(graded.CriteriaResults);   // a judge grade of the empty text is not a grade of the agent
+            Assert.Null(graded.Failure);
+            Assert.Equal(0, graded.Score);
         }
+        else
+        {
+            Assert.Equal(40, graded.Score);       // a measured turn keeps the harness's verdict
+            Assert.NotNull(graded.CriteriaResults);
+        }
+    }
+
+    [Fact]
+    public void CaseEvidence_ReviewResult_LeavesAnErroredResultAndACaseWithoutATurnAlone()
+    {
+        var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+        var evidence = new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }.CaseEvidenceFor(new FakeEvaluableAgent())!;
+        evidence.BeginCase("case-1");
+        var turn = AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(new WorkIqTurnRequest("prompt", "case-1", "turn-1"));
+        sink.Record(turn with { AnswerText = null, AnswerCompleteness = OutputCompleteness.Ambiguous });
+        var errored = new AgentEval.Models.TestResult { TestName = "case-1", Error = new InvalidOperationException("earlier error") };
+        var noTurn = new AgentEval.Models.TestResult { TestName = "case-2", Passed = false };
+
+        evidence.ReviewResult(errored, "case-1");
+        evidence.ReviewResult(noTurn, "case-2");
+
+        Assert.IsType<InvalidOperationException>(errored.Error);
+        Assert.False(noTurn.HasError);
     }
 
     // ---------------------------------------------------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------------------------------------------------
 
-    /// <summary>Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on|off</c>, the way the CLI invokes it.</summary>
-    private static Task<int> RunEvalAsync(bool contentCapture, EvalOptions opts, WorkIqEvaluableAgent standIn)
+    /// <summary>
+    /// Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on|off</c>, the way the CLI invokes it. The
+    /// target gets the stand-in's turn sink through its test seam, unless the stand-in was built without one.
+    /// </summary>
+    private Task<int> RunEvalAsync(bool contentCapture, EvalOptions opts, WorkIqEvaluableAgent standIn)
     {
         var command = new Command("eval-m365-aef-test");
         command.Options.Add(new Option<DirectoryInfo?>("--aef"));
         var controls = new AefCliOptions(command);
+        IReadOnlyList<ISutTarget> targets =
+            [new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = _sinks.TryGetValue(standIn, out var sink) ? sink : null }];
         return controls.InvokeAsync(
             command.Parse(["--aef-content", contentCapture ? "on" : "off"]),
-            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None, sutOverride: standIn));
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None, sutOverride: standIn, sutTargetsOverride: targets));
     }
 
     private (WorkIqEvaluableAgent Agent, FakeWorkIqHandler Handler, CliTurnSink Sink) StandIn(FileInfo config, string sendFixture, bool attachSink = true)
@@ -344,7 +417,7 @@ public sealed class Microsoft365AefProvenanceTests : IDisposable
             innerHandler: handler);
         if (attachSink)
         {
-            sink.AttachTo(agent);
+            _sinks[agent] = sink;
         }
 
         return (agent, handler, sink);

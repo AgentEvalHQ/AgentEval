@@ -11,15 +11,15 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M30/M31: the per-case turn sink of <c>--sut microsoft365</c>. Keeps the last result per case and every result in
-/// order, is thread-safe, and its verbose line never fabricates: a missing answer prints its completeness, not a length;
-/// an absent evidence channel prints its availability, not a count; a non-completed turn prints the safe failure, never
-/// partial text.
+/// The per-case turn sink of <c>--sut microsoft365</c>. Keeps every result in order, hands back a case's latest turn
+/// since a cursor, is thread-safe, and its verbose line never fabricates: a missing answer prints its completeness, not
+/// a length; an evidence channel prints <c>EvidenceSet.Describe</c> (availability, count, and validation when not valid),
+/// never a bare count; a non-completed turn prints the safe failure, never partial text.
 /// </summary>
 public class CliTurnSinkTests
 {
     [Fact]
-    public void Record_KeepsTheLastResultPerCase_AndAllInOrder()
+    public void Record_KeepsEveryResult_LatestForIsTheCasesLastTurn()
     {
         var sink = new CliTurnSink(verbose: false, new StringWriter());
         var a1 = Completed("case-a", "first answer", taskId: "task-1", contextId: "ctx-1");
@@ -31,24 +31,22 @@ public class CliTurnSinkTests
         sink.Record(a2);
 
         Assert.Equal(3, sink.Count);
-        Assert.Equal(new[] { a1, b1, a2 }, sink.All);
-        Assert.Equal(2, sink.LastByCase.Count);
-        Assert.Same(a2, sink.LastByCase["case-a"]);
-        Assert.Same(b1, sink.LastByCase["case-b"]);
+        Assert.Same(a2, sink.LatestFor("case-a", since: 0));
+        Assert.Same(b1, sink.LatestFor("case-b", since: 0));
     }
 
     [Fact]
-    public void Record_Snapshots_AreDetachedFromLaterRecords()
+    public void LatestFor_NothingRecordedForTheCaseSinceTheCursor_IsNull()
     {
         var sink = new CliTurnSink(verbose: false, new StringWriter());
-        sink.Record(Completed("case-a", "x", "task-1", "ctx-1"));
-        var all = sink.All;
-        var last = sink.LastByCase;
+        var a1 = Completed("case-a", "x", "task-1", "ctx-1");
+        sink.Record(a1);
+        var cursor = sink.Count;
 
         sink.Record(Completed("case-b", "y", "task-2", "ctx-2"));
 
-        Assert.Single(all);
-        Assert.Single(last);
+        Assert.Null(sink.LatestFor("case-a", cursor));   // a later trial never borrows an earlier trial's turn
+        Assert.Same(a1, sink.LatestFor("case-a", since: 0));
         Assert.Equal(2, sink.Count);
     }
 
@@ -94,7 +92,7 @@ public class CliTurnSinkTests
         Assert.Contains("ctx=ctx-1", line, StringComparison.Ordinal);
         Assert.Contains("state=TASK_STATE_COMPLETED", line, StringComparison.Ordinal);
         Assert.Contains("answer=Complete(11 chars)", line, StringComparison.Ordinal);
-        Assert.Contains("citationMarkers=Provided(2)", line, StringComparison.Ordinal);
+        Assert.Contains("citationMarkers=Provided (2 marker(s))", line, StringComparison.Ordinal);
         Assert.Contains("toolExecutions=NotRequested", line, StringComparison.Ordinal);
         Assert.Contains("elapsedMs=250", line, StringComparison.Ordinal);
         Assert.DoesNotContain("failure=", line, StringComparison.Ordinal);
@@ -132,6 +130,32 @@ public class CliTurnSinkTests
         Assert.Contains("line one line two", line, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(EvidenceValidation.Conflicting)]
+    [InlineData(EvidenceValidation.Malformed)]
+    public void FormatLine_ProvidedButNotValidChannel_ShowsItsValidation_NeverReadsAsObservedEmpty(EvidenceValidation validation)
+    {
+        // A conflicting or malformed channel holds no items; before the shared Describe it printed "Provided(0)", the same
+        // text as a channel that was observed empty, so "no tools ran" and "the tool evidence disagreed" looked alike.
+        var result = Completed("case-a", "answer", "task-1", "ctx-1", toolExecutions: ProvidedToolExecutions(validation));
+
+        var line = CliTurnSink.FormatLine(result);
+
+        Assert.Contains($"toolExecutions=Provided (0 execution(s), {validation})", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("Provided(0)", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("observed empty", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatLine_ObservedEmptyChannel_SaysObservedEmpty()
+    {
+        var result = Completed("case-a", "answer", "task-1", "ctx-1", toolExecutions: ProvidedToolExecutions(EvidenceValidation.Valid));
+
+        var line = CliTurnSink.FormatLine(result);
+
+        Assert.Contains("toolExecutions=Provided (observed empty: 0 execution(s) in this snapshot)", line, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Record_IsThreadSafe_UnderConcurrentTurns()
     {
@@ -140,8 +164,7 @@ public class CliTurnSinkTests
         Parallel.For(0, 200, i => sink.Record(Completed("case-" + (i % 10), "a", "task-" + i, "ctx-" + (i % 10))));
 
         Assert.Equal(200, sink.Count);
-        Assert.Equal(200, sink.All.Count);
-        Assert.Equal(10, sink.LastByCase.Count);
+        Assert.All(Enumerable.Range(0, 10), i => Assert.NotNull(sink.LatestFor("case-" + i, since: 0)));
     }
 
     [Fact]
@@ -173,7 +196,54 @@ public class CliTurnSinkTests
         Assert.StartsWith("[m365] WARNING case=case-amb task=task-9", warning, StringComparison.Ordinal);
         Assert.Contains("no answer was selected (answer Ambiguous)", warning, StringComparison.Ordinal);
         Assert.Contains(WorkIqEvaluableAgent.CompletedNoAnswerFinishReason, warning, StringComparison.Ordinal);
-        Assert.Same(noAnswer, Assert.Single(sink.All));
+        Assert.Equal(1, sink.Count);
+        Assert.Same(noAnswer, sink.LatestFor("case-amb", since: 0));
+    }
+
+    [Fact]
+    public void Record_AmbiguousAnswer_WhenTheCommandRecordsItAsNotMeasured_TheWarningSaysNotMeasured()
+    {
+        // eval records a turn with several candidates and none selected as not measured; its warning must say so, and
+        // must not say the empty text is graded.
+        var err = new StringWriter();
+        var sink = new CliTurnSink(verbose: false, err) { UnselectedAnswerIsNotMeasured = true };
+
+        sink.Record(Completed("case-amb", "unused", "task-9", "ctx-9") with { AnswerText = null, AnswerCompleteness = OutputCompleteness.Ambiguous });
+
+        var warning = err.ToString();
+        Assert.Contains("recorded as NOT MEASURED", warning, StringComparison.Ordinal);
+        Assert.Contains("not the agent's answer", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("graded", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Record_AmbiguousAnswer_WhenTheCommandGradesIt_TheWarningSaysTheEmptyTextIsGraded()
+    {
+        var err = new StringWriter();
+        var sink = new CliTurnSink(verbose: false, err);
+
+        sink.Record(Completed("case-amb", "unused", "task-9", "ctx-9") with { AnswerText = null, AnswerCompleteness = OutputCompleteness.Ambiguous });
+
+        var warning = err.ToString();
+        Assert.Contains("graded on an empty text that is not the agent's answer", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("NOT MEASURED", warning, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Record_CompletedWithNoAnswerAtAll_IsGraded_NeverCalledNotMeasured(bool unselectedAnswerIsNotMeasured)
+    {
+        // A completed turn with no answer at all (None) stays a failure: the warning never calls it not measured.
+        var err = new StringWriter();
+        var sink = new CliTurnSink(verbose: false, err) { UnselectedAnswerIsNotMeasured = unselectedAnswerIsNotMeasured };
+
+        sink.Record(Completed("case-none", "unused", "task-8", "ctx-8") with { AnswerText = null, AnswerCompleteness = OutputCompleteness.None });
+
+        var warning = err.ToString();
+        Assert.Contains("no answer was selected (answer None)", warning, StringComparison.Ordinal);
+        Assert.Contains("the agent gave no answer, so the case is graded on an empty text", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("NOT MEASURED", warning, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -197,7 +267,17 @@ public class CliTurnSinkTests
 
     private static readonly DateTimeOffset Start = new(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
 
-    private static WorkIqTurnResult Completed(string caseId, string answer, string? taskId, string? contextId, int citationMarkers = 0)
+    private static EvidenceSet<ToolExecutionObservation> ProvidedToolExecutions(EvidenceValidation validation) =>
+        EvidenceSet<ToolExecutionObservation>.Provided(
+            ImmutableArray<ToolExecutionObservation>.Empty,
+            validation,
+            EvidenceCoverage.Unknown,
+            EvidenceScope.Turn,
+            ImmutableArray<SourceRef>.Empty);
+
+    private static WorkIqTurnResult Completed(
+        string caseId, string answer, string? taskId, string? contextId, int citationMarkers = 0,
+        EvidenceSet<ToolExecutionObservation>? toolExecutions = null)
     {
         var identity = Identity(caseId, taskId, contextId);
         var markers = citationMarkers > 0
@@ -220,7 +300,8 @@ public class CliTurnSinkTests
                 true,
                 "selection-v1",
                 ImmutableArray<SourceRef>.Empty),
-            markers);
+            markers,
+            toolExecutions);
 
         return new WorkIqTurnResult(
             WorkIqTurnOutcome.Completed,
@@ -263,7 +344,9 @@ public class CliTurnSinkTests
     private static WorkIqTaskHandle? Handle(string? taskId, string? contextId) =>
         taskId is null ? null : new WorkIqTaskHandle(new Uri("https://workiq.svc.cloud.microsoft/a2a/"), "1.0", null, taskId, contextId, null, "principal-1");
 
-    private static Microsoft365TurnEvidence Evidence(TurnIdentity identity, string? taskState, AnswerEvidence? answer, EvidenceSet<CitationMarker> markers) =>
+    private static Microsoft365TurnEvidence Evidence(
+        TurnIdentity identity, string? taskState, AnswerEvidence? answer, EvidenceSet<CitationMarker> markers,
+        EvidenceSet<ToolExecutionObservation>? toolExecutions = null) =>
         new(
             Microsoft365Evidence.SchemaVersion,
             Microsoft365Evidence.NormalizerVersion,
@@ -274,7 +357,7 @@ public class CliTurnSinkTests
             CaptureState.NotRetained,
             answer,
             EvidenceSet<ToolSelectionObservation>.NotRequested(EvidenceScope.Turn),
-            EvidenceSet<ToolExecutionObservation>.NotRequested(EvidenceScope.Turn),
+            toolExecutions ?? EvidenceSet<ToolExecutionObservation>.NotRequested(EvidenceScope.Turn),
             EvidenceSet<ApprovalIntentObservation>.NotRequested(EvidenceScope.Turn),
             EvidenceSet<RetrievalExecutionObservation>.NotRequested(EvidenceScope.Turn),
             markers,

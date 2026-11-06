@@ -26,7 +26,9 @@ public enum WorkIqInteractionKind
 
 /// <summary>
 /// A tool invocation <b>proposed</b> in a confirmation card. Evidence of a request for consent, not of execution;
-/// the argument text is kept verbatim and the parsed form is a separate projection.
+/// the argument text is kept verbatim and the parsed form is a separate projection. Each proposed call is projected
+/// from the approval intent of the same card walk (<see cref="Microsoft365TurnEvidence.ApprovalIntents"/>), in the same
+/// order; a field the card did not carry as a valid string is null here, and the approval intent keeps its exact state.
 /// </summary>
 /// <param name="CallId">The proposed call id as sent, when any.</param>
 /// <param name="CallType">The raw call type as sent, when any.</param>
@@ -45,7 +47,10 @@ public sealed record WorkIqProposedCall(
 /// <summary>
 /// A suspended task's pause as surfaced to the host: which task/context, the pause's own <c>sourceRequestId</c>,
 /// the recognised kind, the proposed calls and the exact option strings the card offers. No credential, and no
-/// default answer: nothing is approved unless the host builds a <see cref="WorkIqInteractionResponse"/>.
+/// default answer: nothing is approved. A status message with more than one pause part is
+/// <see cref="WorkIqInteractionKind.Unknown"/> with no proposed call, exactly as the evidence document's approval
+/// intents refuse to choose. Answering a pause (<see cref="WorkIqInteractionResponse"/>) is not supported in this
+/// preview.
 /// </summary>
 /// <param name="Task">The suspended task.</param>
 /// <param name="Kind">The recognised kind.</param>
@@ -80,7 +85,8 @@ public sealed record WorkIqPendingInteraction(
 /// <summary>
 /// The host's explicit decision or input for one pause, bound to that pause's <c>sourceRequestId</c> and task and
 /// validated against the recognised options. Built only through <see cref="ForOption"/> / <see cref="ForInput"/>
-/// so an arbitrary adaptive-card action can never be sent.
+/// so an arbitrary adaptive-card action can never be sent. It is the argument of
+/// <see cref="IWorkIqConversation.ContinueAsync"/>, which is not supported in this preview: nothing can be sent with it yet.
 /// </summary>
 public sealed record WorkIqInteractionResponse
 {

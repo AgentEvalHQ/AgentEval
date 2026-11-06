@@ -11,6 +11,7 @@ using A2A;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Evidence;
+using AgentEval.Microsoft365.Evidence.Decoders;
 using Microsoft.Identity.Client;
 using Xunit;
 
@@ -325,7 +326,7 @@ public sealed class WorkIqIssueClassifierTests
     }
 
     [Fact]
-    public void FromException_TurnNotCompletedWithAFailure_UsesTheFailureAndTheTurnIds()
+    public void FromException_TurnNotCompletedWithAFailure_TakesTheTurnCode_TheFailuresCategoryAndCause_AndTheTurnIds()
     {
         var failure = new WorkIqFailure(WorkIqFailureCategory.Timeout, "no reply", OutcomeCertainty.Indeterminate, WorkIqOperation.Send);
         var ex = new WorkIqTurnNotCompletedException(TurnResult(WorkIqTurnOutcome.Indeterminate, failure));
@@ -333,7 +334,9 @@ public sealed class WorkIqIssueClassifierTests
         var issue = WorkIqIssueClassifier.FromException(ex, WorkIqTraceStage.Outcome);
 
         Assert.Equal(WorkIqIssueCategory.Network, issue.Category);
-        Assert.Equal("transport.timeout", issue.Code);
+        Assert.Equal("turn.indeterminate", issue.Code);
+        Assert.Equal(WorkIqIssueClassifier.CauseTimeout, issue.SuggestedCause);
+        Assert.Contains("Send: Timeout (Indeterminate): no reply", issue.Message, StringComparison.Ordinal);
         Assert.Equal("case-7", issue.CaseId);
         Assert.Equal("turn-3", issue.TurnId);
         Assert.Equal("ctx-9", issue.ContextId);
@@ -342,11 +345,79 @@ public sealed class WorkIqIssueClassifierTests
     }
 
     [Theory]
+    [InlineData(WorkIqTurnOutcome.Failed, "TASK_STATE_FAILED", "turn.failed")]
+    [InlineData(WorkIqTurnOutcome.Rejected, "TASK_STATE_REJECTED", "turn.rejected")]
+    [InlineData(WorkIqTurnOutcome.Canceled, "TASK_STATE_CANCELED", "turn.canceled")]
+    public void FromException_TerminalTurnWithItsRemoteErrorFailure_IsTheConversationsTurnCode(WorkIqTurnOutcome outcome, string state, string code)
+    {
+        // The shape the conversation builds: a failed, rejected or canceled task always carries a RemoteError failure
+        // with the task state. The doctor's probe and census classify that result; they must say what the turn registered.
+        var failure = Failure(WorkIqFailureCategory.RemoteError, remoteTaskState: state);
+        var result = TurnResult(outcome, failure);
+
+        var issue = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(result), WorkIqTraceStage.Outcome);
+
+        Assert.Equal(code, issue.Code);
+        Assert.Equal(WorkIqConversation.OutcomeIssueCode(outcome), issue.Code);
+        Assert.Equal(WorkIqIssueClassifier.ForTurnOutcome(result), (issue.Category, issue.Code, issue.SuggestedCause));
+        Assert.Equal(WorkIqIssueCategory.Service, issue.Category);
+        Assert.Equal(state, issue.A2AState);
+        Assert.Equal("task-1", issue.TaskId);
+        Assert.Equal("req-1", issue.RequestId);
+    }
+
+    [Fact]
+    public void FromException_FailedTurnWithA403_IsTurnFailed_WithThePermissionCauseAndTheStatus()
+    {
+        var result = TurnResult(WorkIqTurnOutcome.Failed, Failure(WorkIqFailureCategory.Forbidden, httpStatus: 403));
+
+        var issue = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(result), WorkIqTraceStage.Outcome);
+
+        Assert.Equal("turn.failed", issue.Code);
+        Assert.Equal(WorkIqIssueCategory.Permission, issue.Category);
+        Assert.Equal(WorkIqIssueClassifier.Cause403, issue.SuggestedCause);
+        Assert.Equal(403, issue.HttpStatus);
+        Assert.Equal("req-1", issue.RequestId);
+    }
+
+    [Fact]
+    public void FromException_TurnWithATokenFailure_KeepsTheAuthCode_TheAuthLayerRegisteredIt()
+    {
+        var failure = new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "sign-in not completed (nothing was sent)", OutcomeCertainty.Known, WorkIqOperation.Send)
+        {
+            TokenFailure = WorkIqTokenFailure.SignInNotCompleted,
+        };
+
+        var issue = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(TurnResult(WorkIqTurnOutcome.Failed, failure)), WorkIqTraceStage.Outcome);
+
+        Assert.Equal("auth.sign_in_not_completed", issue.Code);
+        Assert.Equal(WorkIqIssueCategory.Authentication, issue.Category);
+        Assert.Equal("turn-3", issue.TurnId);
+    }
+
+    [Fact]
+    public void ForTurnOutcome_TurnDeadlineOrRecoveryBudget_IsBudgetWithACauseThatNamesIt_NeverANetworkTimeout()
+    {
+        var deadline = new WorkIqFailure(WorkIqFailureCategory.Timeout, "deadline", OutcomeCertainty.Indeterminate, WorkIqOperation.Send) { LocalBudget = WorkIqLocalBudget.TurnDeadline };
+        var recovery = new WorkIqFailure(WorkIqFailureCategory.Timeout, "recovery", OutcomeCertainty.Indeterminate, WorkIqOperation.GetTask) { LocalBudget = WorkIqLocalBudget.RecoveryBudget };
+
+        var (deadlineCategory, deadlineCode, deadlineCause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Indeterminate, deadline));
+        var (recoveryCategory, recoveryCode, recoveryCause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Indeterminate, recovery));
+
+        Assert.Equal((WorkIqIssueCategory.Budget, "turn.indeterminate", WorkIqIssueClassifier.CauseTurnDeadline), (deadlineCategory, deadlineCode, deadlineCause));
+        Assert.Equal((WorkIqIssueCategory.Budget, "turn.indeterminate", WorkIqIssueClassifier.CauseRecoveryBudget), (recoveryCategory, recoveryCode, recoveryCause));
+        Assert.Contains("TurnDeadline", deadlineCause, StringComparison.Ordinal);
+        Assert.Contains("RecoveryBudget", recoveryCause, StringComparison.Ordinal);
+        Assert.DoesNotContain("SendTimeout", deadlineCause, StringComparison.Ordinal);
+        Assert.DoesNotContain("SendTimeout", recoveryCause, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData(WorkIqTurnOutcome.InputRequired, WorkIqIssueCategory.Service, "turn.input_required", "nothing was approved")]
     [InlineData(WorkIqTurnOutcome.AuthRequired, WorkIqIssueCategory.Service, "turn.auth_required", "authorization")]
-    [InlineData(WorkIqTurnOutcome.Failed, WorkIqIssueCategory.Service, "task.failed", "never an answer")]
-    [InlineData(WorkIqTurnOutcome.Rejected, WorkIqIssueCategory.Service, "task.rejected", "refused")]
-    [InlineData(WorkIqTurnOutcome.Canceled, WorkIqIssueCategory.Service, "task.canceled", "confirmed")]
+    [InlineData(WorkIqTurnOutcome.Failed, WorkIqIssueCategory.Service, "turn.failed", "never an answer")]
+    [InlineData(WorkIqTurnOutcome.Rejected, WorkIqIssueCategory.Service, "turn.rejected", "refused")]
+    [InlineData(WorkIqTurnOutcome.Canceled, WorkIqIssueCategory.Service, "turn.canceled", "confirmed")]
     [InlineData(WorkIqTurnOutcome.Indeterminate, WorkIqIssueCategory.Unknown, "turn.indeterminate", "not resent")]
     public void FromException_TurnNotCompletedWithoutAFailure_ClassifiesByOutcome(WorkIqTurnOutcome outcome, WorkIqIssueCategory category, string code, string causeFragment)
     {
@@ -364,15 +435,214 @@ public sealed class WorkIqIssueClassifierTests
     [Theory]
     [InlineData(WorkIqTurnOutcome.InputRequired, "turn.input_required")]
     [InlineData(WorkIqTurnOutcome.AuthRequired, "turn.auth_required")]
+    [InlineData(WorkIqTurnOutcome.Failed, "turn.failed")]
+    [InlineData(WorkIqTurnOutcome.Rejected, "turn.rejected")]
+    [InlineData(WorkIqTurnOutcome.Canceled, "turn.canceled")]
     [InlineData(WorkIqTurnOutcome.Indeterminate, "turn.indeterminate")]
     public void TurnOutcomeIssueCode_TheConversationAndTheClassifierSpellItTheSame(WorkIqTurnOutcome outcome, string code)
     {
-        // Review L5: the conversation registered "turn.inputrequired" while the classifier said "turn.input_required".
+        // One spelling for a turn that did not complete: the conversation's code, the classifier's issue for a turn
+        // result (the doctor's probe and census use it) and the turn-level classification all say turn.<outcome>.
         var fromClassifier = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(TurnResult(outcome, null)), WorkIqTraceStage.Outcome);
 
         Assert.Equal(code, WorkIqConversation.OutcomeIssueCode(outcome));
         Assert.Equal(code, fromClassifier.Code);
+        Assert.Equal(code, WorkIqIssueClassifier.ForTurnOutcome(TurnResult(outcome, null)).Code);
     }
+
+    [Fact]
+    public void TurnCauses_PointATesterAtWhatTheyCanDoNow_NeverAtAnUnsupportedResume()
+    {
+        // ContinueAsync is not supported in this preview: no cause text may send a tester to resume a task with it.
+        foreach (var outcome in Enum.GetValues<WorkIqTurnOutcome>().Where(o => o != WorkIqTurnOutcome.Completed))
+        {
+            var cause = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(outcome, null)).Cause;
+
+            Assert.DoesNotContain("resume", cause, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("ContinueAsync", cause, StringComparison.Ordinal);
+            Assert.DoesNotContain("wave", cause, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains("sign in to the connector", WorkIqIssueClassifier.CauseAuthRequired, StringComparison.Ordinal);
+        Assert.Contains("run the case again", WorkIqIssueClassifier.CauseAuthRequired, StringComparison.Ordinal);
+        Assert.Contains("rephrase the case", WorkIqIssueClassifier.CauseInputRequired, StringComparison.Ordinal);
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // ForTurnOutcome: the one issue a turn that did not complete registers
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void ForTurnOutcome_LocalCancel_IsBudgetWithTheLocalCause_NeverService()
+    {
+        var failure = new WorkIqFailure(WorkIqFailureCategory.Canceled, "stopped", OutcomeCertainty.Indeterminate, WorkIqOperation.Send);
+
+        var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Indeterminate, failure));
+
+        Assert.Equal(WorkIqIssueCategory.Budget, category);
+        Assert.Equal("turn.indeterminate", code);
+        Assert.Equal(WorkIqIssueClassifier.CauseLocalCanceled, cause);
+    }
+
+    [Fact]
+    public void ForTurnOutcome_FailedWithA403_IsPermissionWithTheConsentCause()
+    {
+        var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Failed, Failure(WorkIqFailureCategory.Forbidden, httpStatus: 403)));
+
+        Assert.Equal(WorkIqIssueCategory.Permission, category);
+        Assert.Equal("turn.failed", code);
+        Assert.Equal(WorkIqIssueClassifier.Cause403, cause);
+    }
+
+    [Theory]
+    [InlineData(WorkIqTurnOutcome.InputRequired)]
+    [InlineData(WorkIqTurnOutcome.AuthRequired)]
+    public void ForTurnOutcome_PausedTurnWithAFailure_KeepsThePauseCause(WorkIqTurnOutcome outcome)
+    {
+        var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(outcome, Failure(WorkIqFailureCategory.RemoteError)));
+
+        Assert.Equal(WorkIqIssueCategory.Service, category);
+        Assert.Equal(WorkIqConversation.OutcomeIssueCode(outcome), code);
+        Assert.Equal(outcome == WorkIqTurnOutcome.AuthRequired ? WorkIqIssueClassifier.CauseAuthRequired : WorkIqIssueClassifier.CauseInputRequired, cause);
+    }
+
+    [Fact]
+    public void ForTurnOutcome_WithoutAFailure_AgreesWithTheIssueFromATurnResult()
+    {
+        foreach (var outcome in Enum.GetValues<WorkIqTurnOutcome>().Where(o => o != WorkIqTurnOutcome.Completed))
+        {
+            var (category, code, cause) = WorkIqIssueClassifier.ForTurnOutcome(TurnResult(outcome, null));
+            var issue = WorkIqIssueClassifier.FromException(new WorkIqTurnNotCompletedException(TurnResult(outcome, null)), WorkIqTraceStage.Outcome);
+
+            Assert.Equal((issue.Category, issue.Code, issue.SuggestedCause), (category, code, cause));
+        }
+    }
+
+    [Fact]
+    public void ForTurnOutcome_Null_Throws() =>
+        Assert.Throws<ArgumentNullException>(() => WorkIqIssueClassifier.ForTurnOutcome(null!));
+
+    // ---------------------------------------------------------------------------------------------------------
+    // ForFailure: the census every failure path relies on
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void ForFailure_EveryCategoryAndOperation_IsClassifiedLikeFromFailure_AndALocalCancelIsAlwaysBudget()
+    {
+        foreach (var category in Enum.GetValues<WorkIqFailureCategory>())
+        {
+            foreach (var operation in Enum.GetValues<WorkIqOperation>())
+            {
+                var failure = new WorkIqFailure(category, "safe message", OutcomeCertainty.Indeterminate, operation);
+
+                var (issueCategory, code, cause) = WorkIqIssueClassifier.ForFailure(failure);
+                var issue = WorkIqIssueClassifier.FromFailure(failure);
+
+                Assert.Equal((issue.Category, issue.Code, issue.SuggestedCause), (issueCategory, code, cause));
+                Assert.False(string.IsNullOrWhiteSpace(code), $"{category}/{operation}");
+                Assert.False(string.IsNullOrWhiteSpace(cause), $"{category}/{operation}");
+                if (category == WorkIqFailureCategory.Canceled)
+                {
+                    Assert.Equal(WorkIqIssueCategory.Budget, issueCategory);
+                    Assert.Equal("local.canceled", code);
+                }
+                else if (category != WorkIqFailureCategory.Unknown)
+                {
+                    Assert.NotEqual(WorkIqIssueCategory.Unknown, issueCategory);
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(WorkIqTokenFailure.SignInNotCompleted, "auth.sign_in_not_completed", "Nothing was sent")]
+    [InlineData(WorkIqTokenFailure.EmptyToken, "auth.empty_token", "empty token, so nothing was sent")]
+    [InlineData(WorkIqTokenFailure.ProviderFailed, "auth.token_acquisition_failed", "nothing was sent")]
+    public void FromFailure_NoToken_IsNoRejectedToken_AndNothingWasSent(WorkIqTokenFailure tokenFailure, string code, string causeFragment)
+    {
+        var failure = new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "no token (nothing was sent)", OutcomeCertainty.Known, WorkIqOperation.Send)
+        {
+            TokenFailure = tokenFailure,
+        };
+
+        var issue = WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth);
+
+        Assert.Equal(WorkIqIssueCategory.Authentication, issue.Category);
+        Assert.Equal(code, issue.Code);
+        Assert.Contains(causeFragment, issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.DoesNotContain("token rejected", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.Equal(tokenFailure == WorkIqTokenFailure.SignInNotCompleted, WorkIqIssueClassifier.IsSignInNotCompleted(failure));
+    }
+
+    [Fact]
+    public void FromFailure_ProviderFailedWithAConsentRefusal_IsPermissionWithTheCatalogCause()
+    {
+        var failure = new WorkIqFailure(WorkIqFailureCategory.Forbidden, "AADSTS65001: consent missing (nothing was sent)", OutcomeCertainty.Known, WorkIqOperation.Send)
+        {
+            TokenFailure = WorkIqTokenFailure.ProviderFailed,
+        };
+
+        var issue = WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth);
+
+        Assert.Equal(WorkIqIssueCategory.Permission, issue.Category);
+        Assert.Equal("auth.token_acquisition_failed", issue.Code);
+        Assert.StartsWith("AADSTS65001: ", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.Equal("AADSTS65001", issue.AadstsCode);
+    }
+
+    [Fact]
+    public void IsSignInNotCompleted_ReadsTheStructuredTokenFailure()
+    {
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(null));
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "sign-in not completed", OutcomeCertainty.Known, WorkIqOperation.Send)));
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "x", OutcomeCertainty.Known) { TokenFailure = WorkIqTokenFailure.EmptyToken }));
+        Assert.True(WorkIqIssueClassifier.IsSignInNotCompleted(new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "x", OutcomeCertainty.Known) { TokenFailure = WorkIqTokenFailure.SignInNotCompleted }));
+    }
+
+    [Fact]
+    public void TaskCauses_TheRemoteErrorAndTheTurnOutcomeShareOneText()
+    {
+        var remoteFailed = WorkIqIssueClassifier.FromFailure(Failure(WorkIqFailureCategory.RemoteError, remoteTaskState: "TASK_STATE_FAILED"));
+        var remoteRejected = WorkIqIssueClassifier.FromFailure(Failure(WorkIqFailureCategory.RemoteError, remoteTaskState: "TASK_STATE_REJECTED"));
+        var remoteCanceled = WorkIqIssueClassifier.FromFailure(Failure(WorkIqFailureCategory.RemoteError, remoteTaskState: "TASK_STATE_CANCELED"));
+
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskFailed, remoteFailed.SuggestedCause);
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskRejected, remoteRejected.SuggestedCause);
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskCanceled, remoteCanceled.SuggestedCause);
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskFailed, WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Failed, null)).Cause);
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskRejected, WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Rejected, null)).Cause);
+        Assert.Equal(WorkIqIssueClassifier.CauseTaskCanceled, WorkIqIssueClassifier.ForTurnOutcome(TurnResult(WorkIqTurnOutcome.Canceled, null)).Cause);
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // Causes of evidence and reduction issues (one home for tester-facing cause text)
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(WorkIqEvidenceNormalizer.AnswerAmbiguousIssueCode, "several answer candidates")]
+    [InlineData(Native118DiagnosticsDecoder.AmbiguousArtifactIssueCode, "never picks the last one")]
+    [InlineData(InteractionDecoder.ConflictingTwinsIssueCode, "both proposals are kept")]
+    [InlineData(InteractionDecoder.AmbiguousPartIssueCode, "more than one pause")]
+    [InlineData(Native118DiagnosticsDecoder.FieldInvalidIssueCode, "native 1.18 shapes")]
+    [InlineData(InteractionDecoder.CardMalformedIssueCode, "interaction profile")]
+    [InlineData("citations.malformed", "sample-observed shapes")]
+    [InlineData("something.else", "source pointers")]
+    public void CauseForEvidenceIssue_NamesWhatTheTesterReads(string code, string fragment) =>
+        Assert.Contains(fragment, WorkIqIssueClassifier.CauseForEvidenceIssue(code), StringComparison.Ordinal);
+
+    [Theory]
+    [InlineData("status.task_id_mismatch", "different from the task")]
+    [InlineData("artifact.before_task_snapshot", "before any task snapshot")]
+    [InlineData("status.before_task_snapshot", "before any task snapshot")]
+    [InlineData("artifact.append_after_last_chunk", "after lastChunk")]
+    [InlineData("artifact.missing_id", "missing or duplicated artifactId")]
+    [InlineData("message.second_direct_message", "A direct message arrived")]
+    [InlineData("part.one_of", "one-of text")]
+    [InlineData("task.state_unspecified", "state vocabulary")]
+    [InlineData("frame.malformed", "not applied")]
+    [InlineData("other", "does not repair")]
+    public void CauseForReduceWarning_NamesWhatTheTesterReads(string code, string fragment) =>
+        Assert.Contains(fragment, WorkIqIssueClassifier.CauseForReduceWarning(code), StringComparison.Ordinal);
 
     [Fact]
     public void TurnOutcomeIssueCode_EveryOutcome_IsSnakeCase()
@@ -396,8 +666,10 @@ public sealed class WorkIqIssueClassifierTests
 
         var issue = WorkIqIssueClassifier.FromException(ex, WorkIqTraceStage.Send);
 
+        // The turn's code, as the conversation registers it, with the local stop's category and cause.
         Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
-        Assert.Equal("local.canceled", issue.Code);
+        Assert.Equal("turn.indeterminate", issue.Code);
+        Assert.Equal(WorkIqIssueClassifier.CauseLocalCanceled, issue.SuggestedCause);
     }
 
     // ---------------------------------------------------------------------------------------------------------

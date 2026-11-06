@@ -16,7 +16,7 @@ namespace AgentEval.Microsoft365.Protocol;
 /// true/false/omitted, <c>lastChunk</c> closing one artifact only, non-text parts preserved, unknown fields
 /// counted as schema warnings, identical chunks never de-duplicated. A subscription's first snapshot
 /// <b>replaces</b> state; a terminal snapshot reconciles it. It never treats HTTP 200, EOF, <c>lastChunk</c> or
-/// telemetry as completion: only an observed <see cref="WorkIqTaskState.Completed"/> state is. Owned by lane C (M13).
+/// telemetry as completion: only an observed <see cref="WorkIqTaskState.Completed"/> state is.
 /// </summary>
 /// <remarks>
 /// <para>One reducer serves one turn (one task identity, or one direct message). It is built with a
@@ -31,8 +31,7 @@ namespace AgentEval.Microsoft365.Protocol;
 /// then completes reads as Completed <i>and</i> interrupted — never as a clean pass.</para>
 /// <para>End of stream (<see cref="MarkStreamEnded"/>): EOF is a normal end when the task has <i>settled</i> — a
 /// terminal state (Completed, Failed, Canceled, Rejected) or a suspended one (InputRequired, AuthRequired: the service
-/// closes the stream and waits for input on the same task; HLD D6, research "Streaming, snapshots and multiple turns"
-/// item 9) — or when a direct message was the reply. EOF while the task is still Submitted/Working (or Unknown), or
+/// closes the stream and waits for input on the same task) — or when a direct message was the reply. EOF while the task is still Submitted/Working (or Unknown), or
 /// before any task identity or message, is an interruption. Settled is not completed: a suspended or failed task never
 /// yields an answer.</para>
 /// <para>Not thread-safe: a turn applies frames sequentially.</para>
@@ -319,7 +318,7 @@ internal sealed class WorkIqTaskReducer
     /// <see cref="WorkIqTaskState.Working"/> (or <see cref="WorkIqTaskState.Unknown"/>), or before any task identity
     /// or message, is an interruption: the transport ended, the operation did not. Traces <c>reduce.stream_ended</c>
     /// (Info when settled, Warning otherwise). Settled is never completion: only
-    /// <see cref="WorkIqTaskState.Completed"/> yields an answer (HLD D6).
+    /// <see cref="WorkIqTaskState.Completed"/> yields an answer.
     /// </summary>
     /// <returns>Whether the reduction is interrupted after the call.</returns>
     public bool MarkStreamEnded()
@@ -622,7 +621,7 @@ internal sealed class WorkIqTaskReducer
             terminal
                 ? "A frame failed or the connection dropped during the stream, but the task reached a terminal state from the valid frames. The answer is usable only if its state is completed; intermediate events may be missing from the evidence."
                 : suspended
-                    ? "A frame failed or the connection dropped after the task paused for input or authorization. The pause and its payload come from the valid frames and the task stays resumable on the same id; intermediate events may be missing from the evidence. A paused task is not an answer either way."
+                    ? "A frame failed or the connection dropped after the task paused for input or authorization. The pause and its payload come from the valid frames and the task stays paused on the same id (this provider never answers a pause); intermediate events may be missing from the evidence. A paused task is not an answer either way."
                     : "The connection dropped or the stream ended before the task finished. When a task id is known the turn reconciles with GetTask (and SubscribeToTask when the card allows streaming) under the recovery budget; otherwise the outcome is indeterminate and the prompt is not resent.");
     }
 
@@ -643,53 +642,8 @@ internal sealed class WorkIqTaskReducer
             var separator = warning.IndexOf(':', StringComparison.Ordinal);
             var code = separator > 0 ? warning[..separator] : warning;
             Trace("reduce." + code, warning, WorkIqTraceLevel.Warning, null);
-            Issue(WorkIqIssueCategory.Protocol, "reduce." + code, warning, SuggestedCause(code));
+            Issue(WorkIqIssueCategory.Protocol, "reduce." + code, warning, WorkIqIssueClassifier.CauseForReduceWarning(code));
         }
-    }
-
-    private static string SuggestedCause(string code)
-    {
-        if (code.EndsWith(".task_id_mismatch", StringComparison.Ordinal) || code.EndsWith(".id_mismatch", StringComparison.Ordinal) || code.EndsWith(".context_id_mismatch", StringComparison.Ordinal))
-        {
-            return "A frame carried a task or context id different from the task this turn is tracking; the service may be multiplexing, the subscription may target another task, or the reply belongs to a previous turn. Check the ids in the raw capture.";
-        }
-
-        if (code.EndsWith(".before_task_snapshot", StringComparison.Ordinal))
-        {
-            return "A status or artifact update arrived before any task snapshot. A conforming stream starts with the task; identity was taken from the update, so earlier state (if any) may be missing.";
-        }
-
-        if (code.StartsWith("artifact.append_after_last_chunk", StringComparison.Ordinal))
-        {
-            return "The service kept sending chunks for an artifact after lastChunk: true. The chunks were applied in order and never de-duplicated; the artifact content may be longer than the service intended.";
-        }
-
-        if (code.StartsWith("artifact.", StringComparison.Ordinal))
-        {
-            return "An artifact in the stream deviates from A2A 1.0 (missing or duplicated artifactId). Nothing was merged by guess; the raw capture holds the exact frames.";
-        }
-
-        if (code.StartsWith("message.", StringComparison.Ordinal))
-        {
-            return "A direct message arrived where exactly one (or none, in a task stream) was expected, or it carries an unexpected role or id. The first message is the reply; later ones are retained separately and never merged into it.";
-        }
-
-        if (code.StartsWith("part.", StringComparison.Ordinal))
-        {
-            return "A part did not follow the one-of text | raw | url | data rule. Content was mapped by the SDK's content case; the raw capture holds the original part.";
-        }
-
-        if (code.StartsWith("task.", StringComparison.Ordinal) || code.StartsWith("status.", StringComparison.Ordinal))
-        {
-            return "The task or status deviates from the expected identity or state vocabulary (unspecified state, missing or changed id). An unknown state never counts as completed.";
-        }
-
-        if (code.StartsWith("frame.", StringComparison.Ordinal))
-        {
-            return "A stream frame violated the A2A 1.0 shape and was not applied; the run is marked interrupted so it cannot pass silently. The raw capture holds the exact bytes.";
-        }
-
-        return "The stream deviates from A2A 1.0 in a way this provider records but does not repair; the raw capture holds the exact bytes.";
     }
 
     private void TraceStateChange(WorkIqTaskState previous)

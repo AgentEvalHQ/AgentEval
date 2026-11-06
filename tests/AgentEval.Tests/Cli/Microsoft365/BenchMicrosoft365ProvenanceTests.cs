@@ -14,9 +14,9 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M60 / phase-2 open issue: a <c>bench … --sut microsoft365</c> run records the same Microsoft 365 provenance keys in
+/// A <c>bench … --sut microsoft365</c> run records the same Microsoft 365 provenance keys in
 /// its AEF run config as <c>eval</c> does (a2aVersion, m365Profile, normalizerVersion, providerProfileVersion,
-/// m365ConfigSha256, m365AgentId, m365EndpointHost). <see cref="Microsoft365SutTarget.BenchRunSettings"/> derives them
+/// m365ConfigSha256, m365AgentId, m365EndpointHost). <see cref="SutTargetResolver.RunSettingsFor"/> (the target's <c>RunSettings</c>) derives them
 /// from the validated target, and every bench family with a <c>--sut</c> seam threads them into
 /// <c>BenchAef.Write</c> / <c>WriteScan</c> / <c>WriteResult</c>. No per-case evidence document exists in a bench run,
 /// so no content policy is claimed. Offline: the scan families run their mock, the compliance families grade a supplied
@@ -45,11 +45,11 @@ public sealed class BenchMicrosoft365ProvenanceTests : IDisposable
     }
 
     [Fact]
-    public void BenchRunSettings_Microsoft365_IsTheValidatedTargetsProvenanceWithoutAContentPolicy()
+    public void RunSettingsFor_Microsoft365_IsTheValidatedTargetsProvenanceWithoutAContentPolicy()
     {
         var (target, config) = ValidatedTarget(profile: "native118");
 
-        var settings = Microsoft365SutTarget.BenchRunSettings([target], " Microsoft365 ")!;
+        var settings = SutTargetResolver.RunSettingsFor([target], " Microsoft365 ")!;
 
         Assert.Equal("1.0", (string?)settings["a2aVersion"]);
         Assert.Equal("Native118Diagnostics", (string?)settings["m365Profile"]);
@@ -63,14 +63,14 @@ public sealed class BenchMicrosoft365ProvenanceTests : IDisposable
     }
 
     [Fact]
-    public void BenchRunSettings_OtherSutOrUnvalidatedTarget_IsNull()
+    public void RunSettingsFor_OtherSutOrUnvalidatedTarget_IsNull()
     {
         var (target, _) = ValidatedTarget();
 
-        Assert.Null(Microsoft365SutTarget.BenchRunSettings([target], "copilot-studio"));
-        Assert.Null(Microsoft365SutTarget.BenchRunSettings([target], null));
-        Assert.Null(Microsoft365SutTarget.BenchRunSettings([new Microsoft365SutTarget(TextWriter.Null)], "microsoft365"));
-        Assert.Null(Microsoft365SutTarget.BenchRunSettings([], "microsoft365"));
+        Assert.Null(SutTargetResolver.RunSettingsFor([target], "copilot-studio"));
+        Assert.Null(SutTargetResolver.RunSettingsFor([target], null));
+        Assert.Null(SutTargetResolver.RunSettingsFor([new Microsoft365SutTarget(TextWriter.Null)], "microsoft365"));
+        Assert.Null(SutTargetResolver.RunSettingsFor([], "microsoft365"));
     }
 
     [Theory]
@@ -81,7 +81,7 @@ public sealed class BenchMicrosoft365ProvenanceTests : IDisposable
     public async Task ScanAndPerfFamilies_SubjectSettings_ReachTheRunConfig(string family)
     {
         var (target, config) = ValidatedTarget();
-        var settings = Microsoft365SutTarget.BenchRunSettings([target], "microsoft365")!;
+        var settings = SutTargetResolver.RunSettingsFor([target], "microsoft365")!;
         var aef = new DirectoryInfo(Path.Combine(_root, "aef-" + family));
         Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
 
@@ -103,7 +103,7 @@ public sealed class BenchMicrosoft365ProvenanceTests : IDisposable
     public async Task ComplianceFamilies_SubjectSettings_ReachTheRunConfig(string family)
     {
         var (target, config) = ValidatedTarget();
-        var settings = Microsoft365SutTarget.BenchRunSettings([target], "microsoft365")!;
+        var settings = SutTargetResolver.RunSettingsFor([target], "microsoft365")!;
         var aef = new DirectoryInfo(Path.Combine(_root, "aef-" + family));
         await new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")).InitializeSolutionAsync("m365-bench-provenance");
 

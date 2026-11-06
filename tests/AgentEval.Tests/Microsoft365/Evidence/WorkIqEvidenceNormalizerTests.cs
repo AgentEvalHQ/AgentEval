@@ -463,9 +463,8 @@ public sealed class WorkIqEvidenceNormalizerTests
     [Fact]
     public void Normalize_DefaultConstructor_DelegatesToTheRealAnswerSelector()
     {
-        // Lane A owns WorkIqAnswerSelector. Until it lands the real selector throws NotImplementedException; the
-        // contract tested here holds in both states: the normaliser never swallows the selector's exception, and
-        // once the selector works its text is what the document carries.
+        // The default constructor uses the real WorkIqAnswerSelector: the normaliser never swallows an exception the
+        // selector throws, and the selector's text is what the document carries.
         var task = SnapshotFromEnvelope(AnswerFixture);
         WorkIqAnswerSelection? real = null;
         Exception? realError = null;

@@ -13,7 +13,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M30: the <c>--sut microsoft365</c> built-in target under the shared <c>eval</c>/<c>bench</c> seam. Mirrors
+/// The <c>--sut microsoft365</c> built-in target under the shared <c>eval</c>/<c>bench</c> seam. Mirrors
 /// <c>SutTargetResolverTests</c>' shape: registration, option binding, the safety gates in their documented order (all
 /// before any network call), config fail-fast, the resolved name, and the <c>sutOverride</c> seam.
 /// </summary>
@@ -193,7 +193,7 @@ public class Microsoft365SutTargetTests
             var target = new Microsoft365SutTarget(new StringWriter());
             target.Validate(Common(consent: true), new Microsoft365SutOptions { ConfigFile = cfg, Profile = profile });
 
-            // Review L4: the memoised profile is the one the run records, not merely "Validate did not throw".
+            // The memoised profile is the one the run records, not merely "Validate did not throw".
             Assert.Equal(expected, (string?)target.AefRunSettings(null)!["m365Profile"]);
         }
         finally { TryDelete(cfg); }
@@ -204,7 +204,7 @@ public class Microsoft365SutTargetTests
     [InlineData("NATIVE118", DiagnosticProfile.Native118Diagnostics)]
     public void ParseProfile_MapsTheTwoValues(string value, DiagnosticProfile expected)
     {
-        Assert.Equal(expected, Microsoft365SutTarget.ParseProfile(value));
+        Assert.Equal(expected, Microsoft365CliOptions.ParseProfile(value));
     }
 
     [Theory]
@@ -215,7 +215,7 @@ public class Microsoft365SutTargetTests
     [InlineData("PublicAnswerOnly")]
     public void ParseProfile_RejectsEverythingElse(string? value)
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => Microsoft365SutTarget.ParseProfile(value));
+        var ex = Assert.Throws<InvalidOperationException>(() => Microsoft365CliOptions.ParseProfile(value));
         Assert.Contains("m365-profile", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -391,7 +391,7 @@ public class Microsoft365SutTargetTests
         finally { TryDelete(cfg); }
     }
 
-    // ── the honesty badge (HLD section 9) ──
+    // ── the honesty badge ──
 
     [Fact]
     public void FormatBadge_CarriesTheHonestyStatement_AndBothDiagnosticsPaths()
@@ -429,7 +429,7 @@ public class Microsoft365SutTargetTests
         Assert.Contains("turns counted, consumption not metered", line, StringComparison.Ordinal);
     }
 
-    // ── the public diagnostics forwarder the badge relies on (a provider type; its only consumer is this lane) ──
+    // ── the public diagnostics forwarder the badge relies on (a provider type) ──
 
     [Fact]
     public void Diagnostics_Describe_HonoursTraceFileRunIdAndDirectory_CreatesNothing()

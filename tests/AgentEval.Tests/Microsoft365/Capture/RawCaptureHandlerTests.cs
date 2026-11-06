@@ -131,6 +131,24 @@ public sealed class RawCaptureHandlerTests
         Assert.Equal(2, sink.Records.Count);
     }
 
+    [Fact]
+    public async Task SendAsync_SinkOnTheRequest_WinsOverTheCurrentSink()
+    {
+        var (diag, _, _) = Diag();
+        var current = Sink(diag);
+        var own = new RawCaptureSink("cap-own", EvidenceContentPolicy.FullEvidence, 1 << 20, 1000, null, diag);
+        using var rig = new Rig(current, diag);
+        rig.Fake.OnRpc("SendMessage", SendReply);
+        using var request = Rpc("SendMessage");
+        request.Options.Set(RawCaptureHandler.SinkOption, own);
+
+        (await rig.Client.SendAsync(request)).Dispose();
+
+        // A call's request and response land in the sink it carries, never in the sink another call on the client set.
+        Assert.Equal(2, own.Records.Count);
+        Assert.Empty(current.Records);
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     // Buffered JSON
     // ---------------------------------------------------------------------------------------------------------

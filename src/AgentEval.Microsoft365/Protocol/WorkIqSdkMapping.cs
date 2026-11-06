@@ -21,7 +21,6 @@ namespace AgentEval.Microsoft365.Protocol;
 /// unspecified role, a blank id, mismatched ids) is reported through the optional <c>warnings</c> collection
 /// rather than silently repaired. Unknown wire fields are not visible here — the SDK drops them while
 /// deserializing — so they are counted only where the raw bytes are (the capture) and passed in as a count.
-/// Owned by lane C (M13).
 /// </summary>
 internal static class WorkIqSdkMapping
 {

@@ -127,8 +127,8 @@ public static class Microsoft365HelloWorld
 
 /// <summary>
 /// What the two Microsoft 365 samples share: the setup check, the diagnostics paths, the one-line evidence summary,
-/// how a non-completed turn and a failure are reported (which stage, why, what to do next), and the closing honesty
-/// statement of the provider's design (HLD section 9).
+/// how a non-completed turn and a failure are reported (which stage, why, what to do next), and the closing statement
+/// of what the provider observes and what it does not.
 /// </summary>
 internal static class Microsoft365SampleSupport
 {
@@ -187,36 +187,17 @@ internal static class Microsoft365SampleSupport
     }
 
     /// <summary>
-    /// One line of evidence availability: citation markers and sources (with their counts only when provided) and tool
-    /// executions. A channel that is not provided prints its availability, never a zero.
+    /// One line of evidence availability: citation markers and sources and tool executions, each described by
+    /// <see cref="EvidenceSet{T}.Describe"/>. A channel that is not provided prints its availability, never a zero; an
+    /// observed-empty channel says so (zero rows in this snapshot, not proof the service did nothing).
     /// </summary>
     /// <param name="evidence">The reply's evidence document, or null when the reply carried none.</param>
     public static string EvidenceLine(Microsoft365TurnEvidence? evidence) =>
         evidence is null
             ? "no evidence document on the reply"
-            : $"citation markers {Describe(evidence.CitationMarkers, "marker(s)")} · " +
-              $"citation sources {Describe(evidence.CitationSources, "source(s)")} · " +
-              $"tool executions {Describe(evidence.ToolExecutions, "execution(s)")}";
-
-    /// <summary>
-    /// A channel's availability; for a provided channel also its item count (and its validation when not valid). An
-    /// observed-empty channel says so: zero rows in this snapshot, not proof the service did nothing.
-    /// </summary>
-    /// <typeparam name="T">The observation type.</typeparam>
-    /// <param name="set">The channel.</param>
-    /// <param name="noun">What an item is called.</param>
-    public static string Describe<T>(EvidenceSet<T> set, string noun)
-    {
-        if (!set.IsProvided)
-            return set.Availability.ToString();
-
-        if (set.IsObservedEmpty)
-            return $"Provided (observed empty: 0 {noun} in this snapshot)";
-
-        var count = set.Items.IsDefault ? 0 : set.Items.Length;
-        var validation = set.Validation == EvidenceValidation.Valid ? "" : $", {set.Validation}";
-        return $"Provided ({count} {noun}{validation})";
-    }
+            : $"citation markers {evidence.CitationMarkers.Describe("marker(s)")} · " +
+              $"citation sources {evidence.CitationSources.Describe("source(s)")} · " +
+              $"tool executions {evidence.ToolExecutions.Describe("execution(s)")}";
 
     /// <summary>
     /// Reports a turn that did not complete the way the provider's design requires: the outcome, the task id, the
@@ -270,7 +251,7 @@ internal static class Microsoft365SampleSupport
         Console.WriteLine($"      Symptom → cause → fix table: {TroubleshootingDoc}");
     }
 
-    /// <summary>The provider's honesty statements (HLD section 9), printed at the end of a run.</summary>
+    /// <summary>What the provider observes and what it does not, printed at the end of a run.</summary>
     /// <param name="maxTurns">The turn cap in effect (0 = none).</param>
     /// <param name="profile">The diagnostic profile in effect.</param>
     public static void PrintHonestyStatement(int maxTurns, DiagnosticProfile profile)

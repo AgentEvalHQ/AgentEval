@@ -14,12 +14,18 @@ namespace AgentEval.Microsoft365.Capture;
 /// A <see cref="DelegatingHandler"/> that authenticates every A2A request: <c>Authorization: Bearer</c> from the
 /// <see cref="IWorkIqTokenProvider"/> (only for destinations the trust policy allows), <c>A2A-Version: 1.0</c>
 /// (card requests included — Work IQ defaults to 0.3 without it), a <c>User-Agent</c> naming this package, and
-/// capture of the <c>request-id</c> response header for correlation. A 401 surfaces
-/// <see cref="WorkIqFailureCategory.Unauthorized"/> with a device-code hint and is never resent. On the live transport
-/// the A2A client acquires the token before the HTTP call (<see cref="AcquireTokenAsync"/>, outside
-/// <c>HttpClient.Timeout</c>) and hands it over in <see cref="PreAcquiredTokenOption"/>; this handler then only attaches
-/// it. Owned by lane A (M11).
+/// capture of the <c>request-id</c> response header for correlation. A 401 or 403 reply is traced with a hint and
+/// passed on, never resent; the A2A client classifies it. On the live transport the A2A client acquires the token
+/// before the HTTP call (<see cref="AcquireTokenAsync"/>, outside <c>HttpClient.Timeout</c>) and hands it over in
+/// <see cref="PreAcquiredTokenOption"/>; this handler then only attaches it.
 /// </summary>
+/// <remarks>
+/// Issues: a refused destination, a 401 and a 403 are traced here only; the layer that ends the operation (the A2A
+/// client, or the turn) registers the one issue for them. A token failure is the exception: it is registered here,
+/// once, through <see cref="WorkIqIssueClassifier"/> (<c>auth.sign_in_not_completed</c>, <c>auth.empty_token</c>,
+/// <c>auth.token_acquisition_failed</c>), where the sign-in and the provider's error are at hand; the failure carries
+/// <see cref="WorkIqFailure.TokenFailure"/>, so every layer above traces it without registering it again.
+/// </remarks>
 internal sealed class WorkIqAuthHandler : DelegatingHandler
 {
     /// <summary>The request header that pins the protocol version.</summary>
@@ -44,13 +50,8 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
     /// </summary>
     internal static readonly HttpRequestOptionsKey<string> PreAcquiredTokenOption = new("AgentEval.Microsoft365.PreAcquiredToken");
 
-    /// <summary>The phrase that marks a token wait stopped before the HTTP call (see <see cref="IsSignInNotCompleted"/>).</summary>
+    /// <summary>The phrase the safe message of a token wait stopped before the HTTP call carries (<see cref="WorkIqTokenFailure.SignInNotCompleted"/>).</summary>
     internal const string SignInNotCompletedText = "sign-in not completed";
-
-    /// <summary>The suggested cause of <c>auth.sign_in_not_completed</c>.</summary>
-    internal const string SignInNotCompletedCause =
-        "The sign-in did not finish before the wait ended: a device-code prompt was not completed in time (open the page it names, enter the code, sign in as the test user), or the run was stopped. " +
-        "Nothing was sent to Work IQ. Sign in first with `agenteval m365 doctor --stage auth` (the token is cached), then run again.";
 
     /// <summary>Creates the handler.</summary>
     /// <param name="tokenProvider">The host-owned token source.</param>
@@ -94,7 +95,6 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 OutcomeCertainty.Known,
                 op);
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.untrusted_destination", refused.SafeMessage, WorkIqTraceLevel.Error);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Config, "auth.untrusted_destination", refused.SafeMessage, WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.UntrustedHost)));
             throw new WorkIqProtocolException(refused);
         }
 
@@ -140,21 +140,11 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
         {
             var hint = $"token rejected: audience/scope/expiry — re-run the device-code sign-in; scope must be {ExpectedScope}";
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.unauthorized", $"{destination} → HTTP 401: {hint} (not resent)", WorkIqTraceLevel.Error, requestId: requestId, httpStatus: status, elapsedMs: elapsedMs);
-            Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.unauthorized", $"HTTP 401 from {uri.Host}: {hint}", WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.Unauthorized))
-            {
-                HttpStatus = status,
-                RequestId = requestId,
-            });
         }
         else if (status == 403)
         {
             var hint = $"the signed-in user or the app lacks the delegated permission, its admin consent or a Work IQ licence (scope {ExpectedScope})";
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.forbidden", $"{destination} → HTTP 403: {hint} (not resent)", WorkIqTraceLevel.Error, requestId: requestId, httpStatus: status, elapsedMs: elapsedMs);
-            Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Auth, WorkIqIssueCategory.Permission, "auth.forbidden", $"HTTP 403 from {uri.Host}: {hint}", WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.Forbidden))
-            {
-                HttpStatus = status,
-                RequestId = requestId,
-            });
         }
 
         return response;
@@ -164,15 +154,16 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
     /// Acquires the bearer token for one request from <see cref="TokenProvider"/>, tracing <c>auth.token_requested</c>
     /// and <c>auth.token_acquired</c> (its length only, never the token). A provider failure becomes a
     /// <see cref="WorkIqProtocolException"/> (<see cref="WorkIqFailureCategory.Unauthorized"/>, or the provider's own
-    /// classified failure, <see cref="OutcomeCertainty.Known"/>: nothing was sent); an empty token too.
+    /// classified failure, <see cref="OutcomeCertainty.Known"/>: nothing was sent) with <see cref="WorkIqFailure.TokenFailure"/>
+    /// set; an empty token too. Such a failure's issue is registered here, once (see the remarks of the class).
     /// </summary>
     /// <remarks>
     /// <para>
     /// <paramref name="outsideHttpTimeout"/> is <see langword="true"/> when the A2A client acquires the token before the HTTP
     /// call (the live path does, for every operation): the wait is then bounded by the operation's own token and by the
     /// sign-in code's expiry, never by <c>HttpClient.Timeout</c>, so a slow device-code sign-in cannot be mistaken for a
-    /// network timeout. A stop of that wait is reported as <see cref="SignInNotCompletedText"/> (Unauthorized, Known,
-    /// nothing was sent; issue <c>auth.sign_in_not_completed</c>).
+    /// network timeout. A stop of that wait is reported as <see cref="WorkIqTokenFailure.SignInNotCompleted"/>
+    /// (Unauthorized, Known, nothing was sent; issue <c>auth.sign_in_not_completed</c>).
     /// </para>
     /// <para>
     /// Inside the pipeline (<paramref name="outsideHttpTimeout"/> false: a request the client did not prepare, such as the
@@ -183,8 +174,9 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
     /// <param name="destination">The safe <c>METHOD scheme://host/path</c> of the request (no query).</param>
     /// <param name="outsideHttpTimeout">Whether the caller acquires the token before the HTTP call.</param>
     /// <param name="cancellationToken">The operation's token.</param>
+    /// <param name="call">The per-call context of the operation; its case and turn are stamped on the issue of a token failure.</param>
     /// <exception cref="WorkIqProtocolException">No usable token was acquired; nothing was sent.</exception>
-    internal async Task<string> AcquireTokenAsync(WorkIqOperation op, string destination, bool outsideHttpTimeout, CancellationToken cancellationToken)
+    internal async Task<string> AcquireTokenAsync(WorkIqOperation op, string destination, bool outsideHttpTimeout, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         var started = Diagnostics.Clock.GetTimestamp();
         Diagnostics.Trace(
@@ -207,9 +199,12 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 $"{op}: {SignInNotCompletedText}: no token was acquired before the wait was stopped after {elapsed.TotalSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)} s " +
                 "(the caller's cancellation or the turn deadline); nothing was sent",
                 OutcomeCertainty.Known,
-                op);
+                op)
+            {
+                TokenFailure = WorkIqTokenFailure.SignInNotCompleted,
+            };
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.sign_in_not_completed", failure.SafeMessage, WorkIqTraceLevel.Error, elapsedMs: elapsed.TotalMilliseconds);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.sign_in_not_completed", failure.SafeMessage, SignInNotCompletedCause));
+            RegisterTokenIssue(WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth), call);
             throw new WorkIqProtocolException(failure, ex);
         }
         catch (OperationCanceledException)
@@ -231,7 +226,10 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 WorkIqTraceLevel.Error,
                 httpStatus: ex.Failure.HttpStatus,
                 elapsedMs: Diagnostics.Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw;
+            // The provider's failure carries its AADSTS code in the safe message, so the classifier gives the catalog's cause.
+            var failure = ex.Failure with { TokenFailure = WorkIqTokenFailure.ProviderFailed };
+            RegisterTokenIssue(WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth), call);
+            throw new WorkIqProtocolException(failure, ex);
         }
         catch (Exception ex)
         {
@@ -239,9 +237,12 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 WorkIqFailureCategory.Unauthorized,
                 $"token acquisition failed: {ex.GetType().Name} (nothing was sent); re-run the device-code sign-in; scope must be {ExpectedScope}",
                 OutcomeCertainty.Known,
-                op);
+                op)
+            {
+                TokenFailure = WorkIqTokenFailure.ProviderFailed,
+            };
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.failed", failure.SafeMessage, WorkIqTraceLevel.Error, elapsedMs: Diagnostics.Clock.GetElapsedTime(started).TotalMilliseconds);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.token_acquisition_failed", failure.SafeMessage, WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.Unauthorized)));
+            RegisterTokenIssue(WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth), call);
             throw new WorkIqProtocolException(failure, ex);
         }
 
@@ -251,9 +252,12 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
                 WorkIqFailureCategory.Unauthorized,
                 $"the token provider returned an empty token (nothing was sent); re-run the device-code sign-in; scope must be {ExpectedScope}",
                 OutcomeCertainty.Known,
-                op);
+                op)
+            {
+                TokenFailure = WorkIqTokenFailure.EmptyToken,
+            };
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.failed", failure.SafeMessage, WorkIqTraceLevel.Error);
-            Diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.empty_token", failure.SafeMessage, WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.Unauthorized)));
+            RegisterTokenIssue(WorkIqIssueClassifier.FromFailure(failure, WorkIqTraceStage.Auth), call);
             throw new WorkIqProtocolException(failure);
         }
 
@@ -266,15 +270,6 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
             elapsedMs: Diagnostics.Clock.GetElapsedTime(started).TotalMilliseconds);
         return token;
     }
-
-    /// <summary>
-    /// Whether <paramref name="failure"/> is a stopped token wait before the HTTP call (<see cref="SignInNotCompletedText"/>):
-    /// nothing was sent, and it is no network timeout.
-    /// </summary>
-    /// <param name="failure">The failure.</param>
-    internal static bool IsSignInNotCompleted(WorkIqFailure? failure) =>
-        failure is { Category: WorkIqFailureCategory.Unauthorized, HttpStatus: null, Certainty: OutcomeCertainty.Known }
-        && failure.SafeMessage.Contains(SignInNotCompletedText, StringComparison.Ordinal);
 
     /// <summary>The safe <c>METHOD scheme://host/path</c> text of a request destination (no query, no fragment).</summary>
     /// <param name="method">The HTTP method.</param>
@@ -302,6 +297,10 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
 
     private static bool IsTokenChar(char c) =>
         char.IsAsciiLetterOrDigit(c) || "!#$%&'*+-.^_`|~".Contains(c);
+
+    /// <summary>Registers the one issue of a token failure, stamped with the case and turn the call belongs to.</summary>
+    private void RegisterTokenIssue(WorkIqIssue issue, WorkIqCallContext? call) =>
+        Diagnostics.Issue(issue with { CaseId = issue.CaseId ?? call?.CaseId, TurnId = issue.TurnId ?? call?.TurnId });
 
     private static string? ReadRequestId(HttpResponseMessage response)
     {

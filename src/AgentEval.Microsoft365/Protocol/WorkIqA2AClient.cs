@@ -16,8 +16,8 @@ namespace AgentEval.Microsoft365.Protocol;
 
 /// <summary>
 /// The production <see cref="IWorkIqA2AClient"/> over the A2A .NET SDK types, built on an <see cref="HttpClient"/>
-/// whose pipeline is <c>WorkIqAuthHandler → RawCaptureHandler → inner</c>. The blocking operations live here
-/// (lane A, M10); the two streaming members live in <c>WorkIqA2AClient.Streaming.cs</c> (lane C, M13).
+/// whose pipeline is <c>WorkIqAuthHandler → RawCaptureHandler → inner</c>. The blocking operations live here; the two
+/// streaming members live in <c>WorkIqA2AClient.Streaming.cs</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -35,6 +35,13 @@ namespace AgentEval.Microsoft365.Protocol;
 /// A 429/503 reply is retried (bounded, exponential with jitter, <c>Retry-After</c> honoured) only for discovery,
 /// <c>GetTask</c> and <c>CancelTask</c>; a send is never resent. Every reply is validated as A2A 1.0: a JSON-RPC
 /// error on HTTP 200 and a 0.3-shaped body (<c>kind</c> discriminators, lowercase states) both fail the call.
+/// </para>
+/// <para>
+/// Every failure is traced here. Its issue is registered here once, classified by <see cref="WorkIqIssueClassifier"/>,
+/// only when this client is the layer that ends the operation (<see cref="RegistersIssue"/>): a turn registers the
+/// issue of its own outcome, the auth layer the issue of a token failure. The per-call facts (JSON-RPC id, capture
+/// folder, the capture of a stream) travel on the <see cref="WorkIqCallContext"/>, and a blocking call's capture sink
+/// travels on its own request, so two calls on one client never overwrite each other's.
 /// </para>
 /// </remarks>
 internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
@@ -65,24 +72,24 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     private Task<RawAgentCard>? _discovery;
     private RawAgentCard? _card;
     private A2AClient? _client;
-    private string? _routingTenant;
     private int _captureSequence;
-    private string? _nextRpcId;
 
     /// <summary>Creates the client over an authenticated, captured <see cref="HttpClient"/>.</summary>
     /// <param name="config">The validated connection settings.</param>
     /// <param name="options">The validated runtime options.</param>
     /// <param name="http">The client whose pipeline is <c>WorkIqAuthHandler → RawCaptureHandler → inner</c>.</param>
-    /// <param name="capture">The capture handler inside <paramref name="http"/> (its <see cref="RawCaptureHandler.CurrentSink"/> is set per operation).</param>
+    /// <param name="capture">The capture handler inside <paramref name="http"/> (its <see cref="RawCaptureHandler.CurrentSink"/> is set while a stream is open).</param>
     /// <param name="clock">The clock used for receipt times, backoff and elapsed measurements.</param>
     /// <param name="diagnostics">The diagnostics every operation traces through; null means <see cref="WorkIqDiagnostics.None"/>.</param>
+    /// <param name="policy">The trust policy the transport already enforces (the factory passes the auth handler's); null builds one from <see cref="Microsoft365Config.TrustedHosts"/>.</param>
     public WorkIqA2AClient(
         Microsoft365Config config,
         WorkIqOptions options,
         HttpClient http,
         RawCaptureHandler capture,
         TimeProvider clock,
-        WorkIqDiagnostics diagnostics)
+        WorkIqDiagnostics diagnostics,
+        WorkIqTrustPolicy? policy = null)
     {
         Config = config ?? throw new ArgumentNullException(nameof(config));
         Options = options ?? throw new ArgumentNullException(nameof(options));
@@ -92,7 +99,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         Diagnostics = diagnostics ?? WorkIqDiagnostics.None;
         config.Validate();
         options.Validate();
-        Policy = new WorkIqTrustPolicy(config.TrustedHosts);
+        Policy = policy ?? new WorkIqTrustPolicy(config.TrustedHosts);
         Profile = options.ProfileOverride ?? config.ResolveProfile();
     }
 
@@ -107,6 +114,12 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
     /// <summary>The capture handler inside <see cref="Http"/>.</summary>
     internal RawCaptureHandler Capture { get; }
+
+    /// <summary>
+    /// The diagnostics every operation of this client traces through (<c>discovery.*</c>, <c>rpc.sent</c>,
+    /// <c>rpc.response</c>, <c>rpc.error</c>, <c>task.state</c>, the stream events); never null.
+    /// </summary>
+    internal WorkIqDiagnostics Diagnostics { get; }
 
     /// <summary>
     /// The auth handler inside <see cref="Http"/>, when the client should acquire the bearer token itself before every
@@ -128,8 +141,8 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     /// <summary>The discovered card, or null before discovery completed.</summary>
     internal RawAgentCard? Card => Volatile.Read(ref _card);
 
-    /// <summary>The opaque A2A routing <c>tenant</c> of the selected interface, when the card declared one; null before discovery.</summary>
-    internal string? RoutingTenant => Volatile.Read(ref _routingTenant);
+    /// <summary>The opaque A2A routing <c>tenant</c> of the selected interface (<see cref="RawAgentCard.RoutingTenant"/>); null before discovery or when the card declares none.</summary>
+    internal string? RoutingTenant => Card?.RoutingTenant;
 
     /// <summary>
     /// The SDK client on the selected endpoint, created by discovery (used by the streaming members). Throws
@@ -138,29 +151,12 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     internal A2AClient Client =>
         Volatile.Read(ref _client) ?? throw new InvalidOperationException("The A2A client is created by discovery; await EnsureDiscoveredAsync first.");
 
-    /// <summary>
-    /// The JSON-RPC id the next blocking call uses instead of minting one (consumed by that call), so a turn's
-    /// identity can carry the id that really went on the wire. Null means mint.
-    /// </summary>
-    internal string? NextRpcId
-    {
-        get => Volatile.Read(ref _nextRpcId);
-        set => Volatile.Write(ref _nextRpcId, value);
-    }
-
-    /// <summary>
-    /// The <c>&lt;runId&gt;/&lt;turnId&gt;</c>-style subfolder captures of the current turn are written under
-    /// <see cref="WorkIqOptions.RawCaptureDirectory"/> (<see cref="EvidenceContentPolicy.FullEvidence"/> only); null
-    /// means <c>&lt;runId&gt;/no-turn</c>. Set by the conversation per turn.
-    /// </summary>
-    internal string? CaptureScope { get; set; }
-
     /// <inheritdoc/>
     /// <remarks>Discovery runs once per client and is cached; a failed discovery is retried on the next call.</remarks>
-    public Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken) => EnsureDiscoveredAsync(cancellationToken);
+    public Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null) => EnsureDiscoveredAsync(cancellationToken, call);
 
     /// <inheritdoc/>
-    public async Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
+    public async Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.Message is null)
@@ -168,12 +164,8 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             throw new ArgumentException("A send needs a message.", nameof(request));
         }
 
-        await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
-
-        request.Configuration ??= new SendMessageConfiguration();
-        request.Configuration.ReturnImmediately = false;
-        request.Configuration.AcceptedOutputModes ??= AcceptedOutputModesFor(Profile);
-        request.Tenant ??= RoutingTenant;
+        await EnsureDiscoveredAsync(cancellationToken, call).ConfigureAwait(false);
+        ApplySendConfiguration(request, Profile, Options.HistoryLength, RoutingTenant);
 
         return await CallAsync<SendMessageResponse>(
             A2AMethods.SendMessage,
@@ -183,30 +175,32 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             taskId: request.Message.TaskId,
             contextId: request.Message.ContextId,
             messageId: request.Message.MessageId,
+            call,
             cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
-    public async Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken)
+    public async Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
-        await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureDiscoveredAsync(cancellationToken, call).ConfigureAwait(false);
         var request = new GetTaskRequest { Id = taskId, HistoryLength = historyLength, Tenant = RoutingTenant };
-        return await CallAsync<AgentTask>(A2AMethods.GetTask, request, WorkIqOperation.GetTask, allowRetry: true, taskId, contextId: null, messageId: null, cancellationToken).ConfigureAwait(false);
+        return await CallAsync<AgentTask>(A2AMethods.GetTask, request, WorkIqOperation.GetTask, allowRetry: true, taskId, contextId: null, messageId: null, call, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
-    public async Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken)
+    public async Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
-        await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureDiscoveredAsync(cancellationToken, call).ConfigureAwait(false);
         var request = new CancelTaskRequest { Id = taskId, Tenant = RoutingTenant };
-        return await CallAsync<AgentTask>(A2AMethods.CancelTask, request, WorkIqOperation.CancelTask, allowRetry: true, taskId, contextId: null, messageId: null, cancellationToken).ConfigureAwait(false);
+        return await CallAsync<AgentTask>(A2AMethods.CancelTask, request, WorkIqOperation.CancelTask, allowRetry: true, taskId, contextId: null, messageId: null, call, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Runs discovery once (thread-safe), caches the card and creates <see cref="Client"/>; a failed attempt is retried by the next caller.</summary>
     /// <param name="cancellationToken">Cancellation token of the caller that triggers discovery.</param>
-    internal Task<RawAgentCard> EnsureDiscoveredAsync(CancellationToken cancellationToken)
+    /// <param name="call">The per-call context of the caller that triggers discovery.</param>
+    internal Task<RawAgentCard> EnsureDiscoveredAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         if (Card is { } cached)
         {
@@ -223,7 +217,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
             if (_discovery is null || _discovery.IsFaulted || _discovery.IsCanceled)
             {
-                _discovery = DiscoverCoreAsync(cancellationToken);
+                _discovery = DiscoverCoreAsync(call, cancellationToken);
             }
 
             pending = _discovery;
@@ -232,21 +226,24 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         return pending;
     }
 
-    /// <summary>Opens a new capture sink for one operation (from the options) and makes it the capture handler's current sink.</summary>
+    /// <summary>
+    /// A new capture sink for one operation (from the options), under the call's capture folder. A blocking call
+    /// attaches it to its own requests (<see cref="RawCaptureHandler.SinkOption"/>); a stream makes it the capture
+    /// handler's <see cref="RawCaptureHandler.CurrentSink"/>, because the SDK builds the stream's request.
+    /// </summary>
     /// <param name="op">The operation the capture belongs to (part of the capture id).</param>
-    internal RawCaptureSink BeginCapture(WorkIqOperation op)
+    /// <param name="call">The per-call context (its <see cref="WorkIqCallContext.CaptureScope"/>).</param>
+    internal RawCaptureSink NewCaptureSink(WorkIqOperation op, WorkIqCallContext? call)
     {
         var sequence = Interlocked.Increment(ref _captureSequence);
         var captureId = string.Create(CultureInfo.InvariantCulture, $"{op.ToString().ToLowerInvariant()}-{sequence:D4}");
         var directory = Options.RawCaptureDirectory is null
             ? null
-            : new DirectoryInfo(Path.Combine(Options.RawCaptureDirectory.FullName, Diagnostics.RunId, CaptureScope ?? "no-turn"));
-        var sink = new RawCaptureSink(captureId, Options.ContentPolicy, Options.MaxCaptureBytes, Options.MaxCaptureFrames, directory);
-        Capture.CurrentSink = sink;
-        return sink;
+            : new DirectoryInfo(Path.Combine(Options.RawCaptureDirectory.FullName, Diagnostics.RunId, call?.CaptureScope ?? "no-turn"));
+        return new RawCaptureSink(captureId, Options.ContentPolicy, Options.MaxCaptureBytes, Options.MaxCaptureFrames, directory);
     }
 
-    /// <summary>Completes a capture opened by <see cref="BeginCapture"/>, detaches it from the handler and returns its reference.</summary>
+    /// <summary>Completes a capture opened by <see cref="NewCaptureSink"/>, detaches it from the handler when it is the current sink and returns its reference.</summary>
     /// <param name="sink">The sink.</param>
     /// <param name="interrupted">Whether the operation ended before its reply did (the capture is marked interrupted first).</param>
     internal RawCaptureRef EndCapture(RawCaptureSink sink, bool interrupted = false)
@@ -279,8 +276,28 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         return new ExpectationScope(this, predicate);
     }
 
-    /// <summary>Mints a JSON-RPC id (<c>rpc-&lt;32 hex&gt;</c>).</summary>
-    internal string NewRpcId() => "rpc-" + Guid.NewGuid().ToString("N");
+    /// <summary>Mints a JSON-RPC id (<c>rpc-&lt;32 hex&gt;</c>); the one place an id is minted (a turn mints its identity's id here too).</summary>
+    internal static string NewRpcId() => "rpc-" + Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// The one rule for a send's configuration, blocking and streaming alike: <c>returnImmediately: false</c> (a blocking
+    /// send waits for its reply; a streaming send runs to its terminal event — the flag is no streaming-finality
+    /// control), and the profile's accepted output modes, the history length and the routing tenant unless the caller
+    /// set them.
+    /// </summary>
+    /// <param name="request">The request to configure.</param>
+    /// <param name="profile">The diagnostic profile whose output modes are requested.</param>
+    /// <param name="historyLength">The history length; null omits it.</param>
+    /// <param name="routingTenant">The routing tenant of the selected interface; null omits it.</param>
+    internal static void ApplySendConfiguration(SendMessageRequest request, DiagnosticProfile profile, int? historyLength, string? routingTenant)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var configuration = request.Configuration ??= new SendMessageConfiguration();
+        configuration.ReturnImmediately = false;
+        configuration.AcceptedOutputModes ??= AcceptedOutputModesFor(profile);
+        configuration.HistoryLength ??= historyLength;
+        request.Tenant ??= routingTenant;
+    }
 
     /// <summary>
     /// Classifies an exception raised by a transport operation into a safe <see cref="WorkIqFailure"/> (type, status
@@ -500,60 +517,28 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             Capture: capture);
     }
 
-    /// <summary>The issue category a failure category maps to (<see cref="WorkIqFailureCategory.Canceled"/> raises no issue).</summary>
-    /// <param name="category">The failure category.</param>
-    internal static WorkIqIssueCategory? IssueCategoryOf(WorkIqFailureCategory category) => category switch
-    {
-        WorkIqFailureCategory.Unauthorized => WorkIqIssueCategory.Authentication,
-        WorkIqFailureCategory.Forbidden => WorkIqIssueCategory.Permission,
-        WorkIqFailureCategory.Transport => WorkIqIssueCategory.Network,
-        WorkIqFailureCategory.Timeout => WorkIqIssueCategory.Network,
-        WorkIqFailureCategory.RateLimited => WorkIqIssueCategory.Service,
-        WorkIqFailureCategory.RemoteError => WorkIqIssueCategory.Service,
-        WorkIqFailureCategory.NotFound => WorkIqIssueCategory.Service,
-        WorkIqFailureCategory.ProtocolVersionMismatch => WorkIqIssueCategory.Protocol,
-        WorkIqFailureCategory.Malformed => WorkIqIssueCategory.Protocol,
-        WorkIqFailureCategory.UntrustedHost => WorkIqIssueCategory.Config,   // the fix is in trustedHosts (the config), like WorkIqIssueClassifier says
-        WorkIqFailureCategory.Canceled => null,
-        _ => WorkIqIssueCategory.Unknown,
-    };
-
-    /// <summary>A suggested cause for a failure category, for the issue register.</summary>
-    /// <param name="category">The failure category.</param>
-    internal static string SuggestedCauseOf(WorkIqFailureCategory category) => category switch
-    {
-        WorkIqFailureCategory.Unauthorized => "The bearer token was rejected: wrong audience/scope, expired, or the sign-in was for another tenant. Re-run the device-code sign-in with the configured scope.",
-        WorkIqFailureCategory.Forbidden => "The signed-in user or the app registration lacks the delegated WorkIQAgent.Ask permission, its admin consent, or a Work IQ licence.",
-        WorkIqFailureCategory.Transport => "Network, DNS, proxy or TLS problem between this machine and the Work IQ endpoint.",
-        WorkIqFailureCategory.Timeout => "The service did not answer within the configured timeout; raise SendTimeout/RecoveryBudget or check connectivity.",
-        WorkIqFailureCategory.RateLimited => "The tenant or app is throttled; wait for Retry-After and reduce concurrency.",
-        WorkIqFailureCategory.RemoteError => "The service reported an error or ended the task failed/rejected; see the raw capture and the request-id when contacting support.",
-        WorkIqFailureCategory.NotFound => "The agent id, endpoint or task does not exist for this principal (a task may have expired or been purged).",
-        WorkIqFailureCategory.ProtocolVersionMismatch => "The endpoint speaks A2A 0.3 or rejected 1.0; this provider never downgrades. Check the A2A-Version header and the card's supportedInterfaces.",
-        WorkIqFailureCategory.Malformed => "The reply is not a valid A2A 1.0 envelope; the raw capture shows what arrived.",
-        WorkIqFailureCategory.UntrustedHost => "The card or an interface URL points at a host outside trustedHosts; the token was not sent. Fix the config or the card.",
-        WorkIqFailureCategory.Canceled => "The local wait was canceled; the remote task state is unknown.",
-        _ => "Unclassified; see the trace and the raw capture.",
-    };
-
     /// <summary>
-    /// The suggested cause of one failure: <see cref="SuggestedCauseOf(WorkIqFailureCategory)"/>, except for a token wait
-    /// stopped before the call (<see cref="WorkIqAuthHandler.IsSignInNotCompleted"/>), which is no rejected token: nothing
-    /// was sent, the sign-in did not finish.
+    /// Whether this client registers the issue of <paramref name="failure"/>: not when the caller registers it itself
+    /// (<see cref="WorkIqCallContext.CallerRegistersIssues"/>), not for a token failure (the auth layer registered it,
+    /// <see cref="WorkIqFailure.TokenFailure"/>) and not for a local cancellation (the caller stopped the call and knows why).
     /// </summary>
     /// <param name="failure">The failure.</param>
-    internal static string SuggestedCauseOf(WorkIqFailure failure)
-    {
-        ArgumentNullException.ThrowIfNull(failure);
-        return WorkIqAuthHandler.IsSignInNotCompleted(failure) ? WorkIqAuthHandler.SignInNotCompletedCause : SuggestedCauseOf(failure.Category);
-    }
+    /// <param name="call">The per-call context.</param>
+    internal static bool RegistersIssue(WorkIqFailure failure, WorkIqCallContext? call) =>
+        call?.CallerRegistersIssues != true
+        && failure.TokenFailure is null
+        && failure.Category != WorkIqFailureCategory.Canceled;
 
-    /// <summary>Registers an issue for a failure (none for a local cancellation) and traces <c>rpc.error</c>.</summary>
+    /// <summary>
+    /// Traces <c>rpc.error</c> for a failure of a call this client ended and registers its issue when this client owns it
+    /// (<see cref="RegistersIssue"/>); a failure the caller declared expected (<see cref="ExpectFailure"/>) is traced at Info only.
+    /// </summary>
     /// <param name="failure">The failure.</param>
     /// <param name="stage">The pipeline stage.</param>
     /// <param name="rpcId">The JSON-RPC id, when any.</param>
     /// <param name="elapsedMs">Elapsed milliseconds, when measured.</param>
-    internal void ReportFailure(WorkIqFailure failure, WorkIqTraceStage stage, string? rpcId, double? elapsedMs)
+    /// <param name="call">The per-call context.</param>
+    internal void ReportFailure(WorkIqFailure failure, WorkIqTraceStage stage, string? rpcId, double? elapsedMs, WorkIqCallContext? call = null)
     {
         ArgumentNullException.ThrowIfNull(failure);
         if (Volatile.Read(ref _expectedFailure) is { } expected && expected(failure))
@@ -586,38 +571,8 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             ElapsedMs = elapsedMs,
         });
 
-        if (IssueCategoryOf(failure.Category) is { } category)
-        {
-            Diagnostics.Issue(new WorkIqIssue(
-                default,
-                stage,
-                category,
-                $"{failure.Operation.ToString().ToLowerInvariant()}.{failure.Category.ToString().ToLowerInvariant()}",
-                failure.SafeMessage,
-                SuggestedCauseOf(failure.Category))
-            {
-                HttpStatus = failure.HttpStatus,
-                RpcErrorCode = failure.RpcErrorCode,
-                A2AState = failure.RemoteTaskState,
-                RequestId = failure.RequestId,
-                TaskId = failure.TaskId,
-                ContextId = failure.ContextId,
-            });
-        }
+        RegisterIssue(failure, stage, call);
     }
-
-    /// <summary>The trace stage of an operation.</summary>
-    /// <param name="op">The operation.</param>
-    internal static WorkIqTraceStage StageOf(WorkIqOperation op) => op switch
-    {
-        WorkIqOperation.Discover => WorkIqTraceStage.Discovery,
-        WorkIqOperation.Send => WorkIqTraceStage.Send,
-        WorkIqOperation.Stream => WorkIqTraceStage.Stream,
-        WorkIqOperation.GetTask => WorkIqTraceStage.GetTask,
-        WorkIqOperation.CancelTask => WorkIqTraceStage.Cancel,
-        WorkIqOperation.Subscribe => WorkIqTraceStage.Subscribe,
-        _ => WorkIqTraceStage.Send,
-    };
 
     /// <summary>
     /// Detects an A2A 0.3-shaped result (a <c>kind</c> discriminator on the result, its <c>task</c>/<c>message</c>,
@@ -681,11 +636,23 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         return delay > RetryMaxDelay ? RetryMaxDelay : delay;
     }
 
+    /// <summary>
+    /// Registers the one issue of a failure this client ended, classified by <see cref="WorkIqIssueClassifier"/>, when
+    /// <see cref="RegistersIssue"/> says this client owns it.
+    /// </summary>
+    private void RegisterIssue(WorkIqFailure failure, WorkIqTraceStage stage, WorkIqCallContext? call, WorkIqTraceLevel level = WorkIqTraceLevel.Error)
+    {
+        if (RegistersIssue(failure, call))
+        {
+            Diagnostics.Issue(WorkIqIssueClassifier.FromFailure(failure, stage), level);
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     // Discovery
     // ---------------------------------------------------------------------------------------------------------
 
-    private async Task<RawAgentCard> DiscoverCoreAsync(CancellationToken cancellationToken)
+    private async Task<RawAgentCard> DiscoverCoreAsync(WorkIqCallContext? call, CancellationToken cancellationToken)
     {
         var cardUri = Config.ResolveCardUri();
         var started = Clock.GetTimestamp();
@@ -698,68 +665,12 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
                 $"Discover: the card URI {cardUri.Scheme}://{cardUri.Host} is outside the trust policy (trusted: {string.Join(", ", Policy.TrustedHosts)}); nothing was sent",
                 OutcomeCertainty.Known,
                 WorkIqOperation.Discover);
-            ReportDiscoveryFailure(refused, "discovery.untrusted_host", Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw new WorkIqProtocolException(refused);
+            throw FailDiscovery(refused, "discovery.untrusted_host", Clock.GetElapsedTime(started).TotalMilliseconds, call);
         }
 
-        // The token first, outside HttpClient.Timeout: the first sign-in of a run happens here.
-        var token = await AcquireTokenBeforeCallAsync(WorkIqOperation.Discover, HttpMethod.Get, cardUri, WorkIqTraceStage.Discovery, cancellationToken).ConfigureAwait(false);
-
-        var sink = BeginCapture(WorkIqOperation.Discover);
-        HttpExchange exchange;
-        try
-        {
-            exchange = await ExchangeWithRetryAsync(WithToken(() => new HttpRequestMessage(HttpMethod.Get, cardUri), token), WorkIqOperation.Discover, allowRetry: true, taskId: null, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not WorkIqProtocolException)
-        {
-            var capture = EndCapture(sink, interrupted: true);
-            var failure = Classify(ex, WorkIqOperation.Discover, requestId: null, callerToken: cancellationToken, scope: Config.Scope) with { Capture = capture };
-            ReportDiscoveryFailure(failure, "discovery.failed", Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-        catch (WorkIqProtocolException ex)
-        {
-            var capture = EndCapture(sink, interrupted: true);
-            var failure = ex.Failure with { Capture = ex.Failure.Capture ?? capture };
-            ReportDiscoveryFailure(failure, "discovery.failed", Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
-        var captureRef = EndCapture(sink);
+        var (exchange, capture) = await FetchCardAsync(cardUri, started, call, cancellationToken).ConfigureAwait(false);
         var elapsedMs = Clock.GetElapsedTime(started).TotalMilliseconds;
-        if (!exchange.Success)
-        {
-            var failure = ClassifyHttpStatus(exchange.HttpStatus, WorkIqOperation.Discover, exchange.RequestId, null, null, null, captureRef, Config.Scope, exchange.RetryAfter);
-            ReportDiscoveryFailure(failure, "discovery.failed", elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        AgentCard? card;
-        try
-        {
-            card = JsonSerializer.Deserialize<AgentCard>(exchange.Body, A2AJsonUtilities.DefaultOptions);
-        }
-        catch (JsonException ex)
-        {
-            var failure = Classify(ex, WorkIqOperation.Discover, exchange.RequestId) with { Capture = captureRef, HttpStatus = exchange.HttpStatus };
-            ReportDiscoveryFailure(failure, "discovery.failed", elapsedMs);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
-        if (card is null)
-        {
-            var failure = new WorkIqFailure(
-                WorkIqFailureCategory.Malformed,
-                "Discover: the agent card body deserialized to null",
-                OutcomeCertainty.Known,
-                WorkIqOperation.Discover,
-                HttpStatus: exchange.HttpStatus,
-                RequestId: exchange.RequestId,
-                Capture: captureRef);
-            ReportDiscoveryFailure(failure, "discovery.failed", elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
+        var card = ParseCard(exchange, capture, elapsedMs, call);
 
         var sha256 = Sha256Hex(exchange.Bytes);
         Diagnostics.Trace(
@@ -771,36 +682,101 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             httpStatus: exchange.HttpStatus,
             elapsedMs: elapsedMs);
 
-        AgentInterface selected;
-        try
-        {
-            selected = Policy.SelectInterface(card, cardUri);
-        }
-        catch (WorkIqProtocolException ex)
-        {
-            var failure = ex.Failure with { Capture = captureRef, HttpStatus = exchange.HttpStatus, RequestId = exchange.RequestId };
-            ReportDiscoveryFailure(
-                failure,
-                failure.Category == WorkIqFailureCategory.UntrustedHost ? "discovery.untrusted_host" : "discovery.version_mismatch",
-                elapsedMs);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
+        var selected = SelectInterface(card, cardUri, exchange, capture, elapsedMs, call);
         var endpoint = new Uri(selected.Url, UriKind.Absolute);
-        var raw = new RawAgentCard(card, exchange.Body, sha256, cardUri, endpoint, selected.ProtocolVersion.Trim(), exchange.ReceivedAt);
-        Volatile.Write(ref _routingTenant, string.IsNullOrWhiteSpace(selected.Tenant) ? null : selected.Tenant);
+        var routingTenant = string.IsNullOrWhiteSpace(selected.Tenant) ? null : selected.Tenant;
+        var raw = new RawAgentCard(card, exchange.Body, sha256, cardUri, endpoint, selected.ProtocolVersion.Trim(), exchange.ReceivedAt, routingTenant);
         Volatile.Write(ref _client, new A2AClient(endpoint, Http));
         Volatile.Write(ref _card, raw);
         Diagnostics.Trace(
             WorkIqTraceStage.Discovery,
             "discovery.interface_selected",
-            $"selected {selected.ProtocolBinding} {raw.SelectedProtocolVersion} at {endpoint.Scheme}://{endpoint.Host}{endpoint.AbsolutePath} (routing tenant {(RoutingTenant is null ? "absent" : "present")})",
+            $"selected {selected.ProtocolBinding} {raw.SelectedProtocolVersion} at {endpoint.Scheme}://{endpoint.Host}{endpoint.AbsolutePath} (routing tenant {(routingTenant is null ? "absent" : "present")})",
             requestId: exchange.RequestId,
             elapsedMs: Clock.GetElapsedTime(started).TotalMilliseconds);
         return raw;
     }
 
-    private void ReportDiscoveryFailure(WorkIqFailure failure, string code, double elapsedMs)
+    /// <summary>GETs the card (bounded retry) with its own capture; a transport failure or an error status is reported and thrown.</summary>
+    private async Task<(HttpExchange Exchange, RawCaptureRef Capture)> FetchCardAsync(Uri cardUri, long started, WorkIqCallContext? call, CancellationToken cancellationToken)
+    {
+        // The token first, outside HttpClient.Timeout: the first sign-in of a run happens here.
+        var token = await AcquireTokenBeforeCallAsync(WorkIqOperation.Discover, HttpMethod.Get, cardUri, WorkIqTraceStage.Discovery, call, cancellationToken).ConfigureAwait(false);
+
+        var sink = NewCaptureSink(WorkIqOperation.Discover, call);
+        HttpExchange exchange;
+        try
+        {
+            exchange = await ExchangeWithRetryAsync(Prepare(() => new HttpRequestMessage(HttpMethod.Get, cardUri), token, sink), WorkIqOperation.Discover, allowRetry: true, taskId: null, cancellationToken).ConfigureAwait(false);
+        }
+        catch (WorkIqProtocolException ex)
+        {
+            var capture = EndCapture(sink, interrupted: true);
+            var failure = ex.Failure with { Capture = ex.Failure.Capture ?? capture };
+            throw FailDiscovery(failure, "discovery.failed", Clock.GetElapsedTime(started).TotalMilliseconds, call, ex);
+        }
+        catch (Exception ex)
+        {
+            var capture = EndCapture(sink, interrupted: true);
+            var failure = Classify(ex, WorkIqOperation.Discover, requestId: null, callerToken: cancellationToken, scope: Config.Scope) with { Capture = capture };
+            throw FailDiscovery(failure, "discovery.failed", Clock.GetElapsedTime(started).TotalMilliseconds, call, ex);
+        }
+
+        var captureRef = EndCapture(sink);
+        if (!exchange.Success)
+        {
+            var failure = ClassifyHttpStatus(exchange.HttpStatus, WorkIqOperation.Discover, exchange.RequestId, null, null, null, captureRef, Config.Scope, exchange.RetryAfter);
+            throw FailDiscovery(failure, "discovery.failed", Clock.GetElapsedTime(started).TotalMilliseconds, call);
+        }
+
+        return (exchange, captureRef);
+    }
+
+    /// <summary>Parses the card body; a parse failure or a null card is reported and thrown.</summary>
+    private AgentCard ParseCard(HttpExchange exchange, RawCaptureRef capture, double elapsedMs, WorkIqCallContext? call)
+    {
+        AgentCard? card;
+        try
+        {
+            card = JsonSerializer.Deserialize<AgentCard>(exchange.Body, A2AJsonUtilities.DefaultOptions);
+        }
+        catch (JsonException ex)
+        {
+            var failure = Classify(ex, WorkIqOperation.Discover, exchange.RequestId) with { Capture = capture, HttpStatus = exchange.HttpStatus };
+            throw FailDiscovery(failure, "discovery.failed", elapsedMs, call, ex);
+        }
+
+        return card ?? throw FailDiscovery(
+            new WorkIqFailure(
+                WorkIqFailureCategory.Malformed,
+                "Discover: the agent card body deserialized to null",
+                OutcomeCertainty.Known,
+                WorkIqOperation.Discover,
+                HttpStatus: exchange.HttpStatus,
+                RequestId: exchange.RequestId,
+                Capture: capture),
+            "discovery.failed",
+            elapsedMs,
+            call);
+    }
+
+    /// <summary>Lets the trust policy select the interface; a refusal is reported and thrown.</summary>
+    private AgentInterface SelectInterface(AgentCard card, Uri cardUri, HttpExchange exchange, RawCaptureRef capture, double elapsedMs, WorkIqCallContext? call)
+    {
+        try
+        {
+            return Policy.SelectInterface(card, cardUri);
+        }
+        catch (WorkIqProtocolException ex)
+        {
+            var failure = ex.Failure with { Capture = capture, HttpStatus = exchange.HttpStatus, RequestId = exchange.RequestId };
+            var code = failure.Category == WorkIqFailureCategory.UntrustedHost ? "discovery.untrusted_host" : "discovery.version_mismatch";
+            throw FailDiscovery(failure, code, elapsedMs, call, ex);
+        }
+    }
+
+    /// <summary>Traces a discovery failure under <paramref name="code"/>, registers its issue when this client owns it, and returns the exception to throw.</summary>
+    private WorkIqProtocolException FailDiscovery(WorkIqFailure failure, string code, double elapsedMs, WorkIqCallContext? call, Exception? inner = null)
     {
         Diagnostics.Trace(new WorkIqTraceEvent(default, WorkIqTraceStage.Discovery, WorkIqTraceLevel.Error, code, $"{failure.Category} ({failure.Certainty}): {failure.SafeMessage}")
         {
@@ -810,15 +786,8 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             ElapsedMs = elapsedMs,
         });
 
-        if (IssueCategoryOf(failure.Category) is { } category)
-        {
-            Diagnostics.Issue(new WorkIqIssue(default, WorkIqTraceStage.Discovery, category, code, failure.SafeMessage, SuggestedCauseOf(failure.Category))
-            {
-                HttpStatus = failure.HttpStatus,
-                RpcErrorCode = failure.RpcErrorCode,
-                RequestId = failure.RequestId,
-            });
-        }
+        RegisterIssue(failure, WorkIqTraceStage.Discovery, call);
+        return new WorkIqProtocolException(failure, inner);
     }
 
     private static string Describe(bool? value) => value is null ? "unknown" : value.Value ? "true" : "false";
@@ -835,164 +804,24 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         string? taskId,
         string? contextId,
         string? messageId,
+        WorkIqCallContext? call,
         CancellationToken cancellationToken)
         where T : class
     {
-        var card = Card ?? await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
-        var stage = StageOf(op);
+        var card = Card ?? await EnsureDiscoveredAsync(cancellationToken, call).ConfigureAwait(false);
+        var stage = WorkIqIssueClassifier.StageFor(op);
 
         // The token before the call and before "rpc.sent": a sign-in that does not finish sends nothing.
-        var token = await AcquireTokenBeforeCallAsync(op, HttpMethod.Post, card.SelectedEndpoint, stage, cancellationToken).ConfigureAwait(false);
-        var rpcId = Interlocked.Exchange(ref _nextRpcId, null) ?? NewRpcId();
-        var envelope = new JsonRpcRequest
-        {
-            Method = method,
-            Id = new JsonRpcId(rpcId),
-            Params = JsonSerializer.SerializeToElement(parameters, parameters.GetType(), A2AJsonUtilities.DefaultOptions),
-        };
-
-        var started = Clock.GetTimestamp();
-        Diagnostics.Trace(new WorkIqTraceEvent(default, stage, WorkIqTraceLevel.Info, "rpc.sent", $"{method} → {card.SelectedEndpoint.Host}{card.SelectedEndpoint.AbsolutePath}{(allowRetry ? "" : " (never retried)")}")
-        {
-            RpcId = rpcId,
-            MessageId = messageId,
-            TaskId = taskId,
-            ContextId = contextId,
-        });
-
-        var sink = BeginCapture(op);
-        HttpExchange exchange;
-        try
-        {
-            exchange = await ExchangeWithRetryAsync(
-                WithToken(() => new HttpRequestMessage(HttpMethod.Post, card.SelectedEndpoint) { Content = new JsonRpcContent(envelope) }, token),
-                op,
-                allowRetry,
-                taskId,
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (WorkIqProtocolException ex)
-        {
-            var capture = EndCapture(sink, interrupted: true);
-            var failure = ex.Failure with
-            {
-                Capture = ex.Failure.Capture ?? capture,
-                RpcRequestId = ex.Failure.RpcRequestId ?? rpcId,
-                TaskId = ex.Failure.TaskId ?? taskId,
-                ContextId = ex.Failure.ContextId ?? contextId,
-            };
-            ReportFailure(failure, stage, rpcId, Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-        catch (Exception ex)
-        {
-            var capture = EndCapture(sink, interrupted: true);
-            var failure = Classify(ex, op, requestId: null, taskId, contextId, cancellationToken, Config.Scope) with { Capture = capture, RpcRequestId = rpcId };
-            ReportFailure(failure, stage, rpcId, Clock.GetElapsedTime(started).TotalMilliseconds);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
-        var captureRef = EndCapture(sink);
-        var elapsedMs = Clock.GetElapsedTime(started).TotalMilliseconds;
-
-        if (!exchange.Success)
-        {
-            var failure = ClassifyHttpStatus(exchange.HttpStatus, op, exchange.RequestId, rpcId, taskId, contextId, captureRef, Config.Scope, exchange.RetryAfter);
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        JsonRpcResponse? rpc;
-        try
-        {
-            rpc = JsonSerializer.Deserialize<JsonRpcResponse>(exchange.Body, A2AJsonUtilities.DefaultOptions);
-        }
-        catch (JsonException ex)
-        {
-            var failure = Classify(ex, op, exchange.RequestId, taskId, contextId) with { Capture = captureRef, RpcRequestId = rpcId, HttpStatus = exchange.HttpStatus };
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
-        if (rpc is null)
-        {
-            var failure = Malformed(op, "the JSON-RPC envelope deserialized to null", exchange, rpcId, taskId, contextId, captureRef);
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        if (rpc.Error is { } error)
-        {
-            var failure = ClassifyRpcError(error.Code, op, exchange.RequestId, rpcId, taskId, contextId, captureRef) with { HttpStatus = exchange.HttpStatus };
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        if (rpc.Id.HasValue && !string.Equals(rpc.Id.ToString(), rpcId, StringComparison.Ordinal))
-        {
-            Diagnostics.Trace(new WorkIqTraceEvent(default, stage, WorkIqTraceLevel.Warning, "rpc.id_mismatch", $"{method}: the reply's JSON-RPC id differs from the request id (reply correlated by HTTP exchange)")
-            {
-                RpcId = rpcId,
-                RequestId = exchange.RequestId,
-                HttpStatus = exchange.HttpStatus,
-                TaskId = taskId,
-                ContextId = contextId,
-            });
-        }
-
-        if (rpc.Result is null)
-        {
-            var failure = Malformed(op, "the JSON-RPC envelope carries neither result nor error", exchange, rpcId, taskId, contextId, captureRef);
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        if (DetectLegacyShape(rpc.Result) is { } legacy)
-        {
-            var failure = new WorkIqFailure(
-                WorkIqFailureCategory.ProtocolVersionMismatch,
-                $"{op}: {legacy}; this provider speaks 1.0 only and never downgrades",
-                OutcomeCertainty.Known,
-                op,
-                HttpStatus: exchange.HttpStatus,
-                RequestId: exchange.RequestId,
-                RpcRequestId: rpcId,
-                TaskId: taskId,
-                ContextId: contextId,
-                Capture: captureRef);
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        T? value;
-        try
-        {
-            value = rpc.Result.Deserialize<T>(A2AJsonUtilities.DefaultOptions);
-        }
-        catch (JsonException ex)
-        {
-            var failure = Classify(ex, op, exchange.RequestId, taskId, contextId) with { Capture = captureRef, RpcRequestId = rpcId, HttpStatus = exchange.HttpStatus };
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure, ex);
-        }
-
-        if (value is null)
-        {
-            var failure = Malformed(op, "the JSON-RPC result deserialized to null", exchange, rpcId, taskId, contextId, captureRef);
-            ReportFailure(failure, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(failure);
-        }
-
-        if (ValidateResult(value, op, taskId, exchange, rpcId, contextId, captureRef) is { } invalid)
-        {
-            ReportFailure(invalid, stage, rpcId, elapsedMs);
-            throw new WorkIqProtocolException(invalid);
-        }
+        var token = await AcquireTokenBeforeCallAsync(op, HttpMethod.Post, card.SelectedEndpoint, stage, call, cancellationToken).ConfigureAwait(false);
+        var rpc = new RpcCall(method, op, stage, call?.RpcId ?? NewRpcId(), taskId, contextId, call);
+        var (exchange, capture, elapsedMs) = await ExchangeAsync(rpc, card.SelectedEndpoint, parameters, messageId, allowRetry, token, cancellationToken).ConfigureAwait(false);
+        var result = ReadEnvelope(rpc, exchange, capture, elapsedMs);
+        var value = ReadValue<T>(rpc, result, exchange, capture, elapsedMs);
 
         var (replyTaskId, replyContextId, replyState, replyMessageId) = DescribeResult(value);
         Diagnostics.Trace(new WorkIqTraceEvent(default, stage, WorkIqTraceLevel.Info, "rpc.response", $"{method} ← HTTP {exchange.HttpStatus}: {DescribeShape(value)}")
         {
-            RpcId = rpcId,
+            RpcId = rpc.RpcId,
             MessageId = replyMessageId,
             TaskId = replyTaskId ?? taskId,
             ContextId = replyContextId ?? contextId,
@@ -1002,7 +831,167 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             ElapsedMs = elapsedMs,
         });
 
-        return new WorkIqRpcResult<T>(value, captureRef, exchange.RequestId, exchange.HttpStatus, exchange.ReceivedAt);
+        return new WorkIqRpcResult<T>(value, capture, exchange.RequestId, exchange.HttpStatus, exchange.ReceivedAt);
+    }
+
+    /// <summary>Posts the envelope (a safe read under the bounded retry) with its own capture; a transport failure is reported and thrown.</summary>
+    private async Task<(HttpExchange Exchange, RawCaptureRef Capture, double ElapsedMs)> ExchangeAsync(
+        RpcCall rpc,
+        Uri endpoint,
+        object parameters,
+        string? messageId,
+        bool allowRetry,
+        string? token,
+        CancellationToken cancellationToken)
+    {
+        var envelope = new JsonRpcRequest
+        {
+            Method = rpc.Method,
+            Id = new JsonRpcId(rpc.RpcId),
+            Params = JsonSerializer.SerializeToElement(parameters, parameters.GetType(), A2AJsonUtilities.DefaultOptions),
+        };
+
+        var started = Clock.GetTimestamp();
+        Diagnostics.Trace(new WorkIqTraceEvent(default, rpc.Stage, WorkIqTraceLevel.Info, "rpc.sent", $"{rpc.Method} → {endpoint.Host}{endpoint.AbsolutePath}{(allowRetry ? "" : " (never retried)")}")
+        {
+            RpcId = rpc.RpcId,
+            MessageId = messageId,
+            TaskId = rpc.TaskId,
+            ContextId = rpc.ContextId,
+        });
+
+        var sink = NewCaptureSink(rpc.Op, rpc.Call);
+        HttpExchange exchange;
+        try
+        {
+            exchange = await ExchangeWithRetryAsync(
+                Prepare(() => new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = new JsonRpcContent(envelope) }, token, sink),
+                rpc.Op,
+                allowRetry,
+                rpc.TaskId,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (WorkIqProtocolException ex)
+        {
+            var capture = EndCapture(sink, interrupted: true);
+            var failure = ex.Failure with
+            {
+                Capture = ex.Failure.Capture ?? capture,
+                RpcRequestId = ex.Failure.RpcRequestId ?? rpc.RpcId,
+                TaskId = ex.Failure.TaskId ?? rpc.TaskId,
+                ContextId = ex.Failure.ContextId ?? rpc.ContextId,
+            };
+            throw Fail(rpc, failure, Clock.GetElapsedTime(started).TotalMilliseconds, ex);
+        }
+        catch (Exception ex)
+        {
+            var capture = EndCapture(sink, interrupted: true);
+            var failure = Classify(ex, rpc.Op, requestId: null, rpc.TaskId, rpc.ContextId, cancellationToken, Config.Scope) with { Capture = capture, RpcRequestId = rpc.RpcId };
+            throw Fail(rpc, failure, Clock.GetElapsedTime(started).TotalMilliseconds, ex);
+        }
+
+        var captureRef = EndCapture(sink);
+        return (exchange, captureRef, Clock.GetElapsedTime(started).TotalMilliseconds);
+    }
+
+    /// <summary>Checks the HTTP status and the JSON-RPC envelope (an error object, no result, an A2A 0.3 shape) and returns the <c>result</c> node.</summary>
+    private JsonNode ReadEnvelope(RpcCall rpc, HttpExchange exchange, RawCaptureRef capture, double elapsedMs)
+    {
+        if (!exchange.Success)
+        {
+            throw Fail(rpc, ClassifyHttpStatus(exchange.HttpStatus, rpc.Op, exchange.RequestId, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture, Config.Scope, exchange.RetryAfter), elapsedMs);
+        }
+
+        JsonRpcResponse? response;
+        try
+        {
+            response = JsonSerializer.Deserialize<JsonRpcResponse>(exchange.Body, A2AJsonUtilities.DefaultOptions);
+        }
+        catch (JsonException ex)
+        {
+            var failure = Classify(ex, rpc.Op, exchange.RequestId, rpc.TaskId, rpc.ContextId) with { Capture = capture, RpcRequestId = rpc.RpcId, HttpStatus = exchange.HttpStatus };
+            throw Fail(rpc, failure, elapsedMs, ex);
+        }
+
+        if (response is null)
+        {
+            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC envelope deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+        }
+
+        if (response.Error is { } error)
+        {
+            throw Fail(rpc, ClassifyRpcError(error.Code, rpc.Op, exchange.RequestId, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture) with { HttpStatus = exchange.HttpStatus }, elapsedMs);
+        }
+
+        if (response.Id.HasValue && !string.Equals(response.Id.ToString(), rpc.RpcId, StringComparison.Ordinal))
+        {
+            Diagnostics.Trace(new WorkIqTraceEvent(default, rpc.Stage, WorkIqTraceLevel.Warning, "rpc.id_mismatch", $"{rpc.Method}: the reply's JSON-RPC id differs from the request id (reply correlated by HTTP exchange)")
+            {
+                RpcId = rpc.RpcId,
+                RequestId = exchange.RequestId,
+                HttpStatus = exchange.HttpStatus,
+                TaskId = rpc.TaskId,
+                ContextId = rpc.ContextId,
+            });
+        }
+
+        if (response.Result is null)
+        {
+            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC envelope carries neither result nor error", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+        }
+
+        if (DetectLegacyShape(response.Result) is { } legacy)
+        {
+            var failure = new WorkIqFailure(
+                WorkIqFailureCategory.ProtocolVersionMismatch,
+                $"{rpc.Op}: {legacy}; this provider speaks 1.0 only and never downgrades",
+                OutcomeCertainty.Known,
+                rpc.Op,
+                HttpStatus: exchange.HttpStatus,
+                RequestId: exchange.RequestId,
+                RpcRequestId: rpc.RpcId,
+                TaskId: rpc.TaskId,
+                ContextId: rpc.ContextId,
+                Capture: capture);
+            throw Fail(rpc, failure, elapsedMs);
+        }
+
+        return response.Result;
+    }
+
+    /// <summary>Deserializes and validates the typed result (one-of rules, the task id asked for).</summary>
+    private T ReadValue<T>(RpcCall rpc, JsonNode result, HttpExchange exchange, RawCaptureRef capture, double elapsedMs)
+        where T : class
+    {
+        T? value;
+        try
+        {
+            value = result.Deserialize<T>(A2AJsonUtilities.DefaultOptions);
+        }
+        catch (JsonException ex)
+        {
+            var failure = Classify(ex, rpc.Op, exchange.RequestId, rpc.TaskId, rpc.ContextId) with { Capture = capture, RpcRequestId = rpc.RpcId, HttpStatus = exchange.HttpStatus };
+            throw Fail(rpc, failure, elapsedMs, ex);
+        }
+
+        if (value is null)
+        {
+            throw Fail(rpc, Malformed(rpc.Op, "the JSON-RPC result deserialized to null", exchange, rpc.RpcId, rpc.TaskId, rpc.ContextId, capture), elapsedMs);
+        }
+
+        if (ValidateResult(value, rpc.Op, rpc.TaskId, exchange, rpc.RpcId, rpc.ContextId, capture) is { } invalid)
+        {
+            throw Fail(rpc, invalid, elapsedMs);
+        }
+
+        return value;
+    }
+
+    /// <summary>Reports a failure of a JSON-RPC call (<see cref="ReportFailure"/>) and returns the exception to throw.</summary>
+    private WorkIqProtocolException Fail(RpcCall rpc, WorkIqFailure failure, double elapsedMs, Exception? inner = null)
+    {
+        ReportFailure(failure, rpc.Stage, rpc.RpcId, elapsedMs, rpc.Call);
+        return new WorkIqProtocolException(failure, inner);
     }
 
     private static WorkIqFailure Malformed(WorkIqOperation op, string what, HttpExchange exchange, string rpcId, string? taskId, string? contextId, RawCaptureRef capture) =>
@@ -1027,7 +1016,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
             case SendMessageResponse reply when reply.Task is not null && reply.Message is not null:
                 return Malformed(op, "SendMessage reply carries both task and message (one-of violation)", exchange, rpcId, reply.Task.Id, contextId, capture);
             case AgentTask task when requestedTaskId is not null && !string.Equals(task.Id, requestedTaskId, StringComparison.Ordinal):
-                Diagnostics.Trace(new WorkIqTraceEvent(default, StageOf(op), WorkIqTraceLevel.Warning, "rpc.task_id_mismatch", $"{op}: the reply describes another task than the one requested")
+                Diagnostics.Trace(new WorkIqTraceEvent(default, WorkIqIssueClassifier.StageFor(op), WorkIqTraceLevel.Warning, "rpc.task_id_mismatch", $"{op}: the reply describes another task than the one requested")
                 {
                     RpcId = rpcId,
                     TaskId = requestedTaskId,
@@ -1082,6 +1071,9 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
     private sealed record HttpExchange(int HttpStatus, bool Success, string? RequestId, byte[] Bytes, string Body, DateTimeOffset ReceivedAt, TimeSpan? RetryAfter);
 
+    /// <summary>The facts of one JSON-RPC call that every step reports with.</summary>
+    private sealed record RpcCall(string Method, WorkIqOperation Op, WorkIqTraceStage Stage, string RpcId, string? TaskId, string? ContextId, WorkIqCallContext? Call);
+
     /// <summary>Ends an <see cref="ExpectFailure"/> declaration (only its own: a later declaration is left in place).</summary>
     private sealed class ExpectationScope : IDisposable
     {
@@ -1113,8 +1105,9 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
     /// <param name="method">The HTTP method of the call.</param>
     /// <param name="destination">The call's URI.</param>
     /// <param name="stage">The trace stage of the operation.</param>
+    /// <param name="call">The per-call context (the case and turn stamped on the auth layer's issue).</param>
     /// <param name="cancellationToken">The operation's token.</param>
-    internal async Task<string?> AcquireTokenBeforeCallAsync(WorkIqOperation op, HttpMethod method, Uri destination, WorkIqTraceStage stage, CancellationToken cancellationToken)
+    internal async Task<string?> AcquireTokenBeforeCallAsync(WorkIqOperation op, HttpMethod method, Uri destination, WorkIqTraceStage stage, WorkIqCallContext? call, CancellationToken cancellationToken)
     {
         if (Auth is null)
         {
@@ -1123,7 +1116,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
         try
         {
-            return await Auth.AcquireTokenAsync(op, WorkIqAuthHandler.DescribeDestination(method, destination), outsideHttpTimeout: true, cancellationToken).ConfigureAwait(false);
+            return await Auth.AcquireTokenAsync(op, WorkIqAuthHandler.DescribeDestination(method, destination), outsideHttpTimeout: true, cancellationToken, call).ConfigureAwait(false);
         }
         catch (WorkIqProtocolException ex)
         {
@@ -1138,18 +1131,26 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         }
     }
 
-    /// <summary>Wraps a request factory so every request it builds carries <paramref name="token"/> for the auth handler (unchanged when null).</summary>
+    /// <summary>
+    /// Wraps a request factory so every request it builds carries its own capture sink for the capture handler and,
+    /// when set, the pre-acquired token for the auth handler: both travel on the request, never in a field another
+    /// call on this client could overwrite.
+    /// </summary>
     /// <param name="factory">The request factory.</param>
     /// <param name="token">The pre-acquired token, or null.</param>
-    private static Func<HttpRequestMessage> WithToken(Func<HttpRequestMessage> factory, string? token) =>
-        token is null
-            ? factory
-            : () =>
+    /// <param name="sink">The capture sink of the operation.</param>
+    private static Func<HttpRequestMessage> Prepare(Func<HttpRequestMessage> factory, string? token, RawCaptureSink sink) =>
+        () =>
+        {
+            var request = factory();
+            request.Options.Set(RawCaptureHandler.SinkOption, sink);
+            if (token is not null)
             {
-                var request = factory();
                 request.Options.Set(WorkIqAuthHandler.PreAcquiredTokenOption, token);
-                return request;
-            };
+            }
+
+            return request;
+        };
 
     private async Task<HttpExchange> ExchangeWithRetryAsync(
         Func<HttpRequestMessage> requestFactory,
@@ -1173,7 +1174,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
 
             var delay = ComputeRetryDelay(attempt, exchange.RetryAfter);
             Diagnostics.Trace(
-                StageOf(op),
+                WorkIqIssueClassifier.StageFor(op),
                 "rpc.retry",
                 $"{op}: HTTP {exchange.HttpStatus}; retry {attempt + 1}/{MaxRetries} after {delay.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture)} ms " +
                 $"(Retry-After {(exchange.RetryAfter is null ? "absent" : "honoured")})",

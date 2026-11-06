@@ -8,9 +8,9 @@ using AgentEval.Microsoft365Demo.Tests.TestHelpers;
 namespace AgentEval.Microsoft365Demo.Tests;
 
 /// <summary>
-/// The demo console's own controls, unit by unit: the device-code mask that keeps the sign-in code out of console.log
-/// (review M3 of the final gate: it had no test), and the ASCII markers a redirected screen gets instead of the symbols
-/// (review L2: <c>✓ ✗ –</c> printed as <c>?</c> on Windows), with console.log always UTF-8.
+/// The demo console's own controls, unit by unit: the device-code mask that keeps the sign-in code out of console.log,
+/// and the ASCII markers a redirected screen gets instead of the symbols (<c>✓ ✗ –</c> otherwise print as <c>?</c> on
+/// Windows), with console.log always UTF-8.
 /// </summary>
 public sealed class DemoConsoleTests : IDisposable
 {

@@ -23,6 +23,9 @@ namespace AgentEval.Microsoft365Demo;
 /// <param name="Owned">Whether <see cref="Dispose"/> disposes <paramref name="Client"/>.</param>
 internal sealed record JudgeChoice(IChatClient? Client, string Description, string NotMeasuredReason, bool Owned) : IDisposable
 {
+    /// <summary>The judge of a run whose benchmark does not run: none, and nothing resolved.</summary>
+    public static JudgeChoice NotUsed { get; } = new(null, "not used (the benchmark does not run in this invocation)", "the benchmark did not run", Owned: false);
+
     /// <summary>Whether the criteria are graded.</summary>
     public bool IsAvailable => Client is not null;
 
@@ -87,16 +90,29 @@ internal static class JudgeResolver
             IChatClient client = settings.UsesAzureProtocol
                 ? new AzureOpenAIClient(endpoint, new AzureKeyCredential(key)).GetChatClient(model).AsIChatClient().WithMinimalReasoning()
                 : new OpenAIClient(new ApiKeyCredential(key), new OpenAIClientOptions { Endpoint = endpoint }).GetChatClient(model).AsIChatClient().WithMinimalReasoning();
-            return new JudgeChoice(
-                client,
-                $"{settings.DisplayName}, model {model} ({(settings.Selection == InferenceProviderSelection.Explicit ? InferenceProviderEnvironment.SelectorVariable : "auto-detected")}); judge calls cost money on that provider",
-                "",
-                Owned: true);
+            return new JudgeChoice(client, $"{settings.DisplayName}, model {model} ({ChosenBy(settings)}); judge calls cost money on that provider", "", Owned: true);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UriFormatException)
         {
             var why = $"the judge client could not be built ({ex.GetType().Name}: {WorkIqRedaction.Redact(ex.Message)})";
             return new JudgeChoice(null, "none (" + why + ")", "no judge: " + why, Owned: false);
         }
+    }
+
+    /// <summary>
+    /// How the provider was chosen, naming the variables: <c>AI_INFERENCE_PROVIDER=openai</c>, or
+    /// <c>auto-detected from OPENAI_API_KEY; AI_INFERENCE_PROVIDER is not set</c>, so a tester sees which exported key is used.
+    /// </summary>
+    private static string ChosenBy(InferenceProviderSettings settings)
+    {
+        if (settings.Selection == InferenceProviderSelection.Explicit)
+        {
+            return $"{InferenceProviderEnvironment.SelectorVariable}={settings.ProviderTag}";
+        }
+
+        // Auto-detection picks the first provider whose required variables are all set; with no variable set, the
+        // resolver lists exactly those required variables.
+        var detectedFrom = InferenceProviderEnvironment.MissingVariablesOf(settings.Provider, _ => null);
+        return $"auto-detected from {string.Join(", ", detectedFrom)}; {InferenceProviderEnvironment.SelectorVariable} is not set";
     }
 }

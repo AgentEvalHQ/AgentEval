@@ -12,7 +12,7 @@ namespace AgentEval.Microsoft365Demo;
 /// <summary>How much the screen shows. The run folder's <c>console.log</c> always holds the <see cref="Diagnostic"/> view.</summary>
 internal enum DemoVerbosity
 {
-    /// <summary>The final table and errors (plus the sign-in prompt, which the tester must see).</summary>
+    /// <summary>The final table and errors (plus the sign-in prompt and the judge line before the benchmark, which the tester must see).</summary>
     Quiet,
 
     /// <summary>Default: stage lines (✓/✗/–), one line per turn, one line per issue.</summary>
@@ -187,7 +187,8 @@ internal static class DemoCommandLine
             {
                 HelpName = "quiet|normal|detailed|diagnostic",
                 DefaultValueFactory = _ => "normal",
-                Description = "What the screen shows. quiet: the final table and errors. normal: stage lines (✓/✗/–), one line per turn, one line per issue. " +
+                Description = "What the screen shows. quiet: the final table and errors, plus the sign-in prompt and which judge grades the benchmark. " +
+                              "normal: stage lines (✓/✗/–), one line per turn, one line per issue. " +
                               "detailed: also every trace event and an issue detail block (stage, category, code, AADSTS/HTTP/JSON-RPC codes, request-id, " +
                               "task/context ids, message, cause, action). diagnostic: also each event's data and timings. console.log in the run folder " +
                               "always holds the diagnostic view.",
@@ -216,7 +217,9 @@ internal static class DemoCommandLine
                 HelpName = "file",
                 Description = "The benchmark cases: a JSON array of objects with id and input, and optional evaluation_criteria (strings), passing_score " +
                               "(0-100, default 70), category and tags: the format of samples/datasets/m365-smoke.json. Ids use letters, digits, '.', '_' " +
-                              "or '-'. Default: the 5 read-only cases embedded in the demo (copied from m365-smoke.json).",
+                              "or '-'. 'expected' is accepted and ignored, and the run says so (the agenteval CLI uses it as a substring check when a case " +
+                              "is not graded by a judge); any other field is ignored as well, and the run names it per case. Default: the 5 read-only cases embedded in the demo (from " +
+                              "m365-smoke.json, without 'expected').",
             };
             NoBenchmark = new Option<bool>("--no-benchmark")
             {

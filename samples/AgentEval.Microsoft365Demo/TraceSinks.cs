@@ -18,7 +18,6 @@ namespace AgentEval.Microsoft365Demo;
 internal sealed class DemoTraceSink : IWorkIqTraceSink
 {
     private readonly DemoConsole _console;
-    private int _count;
 
     /// <summary>Creates the sink.</summary>
     /// <param name="console">The demo console.</param>
@@ -26,9 +25,6 @@ internal sealed class DemoTraceSink : IWorkIqTraceSink
     {
         _console = console ?? throw new ArgumentNullException(nameof(console));
     }
-
-    /// <summary>How many events the sink received.</summary>
-    public int Count => Volatile.Read(ref _count);
 
     /// <summary>
     /// Called with every readiness verdict event (<c>doctor.&lt;stage&gt;.pass|fail|skipped</c>) after the event's own line:
@@ -62,7 +58,10 @@ internal sealed class DemoTraceSink : IWorkIqTraceSink
         }
     }
 
-    /// <summary>Reads a readiness verdict event: <c>doctor.&lt;stage&gt;.pass|fail|skipped</c> with its <c>requested</c> flag.</summary>
+    /// <summary>
+    /// Reads a readiness verdict event: the stage and verdict from its documented trace code
+    /// <c>doctor.&lt;stage&gt;.pass|fail|skipped</c>, and its <c>requested</c> flag from the event's data.
+    /// </summary>
     /// <param name="e">The event.</param>
     /// <param name="stage">The stage name.</param>
     /// <param name="verdict">The verdict.</param>
@@ -96,7 +95,6 @@ internal sealed class DemoTraceSink : IWorkIqTraceSink
 
     private void WriteLine(WorkIqTraceEvent e)
     {
-        Interlocked.Increment(ref _count);
         var full = ConsoleTraceSink.Format(e);
         string? screen = null;
         if (_console.Shows(DemoVerbosity.Diagnostic))
@@ -227,14 +225,39 @@ internal sealed class DemoIssueSink : IWorkIqIssueSink
     }
 }
 
+/// <summary>
+/// The heading an issue is grouped under in summary.md and the final table: a judge issue under "Judge" (the judge's
+/// provider settings fix it), every other issue under its category.
+/// </summary>
+/// <param name="Name">The heading (<c>Judge</c>, or the category name).</param>
+/// <param name="Order">The sort order: the categories in their declared order, then the judge.</param>
+/// <param name="WhoFixes">Who or what can fix the issues of this group.</param>
+internal sealed record IssueGroup(string Name, int Order, string WhoFixes);
+
 /// <summary>How an issue is shown: the one-liner, the detail block, and the plain-language cause and action.</summary>
 internal static class IssueText
 {
-    /// <summary>The separator the readiness check puts between what a failure means and what to do.</summary>
+    /// <summary>
+    /// The separator the provider's readiness check puts between what a failure means and what to do. The provider's
+    /// issue has one text field for both; the demo splits it here and nowhere else.
+    /// </summary>
     private const string WhatToDo = " What to do: ";
 
-    /// <summary>The separator of the AADSTS catalogue's "code: cause → fix" form.</summary>
+    /// <summary>The separator of the provider's AADSTS catalogue form (<c>code: cause → fix</c>); split here and nowhere else.</summary>
     private const string Arrow = " → ";
+
+    /// <summary>Who fixes a judge issue.</summary>
+    private const string JudgeWhoFixes = "the judge model's provider settings (AI_INFERENCE_PROVIDER and its variables), not the agent or Work IQ";
+
+    /// <summary>Whether <paramref name="i"/> is about the judge (<c>judge.*</c>), not the agent, Work IQ or the sign-in.</summary>
+    /// <param name="i">The issue.</param>
+    public static bool IsJudge(WorkIqIssue i) => i.Code.StartsWith("judge.", StringComparison.Ordinal);
+
+    /// <summary>The group <paramref name="i"/> is listed under: <c>Judge</c> for a judge issue, else its category.</summary>
+    /// <param name="i">The issue.</param>
+    public static IssueGroup GroupOf(WorkIqIssue i) => IsJudge(i)
+        ? new IssueGroup("Judge", int.MaxValue, JudgeWhoFixes)
+        : new IssueGroup(i.Category.ToString(), (int)i.Category, WhoFixes(i.Category));
 
     /// <summary>One line: <c>! issue Category code (Stage) HTTP … JSON-RPC … AADSTS… req=… — message</c>.</summary>
     /// <param name="i">The issue.</param>
@@ -287,10 +310,7 @@ internal static class IssueText
 
     /// <summary>Who or what can fix <paramref name="i"/>: the judge's provider for a judge issue, else by its category.</summary>
     /// <param name="i">The issue.</param>
-    public static string WhoFixes(WorkIqIssue i) =>
-        i.Code.StartsWith("judge.", StringComparison.Ordinal)
-            ? "the judge model's provider settings (AI_INFERENCE_PROVIDER and its variables), not the agent or Work IQ"
-            : WhoFixes(i.Category);
+    public static string WhoFixes(WorkIqIssue i) => GroupOf(i).WhoFixes;
 
     /// <summary>The detail block of one issue (several lines, each field only when known).</summary>
     /// <param name="i">The issue.</param>
@@ -355,13 +375,19 @@ internal static class IssueText
     }
 
     /// <summary>
-    /// The cause and the action of an issue: the readiness check's "meaning. What to do: action" and the AADSTS
-    /// catalogue's "code: cause → fix" are split; otherwise the suggested cause is the cause and the action comes from the
-    /// category (who can fix it).
+    /// The cause and the action of an issue. A judge issue is the demo's own: both come from <see cref="JudgeFailure"/>.
+    /// A provider issue carries both in one text field: the readiness check's "meaning. What to do: action" and the
+    /// AADSTS catalogue's "code: cause → fix" are split; otherwise the suggested cause is the cause and the action comes
+    /// from the category (who can fix it).
     /// </summary>
     /// <param name="i">The issue.</param>
     public static (string Cause, string Action) CauseAndAction(WorkIqIssue i)
     {
+        if (IsJudge(i))
+        {
+            return (JudgeFailure.CauseFor(i.HttpStatus), JudgeFailure.ActionFor(i.HttpStatus));
+        }
+
         var suggested = Flatten(i.SuggestedCause);
         var at = suggested.IndexOf(WhatToDo, StringComparison.Ordinal);
         if (at >= 0)

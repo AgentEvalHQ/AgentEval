@@ -180,7 +180,7 @@ public sealed class BenchmarkTests : IDisposable
     [Fact]
     public async Task FullRun_TheJudgeCallFailsWith401_TheCaseIsNotMeasured_TheAgentsChecksStand_AndTheIssueNamesTheJudge()
     {
-        // Review M1: a judge outage after a completed turn was an ERROR row "the turn did not complete: outcome Completed".
+        // A judge outage after a completed turn is the judge's failure: never an ERROR row "the turn did not complete: outcome Completed".
         _rig.WithHealthyEndpoint().WithCompletedTurns();
         var judge = new ThrowingJudgeChatClient();
         _rig.Judge = judge;
@@ -231,7 +231,7 @@ public sealed class BenchmarkTests : IDisposable
     [Fact]
     public async Task FullRun_TheJudgeFailsWith503OnEveryCase_TheScreenShowsTheIssueOnceWithItsCount_TheFilesKeepEveryOccurrence()
     {
-        // Review L4 (screen noise): the same issue on three cases is one block on the screen and a ×3 count, three entries in the files.
+        // The same issue on three cases is one block on the screen and a ×3 count, three entries in the files.
         _rig.WithHealthyEndpoint().WithCompletedTurns();
         _rig.Judge = new ThrowingJudgeChatClient { Status = System.Net.HttpStatusCode.ServiceUnavailable };
         var dataset = _rig.WriteDataset("""

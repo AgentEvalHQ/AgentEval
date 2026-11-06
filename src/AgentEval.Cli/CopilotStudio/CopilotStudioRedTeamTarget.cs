@@ -52,7 +52,7 @@ internal sealed record CopilotStudioTargetOptions : IRedTeamTargetOptions
 /// <summary>
 /// Parsed <c>--sut copilot-studio</c> options under the shared <c>eval</c>/<c>bench</c> seam (Track 2) —
 /// mirrors <see cref="CopilotStudioTargetOptions"/>'s config and max-credits fields exactly. The consent flag
-/// is deliberately NOT here (M03): under this seam it is common to every live target and travels on
+/// is deliberately NOT here: under this seam it is common to every live target and travels on
 /// <see cref="CommonTargetOptions.AckLiveSideEffects"/>, registered once per verb by <c>SutTargetResolver</c>;
 /// only the redteam path keeps it on <see cref="CopilotStudioTargetOptions"/>. Deliberately duplicated rather
 /// than shared: the two option TYPES (<see cref="IRedTeamTargetOptions"/> vs <see cref="ISutTargetOptions"/>)
@@ -85,7 +85,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
         Description = "JSON file with the Copilot Studio connection (environmentId, schemaName, tenantId, appClientId; optional cloud, agentName). No secret is stored here; the token is acquired at run time via MSAL device-code auth + a persisted cache. Required by --sut copilot-studio.",
     };
 
-    // Registered by the REDTEAM AddOptionsTo only (M03): under the shared eval/bench seam the consent flag is
+    // Registered by the REDTEAM AddOptionsTo only: under the shared eval/bench seam the consent flag is
     // SutTargetResolver's, bound by the verb into CommonTargetOptions.AckLiveSideEffects.
     private readonly Option<bool> _ackOpt = new("--i-understand-live-side-effects")
     {
@@ -125,7 +125,7 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     public void AddOptionsTo(Command command)
     {
         // The redteam path owns the consent flag itself (RedTeamCommand has no shared resolver to hoist it into),
-        // so _ackOpt is registered HERE, in the same order as before M03 — and only here: the shared
+        // so _ackOpt is registered HERE, in its original order — and only here: the shared
         // ISutTarget.AddOptionsTo below never adds it.
         command.Options.Add(_configOpt);
         command.Options.Add(_ackOpt);
@@ -329,9 +329,12 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     IReadOnlySet<string> ISutTarget.SupportedVerbs { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "eval", "bench" };
 
+    /// <summary>A Copilot Studio agent is an agent, not a model: without <c>--subject</c> the run's subject is <c>agent:&lt;display name&gt;</c>.</summary>
+    AgentEval.Results.Writing.AefSubjectKind ISutTarget.SubjectKind => AgentEval.Results.Writing.AefSubjectKind.Agent;
+
     // P6 item A's config-baseline options are redteam-ONLY (design doc's explicit scope), and the consent flag
     // is COMMON under this seam — SutTargetResolver.AddOptionsTo registers --i-understand-live-side-effects once
-    // per verb (M03) — so this adds exactly the two Copilot-Studio-specific flags and never _ackOpt (a second
+    // per verb — so this adds exactly the two Copilot-Studio-specific flags and never _ackOpt (a second
     // live target on the same command would otherwise collide with it: a duplicate-alias error).
     void ISutTarget.AddOptionsTo(Command command)
     {

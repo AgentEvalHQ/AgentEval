@@ -97,16 +97,6 @@ public sealed class WorkIqDeviceCodeTokenProviderTests
     }
 
     [Theory]
-    [InlineData("AADSTS65001: The user or administrator has not consented to use the application.", "AADSTS65001")]
-    [InlineData("Error AADSTS700016 application not found", "AADSTS700016")]
-    [InlineData("no code here", null)]
-    [InlineData(null, null)]
-    public void ExtractAadstsCode_FindsTheCode(string? message, string? expected)
-    {
-        Assert.Equal(expected, WorkIqDeviceCodeTokenProvider.ExtractAadstsCode(message));
-    }
-
-    [Theory]
     [InlineData("AADSTS65001", 400, true)]
     [InlineData("AADSTS65004", 400, true)]
     [InlineData("AADSTS90094", 400, true)]

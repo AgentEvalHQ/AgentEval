@@ -5,7 +5,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using AgentEval.Microsoft365.Auth;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Protocol;
@@ -18,8 +17,11 @@ namespace AgentEval.Microsoft365.Readiness;
 /// in-memory list the stages read their own events from, and the caller's <see cref="ReadinessCheckOptions.TraceSinks"/>
 /// and <see cref="ReadinessCheckOptions.IssueSinks"/>), runs the stages in order, traces each one on the
 /// <see cref="WorkIqTraceStage.Doctor"/> stage (<c>doctor.&lt;stage&gt;.start</c>, then <c>.pass</c>, <c>.fail</c> or
-/// <c>.skipped</c> with the evidence as data) and registers every failed stage as a <c>doctor.&lt;stage&gt;.failed</c>
-/// issue. The stage implementations live in the <c>Stages</c> and <c>Turns</c> partials. Single-use.
+/// <c>.skipped</c> with the evidence as data) and registers a failed stage as a <c>doctor.&lt;stage&gt;.failed</c>
+/// issue, unless the layer that ended the call (the client, the auth handler, the conversation's turn) already registered
+/// the stage's failure under the same code during the stage: then the stage's verdict is a <c>doctor.&lt;stage&gt;.failed</c>
+/// trace event, so one failure is one issue. The stage implementations live in the <c>Stages</c> and <c>Turns</c>
+/// partials. Single-use.
 /// </summary>
 internal sealed partial class ReadinessRun : IAsyncDisposable
 {
@@ -70,7 +72,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     private HttpClient? _http;
     private WorkIqA2AClient? _client;
     private ProbeTurn? _probe;
-    private CancellationTokenSource? _activeStage;
+    private StageWait? _activeStage;
     private DateTimeOffset _activeStageDeadline;
     private DateTimeOffset? _signInCodeExpiresOn;
     private int _disposed;
@@ -127,9 +129,6 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         string? IssueCategory,
         string? AadstsCode);
 
-    /// <summary>The data of the first event: where the run's files are.</summary>
-    private sealed record ReadyData(string RunId, string TraceFile, string IssueFile, string Directory, bool Verbose, string? ConfigSha256, string? AdapterVersion, [property: JsonPropertyName("a2aVersion")] string A2AVersion);
-
     /// <summary>Runs every stage and returns the report; the diagnostics files are closed when the run is disposed.</summary>
     /// <param name="cancellationToken">Stops the run; the stage in progress fails as canceled and the rest are skipped.</param>
     /// <exception cref="InvalidOperationException">The trace or issue file could not be opened (the message names the path).</exception>
@@ -140,7 +139,6 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         // The config is pure (no network): load it first so the diagnostics carry its identity hash.
         var configResult = LoadConfig();
         OpenDiagnostics();
-        TraceReady();
         _diagnostics.Trace(
             WorkIqTraceStage.Doctor,
             "doctor.started",
@@ -153,6 +151,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         foreach (var stage in ReadinessNames.AllStages)
         {
             ReadinessStageResult result;
+            var issueMark = _issueFilter?.Forwarded ?? 0;
             if (!_requested.Contains(stage))
             {
                 result = NotRequested(stage);
@@ -195,7 +194,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
                 result = await RunStageAsync(stage, cancellationToken).ConfigureAwait(false);
             }
 
-            Record(result);
+            Record(result, issueMark);
             results.Add(result);
 
             if (result.Result == ReadinessResult.Fail && stopReason is null && !_options.ContinueAfterFailure)
@@ -285,69 +284,45 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     // Diagnostics
     // ---------------------------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// Opens the run's diagnostics through the same factory as the live agent: the in-memory list the stages read their
+    /// own events from comes first, the issue register sits behind the expected-reply filter, and the caller's own sinks
+    /// come last and see exactly what the files see (every issue behind the same filter). The factory traces the ready
+    /// event.
+    /// </summary>
     private void OpenDiagnostics()
     {
-        var traceSinks = new List<IWorkIqTraceSink> { _trace };
-        JsonlTraceSink? jsonl = null;
-        JsonlIssueSink? issues;
-        try
+        // The same inputs the constructor resolved _paths from, so the factory resolves the same files and names where the
+        // directory came from.
+        var options = new WorkIqOptions
         {
-            jsonl = new JsonlTraceSink(_paths.TraceFile);
-            traceSinks.Add(jsonl);
-            if (_options.Verbose)
-            {
-                traceSinks.Add(new ConsoleTraceSink(_console));
-            }
-
-            issues = new JsonlIssueSink(_paths.IssueFile);
-        }
-        catch (Exception)
+            TraceFile = _options.TraceFile,
+            IssueFile = _options.IssueFile,
+            DiagnosticsDirectory = _options.DiagnosticsDirectory,
+            RunId = _runId,
+            Verbose = _options.Verbose,
+            TraceSinks = _options.TraceSinks,
+            IssueSinks = _options.IssueSinks,
+        };
+        var setup = new WorkIqDiagnosticsSetup
         {
-            jsonl?.Dispose();
-            throw;
-        }
-
-        _issueFilter = new ExpectedIssueFilter(issues);
-
-        // The caller's own sinks come last and see exactly what the files see: every event after the same stamping and
-        // redaction, every issue behind the same expected-reply filter. They are never disposed with the run.
-        CallerOwnedTraceSink.AppendTo(traceSinks, _options.TraceSinks);
-        var issueSinks = new List<IWorkIqIssueSink> { _issueFilter };
-        foreach (var extra in _options.IssueSinks ?? [])
-        {
-            issueSinks.Add(_issueFilter.Filtering(extra));
-        }
-
+            Console = _console,
+            LeadingTraceSinks = [_trace],
+            WrapIssueRegister = register => _issueFilter = new ExpectedIssueFilter(register),
+            WrapCallerIssueSink = extra => _issueFilter!.Filtering(extra),
+            RunLabel = "m365 doctor run",
+            ReportName = "the readiness report",
+        };
         var configSha256 = _config is null ? null : WorkIqDiagnosticsFactory.ComputeConfigSha256(_config);
-        _diagnostics = new WorkIqDiagnostics(_runId, configSha256, traceSinks, issueSinks, _clock);
+        _diagnostics = WorkIqDiagnosticsFactory.Create(configSha256, options, _clock, setup);
     }
 
-    private void TraceReady()
-    {
-        _diagnostics.Trace(new WorkIqTraceEvent(
-            default,
-            WorkIqTraceStage.Config,
-            WorkIqTraceLevel.Info,
-            WorkIqDiagnosticsFactory.ReadyEventCode,
-            $"Diagnostics ready for m365 doctor run {_runId}: trace file {_paths.TraceFile.FullName}; issue file {_paths.IssueFile.FullName} " +
-            $"(verbose console {(_options.Verbose ? "on" : "off")}). Send both files back with the readiness report; neither contains a token.")
-        {
-            Data = JsonSerializer.SerializeToElement(
-                new ReadyData(
-                    _runId,
-                    _paths.TraceFile.FullName,
-                    _paths.IssueFile.FullName,
-                    _paths.Directory.FullName,
-                    _options.Verbose,
-                    _diagnostics.ConfigSha256,
-                    WorkIqDiagnostics.AdapterVersion,
-                    WorkIqDiagnostics.A2AVersion),
-                WorkIqDiagnosticsJson.Options),
-        });
-    }
-
-    /// <summary>Traces a stage's verdict with its evidence as data, and registers a failed stage in the issue register.</summary>
-    private void Record(ReadinessStageResult result)
+    /// <summary>
+    /// Traces a stage's verdict with its evidence as data, and registers a failed stage in the issue register unless a
+    /// lower layer registered the stage's issue code since <paramref name="issueMark"/> (an earlier
+    /// <see cref="ExpectedIssueFilter.Forwarded"/>); then the verdict is traced only.
+    /// </summary>
+    private void Record(ReadinessStageResult result, int issueMark)
     {
         var name = ReadinessNames.Of(result.Stage);
         var suffix = result.Result switch
@@ -393,12 +368,30 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
         }
 
         var issue = result.Issue;
+        var verdict = $"m365 doctor stage {name} FAILED: {result.Summary}" + (issue is null ? "" : $" [{issue.Code}]");
+        if (issue is not null && _issueFilter is { } filter && filter.ForwardedSince(issueMark, issue.Code))
+        {
+            // The layer that ended the call registered this failure already: one failure, one issue.
+            _diagnostics.Trace(new WorkIqTraceEvent(default, WorkIqTraceStage.Doctor, WorkIqTraceLevel.Error, $"doctor.{name}.failed", $"{verdict}; the issue register already holds this failure as {issue.Code}, so the stage registers no second issue")
+            {
+                CaseId = issue.CaseId,
+                TurnId = issue.TurnId,
+                TaskId = issue.TaskId,
+                ContextId = issue.ContextId,
+                RequestId = issue.RequestId,
+                HttpStatus = issue.HttpStatus,
+                RpcErrorCode = issue.RpcErrorCode,
+                A2AState = issue.A2AState,
+            });
+            return;
+        }
+
         _diagnostics.Issue(new WorkIqIssue(
             default,
             WorkIqTraceStage.Doctor,
             issue?.Category ?? WorkIqIssueCategory.Unknown,
             $"doctor.{name}.failed",
-            $"m365 doctor stage {name} FAILED: {result.Summary}" + (issue is null ? "" : $" [{issue.Code}]"),
+            verdict,
             string.IsNullOrWhiteSpace(result.Action) ? result.Meaning : $"{result.Meaning} What to do: {result.Action}")
         {
             CaseId = issue?.CaseId,
@@ -488,7 +481,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
 
         try
         {
-            source.CancelAfter(wait);
+            source.ExtendTo(wait);
         }
         catch (ObjectDisposedException)
         {
@@ -576,16 +569,8 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
             evidence);
     }
 
-    private WorkIqIssue Stamp(WorkIqIssue issue) => issue with
-    {
-        At = issue.At == default ? _clock.GetUtcNow() : issue.At,
-        RunId = issue.RunId ?? _runId,
-        ConfigSha256 = issue.ConfigSha256 ?? _diagnostics.ConfigSha256,
-        AdapterVersion = issue.AdapterVersion ?? WorkIqDiagnostics.AdapterVersion,
-        A2AVersion = issue.A2AVersion ?? WorkIqDiagnostics.A2AVersion,
-        Message = Redact(issue.Message),
-        SuggestedCause = Redact(issue.SuggestedCause),
-    };
+    /// <summary>Stamps a stage's issue like a registered one; the run id is this run's even before the diagnostics open (a config failure).</summary>
+    private WorkIqIssue Stamp(WorkIqIssue issue) => WorkIqDiagnostics.Stamp(issue, _clock.GetUtcNow(), _runId, _diagnostics.ConfigSha256);
 
     // ---------------------------------------------------------------------------------------------------------
     // Small helpers
@@ -616,17 +601,49 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
     private double Elapsed(long started) => _clock.GetElapsedTime(started).TotalMilliseconds;
 
     /// <summary>
-    /// The token of one stage's wait: the caller's token plus <paramref name="timeout"/>. It becomes the active stage
-    /// source, so a device-code sign-in that starts inside it can extend it to the code's expiry (<see cref="OnSignInPrompted"/>).
+    /// The wait of one stage: the caller's token plus <paramref name="timeout"/> on the run's clock (the same clock the
+    /// stage deadline is computed on). It becomes the active stage wait, so a device-code sign-in that starts inside it
+    /// can extend it to the code's expiry (<see cref="OnSignInPrompted"/>).
     /// </summary>
-    private CancellationTokenSource StageTokenSource(CancellationToken cancellationToken, TimeSpan timeout)
+    private StageWait StageTokenSource(CancellationToken cancellationToken, TimeSpan timeout)
     {
-        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var wait = new StageWait(cancellationToken, timeout, _clock);
         _activeStageDeadline = _clock.GetUtcNow() + timeout;
         _signInCodeExpiresOn = null;   // a sign-in code is reported only by the stage that started it
-        Volatile.Write(ref _activeStage, source);
-        source.CancelAfter(timeout);
-        return source;
+        Volatile.Write(ref _activeStage, wait);
+        return wait;
+    }
+
+    /// <summary>
+    /// One stage's wait: a timer source on the run's clock linked with the caller's token. <see cref="ExtendTo"/> moves the
+    /// timer on the same clock. Disposing it releases both sources.
+    /// </summary>
+    private sealed class StageWait : IDisposable
+    {
+        private readonly CancellationTokenSource _timer;
+        private readonly CancellationTokenSource _linked;
+
+        public StageWait(CancellationToken callerToken, TimeSpan timeout, TimeProvider clock)
+        {
+            _timer = new CancellationTokenSource(timeout, clock);
+            _linked = CancellationTokenSource.CreateLinkedTokenSource(callerToken, _timer.Token);
+        }
+
+        /// <summary>The token the stage waits on.</summary>
+        public CancellationToken Token => _linked.Token;
+
+        /// <summary>Whether the stage timer fired or the caller stopped the run.</summary>
+        public bool IsCancellationRequested => _linked.IsCancellationRequested;
+
+        /// <summary>Restarts the stage timer at <paramref name="wait"/> from now, on the run's clock.</summary>
+        /// <exception cref="ObjectDisposedException">The stage already ended.</exception>
+        public void ExtendTo(TimeSpan wait) => _timer.CancelAfter(wait);
+
+        public void Dispose()
+        {
+            _linked.Dispose();
+            _timer.Dispose();
+        }
     }
 
     /// <summary>The trace events this run recorded since <paramref name="mark"/> (an earlier <see cref="ListTraceSink.Count"/>).</summary>

@@ -99,7 +99,7 @@ internal sealed record RawCaptureFrameRecord(
 /// <see cref="EvidenceContentPolicy.MetadataOnly"/> no body is kept (the reference's state is
 /// <see cref="CaptureState.NotRetained"/>) but the counts and the SHA-256 of what passed through are. The byte bound
 /// is applied before redaction (bounded memory), so a redaction marker can move the retained length by a few bytes;
-/// the hash always describes the retained (redacted) bytes, never the wire bytes. Thread-safe. Owned by lane B (M12).
+/// the hash always describes the retained (redacted) bytes, never the wire bytes. Thread-safe.
 /// </summary>
 internal sealed class RawCaptureSink
 {

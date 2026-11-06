@@ -12,7 +12,10 @@ namespace AgentEval.Microsoft365.Evidence.Decoders;
 /// Decodes the Work IQ interaction data part of a suspended task's status message
 /// (<see cref="InteractionMediaType"/>): the <c>input-required</c> confirmation card into
 /// <see cref="ApprovalIntentObservation"/>s (a proposal awaiting consent is never an execution), and — for the
-/// conversation lane — the whole pause into a <see cref="WorkIqPendingInteraction"/>. The card's
+/// host — the whole pause into a <see cref="WorkIqPendingInteraction"/>. Both come from one walk of the card: the
+/// pause part is selected once (a message with more than one pause part is ambiguous and nothing is chosen), the
+/// actions and twins are walked once, and the pending interaction's proposed calls are projected from the approval
+/// intents, so the two never disagree. The card's
 /// <c>adaptiveCard.actions[].data.message.action</c> and <c>.actionId</c> are JSON-encoded strings of an array of
 /// calls <c>{id, type, function:{name, arguments}}</c> where <c>function.arguments</c> is itself a JSON-encoded
 /// string: the exact argument string is kept verbatim, its parsed form is a separate projection, and the two twins
@@ -46,7 +49,7 @@ internal static class InteractionDecoder
     /// <summary>Issue: the <c>action</c> and <c>actionId</c> twins of one card action differ; both are kept.</summary>
     public const string ConflictingTwinsIssueCode = "approval.conflicting_twins";
 
-    /// <summary>Issue: two interaction data parts both carry <c>input-required</c>; nothing was chosen.</summary>
+    /// <summary>Issue: more than one interaction data part carries a pause (<c>input-required</c> or <c>auth-required</c>), at least one of them <c>input-required</c>; nothing was chosen.</summary>
     public const string AmbiguousPartIssueCode = "approval.ambiguous_interaction_part";
 
     /// <summary>Issue: a twin payload is not a string, not JSON, or not a JSON array.</summary>
@@ -74,30 +77,73 @@ internal static class InteractionDecoder
     /// <summary>One decoded proposed call (from one twin, or merged from both when byte-identical).</summary>
     private sealed record DecodedCall(JsonElement Element, ImmutableArray<SourceRef> Sources);
 
+    /// <summary>What the status message's interaction data parts hold.</summary>
+    private enum PauseShape
+    {
+        /// <summary>No interaction data part at all.</summary>
+        None,
+
+        /// <summary>Interaction data parts, none of which carries a pause key.</summary>
+        NoPause,
+
+        /// <summary>Exactly one part carries a pause key.</summary>
+        Single,
+
+        /// <summary>More than one part carries a pause key; nothing is chosen.</summary>
+        Ambiguous,
+    }
+
+    /// <summary>The one selection of the pause part: <paramref name="Parts"/> are every interaction data part; <paramref name="Pauses"/> those that carry a pause key, in order.</summary>
+    private sealed record PauseSelection(
+        PauseShape Shape,
+        List<(int PartIndex, JsonElement Data)> Parts,
+        List<(int PartIndex, JsonElement Data)> Pauses);
+
+    /// <summary>The one walk of a status message's pause: the selection, the approval intents and, per intent, the raw call type.</summary>
+    private sealed record CardDecoding(
+        PauseSelection Selection,
+        EvidenceSet<ApprovalIntentObservation> Intents,
+        ImmutableArray<Observed<string>> CallTypes);
+
     /// <summary>Decodes the approval intents of a suspended task's status message.</summary>
     /// <param name="statusMessage">The status message; null when the task carried none.</param>
     /// <param name="messageSource">The source pointer of the status message.</param>
     public static EvidenceSet<ApprovalIntentObservation> DecodeApprovalIntents(WorkIqMessage? statusMessage, SourceRef messageSource)
     {
         ArgumentNullException.ThrowIfNull(messageSource);
+        return DecodeCard(statusMessage, messageSource).Intents;
+    }
+
+    /// <summary>
+    /// Selects the pause part once and walks its card once: approval intents only from a single <c>input-required</c>
+    /// pause part; <see cref="EvidenceValidation.Conflicting"/> with no items when more than one part carries a pause and
+    /// at least one of them is <c>input-required</c>; <see cref="EvidenceAvailability.NotProvided"/> otherwise.
+    /// </summary>
+    private static CardDecoding DecodeCard(WorkIqMessage? statusMessage, SourceRef messageSource)
+    {
         if (statusMessage is null)
         {
-            return EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(messageSource));
+            return new CardDecoding(
+                new PauseSelection(PauseShape.None, [], []),
+                EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(messageSource)),
+                ImmutableArray<Observed<string>>.Empty);
         }
 
+        var selection = SelectPause(statusMessage);
         var partsSource = Child(messageSource, "parts");
-        var candidates = FindInteractionParts(statusMessage)
-            .Where(p => p.Data.TryGetProperty(InputRequiredKey, out _))
-            .ToList();
-        if (candidates.Count == 0)
+        var inputPauses = selection.Pauses.Where(p => p.Data.TryGetProperty(InputRequiredKey, out _)).ToList();
+        if (inputPauses.Count == 0)
         {
-            return EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(partsSource));
+            return new CardDecoding(
+                selection,
+                EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(partsSource)),
+                ImmutableArray<Observed<string>>.Empty);
         }
 
-        if (candidates.Count > 1)
+        if (selection.Shape == PauseShape.Ambiguous)
         {
-            var sources = candidates.Select(c => DataSource(partsSource, c.PartIndex)).ToImmutableArray();
-            return EvidenceSet<ApprovalIntentObservation>.Provided(
+            var sources = selection.Pauses.Select(c => DataSource(partsSource, c.PartIndex)).ToImmutableArray();
+            var conflicting = EvidenceSet<ApprovalIntentObservation>.Provided(
                 ImmutableArray<ApprovalIntentObservation>.Empty,
                 EvidenceValidation.Conflicting,
                 EvidenceCoverage.Unknown,
@@ -105,17 +151,39 @@ internal static class InteractionDecoder
                 sources,
                 ImmutableArray.Create(new EvidenceIssue(
                     AmbiguousPartIssueCode,
-                    FormattableString.Invariant($"{candidates.Count} interaction data parts carry input-required; no proposal was chosen from either."),
+                    FormattableString.Invariant($"{selection.Pauses.Count} interaction data parts carry a pause (input-required or auth-required); none was chosen and no proposal was read from any."),
                     sources)));
+            return new CardDecoding(selection, conflicting, ImmutableArray<Observed<string>>.Empty);
         }
 
-        var (partIndex, data) = candidates[0];
-        var pauseSource = Child(DataSource(partsSource, partIndex), InputRequiredKey);
+        var (partIndex, data) = inputPauses[0];
+        var (intents, callTypes) = DecodeInputRequired(data, Child(DataSource(partsSource, partIndex), InputRequiredKey));
+        return new CardDecoding(selection, intents, callTypes);
+    }
+
+    /// <summary>Every interaction data part, and those that carry a pause key (<c>input-required</c> or <c>auth-required</c>).</summary>
+    private static PauseSelection SelectPause(WorkIqMessage message)
+    {
+        var parts = FindInteractionParts(message);
+        var pauses = parts
+            .Where(p => p.Data.TryGetProperty(InputRequiredKey, out _) || p.Data.TryGetProperty(AuthRequiredKey, out _))
+            .ToList();
+        var shape = parts.Count == 0 ? PauseShape.None
+            : pauses.Count == 0 ? PauseShape.NoPause
+            : pauses.Count == 1 ? PauseShape.Single
+            : PauseShape.Ambiguous;
+        return new PauseSelection(shape, parts, pauses);
+    }
+
+    /// <summary>Walks one <c>input-required</c> pause's card: the approval intents and, per intent, the raw call type.</summary>
+    private static (EvidenceSet<ApprovalIntentObservation> Intents, ImmutableArray<Observed<string>> CallTypes) DecodeInputRequired(JsonElement data, SourceRef pauseSource)
+    {
+        var noCallTypes = ImmutableArray<Observed<string>>.Empty;
         var pause = data.GetProperty(InputRequiredKey);
         if (pause.ValueKind != JsonValueKind.Object)
         {
-            return MalformedSet<ApprovalIntentObservation>(pauseSource, ImmutableArray.Create(Issue(
-                CardMalformedIssueCode, "input-required is not a JSON object; no proposal can be read from it.", pauseSource)));
+            return (MalformedSet<ApprovalIntentObservation>(pauseSource, ImmutableArray.Create(Issue(
+                CardMalformedIssueCode, "input-required is not a JSON object; no proposal can be read from it.", pauseSource))), noCallTypes);
         }
 
         var interactionId = ReadString(pause, SourceRequestIdKey, pauseSource);
@@ -124,35 +192,36 @@ internal static class InteractionDecoder
 
         if (!TryGetProperty(pause, AdaptiveCardKey, out var card))
         {
-            return isConfirmation
+            return (isConfirmation
                 ? MalformedSet<ApprovalIntentObservation>(pauseSource, ImmutableArray.Create(Issue(
                     CardMalformedIssueCode, "A confirmation_required pause carries no adaptiveCard; its proposals cannot be read.", pauseSource)))
-                : EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(pauseSource));
+                : EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(pauseSource)), noCallTypes);
         }
 
         var cardSource = Child(pauseSource, AdaptiveCardKey);
         if (card.ValueKind != JsonValueKind.Object)
         {
-            return MalformedSet<ApprovalIntentObservation>(cardSource, ImmutableArray.Create(Issue(
-                CardMalformedIssueCode, "adaptiveCard is not a JSON object.", cardSource)));
+            return (MalformedSet<ApprovalIntentObservation>(cardSource, ImmutableArray.Create(Issue(
+                CardMalformedIssueCode, "adaptiveCard is not a JSON object.", cardSource))), noCallTypes);
         }
 
         if (!TryGetProperty(card, ActionsKey, out var actions))
         {
-            return isConfirmation
+            return (isConfirmation
                 ? MalformedSet<ApprovalIntentObservation>(cardSource, ImmutableArray.Create(Issue(
                     CardMalformedIssueCode, "A confirmation_required card carries no actions; its proposals cannot be read.", cardSource)))
-                : EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(cardSource));
+                : EvidenceSet<ApprovalIntentObservation>.NotProvided(EvidenceScope.Unknown, One(cardSource)), noCallTypes);
         }
 
         var actionsSource = Child(cardSource, ActionsKey);
         if (actions.ValueKind != JsonValueKind.Array)
         {
-            return MalformedSet<ApprovalIntentObservation>(actionsSource, ImmutableArray.Create(Issue(
-                CardMalformedIssueCode, "adaptiveCard.actions is not a JSON array.", actionsSource)));
+            return (MalformedSet<ApprovalIntentObservation>(actionsSource, ImmutableArray.Create(Issue(
+                CardMalformedIssueCode, "adaptiveCard.actions is not a JSON array.", actionsSource))), noCallTypes);
         }
 
         var items = ImmutableArray.CreateBuilder<ApprovalIntentObservation>();
+        var callTypes = ImmutableArray.CreateBuilder<Observed<string>>();
         var issues = new List<EvidenceIssue>();
         var anyInvalid = false;
         var interpreted = 0;
@@ -173,13 +242,16 @@ internal static class InteractionDecoder
                 var id = ObservationId("approval-intent", actionIndex, callIndex);
                 if (call.Element.ValueKind == JsonValueKind.Object)
                 {
-                    items.Add(ToObservation(call, id, interactionId, issues, ref anyInvalid));
+                    var (observation, callType) = ToObservation(call, id, interactionId, issues, ref anyInvalid);
+                    items.Add(observation);
+                    callTypes.Add(callType);
                     interpreted++;
                 }
                 else
                 {
                     anyInvalid = true;
                     items.Add(InvalidObservation(call.Sources, id, interactionId));
+                    callTypes.Add(Observed<string>.Invalid(call.Sources));
                     issues.Add(new EvidenceIssue(
                         CallNotObjectIssueCode,
                         FormattableString.Invariant($"Proposed call {callIndex} of action {actionIndex} is not a JSON object; its fields are Invalid and the call is kept."),
@@ -196,24 +268,30 @@ internal static class InteractionDecoder
             ? (anyInvalid ? EvidenceValidation.Malformed : EvidenceValidation.Valid)
             : RowSetValidation(items.Count, interpreted, anyInvalid);
 
-        return EvidenceSet<ApprovalIntentObservation>.Provided(
+        var set = EvidenceSet<ApprovalIntentObservation>.Provided(
             items.ToImmutable(),
             validation,
             EvidenceCoverage.Unknown,
             EvidenceScope.Unknown,
             One(actionsSource),
             issues.ToImmutableArray());
+        return (set, callTypes.ToImmutable());
     }
 
     /// <summary>
-    /// Decodes the pause of a suspended task for the host: the first interaction data part of
-    /// <paramref name="statusMessage"/> becomes a <see cref="WorkIqPendingInteraction"/> (<c>input-required</c> with
-    /// <c>type: confirmation_required</c> → <see cref="WorkIqInteractionKind.ConfirmationRequired"/> with every
-    /// proposed call and the exact <c>confirmationOption</c> strings; <c>auth-required</c> →
-    /// <see cref="WorkIqInteractionKind.AuthenticationRequired"/>; anything else →
-    /// <see cref="WorkIqInteractionKind.Unknown"/>). Null when the message carries no interaction data part — a
-    /// text-only <c>INPUT_REQUIRED</c> status is the caller's decision. The caller applies the content policy to
-    /// <see cref="WorkIqPendingInteraction.PromptText"/> and <see cref="WorkIqPendingInteraction.RawInteractionData"/>.
+    /// Decodes the pause of a suspended task for the host from the same card walk as
+    /// <see cref="DecodeApprovalIntents"/>, so the two never disagree. The single pause part (the one interaction data
+    /// part that carries <c>input-required</c> or <c>auth-required</c>) becomes a <see cref="WorkIqPendingInteraction"/>:
+    /// <c>input-required</c> with <c>type: confirmation_required</c> → <see cref="WorkIqInteractionKind.ConfirmationRequired"/>
+    /// with the proposed calls projected from the approval intents and the exact <c>confirmationOption</c> strings;
+    /// <c>auth-required</c> → <see cref="WorkIqInteractionKind.AuthenticationRequired"/>; anything else →
+    /// <see cref="WorkIqInteractionKind.Unknown"/>. When more than one part carries a pause, nothing is chosen: the
+    /// interaction is <see cref="WorkIqInteractionKind.Unknown"/> with no proposed call and no option (the approval
+    /// intents are then <see cref="EvidenceValidation.Conflicting"/> or not provided), the first pause part's data is
+    /// retained raw and every pause part is a source. Interaction data parts without any pause yield an
+    /// <see cref="WorkIqInteractionKind.Unknown"/> interaction from the first part. Null when the message carries no
+    /// interaction data part — a text-only <c>INPUT_REQUIRED</c> status is the caller's decision. The caller applies the
+    /// content policy to <see cref="WorkIqPendingInteraction.PromptText"/> and <see cref="WorkIqPendingInteraction.RawInteractionData"/>.
     /// </summary>
     /// <param name="statusMessage">The suspended task's status message.</param>
     /// <param name="task">The suspended task.</param>
@@ -224,17 +302,34 @@ internal static class InteractionDecoder
         ArgumentNullException.ThrowIfNull(task);
         ArgumentException.ThrowIfNullOrWhiteSpace(captureId);
 
-        var parts = FindInteractionParts(statusMessage);
-        if (parts.Count == 0)
+        var messageSource = new SourceRef(captureId, 0, EvidenceOrigin.A2AMessage, WorkIqEvidenceNormalizer.TaskStatusMessagePointer);
+        var decoding = DecodeCard(statusMessage, messageSource);
+        var selection = decoding.Selection;
+        if (selection.Shape == PauseShape.None)
         {
             return null;
         }
 
-        var (partIndex, data) = parts[0];
-        var messageSource = new SourceRef(captureId, 0, EvidenceOrigin.A2AMessage, WorkIqEvidenceNormalizer.TaskStatusMessagePointer);
-        var partSource = Child(Child(messageSource, "parts"), partIndex) with { PartIndex = partIndex };
-        var dataSource = Child(partSource, DataKey);
         var prompt = PromptTextOf(statusMessage);
+        SourceRef PartSource(int index) => Child(Child(messageSource, "parts"), index) with { PartIndex = index };
+
+        if (selection.Shape == PauseShape.Ambiguous)
+        {
+            return new WorkIqPendingInteraction(
+                task,
+                WorkIqInteractionKind.Unknown,
+                null,
+                prompt,
+                ImmutableArray<WorkIqProposedCall>.Empty,
+                ImmutableArray<string>.Empty,
+                ProfileId,
+                selection.Pauses[0].Data,
+                selection.Pauses.Select(p => PartSource(p.PartIndex)).ToImmutableArray());
+        }
+
+        var (partIndex, data) = selection.Shape == PauseShape.Single ? selection.Pauses[0] : selection.Parts[0];
+        var partSource = PartSource(partIndex);
+        var dataSource = Child(partSource, DataKey);
 
         if (TryGetProperty(data, InputRequiredKey, out var pause) && pause.ValueKind == JsonValueKind.Object)
         {
@@ -243,7 +338,7 @@ internal static class InteractionDecoder
             var type = ReadString(pause, TypeKey, pauseSource);
             var isConfirmation = type.IsPresent && string.Equals(type.Value, ConfirmationRequiredType, StringComparison.Ordinal);
             var kind = isConfirmation ? WorkIqInteractionKind.ConfirmationRequired : WorkIqInteractionKind.Unknown;
-            var calls = isConfirmation ? ProposedCallsOf(pause, pauseSource) : ImmutableArray<WorkIqProposedCall>.Empty;
+            var calls = isConfirmation ? ProposedCallsOf(decoding) : ImmutableArray<WorkIqProposedCall>.Empty;
             var options = isConfirmation ? OptionsOf(pause) : ImmutableArray<string>.Empty;
             return new WorkIqPendingInteraction(
                 task,
@@ -497,9 +592,9 @@ internal static class InteractionDecoder
         }
     }
 
-    private static ApprovalIntentObservation ToObservation(DecodedCall call, string id, Observed<string> interactionId, List<EvidenceIssue> issues, ref bool anyInvalid)
+    private static (ApprovalIntentObservation Observation, Observed<string> CallType) ToObservation(DecodedCall call, string id, Observed<string> interactionId, List<EvidenceIssue> issues, ref bool anyInvalid)
     {
-        var (name, argumentsRaw, _, callId) = ReadCall(call.Element, call.Sources);
+        var (name, argumentsRaw, callType, callId) = ReadCall(call.Element, call.Sources);
         var parsed = ParseArguments(argumentsRaw, call.Sources);
         NoteInvalid(issues, FieldInvalidIssueCode, "id", callId);
         NoteInvalid(issues, FieldInvalidIssueCode, "function.name", name);
@@ -510,15 +605,16 @@ internal static class InteractionDecoder
         }
 
         anyInvalid |= IsInvalid(callId) || IsInvalid(name) || IsInvalid(argumentsRaw) || IsInvalid(parsed);
-        return new ApprovalIntentObservation(
+        var observation = new ApprovalIntentObservation(
             id,
             interactionId,
             callId,
-            Native118DiagnosticsDecoder.ToolIdentityOf(Observed<string>.Missing(), name, call.Sources),
+            ToolIdentity.FromReportedNames(Observed<string>.Missing(), name, call.Sources),
             argumentsRaw,
             parsed,
             PendingDecision,
             call.Sources);
+        return (observation, callType);
     }
 
     private static ApprovalIntentObservation InvalidObservation(ImmutableArray<SourceRef> sources, string id, Observed<string> interactionId)
@@ -528,7 +624,7 @@ internal static class InteractionDecoder
             id,
             interactionId,
             invalid,
-            Native118DiagnosticsDecoder.ToolIdentityOf(Observed<string>.Missing(), invalid, sources),
+            ToolIdentity.FromReportedNames(Observed<string>.Missing(), invalid, sources),
             invalid,
             Observed<JsonElement>.Invalid(sources),
             PendingDecision,
@@ -536,50 +632,28 @@ internal static class InteractionDecoder
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // Pending-interaction projection (for the conversation lane)
+    // Pending-interaction projection (for the host)
     // ---------------------------------------------------------------------------------------------------------
 
-    private static ImmutableArray<WorkIqProposedCall> ProposedCallsOf(JsonElement pause, SourceRef pauseSource)
+    /// <summary>The proposed calls of the pending interaction: one per approval intent of the same card walk, in order; a field that is not present is null.</summary>
+    private static ImmutableArray<WorkIqProposedCall> ProposedCallsOf(CardDecoding decoding)
     {
-        if (!TryGetProperty(pause, AdaptiveCardKey, out var card) || !TryGetProperty(card, ActionsKey, out var actions) || actions.ValueKind != JsonValueKind.Array)
+        var intents = decoding.Intents.Items;
+        var calls = ImmutableArray.CreateBuilder<WorkIqProposedCall>(intents.Length);
+        for (var i = 0; i < intents.Length; i++)
         {
-            return ImmutableArray<WorkIqProposedCall>.Empty;
+            var intent = intents[i];
+            var callType = decoding.CallTypes[i];
+            calls.Add(new WorkIqProposedCall(
+                intent.ProposedProviderInvocationId.IsPresent ? intent.ProposedProviderInvocationId.Value : null,
+                callType.IsPresent ? callType.Value : null,
+                intent.Tool.FunctionDisplayName.IsPresent ? intent.Tool.FunctionDisplayName.Value : null,
+                intent.ProposedArgumentsRawText.IsPresent ? intent.ProposedArgumentsRawText.Value : null,
+                intent.ProposedArguments,
+                intent.Sources));
         }
 
-        var actionsSource = Child(Child(pauseSource, AdaptiveCardKey), ActionsKey);
-        var issues = new List<EvidenceIssue>();
-        var anyInvalid = false;
-        var calls = ImmutableArray.CreateBuilder<WorkIqProposedCall>();
-        var actionIndex = 0;
-        foreach (var action in actions.EnumerateArray())
-        {
-            var actionSource = Child(actionsSource, actionIndex);
-            actionIndex++;
-            if (!TryFindProposalMessage(action, actionSource, issues, ref anyInvalid, out var message, out var messageSource))
-            {
-                continue;
-            }
-
-            foreach (var call in DecodeTwins(message, messageSource, issues, ref anyInvalid))
-            {
-                if (call.Element.ValueKind != JsonValueKind.Object)
-                {
-                    calls.Add(new WorkIqProposedCall(null, null, null, null, Observed<JsonElement>.Invalid(call.Sources), call.Sources));
-                    continue;
-                }
-
-                var (name, argumentsRaw, callType, callId) = ReadCall(call.Element, call.Sources);
-                calls.Add(new WorkIqProposedCall(
-                    callId.IsPresent ? callId.Value : null,
-                    callType.IsPresent ? callType.Value : null,
-                    name.IsPresent ? name.Value : null,
-                    argumentsRaw.IsPresent ? argumentsRaw.Value : null,
-                    ParseArguments(argumentsRaw, call.Sources),
-                    call.Sources));
-            }
-        }
-
-        return calls.ToImmutable();
+        return calls.MoveToImmutable();
     }
 
     /// <summary>The exact <c>data.confirmationOption</c> strings of the card's actions, in order, without duplicates.</summary>

@@ -8,17 +8,28 @@ using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using A2A;
+using AgentEval.Microsoft365.Evidence;
+using AgentEval.Microsoft365.Evidence.Decoders;
 using AgentEval.Microsoft365.Protocol;
 using Microsoft.Identity.Client;
 
 namespace AgentEval.Microsoft365.Diagnostics;
 
 /// <summary>
-/// Turns a structured <see cref="WorkIqFailure"/> or a raw exception into a <see cref="WorkIqIssue"/> with the
-/// category that names who can fix it and a plain-language suggested cause, so an external tester reads the issue
-/// register and knows what to do. The precedence is: HTTP 401/403 (sign-in and consent are the most actionable),
-/// then a JSON-RPC error code, then the other HTTP statuses, then the failure category. Messages are redacted;
-/// every correlation fact the source carried is copied onto the issue. Owned by lane B (M16).
+/// The one place that turns a structured <see cref="WorkIqFailure"/>, a turn that did not complete, or a raw
+/// exception into an issue's category (who can fix it), stable code and plain-language suggested cause, so an
+/// external tester reads the issue register and knows what to do. Every layer that registers an issue for a failure
+/// asks this class; none keeps its own table. For a failure the precedence is: a missing token (nothing was sent),
+/// HTTP 401/403 (sign-in and consent are the most actionable), then a JSON-RPC error code, then the other
+/// HTTP statuses, then the failure category. A local cancellation is always <see cref="WorkIqIssueCategory.Budget"/>
+/// (<c>local.canceled</c>), never the service's fault; so is a local budget that ran out (the turn deadline or the
+/// recovery budget, <see cref="WorkIqFailure.LocalBudget"/>), with a cause that names it, never a network timeout. A turn
+/// that did not complete is coded <c>turn.&lt;outcome&gt;</c> (<see cref="WorkIqConversation.OutcomeIssueCode"/>:
+/// <c>turn.failed</c>, <c>turn.rejected</c>, <c>turn.canceled</c>, …), whatever failure it carries, both when the
+/// conversation registers it and when a turn result or its exception is classified here; only a token failure keeps
+/// its <c>auth.*</c> code. Messages are redacted; every correlation fact the source carried
+/// is copied onto the issue. The causes of evidence and reduction issues live here too
+/// (<see cref="CauseForEvidenceIssue"/>, <see cref="CauseForReduceWarning"/>).
 /// </summary>
 internal static partial class WorkIqIssueClassifier
 {
@@ -62,6 +73,14 @@ internal static partial class WorkIqIssueClassifier
     public const string CauseBudget =
         "a local budget ran out (TurnDeadline or RecoveryBudget) before a terminal task state was observed; the input was not resent — raise the budget or inspect the task by id";
 
+    /// <summary>Suggested cause of a turn stopped by its turn deadline (<see cref="WorkIqOptions.TurnDeadline"/>).</summary>
+    public const string CauseTurnDeadline =
+        "the turn deadline (TurnDeadline) elapsed before a terminal task state was observed; the request may have reached the service and the input was not resent — raise TurnDeadline or inspect the task by id";
+
+    /// <summary>Suggested cause of a task still running when the recovery budget (<see cref="WorkIqOptions.RecoveryBudget"/>) ran out.</summary>
+    public const string CauseRecoveryBudget =
+        "the task stayed submitted/working longer than RecoveryBudget allows; the input was not resent — raise RecoveryBudget or inspect the task with GetTask/CancelTask using the handle on the result";
+
     /// <summary>Suggested cause of a DNS/connection failure.</summary>
     public const string CauseTransport =
         "no response: DNS, TLS, socket or connection failure before the service answered; check connectivity and the proxy; the host must resolve and present a valid certificate";
@@ -81,10 +100,58 @@ internal static partial class WorkIqIssueClassifier
     /// <summary>Suggested cause of an unclassified failure.</summary>
     public const string CauseUnknown = "not classified; the message says what is known";
 
+    /// <summary>Suggested cause of a task the service reported failed.</summary>
+    public const string CauseTaskFailed =
+        "the service reported the task failed; the status message in the capture says why (a partial artifact may exist but is never an answer)";
+
+    /// <summary>Suggested cause of a task the service rejected.</summary>
+    public const string CauseTaskRejected =
+        "the service refused the task (policy, content or capability); the status message in the capture says why";
+
+    /// <summary>Suggested cause of a task the service confirmed cancelled.</summary>
+    public const string CauseTaskCanceled = "the service confirmed the task was cancelled";
+
+    /// <summary>Suggested cause of a turn that paused for input or a confirmation.</summary>
+    public const string CauseInputRequired =
+        "the task is suspended waiting for input or approval; nothing was approved — this provider never answers a confirmation or an input prompt, so rephrase the case so that no action is proposed (the pending interaction on the turn result shows what was asked)";
+
+    /// <summary>Suggested cause of a turn that paused for an external authorization.</summary>
+    public const string CauseAuthRequired =
+        "the task is suspended waiting for an external authorization (a connector sign-in) that this provider cannot complete; no answer was fabricated — sign in to the connector the status message names in Microsoft 365 (Copilot Chat), then run the case again";
+
+    /// <summary>Suggested cause of a turn whose remote state is unknown.</summary>
+    public const string CauseIndeterminate =
+        "the remote state is unknown (no terminal state observed before the transport or the budget ended); the input was not resent — inspect the task by id";
+
+    /// <summary>Suggested cause of a token wait that ended before the sign-in finished (<c>auth.sign_in_not_completed</c>).</summary>
+    public const string CauseSignInNotCompleted =
+        "The sign-in did not finish before the wait ended: a device-code prompt was not completed in time (open the page it names, enter the code, sign in as the test user), or the run was stopped. " +
+        "Nothing was sent to Work IQ. Sign in first with `agenteval m365 doctor --stage auth` (the token is cached), then run again.";
+
+    /// <summary>Suggested cause of a token provider that returned an empty token (<c>auth.empty_token</c>).</summary>
+    public const string CauseEmptyToken =
+        "the token provider returned an empty token, so nothing was sent; re-run the device-code sign-in, or check that the host's token provider returns the Work IQ access token for the scope " +
+        WorkIqAadstsCatalog.WorkIqScope;
+
+    /// <summary>Suggested cause of a token provider that failed without an AADSTS code (<c>auth.token_acquisition_failed</c>).</summary>
+    public const string CauseTokenAcquisitionFailed =
+        "the token provider failed before a token was acquired, so nothing was sent; the message says why — re-run the device-code sign-in; the scope must be " +
+        WorkIqAadstsCatalog.WorkIqScope;
+
     /// <summary>
-    /// Classifies a structured failure: category, stable code and suggested cause from its HTTP status, JSON-RPC
-    /// code and category (in that precedence), with every correlation fact copied over and an AADSTS code
-    /// extracted from the safe message when one is there.
+    /// Whether <paramref name="failure"/> is a token wait stopped before the HTTP call
+    /// (<see cref="WorkIqTokenFailure.SignInNotCompleted"/>): nothing was sent, so it is no rejected token and no network timeout.
+    /// </summary>
+    /// <param name="failure">The failure, or null.</param>
+    internal static bool IsSignInNotCompleted(WorkIqFailure? failure) =>
+        failure?.TokenFailure == WorkIqTokenFailure.SignInNotCompleted;
+
+    /// <summary>
+    /// Classifies a structured failure: category, stable code and suggested cause from a missing token
+    /// (<see cref="WorkIqFailure.TokenFailure"/>: <c>auth.sign_in_not_completed</c>, <c>auth.empty_token</c>,
+    /// <c>auth.token_acquisition_failed</c>; nothing was sent), its HTTP status, JSON-RPC code and category (in that
+    /// precedence), with every correlation fact copied over and an AADSTS code extracted from the safe message when one
+    /// is there.
     /// </summary>
     /// <param name="failure">The failure.</param>
     /// <param name="stage">The stage to stamp; null derives it from <see cref="WorkIqFailure.Operation"/> (<see cref="StageFor"/>).</param>
@@ -92,7 +159,7 @@ internal static partial class WorkIqIssueClassifier
     public static WorkIqIssue FromFailure(WorkIqFailure failure, WorkIqTraceStage? stage = null, string? retryAfter = null)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        var (category, code, cause) = ClassifyFailure(failure, retryAfter ?? RetryAfterFrom(failure.SafeMessage));
+        var (category, code, cause) = ForFailure(failure, retryAfter);
         var message = $"{failure.Operation}: {failure.Category} ({failure.Certainty}): {WorkIqRedaction.Redact(failure.SafeMessage)}";
         return new WorkIqIssue(default, stage ?? StageFor(failure.Operation), category, code, message, cause)
         {
@@ -104,6 +171,42 @@ internal static partial class WorkIqIssueClassifier
             ContextId = failure.ContextId,
             AadstsCode = WorkIqAadstsCatalog.ExtractCode(failure.SafeMessage),
         };
+    }
+
+    /// <summary>
+    /// The category, stable code and suggested cause of a structured failure, for a caller that builds its own issue
+    /// (its own message and correlation fields): the same answer <see cref="FromFailure"/> stamps on the issue it builds.
+    /// </summary>
+    /// <param name="failure">The failure.</param>
+    /// <param name="retryAfter">The <c>Retry-After</c> value of a 429/503, when the caller has it; null scans the safe message for <c>retry-after=&lt;seconds&gt;</c>.</param>
+    public static (WorkIqIssueCategory Category, string Code, string Cause) ForFailure(WorkIqFailure failure, string? retryAfter = null)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        return ClassifyFailure(failure, retryAfter ?? RetryAfterFrom(failure.SafeMessage));
+    }
+
+    /// <summary>
+    /// The category, code and suggested cause of the one issue a turn that did not complete registers. The code is
+    /// always <see cref="WorkIqConversation.OutcomeIssueCode"/> of the outcome (<c>turn.failed</c>, <c>turn.rejected</c>,
+    /// <c>turn.canceled</c>, <c>turn.indeterminate</c>, <c>turn.input_required</c>, <c>turn.auth_required</c>). A paused
+    /// turn (input or authorization required) takes the pause's category and cause. Any other turn with a structured
+    /// failure takes the failure's category and cause (<see cref="ForFailure"/>), so a local cancellation is
+    /// <see cref="WorkIqIssueCategory.Budget"/> and a 403 is <see cref="WorkIqIssueCategory.Permission"/>; without a
+    /// failure the outcome decides.
+    /// </summary>
+    /// <param name="result">The turn result.</param>
+    public static (WorkIqIssueCategory Category, string Code, string Cause) ForTurnOutcome(WorkIqTurnResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var code = WorkIqConversation.OutcomeIssueCode(result.Outcome);
+        if (result.Failure is { } failure && result.Outcome is not (WorkIqTurnOutcome.InputRequired or WorkIqTurnOutcome.AuthRequired))
+        {
+            var (category, _, cause) = ForFailure(failure);
+            return (category, code, cause);
+        }
+
+        var (outcomeCategory, outcomeCause) = ForOutcome(result.Outcome);
+        return (outcomeCategory, code, outcomeCause);
     }
 
     /// <summary>
@@ -244,6 +347,11 @@ internal static partial class WorkIqIssueClassifier
 
     private static (WorkIqIssueCategory Category, string Code, string Cause) ClassifyFailure(WorkIqFailure failure, string? retryAfter)
     {
+        if (failure.TokenFailure is { } tokenFailure)
+        {
+            return ForTokenFailure(failure, tokenFailure);
+        }
+
         if (failure.HttpStatus is 401)
         {
             return (WorkIqIssueCategory.Authentication, "http.401", Cause401);
@@ -285,9 +393,13 @@ internal static partial class WorkIqIssueClassifier
             case WorkIqFailureCategory.Transport:
                 return (WorkIqIssueCategory.Network, "transport.error", CauseTransport);
             case WorkIqFailureCategory.Timeout:
-                return failure.Operation == WorkIqOperation.Local
-                    ? (WorkIqIssueCategory.Budget, "budget.exceeded", CauseBudget)
-                    : (WorkIqIssueCategory.Network, "transport.timeout", CauseTimeout);
+                return failure.LocalBudget switch
+                {
+                    WorkIqLocalBudget.TurnDeadline => (WorkIqIssueCategory.Budget, "budget.exceeded", CauseTurnDeadline),
+                    WorkIqLocalBudget.RecoveryBudget => (WorkIqIssueCategory.Budget, "budget.recovery_exhausted", CauseRecoveryBudget),
+                    _ when failure.Operation == WorkIqOperation.Local => (WorkIqIssueCategory.Budget, "budget.exceeded", CauseBudget),
+                    _ => (WorkIqIssueCategory.Network, "transport.timeout", CauseTimeout),
+                };
             case WorkIqFailureCategory.Malformed:
                 return (WorkIqIssueCategory.Protocol, "protocol.malformed", CauseMalformed);
             case WorkIqFailureCategory.Canceled:
@@ -302,17 +414,52 @@ internal static partial class WorkIqIssueClassifier
     private static (WorkIqIssueCategory Category, string Code, string Cause) ForRemoteError(WorkIqFailure failure) =>
         WorkIqOutcomeClassifier.ToTaskState(failure.RemoteTaskState) switch
         {
-            WorkIqTaskState.Failed => (WorkIqIssueCategory.Service, "task.failed", "the service reported the task failed; the status message in the capture says why (a partial artifact may exist but is never an answer)"),
-            WorkIqTaskState.Rejected => (WorkIqIssueCategory.Service, "task.rejected", "the service refused the task (policy, content or capability); the status message in the capture says why"),
-            WorkIqTaskState.Canceled => (WorkIqIssueCategory.Service, "task.canceled", "the service confirmed the task was cancelled"),
+            WorkIqTaskState.Failed => (WorkIqIssueCategory.Service, "task.failed", CauseTaskFailed),
+            WorkIqTaskState.Rejected => (WorkIqIssueCategory.Service, "task.rejected", CauseTaskRejected),
+            WorkIqTaskState.Canceled => (WorkIqIssueCategory.Service, "task.canceled", CauseTaskCanceled),
             _ => (WorkIqIssueCategory.Service, "remote.error", "the service answered with an error; the HTTP status, the JSON-RPC code and the capture say why"),
         };
 
+    /// <summary>
+    /// A failure with no bearer token, so nothing was sent: a sign-in that never finished, an empty token, or a token
+    /// provider that failed (a consent or permission refusal is <see cref="WorkIqIssueCategory.Permission"/>; an AADSTS
+    /// code in the message gets the catalog's cause).
+    /// </summary>
+    private static (WorkIqIssueCategory Category, string Code, string Cause) ForTokenFailure(WorkIqFailure failure, WorkIqTokenFailure tokenFailure) => tokenFailure switch
+    {
+        WorkIqTokenFailure.SignInNotCompleted => (WorkIqIssueCategory.Authentication, "auth.sign_in_not_completed", CauseSignInNotCompleted),
+        WorkIqTokenFailure.EmptyToken => (WorkIqIssueCategory.Authentication, "auth.empty_token", CauseEmptyToken),
+        _ => (
+            failure.Category == WorkIqFailureCategory.Forbidden ? WorkIqIssueCategory.Permission : WorkIqIssueCategory.Authentication,
+            "auth.token_acquisition_failed",
+            WorkIqAadstsCatalog.ExtractCode(failure.SafeMessage) is { } aadsts ? WorkIqAadstsCatalog.Describe(aadsts) : CauseTokenAcquisitionFailed),
+    };
+
+    /// <summary>The category and cause of a turn outcome when no structured failure says more.</summary>
+    private static (WorkIqIssueCategory Category, string Cause) ForOutcome(WorkIqTurnOutcome outcome) => outcome switch
+    {
+        WorkIqTurnOutcome.InputRequired => (WorkIqIssueCategory.Service, CauseInputRequired),
+        WorkIqTurnOutcome.AuthRequired => (WorkIqIssueCategory.Service, CauseAuthRequired),
+        WorkIqTurnOutcome.Failed => (WorkIqIssueCategory.Service, CauseTaskFailed),
+        WorkIqTurnOutcome.Rejected => (WorkIqIssueCategory.Service, CauseTaskRejected),
+        WorkIqTurnOutcome.Canceled => (WorkIqIssueCategory.Service, CauseTaskCanceled),
+        WorkIqTurnOutcome.Indeterminate => (WorkIqIssueCategory.Unknown, CauseIndeterminate),
+        _ => (WorkIqIssueCategory.Unknown, "the turn did not complete; the outcome says what is known"),
+    };
+
+    /// <summary>
+    /// The issue of a turn result, with the code the conversation registers for it: <see cref="ForTurnOutcome"/>
+    /// (<c>turn.&lt;outcome&gt;</c>) with the failure's correlation facts copied over. A failed, rejected or canceled
+    /// turn always carries a <see cref="WorkIqFailureCategory.RemoteError"/> failure, and a turn ended by an HTTP error
+    /// carries that status; neither changes the code. A token failure keeps its own <c>auth.*</c> code: the auth layer
+    /// registered that issue, and the conversation registers no turn issue for it.
+    /// </summary>
     private static WorkIqIssue FromTurnResult(WorkIqTurnResult result, WorkIqTraceStage stage)
     {
         var taskId = result.Task?.TaskId;
         var a2aState = result.Evidence?.TaskState;
-        if (result.Failure is { } failure)
+        var failure = result.Failure;
+        if (failure is { TokenFailure: not null })
         {
             var fromFailure = FromFailure(failure, stage);
             return fromFailure with
@@ -325,25 +472,21 @@ internal static partial class WorkIqIssueClassifier
             };
         }
 
-        var (category, code, cause) = result.Outcome switch
-        {
-            WorkIqTurnOutcome.InputRequired => (WorkIqIssueCategory.Service, "turn.input_required", "the task is suspended waiting for input or approval; nothing was approved — an evaluation cannot answer a consent prompt; the pending interaction is on the turn result"),
-            WorkIqTurnOutcome.AuthRequired => (WorkIqIssueCategory.Service, "turn.auth_required", "the task is suspended waiting for an external authorization workflow; no answer was fabricated — complete the authorization the status message names, then resume on the same task"),
-            WorkIqTurnOutcome.Failed => (WorkIqIssueCategory.Service, "task.failed", "the service reported the task failed; the status message in the capture says why (a partial artifact may exist but is never an answer)"),
-            WorkIqTurnOutcome.Rejected => (WorkIqIssueCategory.Service, "task.rejected", "the service refused the task (policy, content or capability); the status message in the capture says why"),
-            WorkIqTurnOutcome.Canceled => (WorkIqIssueCategory.Service, "task.canceled", "the service confirmed the task was cancelled"),
-            WorkIqTurnOutcome.Indeterminate => (WorkIqIssueCategory.Unknown, "turn.indeterminate", "the remote state is unknown (no terminal state observed before the transport or the budget ended); the input was not resent — inspect the task by id"),
-            _ => (WorkIqIssueCategory.Unknown, "turn.not_completed", "the turn did not complete; the outcome says what is known"),
-        };
-
-        var message = $"turn {result.Identity?.TurnId ?? "?"}: outcome={result.Outcome}, transport={result.Transport}, answer={result.AnswerCompleteness}";
+        var (category, code, cause) = ForTurnOutcome(result);
+        var message = failure is null
+            ? $"turn {result.Identity?.TurnId ?? "?"}: outcome={result.Outcome}, transport={result.Transport}, answer={result.AnswerCompleteness}"
+            : $"{failure.Operation}: {failure.Category} ({failure.Certainty}): {WorkIqRedaction.Redact(failure.SafeMessage)}";
         return new WorkIqIssue(default, stage, category, code, message, cause)
         {
             CaseId = result.Identity?.CaseId,
             TurnId = result.Identity?.TurnId,
-            TaskId = taskId,
-            ContextId = result.ContextId,
-            A2AState = a2aState,
+            HttpStatus = failure?.HttpStatus,
+            RpcErrorCode = failure?.RpcErrorCode,
+            RequestId = failure?.RequestId,
+            TaskId = failure?.TaskId ?? taskId,
+            ContextId = failure?.ContextId ?? result.ContextId,
+            A2AState = failure?.RemoteTaskState ?? a2aState,
+            AadstsCode = failure is null ? null : WorkIqAadstsCatalog.ExtractCode(failure.SafeMessage),
         };
     }
 
@@ -394,6 +537,103 @@ internal static partial class WorkIqIssueClassifier
         };
 
         return Issue(stage, networkCategory, networkCode, Describe(http), networkCause);
+    }
+
+    /// <summary>
+    /// The plain-language cause of an evidence normalisation issue (registered as <see cref="WorkIqIssueCategory.Protocol"/>
+    /// at the <see cref="WorkIqTraceStage.Normalize"/> stage), keyed by the issue code or its prefix.
+    /// </summary>
+    /// <param name="code">The evidence issue code (for example <c>answer.ambiguous</c> or <c>diagnostics.field_invalid</c>).</param>
+    public static string CauseForEvidenceIssue(string code)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        if (string.Equals(code, WorkIqEvidenceNormalizer.AnswerAmbiguousIssueCode, StringComparison.Ordinal))
+        {
+            return "The service returned several answer candidates and the selection policy chose none; inspect the artifacts in the capture and report the shape.";
+        }
+
+        if (string.Equals(code, Native118DiagnosticsDecoder.AmbiguousArtifactIssueCode, StringComparison.Ordinal))
+        {
+            return "Two distinct artifacts play the same diagnostic role; the decoder never picks the last one. Report the capture so the artifact relationship can be decoded.";
+        }
+
+        if (string.Equals(code, InteractionDecoder.ConflictingTwinsIssueCode, StringComparison.Ordinal))
+        {
+            return "The confirmation card's action and actionId payloads differ; both proposals are kept and nothing was approved.";
+        }
+
+        if (string.Equals(code, InteractionDecoder.AmbiguousPartIssueCode, StringComparison.Ordinal))
+        {
+            return "The status message carries more than one pause (input-required or auth-required data parts); none was chosen, no proposal is read from any, and nothing was approved. Report the capture.";
+        }
+
+        if (code.StartsWith("diagnostics.", StringComparison.Ordinal))
+        {
+            return "The diagnostic artifact does not match the native 1.18 shapes this decoder knows (an experimental, undocumented format); the service may have changed it. The raw data stays in the capture.";
+        }
+
+        if (code.StartsWith("citations.", StringComparison.Ordinal))
+        {
+            return "The attribution metadata or the citation markers do not match the sample-observed shapes; the raw data stays in the capture.";
+        }
+
+        if (code.StartsWith("approval.", StringComparison.Ordinal))
+        {
+            return "The confirmation card does not match the interaction profile; the pause is retained raw and is never auto-answered.";
+        }
+
+        return "See the capture at the issue's source pointers.";
+    }
+
+    /// <summary>
+    /// The plain-language cause of a stream deviation the task reducer records (<c>reduce.&lt;code&gt;</c>, registered as
+    /// <see cref="WorkIqIssueCategory.Protocol"/>), keyed by the warning code or its prefix/suffix.
+    /// </summary>
+    /// <param name="code">The warning code without the <c>reduce.</c> prefix (for example <c>status.task_id_mismatch</c>).</param>
+    public static string CauseForReduceWarning(string code)
+    {
+        ArgumentNullException.ThrowIfNull(code);
+        if (code.EndsWith(".task_id_mismatch", StringComparison.Ordinal) || code.EndsWith(".id_mismatch", StringComparison.Ordinal) || code.EndsWith(".context_id_mismatch", StringComparison.Ordinal))
+        {
+            return "A frame carried a task or context id different from the task this turn is tracking; the service may be multiplexing, the subscription may target another task, or the reply belongs to a previous turn. Check the ids in the raw capture.";
+        }
+
+        if (code.EndsWith(".before_task_snapshot", StringComparison.Ordinal))
+        {
+            return "A status or artifact update arrived before any task snapshot. A conforming stream starts with the task; identity was taken from the update, so earlier state (if any) may be missing.";
+        }
+
+        if (code.StartsWith("artifact.append_after_last_chunk", StringComparison.Ordinal))
+        {
+            return "The service kept sending chunks for an artifact after lastChunk: true. The chunks were applied in order and never de-duplicated; the artifact content may be longer than the service intended.";
+        }
+
+        if (code.StartsWith("artifact.", StringComparison.Ordinal))
+        {
+            return "An artifact in the stream deviates from A2A 1.0 (missing or duplicated artifactId). Nothing was merged by guess; the raw capture holds the exact frames.";
+        }
+
+        if (code.StartsWith("message.", StringComparison.Ordinal))
+        {
+            return "A direct message arrived where exactly one (or none, in a task stream) was expected, or it carries an unexpected role or id. The first message is the reply; later ones are retained separately and never merged into it.";
+        }
+
+        if (code.StartsWith("part.", StringComparison.Ordinal))
+        {
+            return "A part did not follow the one-of text | raw | url | data rule. Content was mapped by the SDK's content case; the raw capture holds the original part.";
+        }
+
+        if (code.StartsWith("task.", StringComparison.Ordinal) || code.StartsWith("status.", StringComparison.Ordinal))
+        {
+            return "The task or status deviates from the expected identity or state vocabulary (unspecified state, missing or changed id). An unknown state never counts as completed.";
+        }
+
+        if (code.StartsWith("frame.", StringComparison.Ordinal))
+        {
+            return "A stream frame violated the A2A 1.0 shape and was not applied; the run is marked interrupted so it cannot pass silently. The raw capture holds the exact bytes.";
+        }
+
+        return "The stream deviates from A2A 1.0 in a way this provider records but does not repair; the raw capture holds the exact bytes.";
     }
 
     private static WorkIqIssue Issue(WorkIqTraceStage stage, WorkIqIssueCategory category, string code, string message, string cause) =>

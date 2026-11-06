@@ -40,13 +40,26 @@ internal sealed record DemoCase(
 /// <summary>The cases the benchmark runs and where they came from.</summary>
 /// <param name="Cases">The cases, in file order.</param>
 /// <param name="Source">The file path, or the embedded default's description.</param>
-internal sealed record DemoCaseSet(IReadOnlyList<DemoCase> Cases, string Source);
+/// <param name="IgnoredFieldsNote">
+/// Which cases carry a field the demo does not run (<c>expected</c>, or a field it does not read), per field, and why;
+/// null when none does. The banner and summary.md print it, so no field is dropped without a word.
+/// </param>
+internal sealed record DemoCaseSet(IReadOnlyList<DemoCase> Cases, string Source, string? IgnoredFieldsNote = null);
 
 /// <summary>
-/// Reads the benchmark cases: the embedded default (five read-only cases copied from
-/// <c>samples/datasets/m365-smoke.json</c>) or a <c>--dataset</c> file in the same format. A file that does not fit is
-/// a usage error with a message naming the case and the field, found before anything is sent.
+/// Reads the benchmark cases: the embedded default (five read-only cases from <c>samples/datasets/m365-smoke.json</c>,
+/// without their <c>expected</c> values) or a <c>--dataset</c> file in the same format. A file that does not fit is a
+/// usage error with a message naming the case and the field, found before anything is sent. A field the demo does not
+/// run (<c>expected</c>, or any field it does not read, such as a misspelt <c>evaluation_criteria</c>) is ignored, and
+/// the banner and summary.md name it per case.
 /// </summary>
+/// <remarks>
+/// AgentEval's <c>JsonDatasetLoader</c> reads the same format, but it cannot hold the demo to these rules: it reads only
+/// from a file path (not the embedded default), fills a missing <c>input</c> with an empty string and a missing
+/// <c>id</c> with <c>item_N</c>, accepts any <c>passing_score</c>, keeps unknown fields as metadata without a word, and
+/// names a bad case by its index. The demo refuses the first four before a turn reaches a live tenant, and names every
+/// field it ignores.
+/// </remarks>
 internal static partial class DemoDataset
 {
     /// <summary>The manifest name of the embedded default cases.</summary>
@@ -58,6 +71,12 @@ internal static partial class DemoDataset
     /// <summary>How the embedded default is named in reports.</summary>
     public const string EmbeddedSource = "embedded: 5 read-only cases from samples/datasets/m365-smoke.json";
 
+    /// <summary>The field of the shared dataset format the demo accepts and ignores (the CLI reads it).</summary>
+    public const string IgnoredField = "expected";
+
+    /// <summary>The fields the demo reads, in the order the messages list them.</summary>
+    public static readonly IReadOnlyList<string> ReadFields = ["id", "input", "category", "evaluation_criteria", "passing_score", "tags"];
+
     /// <summary>Loads the embedded default cases.</summary>
     /// <exception cref="InvalidDataException">The resource is missing or malformed (a build defect).</exception>
     public static DemoCaseSet LoadDefault()
@@ -65,7 +84,7 @@ internal static partial class DemoDataset
         using var stream = typeof(DemoDataset).Assembly.GetManifestResourceStream(EmbeddedResourceName)
             ?? throw new InvalidDataException($"The embedded default dataset '{EmbeddedResourceName}' is missing from the demo assembly.");
         using var reader = new StreamReader(stream);
-        return new DemoCaseSet(Parse(reader.ReadToEnd(), "the embedded default dataset"), EmbeddedSource);
+        return Parse(reader.ReadToEnd(), "the embedded default dataset", EmbeddedSource);
     }
 
     /// <summary>Loads a <c>--dataset</c> file.</summary>
@@ -84,14 +103,15 @@ internal static partial class DemoDataset
             throw new InvalidDataException($"--dataset {file.FullName} could not be read: {ex.Message}", ex);
         }
 
-        return new DemoCaseSet(Parse(json, "--dataset " + file.FullName), file.FullName);
+        return Parse(json, "--dataset " + file.FullName, file.FullName);
     }
 
     /// <summary>Parses the case array.</summary>
     /// <param name="json">The JSON text.</param>
     /// <param name="sourceName">How the source is named in errors.</param>
+    /// <param name="source">How the source is named in reports (<see cref="DemoCaseSet.Source"/>).</param>
     /// <exception cref="InvalidDataException">The text does not fit the format.</exception>
-    internal static IReadOnlyList<DemoCase> Parse(string json, string sourceName)
+    internal static DemoCaseSet Parse(string json, string sourceName, string source)
     {
         JsonDocument document;
         try
@@ -112,6 +132,7 @@ internal static partial class DemoDataset
 
             var cases = new List<DemoCase>();
             var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ignored = new List<(string Field, List<string> CaseIds)>();
             var index = 0;
             foreach (var item in document.RootElement.EnumerateArray())
             {
@@ -139,6 +160,24 @@ internal static partial class DemoDataset
                 }
 
                 where = $"{sourceName}, case '{id}'";
+                foreach (var property in item.EnumerateObject())
+                {
+                    if (ReadFields.Contains(property.Name, StringComparer.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var entry = ignored.FindIndex(e => string.Equals(e.Field, property.Name, StringComparison.Ordinal));
+                    if (entry < 0)
+                    {
+                        ignored.Add((property.Name, [id]));
+                    }
+                    else if (!ignored[entry].CaseIds.Contains(id, StringComparer.Ordinal))
+                    {
+                        ignored[entry].CaseIds.Add(id);
+                    }
+                }
+
                 var input = RequiredString(item, "input", where);
                 var category = OptionalString(item, "category", where);
                 var criteria = OptionalStrings(item, "evaluation_criteria", where);
@@ -155,9 +194,18 @@ internal static partial class DemoDataset
                 cases.Add(new DemoCase(id, input, category, criteria, passingScore, tags));
             }
 
-            return cases;
+            return new DemoCaseSet(cases, source, IgnoredNote(ignored));
         }
     }
+
+    /// <summary>The note on the fields the demo ignores, one part per field with the cases that carry it; null when none does.</summary>
+    private static string? IgnoredNote(IReadOnlyList<(string Field, List<string> CaseIds)> ignored) => ignored.Count == 0
+        ? null
+        : string.Join("; ", ignored.Select(e =>
+            $"'{e.Field}' is ignored in {e.CaseIds.Count.ToString(CultureInfo.InvariantCulture)} case(s) ({string.Join(", ", e.CaseIds)}): " +
+            (e.Field == IgnoredField
+                ? "the demo grades each case's criteria with the judge only; the agenteval CLI uses 'expected' as a case-insensitive substring check when a case is not graded by a judge"
+                : $"the demo does not read it (it reads {string.Join(", ", ReadFields)}, names exactly as written)")));
 
     private static string RequiredString(JsonElement item, string name, string where)
     {

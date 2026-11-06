@@ -17,7 +17,7 @@ using static AgentEval.Tests.Microsoft365.Readiness.ReadinessTestRig;
 namespace AgentEval.Tests.Microsoft365.Readiness;
 
 /// <summary>
-/// M37: the readiness check behind <c>agenteval m365 doctor</c>, stage by stage, offline — the real handler chain
+/// The readiness check behind <c>agenteval m365 doctor</c>, stage by stage, offline — the real handler chain
 /// (auth → capture → <see cref="FakeWorkIqHandler"/>) and a host token provider handing out <c>fake-token</c>. Every
 /// verdict, the evidence a tester reads, the stop-at-first-failure rule, consent, and that no output ever carries the
 /// token.
@@ -113,7 +113,7 @@ public sealed class Microsoft365ReadinessCheckTests
 
         var report = await rig.RunAsync(rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config }), file);
 
-        // Review L7: a shape check saves the tester a sign-in round trip; the sign-in stays the authority, so it only warns.
+        // a shape check saves the tester a sign-in round trip; the sign-in stays the authority, so it only warns.
         var config = report.Find(ReadinessStage.Config)!;
         Assert.Equal(ReadinessResult.Pass, config.Result);
         Assert.Equal(warnings, config.Warnings.Count);
@@ -179,7 +179,7 @@ public sealed class Microsoft365ReadinessCheckTests
     [Fact]
     public async Task Config_ProfileOverride_WithoutASource_SaysTheOptions_NotACommandLineOption()
     {
-        // Review L7: the check said "from --m365-profile" for every host, the demo (whose option is --profile) included.
+        // the check said "from --m365-profile" for every host, the demo (whose option is --profile) included.
         using var rig = new ReadinessTestRig();
 
         var report = await rig.RunAsync(rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config }, profile: DiagnosticProfile.Native118Diagnostics));
@@ -207,7 +207,7 @@ public sealed class Microsoft365ReadinessCheckTests
     [Fact]
     public async Task IssueFileOption_TheRegisterIsWrittenThere_AndTheReportAndTheTraceNameIt()
     {
-        // Review L2: a host that wants one register for the run (the demo's issues.jsonl) names it; nothing is renamed afterwards.
+        // a host that wants one register for the run (the demo's issues.jsonl) names it; nothing is renamed afterwards.
         using var rig = new ReadinessTestRig();
         rig.Handler.FailWith(FakeWorkIqHandler.CardMethod, System.Net.HttpStatusCode.Unauthorized);
         var issueFile = new FileInfo(Path.Combine(rig.Root.FullName, "run", "issues.jsonl"));
@@ -217,7 +217,7 @@ public sealed class Microsoft365ReadinessCheckTests
 
         Assert.True(report.AnyFailed);
         Assert.Equal(issueFile.FullName, report.IssueFile);
-        Assert.Contains("doctor.discovery.failed", Codes(issueFile.FullName));
+        Assert.Contains("http.401", Codes(issueFile.FullName));
         Assert.False(File.Exists(Path.Combine(rig.Diagnostics.FullName, "m365-issues.jsonl")), "Nothing goes to the default register when the host names one.");
         var trace = ReadText(report.TraceFile);
         Assert.Contains(issueFile.FullName.Replace("\\", "\\\\", StringComparison.Ordinal), trace, StringComparison.Ordinal);
@@ -499,6 +499,51 @@ public sealed class Microsoft365ReadinessCheckTests
     }
 
     [Fact]
+    public async Task Protocol_Http403_IsOneIssue_TheClients_AndTheStageVerdictIsTraced()
+    {
+        // One failure, one issue: the client registered http.403 for the GetTask it ended, so the stage traces its verdict
+        // instead of registering doctor.protocol.failed for the same failure.
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).FailWith("GetTask", HttpStatusCode.Forbidden);
+
+        var report = await rig.RunAsync(rig.Options());
+
+        Assert.Equal(ReadinessResult.Fail, report.Find(ReadinessStage.Protocol)!.Result);
+        Assert.Equal(new[] { "http.403" }, Codes(report.IssueFile));
+        Assert.Contains("doctor.protocol.failed", Codes(report.TraceFile));
+    }
+
+    /// <summary>
+    /// The doctor leg of the classification census (the blocking and streaming legs are in
+    /// <c>WorkIqA2AClientStreamingTests</c>): the same HTTP failure on GetTask gives the doctor's stage issue the category
+    /// and code the blocking client registers. 429 is left out: the doctor runs on the real clock, and a safe read
+    /// retries a 429 with backoff.
+    /// </summary>
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task Protocol_OneHttpFailure_ClassifiedLikeTheBlockingClient(HttpStatusCode status)
+    {
+        using var blocking = AgentEval.Tests.Microsoft365.Protocol.WorkIqClientHarness.Create().WithDefaultCard();
+        blocking.Handler.FailWith("GetTask", status);
+        await Assert.ThrowsAsync<WorkIqProtocolException>(() => blocking.Client.GetTaskAsync("task-census", null, CancellationToken.None));
+        var expected = Assert.Single(blocking.Issues.Issues);
+
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).FailWith("GetTask", status);
+        var report = await rig.RunAsync(rig.Options());
+
+        var protocol = report.Find(ReadinessStage.Protocol)!;
+        Assert.Equal(ReadinessResult.Fail, protocol.Result);
+        Assert.NotNull(protocol.Issue);
+        Assert.Equal(expected.Category, protocol.Issue.Category);
+        Assert.Equal(expected.Code, protocol.Issue.Code);
+        Assert.Equal((int)status, protocol.Issue.HttpStatus);
+    }
+
+    [Fact]
     public async Task Protocol_VersionNotSupported_Fails()
     {
         using var rig = new ReadinessTestRig();
@@ -627,7 +672,8 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.Contains("TASK_STATE_COMPLETED", EvidenceOf(probe, "observed states"), StringComparison.Ordinal);
         Assert.Equal(AnswerLength(CompletedWithAttributions).ToString(System.Globalization.CultureInfo.InvariantCulture), EvidenceOf(probe, "answer length"));
         Assert.StartsWith("Project Atlas is on schedule", EvidenceOf(probe, "answer (first 80 characters)"), StringComparison.Ordinal);
-        Assert.Equal("2", EvidenceOf(probe, "attributions"));
+        Assert.Equal("Provided (2 attribution(s))", EvidenceOf(probe, "attributions"));
+        Assert.Contains("attributions Provided (2 attribution(s))", probe.Summary, StringComparison.Ordinal);
         Assert.Equal("0", EvidenceOf(probe, "recovery polls (GetTask)"));
         Assert.Equal(Microsoft365ReadinessCheck.ProbePrompt, EvidenceOf(probe, "prompt"));
         Assert.Contains(probe.Warnings, w => w.Contains("not the single word READY", StringComparison.Ordinal));
@@ -661,6 +707,42 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.Contains("confirmation", probe.Summary, StringComparison.Ordinal);
         Assert.Contains("nothing was approved", probe.Summary, StringComparison.Ordinal);
         Assert.Equal(1, rig.Handler.CountOf("SendMessage"));
+    }
+
+    [Fact]
+    public async Task Probe_FailedTask_IsTurnFailed_LikeTheConversation_AndOneIssue()
+    {
+        // The conversation registers turn.failed for a failed task; the doctor's probe must name the same code, and the
+        // stage must not register its own doctor.probe.failed for that one failure.
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).OnRpc("SendMessage", "envelopes/send-task-failed-with-partial-artifact.json");
+
+        var report = await rig.RunAsync(rig.Options(stages: ConfigAndProbe, consent: true));
+
+        var probe = report.Find(ReadinessStage.Probe)!;
+        Assert.Equal(ReadinessResult.Fail, probe.Result);
+        Assert.NotNull(probe.Issue);
+        Assert.Equal("turn.failed", probe.Issue.Code);
+        Assert.Equal(WorkIqIssueCategory.Service, probe.Issue.Category);
+        Assert.Equal(new[] { "turn.failed" }, Codes(report.IssueFile));
+        Assert.Contains("doctor.probe.failed", Codes(report.TraceFile));
+    }
+
+    [Fact]
+    public async Task Probe_Http403OnTheSend_IsOneIssue_WithThePermissionCategory()
+    {
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).FailWith("SendMessage", HttpStatusCode.Forbidden);
+
+        var report = await rig.RunAsync(rig.Options(stages: ConfigAndProbe, consent: true));
+
+        var probe = report.Find(ReadinessStage.Probe)!;
+        Assert.Equal(ReadinessResult.Fail, probe.Result);
+        Assert.NotNull(probe.Issue);
+        Assert.StartsWith("turn.", probe.Issue.Code, StringComparison.Ordinal);
+        Assert.Equal(WorkIqIssueCategory.Permission, probe.Issue.Category);
+        Assert.Equal(403, probe.Issue.HttpStatus);
+        Assert.Equal(new[] { probe.Issue.Code }, Codes(report.IssueFile));
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -779,7 +861,12 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.Equal(ReadinessResult.Fail, census.Result);
         Assert.Contains("the census could not be measured", census.Summary, StringComparison.Ordinal);
         Assert.StartsWith("unknown", EvidenceOf(census, "diagnostic modes accepted"), StringComparison.Ordinal);
-        Assert.Contains("doctor.census.failed", Codes(report.IssueFile));
+
+        // The census turn registered its outcome; the stage traces its verdict instead of registering it twice.
+        Assert.NotNull(census.Issue);
+        Assert.Single(Codes(report.IssueFile), c => c == census.Issue.Code);
+        Assert.DoesNotContain("doctor.census.failed", Codes(report.IssueFile));
+        Assert.Contains("doctor.census.failed", Codes(report.TraceFile));
     }
 
     // ---------------------------------------------------------------------------------------------------------

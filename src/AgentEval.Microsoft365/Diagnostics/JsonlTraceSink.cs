@@ -10,7 +10,7 @@ namespace AgentEval.Microsoft365.Diagnostics;
 /// <see cref="WorkIqDiagnosticsJson.TruncationMarker"/> where it was cut, flushed per write. The directory is
 /// created when missing. Thread-safe.
 /// </summary>
-public sealed class JsonlTraceSink : IWorkIqTraceSink, IDisposable
+internal sealed class JsonlTraceSink : IWorkIqTraceSink, IDisposable
 {
     private readonly JsonlLineWriter _writer;
 

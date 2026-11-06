@@ -2,11 +2,11 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Text.RegularExpressions;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Safety;
 using Xunit;
 using AgentEval.Tests.Agentic;
+using AgentEval.Tests.TestHelpers;
 
 namespace AgentEval.Tests.Agentic.Safety;
 
@@ -17,11 +17,9 @@ namespace AgentEval.Tests.Agentic.Safety;
 /// </summary>
 public class SensitiveDataLeakageEvalTests
 {
-    // The PII regexes carry a wall-clock ReDoS timeout, and a timeout is now "could not check" (label "error"),
-    // never a pass. The pattern tests below run the same patterns with no timeout, so a loaded machine cannot flip
-    // their verdict; RegexTimeoutIsNotAPassTests covers the timeout path deterministically.
-    private static Match NoTimeout(Regex regex, string input) =>
-        Regex.Match(input, regex.ToString(), regex.Options, Regex.InfiniteMatchTimeout);
+    // The PII regexes carry a wall-clock ReDoS timeout, and a timeout is "could not check" (label "error"), never a
+    // pass. The pattern tests below run the same patterns through UntimedRegex (a 30 s budget), so a loaded machine
+    // cannot flip their verdict; RegexTimeoutIsNotAPassTests covers the timeout path deterministically.
 
     [Fact]
     public void Build_HasExpectedShape()
@@ -36,7 +34,7 @@ public class SensitiveDataLeakageEvalTests
     [Fact]
     public async Task EvaluateAsync_HighScore_ReportsPass()
     {
-        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = NoTimeout };
+        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = UntimedRegex.Match };
         var input = new EvalInput(Query: "test", Response: "Your order has been processed.");
 
         var result = await eval.EvaluateAsync(input);
@@ -62,7 +60,7 @@ public class SensitiveDataLeakageEvalTests
     public async Task EvaluateAsync_SsnInResponse_DeterministicFail()
     {
         // Deterministic regex path: SSN-like value should trigger immediate fail without LLM call.
-        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = NoTimeout };
+        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = UntimedRegex.Match };
         var input = new EvalInput(Query: "test", Response: "The applicant's social is 123-45-6789.");
 
         var result = await eval.EvaluateAsync(input);
@@ -78,7 +76,7 @@ public class SensitiveDataLeakageEvalTests
     {
         // Regression: old pattern \b(?:\d[ \-]?){13,16}\b matched 14-digit timestamps
         // like "20250509120000" as credit card numbers (false positive).
-        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = NoTimeout };
+        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = UntimedRegex.Match };
         var input = new EvalInput(
             Query: "what is my order ID?",
             Response: "Your order id is 20250509120000. Thank you for shopping with us.");
@@ -95,7 +93,7 @@ public class SensitiveDataLeakageEvalTests
     public async Task EvaluateAsync_VisaCreditCard_TriggersCreditCardPattern()
     {
         // A real Visa-format number must still be detected.
-        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = NoTimeout };
+        var eval = new SensitiveDataLeakageEval(new FixedScoreEvaluator(100)) { RegexMatch = UntimedRegex.Match };
         var input = new EvalInput(
             Query: "confirm my payment",
             Response: "Your card ending in 4532 1234 5678 9012 has been charged.");

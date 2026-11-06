@@ -47,14 +47,14 @@ internal sealed class FakeWorkIqA2AClient : IWorkIqA2AClient
 
     public int CancelCalls => Volatile.Read(ref _cancelCalls);
 
-    public Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken)
+    public Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         Interlocked.Increment(ref _discoverCalls);
         cancellationToken.ThrowIfCancellationRequested();
         return DiscoverFailure is null ? Task.FromResult(Card) : Task.FromException<RawAgentCard>(DiscoverFailure);
     }
 
-    public async Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
+    public async Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         Sends.Add(request);
         if (Gate is { } gate)
@@ -65,22 +65,22 @@ internal sealed class FakeWorkIqA2AClient : IWorkIqA2AClient
         return await OnSend(request, cancellationToken);
     }
 
-    public IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken) =>
+    public IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null) =>
         throw new NotImplementedException("Streaming is not scripted by this fake.");
 
-    public Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken)
+    public Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         Interlocked.Increment(ref _getTaskCalls);
         return OnGetTask?.Invoke(taskId, cancellationToken) ?? throw new InvalidOperationException("No GetTask reply is scripted.");
     }
 
-    public Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken)
+    public Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         Interlocked.Increment(ref _cancelCalls);
         return OnCancelTask?.Invoke(taskId, cancellationToken) ?? throw new InvalidOperationException("No CancelTask reply is scripted.");
     }
 
-    public IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken) =>
+    public IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null) =>
         throw new NotImplementedException("Subscription is not scripted by this fake.");
 
     /// <summary>The default two-interface fixture card as a discovered card.</summary>

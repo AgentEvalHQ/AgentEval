@@ -4,7 +4,10 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Text.Json.Nodes;
 using AgentEval.Core;
+using AgentEval.Models;
+using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Commands.Targets;
 
@@ -18,8 +21,7 @@ internal interface ISutTargetOptions { }
 
 /// <summary>
 /// A built-in system-under-test reachable from MULTIPLE verbs (<c>eval</c>, <c>bench</c>) via a shared
-/// <c>--sut</c> flag — Track 2 of the Copilot Studio integration plan. Generalizes the
-/// already-shipped <c>redteam --sut</c> pattern WITHOUT touching
+/// <c>--sut</c> flag. Generalizes the already-shipped <c>redteam --sut</c> pattern WITHOUT touching
 /// <c>AgentEval.Cli.Commands.RedTeamTargets.IRedTeamBuiltInTarget</c>, <c>RedTeamOptions</c>, or
 /// <c>RedTeamCommand.cs</c> — a target that wants BOTH surfaces implements both interfaces via EXPLICIT
 /// interface implementation (the same C# idiom <c>IEnumerable</c>/<c>IEnumerable&lt;T&gt;</c> use), so the
@@ -59,6 +61,56 @@ internal interface ISutTarget
 
     /// <summary>Build the system-under-test. <paramref name="sutOverride"/>, if non-null, is returned as-is (the credential-free test seam).</summary>
     IEvaluableAgent Build(CommonTargetOptions common, ISutTargetOptions? own, IEvaluableAgent? sutOverride);
+
+    /// <summary>
+    /// What the subject is when a run is given no <c>--subject</c>: the AEF subject ref is then
+    /// <c>&lt;kind&gt;:&lt;resolved name&gt;</c>. <see cref="AefSubjectKind.Model"/> unless the target drives an agent.
+    /// </summary>
+    AefSubjectKind SubjectKind => AefSubjectKind.Model;
+
+    /// <summary>
+    /// The content-free provenance this target adds to an AEF run's config settings, read after <see cref="Validate"/>;
+    /// null adds nothing. A run that writes no per-case evidence documents (a <c>bench</c> run) records these.
+    /// </summary>
+    JsonObject? RunSettings() => null;
+
+    /// <summary>
+    /// What this target adds to the AEF evidence of an <c>eval</c> run against <paramref name="agent"/> (the agent
+    /// <see cref="Build"/> returned), or null when it adds nothing beyond <see cref="RunSettings"/>.
+    /// </summary>
+    /// <param name="agent">The agent the command evaluates.</param>
+    ISutCaseEvidence? CaseEvidenceFor(IEvaluableAgent agent) => null;
+}
+
+/// <summary>
+/// What a built-in target adds to the AEF evidence of an <c>eval</c> run: the run provenance, a review of each case's
+/// result against what the target observed, and each case's evidence document. The command calls
+/// <see cref="BeginCase"/> before a case or trial runs, then <see cref="ReviewResult"/> and <see cref="DocumentFor"/>
+/// once it has a result, before the result is recorded. Cases and trials run one after another.
+/// </summary>
+internal interface ISutCaseEvidence
+{
+    /// <summary>The subject's provider, recorded in the AEF run.</summary>
+    string SubjectProvider { get; }
+
+    /// <summary>The provenance keys for the run's config settings; null adds nothing.</summary>
+    JsonObject? RunSettings { get; }
+
+    /// <summary>Marks the start of a case or trial.</summary>
+    /// <param name="caseId">The AEF case id.</param>
+    void BeginCase(string caseId);
+
+    /// <summary>
+    /// Applies what the target observed during the case to its result before the result is recorded: a case the target
+    /// knows was not measured is marked not measured (<see cref="TestResult.Error"/>), never left as a failure.
+    /// </summary>
+    /// <param name="result">The case's (or trial's) result, as the harness produced it.</param>
+    /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>
+    void ReviewResult(TestResult result, string caseId);
+
+    /// <summary>The case's evidence document, or null when there is none.</summary>
+    /// <param name="caseId">The AEF case id given to <see cref="BeginCase"/>.</param>
+    string? DocumentFor(string caseId);
 }
 
 /// <summary>
@@ -113,6 +165,13 @@ internal sealed record CommonTargetOptions
 /// </summary>
 internal static class SutTargetResolver
 {
+    /// <summary>
+    /// What <c>--i-understand-live-side-effects</c> acknowledges, shared by every command that registers it (each adds
+    /// what the flag gates on that command).
+    /// </summary>
+    internal const string ConsentDescription =
+        "Required consent for a live built-in --sut target (copilot-studio, microsoft365): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent.";
+
     /// <summary>The built-in targets available under this shared seam: <c>copilot-studio</c> and <c>microsoft365</c> (see <see cref="ISutTarget"/>'s scope note).</summary>
     internal static IReadOnlyList<ISutTarget> BuiltInTargets() =>
         [new global::AgentEval.Cli.CopilotStudio.CopilotStudioRedTeamTarget(), new global::AgentEval.Cli.Microsoft365.Microsoft365SutTarget()];
@@ -139,13 +198,13 @@ internal static class SutTargetResolver
         };
         command.Options.Add(sutOpt);
 
-        // ONE consent flag per verb, owned here rather than by each live target (M03): two targets each
+        // ONE consent flag per verb, owned here rather than by each live target: two targets each
         // registering "--i-understand-live-side-effects" on the same command would be a duplicate-alias error.
         // Bound by the calling verb into CommonTargetOptions.AckLiveSideEffects, which each live target's
         // Validate reads for its consent gate.
         var ackOpt = new Option<bool>("--i-understand-live-side-effects")
         {
-            Description = "Required consent for a live built-in --sut target (copilot-studio, microsoft365): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent. Without this the command refuses before any network call.",
+            Description = ConsentDescription + " Without this the command refuses before any network call.",
         };
         if (targets.Count > 0)
         {
@@ -179,7 +238,7 @@ internal static class SutTargetResolver
             return (null, null);
         }
 
-        var target = targets.FirstOrDefault(t => string.Equals(t.Sut, opts.Sut.Trim(), StringComparison.OrdinalIgnoreCase))
+        var target = Find(targets, opts.Sut)
             ?? throw new InvalidOperationException(
                 $"Unknown --sut value: '{opts.Sut}'. Valid for this verb: {string.Join(", ", targets.Select(t => t.Sut))}.");
 
@@ -187,4 +246,27 @@ internal static class SutTargetResolver
         target.Validate(opts, own);
         return (target.Build(opts, own, sutOverride), target.ResolvedName(opts, own));
     }
+
+    /// <summary>
+    /// The target among <paramref name="targets"/> that <paramref name="sut"/> names (trimmed, case-insensitive), or null
+    /// when <paramref name="sut"/> is null or names none of them.
+    /// </summary>
+    /// <param name="targets">The targets the command resolved <c>--sut</c> against.</param>
+    /// <param name="sut">The parsed <c>--sut</c> value.</param>
+    internal static ISutTarget? Find(IEnumerable<ISutTarget> targets, string? sut)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        return sut is null
+            ? null
+            : targets.FirstOrDefault(t => string.Equals(t.Sut, sut.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The run provenance a <c>bench</c> command adds to its AEF run: <see cref="ISutTarget.RunSettings"/> of the target
+    /// <paramref name="sut"/> names among <paramref name="targets"/> (the instance the command validated and built), or
+    /// null when <paramref name="sut"/> names none of them.
+    /// </summary>
+    /// <param name="targets">The targets the command resolved <c>--sut</c> against.</param>
+    /// <param name="sut">The parsed <c>--sut</c> value.</param>
+    internal static JsonObject? RunSettingsFor(IEnumerable<ISutTarget> targets, string? sut) => Find(targets, sut)?.RunSettings();
 }

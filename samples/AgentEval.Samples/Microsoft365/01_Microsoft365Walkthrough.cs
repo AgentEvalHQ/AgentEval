@@ -277,7 +277,7 @@ public static class Microsoft365Walkthrough
         {
             var (_, result) = await InvokeAsync(state, "scene-4-action", ActionPrompt);
             Console.WriteLine("   Outcome: Completed — the agent answered in words.");
-            Console.WriteLine($"   Approval intents: {Microsoft365SampleSupport.Describe(result.Evidence.ApprovalIntents, "intent(s)")}");
+            Console.WriteLine($"   Approval intents: {result.Evidence.ApprovalIntents.Describe("intent(s)")}");
             Console.WriteLine("   A completed reply proves what the agent SAID; whether anything was created is not observable");
             Console.WriteLine("   here — check the test user's calendar.");
         }
@@ -287,7 +287,7 @@ public static class Microsoft365Walkthrough
             Console.WriteLine("   Outcome: InputRequired — reported as NOT completed, never graded as an answer.");
             Console.WriteLine($"      task id {result.Task?.TaskId ?? "none"} · context id {result.ContextId ?? "none"}");
             PrintPendingInteraction(result.PendingInteraction);
-            Console.WriteLine($"      approval intents: {Microsoft365SampleSupport.Describe(result.Evidence.ApprovalIntents, "intent(s)")}");
+            Console.WriteLine($"      approval intents: {result.Evidence.ApprovalIntents.Describe("intent(s)")}");
             Console.WriteLine("   ✅ Nothing was approved: this sample never builds a WorkIqInteractionResponse, and the provider");
             Console.WriteLine("      never answers a card on its own.");
         }
@@ -385,13 +385,13 @@ public static class Microsoft365Walkthrough
 
         Console.WriteLine();
         Console.WriteLine($"   {"channel",-22} availability");
-        Row("citation markers", Microsoft365SampleSupport.Describe(evidence.CitationMarkers, "marker(s)"));
-        Row("citation sources", Microsoft365SampleSupport.Describe(evidence.CitationSources, "source(s)"));
-        Row("tool selections", Microsoft365SampleSupport.Describe(evidence.ToolSelections, "selection(s)"));
-        Row("tool executions", Microsoft365SampleSupport.Describe(evidence.ToolExecutions, "execution(s)"));
-        Row("retrieval executions", Microsoft365SampleSupport.Describe(evidence.RetrievalExecutions, "execution(s)"));
-        Row("approval intents", Microsoft365SampleSupport.Describe(evidence.ApprovalIntents, "intent(s)"));
-        Row("skill activations", Microsoft365SampleSupport.Describe(evidence.SkillActivations, "activation(s)"));
+        Row("citation markers", evidence.CitationMarkers.Describe("marker(s)"));
+        Row("citation sources", evidence.CitationSources.Describe("source(s)"));
+        Row("tool selections", evidence.ToolSelections.Describe("selection(s)"));
+        Row("tool executions", evidence.ToolExecutions.Describe("execution(s)"));
+        Row("retrieval executions", evidence.RetrievalExecutions.Describe("execution(s)"));
+        Row("approval intents", evidence.ApprovalIntents.Describe("intent(s)"));
+        Row("skill activations", evidence.SkillActivations.Describe("activation(s)"));
         Console.WriteLine();
 
         if (evidence.CitationMarkers.IsProvided && !evidence.CitationMarkers.Items.IsDefaultOrEmpty)

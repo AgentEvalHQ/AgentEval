@@ -34,6 +34,12 @@ internal sealed class DemoRig : IDisposable
     /// <summary>A task paused for the user's confirmation of a proposed calendar event.</summary>
     public const string InputRequiredConfirmation = "envelopes/send-task-input-required-confirmation.json";
 
+    /// <summary>A completed task with two answer artifacts and none selected (answer completeness Ambiguous).</summary>
+    public const string AmbiguousAnswer = "envelopes/send-task-completed-two-text-artifacts-ambiguous.json";
+
+    /// <summary>A completed task whose answer artifact has no text.</summary>
+    public const string EmptyAnswer = "envelopes/send-task-completed-empty-answer.json";
+
     /// <summary>The JSON-RPC TaskNotFound reply the readiness check's protocol stage expects for its random task id.</summary>
     public const string TaskNotFoundReply = "{\"jsonrpc\":\"2.0\",\"id\":\"rpc-1\",\"error\":{\"code\":-32001,\"message\":\"Task not found\"}}";
 
@@ -92,6 +98,9 @@ internal sealed class DemoRig : IDisposable
 
     /// <summary>The judge the demo receives through its host seam; null means "resolve from the (empty) environment", that is: none.</summary>
     public IChatClient? Judge { get; set; }
+
+    /// <summary>Writes the <c>--zip</c> archive in place of the real writer (a test makes it fail); null keeps the real one.</summary>
+    public Func<AgentEval.Microsoft365Demo.RunFolder, FileInfo>? ZipWriter { get; set; }
 
     /// <summary>The demo's whole environment (empty unless a test sets a variable).</summary>
     public Dictionary<string, string> Environment { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -181,6 +190,7 @@ internal sealed class DemoRig : IDisposable
             Now = () => FixedNow,
             JudgeClient = Judge,
             GetEnvironmentVariable = name => Environment.TryGetValue(name, out var value) ? value : null,
+            ZipWriter = ZipWriter,
         };
 
         // A hang is a failure, not a stuck test run: the demo ends the stage in progress and still writes the folder.

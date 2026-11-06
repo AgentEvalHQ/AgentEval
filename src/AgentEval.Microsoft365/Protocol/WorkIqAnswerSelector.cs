@@ -25,7 +25,7 @@ internal sealed record WorkIqAnswerSelection(
 /// for a completed task the artifact classified as the answer (name <c>Answer</c>, or the single text artifact;
 /// diagnostic artifacts excluded by media type/name); status-message text never merged; several candidates →
 /// <see cref="OutputCompleteness.Ambiguous"/> with every candidate retained (never mixed); text chunks concatenated
-/// without inserted newlines; an empty answer is <see cref="OutputCompleteness.Empty"/>, not a failure. Owned by lane A (M21).
+/// without inserted newlines; an empty answer is <see cref="OutputCompleteness.Empty"/>, not a failure.
 /// </summary>
 /// <remarks>
 /// The selector is state-agnostic: it classifies and assembles whatever the snapshot holds, and the conversation

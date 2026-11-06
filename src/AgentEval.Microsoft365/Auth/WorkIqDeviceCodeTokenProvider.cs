@@ -4,7 +4,6 @@
 
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using AgentEval.Microsoft365.Diagnostics;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -45,9 +44,11 @@ internal sealed record WorkIqTokenInfo(
 /// timeout: the A2A client acquires the token before each call, outside the call's timeout. An MSAL service failure is wrapped in
 /// <see cref="WorkIqProtocolException"/> (<see cref="WorkIqFailureCategory.Forbidden"/> for consent/permission
 /// AADSTS codes or HTTP 403, else <see cref="WorkIqFailureCategory.Unauthorized"/>) carrying the AADSTS code and
-/// MSAL error code only, so the transport classifier can map it.
+/// MSAL error code only, with the MSAL exception as its inner exception. The provider registers no issue itself: the
+/// auth handler that asked for the token registers the one issue through <see cref="WorkIqIssueClassifier"/>, which
+/// reads the AADSTS code in the safe message and takes its cause from <see cref="WorkIqAadstsCatalog"/>.
 /// </remarks>
-public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider, IWorkIqSignInWaitSource
+public sealed class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider, IWorkIqSignInWaitSource
 {
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private IPublicClientApplication? _app;
@@ -232,25 +233,11 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
         return at > 0 ? trimmed[0] + "***" + trimmed[at..] : trimmed[0] + "***";
     }
 
-    /// <summary>Extracts the <c>AADSTS</c> code from an MSAL message, or null.</summary>
-    /// <param name="message">The exception message.</param>
-    internal static string? ExtractAadstsCode(string? message)
-    {
-        if (string.IsNullOrEmpty(message))
-        {
-            return null;
-        }
-
-        var match = AadstsPattern().Match(message);
-        return match.Success ? match.Value : null;
-    }
-
     /// <summary>Whether an AADSTS code or HTTP status describes a consent/permission refusal (→ Forbidden) rather than an authentication failure (→ Unauthorized).</summary>
     /// <param name="aadstsCode">The AADSTS code, when any.</param>
     /// <param name="httpStatus">The HTTP status MSAL saw.</param>
     internal static bool IsPermissionRefusal(string? aadstsCode, int httpStatus) =>
-        httpStatus == 403
-        || aadstsCode is "AADSTS65001" or "AADSTS65004" or "AADSTS650052" or "AADSTS90094" or "AADSTS53003" or "AADSTS7000215";
+        httpStatus == 403 || WorkIqAadstsCatalog.IsPermissionRefusal(aadstsCode);
 
     private Task ShowDeviceCodePrompt(DeviceCodeResult deviceCode, IWorkIqSignInWaitListener? signInWait)
     {
@@ -331,9 +318,11 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
         Volatile.Write(ref _lastTokenInfo, info);
     }
 
+    // The provider traces a failure and wraps it; the auth handler that asked for the token registers its one issue,
+    // classified from the failure, whose safe message carries the AADSTS code the catalog describes.
     private WorkIqProtocolException Wrap(MsalServiceException ex, string phase, long started)
     {
-        var aadsts = ExtractAadstsCode(ex.Message);
+        var aadsts = WorkIqAadstsCatalog.ExtractCode(ex.Message);
         var category = IsPermissionRefusal(aadsts, ex.StatusCode) ? WorkIqFailureCategory.Forbidden : WorkIqFailureCategory.Unauthorized;
         var failure = new WorkIqFailure(
             category,
@@ -352,19 +341,6 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
             WorkIqTraceLevel.Error,
             httpStatus: failure.HttpStatus,
             elapsedMs: Diagnostics.Clock.GetElapsedTime(started).TotalMilliseconds);
-        Diagnostics.Issue(new WorkIqIssue(
-            default,
-            WorkIqTraceStage.Auth,
-            category == WorkIqFailureCategory.Forbidden ? WorkIqIssueCategory.Permission : WorkIqIssueCategory.Authentication,
-            "auth.msal_service_error",
-            failure.SafeMessage,
-            category == WorkIqFailureCategory.Forbidden
-                ? "Admin consent for the delegated WorkIQAgent.Ask permission is missing, the user declined consent, or a conditional-access policy blocked the sign-in."
-                : "The sign-in failed or the device code expired/was declined; re-run the device-code sign-in in the configured tenant.")
-        {
-            HttpStatus = failure.HttpStatus,
-            AadstsCode = aadsts,
-        });
         return new WorkIqProtocolException(failure, ex);
     }
 
@@ -376,12 +352,6 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
             OutcomeCertainty.Known,
             WorkIqOperation.Unknown);
         Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.failed", failure.SafeMessage, WorkIqTraceLevel.Error, elapsedMs: Diagnostics.Clock.GetElapsedTime(started).TotalMilliseconds);
-        Diagnostics.Issue(WorkIqIssue.Create(
-            WorkIqTraceStage.Auth,
-            WorkIqIssueCategory.Authentication,
-            "auth.msal_client_error",
-            failure.SafeMessage,
-            "The device code expired before the sign-in completed, the sign-in was canceled, or the local MSAL cache could not be used; re-run the device-code sign-in."));
         return new WorkIqProtocolException(failure, ex);
     }
 
@@ -428,7 +398,4 @@ public sealed partial class WorkIqDeviceCodeTokenProvider : IWorkIqTokenProvider
             _initLock.Release();
         }
     }
-
-    [GeneratedRegex(@"AADSTS\d{4,}", RegexOptions.CultureInvariant)]
-    private static partial Regex AadstsPattern();
 }

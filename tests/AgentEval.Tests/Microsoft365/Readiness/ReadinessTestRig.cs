@@ -5,6 +5,7 @@
 using System.Text;
 using System.Text.Json;
 using AgentEval.Microsoft365;
+using AgentEval.Microsoft365.Auth;
 using AgentEval.Microsoft365.Readiness;
 using AgentEval.Tests.Microsoft365.Auth;
 using AgentEval.Tests.Microsoft365.TestHelpers;
@@ -15,7 +16,7 @@ namespace AgentEval.Tests.Microsoft365.Readiness;
 /// One offline readiness run: a temp folder for the config, the diagnostics and any raw capture, the scripted
 /// <see cref="FakeWorkIqHandler"/> behind the real handler chain, a host token provider that hands out
 /// <see cref="FakeToken"/> (or throws), and a console writer. Nothing touches the network or a real tenant; the fake
-/// answers immediately, so no fake clock is pumped.
+/// answers immediately. A test of the stage timers runs the check on a fake clock and advances it.
 /// </summary>
 internal sealed class ReadinessTestRig : IDisposable
 {
@@ -99,6 +100,10 @@ internal sealed class ReadinessTestRig : IDisposable
     /// <summary>Runs the check through the internal seam (fake transport, host token provider).</summary>
     public Task<ReadinessReport> RunAsync(ReadinessCheckOptions options, FileInfo? configFile = null) =>
         Microsoft365ReadinessCheck.RunAsync(null, configFile ?? WriteConfig(), options, Handler, Tokens);
+
+    /// <summary>Runs the check on an injected clock: every stage timer and sign-in wait runs on <paramref name="clock"/>, so a test advances it instead of waiting.</summary>
+    public Task<ReadinessReport> RunAsync(ReadinessCheckOptions options, TimeProvider clock, IWorkIqTokenProvider tokens, CancellationToken cancellationToken) =>
+        Microsoft365ReadinessCheck.RunAsync(null, WriteConfig(), options, Handler, tokens, clock, cancellationToken);
 
     /// <summary>The text of a file the run wrote (empty when absent).</summary>
     public static string ReadText(string? path) => path is not null && File.Exists(path) ? File.ReadAllText(path) : "";

@@ -16,7 +16,7 @@ namespace AgentEval.Microsoft365.Protocol;
 /// The streaming half of <see cref="WorkIqA2AClient"/>: <c>SendStreamingMessage</c> and <c>SubscribeToTask</c> over
 /// the SDK's <c>SendStreamingMessageAsync</c> / <c>SubscribeToTaskAsync</c>, with every frame captured (client
 /// sequence, connection epoch, receipt time, SSE envelope), exactly-one-of validation of <see cref="StreamResponse"/>,
-/// task/context id consistency checks, and JSON-RPC errors inspected inside the stream. Owned by lane C (M13).
+/// task/context id consistency checks, and JSON-RPC errors inspected inside the stream.
 /// </summary>
 /// <remarks>
 /// <para>The SDK does not expose the raw SSE <c>data</c> line, the <c>id</c>/<c>event</c> fields or the JSON-RPC id
@@ -24,7 +24,7 @@ namespace AgentEval.Microsoft365.Protocol;
 /// re-serialized with <see cref="A2AJsonUtilities.DefaultOptions"/> (a projection), <see cref="WorkIqStreamFrame.SseId"/>
 /// and <see cref="WorkIqStreamFrame.SseEvent"/> are null, and no <see cref="WorkIqTraceEvent.RpcId"/> is traced. The
 /// exact bytes (envelope fields included) are retained by the <see cref="RawCaptureHandler"/>'s tee under the
-/// content policy; the capture reference of the last stream is <see cref="LastStreamCapture"/>.</para>
+/// content policy; the capture reference of the stream is handed back on <see cref="WorkIqCallContext.StreamCapture"/>.</para>
 /// <para>A JSON-RPC <c>error</c> frame makes the SDK throw an <see cref="A2AException"/> out of its enumerator;
 /// like any other mid-stream exception it becomes one final frame whose <see cref="WorkIqStreamFrame.Failure"/>
 /// is <see cref="ClassifyException"/>'s verdict, after which the iterator ends — it never throws once a frame was
@@ -51,26 +51,19 @@ internal sealed partial class WorkIqA2AClient
     /// <summary>The connection epoch of the most recently opened stream (0 before any).</summary>
     internal int StreamConnectionEpoch => Volatile.Read(ref _streamConnectionEpoch);
 
-    /// <summary>
-    /// The raw capture reference of the most recently ended stream (<c>SendStreamingMessage</c> or
-    /// <c>SubscribeToTask</c>); null while a stream is open or before any. Frames carry no capture slot, so the
-    /// conversation reads it here once the enumeration ends and attaches it to the reduced snapshot.
-    /// </summary>
-    internal RawCaptureRef? LastStreamCapture { get; private set; }
-
     /// <inheritdoc/>
-    public IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken)
+    public IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Message);
-        return RunStreamAsync(WorkIqOperation.Stream, request, subscribedTaskId: null, cancellationToken);
+        return RunStreamAsync(WorkIqOperation.Stream, request, subscribedTaskId: null, call, cancellationToken);
     }
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken)
+    public IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
-        return RunStreamAsync(WorkIqOperation.Subscribe, request: null, taskId, cancellationToken);
+        return RunStreamAsync(WorkIqOperation.Subscribe, request: null, taskId, call, cancellationToken);
     }
 
     /// <summary>
@@ -85,233 +78,187 @@ internal sealed partial class WorkIqA2AClient
         _ => [TextPlainOutputMode],
     };
 
-    /// <summary>
-    /// Sets the request configuration the way the blocking send does (kept local to this partial on purpose):
-    /// <c>acceptedOutputModes</c> from the profile, <c>returnImmediately: false</c> (a streaming send runs to its
-    /// terminal event; the flag is not a streaming-finality control) and <c>historyLength</c> from the options
-    /// unless the caller already set one.
-    /// </summary>
-    /// <param name="request">The request to configure.</param>
-    /// <param name="profile">The effective diagnostic profile.</param>
-    /// <param name="historyLength">The configured history length; null omits it.</param>
-    private static void ApplyStreamConfiguration(SendMessageRequest request, DiagnosticProfile profile, int? historyLength)
-    {
-        var configuration = request.Configuration ?? new SendMessageConfiguration();
-        configuration.AcceptedOutputModes = AcceptedOutputModesFor(profile);
-        configuration.ReturnImmediately = false;
-        configuration.HistoryLength ??= historyLength;
-        request.Configuration = configuration;
-    }
-
-    /// <summary>The routing <c>tenant</c> of the interface the trust policy selected, when the card declares one.</summary>
-    /// <param name="card">The discovered card.</param>
-    private static string? ResolveRoutingTenant(RawAgentCard card)
-    {
-        foreach (var candidate in card.Card.SupportedInterfaces ?? [])
-        {
-            if (candidate is null || string.IsNullOrEmpty(candidate.Url))
-            {
-                continue;
-            }
-
-            if (string.Equals(candidate.Url, card.SelectedEndpoint.AbsoluteUri, StringComparison.Ordinal)
-                || string.Equals(candidate.Url, card.SelectedEndpoint.OriginalString, StringComparison.Ordinal)
-                || (Uri.TryCreate(candidate.Url, UriKind.Absolute, out var url) && url == card.SelectedEndpoint))
-            {
-                return string.IsNullOrWhiteSpace(candidate.Tenant) ? null : candidate.Tenant;
-            }
-        }
-
-        return null;
-    }
-
     private async IAsyncEnumerable<WorkIqStreamFrame> RunStreamAsync(
         WorkIqOperation operation,
         SendMessageRequest? request,
         string? subscribedTaskId,
+        WorkIqCallContext? call,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var isSubscribe = operation == WorkIqOperation.Subscribe;
-        var stage = isSubscribe ? WorkIqTraceStage.Subscribe : WorkIqTraceStage.Stream;
-        var prefix = isSubscribe ? "subscribe" : "stream";
-
         // Discovery failures propagate before any frame exists, exactly like the blocking operations.
-        var card = await EnsureDiscoveredAsync(cancellationToken).ConfigureAwait(false);
+        var card = await EnsureDiscoveredAsync(cancellationToken, call).ConfigureAwait(false);
 
         // So does a sign-in that does not finish: the token is acquired before the stream opens, outside
         // HttpClient.Timeout (the SDK builds its own requests, so the auth handler's own call is then a cache hit).
-        _ = await AcquireTokenBeforeCallAsync(operation, HttpMethod.Post, card.SelectedEndpoint, isSubscribe ? WorkIqTraceStage.Subscribe : WorkIqTraceStage.Stream, cancellationToken).ConfigureAwait(false);
-        var routingTenant = ResolveRoutingTenant(card);
-        var expectedTaskId = subscribedTaskId ?? request?.Message.TaskId;
-        var expectedContextId = request?.Message.ContextId;
-        var profile = Options.ProfileOverride ?? Config.ResolveProfile();
+        _ = await AcquireTokenBeforeCallAsync(operation, HttpMethod.Post, card.SelectedEndpoint, WorkIqIssueClassifier.StageFor(operation), call, cancellationToken).ConfigureAwait(false);
         if (request is not null)
         {
-            ApplyStreamConfiguration(request, profile, Options.HistoryLength);
-            request.Tenant ??= routingTenant;
+            ApplySendConfiguration(request, Profile, Options.HistoryLength, RoutingTenant);
         }
 
-        var epoch = Interlocked.Increment(ref _streamConnectionEpoch);
-        var startTimestamp = Clock.GetTimestamp();
-        var tracker = new StreamIdTracker(expectedTaskId, expectedContextId);
-        var sink = BeginCapture(operation);
-        LastStreamCapture = null;
-        RawCaptureRef? capture = null;
-        var captureEnded = false;
-        long sequence = 0;
-        var malformed = 0;
-        Exception? terminalException = null;
+        var run = new StreamRun(
+            operation,
+            subscribedTaskId ?? request?.Message.TaskId,
+            request?.Message.ContextId,
+            Interlocked.Increment(ref _streamConnectionEpoch),
+            Clock.GetTimestamp(),
+            NewCaptureSink(operation, call));
+
+        // The SDK builds the stream's request, so its capture sink cannot travel on it: the handler's current sink it is.
+        Capture.CurrentSink = run.Sink;
+        TraceOpened(run, card, request);
+
         IAsyncEnumerator<StreamResponse>? enumerator = null;
-
-        TraceEvent(
-            stage,
-            prefix + ".opened",
-            isSubscribe ? $"SubscribeToTask stream opened (epoch {epoch})" : $"SendStreamingMessage stream opened (epoch {epoch})",
-            WorkIqTraceLevel.Info,
-            new OpenedData(epoch, operation.ToString(), isSubscribe ? null : AcceptedOutputModesFor(profile), routingTenant is not null, card.SelectedEndpoint.Host),
-            taskId: expectedTaskId,
-            contextId: expectedContextId,
-            messageId: request?.Message.MessageId);
-
         try
         {
             try
             {
-                var source = isSubscribe
-                    ? Client.SubscribeToTaskAsync(new SubscribeToTaskRequest { Id = subscribedTaskId!, Tenant = routingTenant }, cancellationToken)
+                var source = run.IsSubscribe
+                    ? Client.SubscribeToTaskAsync(new SubscribeToTaskRequest { Id = subscribedTaskId!, Tenant = RoutingTenant }, cancellationToken)
                     : Client.SendStreamingMessageAsync(request!, cancellationToken);
                 enumerator = source.GetAsyncEnumerator(cancellationToken);
             }
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
-                terminalException = ex;
+                run.TerminalException = ex;
             }
 
-            while (terminalException is null)
+            while (run.TerminalException is null && await NextResponseAsync(enumerator!, run).ConfigureAwait(false) is { } response)
             {
-                StreamResponse? response = null;
-                var moved = false;
-                try
-                {
-                    moved = await enumerator!.MoveNextAsync().ConfigureAwait(false);
-                    if (moved)
-                    {
-                        response = enumerator.Current;
-                    }
-                }
-                catch (Exception ex) when (ex is not OutOfMemoryException)
-                {
-                    terminalException = ex;
-                }
-
-                if (terminalException is not null || !moved)
-                {
-                    break;
-                }
-
-                if (response is null)
-                {
-                    // The SDK throws rather than yielding null; a null here is a defect worth a loud, typed failure.
-                    terminalException = new InvalidOperationException("The A2A SDK stream yielded a null StreamResponse.");
-                    break;
-                }
-
-                sequence++;
-                var frame = BuildFrame(response, sequence, epoch, tracker, stage, prefix, operation);
-                if (frame.Failure is not null)
-                {
-                    malformed++;
-                }
-
-                yield return frame;
+                run.Sequence++;
+                yield return BuildFrame(response, run, call);
             }
 
-            if (terminalException is not null)
+            if (run.TerminalException is not null)
             {
-                capture = TryEndCapture(sink, stage, prefix, tracker, interrupted: true);
-                captureEnded = true;
-                sequence++;
-
-                // The static classifier (behind ClassifyException) is used directly so the caller's token tells a local
-                // cancellation from an HttpClient timeout: both surface as TaskCanceledException mid-stream.
-                var failure = Classify(terminalException, operation, requestId: null, tracker.TaskId, tracker.ContextId, callerToken: cancellationToken, scope: Config.Scope);
-                if (failure.Capture is null && capture is not null)
-                {
-                    failure = failure with { Capture = capture };
-                }
-
-                TraceEvent(
-                    stage,
-                    prefix + ".failed",
-                    $"{(isSubscribe ? "SubscribeToTask" : "SendStreamingMessage")} stream failed after {sequence - 1} frame(s): {failure.Category}: {failure.SafeMessage}",
-                    WorkIqTraceLevel.Error,
-                    new FailedData(failure.Category.ToString(), failure.Certainty.ToString(), terminalException.GetType().FullName ?? terminalException.GetType().Name, sequence - 1, epoch),
-                    taskId: tracker.TaskId,
-                    contextId: tracker.ContextId,
-                    httpStatus: failure.HttpStatus,
-                    rpcErrorCode: failure.RpcErrorCode,
-                    requestId: failure.RequestId,
-                    elapsedMs: Clock.GetElapsedTime(startTimestamp).TotalMilliseconds);
-                Diagnostics.Issue(
-                    new WorkIqIssue(default, stage, IssueCategoryFor(failure.Category), prefix + ".failed", $"the stream failed after {sequence - 1} frame(s): {failure.Category}: {failure.SafeMessage}", SuggestedCauseFor(failure, sequence - 1))
-                    {
-                        TaskId = tracker.TaskId,
-                        ContextId = tracker.ContextId,
-                        HttpStatus = failure.HttpStatus,
-                        RpcErrorCode = failure.RpcErrorCode,
-                        RequestId = failure.RequestId,
-                        A2AState = failure.RemoteTaskState,
-                    });
-
-                yield return new WorkIqStreamFrame(sequence, epoch, Clock.GetUtcNow(), null, null, null, null, failure);
+                yield return FailureFrame(run, call, cancellationToken);
             }
         }
         finally
         {
-            if (enumerator is not null)
-            {
-                try
-                {
-                    await enumerator.DisposeAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is not OutOfMemoryException)
-                {
-                    TraceEvent(stage, prefix + ".dispose_failed", $"disposing the SDK stream enumerator failed: {ex.GetType().Name}", WorkIqTraceLevel.Warning, null, taskId: tracker.TaskId, contextId: tracker.ContextId);
-                }
-            }
-
-            if (!captureEnded)
-            {
-                // A clean EOF completes the capture; the reducer, not the capture, decides whether EOF came too early.
-                capture = TryEndCapture(sink, stage, prefix, tracker, interrupted: false);
-            }
-
-            LastStreamCapture = capture;
-            var elapsed = Clock.GetElapsedTime(startTimestamp).TotalMilliseconds;
-            TraceEvent(
-                stage,
-                prefix + ".ended",
-                terminalException is null
-                    ? $"stream ended after {sequence} frame(s){(malformed > 0 ? $", {malformed} malformed" : "")} (EOF is not completion)"
-                    : $"stream ended by a failure after {sequence} frame(s) including the failure frame{(malformed > 0 ? $", {malformed} malformed" : "")}",
-                terminalException is null && malformed == 0 ? WorkIqTraceLevel.Info : WorkIqTraceLevel.Warning,
-                new EndedData(sequence, malformed, terminalException is not null, epoch, tracker.TaskId, tracker.ContextId, tracker.LastState, capture?.State.ToString(), capture?.ByteCount),
-                taskId: tracker.TaskId,
-                contextId: tracker.ContextId,
-                a2aState: tracker.LastState,
-                elapsedMs: elapsed);
+            await DisposeEnumeratorAsync(enumerator, run).ConfigureAwait(false);
+            EndStream(run, call);
         }
     }
 
-    private WorkIqStreamFrame BuildFrame(
-        StreamResponse response,
-        long sequence,
-        int epoch,
-        StreamIdTracker tracker,
-        WorkIqTraceStage stage,
-        string prefix,
-        WorkIqOperation operation)
+    /// <summary>The next response of the SDK stream; null at its end or when it failed (then <see cref="StreamRun.TerminalException"/> is set).</summary>
+    private static async Task<StreamResponse?> NextResponseAsync(IAsyncEnumerator<StreamResponse> enumerator, StreamRun run)
     {
+        try
+        {
+            if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            // The SDK throws rather than yielding null; a null here is a defect worth a loud, typed failure.
+            return enumerator.Current ?? throw new InvalidOperationException("The A2A SDK stream yielded a null StreamResponse.");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            run.TerminalException = ex;
+            return null;
+        }
+    }
+
+    private void TraceOpened(StreamRun run, RawAgentCard card, SendMessageRequest? request) =>
+        TraceEvent(
+            run.Stage,
+            run.Prefix + ".opened",
+            run.IsSubscribe ? $"SubscribeToTask stream opened (epoch {run.Epoch})" : $"SendStreamingMessage stream opened (epoch {run.Epoch})",
+            WorkIqTraceLevel.Info,
+            new OpenedData(run.Epoch, run.Operation.ToString(), request?.Configuration?.AcceptedOutputModes?.ToList(), RoutingTenant is not null, card.SelectedEndpoint.Host),
+            taskId: run.Tracker.TaskId,
+            contextId: run.Tracker.ContextId,
+            messageId: request?.Message.MessageId);
+
+    /// <summary>
+    /// Ends the capture as interrupted and turns the exception that ended the stream into its one final failure frame:
+    /// traced, and registered as an issue when this client ends the operation (<see cref="RegistersIssue"/>).
+    /// </summary>
+    private WorkIqStreamFrame FailureFrame(StreamRun run, WorkIqCallContext? call, CancellationToken cancellationToken)
+    {
+        var exception = run.TerminalException!;
+        run.Capture = TryEndCapture(run, interrupted: true);
+        run.CaptureEnded = true;
+        run.Sequence++;
+        var framesBefore = run.Sequence - 1;
+
+        // The static classifier (behind ClassifyException) is used directly so the caller's token tells a local
+        // cancellation from an HttpClient timeout: both surface as TaskCanceledException mid-stream.
+        var failure = Classify(exception, run.Operation, requestId: null, run.Tracker.TaskId, run.Tracker.ContextId, callerToken: cancellationToken, scope: Config.Scope);
+        if (failure.Capture is null && run.Capture is not null)
+        {
+            failure = failure with { Capture = run.Capture };
+        }
+
+        TraceEvent(
+            run.Stage,
+            run.Prefix + ".failed",
+            $"{(run.IsSubscribe ? "SubscribeToTask" : "SendStreamingMessage")} stream failed after {framesBefore} frame(s): {failure.Category}: {failure.SafeMessage}",
+            WorkIqTraceLevel.Error,
+            new FailedData(failure.Category.ToString(), failure.Certainty.ToString(), exception.GetType().FullName ?? exception.GetType().Name, framesBefore, run.Epoch),
+            taskId: run.Tracker.TaskId,
+            contextId: run.Tracker.ContextId,
+            httpStatus: failure.HttpStatus,
+            rpcErrorCode: failure.RpcErrorCode,
+            requestId: failure.RequestId,
+            elapsedMs: Clock.GetElapsedTime(run.Started).TotalMilliseconds);
+        RegisterIssue(failure, run.Stage, call);
+
+        return new WorkIqStreamFrame(run.Sequence, run.Epoch, Clock.GetUtcNow(), null, null, null, null, failure);
+    }
+
+    private async Task DisposeEnumeratorAsync(IAsyncEnumerator<StreamResponse>? enumerator, StreamRun run)
+    {
+        if (enumerator is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            TraceEvent(run.Stage, run.Prefix + ".dispose_failed", $"disposing the SDK stream enumerator failed: {ex.GetType().Name}", WorkIqTraceLevel.Warning, null, taskId: run.Tracker.TaskId, contextId: run.Tracker.ContextId);
+        }
+    }
+
+    /// <summary>Completes the capture (unless the failure frame did), hands it back on the call context and traces the end of the stream.</summary>
+    private void EndStream(StreamRun run, WorkIqCallContext? call)
+    {
+        if (!run.CaptureEnded)
+        {
+            // A clean EOF completes the capture; the reducer, not the capture, decides whether EOF came too early.
+            run.Capture = TryEndCapture(run, interrupted: false);
+        }
+
+        if (call is not null)
+        {
+            call.StreamCapture = run.Capture;
+        }
+
+        var failed = run.TerminalException is not null;
+        TraceEvent(
+            run.Stage,
+            run.Prefix + ".ended",
+            failed
+                ? $"stream ended by a failure after {run.Sequence} frame(s) including the failure frame{(run.Malformed > 0 ? $", {run.Malformed} malformed" : "")}"
+                : $"stream ended after {run.Sequence} frame(s){(run.Malformed > 0 ? $", {run.Malformed} malformed" : "")} (EOF is not completion)",
+            !failed && run.Malformed == 0 ? WorkIqTraceLevel.Info : WorkIqTraceLevel.Warning,
+            new EndedData(run.Sequence, run.Malformed, failed, run.Epoch, run.Tracker.TaskId, run.Tracker.ContextId, run.Tracker.LastState, run.Capture?.State.ToString(), run.Capture?.ByteCount),
+            taskId: run.Tracker.TaskId,
+            contextId: run.Tracker.ContextId,
+            a2aState: run.Tracker.LastState,
+            elapsedMs: Clock.GetElapsedTime(run.Started).TotalMilliseconds);
+    }
+
+    private WorkIqStreamFrame BuildFrame(StreamResponse response, StreamRun run, WorkIqCallContext? call)
+    {
+        var sequence = run.Sequence;
+        var tracker = run.Tracker;
         var receivedAt = Clock.GetUtcNow();
         string? dataJson = null;
         try
@@ -320,64 +267,29 @@ internal sealed partial class WorkIqA2AClient
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
         {
-            TraceEvent(stage, prefix + ".projection_failed", $"frame {sequence} could not be re-serialized: {ex.GetType().Name}", WorkIqTraceLevel.Warning, null, taskId: tracker.TaskId, contextId: tracker.ContextId);
+            TraceEvent(run.Stage, run.Prefix + ".projection_failed", $"frame {sequence} could not be re-serialized: {ex.GetType().Name}", WorkIqTraceLevel.Warning, null, taskId: tracker.TaskId, contextId: tracker.ContextId);
         }
 
         var bytes = dataJson is null ? (int?)null : Encoding.UTF8.GetByteCount(dataJson);
         var populated = (response.Task is null ? 0 : 1) + (response.Message is null ? 0 : 1) + (response.StatusUpdate is null ? 0 : 1) + (response.ArtifactUpdate is null ? 0 : 1);
         if (populated != 1)
         {
-            var failure = new WorkIqFailure(
-                WorkIqFailureCategory.Malformed,
-                $"stream frame {sequence} has {populated} of task|message|statusUpdate|artifactUpdate populated; exactly one is required",
-                OutcomeCertainty.Indeterminate,
-                operation,
-                TaskId: tracker.TaskId,
-                ContextId: tracker.ContextId);
-            TraceEvent(
-                stage,
-                prefix + ".malformed",
-                failure.SafeMessage,
-                WorkIqTraceLevel.Warning,
-                new FrameData(sequence, epoch, "malformed", null, null, null, null, bytes, populated),
-                taskId: tracker.TaskId,
-                contextId: tracker.ContextId);
-            Diagnostics.Issue(
-                new WorkIqIssue(default, stage, WorkIqIssueCategory.Protocol, prefix + ".one_of_violation", failure.SafeMessage,
-                    "The service sent a frame whose result holds several (or none) of task | message | statusUpdate | artifactUpdate. A2A 1.0 requires exactly one; the frame is recorded as malformed, not applied and not skipped silently. The raw capture holds the exact bytes.")
-                {
-                    TaskId = tracker.TaskId,
-                    ContextId = tracker.ContextId,
-                },
-                WorkIqTraceLevel.Warning);
-            return new WorkIqStreamFrame(sequence, epoch, receivedAt, null, dataJson, null, null, failure);
+            return MalformedFrame(run, call, receivedAt, dataJson, bytes, populated);
         }
 
         var described = Describe(response);
-        foreach (var mismatch in tracker.Observe(described.TaskId, described.ContextId))
-        {
-            TraceEvent(stage, prefix + ".id_mismatch", $"frame {sequence}: {mismatch}", WorkIqTraceLevel.Warning, new FrameData(sequence, epoch, described.Kind, described.TaskId, described.ContextId, described.ArtifactId, described.State, bytes, populated), taskId: described.TaskId, contextId: described.ContextId);
-            Diagnostics.Issue(
-                new WorkIqIssue(default, stage, WorkIqIssueCategory.Protocol, prefix + ".id_mismatch", $"frame {sequence}: {mismatch}",
-                    "A frame carried a task or context id different from the one this stream established. The frame is delivered as is and the reducer records the mismatch; the service may be multiplexing or the subscription may target another task.")
-                {
-                    TaskId = described.TaskId,
-                    ContextId = described.ContextId,
-                },
-                WorkIqTraceLevel.Warning);
-        }
-
+        ReportIdMismatches(run, described, bytes, populated);
         if (described.State is not null)
         {
             tracker.LastState = described.State;
         }
 
         TraceEvent(
-            stage,
-            prefix + ".frame",
+            run.Stage,
+            run.Prefix + ".frame",
             $"frame {sequence} ({described.Kind}{(described.ArtifactId is null ? "" : $" {described.ArtifactId}")}{(described.State is null ? "" : $" {described.State}")}{(bytes is null ? "" : $", {bytes} bytes")})",
             WorkIqTraceLevel.Info,
-            new FrameData(sequence, epoch, described.Kind, described.TaskId, described.ContextId, described.ArtifactId, described.State, bytes, populated, described.Append, described.LastChunk),
+            new FrameData(sequence, run.Epoch, described.Kind, described.TaskId, described.ContextId, described.ArtifactId, described.State, bytes, populated, described.Append, described.LastChunk),
             taskId: described.TaskId ?? tracker.TaskId,
             contextId: described.ContextId ?? tracker.ContextId,
             messageId: described.MessageId,
@@ -386,7 +298,7 @@ internal sealed partial class WorkIqA2AClient
         if (described.State is not null)
         {
             TraceEvent(
-                stage,
+                run.Stage,
                 "task.state",
                 $"task state observed in frame {sequence}: {described.State}",
                 WorkIqTraceLevel.Info,
@@ -396,24 +308,68 @@ internal sealed partial class WorkIqA2AClient
                 a2aState: described.State);
         }
 
-        return new WorkIqStreamFrame(sequence, epoch, receivedAt, response, dataJson, null, null, null);
+        return new WorkIqStreamFrame(sequence, run.Epoch, receivedAt, response, dataJson, null, null, null);
     }
 
-    private RawCaptureRef? TryEndCapture(RawCaptureSink sink, WorkIqTraceStage stage, string prefix, StreamIdTracker tracker, bool interrupted)
+    /// <summary>
+    /// The frame of a response that violates exactly-one-of: recorded as malformed, never applied and never skipped
+    /// silently. A turn that reads it stops and registers the issue of its outcome, so this client registers one only
+    /// for a stream of its own.
+    /// </summary>
+    private WorkIqStreamFrame MalformedFrame(StreamRun run, WorkIqCallContext? call, DateTimeOffset receivedAt, string? dataJson, int? bytes, int populated)
+    {
+        run.Malformed++;
+        var failure = new WorkIqFailure(
+            WorkIqFailureCategory.Malformed,
+            $"stream frame {run.Sequence} has {populated} of task|message|statusUpdate|artifactUpdate populated; exactly one is required",
+            OutcomeCertainty.Indeterminate,
+            run.Operation,
+            TaskId: run.Tracker.TaskId,
+            ContextId: run.Tracker.ContextId);
+        TraceEvent(
+            run.Stage,
+            run.Prefix + ".malformed",
+            failure.SafeMessage,
+            WorkIqTraceLevel.Warning,
+            new FrameData(run.Sequence, run.Epoch, "malformed", null, null, null, null, bytes, populated),
+            taskId: run.Tracker.TaskId,
+            contextId: run.Tracker.ContextId);
+        RegisterIssue(failure, run.Stage, call, WorkIqTraceLevel.Warning);
+        return new WorkIqStreamFrame(run.Sequence, run.Epoch, receivedAt, null, dataJson, null, null, failure);
+    }
+
+    /// <summary>Traces and registers every task or context id of the frame that disagrees with the ids the stream established.</summary>
+    private void ReportIdMismatches(StreamRun run, FrameDescription described, int? bytes, int populated)
+    {
+        foreach (var mismatch in run.Tracker.Observe(described.TaskId, described.ContextId))
+        {
+            TraceEvent(run.Stage, run.Prefix + ".id_mismatch", $"frame {run.Sequence}: {mismatch}", WorkIqTraceLevel.Warning, new FrameData(run.Sequence, run.Epoch, described.Kind, described.TaskId, described.ContextId, described.ArtifactId, described.State, bytes, populated), taskId: described.TaskId, contextId: described.ContextId);
+            Diagnostics.Issue(
+                new WorkIqIssue(default, run.Stage, WorkIqIssueCategory.Protocol, run.Prefix + ".id_mismatch", $"frame {run.Sequence}: {mismatch}",
+                    "A frame carried a task or context id different from the one this stream established. The frame is delivered as is and the reducer records the mismatch; the service may be multiplexing or the subscription may target another task.")
+                {
+                    TaskId = described.TaskId,
+                    ContextId = described.ContextId,
+                },
+                WorkIqTraceLevel.Warning);
+        }
+    }
+
+    private RawCaptureRef? TryEndCapture(StreamRun run, bool interrupted)
     {
         try
         {
-            return EndCapture(sink, interrupted);
+            return EndCapture(run.Sink, interrupted);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            TraceEvent(stage, prefix + ".capture_failed", $"ending the raw capture failed: {ex.GetType().Name}: {ex.Message}", WorkIqTraceLevel.Error, null, taskId: tracker.TaskId, contextId: tracker.ContextId);
+            TraceEvent(run.Stage, run.Prefix + ".capture_failed", $"ending the raw capture failed: {ex.GetType().Name}: {ex.Message}", WorkIqTraceLevel.Error, null, taskId: run.Tracker.TaskId, contextId: run.Tracker.ContextId);
             Diagnostics.Issue(
-                new WorkIqIssue(default, WorkIqTraceStage.Capture, WorkIqIssueCategory.Capture, prefix + ".capture_failed", $"the raw capture of the stream could not be finalised: {ex.GetType().Name}: {ex.Message}",
+                new WorkIqIssue(default, WorkIqTraceStage.Capture, WorkIqIssueCategory.Capture, run.Prefix + ".capture_failed", $"the raw capture of the stream could not be finalised: {ex.GetType().Name}: {ex.Message}",
                     "The capture sink failed while closing (a full disk, an unwritable RawCaptureDirectory, or a bound exceeded). The frames were still delivered; the evidence carries no raw capture for this stream.")
                 {
-                    TaskId = tracker.TaskId,
-                    ContextId = tracker.ContextId,
+                    TaskId = run.Tracker.TaskId,
+                    ContextId = run.Tracker.ContextId,
                 });
             return null;
         }
@@ -486,34 +442,46 @@ internal sealed partial class WorkIqA2AClient
         });
     }
 
-    private static WorkIqIssueCategory IssueCategoryFor(WorkIqFailureCategory category) => category switch
+    /// <summary>The state of one stream call, shared by the steps of <see cref="RunStreamAsync"/>.</summary>
+    private sealed class StreamRun
     {
-        WorkIqFailureCategory.Unauthorized => WorkIqIssueCategory.Authentication,
-        WorkIqFailureCategory.Forbidden => WorkIqIssueCategory.Permission,
-        WorkIqFailureCategory.Transport or WorkIqFailureCategory.Timeout => WorkIqIssueCategory.Network,
-        WorkIqFailureCategory.ProtocolVersionMismatch or WorkIqFailureCategory.Malformed => WorkIqIssueCategory.Protocol,
-        WorkIqFailureCategory.UntrustedHost => WorkIqIssueCategory.Config,
-        WorkIqFailureCategory.RateLimited or WorkIqFailureCategory.NotFound or WorkIqFailureCategory.RemoteError => WorkIqIssueCategory.Service,
-        _ => WorkIqIssueCategory.Unknown,
-    };
-
-    private static string SuggestedCauseFor(WorkIqFailure failure, long framesBefore)
-    {
-        var after = framesBefore == 0 ? "before any frame arrived" : $"after {framesBefore} frame(s)";
-        return failure.Category switch
+        public StreamRun(WorkIqOperation operation, string? expectedTaskId, string? expectedContextId, int epoch, long started, RawCaptureSink sink)
         {
-            WorkIqFailureCategory.RemoteError => $"The service answered with a JSON-RPC error inside the stream {after} (code {failure.RpcErrorCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unknown"}). The task's remote state is unknown from the stream; when a task id is known the turn reconciles with GetTask.",
-            WorkIqFailureCategory.Unauthorized => "The token was rejected (HTTP 401) when the stream was opened. Sign in again (device code); the request is never resent automatically.",
-            WorkIqFailureCategory.Forbidden => "The signed-in principal lacks the delegated permission or admin consent for Work IQ (HTTP 403).",
-            WorkIqFailureCategory.RateLimited => "The service throttled the request (HTTP 429/503). A streaming send is never retried; wait and run the case again.",
-            WorkIqFailureCategory.NotFound => "The task or endpoint was not found (HTTP 404 / TaskNotFound); a not-found task may be expired, purged or inaccessible rather than nonexistent.",
-            WorkIqFailureCategory.Timeout => $"The local timeout fired {after}. The remote task may still be running; when its id is known the turn reconciles with GetTask.",
-            WorkIqFailureCategory.Transport => $"The connection dropped {after} (DNS, TLS, socket or proxy). When a task id is known the turn reconciles with GetTask/SubscribeToTask; otherwise the outcome is indeterminate.",
-            WorkIqFailureCategory.Canceled => $"The caller's cancellation token fired {after}. Only the local wait stopped; the remote task was not cancelled unless CancelTask confirms it.",
-            WorkIqFailureCategory.Malformed => $"The stream carried bytes the SDK could not parse {after}. The raw capture holds them; the run cannot pass on a parse failure.",
-            WorkIqFailureCategory.ProtocolVersionMismatch => "The service answered in a shape this provider does not speak (A2A 0.3 or VersionNotSupported). Check the A2A-Version header and the card's interfaces.",
-            _ => $"The stream failed {after}: {failure.SafeMessage}. The raw capture holds what was received.",
-        };
+            Operation = operation;
+            IsSubscribe = operation == WorkIqOperation.Subscribe;
+            Stage = IsSubscribe ? WorkIqTraceStage.Subscribe : WorkIqTraceStage.Stream;
+            Prefix = IsSubscribe ? "subscribe" : "stream";
+            Tracker = new StreamIdTracker(expectedTaskId, expectedContextId);
+            Epoch = epoch;
+            Started = started;
+            Sink = sink;
+        }
+
+        public WorkIqOperation Operation { get; }
+
+        public bool IsSubscribe { get; }
+
+        public WorkIqTraceStage Stage { get; }
+
+        public string Prefix { get; }
+
+        public StreamIdTracker Tracker { get; }
+
+        public int Epoch { get; }
+
+        public long Started { get; }
+
+        public RawCaptureSink Sink { get; }
+
+        public long Sequence { get; set; }
+
+        public int Malformed { get; set; }
+
+        public RawCaptureRef? Capture { get; set; }
+
+        public bool CaptureEnded { get; set; }
+
+        public Exception? TerminalException { get; set; }
     }
 
     /// <summary>Tracks the task/context ids a stream established (from the request, then from the first frame that carries them) and reports frames that disagree.</summary>

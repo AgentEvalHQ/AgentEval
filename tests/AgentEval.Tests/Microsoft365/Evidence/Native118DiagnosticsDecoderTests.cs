@@ -16,7 +16,8 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 /// <see cref="Native118DiagnosticsDecoder"/>: artifacts found by media type or name, the first object data part,
 /// conflicts never resolved last-wins, every list row kept (invalid rows with Invalid fields), integers that are
 /// never bools, a missing retrieval status that is never success, unranked hits kept, total vs returned counts
-/// kept apart, identical rows kept apart, unknown fields counted, and a native import that names its losses.
+/// kept apart, identical rows kept apart, and unknown fields counted. Approval intents are not decoded here (the
+/// normaliser decodes them from the status message under every profile).
 /// </summary>
 public sealed class Native118DiagnosticsDecoderTests
 {
@@ -101,7 +102,6 @@ public sealed class Native118DiagnosticsDecoderTests
         Assert.Equal("/artifacts/2/parts/0/data/executions/0/debugInfo/retrievalHits/1", Assert.Single(retrieval.Hits.Items[1].Sources).JsonPointer);
         Assert.Equal("retrieval-passage-0-1-0", retrieval.Hits.Items[1].Passages.Items[0].ObservationId);
 
-        Assert.Equal(EvidenceAvailability.NotProvided, result.ApprovalIntents.Availability);
         Assert.Empty(result.Issues);
     }
 
@@ -117,7 +117,6 @@ public sealed class Native118DiagnosticsDecoderTests
         Assert.Equal(EvidenceAvailability.NotProvided, result.ToolSelections.Availability);
         Assert.Equal(EvidenceAvailability.NotProvided, result.ToolExecutions.Availability);
         Assert.Equal(EvidenceAvailability.NotProvided, result.RetrievalExecutions.Availability);
-        Assert.Equal(EvidenceAvailability.NotProvided, result.ApprovalIntents.Availability);
         Assert.Equal("/artifacts", Assert.Single(result.ToolSelections.Sources).JsonPointer);
         Assert.Empty(result.Issues);
     }
@@ -544,81 +543,10 @@ public sealed class Native118DiagnosticsDecoderTests
         Assert.Equal(EvidenceValidation.Partial, passages.Validation);
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Native import
-    // ---------------------------------------------------------------------------------------------------------
-
-    [Fact]
-    public void DecodeNativeImport_EmptyRetrieval_IsObservedEmptyWithUnknownCoverageAndTheCollapseLoss()
-    {
-        var result = Native118DiagnosticsDecoder.DecodeNativeImport(ParseJson("{\"retrieval_executions\":[]}"), "cap-import");
-
-        Assert.True(result.RetrievalExecutions.IsObservedEmpty);
-        Assert.Equal(EvidenceCoverage.Unknown, result.RetrievalExecutions.Coverage);
-        Assert.Equal(EvidenceOrigin.NativeEvaluationImport, Assert.Single(result.RetrievalExecutions.Sources).Origin);
-        Assert.Equal("/retrieval_executions", Assert.Single(result.RetrievalExecutions.Sources).JsonPointer);
-        Assert.Equal(EvidenceAvailability.NotProvided, result.ToolSelections.Availability);
-        Assert.Equal(EvidenceAvailability.NotProvided, result.ApprovalIntents.Availability);
-        var loss = Assert.Single(result.Issues);
-        Assert.Equal(Native118DiagnosticsDecoder.ImportLossIssuePrefix + Native118DiagnosticsDecoder.LossCollapseToEmpty, loss.Code);
-    }
-
-    [Fact]
-    public void DecodeNativeImport_NonEmptyRetrieval_NeverSucceedsAndNamesTheDroppedFields()
-    {
-        var result = Native118DiagnosticsDecoder.DecodeNativeImport(
-            ParseJson("{\"retrieval_executions\":[{\"capability\":\"X\",\"status\":\"success\",\"queries\":[{\"queryString\":\"q\"}],\"totalResultCount\":3,\"retrievalHits\":[{\"webUrl\":\"https://a.example.invalid\",\"rank\":1,\"extracts\":[{\"text\":\"p\"}]}]}]}"),
-            "cap-import");
-
-        var retrieval = Assert.Single(result.RetrievalExecutions.Items);
-        Assert.Equal("success", retrieval.ProviderStatus.Value);
-        Assert.Equal(ExecutionOutcome.Unknown, retrieval.Outcome.Value);
-        Assert.Equal(Native118DiagnosticsDecoder.ImportOutcomeRuleId, retrieval.Outcome.DerivationRuleId);
-        Assert.Equal("q", Assert.Single(retrieval.Queries.Items).QueryText.Value);
-        Assert.Equal(FieldState.Missing, retrieval.LatencyMilliseconds.State);
-        Assert.Equal(3L, retrieval.TotalResultCount.Value);
-        Assert.Equal(1, Assert.Single(retrieval.Hits.Items).Rank.Value);
-        var losses = result.Issues.Where(i => i.Code.StartsWith(Native118DiagnosticsDecoder.ImportLossIssuePrefix, StringComparison.Ordinal)).Select(i => i.Code).ToArray();
-        Assert.Equal(
-            new[]
-            {
-                Native118DiagnosticsDecoder.ImportLossIssuePrefix + Native118DiagnosticsDecoder.LossDroppedFields,
-                Native118DiagnosticsDecoder.ImportLossIssuePrefix + Native118DiagnosticsDecoder.LossStatusDefault,
-                Native118DiagnosticsDecoder.ImportLossIssuePrefix + Native118DiagnosticsDecoder.LossUnrankedHits,
-            },
-            losses);
-    }
-
-    [Fact]
-    public void DecodeNativeImport_Tools_AreDecodedFromThePersistedNames()
-    {
-        var result = Native118DiagnosticsDecoder.DecodeNativeImport(
-            ParseJson("{\"selected_functions\":[{\"plugin_name\":\"P\",\"function_name\":\"F\"}],\"executions\":[{\"plugin_name\":\"P\",\"function_name\":\"F\",\"response_status\":true}]}"),
-            "cap-import");
-
-        Assert.Equal("F", Assert.Single(result.ToolSelections.Items).Tool.FunctionDisplayName.Value);
-        var execution = Assert.Single(result.ToolExecutions.Items);
-        Assert.Equal("P", execution.Tool.PluginName.Value);
-        Assert.Equal(FieldState.Invalid, execution.ResponseStatus.State);
-        Assert.Equal(EvidenceValidation.Partial, result.ToolExecutions.Validation);
-        Assert.Equal(EvidenceAvailability.NotProvided, result.RetrievalExecutions.Availability);
-    }
-
-    [Fact]
-    public void DecodeNativeImport_NotAnObject_IsMalformedEverywhere()
-    {
-        var result = Native118DiagnosticsDecoder.DecodeNativeImport(ParseJson("[]"), "cap-import");
-
-        Assert.Equal(EvidenceValidation.Malformed, result.ToolSelections.Validation);
-        Assert.Equal(EvidenceValidation.Malformed, result.RetrievalExecutions.Validation);
-        Assert.Equal(Native118DiagnosticsDecoder.ImportNotObjectIssueCode, Assert.Single(result.Issues).Code);
-    }
-
     [Fact]
     public void Decode_NullArguments_Throw()
     {
         Assert.Throws<ArgumentNullException>(() => Native118DiagnosticsDecoder.Decode(null!, CaptureId));
         Assert.Throws<ArgumentException>(() => Native118DiagnosticsDecoder.Decode(Snapshot(), ""));
-        Assert.Throws<ArgumentException>(() => Native118DiagnosticsDecoder.DecodeNativeImport(ParseJson("{}"), " "));
     }
 }

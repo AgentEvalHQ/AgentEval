@@ -14,15 +14,36 @@ using Xunit;
 namespace AgentEval.Tests.Microsoft365.Auth;
 
 /// <summary>
-/// Review M1 / L2: the bearer token is acquired before each HTTP call, outside <c>HttpClient.Timeout</c>. A device-code
-/// sign-in slower than the HTTP timeout therefore still works; one that never finishes is reported as "sign-in not
-/// completed — nothing was sent", never as a network timeout that may have reached the service; and the readiness check
-/// bounds a sign-in by its code's own expiry instead of the stage timeout. Real time, sub-second to two seconds per test.
+/// The bearer token is acquired before each HTTP call, outside <c>HttpClient.Timeout</c>. A device-code sign-in slower
+/// than the HTTP timeout therefore still works; one that never finishes is reported as "sign-in not completed — nothing
+/// was sent", never as a network timeout that may have reached the service; and the readiness check bounds a sign-in by
+/// its code's own expiry instead of the stage timeout.
 /// </summary>
+/// <remarks>
+/// Real time on purpose: <c>HttpClient.Timeout</c>, the boundary under test, cannot run on a fake clock. Every margin is
+/// therefore seconds wide, never sub-second: the in-memory card fetch and send that must finish inside a bound get
+/// <see cref="NetworkBound"/> (2 s, or 1.5 s for a turn deadline) against a sign-in of <see cref="SlowSignIn"/> (3.5 s),
+/// so only the ordering under test decides the result, not the load on the machine. Three to four seconds per test.
+/// </remarks>
 public sealed class SignInOutsideHttpTimeoutTests : IDisposable
 {
     private const string CompletedFixture = "envelopes/send-task-completed-with-answer-and-attributions.json";
     private const string CardFixture = "cards/default-card-two-interfaces.json";
+
+    /// <summary>The bound (an HTTP timeout, a turn deadline, a stage timeout) the in-memory network part must finish within.</summary>
+    private static readonly TimeSpan NetworkBound = TimeSpan.FromSeconds(2);
+
+    /// <summary>A turn deadline: the network part of a turn after a sign-in must finish within it.</summary>
+    private static readonly TimeSpan TurnDeadline = TimeSpan.FromSeconds(1.5);
+
+    /// <summary>A sign-in clearly longer than every bound above.</summary>
+    private static readonly TimeSpan SlowSignIn = TimeSpan.FromSeconds(3.5);
+
+    /// <summary>
+    /// How far past its expiry a sign-in code already is, so that with <see cref="WorkIqSignInWait.Grace"/> the wait for
+    /// it ends 3 s from now: longer than every bound above, so the code's expiry, not the bound, ends the wait.
+    /// </summary>
+    private static readonly TimeSpan ExpiredCodeAge = WorkIqSignInWait.Grace - TimeSpan.FromSeconds(3);
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), "agenteval-m365-signin-" + Guid.NewGuid().ToString("N"));
 
@@ -49,8 +70,8 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
     public async Task BuildLive_SignInSlowerThanTheHttpTimeout_TheTurnStillCompletes()
     {
         var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnRpc("SendMessage", CompletedFixture);
-        var tokens = new SlowSignInTokenProvider { FirstDelay = TimeSpan.FromMilliseconds(1500) };
-        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromMilliseconds(400));
+        var tokens = new SlowSignInTokenProvider { FirstDelay = SlowSignIn };
+        var agent = Build(handler, tokens, sendTimeout: NetworkBound);
         await using (agent)
         {
             var response = await agent.InvokeAsync("Summarize the status of Project Atlas and cite the sources.");
@@ -71,6 +92,7 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
         var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromMilliseconds(200));
         await using (agent)
         {
+            // Nothing is sent, so the short HTTP timeout never races anything: the caller's stop alone ends the wait.
             using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(700));
 
             var ex = await Assert.ThrowsAsync<WorkIqTurnCanceledException>(() => agent.InvokeAsync("Summarize the status of Project Atlas.", stop.Token));
@@ -91,6 +113,11 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
             Assert.Contains("auth.sign_in_not_completed", issues, StringComparison.Ordinal);
             Assert.Contains("agenteval m365 doctor --stage auth", issues, StringComparison.Ordinal);
             Assert.DoesNotContain("The bearer token was rejected", issues, StringComparison.Ordinal);
+
+            // One failure, one issue: the auth layer's, stamped with the turn; the turn registers no second one.
+            var line = Assert.Single(issues.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+            Assert.Contains(ex.TurnResult.Identity.TurnId, line, StringComparison.Ordinal);
+            Assert.DoesNotContain("turn.failed", line, StringComparison.Ordinal);
         }
     }
 
@@ -102,8 +129,8 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
     public async Task BuildLive_SignInInsideATurnLongerThanTheTurnDeadline_WaitsForTheCode_AndTheTurnCompletes()
     {
         var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnRpc("SendMessage", CompletedFixture);
-        var tokens = new TurnSignInTokenProvider { SignInOnCall = 2, SignInTakes = TimeSpan.FromMilliseconds(1200), CodeExpiresIn = TimeSpan.FromMinutes(1) };
-        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TimeSpan.FromMilliseconds(300));
+        var tokens = new TurnSignInTokenProvider { SignInOnCall = 2, SignInTakes = SlowSignIn, CodeExpiresIn = TimeSpan.FromMinutes(1) };
+        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TurnDeadline);
         await using (agent)
         {
             var response = await agent.InvokeAsync("Summarize the status of Project Atlas and cite the sources.");
@@ -121,6 +148,75 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
     }
 
     [Fact]
+    public async Task BuildLive_SignInInsideAStreamedTurnLongerThanTheTurnDeadline_WaitsForTheCode_AndTheTurnCompletes()
+    {
+        var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnSse("SendStreamingMessage", "sse/stream-happy-path.txt");
+        var tokens = new TurnSignInTokenProvider { SignInOnCall = 2, SignInTakes = SlowSignIn, CodeExpiresIn = TimeSpan.FromMinutes(1) };
+        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TurnDeadline);
+        await using (agent)
+        {
+            WorkIqTurnResult? result = null;
+            await foreach (var e in agent.Conversation.StreamTurnAsync(new WorkIqTurnRequest("Summarize the status of Project Atlas and cite the sources.", "case-stream", "turn-stream")))
+            {
+                if (e is WorkIqStreamEvent.TurnFinished finished)
+                {
+                    result = finished.Result;
+                }
+            }
+
+            // A streamed turn waits for the person's sign-in like a blocking one: the deadline bounds the network only.
+            Assert.NotNull(result);
+            Assert.Equal(WorkIqTurnOutcome.Completed, result.Outcome);
+            Assert.Equal(1, handler.CountOf("SendStreamingMessage"));
+            var events = agent.Diagnostics.RecentEvents;
+            Assert.Single(events, e => e.Code == "turn.sign_in_wait");
+            Assert.Single(events, e => e.Code == "turn.sign_in_done");
+            Assert.DoesNotContain(events, e => e.Code == "auth.sign_in_not_completed");
+        }
+    }
+
+    [Fact]
+    public async Task BuildLive_StreamedTurnReconciledThroughGetTask_TheReconciliationListensForASignInToo()
+    {
+        // A streamed turn yields its events to the caller, and a flow-local scope does not survive a yield. The GetTask
+        // reconciliation after an early end of stream acquires a token as well (a device-code sign-in can start there), so
+        // the turn must be listening for a sign-in then too, not only while the stream opens. No timing involved: the
+        // token provider records whether a listener was current at each call.
+        var completed = FixtureLoader.Text("envelopes/gettask-completed.json")
+            .Replace("task-7a1e3c5b-9d2f-4e8a-b1c6-3f5d7e9a0b21", "task-ab12cd34-ef56-4a78-9b01-23c45d67e89f", StringComparison.Ordinal);
+        var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnSse("SendStreamingMessage", "sse/stream-eof-before-terminal.txt").OnRpc("GetTask", completed);
+        var tokens = new ListenerProbeTokenProvider();
+        var agent = Microsoft365AgentFactory.BuildLive(
+            WorkIqClientHarness.DefaultConfig(),
+            iUnderstandLiveSideEffects: true,
+            new WorkIqOptions
+            {
+                SendTimeout = TimeSpan.FromSeconds(30),
+                RecoveryPollInterval = TimeSpan.FromMilliseconds(10),
+                DiagnosticsDirectory = new DirectoryInfo(_root),
+                RunId = "run-signin-stream-reconcile",
+            },
+            tokens,
+            innerHandler: handler);
+        await using (agent)
+        {
+            var events = 0;
+            await foreach (var e in agent.Conversation.StreamTurnAsync(new WorkIqTurnRequest("Summarize the status of Project Atlas and cite the sources.", "case-stream", "turn-stream-reconcile")))
+            {
+                events++;
+            }
+
+            Assert.True(events > 0);
+            Assert.True(handler.CountOf("GetTask") >= 1);
+            var calls = tokens.SawListener;
+            Assert.True(calls.Count >= 3, $"expected the card, the stream and a GetTask token call; got {calls.Count}");
+
+            // Call 1 is discovery, before the turn listens; the stream's call and every reconciliation call are inside it.
+            Assert.All(calls.Skip(1), sawListener => Assert.True(sawListener));
+        }
+    }
+
+    [Fact]
     public async Task BuildLive_SignInInsideATurnThatOutlivesTheCode_EndsAsSignInNotCompleted_NothingSent()
     {
         var handler = new FakeWorkIqHandler().OnCard(CardFixture).OnRpc("SendMessage", CompletedFixture);
@@ -128,10 +224,10 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
         {
             SignInOnCall = 2,
             SignInTakes = Timeout.InfiniteTimeSpan,
-            // Already 9.4 s past expiry: with the 10 s grace the turn waits about 0.6 s, longer than its 0.3 s deadline, then stops.
-            CodeExpiresIn = TimeSpan.FromSeconds(-9.4),
+            // Already past expiry: with the grace the turn waits about 3 s, longer than its 1.5 s deadline, then stops.
+            CodeExpiresIn = -ExpiredCodeAge,
         };
-        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TimeSpan.FromMilliseconds(300));
+        var agent = Build(handler, tokens, sendTimeout: TimeSpan.FromSeconds(30), turnDeadline: TurnDeadline);
         await using (agent)
         {
             var ex = await Assert.ThrowsAsync<WorkIqTurnNotCompletedException>(() => agent.InvokeAsync("Summarize the status of Project Atlas."));
@@ -214,12 +310,12 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
         using var rig = new ReadinessTestRig();
         var tokens = new SlowSignInTokenProvider
         {
-            FirstDelay = TimeSpan.FromMilliseconds(1200),
+            FirstDelay = SlowSignIn,
             PromptExpiresIn = TimeSpan.FromSeconds(30),
         };
         var options = rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Auth }) with
         {
-            StageTimeout = TimeSpan.FromMilliseconds(400),
+            StageTimeout = NetworkBound,
         };
 
         var report = await Microsoft365ReadinessCheck.RunAsync(null, rig.WriteConfig(), options, rig.Handler, tokens);
@@ -236,12 +332,12 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
         var tokens = new SlowSignInTokenProvider
         {
             FirstDelay = Timeout.InfiniteTimeSpan,
-            // Already 9.4 s past expiry: with the 10 s grace the stage waits about 0.6 s, longer than its 0.3 s timeout.
-            PromptExpiresIn = TimeSpan.FromSeconds(-9.4),
+            // Already past expiry: with the grace the stage waits about 3 s, longer than its 2 s timeout.
+            PromptExpiresIn = -ExpiredCodeAge,
         };
         var options = rig.Options(stages: new HashSet<ReadinessStage> { ReadinessStage.Config, ReadinessStage.Auth }) with
         {
-            StageTimeout = TimeSpan.FromMilliseconds(300),
+            StageTimeout = NetworkBound,
         };
 
         var report = await Microsoft365ReadinessCheck.RunAsync(null, rig.WriteConfig(), options, rig.Handler, tokens);
@@ -254,7 +350,7 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // The trace copy of the device-code message (review L1)
+    // The trace copy of the device-code message
     // ---------------------------------------------------------------------------------------------------------
 
     [Theory]
@@ -329,6 +425,36 @@ public sealed class SignInOutsideHttpTimeoutTests : IDisposable
             }
 
             return StaticTokenProvider.DefaultToken;
+        }
+    }
+
+    /// <summary>
+    /// A token provider that answers at once and records, per call, whether a sign-in listener
+    /// (<see cref="WorkIqSignInWait.Current"/>) was current: the flow the device-code provider would report a sign-in to.
+    /// </summary>
+    private sealed class ListenerProbeTokenProvider : IWorkIqTokenProvider
+    {
+        private readonly List<bool> _sawListener = [];
+
+        public IReadOnlyList<bool> SawListener
+        {
+            get
+            {
+                lock (_sawListener)
+                {
+                    return _sawListener.ToArray();
+                }
+            }
+        }
+
+        public ValueTask<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            lock (_sawListener)
+            {
+                _sawListener.Add(WorkIqSignInWait.Current is not null);
+            }
+
+            return ValueTask.FromResult(StaticTokenProvider.DefaultToken);
         }
     }
 

@@ -7,14 +7,14 @@ using A2A;
 namespace AgentEval.Microsoft365.Protocol;
 
 /// <summary>
-/// The deterministic outcome rules of one turn (M14): the raw A2A state string or SDK enum → <see cref="WorkIqTaskState"/>
+/// The deterministic outcome rules of one turn: the raw A2A state string or SDK enum → <see cref="WorkIqTaskState"/>
 /// (strict wire names; anything else is <see cref="WorkIqTaskState.Unknown"/>, which never implies completion);
 /// task state + direct message + transport + failure → (<see cref="WorkIqTurnOutcome"/>, <see cref="OutcomeCertainty"/>);
 /// the answer completeness given the outcome and the answer selection; and the telemetry completeness given the
 /// diagnostic profile. Precedence in <see cref="Classify"/>: an observed terminal or suspended state is authoritative,
 /// then a direct message, then the transport and the structured failure; a non-terminal or unknown state with
 /// nothing more is <see cref="WorkIqTurnOutcome.Indeterminate"/>. A local stop is never
-/// <see cref="WorkIqTurnOutcome.Canceled"/> (only the service's <c>TASK_STATE_CANCELED</c> is). Owned by lane B.
+/// <see cref="WorkIqTurnOutcome.Canceled"/> (only the service's <c>TASK_STATE_CANCELED</c> is).
 /// </summary>
 internal static class WorkIqOutcomeClassifier
 {

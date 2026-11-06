@@ -18,7 +18,7 @@ using Xunit;
 namespace AgentEval.Tests.Microsoft365.Streaming;
 
 /// <summary>
-/// Contract tests of the streaming half of <see cref="WorkIqA2AClient"/> (M13) over the scripted
+/// Contract tests of the streaming half of <see cref="WorkIqA2AClient"/> over the scripted
 /// <see cref="FakeWorkIqHandler"/> behind the production pipeline (<c>WorkIqAuthHandler → RawCaptureHandler → fake</c>):
 /// frames are identical whatever the chunk boundaries, a mid-stream failure becomes one final failure frame
 /// (never an exception after frames were yielded), a malformed frame is reported and the stream continues, ids are
@@ -184,7 +184,22 @@ public sealed class WorkIqA2AClientStreamingTests
         Assert.All(frames.Where(f => f != malformed), f => Assert.Null(f.Failure));
         Assert.Equal(TaskState.Completed, frames[^1].Event!.StatusUpdate!.Status.State);
         Assert.Contains(h.Trace.Events, e => e.Code == "stream.malformed" && e.Level == WorkIqTraceLevel.Warning);
-        Assert.Contains(h.Issues.Issues, i => i.Code == "stream.one_of_violation" && i.Category == WorkIqIssueCategory.Protocol);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Protocol, issue.Category);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(malformed.Failure).Code, issue.Code);
+    }
+
+    [Fact]
+    public async Task StreamAsync_MalformedFrameInATurn_TracedButNotRegistered()
+    {
+        var h = Build();
+        h.Fake.OnSse(StreamMethod, "sse/stream-malformed-event.txt", chunkSize: 5);
+
+        var frames = await CollectAsync(h.Client.StreamAsync(Request(), CancellationToken.None, new WorkIqCallContext { CallerRegistersIssues = true }));
+
+        Assert.Single(frames, f => f.Failure is not null);
+        Assert.Contains(h.Trace.Events, e => e.Code == "stream.malformed");
+        Assert.Empty(h.Issues.Issues);
     }
 
     [Fact]
@@ -208,7 +223,10 @@ public sealed class WorkIqA2AClientStreamingTests
         Assert.Equal(SseFixtureFrames.TaskId, last.Failure.TaskId);
         Assert.Equal(SseFixtureFrames.ContextId, last.Failure.ContextId);
         Assert.Contains(h.Trace.Events, e => e.Code == "stream.failed" && e.Level == WorkIqTraceLevel.Error && e.RpcErrorCode == -32603);
-        Assert.Contains(h.Issues.Issues, i => i.Code == "stream.failed" && i.Category == WorkIqIssueCategory.Service);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Service, issue.Category);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(last.Failure).Code, issue.Code);
+        Assert.Equal(-32603, issue.RpcErrorCode);
     }
 
     [Fact]
@@ -226,7 +244,9 @@ public sealed class WorkIqA2AClientStreamingTests
         Assert.Null(only.DataJson);
         Assert.NotNull(only.Failure);
         Assert.Equal(WorkIqFailureCategory.Transport, only.Failure.Category);
-        Assert.Contains(h.Issues.Issues, i => i.Code == "stream.failed" && i.Category == WorkIqIssueCategory.Network);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Network, issue.Category);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(only.Failure).Code, issue.Code);
         Assert.Contains(h.Trace.Events, e => e.Code == "stream.ended" && e.Level == WorkIqTraceLevel.Warning);
     }
 
@@ -242,6 +262,31 @@ public sealed class WorkIqA2AClientStreamingTests
         Assert.NotNull(only.Failure);
         Assert.Equal(500, only.Failure.HttpStatus);
         Assert.Null(only.Event);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task OneHttpFailure_BlockingAndStreaming_RegisterTheSameSingleIssue(HttpStatusCode status)
+    {
+        var blocking = Build();
+        blocking.Fake.FailWith("SendMessage", status);
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => blocking.Client.SendAsync(Request(), CancellationToken.None));
+
+        var streaming = Build();
+        streaming.Fake.FailWith(StreamMethod, status);
+        var frames = await CollectAsync(streaming.Client.StreamAsync(Request(), CancellationToken.None));
+
+        // One failure, one issue on either path, and the same category and code: both come from the classifier.
+        var sent = Assert.Single(blocking.Issues.Issues);
+        var streamed = Assert.Single(streaming.Issues.Issues);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(ex.Failure).Code, sent.Code);
+        Assert.Equal(sent.Category, streamed.Category);
+        Assert.Equal(sent.Code, streamed.Code);
+        Assert.Equal((int)status, Assert.Single(frames).Failure!.HttpStatus);
     }
 
     [Fact]
@@ -457,18 +502,19 @@ public sealed class WorkIqA2AClientStreamingTests
     }
 
     [Fact]
-    public async Task StreamAsync_AfterTheStreamEnds_ExposesTheRawCaptureReference()
+    public async Task StreamAsync_AfterTheStreamEnds_HandsTheRawCaptureBackOnTheCall()
     {
         var h = Build();
         h.Fake.OnSse(StreamMethod, HappyPath);
-        Assert.Null(h.Client.LastStreamCapture);
+        var call = new WorkIqCallContext();
 
-        await CollectAsync(h.Client.StreamAsync(Request(), CancellationToken.None));
+        await CollectAsync(h.Client.StreamAsync(Request(), CancellationToken.None, call));
 
-        var capture = h.Client.LastStreamCapture;
+        var capture = call.StreamCapture;
         Assert.NotNull(capture);
         Assert.False(string.IsNullOrWhiteSpace(capture.CaptureId));
         Assert.Equal(RawCaptureSink.PolicyId, capture.PolicyId);
+        Assert.Null(h.Client.Capture.CurrentSink);
     }
 
     [Fact]

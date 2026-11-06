@@ -13,7 +13,7 @@ namespace AgentEval.Tests.Microsoft365;
 
 /// <summary>
 /// Catalog guard for the synthetic Work IQ A2A 1.0 fixture corpus embedded from <c>Microsoft365/Fixtures</c>
-/// (task M04). It proves what the later lanes rely on: the embedded set equals the catalog in the folder README,
+/// It proves what the provider's tests rely on: the embedded set equals the catalog in the folder README,
 /// every file has the structural shape its consumer expects (JSON-RPC 2.0 envelopes, SSE framing the SDK's own
 /// parser accepts, seven unique normalisation ids), the 1.0 envelopes round-trip through the A2A SDK's
 /// <see cref="A2AJsonUtilities.DefaultOptions"/>, and the deliberately 0.3-shaped and malformed fixtures do NOT read
@@ -435,7 +435,7 @@ public sealed class FixtureCatalogTests
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // Content the normaliser and decoder lanes depend on
+    // Content the normaliser and the decoders depend on
     // ---------------------------------------------------------------------------------------------------------
 
     [Fact]

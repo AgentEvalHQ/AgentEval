@@ -18,6 +18,7 @@ using AgentEval.Evals.Agentic.StochasticStability;
 using AgentEval.Evals.Agentic.System;
 using AgentEval.Evals.Agentic.Telemetry;
 using AgentEval.Evals.Agentic.UX;
+using AgentEval.Tests.TestHelpers;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic;
@@ -26,6 +27,10 @@ namespace AgentEval.Tests.Agentic;
 /// Shared fixture helper that builds an <see cref="IEval"/> instance for a given
 /// evaluator key, backed by a fixed-score stub evaluator.
 /// </summary>
+/// <remarks>
+/// The evaluators whose deterministic path scans with wall-clock-limited patterns run them through
+/// <see cref="UntimedRegex.Match"/>, so a loaded test host cannot turn a decision into "could not check".
+/// </remarks>
 internal static class AgenticEvaluatorFixture
 {
     /// <summary>
@@ -60,7 +65,7 @@ internal static class AgenticEvaluatorFixture
                                            judge,
                                            new StaticPolicyResolver(new ProhibitedActionPolicy([], [], [], [])),
                                            "test-subject"),
-        "sensitive_data_leakage"    => new SensitiveDataLeakageEval(judge),
+        "sensitive_data_leakage"    => new SensitiveDataLeakageEval(judge) { RegexMatch = UntimedRegex.Match },
         "indirect_attack"           => new IndirectAttackEval(judge),
         "hate_unfairness"           => new HateUnfairnessEval(judge),
         "sexual"                    => new SexualEval(judge),
@@ -97,9 +102,9 @@ internal static class AgenticEvaluatorFixture
         "uncertainty_acknowledgment" => new UncertaintyAcknowledgmentEval(judge),
         "self_correction_quality"   => new SelfCorrectionQualityEval(judge),
         // ── Phase 6: Adversarial evaluators ───────────────────────────────────
-        "direct_injection"          => new DirectInjectionEval(judge),
-        "persona_attack"            => new PersonaAttackEval(judge),
-        "jailbreak_resistance"      => new JailbreakResistanceEval(judge),
+        "direct_injection"          => new DirectInjectionEval(judge) { RegexMatch = UntimedRegex.Match },
+        "persona_attack"            => new PersonaAttackEval(judge) { RegexMatch = UntimedRegex.Match },
+        "jailbreak_resistance"      => new JailbreakResistanceEval(judge) { RegexMatch = UntimedRegex.Match },
         // ── Phase 6: UX evaluators ────────────────────────────────────────────
         "verbosity_appropriateness" => new VerbosityAppropriatenessEval(judge),
         "tone_appropriateness"      => new ToneAppropriatenessEval(judge),

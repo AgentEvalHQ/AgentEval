@@ -101,6 +101,26 @@ public sealed class RunFolderTests : IDisposable
         Assert.Equal(run.Text("summary.md"), reader.ReadToEnd());
     }
 
+    [Fact]
+    public async Task ZipFailsAfterTheLogWasClosed_ExitIs3_AndConsoleLogEndsWithTheChangedResult()
+    {
+        // The zip is written after console.log is closed (the zip holds console.log). When it fails, the reports are
+        // written again as ERROR (exit 3); console.log must not end on the earlier table alone.
+        _rig.WithHealthyEndpoint().WithCompletedTurns();
+        _rig.Judge = new FakeJudgeChatClient();
+        _rig.ZipWriter = _ => throw new IOException("simulated: the disk is full");
+
+        var run = await _rig.RunAsync(DemoRig.Consent, "--zip");
+
+        run.AssertExit(3);
+        Assert.Contains("the zip could not be written", run.Err, StringComparison.Ordinal);
+        Assert.Contains("exit 3", run.Text("summary.md"), StringComparison.Ordinal);
+        var lastLine = run.Text("console.log").TrimEnd('\n').Split('\n')[^1];
+        Assert.Contains("after this log was closed, the zip could not be written", lastLine, StringComparison.Ordinal);
+        Assert.Contains("(exit 3)", lastLine, StringComparison.Ordinal);
+        Assert.False(run.Zip.Exists);
+    }
+
     [Theory]
     [MemberData(nameof(Levels))]
     public async Task NoTokenAndNoAuthorizationHeader_AnywhereTheRunWrote_AtEveryVerbosity(string level)

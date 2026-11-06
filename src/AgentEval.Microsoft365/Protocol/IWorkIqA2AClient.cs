@@ -13,7 +13,8 @@ namespace AgentEval.Microsoft365.Protocol;
 /// and transport error classification. It never interprets tool meaning, scores, consents, or resubmits a send;
 /// a 429/503 backoff (with jitter) applies only to discovery, <c>GetTask</c> and <c>CancelTask</c>. Every
 /// response is validated as A2A 1.0; a 0.3-shaped reply fails with
-/// <see cref="WorkIqFailureCategory.ProtocolVersionMismatch"/>.
+/// <see cref="WorkIqFailureCategory.ProtocolVersionMismatch"/>. Every operation takes an optional
+/// <see cref="WorkIqCallContext"/>: the per-call facts travel with the call, never in fields of the client.
 /// </summary>
 internal interface IWorkIqA2AClient
 {
@@ -23,33 +24,45 @@ internal interface IWorkIqA2AClient
     /// returns the typed card with its raw JSON and digest.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken);
+    /// <param name="call">The per-call context; null means a call of its own (no turn).</param>
+    Task<RawAgentCard> DiscoverAsync(CancellationToken cancellationToken, WorkIqCallContext? call = null);
 
     /// <summary>Blocking <c>SendMessage</c>; the reply is a task or a direct message. Never retried.</summary>
     /// <param name="request">The request (<c>returnImmediately</c> set explicitly by the caller).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken);
+    /// <param name="call">The per-call context (the JSON-RPC id to send among it); null means a call of its own.</param>
+    Task<WorkIqRpcResult<SendMessageResponse>> SendAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null);
 
-    /// <summary><c>SendStreamingMessage</c>; yields every SSE frame with its envelope and the typed event (or a frame-level failure). Never retried.</summary>
+    /// <summary>
+    /// <c>SendStreamingMessage</c>; yields every SSE frame with its envelope and the typed event (or a frame-level
+    /// failure). Never retried. When the stream ends, its raw capture is on <see cref="WorkIqCallContext.StreamCapture"/>.
+    /// </summary>
     /// <param name="request">The request.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken);
+    /// <param name="call">The per-call context; null means a call of its own.</param>
+    IAsyncEnumerable<WorkIqStreamFrame> StreamAsync(SendMessageRequest request, CancellationToken cancellationToken, WorkIqCallContext? call = null);
 
     /// <summary><c>GetTask</c>; the task is directly under <c>result</c>. Safe to retry under backoff.</summary>
     /// <param name="taskId">The task id.</param>
     /// <param name="historyLength">The <c>historyLength</c> to request; null omits it.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken);
+    /// <param name="call">The per-call context; null means a call of its own.</param>
+    Task<WorkIqRpcResult<AgentTask>> GetTaskAsync(string taskId, int? historyLength, CancellationToken cancellationToken, WorkIqCallContext? call = null);
 
     /// <summary><c>CancelTask</c>; returns the task as the service reports it after the request (canceled only if its state says so).</summary>
     /// <param name="taskId">The task id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken);
+    /// <param name="call">The per-call context; null means a call of its own.</param>
+    Task<WorkIqRpcResult<AgentTask>> CancelTaskAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null);
 
-    /// <summary><c>SubscribeToTask</c>; the first frame is the current task snapshot, then future events. Never resubmits input.</summary>
+    /// <summary>
+    /// <c>SubscribeToTask</c>; the first frame is the current task snapshot, then future events. Never resubmits input.
+    /// When the stream ends, its raw capture is on <see cref="WorkIqCallContext.StreamCapture"/>.
+    /// </summary>
     /// <param name="taskId">The task id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken);
+    /// <param name="call">The per-call context; null means a call of its own.</param>
+    IAsyncEnumerable<WorkIqStreamFrame> SubscribeAsync(string taskId, CancellationToken cancellationToken, WorkIqCallContext? call = null);
 }
 
 /// <summary>A discovered agent card together with the bytes it was parsed from and the interface the trust policy selected.</summary>
@@ -60,6 +73,7 @@ internal interface IWorkIqA2AClient
 /// <param name="SelectedEndpoint">The JSON-RPC interface URL selected by the trust policy.</param>
 /// <param name="SelectedProtocolVersion">The protocol version of the selected interface (<c>1.0</c>).</param>
 /// <param name="FetchedAt">Local fetch time.</param>
+/// <param name="RoutingTenant">The opaque A2A routing <c>tenant</c> the selected interface declares, set once by discovery; null when it declares none.</param>
 internal sealed record RawAgentCard(
     AgentCard Card,
     string RawJson,
@@ -67,7 +81,8 @@ internal sealed record RawAgentCard(
     Uri CardUri,
     Uri SelectedEndpoint,
     string SelectedProtocolVersion,
-    DateTimeOffset FetchedAt);
+    DateTimeOffset FetchedAt,
+    string? RoutingTenant = null);
 
 /// <summary>A typed RPC reply together with its raw capture and correlation facts.</summary>
 /// <typeparam name="T">The SDK result type.</typeparam>

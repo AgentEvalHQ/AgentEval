@@ -8,9 +8,12 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using A2A;
 using AgentEval.Microsoft365;
+using AgentEval.Microsoft365.Auth;
+using AgentEval.Microsoft365.Capture;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Evidence;
 using AgentEval.Microsoft365.Protocol;
+using AgentEval.Tests.Microsoft365.Auth;
 using AgentEval.Tests.Microsoft365.Protocol;
 using AgentEval.Tests.Microsoft365.TestHelpers;
 using Xunit;
@@ -22,7 +25,7 @@ namespace AgentEval.Tests.Microsoft365.Conversation;
 /// scripted <see cref="FakeWorkIqA2AClient"/> where a send must block): context ownership, the blocking turn path
 /// with <c>GetTask</c> polling, every outcome mapping, pending interactions, the single-active-turn guard, reset,
 /// abandonment (never a <c>CancelTask</c>), local stops, budgets, handle validation and the Location metadata.
-/// Reduction and normalisation run through lane C's reducer/mapping and lane F's normaliser.
+/// Reduction and normalisation run through the real task reducer, SDK mapping and evidence normaliser.
 /// </summary>
 public sealed class WorkIqConversationTests
 {
@@ -385,7 +388,12 @@ public sealed class WorkIqConversationTests
 
             Assert.Equal("Allow", WorkIqInteractionResponse.ForOption(pending, "Allow").SelectedOption);
             Assert.Throws<ArgumentException>(() => WorkIqInteractionResponse.ForOption(pending, "Yes"));
-            Assert.Contains(h.Issues.Issues, i => i.Code == "turn.input_required");
+            var issue = Assert.Single(h.Issues.Issues, i => i.Code == "turn.input_required");
+
+            // The tester reads this cause: it must not point at an API that throws, nor carry planning words.
+            Assert.DoesNotContain("ContinueAsync", issue.SuggestedCause, StringComparison.Ordinal);
+            Assert.DoesNotContain("wave", issue.SuggestedCause, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(WorkIqIssueClassifier.ForTurnOutcome(result).Cause, issue.SuggestedCause);
             Assert.Equal(WorkIqTraceLevel.Warning, Assert.Single(h.Events("turn.outcome")).Level);
         }
     }
@@ -552,7 +560,12 @@ public sealed class WorkIqConversationTests
             Assert.Null(conversation.ContextId);
             Assert.False(conversation.IsTurnActive);
             Assert.Single(h.Events("send.failed"));
-            Assert.Contains(h.Issues.Issues, i => i.Code == "turn.indeterminate");
+            Assert.Single(h.Events("rpc.error"));
+
+            // One failure, one issue: the turn's, never a second one from the client underneath.
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Network, issue.Category);
         }
     }
 
@@ -565,13 +578,24 @@ public sealed class WorkIqConversationTests
         {
             h.Handler.FailWith("SendMessage", HttpStatusCode.Forbidden);
 
-            var result = await conversation.RunTurnAsync(Turn());
+            var result = await conversation.RunTurnAsync(Turn(caseId: "case-403", turnId: "turn-403"));
 
             Assert.Equal(WorkIqTurnOutcome.Failed, result.Outcome);
             Assert.Equal(TransportOutcome.Failed, result.Transport);
             Assert.Equal(WorkIqFailureCategory.Forbidden, result.Failure!.Category);
             Assert.Equal(403, result.Failure.HttpStatus);
             Assert.Equal(1, h.Handler.CountOf("SendMessage"));
+
+            // One HTTP 403, one issue: the auth handler and the client trace it, the turn registers it.
+            Assert.Single(h.Events("auth.forbidden"));
+            Assert.Single(h.Events("rpc.error"));
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.failed", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Permission, issue.Category);
+            Assert.Equal(403, issue.HttpStatus);
+            Assert.Equal("case-403", issue.CaseId);
+            Assert.Equal("turn-403", issue.TurnId);
+            Assert.Equal(WorkIqIssueClassifier.ForTurnOutcome(result).Cause, issue.SuggestedCause);
         }
     }
 
@@ -591,6 +615,12 @@ public sealed class WorkIqConversationTests
             Assert.Equal(0, h.Handler.CountOf("SendMessage"));
             Assert.Null(conversation.Card);
             Assert.Single(h.Events("discovery.turn_blocked"));
+            Assert.Single(h.Events("discovery.untrusted_host"));
+
+            // The discovery inside the turn traces the refusal; the turn registers the one issue, under Config.
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.failed", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Config, issue.Category);
         }
     }
 
@@ -721,7 +751,7 @@ public sealed class WorkIqConversationTests
     [Fact]
     public async Task RunTurn_CallerCanceled_ThrowsCanceledExceptionCarryingIndeterminateResult()
     {
-        var (client, conversation, _, _, _) = Fake();
+        var (client, conversation, _, issues, _) = Fake();
         await using (conversation)
         {
             client.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -741,13 +771,18 @@ public sealed class WorkIqConversationTests
             Assert.Null(ex.TurnResult.Task);
             Assert.False(conversation.IsTurnActive);
             Assert.Equal(0, client.CancelCalls);
+
+            // A local stop is the caller's, never the service's: the turn's issue is filed under Budget.
+            var issue = Assert.Single(issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
         }
     }
 
     [Fact]
     public async Task RunTurn_TurnDeadline_IndeterminateTimeoutWithoutThrow()
     {
-        var (client, conversation, _, _, clock) = Fake(new WorkIqOptions { TurnDeadline = TimeSpan.FromSeconds(5) });
+        var (client, conversation, _, issues, clock) = Fake(new WorkIqOptions { TurnDeadline = TimeSpan.FromSeconds(5) });
         await using (conversation)
         {
             client.Gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -760,6 +795,12 @@ public sealed class WorkIqConversationTests
             Assert.Equal(TransportOutcome.Failed, result.Transport);
             Assert.Single(client.Sends);
             Assert.Equal(0, client.CancelCalls);
+
+            // The turn's own budget ran out, not the network: Budget, with a cause that names TurnDeadline.
+            var issue = Assert.Single(issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
+            Assert.Equal(WorkIqIssueClassifier.CauseTurnDeadline, issue.SuggestedCause);
         }
     }
 
@@ -785,7 +826,14 @@ public sealed class WorkIqConversationTests
             Assert.Equal(1, h.Handler.CountOf("SendMessage"));
             Assert.Equal(0, h.Handler.CountOf("CancelTask"));
             Assert.Equal(SubmittedTaskId, conversation.ActiveTask?.TaskId);
-            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted" && i.Category == WorkIqIssueCategory.Budget);
+
+            // One failure, one issue: the turn's outcome, filed under Budget with the RecoveryBudget cause (never a
+            // network timeout); the exhausted budget itself is traced.
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
+            Assert.Equal(WorkIqIssueClassifier.CauseRecoveryBudget, issue.SuggestedCause);
+            Assert.Single(h.Events("budget.recovery_exhausted"));
             Assert.Single(h.Events("budget.exceeded"));
         }
     }
@@ -810,7 +858,7 @@ public sealed class WorkIqConversationTests
             Assert.Single(h.Events("cancel.not_confirmed"));
             Assert.Null(conversation.ConfirmedCanceledTaskId);
 
-            // Review L5: the task finished on its own, so the register carries a Warning that says so — never the Error
+            // The task finished on its own, so the register carries a Warning that says so — never the Error
             // "budget.recovery_exhausted" for a turn that completed.
             Assert.Single(h.Events("budget.recovered_after_cancel"));
             var recovered = Assert.Single(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
@@ -842,8 +890,11 @@ public sealed class WorkIqConversationTests
             Assert.Null(result.AnswerText);
             Assert.Single(h.Events("cancel.confirmed"));
             Assert.Equal(SubmittedTaskId, conversation.ConfirmedCanceledTaskId);
-            // The budget ran out and the task was canceled because of it: that Error stays in the register.
-            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted");
+            // The budget ran out and the task was canceled because of it: the turn's one issue says so.
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.canceled", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
+            Assert.Equal(WorkIqIssueClassifier.CauseRecoveryBudget, issue.SuggestedCause);
             Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
         }
     }
@@ -868,7 +919,11 @@ public sealed class WorkIqConversationTests
             Assert.Equal(WorkIqFailureCategory.Timeout, result.Failure!.Category);
             Assert.Single(h.Events("cancel.not_confirmed"));
             Assert.Null(conversation.ConfirmedCanceledTaskId);
-            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted" && i.A2AState == "TASK_STATE_WORKING");
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
+            Assert.Equal("TASK_STATE_WORKING", issue.A2AState);
+            Assert.Single(h.Events("budget.recovery_exhausted"));
             Assert.DoesNotContain(h.Issues.Issues, i => i.Code == "budget.recovered_after_cancel");
         }
     }
@@ -891,7 +946,9 @@ public sealed class WorkIqConversationTests
             Assert.Equal(WorkIqTurnOutcome.Indeterminate, result.Outcome);
             Assert.Equal(WorkIqFailureCategory.Timeout, result.Failure!.Category);
             Assert.Single(h.Events("cancel.failed"));
-            Assert.Contains(h.Issues.Issues, i => i.Code == "budget.recovery_exhausted");
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal("turn.indeterminate", issue.Code);
+            Assert.Equal(WorkIqIssueCategory.Budget, issue.Category);
         }
     }
 
@@ -948,6 +1005,65 @@ public sealed class WorkIqConversationTests
             Assert.Equal(1, h.Handler.CountOf("SendStreamingMessage"));
             Assert.Equal(0, h.Handler.CountOf("SendMessage"));
             Assert.False(conversation.IsTurnActive);
+        }
+    }
+
+    [Fact]
+    public async Task StreamTurnAsync_ThenAnExplicitGetTask_TheReadSendsItsOwnRpcId()
+    {
+        var (h, conversation) = Real();
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnSse("SendStreamingMessage", "sse/stream-happy-path.txt").OnRpc("GetTask", "envelopes/gettask-completed.json");
+            WorkIqTurnResult? streamed = null;
+            await foreach (var e in conversation.StreamTurnAsync(Turn(turnId: "turn-stream-rpc")))
+            {
+                if (e is WorkIqStreamEvent.TurnFinished finished)
+                {
+                    streamed = finished.Result;
+                }
+            }
+
+            Assert.NotNull(streamed);
+            Assert.Equal(WorkIqTurnOutcome.Completed, streamed.Outcome);
+
+            await conversation.GetTaskAsync(streamed.Task!);
+
+            // The stream turn's identity id never went on the wire (the SDK mints the stream's id), so a later call on
+            // the same client must not pick it up: the read mints its own.
+            var get = Assert.Single(Posts(h, "GetTask"));
+            Assert.NotEqual(JsonSerializer.Serialize(streamed.Identity.RpcRequestId), get.JsonRpcId);
+            Assert.StartsWith("\"rpc-", get.JsonRpcId, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task StreamTurnAsync_RpcErrorFrame_OneIssueFromTheTurn()
+    {
+        var (h, conversation) = Real();
+        using (h)
+        await using (conversation)
+        {
+            h.Handler.OnSse("SendStreamingMessage", "sse/stream-rpc-error-frame.txt", chunkSize: 2);
+            WorkIqTurnResult? streamed = null;
+            await foreach (var e in conversation.StreamTurnAsync(Turn(caseId: "case-stream", turnId: "turn-stream-error")))
+            {
+                if (e is WorkIqStreamEvent.TurnFinished finished)
+                {
+                    streamed = finished.Result;
+                }
+            }
+
+            Assert.NotNull(streamed);
+            Assert.NotEqual(WorkIqTurnOutcome.Completed, streamed.Outcome);
+            Assert.Equal(-32603, streamed.Failure!.RpcErrorCode);
+            Assert.Contains(h.Trace.Events, e => e.Code == "stream.failed");
+
+            // The client traces the failure frame; the turn registers the one issue of its outcome.
+            var issue = Assert.Single(h.Issues.Issues);
+            Assert.Equal(WorkIqConversation.OutcomeIssueCode(streamed.Outcome), issue.Code);
+            Assert.Equal("turn-stream-error", issue.TurnId);
         }
     }
 
@@ -1158,7 +1274,7 @@ public sealed class WorkIqConversationTests
     [Fact]
     public async Task ContinueAsync_NotSupportedYet()
     {
-        var (_, conversation, _, _, _) = Fake();
+        var (client, conversation, _, _, _) = Fake();
         await using (conversation)
         {
             var handle = new WorkIqTaskHandle(new Uri("https://workiq.svc.cloud.microsoft/a2a/"), "1.0", null, "task-1", null, null, conversation.PrincipalKey);
@@ -1167,7 +1283,12 @@ public sealed class WorkIqConversationTests
 
             var ex = await Assert.ThrowsAsync<NotSupportedException>(() => conversation.ContinueAsync(pending, response));
 
-            Assert.Contains("TODO(M53)", ex.Message, StringComparison.Ordinal);
+            Assert.Equal(WorkIqConversation.ContinueNotSupportedMessage, ex.Message);
+            Assert.Contains("not supported", ex.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("TODO", ex.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("wave", ex.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, client.CancelCalls);
+            Assert.Empty(client.Sends);
         }
     }
 
@@ -1216,6 +1337,62 @@ public sealed class WorkIqConversationTests
             await conversation.RunTurnAsync(Turn());
 
             h.AssertNoSecretInDiagnostics();
+        }
+    }
+
+    [Fact]
+    public async Task GetTaskAsync_WhileATurnWaitsForItsToken_EachCallSendsItsOwnRpcId()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler
+            .OnRpc("SendMessage", "envelopes/send-task-completed-with-answer-and-attributions.json")
+            .OnRpc("GetTask", "envelopes/gettask-completed.json");
+
+        // The live shape: the client acquires each token before its call (the send's is held open); the pipeline's
+        // handler attaches it.
+        var tokens = new GatedTokenProvider(gatedCall: 2);
+        var client = new WorkIqA2AClient(h.Config, h.Options, h.Http, h.Capture, h.Clock, h.Diagnostics) { Auth = new WorkIqAuthHandler(tokens) { Diagnostics = h.Diagnostics } };
+        await using var conversation = new WorkIqConversation(client, h.Config, h.Options, h.Clock, h.Diagnostics);
+
+        var turn = conversation.RunTurnAsync(Turn(turnId: "turn-race"));
+        await tokens.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        var handle = new WorkIqTaskHandle(new Uri("https://workiq.svc.cloud.microsoft/a2a/"), "1.0", null, SubmittedTaskId, SharedContextId, null, conversation.PrincipalKey);
+        await conversation.GetTaskAsync(handle);
+        tokens.Release.SetResult();
+        var result = await turn.WaitAsync(TimeSpan.FromSeconds(30));
+
+        // The read in the middle of the turn never takes the turn's id: the send carries the id its identity names.
+        Assert.Equal(WorkIqTurnOutcome.Completed, result.Outcome);
+        var send = Assert.Single(Posts(h, "SendMessage"));
+        var get = Assert.Single(Posts(h, "GetTask"));
+        Assert.Equal(JsonSerializer.Serialize(result.Identity.RpcRequestId), send.JsonRpcId);
+        Assert.NotEqual(send.JsonRpcId, get.JsonRpcId);
+    }
+
+    /// <summary>A token provider whose call number <c>gatedCall</c> waits until <see cref="Release"/> is set; every other call returns at once.</summary>
+    private sealed class GatedTokenProvider : IWorkIqTokenProvider
+    {
+        private readonly int _gatedCall;
+        private int _calls;
+
+        public GatedTokenProvider(int gatedCall)
+        {
+            _gatedCall = gatedCall;
+        }
+
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _calls) == _gatedCall)
+            {
+                Entered.TrySetResult();
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+
+            return StaticTokenProvider.DefaultToken;
         }
     }
 }

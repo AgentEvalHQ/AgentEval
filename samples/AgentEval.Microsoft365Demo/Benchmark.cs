@@ -7,6 +7,7 @@ using AgentEval.Core;
 using AgentEval.MAF;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
+using AgentEval.Microsoft365.Evidence;
 using AgentEval.Models;
 
 namespace AgentEval.Microsoft365Demo;
@@ -83,7 +84,23 @@ internal sealed record JudgeFailure(string ErrorType, string SafeMessage, int? H
     public string Text => $"the judge call failed: {ErrorType}: {SafeMessage}";
 
     /// <summary>Whether the judge's provider refused the credentials or the deployment (HTTP 401 or 403).</summary>
-    public bool IsAuthRefusal => HttpStatus is 401 or 403;
+    public bool IsAuthRefusal => IsAuthStatus(HttpStatus);
+
+    /// <summary>
+    /// Why a judge call with <paramref name="httpStatus"/> failed, in plain words. The demo's own issue text: the issue
+    /// register and every report read it from here, never by splitting the issue's suggested cause.
+    /// </summary>
+    /// <param name="httpStatus">The HTTP status of the judge's provider, when known.</param>
+    public static string CauseFor(int? httpStatus) => IsAuthStatus(httpStatus)
+        ? $"The judge model's provider refused the judge's key or deployment (HTTP {httpStatus!.Value.ToString(CultureInfo.InvariantCulture)}): " +
+          "this is the judge's configuration, not the agent, Work IQ or your Microsoft 365 sign-in."
+        : "The judge model's provider failed or could not be reached (network, timeout, overload or a service error): this is the judge, not the agent or Work IQ.";
+
+    /// <summary>What to do about a judge call with <paramref name="httpStatus"/> that failed.</summary>
+    /// <param name="httpStatus">The HTTP status of the judge's provider, when known.</param>
+    public static string ActionFor(int? httpStatus) => IsAuthStatus(httpStatus)
+        ? "Check AI_INFERENCE_PROVIDER and that provider's API key, endpoint and model or deployment, then run again (or run with --no-judge)."
+        : "Check the judge provider's endpoint and status and run again (or run with --no-judge).";
 
     /// <summary>Reads a judge exception: its type, its redacted message and the HTTP status of the first exception in the chain that carries one.</summary>
     /// <param name="error">The exception the judge call threw.</param>
@@ -105,17 +122,15 @@ internal sealed record JudgeFailure(string ErrorType, string SafeMessage, int? H
             IsAuthRefusal ? WorkIqIssueCategory.Authentication : WorkIqIssueCategory.Service,
             IssueCode,
             $"{Text} — the JUDGE failed, not the agent: the agent's turn completed and its deterministic checks were measured; the criteria were NOT MEASURED",
-            IsAuthRefusal
-                ? $"The judge model's provider refused the judge's key or deployment (HTTP {HttpStatus!.Value.ToString(CultureInfo.InvariantCulture)}): " +
-                  "this is the judge's configuration, not the agent, Work IQ or your Microsoft 365 sign-in. " +
-                  "What to do: check AI_INFERENCE_PROVIDER and that provider's API key, endpoint and model or deployment, then run again (or run with --no-judge)."
-                : "The judge model's provider failed or could not be reached (network, timeout, overload or a service error): this is the judge, not the agent or Work IQ. " +
-                  "What to do: check the judge provider's endpoint and status and run again (or run with --no-judge).")
+            // The issue register has one text field for both: issues.jsonl readers get the cause and the action in it.
+            CauseFor(HttpStatus) + " What to do: " + ActionFor(HttpStatus))
         with
         {
             CaseId = caseId,
             HttpStatus = HttpStatus,
         };
+
+    private static bool IsAuthStatus(int? httpStatus) => httpStatus is 401 or 403;
 
     private static int? StatusOf(Exception error)
     {
@@ -136,10 +151,23 @@ internal sealed record JudgeFailure(string ErrorType, string SafeMessage, int? H
     }
 }
 
-/// <summary>What the benchmark ran and why it stopped early, when it did.</summary>
+/// <summary>What the benchmark ran, why it stopped early, and why criteria went ungraded.</summary>
 /// <param name="Cases">One outcome per case, in dataset order (cases it did not reach are NOT MEASURED).</param>
 /// <param name="StopReason">Why the benchmark stopped before the last case; null when it ran them all.</param>
-internal sealed record BenchmarkOutcome(IReadOnlyList<CaseOutcome> Cases, string? StopReason);
+/// <param name="CriteriaNotGraded">
+/// Why declared criteria were not graded (no judge, or a judge call that failed), in one line; null when every case
+/// with criteria was graded. The stage row and the exit meaning both print this one text.
+/// </param>
+internal sealed record BenchmarkOutcome(IReadOnlyList<CaseOutcome> Cases, string? StopReason, string? CriteriaNotGraded = null)
+{
+    /// <summary>How many cases got <paramref name="verdict"/>.</summary>
+    /// <param name="verdict">The verdict.</param>
+    public int Count(CaseVerdict verdict) => Cases.Count(c => c.Verdict == verdict);
+
+    /// <summary>The ids of the cases that got <paramref name="verdict"/>, in dataset order.</summary>
+    /// <param name="verdict">The verdict.</param>
+    public string[] IdsOf(CaseVerdict verdict) => Cases.Where(c => c.Verdict == verdict).Select(c => c.Case.Id).ToArray();
+}
 
 /// <summary>
 /// The benchmark: every case runs through AgentEval's <see cref="MAFEvaluationHarness"/> over the live
@@ -279,7 +307,34 @@ internal static class Benchmark
             console.Line(DemoVerbosity.Quiet, "  benchmark stopped early: " + stopReason, Tint.Warn);
         }
 
-        return new BenchmarkOutcome(outcomes, stopReason);
+        return new BenchmarkOutcome(outcomes, stopReason, CriteriaNotGraded(outcomes, judge));
+    }
+
+    /// <summary>
+    /// Why declared criteria were not graded, in one line: no judge, and/or the judge calls that failed after a completed
+    /// turn (their count and the first failure); null when nothing applies.
+    /// </summary>
+    /// <param name="outcomes">The case outcomes.</param>
+    /// <param name="judge">The judge.</param>
+    internal static string? CriteriaNotGraded(IReadOnlyList<CaseOutcome> outcomes, JudgeChoice judge)
+    {
+        ArgumentNullException.ThrowIfNull(outcomes);
+        ArgumentNullException.ThrowIfNull(judge);
+        var reasons = new List<string>(2);
+        if (!judge.IsAvailable && outcomes.Any(o => o.Case.Criteria.Count > 0))
+        {
+            reasons.Add(judge.NotMeasuredReason);
+        }
+
+        var failed = outcomes.Where(o => o.JudgeFailure is not null).ToArray();
+        if (failed.Length > 0)
+        {
+            var first = failed[0].JudgeFailure!;
+            reasons.Add($"the judge call failed for {failed.Length.ToString(CultureInfo.InvariantCulture)} case(s) ({first.ErrorType}: " +
+                        $"{IssueText.Truncate(first.SafeMessage, 160)}); the agent was measured, the judge was not");
+        }
+
+        return reasons.Count == 0 ? null : string.Join("; ", reasons);
     }
 
     /// <summary>
@@ -348,8 +403,9 @@ internal static class Benchmark
         {
             list.Add(new(CriteriaCheck, CheckResult.NotMeasured, judgeFailure.Text));
         }
-        else if (turn?.AnswerCompleteness == OutputCompleteness.Ambiguous)
+        else if (turn is not null && !Microsoft365Evidence.IsAnswerMeasured(turn))
         {
+            // The provider's one rule: a completed turn with several candidates and none selected is not a measured answer.
             list.Add(new(CriteriaCheck, CheckResult.NotMeasured, "no answer was selected (several candidates), so the judge graded an empty string: not a measurement of the agent"));
         }
         else if (result.JudgeFailed)
@@ -466,17 +522,23 @@ internal static class Benchmark
     /// <param name="elapsed">The duration.</param>
     public static string Milliseconds(TimeSpan elapsed) => elapsed.TotalMilliseconds.ToString("0", CultureInfo.InvariantCulture) + " ms";
 
-    private static CheckOutcome AnswerCheck(WorkIqTurnResult turn) => turn.AnswerCompleteness switch
+    private static CheckOutcome AnswerCheck(WorkIqTurnResult turn)
     {
-        OutputCompleteness.Complete when !string.IsNullOrWhiteSpace(turn.AnswerText) =>
-            new(AnswerNonEmpty, CheckResult.Pass, $"{turn.AnswerText!.Length.ToString(CultureInfo.InvariantCulture)} characters"),
-        OutputCompleteness.Complete or OutputCompleteness.Empty =>
-            new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with an empty answer"),
-        OutputCompleteness.None =>
-            new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with no answer artifact"),
-        OutputCompleteness.Ambiguous =>
-            new(AnswerNonEmpty, CheckResult.NotMeasured, "several answer candidates and none selected; the evidence document keeps them all"),
-        _ =>
-            new(AnswerNonEmpty, CheckResult.NotMeasured, $"answer {turn.AnswerCompleteness}: not a complete answer"),
-    };
+        if (!Microsoft365Evidence.IsAnswerMeasured(turn))
+        {
+            return new(AnswerNonEmpty, CheckResult.NotMeasured, "several answer candidates and none selected; the evidence document keeps them all");
+        }
+
+        return turn.AnswerCompleteness switch
+        {
+            OutputCompleteness.Complete when !string.IsNullOrWhiteSpace(turn.AnswerText) =>
+                new(AnswerNonEmpty, CheckResult.Pass, $"{turn.AnswerText!.Length.ToString(CultureInfo.InvariantCulture)} characters"),
+            OutputCompleteness.Complete or OutputCompleteness.Empty =>
+                new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with an empty answer"),
+            OutputCompleteness.None =>
+                new(AnswerNonEmpty, CheckResult.Fail, "the turn completed with no answer artifact"),
+            _ =>
+                new(AnswerNonEmpty, CheckResult.NotMeasured, $"answer {turn.AnswerCompleteness}: not a complete answer"),
+        };
+    }
 }

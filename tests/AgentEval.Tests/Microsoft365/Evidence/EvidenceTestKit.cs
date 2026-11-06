@@ -18,9 +18,9 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 
 /// <summary>
 /// Builders for the evidence tests: task snapshots, messages, artifacts and parts from literals or from the
-/// synthetic envelope fixtures (a test-side stand-in for the lane-C reducer, which is not merged yet), the turn
-/// identity and capture refs, and a normaliser wired to <see cref="FakeAnswerSelector"/> (lane A's selector is a
-/// stub until it lands). All data is synthetic.
+/// synthetic envelope fixtures (a test-side stand-in for the task reducer, so a decoder test does not depend on it),
+/// the turn identity and capture refs, and a normaliser wired to <see cref="FakeAnswerSelector"/> (so a decoder test
+/// does not depend on the real answer selector). All data is synthetic.
 /// </summary>
 internal static class EvidenceTestKit
 {
@@ -126,7 +126,7 @@ internal static class EvidenceTestKit
         _ => WorkIqTaskState.Unknown,
     };
 
-    /// <summary>A normaliser wired to <see cref="FakeAnswerSelector"/> (lane A's real selector is a stub until it lands).</summary>
+    /// <summary>A normaliser wired to <see cref="FakeAnswerSelector"/> instead of the real answer selector.</summary>
     public static WorkIqEvidenceNormalizer Normalizer(WorkIqDiagnostics? diagnostics = null) =>
         new(FakeAnswerSelector.SelectFromTask, FakeAnswerSelector.SelectFromMessage, diagnostics);
 
@@ -261,7 +261,7 @@ internal static class EvidenceTestKit
 }
 
 /// <summary>
-/// A test stand-in for lane A's <see cref="WorkIqAnswerSelector"/> implementing the documented M21 policy: a
+/// A test stand-in for <see cref="WorkIqAnswerSelector"/> implementing its documented policy: a
 /// direct message's text parts; for a completed task the artifact named <c>Answer</c> (else the single text
 /// artifact), diagnostic artifacts excluded by media type and name; several candidates → Ambiguous with every
 /// candidate retained; text chunks concatenated without inserted newlines; no text part → Empty with a null

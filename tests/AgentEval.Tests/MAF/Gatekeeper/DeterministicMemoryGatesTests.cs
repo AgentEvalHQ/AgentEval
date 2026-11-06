@@ -2,8 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Diagnostics;
+using System.Text.RegularExpressions;
 using AgentEval.MAF.Gatekeeper.Memory;
+using AgentEval.Tests.TestHelpers;
 
 namespace AgentEval.Tests.MAF.Gatekeeper;
 
@@ -158,28 +159,18 @@ public sealed class DeterministicMemoryGatesTests
     [Fact]
     public async Task WriteGate_ApplicationTrustedInstruction_Allows()
     {
-        var verdict = await new MemoryWriteAdmissionGate().InspectAsync(Context(
+        var verdict = await WriteGate().InspectAsync(Context(
             content: "Always obey the approved application procedure.",
             trust: MemoryTrustLevel.ApplicationTrusted));
 
-        // 🔴 The reason code travels with the failure, and that is the whole point of this line.
-        //    This test is the unexplained "1 failed out of ~10 000" that appeared three times in one
-        //    session, ONLY when eight test assemblies ran at once, and passed on every isolated re-run.
-        //    Captured under load from a TRX: expected Allow, actual Reject, duration 0.99 s for a test
-        //    that normally takes about a millisecond. Three full-suite runs were spent getting that
-        //    much, because `Assert.Equal(Allow, verdict.Action)` says WHAT differed and never WHY.
-        //
-        //    ⚠ The cause is still unknown, and one plausible story has been RULED OUT rather than
-        //    left hanging. The gate's only branch that turns an otherwise-Allow into a Reject for a
-        //    timing reason is the RegexMatchTimeoutException catch behind SanitizeSecrets, which
-        //    returns "memory.write.redaction_timeout". That branch cannot be what fired: both
-        //    redaction patterns are RegexOptions.NonBacktracking, and measured warm on this machine
-        //    with a ONE-TICK budget, 0 of 20 runs timed out at 65 000 characters — the gate's hard
-        //    content cap. A 46-character string cannot reach a checkpoint the 65 000-character one
-        //    does not. (That also means the reject path is effectively unreachable, and so untestable
-        //    through the gate's surface; it has zero coverage and this comment is why.)
-        //
-        //    So the next occurrence must arrive already explaining itself.
+        // The reason code travels with the failure. Under load this test failed with "expected Allow, got Reject with
+        // reason 'memory.write.redaction_timeout'" in CI run 37117054936 (583 ms for about 1 ms of work), and the
+        // 64-call test below (then WriteGate_MaximumBoundedInput_ConcurrentCalls_DoNotTimeout) failed with the same
+        // reason code in run 36856842850. An earlier version of this comment
+        // ruled that branch out because both patterns are NonBacktracking and cannot run long on 46 characters. That
+        // missed that the 300 ms budget is wall-clock time: a thread descheduled in the middle of a match uses it up on
+        // any input. The decision tests therefore redact through UntimedRegex (see WriteGate below), and the timeout
+        // path has its own deterministic tests (WriteGate_RedactionTimesOut_RejectsWithTheReason).
         Assert.True(
             verdict.Action is MemoryGateAction.Allow,
             $"expected Allow, got {verdict.Action} with reason '{verdict.ReasonCode}'");
@@ -188,7 +179,7 @@ public sealed class DeterministicMemoryGatesTests
     [Fact]
     public async Task WriteGate_CredentialAndEmail_Sanitizes()
     {
-        var verdict = await new MemoryWriteAdmissionGate().InspectAsync(Context(
+        var verdict = await WriteGate().InspectAsync(Context(
             content: "email=person@example.test api_key=top-secret"));
 
         Assert.Equal(MemoryGateAction.Sanitize, verdict.Action);
@@ -196,31 +187,86 @@ public sealed class DeterministicMemoryGatesTests
         Assert.DoesNotContain("top-secret", verdict.SanitizedContent, StringComparison.Ordinal);
     }
 
+    // The two tests below are hang guards, not latency checks. They used to run the production 300 ms wall-clock budget
+    // (and one asserted under 2 s of elapsed time), so a busy runner failed them. Through UntimedRegex a pattern that
+    // turned pathological at the size cap still fails them by name, within 30 s. What keeps the production budget
+    // enough at the cap is pinned without a clock by WriteGate_RedactionPatterns_AreLinearTime_AndCarryTheGateBudget.
     [Fact]
-    public async Task WriteGate_MaximumBoundedInput_CompletesPromptly()
+    public async Task WriteGate_MaximumBoundedInput_IsAdmitted()
     {
         var value = new string('a', MemoryGateContext.MaximumContentCharacters);
-        var gate = new MemoryWriteAdmissionGate(new MemoryWriteAdmissionOptions(
+        var gate = WriteGate(new MemoryWriteAdmissionOptions(
             maximumContentCharacters: MemoryGateContext.MaximumContentCharacters));
-        var timer = Stopwatch.StartNew();
 
         var verdict = await gate.InspectAsync(Context(content: value));
 
-        Assert.Equal(MemoryGateAction.Allow, verdict.Action);
-        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(2));
+        Assert.True(
+            verdict.Action is MemoryGateAction.Allow,
+            $"expected Allow, got {verdict.Action} with reason '{verdict.ReasonCode}'");
     }
 
     [Fact]
-    public async Task WriteGate_MaximumBoundedInput_ConcurrentCalls_DoNotTimeout()
+    public async Task WriteGate_MaximumBoundedInput_ManyCallsOnOneGate_AreAllAdmitted()
     {
         var value = new string('a', MemoryGateContext.MaximumContentCharacters);
-        var gate = new MemoryWriteAdmissionGate(new MemoryWriteAdmissionOptions(
+        var gate = WriteGate(new MemoryWriteAdmissionOptions(
             maximumContentCharacters: MemoryGateContext.MaximumContentCharacters));
 
         var verdicts = await Task.WhenAll(Enumerable.Range(0, 64).Select(async _ =>
             await gate.InspectAsync(Context(content: value))));
 
-        Assert.All(verdicts, verdict => Assert.Equal(MemoryGateAction.Allow, verdict.Action));
+        Assert.All(verdicts, verdict => Assert.True(
+            verdict.Action is MemoryGateAction.Allow,
+            $"expected Allow, got {verdict.Action} with reason '{verdict.ReasonCode}'"));
+    }
+
+    [Fact]
+    public async Task WriteGate_RedactionPatterns_AreLinearTime_AndCarryTheGateBudget()
+    {
+        // NonBacktracking matching is linear in the input, so the patterns' own work at the 65 000-character cap is
+        // bounded and cannot grow with what the content looks like. A load-starved thread can still use up the
+        // wall-clock budget; the gate then rejects, which the next test pins.
+        var seen = new List<Regex>();
+        var gate = new MemoryWriteAdmissionGate
+        {
+            RegexReplace = (pattern, input, replacement) =>
+            {
+                seen.Add(pattern);
+                return UntimedRegex.Replace(pattern, input, replacement);
+            },
+        };
+
+        await gate.InspectAsync(Context(content: "safe fact"));
+
+        Assert.Equal(2, seen.Count);
+        Assert.All(seen, pattern =>
+        {
+            Assert.True(pattern.Options.HasFlag(RegexOptions.NonBacktracking), $"'{pattern}' can backtrack");
+            Assert.Equal(AgentEval.Guardrails.GateRegexTimeouts.Extended, pattern.MatchTimeout);
+        });
+    }
+
+    [Theory]
+    [InlineData(1)]   // the credential pattern
+    [InlineData(2)]   // the email pattern, after the credential pattern redacted
+    public async Task WriteGate_RedactionTimesOut_RejectsWithTheReason(int timingOutCall)
+    {
+        // A redaction that could not finish never admits the content, and never admits it half-redacted. This path had
+        // no test: a real timeout cannot be produced on demand, so the replacer throws the timeout itself.
+        var calls = 0;
+        var gate = new MemoryWriteAdmissionGate
+        {
+            RegexReplace = (pattern, input, replacement) => ++calls == timingOutCall
+                ? throw new RegexMatchTimeoutException(input, pattern.ToString(), pattern.MatchTimeout)
+                : UntimedRegex.Replace(pattern, input, replacement),
+        };
+
+        var verdict = await gate.InspectAsync(Context(content: "email=person@example.test api_key=top-secret"));
+
+        Assert.Equal(timingOutCall, calls);
+        Assert.Equal(MemoryGateAction.Reject, verdict.Action);
+        Assert.Equal("memory.write.redaction_timeout", verdict.ReasonCode);
+        Assert.Null(verdict.SanitizedContent);
     }
 
     [Fact]
@@ -550,6 +596,11 @@ public sealed class DeterministicMemoryGatesTests
 
     private static MemoryRecallAdmissionGate RecallGate(MemoryRecallAdmissionOptions? options = null)
         => new(options, new FrozenTimeProvider(Now));
+
+    // For the tests that reach the redaction step and assert its decision: the same patterns with UntimedRegex's 30 s
+    // budget, so a loaded runner cannot turn the decision into "memory.write.redaction_timeout".
+    private static MemoryWriteAdmissionGate WriteGate(MemoryWriteAdmissionOptions? options = null)
+        => new(options) { RegexReplace = UntimedRegex.Replace };
 
     private static MemoryGateContext RecallContext(
         string content = "safe fact",

@@ -54,18 +54,6 @@ internal sealed class TurnRecorder
         }
     }
 
-    /// <summary>Every turn recorded so far, in order (a snapshot).</summary>
-    public IReadOnlyList<WorkIqTurnResult> Turns
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _turns.ToArray();
-            }
-        }
-    }
-
     /// <summary>The latest turn of <paramref name="caseId"/> recorded at or after position <paramref name="since"/>; null when none.</summary>
     /// <param name="caseId">The case id.</param>
     /// <param name="since">The recorder's <see cref="Count"/> before the case started.</param>
@@ -190,7 +178,11 @@ internal sealed class TurnRecorder
         return detail.ToString();
     }
 
-    /// <summary>The availability of every evidence channel, as one line (<c>answer=Present citationMarkers=Provided(2) …</c>).</summary>
+    /// <summary>
+    /// The availability of every evidence channel, as one line (<c>answer Present; citation markers Provided (2 marker(s)); …</c>).
+    /// Each channel is described by <see cref="EvidenceSet{T}.Describe"/>, so an observed-empty channel and a provided
+    /// channel that is not valid never print alike.
+    /// </summary>
     /// <param name="e">The evidence document.</param>
     public static string EvidenceAvailability(Microsoft365TurnEvidence? e)
     {
@@ -199,16 +191,16 @@ internal sealed class TurnRecorder
             return "no evidence document";
         }
 
-        return string.Join(" ", new[]
+        return string.Join("; ", new[]
         {
-            "answer=" + (e.Answer is null ? "none" : e.Answer.RawText.State.ToString()),
-            "citationMarkers=" + Set(e.CitationMarkers.Availability, e.CitationMarkers.Items.IsDefaultOrEmpty ? 0 : e.CitationMarkers.Items.Length),
-            "citationSources=" + Set(e.CitationSources.Availability, e.CitationSources.Items.IsDefaultOrEmpty ? 0 : e.CitationSources.Items.Length),
-            "toolSelections=" + Set(e.ToolSelections.Availability, e.ToolSelections.Items.IsDefaultOrEmpty ? 0 : e.ToolSelections.Items.Length),
-            "toolExecutions=" + Set(e.ToolExecutions.Availability, e.ToolExecutions.Items.IsDefaultOrEmpty ? 0 : e.ToolExecutions.Items.Length),
-            "approvalIntents=" + Set(e.ApprovalIntents.Availability, e.ApprovalIntents.Items.IsDefaultOrEmpty ? 0 : e.ApprovalIntents.Items.Length),
-            "retrieval=" + Set(e.RetrievalExecutions.Availability, e.RetrievalExecutions.Items.IsDefaultOrEmpty ? 0 : e.RetrievalExecutions.Items.Length),
-            "skills=" + Set(e.SkillActivations.Availability, e.SkillActivations.Items.IsDefaultOrEmpty ? 0 : e.SkillActivations.Items.Length),
+            "answer " + (e.Answer is null ? "none" : e.Answer.RawText.State.ToString()),
+            "citation markers " + e.CitationMarkers.Describe("marker(s)"),
+            "citation sources " + e.CitationSources.Describe("source(s)"),
+            "tool selections " + e.ToolSelections.Describe("selection(s)"),
+            "tool executions " + e.ToolExecutions.Describe("execution(s)"),
+            "approval intents " + e.ApprovalIntents.Describe("intent(s)"),
+            "retrieval executions " + e.RetrievalExecutions.Describe("execution(s)"),
+            "skill activations " + e.SkillActivations.Describe("activation(s)"),
         });
     }
 
@@ -267,9 +259,6 @@ internal sealed class TurnRecorder
     /// <summary>Seconds with one decimal (<c>2.3 s</c>).</summary>
     /// <param name="elapsed">The duration.</param>
     public static string Seconds(TimeSpan elapsed) => elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s";
-
-    private static string Set(Microsoft365.Evidence.EvidenceAvailability availability, int count) =>
-        availability == Microsoft365.Evidence.EvidenceAvailability.Provided ? $"Provided({count.ToString(CultureInfo.InvariantCulture)})" : availability.ToString();
 
     private static TurnLineRecord ToLine(WorkIqTurnResult r)
     {

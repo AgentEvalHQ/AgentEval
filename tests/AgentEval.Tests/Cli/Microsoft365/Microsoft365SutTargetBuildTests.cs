@@ -12,7 +12,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// Phase-2 open issue: the LIVE <see cref="Microsoft365SutTarget.Build"/> path (no <c>sutOverride</c>), offline. Only
+/// The LIVE <see cref="Microsoft365SutTarget.Build"/> path (no <c>sutOverride</c>), offline. Only
 /// the two outer edges are replaced through the target's test seams — the token source and the innermost HTTP handler —
 /// and the diagnostics go to a temp folder. Everything the CLI does on a tester's machine runs: the option mapping,
 /// the honesty badge with the exact trace and issue paths, the turn sink and a real turn.
@@ -78,8 +78,9 @@ public sealed class Microsoft365SutTargetBuildTests : IDisposable
 
             Assert.StartsWith("Project Atlas is on schedule", response.Text, StringComparison.Ordinal);
             Assert.NotNull(target.TurnSink);
-            Assert.Same(target.TurnSink, target.SinkFor(agent));
-            var turn = Assert.Single(target.TurnSink!.All);
+            Assert.Equal(1, target.TurnSink.Count);
+            var turn = target.TurnSink.LatestFor("case-build", since: 0);
+            Assert.NotNull(turn);
             Assert.Equal("case-build", turn.Identity.CaseId);
             Assert.Contains("[m365 turn] case=case-build", err.ToString(), StringComparison.Ordinal);
             Assert.True(File.Exists(traceFile));

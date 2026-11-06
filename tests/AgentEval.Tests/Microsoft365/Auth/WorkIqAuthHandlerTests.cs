@@ -9,14 +9,16 @@ using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Protocol;
 using AgentEval.Tests.Microsoft365.Protocol;
 using AgentEval.Tests.Microsoft365.TestHelpers;
+using Microsoft.Identity.Client;
 using Xunit;
 
 namespace AgentEval.Tests.Microsoft365.Auth;
 
 /// <summary>
 /// <see cref="WorkIqAuthHandler"/>: bearer + <c>A2A-Version</c> + <c>User-Agent</c> on card and RPC requests,
-/// <c>request-id</c> capture, 401/403 tracing with the device-code hint, the trust check before any token use,
-/// and the guarantee that no token reaches a trace event.
+/// <c>request-id</c> capture, 401/403 tracing with the device-code hint (the issue is the client's, once), the trust
+/// check before any token use, a token failure registered once by the auth layer, and the guarantee that no token
+/// reaches a trace event.
 /// </summary>
 public sealed class WorkIqAuthHandlerTests
 {
@@ -66,7 +68,7 @@ public sealed class WorkIqAuthHandlerTests
     }
 
     [Fact]
-    public async Task SendAsync_Http401_TracedWithHintAndIssueNeverResent()
+    public async Task SendAsync_Http401_TracedWithHint_OneIssue_NeverResent()
     {
         using var h = WorkIqClientHarness.Create();
         h.Handler.FailWith(FakeWorkIqHandler.CardMethod, HttpStatusCode.Unauthorized, headers: Headers(("request-id", "req-401")));
@@ -81,11 +83,16 @@ public sealed class WorkIqAuthHandlerTests
         Assert.Equal("req-401", unauthorized.RequestId);
         Assert.Contains("re-run the device-code sign-in", unauthorized.Message, StringComparison.Ordinal);
         Assert.Contains(h.Config.Scope, unauthorized.Message, StringComparison.Ordinal);
-        Assert.Contains(h.Issues.Issues, i => i.Code == "auth.unauthorized" && i.Category == WorkIqIssueCategory.Authentication && i.HttpStatus == 401);
+
+        // The handler traces the 401; the client, which ended the discovery, registers its one issue.
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Authentication, issue.Category);
+        Assert.Equal(401, issue.HttpStatus);
+        Assert.Equal(WorkIqTraceStage.Discovery, issue.Stage);
     }
 
     [Fact]
-    public async Task SendAsync_Http403_TracedAsPermission()
+    public async Task SendAsync_Http403_TracedAsPermission_OneIssue()
     {
         using var h = WorkIqClientHarness.Create().WithDefaultCard();
         h.Handler.FailWith("SendMessage", HttpStatusCode.Forbidden);
@@ -94,7 +101,9 @@ public sealed class WorkIqAuthHandlerTests
 
         Assert.Equal(WorkIqFailureCategory.Forbidden, ex.Failure.Category);
         Assert.Single(h.Events("auth.forbidden"));
-        Assert.Contains(h.Issues.Issues, i => i.Code == "auth.forbidden" && i.Category == WorkIqIssueCategory.Permission);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Permission, issue.Category);
+        Assert.Equal(WorkIqTraceStage.Send, issue.Stage);
     }
 
     [Fact]
@@ -127,9 +136,10 @@ public sealed class WorkIqAuthHandlerTests
 
         var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => http.GetAsync("https://example.invalid/a2a/.well-known/agent-card.json"));
 
-        // The same category as discovery.untrusted_host: Config (the fix is in the trustedHosts config), never Protocol.
-        var issue = Assert.Single(issues.Issues, i => i.Code == "auth.untrusted_destination");
-        Assert.Equal(WorkIqIssueCategory.Config, issue.Category);
+        // Traced here; the layer that ends the operation registers the one issue (the classifier says Config for an
+        // untrusted host: the fix is in the trustedHosts config).
+        Assert.Empty(issues.Issues);
+        Assert.Equal(WorkIqIssueCategory.Config, WorkIqIssueClassifier.FromFailure(ex.Failure).Category);
 
         Assert.Equal(WorkIqFailureCategory.UntrustedHost, ex.Failure.Category);
         Assert.Equal(WorkIqOperation.Discover, ex.Failure.Operation);
@@ -165,11 +175,17 @@ public sealed class WorkIqAuthHandlerTests
         Assert.DoesNotContain("exploded", ex.Failure.SafeMessage, StringComparison.Ordinal);
         h.Handler.AssertNoRequests();
         Assert.Single(h.Events("auth.failed"));
-        Assert.Contains(h.Issues.Issues, i => i.Code == "auth.token_acquisition_failed");
+
+        // A token failure is registered once, by the auth layer, and marked so the client above only traces it.
+        Assert.Equal(WorkIqTokenFailure.ProviderFailed, ex.Failure.TokenFailure);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqTraceStage.Auth, issue.Stage);
+        Assert.Equal(WorkIqIssueCategory.Authentication, issue.Category);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(ex.Failure).Code, issue.Code);
     }
 
     [Fact]
-    public async Task SendAsync_TokenProviderProtocolException_PassesThrough()
+    public async Task SendAsync_TokenProviderProtocolException_PassesThrough_OneIssue()
     {
         using var h = WorkIqClientHarness.Create().WithDefaultCard();
         var failure = new WorkIqFailure(WorkIqFailureCategory.Forbidden, "MSAL: consent missing", OutcomeCertainty.Known);
@@ -178,12 +194,36 @@ public sealed class WorkIqAuthHandlerTests
         var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.DiscoverAsync(CancellationToken.None));
 
         Assert.Equal(WorkIqFailureCategory.Forbidden, ex.Failure.Category);
+        Assert.Equal(WorkIqTokenFailure.ProviderFailed, ex.Failure.TokenFailure);
         h.Handler.AssertNoRequests();
         Assert.Single(h.Events("auth.failed"));
+        Assert.Equal(WorkIqIssueCategory.Permission, Assert.Single(h.Issues.Issues).Category);
     }
 
     [Fact]
-    public async Task SendAsync_EmptyToken_Unauthorized()
+    public async Task SendAsync_TokenProviderMsalFailure_OneIssueWithTheAadstsCode()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        var msal = new MsalServiceException("unauthorized_client", "AADSTS7000218: The request body must contain the following parameter: 'client_assertion' or 'client_secret'.", 400);
+
+        // The shape the device-code provider wraps an MSAL failure in: the codes in the safe message, MSAL inside.
+        var wrapped = new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "MSAL MsalServiceException during device-code sign-in: error code unauthorized_client, AADSTS7000218, HTTP 400", OutcomeCertainty.Known, HttpStatus: 400);
+        h.Tokens!.Failure = new WorkIqProtocolException(wrapped, msal);
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.DiscoverAsync(CancellationToken.None));
+
+        // One issue, registered by the auth layer and classified from the failure (no second one from the client).
+        var issue = Assert.Single(h.Issues.Issues);
+        var expected = WorkIqIssueClassifier.FromFailure(ex.Failure, WorkIqTraceStage.Auth);
+        Assert.Equal("AADSTS7000218", issue.AadstsCode);
+        Assert.Equal(expected.Category, issue.Category);
+        Assert.Equal(expected.Code, issue.Code);
+        Assert.Equal(expected.SuggestedCause, issue.SuggestedCause);
+        Assert.Equal(WorkIqTokenFailure.ProviderFailed, ex.Failure.TokenFailure);
+    }
+
+    [Fact]
+    public async Task SendAsync_EmptyToken_Unauthorized_OneIssue()
     {
         using var h = WorkIqClientHarness.Create().WithDefaultCard();
         h.Tokens!.Token = "   ";
@@ -191,7 +231,53 @@ public sealed class WorkIqAuthHandlerTests
         var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.DiscoverAsync(CancellationToken.None));
 
         Assert.Equal(WorkIqFailureCategory.Unauthorized, ex.Failure.Category);
+        Assert.Equal(WorkIqTokenFailure.EmptyToken, ex.Failure.TokenFailure);
         h.Handler.AssertNoRequests();
+        Assert.Equal(WorkIqTraceStage.Auth, Assert.Single(h.Issues.Issues).Stage);
+    }
+
+    [Fact]
+    public async Task AcquireTokenAsync_StoppedOutsideTheHttpTimeout_SignInNotCompletedOneIssueStampedWithTheTurn()
+    {
+        var tokens = new StaticTokenProvider();
+        var trace = new ListTraceSink();
+        var issues = new ListIssueSink();
+        using var diagnostics = new WorkIqDiagnostics("run-auth", null, [trace], [issues]);
+        var handler = new WorkIqAuthHandler(tokens) { Diagnostics = diagnostics };
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => handler.AcquireTokenAsync(
+            WorkIqOperation.Send,
+            "POST https://workiq.svc.cloud.microsoft/a2a/",
+            outsideHttpTimeout: true,
+            stop.Token,
+            new WorkIqCallContext { CaseId = "case-7", TurnId = "turn-7" }));
+
+        Assert.Equal(WorkIqTokenFailure.SignInNotCompleted, ex.Failure.TokenFailure);
+        Assert.True(WorkIqIssueClassifier.IsSignInNotCompleted(ex.Failure));
+        var issue = Assert.Single(issues.Issues);
+        Assert.Equal("case-7", issue.CaseId);
+        Assert.Equal("turn-7", issue.TurnId);
+        var expected = WorkIqIssueClassifier.FromFailure(ex.Failure, WorkIqTraceStage.Auth);
+        Assert.Equal(expected.Code, issue.Code);
+        Assert.Equal(expected.SuggestedCause, issue.SuggestedCause);
+    }
+
+    [Fact]
+    public void IsSignInNotCompleted_ReadsTheTypedMarker_NotTheMessage()
+    {
+        var marked = new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "Send: the wait was stopped; nothing was sent", OutcomeCertainty.Known, WorkIqOperation.Send)
+        {
+            TokenFailure = WorkIqTokenFailure.SignInNotCompleted,
+        };
+        var phraseOnly = new WorkIqFailure(WorkIqFailureCategory.Unauthorized, "Send: " + WorkIqAuthHandler.SignInNotCompletedText + ": nothing was sent", OutcomeCertainty.Known, WorkIqOperation.Send);
+
+        Assert.True(WorkIqIssueClassifier.IsSignInNotCompleted(marked));
+        Assert.True(WorkIqIssueClassifier.IsSignInNotCompleted(marked with { SafeMessage = "reworded" }));
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(phraseOnly));
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(marked with { TokenFailure = WorkIqTokenFailure.ProviderFailed }));
+        Assert.False(WorkIqIssueClassifier.IsSignInNotCompleted(null));
     }
 
     [Fact]

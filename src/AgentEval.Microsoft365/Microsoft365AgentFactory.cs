@@ -45,7 +45,7 @@ public static class Microsoft365AgentFactory
     /// its prompt on <see cref="Console.Error"/>). A host passes its own <see cref="WorkIqDeviceCodeTokenProvider"/> to
     /// choose the prompt writer or to share one sign-in with the readiness check; unless the host set its
     /// <see cref="WorkIqDeviceCodeTokenProvider.Diagnostics"/>, this agent's diagnostics are attached to it. A device-code
-    /// sign-in that starts inside a blocking turn is bounded by the code's expiry, not by
+    /// sign-in that starts inside a turn (blocking, streamed or a subscription) is bounded by the code's expiry, not by
     /// <see cref="WorkIqOptions.TurnDeadline"/>, which restarts when the sign-in ends.
     /// </param>
     /// <param name="onTurn">Optional sink invoked with every turn result before the agent returns or throws.</param>
@@ -153,8 +153,9 @@ public static class Microsoft365AgentFactory
 
         // The client acquires the token before every call (Auth set), outside HttpClient.Timeout: a device-code sign-in is
         // bounded by its own code's expiry and the operation's token, and a sign-in that does not finish is reported as
-        // "sign-in not completed, nothing was sent", never as a network timeout that may have reached the service.
-        var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics) { Auth = auth };
+        // "sign-in not completed, nothing was sent", never as a network timeout that may have reached the service. The
+        // client selects the card's interface with the same trust policy the auth handler enforces.
+        var client = new WorkIqA2AClient(config, options, http, capture, clock, diagnostics, policy) { Auth = auth };
         return (http, client);
     }
 

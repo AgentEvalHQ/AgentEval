@@ -111,7 +111,7 @@ public sealed class VerbosityTests : IDisposable
     [Fact]
     public async Task AsciiScreen_RedirectedOutputGetsMarkers_ConsoleLogKeepsTheUtf8Symbols()
     {
-        // Review L2: a redirected screen on Windows is in the legacy code page, where ✓ ✗ – print as '?'.
+        // A redirected screen on Windows is in the legacy code page, where ✓ ✗ – print as '?'.
         _rig.AsciiScreen = true;
 
         var run = await RunScenarioAsync("normal");

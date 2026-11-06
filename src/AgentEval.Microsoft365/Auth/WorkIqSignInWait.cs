@@ -5,7 +5,7 @@
 namespace AgentEval.Microsoft365.Auth;
 
 /// <summary>
-/// Whoever waits on a token while an interactive sign-in may start (a blocking turn of <see cref="WorkIqConversation"/>):
+/// Whoever waits on a token while an interactive sign-in may start (a turn or subscription of <see cref="WorkIqConversation"/>):
 /// told when a device-code sign-in starts, with the instant its code expires, and when the sign-in attempt ends (with a
 /// token or not). A turn uses it so its deadline, which bounds network calls, never cuts a person's sign-in short.
 /// </summary>

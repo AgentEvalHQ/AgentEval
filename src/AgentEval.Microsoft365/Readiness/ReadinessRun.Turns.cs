@@ -56,10 +56,7 @@ internal sealed partial class ReadinessRun
             var answer = result.AnswerText is null
                 ? $"no answer text ({result.AnswerCompleteness})"
                 : string.Create(CultureInfo.InvariantCulture, $"{result.AnswerText.Length}-character answer");
-            var sources = result.Evidence.CitationSources;
-            var attributions = sources.IsProvided
-                ? CountOrAvailability(sources) + " attribution(s)"
-                : $"attributions {sources.Availability}";
+            var attributions = "attributions " + result.Evidence.CitationSources.Describe("attribution(s)");
             return Passed(
                 ReadinessStage.Probe,
                 $"the turn completed in {Ms(result.Timing.Elapsed.TotalMilliseconds)} ms: {answer}, {attributions}",
@@ -158,8 +155,8 @@ internal sealed partial class ReadinessRun
             evidence.Add(AnswerPreviewKey, Preview(result.AnswerText));
         }
 
-        evidence.Add("attributions", CountOrAvailability(result.Evidence.CitationSources));
-        evidence.Add("citation markers", CountOrAvailability(result.Evidence.CitationMarkers));
+        evidence.Add("attributions", result.Evidence.CitationSources.Describe("attribution(s)"));
+        evidence.Add("citation markers", result.Evidence.CitationMarkers.Describe("marker(s)"));
         evidence.Add("elapsed ms", Ms(result.Timing.Elapsed.TotalMilliseconds));
         evidence.Add("recovery polls (GetTask)", result.Timing.RecoveryRequests);
         evidence.Add("request-id", result.Failure?.RequestId ?? RequestIdSince(mark) ?? "absent");
@@ -201,19 +198,6 @@ internal sealed partial class ReadinessRun
     {
         var oneLine = answer.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ').Replace('|', '/');
         return oneLine.Length <= AnswerPreviewLength ? oneLine : oneLine[..AnswerPreviewLength] + "…";
-    }
-
-    private static string CountOrAvailability<T>(EvidenceSet<T> set)
-    {
-        if (!set.IsProvided)
-        {
-            return set.Availability.ToString();
-        }
-
-        var count = set.Items.IsDefault ? 0 : set.Items.Length;
-        return set.Validation == EvidenceValidation.Valid
-            ? count.ToString(CultureInfo.InvariantCulture)
-            : string.Create(CultureInfo.InvariantCulture, $"{count} ({set.Validation})");
     }
 
     private static string InteractionText(WorkIqTurnResult result) => result.PendingInteraction?.Kind switch

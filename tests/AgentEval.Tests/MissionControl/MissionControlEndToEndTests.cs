@@ -794,6 +794,12 @@ public sealed class EndToEndFixture : IDisposable
 /// caller-provided workspace root. Mirrors <see cref="FilesystemSeededFactory"/>
 /// but accepts the root from the test rather than building its own.
 /// </summary>
+/// <remarks>
+/// It keeps the production GraphQL options, including the 30 s execution timeout that McHost sets beside the cost
+/// limits as abuse protection. A local HC0045 (that timeout) from these tests has been seen only with too many test
+/// hosts running at once next to another build, and in none of the failed CI runs from 2026-09-27 to 2026-11-06: run
+/// fewer test projects at a time rather than raising the production timeout.
+/// </remarks>
 public sealed class EndToEndFactory : WebApplicationFactory<Query>
 {
     private readonly string _workspaceRoot;

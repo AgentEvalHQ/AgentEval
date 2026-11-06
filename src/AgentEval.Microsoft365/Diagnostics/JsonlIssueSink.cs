@@ -9,7 +9,7 @@ namespace AgentEval.Microsoft365.Diagnostics;
 /// as <see cref="JsonlTraceSink"/>: one camelCase JSON object per line, enums as strings, absent facts omitted,
 /// 64 KiB line bound with a truncation marker, flushed per write, directory created when missing. Thread-safe.
 /// </summary>
-public sealed class JsonlIssueSink : IWorkIqIssueSink, IDisposable
+internal sealed class JsonlIssueSink : IWorkIqIssueSink, IDisposable
 {
     private readonly JsonlLineWriter _writer;
 

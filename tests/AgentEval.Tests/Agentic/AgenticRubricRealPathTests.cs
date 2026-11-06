@@ -2,11 +2,15 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using AgentEval.Benchmarks;
 using AgentEval.Cli.Commands;
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic;
+using AgentEval.Evals.Agentic.Safety;
+using AgentEval.Tests.TestHelpers;
 using Microsoft.Extensions.AI;
 using Xunit;
 
@@ -69,13 +73,42 @@ public class AgenticRubricRealPathTests : IDisposable
         var judge = new ChatClientEvaluator(new AgentEval.Tests.Evals.RubricJudgeTests.RecordingChatClient(model.Reply));
         var records = Path.Combine(_root, "records.jsonl");
 
+        // The pattern scans run through UntimedRegex. Their own 200 ms budgets are wall-clock time: on a loaded runner a
+        // scan ran out of it, sensitive_data_leakage reported "could not check" on cal-sdl-001, and the check below
+        // failed for a reason that had nothing to do with rubrics (CI runs 40175955827 and 42160278982).
         await BenchAgenticCalibrateCommand.RunCoreAsync(rootOverride: _root, outPathOverride: Path.Combine(_root, "r.md"),
-            evaluatorOverride: judge, recordsPath: records);
+            evaluatorOverride: judge, recordsPath: records,
+            evalResolver: (key, j, m) => UntimedRegex.Resolve(EvalRegistry.Shared, key, j, m));
 
         Assert.Equal(0, model.OtherCalls);
         Assert.True(model.RubricCalls > 100, $"only {model.RubricCalls} rubric calls — the run did not reach the judges");
         var errors = File.ReadAllLines(records).Where(l => l.Contains("\"label\":\"error\"", StringComparison.Ordinal)).ToList();
         Assert.True(errors.Count == 0, $"{errors.Count} records errored, e.g. {errors.FirstOrDefault()}");
+    }
+
+    private static Match TimeOut(Regex regex, string input) =>
+        throw new RegexMatchTimeoutException(input, regex.ToString(), regex.MatchTimeout);
+
+    [Fact]
+    public async Task Calibrate_RunsWhatTheResolverBuilds_AndAScanThatTimedOutIsAnErroredRecord()
+    {
+        // The resolver is how the test above takes the wall-clock budget off the scans, so the run must evaluate what it
+        // builds. And a scan that timed out must reach the records as an error, or the zero-errors check above would not
+        // see the failure it is there to catch.
+        var records = Path.Combine(_root, "records-timeout.jsonl");
+
+        await BenchAgenticCalibrateCommand.RunCoreAsync(rootOverride: _root, outPathOverride: Path.Combine(_root, "r-timeout.md"),
+            evaluatorOverride: new FixedScoreEvaluator(100), recordsPath: records,
+            evalResolver: (key, j, m) => key == "sensitive_data_leakage"
+                ? new SensitiveDataLeakageEval(j, m) { RegexMatch = TimeOut }
+                : UntimedRegex.Resolve(EvalRegistry.Shared, key, j, m));
+
+        var leakage = File.ReadAllLines(records).Where(l => l.Length > 0)
+            .Select(l => JsonDocument.Parse(l).RootElement)
+            .Where(r => r.TryGetProperty("evaluatorKey", out var key) && key.GetString() == "sensitive_data_leakage")
+            .ToList();
+        Assert.NotEmpty(leakage);
+        Assert.All(leakage, r => Assert.Equal("error", r.GetProperty("label").GetString()));
     }
 
     private sealed class EmptyPolicy : AgentEval.Evals.Agentic.Safety.Policy.IPolicyResolver

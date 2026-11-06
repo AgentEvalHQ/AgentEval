@@ -9,6 +9,8 @@
     <LangVersion>preview</LangVersion>
     <RootNamespace>AgentEval.Microsoft365Demo</RootNamespace>
     <AssemblyName>AgentEval.Microsoft365Demo</AssemblyName>
+    <!-- The Microsoft 365 provider is experimental (assembly-level [Experimental]); this demo uses it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
     <!-- The tester's demo for the Microsoft 365 (Work IQ A2A 1.0) provider: readiness, one prompt, a small benchmark
          through MAFEvaluationHarness, and a run folder with every trace and issue. Consumes AgentEval; does not modify
          it. Versions come from Directory.Packages.props (Central Package Management). -->
@@ -41,8 +43,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The default benchmark: five read-only cases copied from samples/datasets/m365-smoke.json. Embedded, so the demo
-         runs from any working directory. -->
+    <!-- The default benchmark: five read-only cases from samples/datasets/m365-smoke.json, without their 'expected'
+         values (the demo does not use them). Embedded, so the demo runs from any working directory. -->
     <EmbeddedResource Include="Data\m365-demo-cases.json" LogicalName="AgentEval.Microsoft365Demo.m365-demo-cases.json" />
     <!-- A copy of samples/datasets/m365-config.template.json, next to the binary too, for the "no config" message. -->
     <None Update="workiq.example.json" CopyToOutputDirectory="PreserveNewest" />

@@ -342,7 +342,7 @@ public sealed class WorkIqTaskReducerTests
     }
 
     /// <summary>
-    /// HLD D6 / research item 9: input-required is a suspended state. The service closes the stream and waits for
+    /// Input-required is a suspended state. The service closes the stream and waits for
     /// input on the same task, so EOF after it is a normal end (Info trace, no interruption issue) — and still not
     /// completion: the snapshot is suspended, never terminal, and carries no answer artifact.
     /// </summary>

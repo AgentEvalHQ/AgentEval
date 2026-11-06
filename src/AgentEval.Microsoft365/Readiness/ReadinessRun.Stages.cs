@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using A2A;
 using AgentEval.Microsoft365.Auth;
-using AgentEval.Microsoft365.Capture;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Protocol;
 using Microsoft.Identity.Client;
@@ -83,12 +82,12 @@ internal sealed partial class ReadinessRun
         // Shape checks only (no network): the sign-in is the authority, but a value that cannot be right saves a round trip.
         if (!Guid.TryParse(config.TenantId.Trim(), out _) && !config.TenantId.Trim().Contains('.', StringComparison.Ordinal))
         {
-            warnings.Add($"tenantId '{config.TenantId.Trim()}' is neither a GUID nor a domain name: the sign-in will most likely fail with AADSTS90002 (tenant not found). Use the Directory (tenant) ID from the app registration's Overview page.");
+            warnings.Add($"tenantId '{config.TenantId.Trim()}' is neither a GUID nor a domain name: the sign-in will most likely fail with {WorkIqAadstsCatalog.TenantNotFoundCode} (tenant not found). Use the Directory (tenant) ID from the app registration's Overview page.");
         }
 
         if (!Guid.TryParse(config.AppClientId.Trim(), out _))
         {
-            warnings.Add($"appClientId '{config.AppClientId.Trim()}' is not a GUID: an app registration's Application (client) ID always is, so the sign-in will most likely fail with AADSTS700016 (application not found). Copy it from the app registration's Overview page.");
+            warnings.Add($"appClientId '{config.AppClientId.Trim()}' is not a GUID: an app registration's Application (client) ID always is, so the sign-in will most likely fail with {WorkIqAadstsCatalog.ApplicationNotFoundCode} (application not found). Copy it from the app registration's Overview page.");
         }
 
         return Passed(
@@ -274,7 +273,7 @@ internal sealed partial class ReadinessRun
                 "the token provider returned an empty token",
                 "No usable token was acquired, so no request can be authenticated.",
                 "Run the doctor again and complete the sign-in; if a host supplies the token provider, check it returns the Work IQ access token.",
-                WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.empty_token", "the token provider returned an empty token", WorkIqA2AClient.SuggestedCauseOf(WorkIqFailureCategory.Unauthorized)),
+                WorkIqIssue.Create(WorkIqTraceStage.Auth, WorkIqIssueCategory.Authentication, "auth.empty_token", "the token provider returned an empty token", WorkIqIssueClassifier.CauseEmptyToken),
                 evidence) with { ElapsedMs = Elapsed(started) };
         }
 
@@ -571,7 +570,7 @@ internal sealed partial class ReadinessRun
             : "";
         var summary = during + (failure switch
         {
-            _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+            _ when WorkIqIssueClassifier.IsSignInNotCompleted(failure) =>
                 _signInCodeExpiresOn is { } expires
                     ? $"sign-in not completed: the device code expired at {expires.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture)} UTC before the sign-in finished; nothing was sent"
                     : $"sign-in not completed: no token before the stage stopped waiting ({Seconds(_options.StageTimeout)} s); nothing was sent",
@@ -600,7 +599,7 @@ internal sealed partial class ReadinessRun
 
         var meaning = failure switch
         {
-            _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+            _ when WorkIqIssueClassifier.IsSignInNotCompleted(failure) =>
                 "No token was acquired, so nothing was sent to Work IQ: the device-code sign-in this stage started was not completed (or the token provider did not answer) before the wait ended. This is not a network timeout.",
             { HttpStatus: 404 } when failure.Operation == WorkIqOperation.GetTask =>
                 "The RPC endpoint answered HTTP 404 where a JSON-RPC endpoint answers a missing task with error -32001: either the selected interface URL is not the Work IQ JSON-RPC endpoint, or the service reports a missing task differently than A2A 1.0 says.",
@@ -628,7 +627,7 @@ internal sealed partial class ReadinessRun
     /// <summary>What a tester does about a transport failure, by its HTTP status, JSON-RPC code and category.</summary>
     private string ActionFor(WorkIqFailure failure) => failure switch
     {
-        _ when WorkIqAuthHandler.IsSignInNotCompleted(failure) =>
+        _ when WorkIqIssueClassifier.IsSignInNotCompleted(failure) =>
             "Run the doctor again (or `--stage auth` alone first) and finish the browser sign-in while the code is valid: open the page the prompt names, enter the code, sign in as the test user.",
         { HttpStatus: 401 } or { Category: WorkIqFailureCategory.Unauthorized } =>
             $"Run the doctor again to sign in afresh. Check that 'scope' is {Microsoft365Config.DefaultScope} and that tenantId and appClientId name the app registration that holds WorkIQAgent.Ask.",

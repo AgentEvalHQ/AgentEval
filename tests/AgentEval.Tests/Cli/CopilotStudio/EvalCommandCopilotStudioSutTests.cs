@@ -103,6 +103,42 @@ public class EvalCommandCopilotStudioSutTests
         finally { TryDelete(dataset); TryDelete(cfg); }
     }
 
+    // ── the AEF subject: a Copilot Studio agent is an agent, never a model ──
+
+    [Fact]
+    public async Task Eval_CopilotStudio_NoSubjectOption_TheSubjectIsTheAgentByItsDisplayName()
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var aef = Directory.CreateTempSubdirectory("agenteval-eval-cs-subject-");
+        try
+        {
+            AIAgent inner = new ChatClientAgent(new AlwaysHelpfulChatClient(), new ChatClientAgentOptions { Name = "cs-fake" });
+            IEvaluableAgent sut = CopilotStudioAgentFactory.FromAgent(inner);
+            var plain = BaseOptions(dataset, ackConsent: true, config: cfg);
+            var opts = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, AckLiveSideEffects = plain.AckLiveSideEffects, TargetOptions = plain.TargetOptions,
+                Format = "json", Quiet = true, Aef = aef, SubjectVersion = "1",
+            };
+
+            var exit = await EvalCommand.ExecuteAsync(opts, default, sutOverride: sut);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            var run = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(
+                Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories))))!;
+            // The config names no agentName, so the display name is the schema name.
+            Assert.Equal(AgentEval.Results.Adapters.Native.AefEvalWriter.Ref("agent", "cr1a2_agent"), (string?)run["subject"]!["ref"]);
+            Assert.Equal("agent", (string?)run["subject"]!["kind"]);
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { aef.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
     // ── --metrics + --runs > 1 (review): must warn, never throw, even with no evaluator client ──
 
     [Fact]
@@ -139,7 +175,7 @@ public class EvalCommandCopilotStudioSutTests
     {
         Dataset = dataset,
         Sut = sut,
-        AckLiveSideEffects = ackConsent,   // M03: the common consent flag lives on EvalOptions, not on the target's own options
+        AckLiveSideEffects = ackConsent,   // the common consent flag lives on EvalOptions, not on the target's own options
         TargetOptions = new Dictionary<string, ISutTargetOptions?>
         {
             ["copilot-studio"] = new CopilotStudioSutOptions { ConfigFile = config, MaxCredits = 0 },

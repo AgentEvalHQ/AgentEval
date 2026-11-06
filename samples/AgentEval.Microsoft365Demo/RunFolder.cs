@@ -251,6 +251,45 @@ internal sealed class RunFolder
         }
     }
 
+    /// <summary>
+    /// Checks that <see cref="ZipFile"/> can be created, before the run's result is decided: creates it and deletes it
+    /// again. A failure is recorded in <see cref="WriteErrors"/> (the run then exits 3, and every report says so) and
+    /// returns false. An older zip of the same name is removed, as <see cref="WriteZip"/> would replace it.
+    /// </summary>
+    public bool TryCheckZipWritable()
+    {
+        try
+        {
+            using (new FileStream(ZipFile.FullName, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 1, FileOptions.DeleteOnClose))
+            {
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            RecordError($"{ZipFile.Name} (the zip beside the run folder): {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>Deletes a partly written <see cref="ZipFile"/>, so no incomplete zip is left to send back; a failure is ignored.</summary>
+    public void TryDeleteZip()
+    {
+        try
+        {
+            var zip = ZipFile;
+            if (zip.Exists)
+            {
+                zip.Delete();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The error that made the zip incomplete is already recorded and printed.
+        }
+    }
+
     /// <summary>Zips the folder into <see cref="ZipFile"/> (replacing an older zip of the same name).</summary>
     /// <exception cref="IOException">The zip could not be written.</exception>
     /// <exception cref="UnauthorizedAccessException">The zip could not be written.</exception>

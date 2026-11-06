@@ -14,7 +14,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// Phase-2 open issue: the exit code when <c>--m365-max-turns</c> stops a run was not pinned. The cap throws
+/// The exit code when <c>--m365-max-turns</c> stops a run. The cap throws
 /// <see cref="WorkIqTurnBudgetExceededException"/> (a <c>FatalEvaluationException</c>) before the send that would cross
 /// it; the run stops once instead of repeating the error per remaining item, and it never ends as a pass. Driven by a
 /// REAL <see cref="WorkIqEvaluableAgent"/> (its own cap) over a scripted conversation whose turns complete.

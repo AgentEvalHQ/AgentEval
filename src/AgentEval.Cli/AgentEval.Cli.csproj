@@ -39,7 +39,8 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
-    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
+    <!-- The Microsoft 365 provider is experimental as a whole assembly (AGENTEVAL_M365_PREVIEW001); the CLI target uses it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001;AGENTEVAL_M365_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

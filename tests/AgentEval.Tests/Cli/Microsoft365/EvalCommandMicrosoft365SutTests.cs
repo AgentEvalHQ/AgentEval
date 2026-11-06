@@ -13,10 +13,10 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M30: <c>eval --sut microsoft365</c> through the shared <c>ISutTarget</c> seam. Mirrors
+/// <c>eval --sut microsoft365</c> through the shared <c>ISutTarget</c> seam. Mirrors
 /// <c>EvalCommandCopilotStudioSutTests</c>' shape: safety-gate validation (throws before any build/network), the
 /// dataset-first precedence, then a full credential-free eval via <c>sutOverride</c> with a benign fake agent (the
-/// stand-in is independent of <c>WorkIqEvaluableAgent</c>, whose live turn is another lane's).
+/// stand-in is independent of <c>WorkIqEvaluableAgent</c>, whose live turn has its own tests).
 /// </summary>
 public class EvalCommandMicrosoft365SutTests
 {
@@ -169,7 +169,7 @@ public class EvalCommandMicrosoft365SutTests
         finally { TryDelete(dataset); TryDelete(cfg); }
     }
 
-    // ── a turn that does not complete is an error row, never a verdict (review M4) ──
+    // ── a turn that does not complete is an error row, never a verdict ──
 
     [Theory]
     [InlineData(WorkIqTurnOutcome.Indeterminate)]
@@ -189,7 +189,6 @@ public class EvalCommandMicrosoft365SutTests
             };
             var sink = new CliTurnSink(verbose: false, TextWriter.Null);
             var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-not-completed", onTurn: sink.Record);
-            sink.AttachTo(agent);
             await using (agent)
             {
                 var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
@@ -209,7 +208,7 @@ public class EvalCommandMicrosoft365SutTests
                     Quiet = true,
                 };
 
-                var exit = await RunWithContentCaptureAsync(opts, agent);
+                var exit = await RunWithContentCaptureAsync(opts, agent, sink);
 
                 Assert.Equal(ExitCodes.GateIndeterminate, exit);   // not measured: no verdict, and never a pass
 
@@ -224,7 +223,9 @@ public class EvalCommandMicrosoft365SutTests
                 Assert.Null(row["score"]?.GetValue<double?>());
 
                 // The sink saw the turn before the throw, under the case's AEF id, and the AEF run carries its document.
-                var turn = Assert.Single(sink.All);
+                Assert.Equal(1, sink.Count);
+                var turn = sink.LatestFor("test1", since: 0);
+                Assert.NotNull(turn);
                 Assert.Equal(outcome, turn.Outcome);
                 Assert.Equal("test1", turn.Identity.CaseId);
                 var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(root.FullName, "aef"), "run.json", SearchOption.AllDirectories)))!;
@@ -244,17 +245,196 @@ public class EvalCommandMicrosoft365SutTests
         }
     }
 
+    // ── a turn that completed with several answer candidates and none selected is NOT MEASURED, never a failure ──
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Eval_Microsoft365_CompletedTurnWithSeveralCandidatesAndNoneSelected_IsNotMeasuredExit11(int runs)
+    {
+        // The agent returns an empty text that is not its answer. The harness grades that empty text as a failure;
+        // eval must record the case (every trial, with --runs) as not measured instead, as the demo does.
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-ambiguous-");
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation
+            {
+                OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(request) with
+                {
+                    AnswerText = null,
+                    AnswerCompleteness = OutputCompleteness.Ambiguous,
+                }),
+            };
+            var stderr = new StringWriter();
+            var sink = new CliTurnSink(verbose: false, stderr);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-ambiguous", onTurn: sink.Record);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+                var opts = OptionsWithAef(dataset, cfg, report, root, runs);
+
+                var exit = await RunWithContentCaptureAsync(opts, agent, sink);
+
+                Assert.Equal(ExitCodes.GateIndeterminate, exit);   // no verdict: neither a pass nor a failure
+                Assert.Equal(runs, conversation.Turns.Count);
+                Assert.Contains("recorded as NOT MEASURED", stderr.ToString(), StringComparison.Ordinal);
+
+                var results = AefResultLines(root);
+                if (runs == 1)
+                {
+                    var row = Assert.Single(System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(report.FullName))!["results"]!.AsArray())!;
+                    Assert.False((bool)row["passed"]!);
+                    Assert.Null(row["score"]?.GetValue<double?>());
+                    Assert.Contains("Not measured", (string?)row["error"], StringComparison.Ordinal);
+                    Assert.Contains("no selected answer", (string?)row["error"], StringComparison.Ordinal);
+                    var line = Assert.Single(results);   // no judge: the case line alone, with no graded child
+                    Assert.Equal("test1", (string?)line["caseId"]);
+                    Assert.Equal("error", (string?)line["state"]);
+                }
+                else
+                {
+                    var trials = results.Where(l => l["trial"] is not null).ToList();
+                    Assert.Equal(runs, trials.Count);
+                    Assert.All(trials, t => Assert.Equal("error", (string?)t["state"]));
+                    Assert.DoesNotContain(results, l => (string?)l["state"] == "failed");
+                }
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task Eval_Microsoft365_NotMeasuredCaseWithMetrics_RecordsEveryMetricAsNotMeasured_NeverScoresTheEmptyText()
+    {
+        // The empty text of an Ambiguous turn is not the agent's answer. A code metric would score it (code_toxicity
+        // passes an empty response at 100); --metrics must record the metric as not measured for that case instead.
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-ambiguous-metrics-");
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation
+            {
+                OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(request) with
+                {
+                    AnswerText = null,
+                    AnswerCompleteness = OutputCompleteness.Ambiguous,
+                }),
+            };
+            var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-ambiguous-metrics", onTurn: sink.Record);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+
+                var exit = await RunWithContentCaptureAsync(OptionsWithAef(dataset, cfg, report, root, runs: 1, metrics: "code_toxicity"), agent, sink);
+
+                Assert.Equal(ExitCodes.GateIndeterminate, exit);
+                var row = Assert.Single(System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(report.FullName))!["results"]!.AsArray())!;
+                Assert.Null(row["metricScores"]);   // no measured metric (the exporter omits an empty map)
+                Assert.Contains("not measured", (string?)row["metricsNotMeasured"]!["code_toxicity"], StringComparison.Ordinal);
+
+                var metric = Assert.Single(AefResultLines(root), l => ((string?)l["path"])?.Contains("/metrics/", StringComparison.Ordinal) == true);
+                Assert.Equal("not_measured", (string?)metric["state"]);
+                Assert.Null(metric["scores"]);
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task Eval_Microsoft365_CompletedTurnWithNoAnswerAtAll_StaysAFailureExit1()
+    {
+        // The other no-answer case keeps its verdict: a completed turn with no answer at all (None) is graded and fails.
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidConfig();
+        var root = Directory.CreateTempSubdirectory("agenteval-eval-m365-none-");
+        try
+        {
+            var conversation = new AgentEval.Tests.Microsoft365.Agent.FakeWorkIqConversation
+            {
+                OnRun = (request, _) => Task.FromResult(AgentEval.Tests.Microsoft365.Agent.TurnResults.Completed(request) with
+                {
+                    AnswerText = null,
+                    AnswerCompleteness = OutputCompleteness.None,
+                }),
+            };
+            var sink = new CliTurnSink(verbose: false, TextWriter.Null);
+            var agent = AgentEval.Microsoft365.Microsoft365AgentFactory.FromConversation(conversation, "m365-none", onTurn: sink.Record);
+            await using (agent)
+            {
+                var report = new FileInfo(Path.Combine(root.FullName, "report.json"));
+
+                var exit = await RunWithContentCaptureAsync(OptionsWithAef(dataset, cfg, report, root, runs: 1), agent, sink);
+
+                Assert.Equal(ExitCodes.TestFailure, exit);
+                var row = Assert.Single(System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(report.FullName))!["results"]!.AsArray())!;
+                Assert.False((bool)row["passed"]!);
+                Assert.DoesNotContain("Not measured", (string?)row["error"] ?? "", StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            TryDelete(dataset);
+            TryDelete(cfg);
+            try { root.Delete(recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* best-effort */ }
+        }
+    }
+
     // ── helpers ──
 
-    /// <summary>Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on</c>, the way the CLI invokes it.</summary>
-    private static Task<int> RunWithContentCaptureAsync(EvalOptions opts, IEvaluableAgent standIn)
+    /// <summary>
+    /// Runs <c>eval</c> under the shared AEF controls with <c>--aef-content on</c>, the way the CLI invokes it, with the
+    /// stand-in's turn sink handed to the target through its test seam.
+    /// </summary>
+    private static Task<int> RunWithContentCaptureAsync(EvalOptions opts, IEvaluableAgent standIn, CliTurnSink sink)
     {
         var command = new System.CommandLine.Command("eval-m365-notcompleted-test");
         command.Options.Add(new System.CommandLine.Option<DirectoryInfo?>("--aef"));
         var controls = new AefCliOptions(command);
+        IReadOnlyList<ISutTarget> targets = [new Microsoft365SutTarget(TextWriter.Null) { TurnSinkForTests = sink }];
         return controls.InvokeAsync(
             command.Parse(["--aef-content", "on"]),
-            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None, sutOverride: standIn));
+            () => EvalCommand.ExecuteAsync(opts, CancellationToken.None, sutOverride: standIn, sutTargetsOverride: targets));
+    }
+
+    private static EvalOptions OptionsWithAef(FileInfo dataset, FileInfo cfg, FileInfo report, DirectoryInfo root, int runs, string? metrics = null) => new()
+    {
+        Metrics = metrics,
+        Dataset = dataset,
+        Sut = "microsoft365",
+        AckLiveSideEffects = true,
+        TargetOptions = new Dictionary<string, ISutTargetOptions?>
+        {
+            ["microsoft365"] = new Microsoft365SutOptions { ConfigFile = cfg, Profile = "public" },
+        },
+        Format = "json",
+        Output = report,
+        Aef = new DirectoryInfo(Path.Combine(root.FullName, "aef")),
+        SubjectVersion = "1",
+        Quiet = true,
+        Runs = runs,
+    };
+
+    private static IReadOnlyList<System.Text.Json.Nodes.JsonNode> AefResultLines(DirectoryInfo root)
+    {
+        var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(root.FullName, "aef"), "run.json", SearchOption.AllDirectories)))!;
+        return File.ReadAllLines(Path.Combine(run, "results.ndjson"))
+            .Where(l => l.Length > 0)
+            .Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!)
+            .ToArray();
     }
 
     private static EvalOptions BaseOptions(

@@ -302,5 +302,78 @@ public sealed class WorkIqDiagnosticsFactoryTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => WorkIqDiagnosticsFactory.Create(null!, new WorkIqOptions(), TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => WorkIqDiagnosticsFactory.Create(Config(), null!, TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => WorkIqDiagnosticsFactory.Create(Config(), new WorkIqOptions(), null!));
+        Assert.Throws<ArgumentNullException>(() => WorkIqDiagnosticsFactory.Create("sha", new WorkIqOptions(), TimeProvider.System, null!));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // The host hooks (the readiness check opens its diagnostics through the same factory)
+    // ---------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Create_WithSetup_LeadingSinksFirst_TheRegisterAndTheCallerSinksWrapped()
+    {
+        var leading = new ListTraceSink();
+        var callerIssues = new ListIssueSink();
+        IWorkIqIssueSink? register = null;
+        var wrappedCallers = 0;
+        var options = new WorkIqOptions
+        {
+            DiagnosticsDirectory = new DirectoryInfo(Sub("diag")),
+            RunId = "run-s",
+            IssueSinks = [callerIssues],
+        };
+        var setup = new WorkIqDiagnosticsSetup
+        {
+            LeadingTraceSinks = [leading],
+            WrapIssueRegister = inner => register = new ForwardingIssueSink(inner),
+            WrapCallerIssueSink = caller =>
+            {
+                wrappedCallers++;
+                return new ForwardingIssueSink(caller);
+            },
+            RunLabel = "m365 doctor run",
+            ReportName = "the readiness report",
+        };
+
+        using (var diagnostics = WorkIqDiagnosticsFactory.Create(configSha256: null, options, new FakeTimeProvider(Start), setup))
+        {
+            diagnostics.Issue(WorkIqIssue.Create(WorkIqTraceStage.Discovery, WorkIqIssueCategory.Permission, "http.403", "Forbidden", "Consent missing."));
+
+            Assert.Null(diagnostics.ConfigSha256);
+            var ready = leading.Events[0];
+            Assert.Equal(WorkIqDiagnosticsFactory.ReadyEventCode, ready.Code);
+            Assert.StartsWith("Diagnostics ready for m365 doctor run run-s: ", ready.Message, StringComparison.Ordinal);
+            Assert.EndsWith("Send both files back with the readiness report; neither contains a token.", ready.Message, StringComparison.Ordinal);
+            Assert.Equal("Options", ready.Data!.Value.GetProperty("directorySource").GetString());
+        }
+
+        Assert.IsType<ForwardingIssueSink>(register);
+        Assert.Equal(1, wrappedCallers);
+        Assert.Equal("http.403", Assert.Single(callerIssues.Issues).Code);
+        Assert.Single(File.ReadAllLines(Path.Combine(Sub("diag"), "m365-issues.jsonl")));
+    }
+
+    [Fact]
+    public void Create_LiveAgentAndSetupDefaults_TraceTheSameReadyShape()
+    {
+        var options = new WorkIqOptions { DiagnosticsDirectory = new DirectoryInfo(Sub("diag")), RunId = "run-d" };
+
+        using var diagnostics = WorkIqDiagnosticsFactory.Create(Config(), options, new FakeTimeProvider(Start));
+
+        var ready = Assert.Single(diagnostics.RecentEvents);
+        Assert.StartsWith("Diagnostics ready for run run-d: ", ready.Message, StringComparison.Ordinal);
+        Assert.EndsWith("Send both files back with a report; neither contains a token.", ready.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>A wrapper that forwards every issue to the sink it wraps and disposes it with itself.</summary>
+    private sealed class ForwardingIssueSink : IWorkIqIssueSink, IDisposable
+    {
+        private readonly IWorkIqIssueSink _inner;
+
+        public ForwardingIssueSink(IWorkIqIssueSink inner) => _inner = inner;
+
+        public void Write(WorkIqIssue i) => _inner.Write(i);
+
+        public void Dispose() => (_inner as IDisposable)?.Dispose();
     }
 }

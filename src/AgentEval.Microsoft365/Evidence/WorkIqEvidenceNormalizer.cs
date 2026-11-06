@@ -225,7 +225,8 @@ internal sealed class WorkIqEvidenceNormalizer
 
         // 6. Approval intents under BOTH profiles: the confirmation card arrives in-band with the input-required status
         //    message, not through a requested diagnostic output mode, so NotRequested under PublicAnswerOnly would be
-        //    untrue. The same decoder and source pointer the native118 decoder uses for its own approval channel.
+        //    untrue. The only place approval intents are decoded; the conversation's pending interaction is built by the
+        //    same decoder from the same card walk, so the two always agree.
         var absence = messageSource is null ? default : ImmutableArray.Create(messageSource);
         var approvalIntents = task is not null
             ? InteractionDecoder.DecodeApprovalIntents(task.StatusMessage, messageSource!)
@@ -458,7 +459,7 @@ internal sealed class WorkIqEvidenceNormalizer
             }
 
             _diagnostics.Issue(
-                WorkIqIssue.Create(WorkIqTraceStage.Normalize, WorkIqIssueCategory.Protocol, issue.Code, issue.SafeMessage, SuggestedCauseOf(issue.Code)) with
+                WorkIqIssue.Create(WorkIqTraceStage.Normalize, WorkIqIssueCategory.Protocol, issue.Code, issue.SafeMessage, WorkIqIssueClassifier.CauseForEvidenceIssue(issue.Code)) with
                 {
                     CaseId = identity.CaseId,
                     TurnId = identity.TurnId,
@@ -499,40 +500,4 @@ internal sealed class WorkIqEvidenceNormalizer
             .Concat(evidence.RetrievalExecutions.Issues)
             .Concat(evidence.ApprovalIntents.Issues)
             .Concat(evidence.SkillActivations.Issues);
-
-    /// <summary>A plain-language cause an external tester can act on, keyed by the issue code's prefix.</summary>
-    private static string SuggestedCauseOf(string code)
-    {
-        if (string.Equals(code, AnswerAmbiguousIssueCode, StringComparison.Ordinal))
-        {
-            return "The service returned several answer candidates and the selection policy chose none; inspect the artifacts in the capture and report the shape.";
-        }
-
-        if (string.Equals(code, Native118DiagnosticsDecoder.AmbiguousArtifactIssueCode, StringComparison.Ordinal))
-        {
-            return "Two distinct artifacts play the same diagnostic role; the decoder never picks the last one. Report the capture so the artifact relationship can be decoded.";
-        }
-
-        if (string.Equals(code, InteractionDecoder.ConflictingTwinsIssueCode, StringComparison.Ordinal))
-        {
-            return "The confirmation card's action and actionId payloads differ; both proposals are kept and nothing was approved.";
-        }
-
-        if (code.StartsWith("diagnostics.", StringComparison.Ordinal))
-        {
-            return "The diagnostic artifact does not match the native 1.18 shapes this decoder knows (an experimental, undocumented format); the service may have changed it. The raw data stays in the capture.";
-        }
-
-        if (code.StartsWith("citations.", StringComparison.Ordinal))
-        {
-            return "The attribution metadata or the citation markers do not match the sample-observed shapes; the raw data stays in the capture.";
-        }
-
-        if (code.StartsWith("approval.", StringComparison.Ordinal))
-        {
-            return "The confirmation card does not match the interaction profile; the pause is retained raw and is never auto-answered.";
-        }
-
-        return "See the capture at the issue's source pointers.";
-    }
 }

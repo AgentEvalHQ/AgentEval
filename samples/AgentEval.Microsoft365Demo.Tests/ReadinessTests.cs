@@ -270,7 +270,7 @@ public sealed class ReadinessTests : IDisposable
     [Fact]
     public async Task SignInFailsAtDetailed_TheStageVerdictIssueIsOneLine_TheStageBlockHasTheDetail_ConsoleLogHasBoth()
     {
-        // Review L4: one auth failure printed near-identical blocks (the doctor's stage issue and the stage's FAILED block).
+        // One auth failure must not print two near-identical blocks (the doctor's stage issue and the stage's FAILED block).
         _rig.WithHealthyEndpoint().WithCompletedTurns();
         _rig.Tokens.Failure = new MsalServiceException(
             "invalid_grant",
@@ -295,15 +295,15 @@ public sealed class ReadinessTests : IDisposable
     [Fact]
     public async Task Readiness_TheIssueRegisterIsIssuesJsonl_FromTheStart_AndTheProfileEvidenceNamesTheDemosOption()
     {
-        // Review L3: the check wrote m365-issues.jsonl and the demo renamed it, while the trace still named the old path.
-        // Review L7: the profile evidence said "from --m365-profile", a CLI option the demo does not have.
+        // The check writes issues.jsonl from its first event, so the trace never names another path; the profile evidence
+        // names the demo's own option (--profile), not the CLI's --m365-profile.
         _rig.Handler.FailWith(FakeWorkIqHandler.CardMethod, HttpStatusCode.Unauthorized);
 
         var run = await _rig.RunAsync("--readiness-only");
 
         run.AssertExit(1);
         Assert.False(run.File("m365-issues.jsonl").Exists);
-        Assert.Contains(run.JsonLines("issues.jsonl"), i => i.GetProperty("code").GetString() == "doctor.discovery.failed");
+        Assert.Contains(run.JsonLines("issues.jsonl"), i => i.GetProperty("code").GetString() == "http.401");
         Assert.Equal(run.File("issues.jsonl").FullName, run.Json("readiness.json").GetProperty("issueFile").GetString());
         foreach (var name in new[] { "trace.jsonl", "console.log", "readiness.md", "readiness.json", "summary.md" })
         {

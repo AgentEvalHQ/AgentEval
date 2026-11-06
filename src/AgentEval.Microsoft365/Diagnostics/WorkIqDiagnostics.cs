@@ -230,16 +230,7 @@ public sealed class WorkIqDiagnostics : IDisposable
             return;
         }
 
-        var stamped = issue with
-        {
-            At = issue.At == default ? _clock.GetUtcNow() : issue.At,
-            RunId = issue.RunId ?? RunId,
-            ConfigSha256 = issue.ConfigSha256 ?? ConfigSha256,
-            AdapterVersion = issue.AdapterVersion ?? AdapterVersion,
-            A2AVersion = issue.A2AVersion ?? A2AVersion,
-            Message = WorkIqRedaction.Redact(issue.Message),
-            SuggestedCause = WorkIqRedaction.Redact(issue.SuggestedCause),
-        };
+        var stamped = Stamp(issue, _clock.GetUtcNow(), RunId, ConfigSha256);
 
         Interlocked.Increment(ref _issueCount);
 
@@ -275,6 +266,31 @@ public sealed class WorkIqDiagnostics : IDisposable
             A2AState = stamped.A2AState,
             Data = JsonSerializer.SerializeToElement(new IssueTraceData(stamped.Code, stamped.Category.ToString(), stamped.SuggestedCause, stamped.AadstsCode), WorkIqDiagnosticsJson.Options),
         });
+    }
+
+    /// <summary>
+    /// The stamping every registered issue gets: <see cref="WorkIqIssue.At"/> (when <c>default</c>), and
+    /// <see cref="WorkIqIssue.RunId"/>, <see cref="WorkIqIssue.ConfigSha256"/>, <see cref="WorkIqIssue.AdapterVersion"/> and
+    /// <see cref="WorkIqIssue.A2AVersion"/> when null; the message and the suggested cause are redacted. Shared by
+    /// <see cref="Issue"/> and the readiness check, which stamps the issue it attaches to a failed stage the same way.
+    /// </summary>
+    /// <param name="issue">The issue.</param>
+    /// <param name="now">The time stamped when the issue carries none.</param>
+    /// <param name="runId">The run id stamped when the issue carries none.</param>
+    /// <param name="configSha256">The config hash stamped when the issue carries none.</param>
+    internal static WorkIqIssue Stamp(WorkIqIssue issue, DateTimeOffset now, string runId, string? configSha256)
+    {
+        ArgumentNullException.ThrowIfNull(issue);
+        return issue with
+        {
+            At = issue.At == default ? now : issue.At,
+            RunId = issue.RunId ?? runId,
+            ConfigSha256 = issue.ConfigSha256 ?? configSha256,
+            AdapterVersion = issue.AdapterVersion ?? AdapterVersion,
+            A2AVersion = issue.A2AVersion ?? A2AVersion,
+            Message = WorkIqRedaction.Redact(issue.Message),
+            SuggestedCause = WorkIqRedaction.Redact(issue.SuggestedCause),
+        };
     }
 
     /// <summary>

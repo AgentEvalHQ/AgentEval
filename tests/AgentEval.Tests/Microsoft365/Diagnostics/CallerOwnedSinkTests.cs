@@ -13,7 +13,7 @@ using Xunit;
 namespace AgentEval.Tests.Microsoft365.Diagnostics;
 
 /// <summary>
-/// M60: the public sink seam — <see cref="WorkIqOptions.TraceSinks"/> / <see cref="WorkIqOptions.IssueSinks"/> on a live
+/// The public sink seam —<see cref="WorkIqOptions.TraceSinks"/> / <see cref="WorkIqOptions.IssueSinks"/> on a live
 /// agent and <see cref="ReadinessCheckOptions.TraceSinks"/> / <see cref="ReadinessCheckOptions.IssueSinks"/> on the
 /// readiness check. A caller's sink receives exactly what the JSONL files receive (same events and issues, same order,
 /// after the same redaction), the caller owns its lifetime (never disposed by the run), and a failing sink is dropped
@@ -127,7 +127,10 @@ public sealed class CallerOwnedSinkTests
         Assert.NotEmpty(issueLines);
         Assert.Equal(ReadinessTestRig.Codes(report.TraceFile), trace.Inner.Events.Select(e => e.Code).ToArray());
         Assert.Equal(ReadinessTestRig.Codes(report.IssueFile), issues.Inner.Issues.Select(i => i.Code).ToArray());
-        Assert.Contains(issues.Inner.Issues, i => i.Code == "doctor.probe.failed");
+        // The paused probe turn registered its outcome; the stage traced its verdict instead of registering it again.
+        Assert.Contains(issues.Inner.Issues, i => i.Code == "turn.input_required");
+        Assert.DoesNotContain(issues.Inner.Issues, i => i.Code == "doctor.probe.failed");
+        Assert.Contains(trace.Inner.Events, e => e.Code == "doctor.probe.failed");
 
         // The TaskNotFound the protocol stage provokes on purpose reaches neither the file nor the caller's sink.
         Assert.DoesNotContain(issues.Inner.Issues, i => i.RpcErrorCode == -32001);

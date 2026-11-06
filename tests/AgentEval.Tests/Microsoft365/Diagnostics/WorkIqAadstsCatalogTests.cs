@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
 using Xunit;
 
@@ -32,7 +33,38 @@ public sealed class WorkIqAadstsCatalogTests
         "AADSTS90002",
         "AADSTS50059",
         "AADSTS90019",
+        "AADSTS65004",
+        "AADSTS650052",
+        "AADSTS90094",
+        "AADSTS7000215",
     ];
+
+    [Theory]
+    [InlineData("AADSTS65001", true)]
+    [InlineData("AADSTS65004", true)]
+    [InlineData("AADSTS650052", true)]
+    [InlineData("AADSTS90094", true)]
+    [InlineData("AADSTS53003", true)]
+    [InlineData("AADSTS7000215", true)]
+    [InlineData("aadsts65001", true)]
+    [InlineData("65001", true)]
+    [InlineData("AADSTS700016", false)]
+    [InlineData("AADSTS50076", false)]
+    [InlineData("AADSTS99999", false)]
+    [InlineData(null, false)]
+    public void IsPermissionRefusal_IsAFlagOnTheCatalogEntries(string? code, bool expected) =>
+        Assert.Equal(expected, WorkIqAadstsCatalog.IsPermissionRefusal(code));
+
+    [Fact]
+    public void WorkIqScope_IsTheConfigDefaultScope() =>
+        Assert.Equal(Microsoft365Config.DefaultScope, WorkIqAadstsCatalog.WorkIqScope);
+
+    [Fact]
+    public void ReadinessCodes_AreCataloguedWithTheirCause()
+    {
+        Assert.Contains("tenant", WorkIqAadstsCatalog.Entries[WorkIqAadstsCatalog.TenantNotFoundCode].Cause, StringComparison.Ordinal);
+        Assert.Contains("application was not found", WorkIqAadstsCatalog.Entries[WorkIqAadstsCatalog.ApplicationNotFoundCode].Cause, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void Entries_Always_ContainEveryCodeThatMattersWithACauseAndAFix()
@@ -57,7 +89,7 @@ public sealed class WorkIqAadstsCatalogTests
     [InlineData("AADSTS90019", "tenantId")]
     public void TryGet_TenantNotFoundCodes_NameTheTenantIdAsTheFix(string code, string field)
     {
-        // Review M2: the placeholder-tenant case, the most predictable first failure, gets a cause and a fix.
+        // the placeholder-tenant case, the most predictable first failure, gets a cause and a fix.
         Assert.True(WorkIqAadstsCatalog.TryGet(code, out var entry));
         Assert.Contains(field, entry.Fix, StringComparison.Ordinal);
         Assert.DoesNotContain("not in this catalog", WorkIqAadstsCatalog.Describe(code), StringComparison.Ordinal);

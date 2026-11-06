@@ -35,6 +35,22 @@ internal enum StageResult
 /// <param name="Detail">What happened, in one line.</param>
 internal sealed record StageRow(string Name, StageResult Result, string Detail);
 
+/// <summary>The names of the demo's stages in the stage table.</summary>
+internal static class StageNames
+{
+    /// <summary>The prompt step.</summary>
+    public const string Prompt = "prompt";
+
+    /// <summary>The benchmark.</summary>
+    public const string Benchmark = "benchmark";
+
+    /// <summary>The prefix of the readiness stages' names (<c>readiness: config</c>, …).</summary>
+    public const string ReadinessPrefix = "readiness: ";
+
+    /// <summary>The row that stands for the whole readiness check when it did not run.</summary>
+    public const string Readiness = "readiness";
+}
+
 /// <summary>Everything the reports of one run are written from.</summary>
 internal sealed record DemoReport
 {
@@ -171,7 +187,7 @@ internal static class Summary
             }
         }
 
-        var issues = report.Issues.GroupBy(i => i.Category).Select(g => $"{g.Key} {g.Count().ToString(CultureInfo.InvariantCulture)}").ToArray();
+        var issues = IssueGroups(report.Issues).Select(g => $"{g.Key.Name} {g.Count().ToString(CultureInfo.InvariantCulture)}").ToArray();
         text.Append('\n').Append("  Issues: ").Append(issues.Length == 0 ? "none" : string.Join(", ", issues)).Append('\n');
         if (report.RuntimeError is not null)
         {
@@ -221,7 +237,10 @@ internal static class Summary
         Row(md, "Content policy", Code(s.ContentPolicy.ToString()));
         Row(md, "Consent", Cell(s.ConsentSource));
         Row(md, "Judge", Cell(report.JudgeDescription));
-        Row(md, "Dataset", report.CaseSet is null ? "not loaded" : Cell(report.CaseSet.Source) + $" ({report.CaseSet.Cases.Count.ToString(CultureInfo.InvariantCulture)} cases)");
+        Row(md, "Dataset", report.CaseSet is null
+            ? "not loaded"
+            : Cell(report.CaseSet.Source) + $" ({report.CaseSet.Cases.Count.ToString(CultureInfo.InvariantCulture)} cases)" +
+              (report.CaseSet.IgnoredFieldsNote is { } ignored ? "; " + Cell(ignored) : ""));
         Row(md, "Turn cap", $"{s.MaxTurns.ToString(CultureInfo.InvariantCulture)} (turns counted, cost not metered)");
         Row(md, "Timeout", $"{s.TimeoutSeconds.ToString(CultureInfo.InvariantCulture)} s per readiness stage or agent turn");
         Row(md, "Screen verbosity", s.Verbosity.ToString().ToLowerInvariant() + " (console.log always has the full view)");
@@ -270,7 +289,7 @@ internal static class Summary
         }
         else
         {
-            var row = report.Stages.FirstOrDefault(r => r.Name == DemoHost.BenchmarkStage);
+            var row = report.Stages.FirstOrDefault(r => r.Name == StageNames.Benchmark);
             md.Append("The benchmark did not run: ").Append(Cell(NotRunDetail(row))).Append(".\n\n");
         }
 
@@ -281,12 +300,12 @@ internal static class Summary
         }
         else
         {
-            md.Append("Every anomaly the connector registered, grouped by who or what can fix it (the same entries as `")
+            md.Append("Every anomaly the run registered, grouped by who or what can fix it (the same entries as `")
                 .Append(RunFolder.IssuesName).Append("`).\n\n");
-            foreach (var group in report.Issues.GroupBy(i => i.Category).OrderBy(g => g.Key))
+            foreach (var group in IssueGroups(report.Issues))
             {
-                md.Append("### ").Append(group.Key).Append(" (").Append(group.Count().ToString(CultureInfo.InvariantCulture)).Append(") — ")
-                    .Append(Cell(IssueText.WhoFixes(group.Key))).Append("\n\n");
+                md.Append("### ").Append(group.Key.Name).Append(" (").Append(group.Count().ToString(CultureInfo.InvariantCulture)).Append(") — ")
+                    .Append(Cell(group.Key.WhoFixes)).Append("\n\n");
                 foreach (var issue in group)
                 {
                     var (cause, action) = IssueText.CauseAndAction(issue);
@@ -375,7 +394,7 @@ internal static class Summary
             .Append(report.CaseSet is null ? "not loaded" : Cell(report.CaseSet.Source)).Append(".\n\n");
         if (report.Benchmark is not { } benchmark)
         {
-            var row = report.Stages.FirstOrDefault(r => r.Name == DemoHost.BenchmarkStage);
+            var row = report.Stages.FirstOrDefault(r => r.Name == StageNames.Benchmark);
             md.Append("The benchmark did not run: ").Append(Cell(NotRunDetail(row))).Append(".\n");
             return md.ToString();
         }
@@ -443,10 +462,10 @@ internal static class Summary
             stopReason = report.Benchmark?.StopReason,
             counts = new
             {
-                pass = cases.Count(c => c.Verdict == CaseVerdict.Pass),
-                fail = cases.Count(c => c.Verdict == CaseVerdict.Fail),
-                error = cases.Count(c => c.Verdict == CaseVerdict.Error),
-                notMeasured = cases.Count(c => c.Verdict == CaseVerdict.NotMeasured),
+                pass = report.Benchmark?.Count(CaseVerdict.Pass) ?? 0,
+                fail = report.Benchmark?.Count(CaseVerdict.Fail) ?? 0,
+                error = report.Benchmark?.Count(CaseVerdict.Error) ?? 0,
+                notMeasured = report.Benchmark?.Count(CaseVerdict.NotMeasured) ?? 0,
             },
             stages = report.Stages.Select(r => new { name = r.Name, result = Label(r.Result), detail = r.Detail }).ToArray(),
             cases = cases.Select(c => new
@@ -485,6 +504,10 @@ internal static class Summary
             }).ToArray(),
         };
     }
+
+    /// <summary>The issues grouped by <see cref="IssueText.GroupOf"/>, in group order (the categories, then the judge).</summary>
+    private static IEnumerable<IGrouping<IssueGroup, WorkIqIssue>> IssueGroups(IEnumerable<WorkIqIssue> issues) =>
+        issues.GroupBy(IssueText.GroupOf).OrderBy(g => g.Key.Order);
 
     private static string CaseTable(BenchmarkOutcome benchmark)
     {

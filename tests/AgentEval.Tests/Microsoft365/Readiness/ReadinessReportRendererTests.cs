@@ -10,7 +10,7 @@ using Xunit;
 namespace AgentEval.Tests.Microsoft365.Readiness;
 
 /// <summary>
-/// M37: the three renderings of a readiness report — <c>readiness.md</c> (header, stage table, evidence per stage,
+/// The three renderings of a readiness report —<c>readiness.md</c> (header, stage table, evidence per stage,
 /// what to send back), <c>readiness.json</c> and the console view — and the report's own verdict rules. Built from a
 /// hand-made report, so no transport is involved.
 /// </summary>

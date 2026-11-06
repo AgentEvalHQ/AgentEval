@@ -5,7 +5,7 @@
 namespace AgentEval.Microsoft365.Diagnostics;
 
 /// <summary>An in-memory trace sink for tests and the doctor report: every event in order, as a snapshot. Thread-safe.</summary>
-public sealed class ListTraceSink : IWorkIqTraceSink
+internal sealed class ListTraceSink : IWorkIqTraceSink
 {
     private readonly object _gate = new();
     private readonly List<WorkIqTraceEvent> _events = [];
@@ -54,8 +54,8 @@ public sealed class ListTraceSink : IWorkIqTraceSink
     }
 }
 
-/// <summary>An in-memory issue sink for tests and the doctor report: every issue in order, as a snapshot. Thread-safe.</summary>
-public sealed class ListIssueSink : IWorkIqIssueSink
+/// <summary>An in-memory issue sink for tests: every issue in order, as a snapshot. Thread-safe.</summary>
+internal sealed class ListIssueSink : IWorkIqIssueSink
 {
     private readonly object _gate = new();
     private readonly List<WorkIqIssue> _issues = [];

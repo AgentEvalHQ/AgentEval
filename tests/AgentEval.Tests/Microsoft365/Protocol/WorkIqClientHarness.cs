@@ -162,10 +162,12 @@ internal sealed class WorkIqClientHarness : IDisposable
 
     /// <summary>
     /// Drives a task that waits on the fake clock (<c>Task.Delay(…, clock, …)</c>, deadline sources) to completion.
-    /// The clock advances only while something is armed on it — up to <paramref name="step"/> at a time, and never
-    /// past the earliest due time, so a wait fires exactly when it is due — and never while the task is between
-    /// clock waits (a continuation travelling through the HTTP pipeline on real thread-pool hops); then the pump
-    /// waits real time instead, bounded by <paramref name="idleTimeout"/> (default <see cref="PumpIdleTimeout"/>).
+    /// The clock advances only while some timer is armed on it — up to <paramref name="step"/> at a time, and never
+    /// past the earliest due time, so a wait fires exactly when it is due; while nothing is armed the pump waits real
+    /// time instead, bounded by <paramref name="idleTimeout"/> (default <see cref="PumpIdleTimeout"/>). Any armed timer
+    /// counts, a deadline source included: a task that keeps a deadline armed while a continuation travels through the
+    /// HTTP pipeline on real thread-pool hops sees that deadline run ahead of the I/O. A test whose deadline must not
+    /// race real I/O therefore pumps on the wait it means (as <c>PumpRecoveryAsync</c> does on <c>recovery.waiting</c>).
     /// Stepping blindly on every yield spent the whole step budget within milliseconds under load, before the task
     /// had armed its next wait, and ran deadlines ahead of the code that was meant to meet them.
     /// </summary>

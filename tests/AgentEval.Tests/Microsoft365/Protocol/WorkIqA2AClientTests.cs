@@ -208,20 +208,51 @@ public sealed class WorkIqA2AClientTests
     }
 
     [Fact]
-    public async Task Send_NextRpcId_GoesOnTheWireOnce()
+    public async Task Send_CallRpcId_GoesOnTheWireForThatCallOnly()
     {
         using var h = WorkIqClientHarness.Create().WithDefaultCard();
         h.Handler.OnRpc("SendMessage", "envelopes/send-task-submitted.json");
-        h.Client.NextRpcId = "rpc-turn-identity-1";
 
-        await h.Client.SendAsync(NewSend(), CancellationToken.None);
+        await h.Client.SendAsync(NewSend(), CancellationToken.None, new WorkIqCallContext { RpcId = "rpc-turn-identity-1" });
         await h.Client.SendAsync(NewSend(), CancellationToken.None);
 
         var posts = h.Handler.Requests.Where(r => r.Method == HttpMethod.Post).ToArray();
         Assert.Equal("\"rpc-turn-identity-1\"", posts[0].JsonRpcId);
         Assert.NotEqual("\"rpc-turn-identity-1\"", posts[1].JsonRpcId);
         Assert.StartsWith("\"rpc-", posts[1].JsonRpcId, StringComparison.Ordinal);
-        Assert.Null(h.Client.NextRpcId);
+    }
+
+    [Fact]
+    public async Task Send_CallerRegistersIssues_FailureIsTracedButNotRegistered()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler.FailWith("SendMessage", HttpStatusCode.Forbidden);
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.SendAsync(NewSend(), CancellationToken.None, new WorkIqCallContext { CallerRegistersIssues = true }));
+
+        Assert.Equal(WorkIqFailureCategory.Forbidden, ex.Failure.Category);
+        Assert.Single(h.Events("rpc.error"));
+        Assert.Single(h.Events("auth.forbidden"));
+        Assert.Empty(h.Issues.Issues);
+    }
+
+    [Fact]
+    public async Task Send_Http403OnItsOwn_ExactlyOneIssueFromTheClassifier()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler.FailWith("SendMessage", HttpStatusCode.Forbidden);
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.SendAsync(NewSend(), CancellationToken.None));
+
+        // The auth handler traces the 403; the client, the layer that ended the call, registers its one issue, and its
+        // category, code and cause are the classifier's.
+        Assert.Single(h.Events("auth.forbidden"));
+        var issue = Assert.Single(h.Issues.Issues);
+        var expected = WorkIqIssueClassifier.FromFailure(ex.Failure, WorkIqTraceStage.Send);
+        Assert.Equal(expected.Category, issue.Category);
+        Assert.Equal(expected.Code, issue.Code);
+        Assert.Equal(expected.SuggestedCause, issue.SuggestedCause);
+        Assert.Equal(WorkIqIssueCategory.Permission, issue.Category);
     }
 
     [Fact]
@@ -270,7 +301,10 @@ public sealed class WorkIqA2AClientTests
         var error = Assert.Single(h.Events("rpc.error"));
         Assert.Equal(-32009, error.RpcErrorCode);
         Assert.Equal(WorkIqTraceLevel.Error, error.Level);
-        Assert.Contains(h.Issues.Issues, i => i.Code == "send.protocolversionmismatch" && i.RpcErrorCode == -32009);
+        var issue = Assert.Single(h.Issues.Issues);
+        Assert.Equal(WorkIqIssueClassifier.FromFailure(ex.Failure).Code, issue.Code);
+        Assert.Equal(WorkIqIssueCategory.Protocol, issue.Category);
+        Assert.Equal(-32009, issue.RpcErrorCode);
     }
 
     [Fact]
@@ -608,13 +642,31 @@ public sealed class WorkIqA2AClientTests
     }
 
     [Fact]
-    public void IssueCategoryOf_CanceledHasNoIssue()
+    public void RegistersIssue_OnlyForAFailureThisClientEnds()
     {
-        Assert.Null(WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Canceled));
-        Assert.Equal(WorkIqIssueCategory.Authentication, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Unauthorized));
-        Assert.Equal(WorkIqIssueCategory.Permission, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.Forbidden));
-        // One category for an untrusted host everywhere: Config (the fix is in trustedHosts), as WorkIqIssueClassifier and the stream path say.
-        Assert.Equal(WorkIqIssueCategory.Config, WorkIqA2AClient.IssueCategoryOf(WorkIqFailureCategory.UntrustedHost));
+        var forbidden = new WorkIqFailure(WorkIqFailureCategory.Forbidden, "Send: HTTP 403", OutcomeCertainty.Known, WorkIqOperation.Send, HttpStatus: 403);
+
+        Assert.True(WorkIqA2AClient.RegistersIssue(forbidden, call: null));
+        Assert.True(WorkIqA2AClient.RegistersIssue(forbidden, new WorkIqCallContext()));
+        Assert.False(WorkIqA2AClient.RegistersIssue(forbidden, new WorkIqCallContext { CallerRegistersIssues = true }));
+        Assert.False(WorkIqA2AClient.RegistersIssue(forbidden with { Category = WorkIqFailureCategory.Canceled }, call: null));
+        Assert.False(WorkIqA2AClient.RegistersIssue(forbidden with { TokenFailure = WorkIqTokenFailure.ProviderFailed }, call: null));
+    }
+
+    [Fact]
+    public async Task Send_CanceledByTheCaller_NoIssue()
+    {
+        using var h = WorkIqClientHarness.Create().WithDefaultCard();
+        h.Handler.OnRpc("SendMessage", "envelopes/send-task-submitted.json");
+        await h.Client.DiscoverAsync(CancellationToken.None);
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+
+        var ex = await Assert.ThrowsAsync<WorkIqProtocolException>(() => h.Client.SendAsync(NewSend(), stop.Token));
+
+        Assert.Equal(WorkIqFailureCategory.Canceled, ex.Failure.Category);
+        Assert.Single(h.Events("rpc.error"));
+        Assert.Empty(h.Issues.Issues);
     }
 
     [Fact]

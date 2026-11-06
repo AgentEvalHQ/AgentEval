@@ -15,7 +15,7 @@ using Xunit;
 namespace AgentEval.Tests.Microsoft365.HarnessBridge;
 
 /// <summary>
-/// M25: the Microsoft 365 provider through the REAL <see cref="MAFEvaluationHarness"/> and the REAL
+/// The Microsoft 365 provider through the REAL <see cref="MAFEvaluationHarness"/> and the REAL
 /// <see cref="WorkIqEvaluableAgent"/> (built by <see cref="Microsoft365AgentFactory.BuildLive"/>; only the token provider
 /// and the innermost HTTP handler are fakes), in both directions: harness → agent (what the harness sends, how many turns,
 /// which context) and agent → harness (what the harness records for a completed, a suspended, a failed, a capped and a

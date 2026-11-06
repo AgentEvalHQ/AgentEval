@@ -5,6 +5,7 @@
 using System.CommandLine;
 using System.Globalization;
 using System.Text;
+using AgentEval.Cli.Commands.Targets;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Diagnostics;
 using AgentEval.Microsoft365.Readiness;
@@ -12,7 +13,7 @@ using AgentEval.Microsoft365.Readiness;
 namespace AgentEval.Cli.Microsoft365;
 
 /// <summary>
-/// Implements <c>agenteval m365 doctor</c> (M37, HLD D21): the readiness check an external tester runs first on their
+/// Implements <c>agenteval m365 doctor</c>: the readiness check an external tester runs first on their
 /// own tenant. It wires the CLI options to <see cref="Microsoft365ReadinessCheck"/>, writes <c>readiness.md</c> and
 /// <c>readiness.json</c> into the report folder (the trace and issue files go there too unless <c>--m365-trace</c>),
 /// prints the console view and the file paths, and exits <c>0</c> when every stage that ran passed and nothing was
@@ -79,7 +80,7 @@ internal static class M365DoctorCommand
         public DirectoryInfo? Report { get; init; }
 
         /// <summary><c>--m365-profile</c>.</summary>
-        public string Profile { get; init; } = Microsoft365SutTarget.DefaultProfile;
+        public string Profile { get; init; } = Microsoft365CliOptions.DefaultProfile;
 
         /// <summary><c>--m365-capture-raw</c>.</summary>
         public DirectoryInfo? CaptureRaw { get; init; }
@@ -103,11 +104,7 @@ internal static class M365DoctorCommand
     /// <param name="stderr">Where the sign-in message, the verbose trace and errors go; null means <see cref="Console.Error"/> at invocation time.</param>
     internal static Command Create(ReadinessRunner? runner, TextWriter? stdout, TextWriter? stderr)
     {
-        var configOpt = new Option<FileInfo?>("--m365-config")
-        {
-            Description = "JSON file with the Work IQ connection: tenantId, appClientId; optional endpoint, agentId (opaque; null = the default Work IQ agent), scope, agentName, diagnosticProfile (PublicAnswerOnly|Native118Diagnostics), timeZone (IANA), trustedHosts. No secret is stored; the token is acquired at run time via MSAL device-code auth + an OS-encrypted cache. Required.",
-            Required = true,
-        };
+        var configOpt = Microsoft365CliOptions.Config("Required.", required: true);
         var stageOpt = new Option<string>("--stage")
         {
             DefaultValueFactory = _ => AllStages,
@@ -119,7 +116,7 @@ internal static class M365DoctorCommand
         };
         var consentOpt = new Option<bool>("--i-understand-live-side-effects")
         {
-            Description = "Required consent for a live built-in --sut target (copilot-studio, microsoft365): acknowledge that the run drives a LIVE agent that can perform real actions and cannot be sandboxed. Use a NON-PROD agent. For m365 doctor it gates the probe and the census: without it they are SKIPPED and no prompt reaches the agent (the config, sign-in, discovery and protocol stages run without it).",
+            Description = SutTargetResolver.ConsentDescription + " For m365 doctor it gates the probe and the census: without it they are SKIPPED and no prompt reaches the agent (the config, sign-in, discovery and protocol stages run without it).",
         };
         var continueOpt = new Option<bool>("--continue")
         {
@@ -129,24 +126,11 @@ internal static class M365DoctorCommand
         {
             Description = "Folder for readiness.md, readiness.json and the trace and issues files (default: .agenteval/m365/doctor-<yyyyMMdd-HHmmss>Z when an .agenteval/ folder is found walking up from the current directory, else <temp>/agenteval-m365/doctor-<stamp>).",
         };
-        var profileOpt = new Option<string>("--m365-profile")
-        {
-            DefaultValueFactory = _ => Microsoft365SutTarget.DefaultProfile,
-            Description = "public = answer only (text/plain); native118 = EXPERIMENTAL, also requests the two diagnostic output modes observed in Microsoft's native evaluator 1.18.0 (tool and retrieval info); not a documented contract",
-        };
-        var captureRawOpt = new Option<DirectoryInfo?>("--m365-capture-raw")
-        {
-            Description = "Retain the raw A2A request/response bytes and stream frames under this directory (opt-in; may contain tenant data; keep it out of source control).",
-        };
-        var verboseOpt = new Option<bool>("--m365-verbose")
-        {
-            DefaultValueFactory = _ => true,
-            Description = "Print every provider trace event to stderr (stage, code, ids, HTTP status, JSON-RPC code, A2A state, elapsed). The JSONL trace and issue files are always written; their paths are printed at the end. On by default for m365 doctor (--m365-verbose false turns it off).",
-        };
-        var traceOpt = new Option<FileInfo?>("--m365-trace")
-        {
-            Description = "Write the JSONL trace to this file instead of the default in the report folder.",
-        };
+        var profileOpt = Microsoft365CliOptions.Profile();
+        var captureRawOpt = Microsoft365CliOptions.CaptureRaw();
+        var verboseOpt = Microsoft365CliOptions.Verbose(
+            "their paths are printed at the end. On by default for m365 doctor (--m365-verbose false turns it off).", onByDefault: true);
+        var traceOpt = Microsoft365CliOptions.Trace("in the report folder");
         var timeoutOpt = new Option<int>("--timeout-seconds")
         {
             DefaultValueFactory = _ => DefaultTimeoutSeconds,
@@ -179,7 +163,7 @@ internal static class M365DoctorCommand
                 Consent = parseResult.GetValue(consentOpt),
                 Continue = parseResult.GetValue(continueOpt),
                 Report = parseResult.GetValue(reportOpt),
-                Profile = parseResult.GetValue(profileOpt) ?? Microsoft365SutTarget.DefaultProfile,
+                Profile = parseResult.GetValue(profileOpt) ?? Microsoft365CliOptions.DefaultProfile,
                 CaptureRaw = parseResult.GetValue(captureRawOpt),
                 Verbose = parseResult.GetValue(verboseOpt),
                 TraceFile = parseResult.GetValue(traceOpt),
@@ -216,7 +200,7 @@ internal static class M365DoctorCommand
         // ── usage (exit 2, nothing created, nothing sent) ──
         if (arguments.ConfigFile is null)
         {
-            stderr.WriteLine("m365 doctor: --m365-config <file.json> is required (tenantId, appClientId; optional endpoint, agentId, scope, agentName, diagnosticProfile, timeZone, trustedHosts).");
+            stderr.WriteLine($"m365 doctor: --m365-config <file.json> is required ({Microsoft365CliOptions.ConfigFields}).");
             return ExitCodes.UsageError;
         }
 
@@ -235,7 +219,7 @@ internal static class M365DoctorCommand
         DiagnosticProfile profile;
         try
         {
-            profile = Microsoft365SutTarget.ParseProfile(arguments.Profile);
+            profile = Microsoft365CliOptions.ParseProfile(arguments.Profile);
         }
         catch (InvalidOperationException ex)
         {

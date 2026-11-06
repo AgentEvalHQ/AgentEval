@@ -26,53 +26,76 @@ public interface IWorkIqConversation : IAsyncDisposable
 
     /// <summary>
     /// Submits one turn as a blocking <c>SendMessage</c> (<c>returnImmediately: false</c>), reconciles a still-active
-    /// task with bounded <c>GetTask</c> polling, and returns the rich result for every outcome — it does not throw
-    /// for a non-completed turn. Throws <see cref="WorkIqProtocolException"/> only when the transport layer failed
-    /// before any result could be built, <see cref="InvalidOperationException"/> when a turn is already active, and
-    /// <see cref="OperationCanceledException"/> when <paramref name="cancellationToken"/> fires before a result exists.
+    /// task with bounded <c>GetTask</c> polling, and returns the rich result for every outcome: a transport failure,
+    /// a refused card or a run-out turn deadline is a result (<see cref="WorkIqTurnOutcome.Failed"/> or
+    /// <see cref="WorkIqTurnOutcome.Indeterminate"/>), never an exception.
     /// </summary>
     /// <param name="request">The turn.</param>
     /// <param name="cancellationToken">Stops local waiting; never cancels the remote task.</param>
+    /// <exception cref="InvalidOperationException">A turn or subscription is already active on this conversation.</exception>
+    /// <exception cref="WorkIqTurnCanceledException">
+    /// <paramref name="cancellationToken"/> or <see cref="AbandonAndResetAsync"/> stopped the turn. It is an
+    /// <see cref="OperationCanceledException"/> that carries the result observed until the stop
+    /// (<see cref="IWorkIqTurnResultCarrier.TurnResult"/>).
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The conversation was disposed.</exception>
     Task<WorkIqTurnResult> RunTurnAsync(WorkIqTurnRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Submits one turn as <c>SendStreamingMessage</c> and yields the rich events as they are reduced, ending with
     /// <see cref="WorkIqStreamEvent.TurnFinished"/>. Shares reduction, answer selection and normalisation with
-    /// <see cref="RunTurnAsync"/>. On EOF without a terminal state and a known task id, reconciles via <c>GetTask</c>
-    /// / <see cref="SubscribeAsync"/> under the recovery budget.
+    /// <see cref="RunTurnAsync"/>. On EOF without a terminal state and a known task id, reconciles through bounded
+    /// <c>GetTask</c> polling under the recovery budget. The enumeration throws what <see cref="RunTurnAsync"/> throws.
     /// </summary>
     /// <param name="request">The turn.</param>
     /// <param name="cancellationToken">Stops local waiting; never cancels the remote task.</param>
     IAsyncEnumerable<WorkIqStreamEvent> StreamTurnAsync(WorkIqTurnRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Reads the current snapshot of a task created by this conversation (same endpoint and principal), without resubmitting anything.</summary>
+    /// <summary>
+    /// Reads the current snapshot of a task created by this conversation (same endpoint and principal), without
+    /// resubmitting anything. Allowed while a turn is active: the read neither waits for the turn nor shares its
+    /// request id or raw capture.
+    /// </summary>
     /// <param name="task">The task handle.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="InvalidOperationException">The handle belongs to another endpoint or principal.</exception>
+    /// <exception cref="WorkIqProtocolException">Discovery or the read failed (a stop of <paramref name="cancellationToken"/> included); no turn result exists here.</exception>
+    /// <exception cref="ObjectDisposedException">The conversation was disposed.</exception>
     Task<WorkIqTaskSnapshot> GetTaskAsync(WorkIqTaskHandle task, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Requests remote cancellation of a task and returns the snapshot the service replied with. Best effort: the
     /// task is canceled only if the returned state says so (it may already be completed, not cancelable or not found).
+    /// Allowed while a turn is active, like <see cref="GetTaskAsync"/>.
     /// </summary>
     /// <param name="task">The task handle.</param>
     /// <param name="cancellationToken">Cancellation token for the cancel request itself; do not pass an already-canceled token.</param>
+    /// <exception cref="InvalidOperationException">The handle belongs to another endpoint or principal.</exception>
+    /// <exception cref="WorkIqProtocolException">Discovery or the request failed (a task not found included); no turn result exists here.</exception>
+    /// <exception cref="ObjectDisposedException">The conversation was disposed.</exception>
     Task<WorkIqTaskSnapshot> CancelTaskAsync(WorkIqTaskHandle task, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Attaches to an existing task via <c>SubscribeToTask</c>: the first frame is a snapshot that replaces local
-    /// state, then future events follow. Never resubmits input. Rejected while a turn is active.
+    /// state, then future events follow. Never resubmits input. Rejected while a turn is active. The enumeration throws
+    /// what <see cref="RunTurnAsync"/> throws, and <see cref="InvalidOperationException"/> for a handle of another
+    /// endpoint or principal.
     /// </summary>
     /// <param name="task">The task handle.</param>
     /// <param name="cancellationToken">Stops local waiting.</param>
     IAsyncEnumerable<WorkIqStreamEvent> SubscribeAsync(WorkIqTaskHandle task, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Continues a suspended task with the host's explicit decision or input (same task and context, new message
-    /// id) and runs the continuation like a turn. Never called automatically by any evaluator.
+    /// Not supported in this preview: throws <see cref="NotSupportedException"/> for any non-null arguments and sends
+    /// nothing. A paused task (input or a confirmation required) keeps its pause on
+    /// <see cref="WorkIqTurnResult.PendingInteraction"/>; nothing is ever approved automatically. Reserved for continuing
+    /// such a task with the host's explicit decision.
     /// </summary>
-    /// <param name="interaction">The pending interaction being answered.</param>
-    /// <param name="response">The validated response.</param>
-    /// <param name="cancellationToken">Stops local waiting.</param>
+    /// <param name="interaction">The pending interaction.</param>
+    /// <param name="response">The host's response.</param>
+    /// <param name="cancellationToken">Not used.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="interaction"/> or <paramref name="response"/> is null.</exception>
+    /// <exception cref="NotSupportedException">Always, once the arguments are not null.</exception>
     Task<WorkIqTurnResult> ContinueAsync(WorkIqPendingInteraction interaction, WorkIqInteractionResponse response, CancellationToken cancellationToken = default);
 
     /// <summary>

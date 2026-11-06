@@ -16,7 +16,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.Microsoft365;
 
 /// <summary>
-/// M37: <c>agenteval m365 doctor</c> — argument validation (usage errors exit 2 before anything is created), the
+/// <c>agenteval m365 doctor</c> — argument validation (usage errors exit 2 before anything is created), the
 /// report folder and the four files written into it, the console view and the paths, and the exit codes 0 / 1 / 11,
 /// all offline: the readiness runner is the provider's internal seam over <see cref="AgentEval.Tests.Microsoft365.TestHelpers.FakeWorkIqHandler"/>
 /// and a host token provider handing out <c>fake-token</c>.
@@ -342,7 +342,7 @@ public sealed class M365DoctorCommandTests
 }
 
 /// <summary>
-/// M37 through the real CLI entry point (<c>Program.cs</c>): a missing <c>--m365-config</c> is a parse error (exit 2,
+/// <c>m365 doctor</c> through the real CLI entry point (<c>Program.cs</c>): a missing <c>--m365-config</c> is a parse error (exit 2,
 /// nothing sent) and <c>--help</c> lists every option. Redirects the console, hence the <c>ConsoleTests</c> collection.
 /// </summary>
 [Collection("ConsoleTests")]

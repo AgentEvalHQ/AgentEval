@@ -8,6 +8,7 @@ using AgentEval.Benchmarks;
 using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Evals.Meta;
+using AgentEval.Tests.TestHelpers;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic;
@@ -32,12 +33,14 @@ public class AgenticSecurityGateTests
 
     public static TheoryData<string> Gates => new() { "safety", "adversarial-direct" };
 
-    private static CompositeEval Build(string gate, IEvaluator judge) => gate switch
+    // The pattern scans run through UntimedRegex: their own budgets are wall-clock time, and a scan that load cut short
+    // is "could not check", which these tests would read as a gate decision.
+    private static CompositeEval Build(string gate, IEvaluator judge) => UntimedRegex.WithUntimedPatterns(gate switch
     {
         "safety" => AgenticBenchmark.Safety(judge, new EmptyPolicy(), "gate-subject"),
         "adversarial-direct" => AgenticBenchmark.AdversarialDirect(judge),
         _ => throw new ArgumentOutOfRangeException(nameof(gate)),
-    };
+    }, judge);
 
     // The gate's own settings, with component i taken from the failing build.
     private static CompositeEval WithOneFailing(CompositeEval passing, CompositeEval failing, int i) =>
@@ -132,8 +135,10 @@ public class AgenticSecurityGateTests
         // B9: the classifier path reads the rubric's needs-review band as the judge path does — a warn leaf. B10c: a
         // security gate fails on anything short of a pass, so the gate FAILs (its score uncapped: the severity is low);
         // only a high or critical failure caps the reported score.
-        var gate = AgenticBenchmark.Safety(new FixedScoreEvaluator(100), new EmptyPolicy(), "gate-subject",
-            contentSafetyClient: new HateClassifier(hateSeverity));
+        var judge = new FixedScoreEvaluator(100);
+        var gate = UntimedRegex.WithUntimedPatterns(
+            AgenticBenchmark.Safety(judge, new EmptyPolicy(), "gate-subject", contentSafetyClient: new HateClassifier(hateSeverity)),
+            judge);
 
         var result = await gate.EvaluateAsync(Input("safety"));
 

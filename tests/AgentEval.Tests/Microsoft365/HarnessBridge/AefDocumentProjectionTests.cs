@@ -7,14 +7,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Microsoft365;
 using AgentEval.Microsoft365.Evidence;
-using AgentEval.Microsoft365.Evidence.Decoders;
 using Xunit;
 using static AgentEval.Tests.Microsoft365.Evidence.EvidenceTestKit;
 
 namespace AgentEval.Tests.Microsoft365.HarnessBridge;
 
 /// <summary>
-/// M31: <see cref="Microsoft365EvidenceProjector.ToAefDocument"/>, the evidence document stored in an AEF run's content
+/// <see cref="Microsoft365EvidenceProjector.ToAefDocument"/>, the evidence document stored in an AEF run's content
 /// capture. Under every policy it is the <see cref="Microsoft365EvidenceJson"/> form with the schema id inside; a removed
 /// value becomes <c>Redacted</c> (never a substitute, never a missing field), and every state, availability and count
 /// stays as observed. <c>FullEvidence</c> keeps everything; <c>SelectedContent</c> (the CLI default) keeps the answer and
@@ -137,7 +136,7 @@ public sealed class AefDocumentProjectionTests
         var execution = new ToolExecutionObservation(
             "tool-execution-1",
             Observed<string>.Missing(),
-            Native118DiagnosticsDecoder.ToolIdentityOf(Observed<string>.Present("Demo Files", source), Observed<string>.Present("ReadDemoFile", source), source),
+            ToolIdentity.FromReportedNames(Observed<string>.Present("Demo Files", source), Observed<string>.Present("ReadDemoFile", source), source),
             Observed<JsonElement>.Present(ParseJson("""{"path":"secret-argument.docx"}"""), source),
             Observed<JsonElement>.Present(ParseJson("""{"content":"secret-result-body"}"""), source),
             Observed<int>.Present(200, source),

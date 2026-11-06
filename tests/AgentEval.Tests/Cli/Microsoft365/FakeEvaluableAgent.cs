@@ -9,7 +9,7 @@ namespace AgentEval.Tests.Cli.Microsoft365;
 /// <summary>
 /// A benign <see cref="IEvaluableAgent"/> with a fixed helpful reply, reusable across unlimited calls: the
 /// <c>sutOverride</c> stand-in that drives the whole <c>--sut microsoft365</c> CLI path credential-free. Deliberately
-/// independent of <c>WorkIqEvaluableAgent</c> (whose live turn is another lane's), so these tests prove the CLI seam
+/// independent of <c>WorkIqEvaluableAgent</c> (whose live turn has its own tests), so these tests prove the CLI seam
 /// (arg parsing, validation, consent, run, reporting) and nothing about the provider's transport.
 /// </summary>
 internal sealed class FakeEvaluableAgent : IEvaluableAgent

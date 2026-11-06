@@ -8,6 +8,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
     <RootNamespace>AgentEval.Microsoft365Demo.Tests</RootNamespace>
+    <!-- The Microsoft 365 provider is experimental (assembly-level [Experimental]); these tests use it on purpose. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_M365_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

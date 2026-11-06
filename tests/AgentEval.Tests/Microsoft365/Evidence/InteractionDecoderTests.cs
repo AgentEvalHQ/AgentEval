@@ -329,7 +329,7 @@ public sealed class InteractionDecoderTests
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // TryDecode (the conversation lane's view of the pause)
+    // TryDecode (the host's view of the pause)
     // ---------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -423,5 +423,130 @@ public sealed class InteractionDecoderTests
         Assert.Throws<ArgumentNullException>(() => InteractionDecoder.TryDecode(null!, Handle(), CaptureId));
         Assert.Throws<ArgumentNullException>(() => InteractionDecoder.TryDecode(MessageWithParts(), null!, CaptureId));
         Assert.Throws<ArgumentException>(() => InteractionDecoder.TryDecode(MessageWithParts(), Handle(), " "));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // One card walk: the evidence's approval intents and the host's pending interaction always agree
+    // ---------------------------------------------------------------------------------------------------------
+
+    private static readonly SourceRef StatusMessageSource = new(CaptureId, 0, EvidenceOrigin.A2AMessage, "/status/message");
+
+    /// <summary>The interaction data part of a one-action confirmation card.</summary>
+    private static WorkIqPart ConfirmationPart(string action) => Confirmation(action, null).Parts[1];
+
+    [Fact]
+    public void TwoInputRequiredParts_BothProjectionsRefuseToChoose()
+    {
+        var part = ConfirmationPart(Calls(("call-1", "CreateDemoEvent", "{}")));
+        var status = MessageWithParts(Text("Confirm?"), part, part);
+
+        var intents = InteractionDecoder.DecodeApprovalIntents(status, StatusMessageSource);
+        var pending = InteractionDecoder.TryDecode(status, Handle(), CaptureId);
+
+        Assert.Equal(EvidenceValidation.Conflicting, intents.Validation);
+        Assert.Empty(intents.Items);
+        Assert.NotNull(pending);
+        Assert.Equal(WorkIqInteractionKind.Unknown, pending.Kind);
+        Assert.Empty(pending.ProposedCalls);
+        Assert.Empty(pending.RecognizedOptions);
+        Assert.Null(pending.SourceRequestId);
+        Assert.Equal(new[] { "/status/message/parts/1", "/status/message/parts/2" }, pending.Sources.Select(s => s.JsonPointer));
+        Assert.Throws<ArgumentException>(() => WorkIqInteractionResponse.ForOption(pending, "Allow"));
+    }
+
+    [Fact]
+    public void AuthPartThenInputRequiredPart_BothProjectionsRefuseToChoose()
+    {
+        var auth = Data("""{"auth-required":{"sourceRequestId":"req-auth"}}""", InteractionDecoder.InteractionMediaType);
+        var status = MessageWithParts(Text("Confirm?"), auth, ConfirmationPart(Calls(("call-1", "CreateDemoEvent", "{}"))));
+
+        var intents = InteractionDecoder.DecodeApprovalIntents(status, StatusMessageSource);
+        var pending = InteractionDecoder.TryDecode(status, Handle(), CaptureId);
+
+        Assert.Equal(EvidenceValidation.Conflicting, intents.Validation);
+        Assert.Empty(intents.Items);
+        Assert.Equal(InteractionDecoder.AmbiguousPartIssueCode, Assert.Single(intents.Issues).Code);
+        Assert.NotNull(pending);
+        Assert.Equal(WorkIqInteractionKind.Unknown, pending.Kind);
+        Assert.Empty(pending.ProposedCalls);
+    }
+
+    [Fact]
+    public void TwoAuthRequiredParts_NoApprovalIntentAndAnUnknownPause()
+    {
+        var auth = Data("""{"auth-required":{"sourceRequestId":"req-auth"}}""", InteractionDecoder.InteractionMediaType);
+        var status = MessageWithParts(Text("Sign in"), auth, auth);
+
+        var intents = InteractionDecoder.DecodeApprovalIntents(status, StatusMessageSource);
+        var pending = InteractionDecoder.TryDecode(status, Handle(), CaptureId);
+
+        Assert.Equal(EvidenceAvailability.NotProvided, intents.Availability);
+        Assert.NotNull(pending);
+        Assert.Equal(WorkIqInteractionKind.Unknown, pending.Kind);
+        Assert.Null(pending.SourceRequestId);
+    }
+
+    [Fact]
+    public void NonPausePartBeforeTheCard_BothProjectionsReadTheCard()
+    {
+        var other = Data("""{"something":{}}""", InteractionDecoder.InteractionMediaType);
+        var status = MessageWithParts(Text("Confirm?"), other, ConfirmationPart(Calls(("call-1", "CreateDemoEvent", "{\"a\":1}"))));
+
+        var intents = InteractionDecoder.DecodeApprovalIntents(status, StatusMessageSource);
+        var pending = InteractionDecoder.TryDecode(status, Handle(), CaptureId);
+
+        Assert.Single(intents.Items);
+        Assert.NotNull(pending);
+        Assert.Equal(WorkIqInteractionKind.ConfirmationRequired, pending.Kind);
+        Assert.Equal("req-test-1", pending.SourceRequestId);
+        Assert.Equal("/status/message/parts/2", Assert.Single(pending.Sources).JsonPointer);
+        AssertProjectionsAgree(status);
+    }
+
+    public static TheoryData<string> CardShapes => new()
+    {
+        "fixture",
+        "differing-twins",
+        "same-name-twice",
+        "non-object-call",
+        "arguments-not-json",
+    };
+
+    [Theory]
+    [MemberData(nameof(CardShapes))]
+    public void EveryProposedCall_IsTheApprovalIntentOfTheSameCardWalk(string shape)
+    {
+        var status = shape switch
+        {
+            "fixture" => FixtureStatus(ConfirmationFixture),
+            "differing-twins" => Confirmation(Calls(("call-1", "F", "{}")), Calls(("call-2", "G", "{}"))),
+            "same-name-twice" => Confirmation(Calls(("call-1", "F", "{}"), ("call-2", "F", "{}")), null),
+            "non-object-call" => Confirmation("[1]", null),
+            _ => Confirmation(Calls(("call-1", "F", "not json")), null),
+        };
+
+        AssertProjectionsAgree(status);
+    }
+
+    private static void AssertProjectionsAgree(WorkIqMessage status)
+    {
+        var intents = InteractionDecoder.DecodeApprovalIntents(status, StatusMessageSource);
+        var pending = InteractionDecoder.TryDecode(status, Handle(), CaptureId);
+
+        Assert.NotNull(pending);
+        Assert.Equal(WorkIqInteractionKind.ConfirmationRequired, pending.Kind);
+        Assert.NotEmpty(intents.Items);
+        Assert.Equal(intents.Items.Length, pending.ProposedCalls.Length);
+        for (var i = 0; i < intents.Items.Length; i++)
+        {
+            var intent = intents.Items[i];
+            var call = pending.ProposedCalls[i];
+            Assert.Equal(intent.ProposedProviderInvocationId.IsPresent ? intent.ProposedProviderInvocationId.Value : null, call.CallId);
+            Assert.Equal(intent.Tool.FunctionDisplayName.IsPresent ? intent.Tool.FunctionDisplayName.Value : null, call.FunctionName);
+            Assert.Equal(intent.ProposedArgumentsRawText.IsPresent ? intent.ProposedArgumentsRawText.Value : null, call.ArgumentsRawText);
+            Assert.Equal(intent.ProposedArguments.State, call.ParsedArguments.State);
+            // Element by element: ImmutableArray's own Equals compares array references, and the two projections are decoded separately.
+            Assert.Equal(intent.Sources.ToArray(), call.Sources.ToArray());
+        }
     }
 }

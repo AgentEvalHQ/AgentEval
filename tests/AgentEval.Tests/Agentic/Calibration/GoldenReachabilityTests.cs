@@ -63,6 +63,7 @@ using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Tests.TestHelpers;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic.Calibration;
@@ -173,8 +174,11 @@ public class GoldenReachabilityTests
     private static async Task<(Reach Class, EvalResult Result)> ClassifyAsync(
         IEvalRegistry registry, string key, EvalInput input, int judgeScore = 42)
     {
+        // Through UntimedRegex: under load a pattern ran out of its wall-clock budget, and a benign query then reached
+        // the judge as an unchecked candidate (TheResponseSwapProbe read Judged for ResponseBlind in CI). The class must
+        // come from what the evaluator decides, not from machine load.
         var judge = new RecordingJudge(judgeScore);
-        var eval = registry.Resolve(key, judge, judgeModel: null);
+        var eval = UntimedRegex.Resolve(registry, key, judge);
         Assert.NotNull(eval);
 
         var result = await eval!.EvaluateAsync(input);
@@ -208,7 +212,7 @@ public class GoldenReachabilityTests
         foreach (var control in ControlResponses)
         {
             var probeJudge = new RecordingJudge();
-            var probeEval = registry.Resolve(key, probeJudge, judgeModel: null);
+            var probeEval = UntimedRegex.Resolve(registry, key, probeJudge);
             Assert.NotNull(probeEval);
 
             var probe = await probeEval!.EvaluateAsync(input with { Response = control });

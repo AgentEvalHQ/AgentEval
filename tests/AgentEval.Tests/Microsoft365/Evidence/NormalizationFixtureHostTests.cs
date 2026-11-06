@@ -15,9 +15,9 @@ using static AgentEval.Tests.Microsoft365.Evidence.EvidenceTestKit;
 namespace AgentEval.Tests.Microsoft365.Evidence;
 
 /// <summary>
-/// The Appendix D fixture host (task M23 "done when"): every fixture of <c>normalization-fixtures.json</c> is fed
-/// through the real normaliser and decoders, the result is serialised with <see cref="Microsoft365EvidenceJson"/>
-/// and the fixture's <c>expected</c> must be a subset (<see cref="JsonSubset"/>) of a small projection of it.
+/// The normalisation fixture host: every A2A fixture of <c>normalization-fixtures.json</c> is fed through the real
+/// normaliser and decoders, the result is serialised with <see cref="Microsoft365EvidenceJson"/> and the fixture's
+/// <c>expected</c> must be a subset (<see cref="JsonSubset"/>) of a small projection of it.
 /// <para>
 /// How a fixture becomes an input: a completed <see cref="WorkIqTaskSnapshot"/> whose status message carries
 /// <c>input.attributions</c> as <c>metadata.attributions</c> (when present) and whose artifacts are an
@@ -25,8 +25,9 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 /// artifact (<c>input.developerInfo</c>, media type <c>application/vnd.ms-workiq.developer-info</c>) and a
 /// <c>Retrieval Info</c> artifact (<c>input.retrievalInfo</c>, media type
 /// <c>application/vnd.ms-workiq-internal.retrieval</c>); <c>profile.developerInfoRequested</c> selects
-/// <see cref="DiagnosticProfile.Native118Diagnostics"/>. A fixture with origin <c>NativeEvaluationImport</c> has no
-/// A2A snapshot: its <c>input.nativeDiagnostics</c> goes to <see cref="Native118DiagnosticsDecoder.DecodeNativeImport"/>.
+/// <see cref="DiagnosticProfile.Native118Diagnostics"/>. The catalog also keeps one fixture with origin
+/// <c>NativeEvaluationImport</c> (a native evaluator's persisted diagnostics): the provider has no importer for it, so
+/// it is not normalised here; it stays in the catalog for when an importer exists.
 /// </para>
 /// <para>
 /// The projection (the test's own, not the evidence schema): for each channel <c>availability</c>, <c>validation</c>,
@@ -40,10 +41,10 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 /// <c>totalResultCount</c>, <c>returnedHitCount</c> = <c>Hits.Items.Length</c>, <c>hits[j]</c> = <c>rankState</c>,
 /// <c>rank</c>, <c>passages</c> (texts); <c>citations</c> = <c>markerCount</c>, <c>referenceOccurrenceCount</c>
 /// (sum of keys), <c>distinctReferenceKeys</c> (first-appearance order), <c>markerKeys</c>, <c>bindings</c> (one per
-/// link); <c>rawAnswerUnchanged</c> = raw text equals <c>input.answerText</c>; <c>losses</c> = the ids of the
-/// <c>import.loss.*</c> issues; <c>legacyToolUsageReport</c>/<c>legacyToolTimeline</c> = <c>null</c> by
-/// construction (the evidence document has no such members; D8 keeps them null on the <c>AgentResponse</c>, which
-/// lane A's agent tests assert).
+/// link); <c>rawAnswerUnchanged</c> = raw text equals <c>input.answerText</c>;
+/// <c>legacyToolUsageReport</c>/<c>legacyToolTimeline</c> = <c>null</c> by
+/// construction (the evidence document has no such members; they stay null on the <c>AgentResponse</c>, which the
+/// agent tests assert).
 /// </para>
 /// <para>
 /// <c>metricEligibility</c> is computed from the evidence states alone: <c>retrievalRankAtK</c> = retrieval
@@ -57,25 +58,9 @@ namespace AgentEval.Tests.Microsoft365.Evidence;
 public sealed class NormalizationFixtureHostTests
 {
     private const string Catalog = "normalization-fixtures.json";
-    private const string ImportCaptureId = "cap-native-import-0001";
     private const string ImportOrigin = "NativeEvaluationImport";
 
-    /// <summary>Every fixture id of the catalog.</summary>
-    public static TheoryData<string> FixtureIds
-    {
-        get
-        {
-            var data = new TheoryData<string>();
-            foreach (var fixture in LoadFixtures())
-            {
-                data.Add(fixture.GetProperty("id").GetString()!);
-            }
-
-            return data;
-        }
-    }
-
-    /// <summary>The fixtures that model A2A artifacts (and therefore produce a whole evidence document).</summary>
+    /// <summary>The fixtures that model A2A artifacts (and therefore produce a whole evidence document); the native import fixture has no importer.</summary>
     public static TheoryData<string> A2AFixtureIds
     {
         get
@@ -99,8 +84,16 @@ public sealed class NormalizationFixtureHostTests
         Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
     }
 
+    [Fact]
+    public void Catalog_KeepsTheNativeImportFixtureForALaterImporter()
+    {
+        var import = Assert.Single(LoadFixtures(), f => string.Equals(f.GetProperty("origin").GetString(), ImportOrigin, StringComparison.Ordinal));
+
+        Assert.True(import.GetProperty("input").TryGetProperty("nativeDiagnostics", out _));
+    }
+
     [Theory]
-    [MemberData(nameof(FixtureIds))]
+    [MemberData(nameof(A2AFixtureIds))]
     public void Normalize_Fixture_ExpectedIsASubsetOfTheProjection(string id)
     {
         var fixture = LoadFixture(id);
@@ -143,20 +136,6 @@ public sealed class NormalizationFixtureHostTests
     private static JsonElement Project(JsonElement fixture)
     {
         var input = fixture.GetProperty("input");
-        if (string.Equals(fixture.GetProperty("origin").GetString(), ImportOrigin, StringComparison.Ordinal))
-        {
-            var result = Native118DiagnosticsDecoder.DecodeNativeImport(input.GetProperty("nativeDiagnostics"), ImportCaptureId);
-            var markers = EvidenceSet<CitationMarker>.NotProvided(EvidenceScope.Response, default);
-            return ToElement(Projection(
-                result.ToolSelections,
-                result.ToolExecutions,
-                result.RetrievalExecutions,
-                markers,
-                ImmutableArray<CitationLink>.Empty,
-                result.Issues,
-                rawAnswerUnchanged: null));
-        }
-
         var evidence = NormalizeA2A(fixture);
         bool? rawUnchanged = input.TryGetProperty("answerText", out var answerText)
             ? evidence.Answer is { RawText.IsPresent: true } answer && string.Equals(answer.RawText.Value, answerText.GetString(), StringComparison.Ordinal)
@@ -167,7 +146,6 @@ public sealed class NormalizationFixtureHostTests
             evidence.RetrievalExecutions,
             evidence.CitationMarkers,
             evidence.CitationLinks,
-            evidence.Issues,
             rawUnchanged));
     }
 
@@ -212,7 +190,6 @@ public sealed class NormalizationFixtureHostTests
         EvidenceSet<RetrievalExecutionObservation> retrievals,
         EvidenceSet<CitationMarker> markers,
         ImmutableArray<CitationLink> links,
-        ImmutableArray<EvidenceIssue> issues,
         bool? rawAnswerUnchanged)
     {
         var projection = new JsonObject
@@ -222,9 +199,6 @@ public sealed class NormalizationFixtureHostTests
             ["retrievalExecutions"] = ProjectRetrievals(retrievals),
             ["citations"] = ProjectCitations(markers, links),
             ["metricEligibility"] = ProjectEligibility(retrievals, executions, markers, links),
-            ["losses"] = Arr(issues
-                .Where(i => i.Code.StartsWith(Native118DiagnosticsDecoder.ImportLossIssuePrefix, StringComparison.Ordinal))
-                .Select(i => Str(i.Code[Native118DiagnosticsDecoder.ImportLossIssuePrefix.Length..]))),
             ["legacyToolUsageReport"] = null,
             ["legacyToolTimeline"] = null,
         };

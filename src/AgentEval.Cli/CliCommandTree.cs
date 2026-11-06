@@ -175,7 +175,7 @@ internal static class CliCommandTree
             return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
                 aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
                 agentIsLive: agentOverride is not null,
-                subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(benchGdprSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut));
         });
 
         // bench gdpr calibrate
@@ -279,7 +279,7 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1,
-                subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(benchEuAiActSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut));
         });
         // bench eu-ai-act calibrate
         var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -463,7 +463,7 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchOwaspAefOpt), noAef: parseResult.GetValue(benchOwaspNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspEndpointOpt) : null,
-                subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(benchOwaspSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchOwaspSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchOwaspCmd);
@@ -535,7 +535,7 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchMitreAefOpt), noAef: parseResult.GetValue(benchMitreNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreEndpointOpt) : null,
-                subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(benchMitreSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchMitreSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchMitreCmd);
@@ -606,7 +606,7 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchNistAefOpt), noAef: parseResult.GetValue(benchNistNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistEndpointOpt) : null,
-                subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(benchNistSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchNistSutTargets, sut));
             return exitCode;
         });
         benchCmd.Add(benchNistCmd);
@@ -924,7 +924,7 @@ internal static class CliCommandTree
                         aef: parseResult.GetValue(benchPerfAefOpt), noAef: parseResult.GetValue(benchPerfNoAefOpt),
                         subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null,
                         agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfEndpointOpt) : null,
-                        subjectSettings: AgentEval.Cli.Microsoft365.Microsoft365SutTarget.BenchRunSettings(presetSutTargets, sut));
+                        subjectSettings: SutTargetResolver.RunSettingsFor(presetSutTargets, sut));
                 });
                 benchPerfCmd.Add(presetCmd);
             }
@@ -1019,7 +1019,7 @@ internal static class CliCommandTree
             await McDoctorCommand.RunAsync());
         mcCmd.Add(mcDoctorCmd);
 
-        // ─── m365 — Microsoft 365 (Work IQ A2A) connector (M37, HLD D21) ─────────────
+        // ─── m365 — Microsoft 365 (Work IQ A2A) connector ─────────────────────────────
         // m365 doctor — the staged readiness check an external tester runs first on their own tenant: config, sign-in,
         // agent card, protocol handshake, and (with --probe + consent) one real prompt and the capability census.
         var m365Cmd = new Command("m365", "Microsoft 365 (Work IQ A2A 1.0) connector commands");

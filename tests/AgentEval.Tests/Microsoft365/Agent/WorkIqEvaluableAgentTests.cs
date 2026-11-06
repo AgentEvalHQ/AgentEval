@@ -107,7 +107,7 @@ public sealed class WorkIqEvaluableAgentTests
         {
             var response = await agent.InvokeAsync("x");
 
-            // Review M3: a missing answer is never indistinguishable from an empty one.
+            // A missing answer is never indistinguishable from an empty one.
             Assert.Equal("", response.Text);
             Assert.Equal(WorkIqEvaluableAgent.CompletedNoAnswerFinishReason, response.FinishReason);
             Assert.Equal("completed-no-answer", response.FinishReason);
