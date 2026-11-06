@@ -452,7 +452,7 @@ internal sealed partial class WorkIqA2AClient : IWorkIqA2AClient
         var (category, hint) = status switch
         {
             401 => (WorkIqFailureCategory.Unauthorized, $"token rejected: audience/scope/expiry — re-run the device-code sign-in; scope must be {scope ?? Microsoft365Config.DefaultScope}"),
-            403 => (WorkIqFailureCategory.Forbidden, $"the signed-in user or the app lacks the delegated permission, its admin consent or a Work IQ licence (scope {scope ?? Microsoft365Config.DefaultScope})"),
+            403 => (WorkIqFailureCategory.Forbidden, $"admin consent for the delegated permission is missing, the user is not in a usage-based billing plan, or Work IQ is not enabled in the tenant (scope {scope ?? Microsoft365Config.DefaultScope})"),
             404 => (WorkIqFailureCategory.NotFound, "endpoint, agent or task not found (a task may be inaccessible, expired or purged)"),
             429 => (WorkIqFailureCategory.RateLimited, "rate limited; backoff applies to discovery/GetTask/CancelTask only, a send is never resent"),
             >= 500 => (WorkIqFailureCategory.RemoteError, "service error"),

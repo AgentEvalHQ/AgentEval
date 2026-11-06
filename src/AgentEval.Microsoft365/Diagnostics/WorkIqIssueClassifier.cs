@@ -40,7 +40,7 @@ internal static partial class WorkIqIssueClassifier
 
     /// <summary>Suggested cause of an HTTP 403.</summary>
     public const string Cause403 =
-        "the signed-in user or app lacks WorkIQAgent.Ask consent, a Microsoft 365 Copilot licence, or Work IQ is not enabled on the tenant; an administrator must grant consent and enable Work IQ";
+        "Work IQ refused the call: admin consent for WorkIQAgent.Ask is missing (the reply then names the required scopes), the user is not in the tenant's usage-based billing plan or was added less than 30 minutes ago, or Work IQ is not enabled in the tenant; an administrator fixes each (docs/microsoft365-tenant-setup.md)";
 
     /// <summary>Suggested cause of an HTTP 404 on the card or the endpoint.</summary>
     public const string Cause404 =

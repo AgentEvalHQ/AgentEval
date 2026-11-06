@@ -174,7 +174,7 @@ internal static partial class WorkIqAadstsCatalog
             new WorkIqAadstsEntry(
                 "AADSTS650052",
                 "the application needs a service the tenant has no service principal for (the Work IQ API is not provisioned or consented in this tenant)",
-                "an administrator checks that Work IQ is enabled for the tenant and grants admin consent for the app registration's WorkIQAgent.Ask permission, which creates the service principal",
+                "a Global Administrator enables Work IQ in the tenant (az ad sp create --id fdcc1f02-fc51-4226-8753-f668596af7f7), then an administrator grants admin consent for WorkIQAgent.Ask (docs/microsoft365-tenant-setup.md, steps 1 and 5)",
                 PermissionRefusal: true),
             new WorkIqAadstsEntry(
                 "AADSTS90094",

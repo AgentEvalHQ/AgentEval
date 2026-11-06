@@ -70,7 +70,7 @@ public sealed class WorkIqIssueClassifierTests
 
     [Theory]
     [InlineData(401, WorkIqIssueCategory.Authentication, "http.401", "api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask")]
-    [InlineData(403, WorkIqIssueCategory.Permission, "http.403", "WorkIQAgent.Ask consent")]
+    [InlineData(403, WorkIqIssueCategory.Permission, "http.403", "admin consent for WorkIQAgent.Ask")]
     [InlineData(404, WorkIqIssueCategory.Config, "http.404", "agent id or endpoint path wrong")]
     [InlineData(429, WorkIqIssueCategory.Service, "http.429", "rate limited")]
     [InlineData(500, WorkIqIssueCategory.Service, "http.500", "HTTP 500")]
@@ -97,12 +97,17 @@ public sealed class WorkIqIssueClassifierTests
     }
 
     [Fact]
-    public void FromFailure_403_SaysAnAdministratorMustGrantConsentAndEnableWorkIq()
+    public void FromFailure_403_NamesConsentTheBillingPlanAndWorkIqEnablement()
     {
+        // Microsoft's quickstart: a 403 that names the required scopes is missing consent; one without is a user
+        // outside the usage-based billing plan. Work IQ not enabled also refuses the call.
         var issue = WorkIqIssueClassifier.FromFailure(Failure(WorkIqFailureCategory.Forbidden, httpStatus: 403));
 
         Assert.Equal(WorkIqIssueClassifier.Cause403, issue.SuggestedCause);
-        Assert.Contains("Copilot licence", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.Contains("admin consent for WorkIQAgent.Ask", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.Contains("usage-based billing plan", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.Contains("Work IQ is not enabled", issue.SuggestedCause, StringComparison.Ordinal);
+        Assert.DoesNotContain("licence", issue.SuggestedCause, StringComparison.Ordinal);
     }
 
     [Fact]

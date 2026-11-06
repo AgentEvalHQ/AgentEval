@@ -1,7 +1,7 @@
 ---
 name: m365-demo-setup
 version: 0.2.0
-description: Take a tester from nothing to a first zipped run of the AgentEval Microsoft 365 demo. Covers the tenant prerequisites (Work IQ, a Copilot licence, a public-client app registration with WorkIQAgent.Ask and admin consent), workiq.json, the first --readiness-only run, reading readiness.md, the full run with consent, and --zip. Use when someone wants to connect the demo to a tenant, run it for the first time, or send a run back. To read a failed run use m365-demo-triage; to change what the demo tests use m365-demo-customize.
+description: Take a tester from nothing to a first zipped run of the AgentEval Microsoft 365 demo. Covers the tenant prerequisites (Work IQ enabled, the user in a usage-based billing plan, a public-client app registration with WorkIQAgent.Ask and admin consent; steps in docs/microsoft365-tenant-setup.md), workiq.json, the first --readiness-only run, reading readiness.md, the full run with consent, and --zip. Use when someone wants to connect the demo to a tenant, run it for the first time, or send a run back. To read a failed run use m365-demo-triage; to change what the demo tests use m365-demo-customize.
 ---
 
 # m365-demo-setup

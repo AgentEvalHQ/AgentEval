@@ -143,7 +143,7 @@ internal sealed class WorkIqAuthHandler : DelegatingHandler
         }
         else if (status == 403)
         {
-            var hint = $"the signed-in user or the app lacks the delegated permission, its admin consent or a Work IQ licence (scope {ExpectedScope})";
+            var hint = $"admin consent for the delegated permission is missing, the user is not in a usage-based billing plan, or Work IQ is not enabled in the tenant (scope {ExpectedScope})";
             Diagnostics.Trace(WorkIqTraceStage.Auth, "auth.forbidden", $"{destination} → HTTP 403: {hint} (not resent)", WorkIqTraceLevel.Error, requestId: requestId, httpStatus: status, elapsedMs: elapsedMs);
         }
 

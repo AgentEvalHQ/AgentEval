@@ -410,7 +410,7 @@ internal static class IssueText
     {
         WorkIqIssueCategory.Config => "your config file or the options",
         WorkIqIssueCategory.Authentication => "the sign-in (you, or the app registration)",
-        WorkIqIssueCategory.Permission => "an Entra / Microsoft 365 administrator (consent, licence, Work IQ enabled)",
+        WorkIqIssueCategory.Permission => "an administrator (admin consent, the billing plan, Work IQ enabled)",
         WorkIqIssueCategory.Network => "the network between this machine and Work IQ",
         WorkIqIssueCategory.Protocol => "the connector maintainers (the reply is not the A2A 1.0 shape)",
         WorkIqIssueCategory.Service => "the Work IQ service (note the request-id)",
@@ -429,7 +429,7 @@ internal static class IssueText
         WorkIqIssueCategory.Authentication =>
             "Complete the sign-in when the prompt appears; check tenantId and appClientId against the app registration's Overview page and that 'Allow public client flows' is on.",
         WorkIqIssueCategory.Permission =>
-            "Ask an administrator to grant admin consent for the delegated WorkIQAgent.Ask permission, and check the user's Microsoft 365 Copilot licence and that Work IQ is enabled.",
+            "Ask an administrator to grant admin consent for the delegated WorkIQAgent.Ask permission, to add the test user to the usage-based billing plan, and to check that Work IQ is enabled (docs/microsoft365-tenant-setup.md).",
         WorkIqIssueCategory.Network =>
             "Check the network, proxy or VPN to workiq.svc.cloud.microsoft and run again; a timed-out prompt may have reached the service, so do not resend it blindly.",
         WorkIqIssueCategory.Protocol =>

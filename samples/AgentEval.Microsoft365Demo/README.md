@@ -15,14 +15,15 @@ and never a mock.
 
 You need, in a non-production tenant:
 
-- Work IQ enabled, and a Microsoft 365 Copilot licence on the test user;
+- Work IQ enabled, and the test user in a usage-based billing plan (Work IQ calls are billed as Copilot Credits);
 - an Entra app registration that is a public client, with the delegated permission `WorkIQAgent.Ask` and admin
   consent; its tenant id and client id;
 - a document titled **"Demo Q3 Planning"** in the test user's OneDrive or SharePoint ([why](#the-grounding-case));
 - the .NET 10 SDK and git;
 - optionally, a judge model for the benchmark's criteria ([The judge](#the-judge-optional)).
 
-The tester guide's [What you need](../../docs/microsoft365-tester-guide.md#what-you-need) gives the portal steps.
+[Connect to a Microsoft 365 tenant](../../docs/microsoft365-tenant-setup.md) gives every step in order, who does
+it, and the first connection test.
 
 The permission covers reads **and writes** of the test user's data. The demo never approves an action or resends a
 prompt, and every step after the readiness check needs your consent.

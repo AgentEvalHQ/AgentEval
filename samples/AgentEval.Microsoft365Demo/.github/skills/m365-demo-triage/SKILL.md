@@ -68,7 +68,7 @@ The category says who acts. The demo prints it on each issue and groups `summary
 |---|---|
 | `Config` | the tester: the config file or the options |
 | `Authentication` | the sign-in: the tester, or the app registration |
-| `Permission` | an Entra or Microsoft 365 administrator: consent, licence, Work IQ enabled |
+| `Permission` | an administrator: admin consent, the billing plan, Work IQ enabled ([setup](../../../../../docs/microsoft365-tenant-setup.md#if-a-step-fails)) |
 | `Network` | the network between this machine and Work IQ |
 | `Protocol` | the connector maintainers: the reply is not the A2A 1.0 shape |
 | `Service` | the Work IQ service: keep the `request-id` |

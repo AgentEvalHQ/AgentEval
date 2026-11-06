@@ -75,7 +75,7 @@ public enum WorkIqIssueCategory
     /// <summary>Sign-in and tokens (MSAL failure, AADSTS code, HTTP 401).</summary>
     Authentication,
 
-    /// <summary>Consent, licence or role (HTTP 403, missing delegated permission, Work IQ not enabled).</summary>
+    /// <summary>Consent, billing or enablement (HTTP 403: missing admin consent, the user not in a usage-based billing plan, Work IQ not enabled).</summary>
     Permission,
 
     /// <summary>DNS, TLS, socket, timeout or connection drop.</summary>

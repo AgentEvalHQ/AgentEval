@@ -21,13 +21,14 @@ Stop there unless the maintainers ask for the command-line results in
 
 ## What you need
 
-Both parts need the same tenant setup.
+Both parts need the same tenant setup. [Connect to a Microsoft 365 tenant](microsoft365-tenant-setup.md) gives
+the steps in order, who does each one, and the first connection test.
 
 | Item | Why | Where to get it |
 |---|---|---|
 | A **non-production** tenant and a **test user** in it | The agent acts as this user on real mail, files and calendar, and a prompt can make it propose an action. Nothing is ever approved for you. | Your organisation's test tenant. Never a production identity. |
-| **Work IQ enabled** in the tenant | Without it the service answers HTTP 403. | An administrator, in the Microsoft 365 admin center. |
-| A **Microsoft 365 Copilot licence** on the test user | Without it the service answers HTTP 403. | Microsoft 365 admin center → *Users* → the test user → *Licenses*. |
+| **Work IQ enabled** in the tenant | Without it the sign-in fails with `AADSTS650052`. | A Global Administrator, once: [setup](microsoft365-tenant-setup.md#1-enable-work-iq-in-the-tenant-once) step 1. |
+| The test user in a **usage-based billing plan** | Work IQ calls are billed as Copilot Credits. Without the plan the service answers HTTP 403. | A billing administrator: [setup](microsoft365-tenant-setup.md#2-set-up-billing-for-the-test-user) step 2. Allow 30 minutes. |
 | An **Entra app registration** that is a **public client** | The connector signs in with a device code and holds no secret. Without this setting the sign-in fails with `AADSTS7000218`. | Entra admin center → *App registrations* → *New registration* (single tenant is fine). Then *Authentication* → *Advanced settings* → **Allow public client flows = Yes** → *Save*. |
 | The delegated permission **`WorkIQAgent.Ask`** with **admin consent** | The scope the service accepts. Without consent the sign-in fails with `AADSTS65001`. It covers reads **and writes** of the user's data. | The app's *API permissions* → *Add a permission* → *APIs my organization uses* → the Work IQ API (`api://workiq.svc.cloud.microsoft`) → *Delegated* → `WorkIQAgent.Ask` → *Add*. Then **Grant admin consent**. |
 | The **tenant id** and the app's **client id** | For `workiq.json`. | The app registration's *Overview* page: *Directory (tenant) ID* and *Application (client) ID*. |
@@ -135,7 +136,7 @@ folder has the same table plus each stage's evidence.
 | `auth` … `AADSTS65001` | Admin consent for `WorkIQAgent.Ask` is missing. | An administrator grants it on the app's *API permissions* page. |
 | `auth` … `AADSTS7000218` | The app is not a public client. | Set *Allow public client flows* to **Yes**. |
 | `auth` … `sign-in not completed: the device code expired …` | Nobody finished the sign-in in time. Nothing was sent. | Run again and sign in while the code is valid (about 15 minutes). |
-| `discovery` or `protocol` … `HTTP 403` | No permission or consent, no Copilot licence, or Work IQ is off. They look the same from outside. | Ask the administrator to check all three. |
+| `discovery` or `protocol` … `HTTP 403` | Scopes named: admin consent is missing. No scope named: the user is not in the billing plan, or Work IQ is off. | [Setup](microsoft365-tenant-setup.md#if-a-step-fails) steps 5, 2 or 1. |
 
 `--continue` runs the remaining stages after a failure. `--stage auth` (or `discovery`, `protocol`) runs one stage
 plus the `config` stage it needs.

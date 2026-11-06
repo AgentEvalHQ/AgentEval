@@ -168,7 +168,7 @@ public sealed class ReadinessTests : IDisposable
     {
         // status, issue category, a phrase of the suggested cause, a phrase of the action
         { HttpStatusCode.Unauthorized, "Authentication", "token rejected", "sign in" },
-        { HttpStatusCode.Forbidden, "Permission", "lacks WorkIQAgent.Ask consent", "admin consent" },
+        { HttpStatusCode.Forbidden, "Permission", "admin consent for WorkIQAgent.Ask", "admin consent" },
     };
 
     [Theory]

@@ -577,7 +577,7 @@ internal sealed partial class ReadinessRun
             { HttpStatus: 401 } or { Category: WorkIqFailureCategory.Unauthorized } =>
                 $"HTTP 401 on {OperationText(failure)}: the token was rejected",
             { HttpStatus: 403 } or { Category: WorkIqFailureCategory.Forbidden } =>
-                $"HTTP 403 on {OperationText(failure)}: the user or the app lacks the permission, its consent, a licence, or Work IQ is not enabled",
+                $"HTTP 403 on {OperationText(failure)}: admin consent is missing, the user is not in the usage-based billing plan, or Work IQ is not enabled",
             { Category: WorkIqFailureCategory.UntrustedHost } =>
                 "the card points at a host outside trustedHosts; no token was sent there",
             { RpcErrorCode: (int)A2AErrorCode.VersionNotSupported } =>
@@ -632,7 +632,7 @@ internal sealed partial class ReadinessRun
         { HttpStatus: 401 } or { Category: WorkIqFailureCategory.Unauthorized } =>
             $"Run the doctor again to sign in afresh. Check that 'scope' is {Microsoft365Config.DefaultScope} and that tenantId and appClientId name the app registration that holds WorkIQAgent.Ask.",
         { HttpStatus: 403 } or { Category: WorkIqFailureCategory.Forbidden } =>
-            "Ask an administrator to grant admin consent for WorkIQAgent.Ask on the app registration, to assign a Microsoft 365 Copilot licence to the test user, and to enable Work IQ in the tenant; then run again.",
+            "If the reply names the required scopes, ask an administrator to grant admin consent for WorkIQAgent.Ask. Otherwise check that the test user is in the usage-based billing plan (wait 30 minutes after adding them) and that Work IQ is enabled in the tenant. The steps are in docs/microsoft365-tenant-setup.md; then run again.",
         { Category: WorkIqFailureCategory.UntrustedHost } =>
             "Inspect the card (the trace's discovery events, or --m365-capture-raw, show its interface hosts). Add a host to trustedHosts only if it is clearly Microsoft's; otherwise send the report folder back.",
         { Category: WorkIqFailureCategory.ProtocolVersionMismatch } or { RpcErrorCode: (int)A2AErrorCode.VersionNotSupported } =>

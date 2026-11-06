@@ -495,7 +495,8 @@ public sealed class Microsoft365ReadinessCheckTests
         Assert.Equal(WorkIqIssueCategory.Permission, protocol.Issue.Category);
         Assert.Equal(403, protocol.Issue.HttpStatus);
         Assert.Contains("admin consent", protocol.Action, StringComparison.Ordinal);
-        Assert.Contains("licence", protocol.Action, StringComparison.Ordinal);
+        Assert.Contains("billing plan", protocol.Action, StringComparison.Ordinal);
+        Assert.Contains("microsoft365-tenant-setup.md", protocol.Action, StringComparison.Ordinal);
     }
 
     [Fact]

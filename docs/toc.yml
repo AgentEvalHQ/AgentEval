@@ -101,6 +101,8 @@
   - name: Microsoft 365 (Work IQ A2A)
     href: microsoft365.md
     items:
+    - name: Connect to a Tenant
+      href: microsoft365-tenant-setup.md
     - name: Tester Guide
       href: microsoft365-tester-guide.md
     - name: Tester Results Template

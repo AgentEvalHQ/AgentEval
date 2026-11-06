@@ -134,7 +134,10 @@ describe the rest.
 
 ## Prerequisites
 
-- **Work IQ enabled** in the tenant, and a **Microsoft 365 Copilot licence** for the test user. Without either one,
+[Connect to a Microsoft 365 tenant](microsoft365-tenant-setup.md) gives the steps in order. In short:
+
+- **Work IQ enabled** in the tenant (a Global Administrator, once) and the test user in a **usage-based billing plan**
+  for Copilot Credits: Work IQ calls are billed separately from any subscription. Without either one,
   the service answers HTTP 403.
 - An **Entra app registration configured as a public client**: *Allow public client flows* set to **Yes** on its
   *Authentication* page. No client secret is used. Without the setting, Entra refuses the sign-in (`AADSTS7000218`).
@@ -148,7 +151,7 @@ describe the rest.
   usefully here.
 - The **.NET 10 SDK**.
 
-The [tester guide](microsoft365-tester-guide.md) gives the click-by-click steps.
+The [setup page](microsoft365-tenant-setup.md) gives the click-by-click steps and the first connection test.
 
 ## Authoring the config JSON
 
@@ -479,7 +482,7 @@ lists every issue code the provider and the demo report, in the issue register o
 | `AADSTS50059`, `AADSTS90002`, `AADSTS90019` | You (config) | No tenant was named, or it was not found (a typo, a placeholder, another cloud). | Set `tenantId` to the *Directory (tenant) ID* on the app's *Overview* page. |
 | `AADSTS50076`, `AADSTS50079` | You (sign-in) | Multi-factor authentication is required, or must be set up. | Complete or set up MFA in the browser during the sign-in. |
 | `AADSTS50105`, `AADSTS53003`, `AADSTS530003` | Tenant admin | User assignment, conditional access or a device policy blocked the sign-in. | Assign the user, or review the policy the Entra sign-in log names. |
-| `AADSTS65001`, `AADSTS65004`, `AADSTS650052`, `AADSTS90094` | Tenant admin | Consent for `WorkIQAgent.Ask` is missing or declined. `650052`: Work IQ is not set up in the tenant. | Grant admin consent on the app registration; for `650052`, enable Work IQ first. |
+| `AADSTS65001`, `AADSTS65004`, `AADSTS650052`, `AADSTS90094` | Tenant admin | Consent for `WorkIQAgent.Ask` is missing or declined. `650052`: Work IQ is not enabled in the tenant. | Grant admin consent on the app registration. For `650052`, a Global Administrator enables Work IQ first ([setup](microsoft365-tenant-setup.md), step 1). |
 | `AADSTS65002`, `AADSTS700016` | You (config) | `appClientId` is wrong, in another tenant, or a Microsoft-owned app. | Use your own app registration's client id. |
 | `AADSTS7000215`, `AADSTS7000218` | App registration owner | Public client flows are off, so Entra asks for a secret. | Set *Allow public client flows* to **Yes** (*Authentication*, *Advanced settings*). |
 | `AADSTS70011`, `AADSTS900144` | You (config) | The scope is wrong, or a sign-in parameter is missing. | Use the default `scope`; check `tenantId` and `appClientId`. |
@@ -503,7 +506,7 @@ lists every issue code the provider and the demo report, in the issue register o
 | `exception.<type>` | Maintainers | An unclassified exception, such as `exception.NullReferenceException`. | Send the trace. |
 | `failure.unknown` | Maintainers | A failure the provider could not classify. | Send the trace. |
 | `http.401` | You (sign-in) | The token was rejected: wrong scope, expired, or another app. | Sign in again; check `tenantId`, `appClientId` and `scope`. |
-| `http.403` | Tenant admin | Consent, a Copilot licence or Work IQ enablement is missing. They look the same from outside. | An administrator checks all three. |
+| `http.403` | Tenant admin | A reply that names the required scopes: admin consent is missing. No scope named: the test user is not in the usage-based billing plan (or was added less than 30 minutes ago), or Work IQ is not enabled. | Follow [setup](microsoft365-tenant-setup.md#if-a-step-fails) steps 5, 2 or 1. |
 | `http.404` | You (config) | A wrong `agentId` or `endpoint`, or an agent the user cannot reach. | Check `endpoint`, and `agentId` (or leave it out). |
 | `http.429` | Work IQ service | Throttled. Reads back off; a send is never retried. | Wait, then run at a lower pace. |
 | `http.<status>` | Work IQ service | Another status: `5xx` is a service fault, others a refusal or a proxy. | Note the `request-id`; report it if it repeats. |

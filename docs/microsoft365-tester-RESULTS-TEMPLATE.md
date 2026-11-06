@@ -24,7 +24,7 @@ key, the device code or the content of `workiq.json`.
 | Prerequisite | Confirmed (yes / no / unsure) |
 |---|---|
 | Work IQ enabled in the tenant | |
-| Microsoft 365 Copilot licence on the test user | |
+| Test user in a usage-based billing plan (Copilot Credits) | |
 | App registration: *Allow public client flows* = Yes | |
 | Delegated `WorkIQAgent.Ask` with admin consent | |
 | "Demo Q3 Planning" document in the test user's files | |
