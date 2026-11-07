@@ -457,6 +457,43 @@ public sealed class Microsoft365ReadinessCheckTests
     }
 
     [Fact]
+    public async Task Protocol_InvalidParams_Passes_WithAWarning_AndStaysOutOfTheIssueRegister()
+    {
+        // Work IQ's real answer on 2026-11-07: it rejects the made-up task id (-32602) instead of TaskNotFound (-32001).
+        const string invalidParams = "{\"jsonrpc\":\"2.0\",\"id\":\"rpc-1\",\"error\":{\"code\":-32602,\"message\":\"Invalid params\"}}";
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).OnRpc("GetTask", invalidParams, headers: new Dictionary<string, string> { ["request-id"] = "req-doctor-2" });
+
+        var report = await rig.RunAsync(rig.Options());
+
+        var protocol = report.Find(ReadinessStage.Protocol)!;
+        Assert.Equal(ReadinessResult.Pass, protocol.Result);
+        Assert.Equal("-32602 (InvalidParams)", EvidenceOf(protocol, "JSON-RPC code"));
+        Assert.Equal("req-doctor-2", EvidenceOf(protocol, "request-id"));
+        Assert.Contains(protocol.Warnings, w => w.Contains("InvalidParams (-32602)", StringComparison.Ordinal));
+        Assert.Null(protocol.Issue);
+        Assert.Empty(ReadLines(report.IssueFile));
+        Assert.Contains("doctor.protocol.expected_invalid_params", Codes(report.TraceFile));
+        Assert.True(report.AllPassed);
+    }
+
+    [Fact]
+    public async Task Protocol_OtherJsonRpcError_StillFails()
+    {
+        // Only the two answers that prove the endpoint pass; any other JSON-RPC error on GetTask still fails the stage.
+        const string internalError = "{\"jsonrpc\":\"2.0\",\"id\":\"rpc-1\",\"error\":{\"code\":-32603,\"message\":\"Internal error\"}}";
+        using var rig = new ReadinessTestRig();
+        rig.Handler.OnCard(DefaultCard).OnRpc("GetTask", internalError);
+
+        var report = await rig.RunAsync(rig.Options());
+
+        var protocol = report.Find(ReadinessStage.Protocol)!;
+        Assert.Equal(ReadinessResult.Fail, protocol.Result);
+        Assert.NotNull(protocol.Issue);
+        Assert.False(report.AllPassed);
+    }
+
+    [Fact]
     public async Task Protocol_Http401_FailsWithAnAuthenticationIssue_AndStopsTheRun()
     {
         using var rig = new ReadinessTestRig();

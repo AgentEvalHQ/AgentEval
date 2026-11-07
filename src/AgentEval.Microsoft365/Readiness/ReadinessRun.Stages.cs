@@ -477,15 +477,15 @@ internal sealed partial class ReadinessRun
         var client = Client;
         var taskId = Microsoft365ReadinessCheck.ProtocolTaskIdPrefix + Guid.NewGuid().ToString("N");
         var evidence = new ReadinessEvidence();
-        evidence.Add("request", $"GetTask for the random task id {taskId}; the expected answer is JSON-RPC TaskNotFound (-32001)");
+        evidence.Add("request", $"GetTask for the random task id {taskId}; the expected answer is JSON-RPC TaskNotFound (-32001), or InvalidParams (-32602) when the service rejects the made-up id");
         var filter = _issueFilter!;
         var started = _clock.GetTimestamp();
         using var stage = StageTokenSource(cancellationToken, _options.StageTimeout);
         try
         {
             WorkIqRpcResult<AgentTask> reply;
-            using (filter.Expect(i => i.RpcErrorCode == (int)A2AErrorCode.TaskNotFound && string.Equals(i.TaskId, taskId, StringComparison.Ordinal)))
-            using (client.ExpectFailure(f => f.RpcErrorCode == (int)A2AErrorCode.TaskNotFound && string.Equals(f.TaskId, taskId, StringComparison.Ordinal)))
+            using (filter.Expect(i => IsExpectedProtocolAnswer(i.RpcErrorCode) && string.Equals(i.TaskId, taskId, StringComparison.Ordinal)))
+            using (client.ExpectFailure(f => IsExpectedProtocolAnswer(f.RpcErrorCode) && string.Equals(f.TaskId, taskId, StringComparison.Ordinal)))
             {
                 reply = await client.GetTaskAsync(taskId, historyLength: null, stage.Token).ConfigureAwait(false);
             }
@@ -538,12 +538,50 @@ internal sealed partial class ReadinessRun
                     : "Nothing to do. Next: add --probe --i-understand-live-side-effects to send one real prompt.",
                 evidence) with { ElapsedMs = elapsed };
         }
+        catch (WorkIqProtocolException ex) when (ex.Failure.RpcErrorCode == (int)A2AErrorCode.InvalidParams)
+        {
+            // Work IQ answered this on 2026-11-07 (a tester's tenant): it rejects the made-up id before looking it up.
+            // A JSON-RPC error on an accepted token, with no version refusal (-32009), proves what this stage checks.
+            var elapsed = Elapsed(started);
+            evidence.Add("endpoint", EndpointText(client));
+            evidence.Add("HTTP status", ex.Failure.HttpStatus?.ToString(CultureInfo.InvariantCulture));
+            evidence.Add("JSON-RPC code", "-32602 (InvalidParams)");
+            evidence.Add("request-id", ex.Failure.RequestId ?? "absent (the service sent no request-id header)");
+            evidence.Add("elapsed ms", Ms(elapsed));
+
+            _diagnostics.Trace(
+                WorkIqTraceStage.Doctor,
+                "doctor.protocol.expected_invalid_params",
+                "the JSON-RPC InvalidParams (-32602) above answers the doctor's GetTask on a made-up task id: the service rejected the id before looking it up; it is not an anomaly and was not written to the issue register",
+                taskId: taskId,
+                requestId: ex.Failure.RequestId,
+                httpStatus: ex.Failure.HttpStatus,
+                rpcErrorCode: ex.Failure.RpcErrorCode);
+
+            return Passed(
+                ReadinessStage.Protocol,
+                "the service answered GetTask on a made-up task id with JSON-RPC InvalidParams (-32602)",
+                "The endpoint speaks JSON-RPC under the A2A-Version 1.0 header and accepted the token; it rejected the made-up task id before looking it up.",
+                _requested.Contains(ReadinessStage.Probe)
+                    ? "Nothing to do."
+                    : "Nothing to do. Next: add --probe --i-understand-live-side-effects to send one real prompt.",
+                evidence,
+                ["GetTask on the made-up task id came back InvalidParams (-32602), not TaskNotFound (-32001). It is still a JSON-RPC answer on an accepted token with no version refusal, so this stage passes."]) with { ElapsedMs = elapsed };
+        }
         catch (WorkIqProtocolException ex)
         {
             evidence.Add("endpoint", client.Card is null ? "not discovered" : EndpointText(client));
             return NetworkStageFailed(ReadinessStage.Protocol, ex.Failure, evidence, timedOut: stage.IsCancellationRequested) with { ElapsedMs = Elapsed(started) };
         }
     }
+
+    /// <summary>
+    /// The two JSON-RPC answers to the protocol stage's GetTask on a made-up task id that prove the endpoint: TaskNotFound
+    /// (-32001), the A2A 1.0 answer, and InvalidParams (-32602), Work IQ's answer when it rejects the id before the lookup.
+    /// </summary>
+    /// <param name="code">The JSON-RPC error code, if any.</param>
+    private static bool IsExpectedProtocolAnswer(int? code) =>
+        code == (int)A2AErrorCode.TaskNotFound || code == (int)A2AErrorCode.InvalidParams;
 
     private static string EndpointText(WorkIqA2AClient client) =>
         client.Card is { } card ? $"{card.SelectedEndpoint.Host}{card.SelectedEndpoint.AbsolutePath} (A2A {card.SelectedProtocolVersion})" : "not discovered";
