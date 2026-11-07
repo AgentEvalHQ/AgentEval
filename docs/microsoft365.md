@@ -15,7 +15,8 @@ asks for the answer only. So every evidence channel carries an availability labe
 `Provided`). An empty tool list means "no tool telemetry was observed", never "no tool was used". See
 [the evidence model](#the-evidence-model).
 
-**Where to start.** The [demo project](../samples/AgentEval.Microsoft365Demo/README.md) is the fastest path: one command
+**Where to start.** [Microsoft 365 at a glance](microsoft365-at-a-glance.md) shows how the pieces fit, with a diagram
+and screenshots. The [demo project](../samples/AgentEval.Microsoft365Demo/README.md) is the fastest path: one command
 checks the connection, sends one prompt, runs a five-case benchmark and saves everything in one run folder. Its run
 folder also holds an AEF run of the benchmark. For your own code, read
 [Using it directly in code](#using-it-directly-in-code-no-cli). For the CLI, start with the
