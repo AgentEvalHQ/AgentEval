@@ -51,7 +51,7 @@ public sealed class BenchAutoAuditCommandTests
     {
         using var env = new ProviderEnvironmentScope();
 
-        var (exit, stdout, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null));
+        var (exit, stdout, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true));
 
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains("needs a real target", stderr, StringComparison.Ordinal);
@@ -63,7 +63,7 @@ public sealed class BenchAutoAuditCommandTests
     {
         using var env = new ProviderEnvironmentScope();
 
-        var (exit, stdout, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, mock: true));
+        var (exit, stdout, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, mock: true));
 
         Assert.Equal(ExitCodes.GateIndeterminate, exit);
         Assert.Contains("MOCK RUN", stderr, StringComparison.Ordinal);
@@ -76,7 +76,7 @@ public sealed class BenchAutoAuditCommandTests
     [Fact]
     public async Task TheMock_CannotBeCombinedWithRealModels()
     {
-        var (exit, _, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, models: ["m1"], mock: true));
+        var (exit, _, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: ["m1"], mock: true));
 
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains("cannot be combined with a real target", stderr, StringComparison.Ordinal);
@@ -129,7 +129,7 @@ public sealed class BenchAutoAuditCommandTests
         };
 
         var (exit, stdout, _) = await RunAsync(() =>
-            BenchAutoAuditCommand.RunAsync(outPath: null, models: ["careful", "leaky"], clientOverride: m => clients[m]));
+            BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: ["careful", "leaky"], clientOverride: m => clients[m]));
 
         Assert.Equal(ExitCodes.Success, exit);
         Assert.Contains("Live run on", stdout, StringComparison.Ordinal);
@@ -145,7 +145,7 @@ public sealed class BenchAutoAuditCommandTests
     public async Task AModelThatFails_IsReportedAsNotCompleted_AndAllFailingIsAnError()
     {
         var (exit, stdout, stderr) = await RunAsync(() =>
-            BenchAutoAuditCommand.RunAsync(outPath: null, models: ["down"], clientOverride: _ => new ScriptedChatClient().AddThrow("503 the provider is down")));
+            BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: ["down"], clientOverride: _ => new ScriptedChatClient().AddThrow("503 the provider is down")));
 
         Assert.Equal(ExitCodes.RuntimeError, exit);
         Assert.Contains("down (override) did not complete", stderr, StringComparison.Ordinal);
@@ -164,7 +164,7 @@ public sealed class BenchAutoAuditCommandTests
         };
 
         var (exit, stdout, stderr) = await RunAsync(() =>
-            BenchAutoAuditCommand.RunAsync(outPath: null, models: ["skips-the-tool", "careful"], clientOverride: m => clients[m]));
+            BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: ["skips-the-tool", "careful"], clientOverride: m => clients[m]));
 
         Assert.Equal(ExitCodes.Success, exit);
         Assert.Contains("skips-the-tool (override) did not complete", stderr, StringComparison.Ordinal);
@@ -183,7 +183,7 @@ public sealed class BenchAutoAuditCommandTests
         };
 
         var (exit, stdout, _) = await RunAsync(() =>
-            BenchAutoAuditCommand.RunAsync(outPath: null, models: ["spaced-leak", "careful"], clientOverride: m => clients[m]));
+            BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: ["spaced-leak", "careful"], clientOverride: m => clients[m]));
 
         Assert.Equal(ExitCodes.Success, exit);
         var rows = stdout.Split('\n').Where(l => l.StartsWith("| ", StringComparison.Ordinal)).ToList();
@@ -196,7 +196,7 @@ public sealed class BenchAutoAuditCommandTests
     [Fact]
     public async Task ModelsGivenButEmpty_IsAUsageError()
     {
-        var (exit, _, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, models: []));
+        var (exit, _, stderr) = await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, noAef: true, models: []));
 
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains("--models names no model", stderr, StringComparison.Ordinal);

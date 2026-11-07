@@ -69,6 +69,7 @@ public class CopilotStudioRedTeamTargetTests
         // still resolve, matching the CLI's OrdinalIgnoreCase construction path.
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Intensity = "moderate",
             Format = "json",
             TargetOptions = new Dictionary<string, IRedTeamTargetOptions?>   // case-sensitive comparer on purpose
@@ -172,6 +173,7 @@ public class CopilotStudioRedTeamTargetTests
         Quiet = true,
         Output = output,
         Aef = aef,
+        NoAef = aef is null, // a test never writes a run into the repository's own .agenteval workspace
     };
 
     private static FileInfo WriteValidConfig()

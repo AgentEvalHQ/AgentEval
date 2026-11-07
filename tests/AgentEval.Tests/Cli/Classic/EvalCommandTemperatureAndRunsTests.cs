@@ -74,6 +74,7 @@ public class EvalCommandTemperatureAndRunsTests
             var plain = SutOptions(dataset, cfg, output);
             var withAgentOptions = new EvalOptions
             {
+                NoAef = true,
                 Dataset = plain.Dataset,
                 Sut = plain.Sut,
                 AckLiveSideEffects = plain.AckLiveSideEffects,
@@ -268,7 +269,7 @@ public class EvalCommandTemperatureAndRunsTests
     {
         // No --endpoint/--azure/--model: the old code fell through to the single-run path and threw
         // "Specify --endpoint <url> or --azure." (exit 3) — or, fully configured, silently ran once.
-        var opts = new EvalOptions { Dataset = new FileInfo("/nonexistent/dataset.yaml"), Format = "json", Runs = runs };
+        var opts = new EvalOptions { NoAef = true, Dataset = new FileInfo("/nonexistent/dataset.yaml"), Format = "json", Runs = runs };
 
         var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(opts, default));
 
@@ -304,6 +305,7 @@ public class EvalCommandTemperatureAndRunsTests
     {
         var opts = new EvalOptions
         {
+            NoAef = true,
             Dataset = new FileInfo("/nonexistent/dataset.yaml"),
             Format = "json",
             Runs = 3,
@@ -397,6 +399,7 @@ public class EvalCommandTemperatureAndRunsTests
         {
             var notQuiet = new EvalOptions
             {
+                NoAef = true,
                 Dataset = dataset,
                 Endpoint = "http://localhost:11434/v1",
                 Model = "fake-model",
@@ -448,6 +451,7 @@ public class EvalCommandTemperatureAndRunsTests
         {
             var opts = new EvalOptions
             {
+                NoAef = true,
                 Dataset = dataset,
                 Endpoint = "http://localhost:11434/v1",
                 Model = "fake-model",
@@ -472,9 +476,10 @@ public class EvalCommandTemperatureAndRunsTests
         Format = "json",
         Output = output,
         Quiet = true,
+        NoAef = true, // a test never writes a run into the repository's own .agenteval workspace
     };
 
-    private static EvalOptions Minimal() => new() { Dataset = new FileInfo("test.yaml"), Format = "json" };
+    private static EvalOptions Minimal() => new() { Dataset = new FileInfo("test.yaml"), Format = "json", NoAef = true };
 
     // EvalOptions is a class with init-only properties (no `with`), so tests copy the fields they use.
     private static EvalOptions Copy(EvalOptions o, int runs) => new()
@@ -488,6 +493,8 @@ public class EvalCommandTemperatureAndRunsTests
         Quiet = o.Quiet,
         Temperature = o.Temperature,
         SuccessThreshold = o.SuccessThreshold,
+        Aef = o.Aef,
+        NoAef = o.NoAef,
         Runs = runs,
     };
 
@@ -502,6 +509,7 @@ public class EvalCommandTemperatureAndRunsTests
         },
         Format = "json",
         Output = output,
+        NoAef = true, // a test never writes a run into the repository's own .agenteval workspace
     };
 
     private static IEvaluableAgent BenignSut()

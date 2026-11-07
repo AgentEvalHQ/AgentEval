@@ -160,6 +160,11 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
+    # Tests must never write runs into the repository's own workspace. A fresh checkout has no .agenteval, so the CLI's
+    # workspace fallback writes nothing here and would hide a test that leaks; create one, as on a developer machine.
+    - name: Prepare the workspace leak check
+      run: mkdir -p .agenteval
+
     - name: Test
       run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage --logger trx
       env:
@@ -172,6 +177,15 @@ jobs:
         # themselves (ProviderEnvironmentScope), so a key in this environment could only ever turn a test
         # that forgot to scrub into a paid model call. Live tests run in llm-integration-tests.yml.
         VSTEST_CONNECTION_TIMEOUT: '300'
+
+    - name: No test wrote a run into the repository workspace
+      run: |
+        leaked=$(find .agenteval -name run.json 2>/dev/null | head -20)
+        if [ -n "$leaked" ]; then
+          echo "::error::Tests wrote AEF runs into the repository's own .agenteval workspace; give them --aef <temp dir> or --no-aef:"
+          echo "$leaked"
+          exit 1
+        fi
 
     # Each failed test by name, with its test host and the first line of its error, read from the TRX files into the
     # run summary. With --verbosity normal the parallel test hosts interleave their console output, so a "Failed X" line
