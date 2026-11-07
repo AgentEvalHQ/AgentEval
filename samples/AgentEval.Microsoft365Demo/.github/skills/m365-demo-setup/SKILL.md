@@ -1,6 +1,6 @@
 ---
 name: m365-demo-setup
-version: 0.2.0
+version: 0.3.0
 description: Take a tester from nothing to a first zipped run of the AgentEval Microsoft 365 demo. Covers the tenant prerequisites (Work IQ enabled, the user in a usage-based billing plan, a public-client app registration with WorkIQAgent.Ask and admin consent; steps in docs/microsoft365-tenant-setup.md), workiq.json, the first --readiness-only run, reading readiness.md, the full run with consent, and --zip. Use when someone wants to connect the demo to a tenant, run it for the first time, or send a run back. To read a failed run use m365-demo-triage; to change what the demo tests use m365-demo-customize.
 ---
 
@@ -16,9 +16,17 @@ repository root, so add `--config ../../workiq.json` to every command. The run f
 
 ## Step 1: Prerequisites
 
-Go through the README's "Before you start" with the user. The tester guide gives the click path for each item:
-`../../docs/microsoft365-tester-guide.md`, section "What you need". The tenant and the test user must be
-non-production. Check that `dotnet --version` starts with `10.`.
+[Connect to a Microsoft 365 tenant](../../../../../docs/microsoft365-tenant-setup.md) (from this folder: `../../docs/microsoft365-tenant-setup.md`) gives
+each step, who does it, and what a failure means. Copilot may ask before it reads a file outside the workspace. Check
+each item with the user, in this order:
+
+1. A Global Administrator enabled Work IQ in the tenant (guide step 1).
+2. The test user is in a usage-based billing plan (step 2). A new assignment can take up to 30 minutes to apply.
+3. The app registration is a public client: *Allow public client flows* = Yes (steps 3 and 4).
+4. It has the delegated permission `WorkIQAgent.Ask`, with admin consent granted (step 5).
+5. Conditional Access allows device-code sign-in for the test user (step 6). The demo signs in with a device code only.
+
+The tenant and the test user must be non-production. Check that `dotnet --version` starts with `10.`.
 
 The document titled "Demo Q3 Planning" matters. Without it the grounding case can still PASS on a plain "not found",
 and then it measures nothing about grounding.
@@ -47,7 +55,21 @@ The first run builds the project. Then the stages `config`, `auth` (the sign-in)
 The first run prints a device-code message. Open <https://microsoft.com/devicelogin>, enter the code and sign in as
 the test user. The stage waits until the code expires, about 15 minutes, whatever `--timeout-seconds` says.
 
-Expected: every stage passes and the exit is `0`. For anything else, use the m365-demo-triage skill.
+Expected: every stage passes and the exit is `0`. A first connection usually fails on the tenant setup.
+`readiness.md` names the code, and the guide's step fixes it ([If a step fails](../../../../../docs/microsoft365-tenant-setup.md#if-a-step-fails)):
+
+| You see | Cause | Guide step |
+|---|---|---|
+| `AADSTS7000218` or `AADSTS7000215` | Public client flows are off. | 4 |
+| `AADSTS65001` | Admin consent for `WorkIQAgent.Ask` is missing. | 5 |
+| `AADSTS650052` | Work IQ is not enabled in the tenant. | 1, then 5 |
+| `AADSTS53003` | Conditional Access blocked the device-code sign-in. | 6 |
+| `AADSTS90002` or `AADSTS700016` | `tenantId` or `appClientId` is wrong. | 7 |
+| HTTP `401` | The token is not for Work IQ: check `scope` in `workiq.json`. | 7 |
+| HTTP `403` that names the required scopes | Admin consent is missing. | 5 |
+| HTTP `403` with no scope named | The user is not in the billing plan, or was added less than 30 minutes ago. | 2 |
+
+Fix that step, then run `--readiness-only` again. For anything else, use the m365-demo-triage skill.
 
 ## Step 4: Read readiness.md together
 

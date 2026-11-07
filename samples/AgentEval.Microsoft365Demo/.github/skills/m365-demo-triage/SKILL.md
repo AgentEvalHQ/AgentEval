@@ -1,6 +1,6 @@
 ---
 name: m365-demo-triage
-version: 0.3.0
+version: 0.4.0
 description: Read a run folder of the AgentEval Microsoft 365 demo and say, for each problem, where it happened, why, what to do next and who can fix it. Reads the exit code, summary.md, readiness.md, issues.jsonl, turns.jsonl, results.json and trace.jsonl, and looks issue codes up in the troubleshooting catalogue of docs/microsoft365.md. Use when a run exited 1, 2, 3 or 11, a stage shows a cross, a case is ERROR or NOT MEASURED, or someone asks what went wrong. For a first run use m365-demo-setup; to change the demo use m365-demo-customize.
 ---
 
@@ -53,8 +53,11 @@ it reads a file outside the workspace. Find the issue's code or message there, a
 
 A turn that did not complete is coded `turn.input_required`, `turn.auth_required`, `turn.failed`, `turn.rejected`,
 `turn.canceled` or `turn.indeterminate`. Its category comes from its failure: a turn refused with HTTP 403 is
-`turn.failed` in `Permission`. `doctor.<stage>.failed` means a readiness stage failed and no lower layer filed the
-cause; `readiness.md` has the detail.
+`turn.failed` in `Permission`. With no failure detail, `turn.input_required` is `Case`, `turn.auth_required` is
+`Authentication`, `turn.failed`, `turn.rejected` and `turn.canceled` are `Service`, and `turn.indeterminate` is
+`Unknown`. `doctor.<stage>.failed` means a readiness stage failed and no lower layer filed the
+cause; `readiness.md` has the detail. For a sign-in or connection failure (an `AADSTS` code, HTTP `401` or `403`),
+[If a step fails](../../../../../docs/microsoft365-tenant-setup.md#if-a-step-fails) in the tenant setup guide names the step that fixes it.
 
 One code comes from the demo itself: `judge.call_failed`, any failed judge call (HTTP 401, 403, 404, an outage). The
 agent was measured; only the criteria are `NOT MEASURED`. Check `AI_INFERENCE_PROVIDER` and its variables, or use
@@ -74,12 +77,12 @@ The category says who acts. The demo prints it on each issue and groups `summary
 | `Service` | the Work IQ service: keep the `request-id` |
 | `Capture` | the raw capture settings; the run itself is unaffected |
 | `Budget` | the run's limits: `--max-turns`, `--timeout-seconds` |
+| `Case` | the tester: the agent paused for a confirmation or input; reword the case to ask for information only |
 | `Unknown` | not classified: send the folder back |
 | Judge (`judge.*` codes) | the judge model's provider settings, not the agent or Work IQ |
 
-Two codes have the category `Service`, so the demo lists them under the Work IQ service, but the fix is the tester's.
-`turn.input_required`: reword the case as read-only. `turn.auth_required`: sign in to the connector in Microsoft 365
-Copilot Chat, then run again.
+`turn.auth_required` is `Authentication`, but the demo's own sign-in worked: a connector the agent uses needs the
+test user's sign-in. Sign in to that connector once in Microsoft 365 Copilot Chat, then run again.
 
 ## Step 5: Verdicts and outcomes
 
@@ -109,4 +112,4 @@ asked for, nothing came back. `Provided (observed empty: …)`: it came back wit
 For each problem: the stage or case, the category and code as written, the `request-id` when there is one, the cause
 in one sentence, and the next action with who takes it. Group repeats of one code into one line with a count. If the
 cause is on the service's side, say so and ask for the zip: nothing on the tester's side causes it. That is the
-category `Protocol` or `Service`, or an unexpected JSON-RPC answer, except `judge.*` codes and the two codes of step 4.
+category `Protocol` or `Service`, or an unexpected JSON-RPC answer, except `judge.*` codes.

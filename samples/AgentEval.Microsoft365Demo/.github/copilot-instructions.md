@@ -11,6 +11,7 @@ and a small benchmark, and writes one run folder. The user is usually an externa
 - `../AgentEval.Microsoft365Demo.Tests`: the offline tests.
 - `../../src/AgentEval.Microsoft365`: the provider. The demo uses its public API only.
 - `../datasets/`: the config template and `m365-smoke.json`, the 8-case set the defaults come from.
+- `../../docs/microsoft365-tenant-setup.md`: the tenant setup, step by step, and what each failure means.
 - `../../docs/microsoft365.md`: the provider reference and the troubleshooting catalogue.
 
 ## Rules

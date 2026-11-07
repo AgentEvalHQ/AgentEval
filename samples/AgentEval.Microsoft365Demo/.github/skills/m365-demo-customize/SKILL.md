@@ -1,7 +1,7 @@
 ---
 name: m365-demo-customize
-version: 0.2.0
-description: Change what the AgentEval Microsoft 365 demo tests. Covers another Microsoft 365 agent (--agent-id, from workiq list-agents or the Copilot Chat URL), the single prompt, the benchmark cases in a dataset JSON, a deterministic check in Benchmark.cs, the native118 profile, the verbosity, the turn cap and the timeouts. Use when someone wants the demo to test something different. For a first run use m365-demo-setup; to read a run folder use m365-demo-triage.
+version: 0.3.0
+description: Change what the AgentEval Microsoft 365 demo tests. Covers another Microsoft 365 agent (--agent-id, from workiq list-agents or the Copilot Chat URL), the single prompt, the benchmark cases in a dataset JSON, a deterministic check in Benchmark.cs, the native118 profile, the verbosity, the turn cap and the timeouts, and a use case for your own declarative agent (step 6). Use when someone wants the demo to test something different. For a first run use m365-demo-setup; to read a run folder use m365-demo-triage.
 ---
 
 # m365-demo-customize
@@ -116,3 +116,32 @@ otherwise it is `PASS`. A turn that did not complete never reaches the checks.
 - `--capture-raw`: keeps the raw protocol traffic under `raw/`, tokens removed. It holds tenant content, so use it only
   when the maintainers ask.
 - `--out <dir>` picks a new or empty run folder; `--zip` also writes `<run folder>.zip`.
+
+## Step 6: A use case for a declarative agent
+
+To evaluate the user's own declarative agent from start to end:
+
+1. **Connect.** Find its id (step 1) and run `--readiness-only` with `--agent-id`. `discovery` must show the agent's
+   own name and version.
+2. **Learn what it is for.** Ask the user for the agent's instructions, knowledge sources and actions (from Copilot
+   Studio or its Agents Toolkit project). The cases follow from its purpose.
+3. **Write 3 to 5 cases** in a new dataset file, such as `my-agent-cases.json` (step 3 has the format; `/add-case`
+   adds one at a time):
+   - two or three questions it should answer from its knowledge, each with criteria that say what a right answer
+     contains;
+   - one question outside its scope, with the criteria that it says it cannot help and invents nothing;
+   - if it reads the user's files or mail, one question about a test document the user owns, named exactly, with
+     explicit dates.
+
+   Keep every case read-only. An agent with actions may pause for a confirmation (`turn.input_required`, category
+   `Case`): reword that case. If it uses a connector, the test user signs in to it once in Microsoft 365 Copilot
+   Chat first, or the turn ends `turn.auth_required`.
+4. **Run** after the user's yes, stating the judge calls (one per case with criteria) and their cost:
+
+   ```bash
+   dotnet run -- --config ../../workiq.json --agent-id "<id>" --dataset my-agent-cases.json --i-understand-live-side-effects --zip
+   ```
+
+   Setting `agentId` in `workiq.json` does the same as `--agent-id` for every run.
+5. **Read the run** with the m365-demo-triage skill. A `FAIL` is a finding about the agent; `ERROR` and
+   `NOT MEASURED` are never grades.
