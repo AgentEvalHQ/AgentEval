@@ -24,7 +24,9 @@ public sealed class EvidenceReadAccessTests
         bool key = false, bool enabled = true, bool realSocket = false)
     {
         var builder = WebApplication.CreateBuilder();
-        if (realSocket) builder.WebHost.UseUrls("http://127.0.0.1:0");
+        // A free loopback port, set on Kestrel itself: UseUrls writes the "urls" setting into the configuration
+        // that the next line clears, so the server fell back to port 5000 and collided with a parallel test run.
+        if (realSocket) builder.WebHost.ConfigureKestrel(o => o.Listen(IPAddress.Loopback, 0));
         else builder.WebHost.UseTestServer();
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
