@@ -15,16 +15,22 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_NOLOGO: true
 
-# Least-privilege default token (SEC-03). The publish job pushes to nuget.org via
-# NUGET_API_KEY (a secret, not GITHUB_TOKEN) and only uploads build artifacts, so the
-# default token needs no more than read access to repository contents.
+# Least-privilege default token (SEC-03): read access to repository contents. The publish job adds only
+# id-token: write, for nuget.org trusted publishing; no NuGet API key is stored anywhere.
 permissions:
   contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    
+    # nuget.org trusted publishing: the job asks GitHub for an identity token and trades it at nuget.org for a one-hour
+    # API key. The nuget.org policy names this repository, this workflow file (release.yml) and this environment, so
+    # only this job can get a key.
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
@@ -380,8 +386,15 @@ jobs:
         }
         Write-Host "All packed corpora AND sidecars are byte-identical to the repository."
 
+    # Right before the push: the key lives one hour, and each identity token buys exactly one key.
+    - name: NuGet login (trusted publishing)
+      id: login
+      uses: NuGet/login@v1
+      with:
+        user: joslat   # the nuget.org profile name that owns the packages and the policy, not an e-mail address
+
     - name: Push to NuGet
-      run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
     - name: Upload NuGet packages as artifacts
       # Keep the actual package available for diagnosis if a pre-push check fails.
