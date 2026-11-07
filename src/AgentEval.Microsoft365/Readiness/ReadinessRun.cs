@@ -582,7 +582,7 @@ internal sealed partial class ReadinessRun : IAsyncDisposable
             ReadinessStage.Config => "load and validate the connection config (no network)",
             ReadinessStage.Auth => "acquire a delegated token (silent from the cache first, device-code sign-in otherwise)",
             ReadinessStage.Discovery => "fetch the agent card and select the A2A 1.0 JSON-RPC interface on a trusted host",
-            ReadinessStage.Protocol => "GetTask for a random task id; the expected answer is JSON-RPC TaskNotFound (-32001)",
+            ReadinessStage.Protocol => "GetTask for a random task id; the expected answer is JSON-RPC TaskNotFound (-32001), or InvalidParams (-32602) when the service rejects the made-up id",
             ReadinessStage.Probe => "one real turn with the fixed probe prompt",
             ReadinessStage.Census => "what the tenant does with the experimental native118 profile and with CancelTask on a finished task",
             _ => stage.ToString(),

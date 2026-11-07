@@ -229,7 +229,7 @@ with its reason, never a pass.
 | `config` | Loads and validates the file. No network. | Every rule passed. It warns when an id cannot be right, or the profile is `native118`. |
 | `auth` | Gets a token from the cache, else by device-code sign-in. Once the prompt shows, it waits until the code expires. | A token for the Work IQ scope was acquired. The token never appears in any output. |
 | `discovery` | Fetches the agent card through the handlers a live run uses, and selects the A2A 1.0 JSON-RPC interface on a trusted host. | The interface was selected, and the service accepted the token. |
-| `protocol` | Sends `GetTask` for a random task id (`doctor-<guid>`). | The service answered JSON-RPC `-32001` (TaskNotFound): it speaks A2A 1.0 and accepted the token. |
+| `protocol` | Sends `GetTask` for a random task id (`doctor-<guid>`). | The service answered JSON-RPC `-32001` (TaskNotFound), or `-32602` (InvalidParams) when it rejects the made-up id before the lookup, as Work IQ does: it speaks A2A 1.0 and accepted the token. |
 | `probe` | Needs `--probe` and consent. Sends `Reply with the single word READY.` in a fresh context. Never answers a pause. | The turn completed. An answer that is empty or not READY adds a warning. |
 | `census` | Runs after the probe. Under `public` it sends the same prompt again under `native118`, then calls `CancelTask` on the finished task. | It records what the tenant supports. A refusal of `native118` still passes; it fails only when it could not measure. |
 
@@ -240,7 +240,7 @@ holds `readiness.md` (every stage's evidence, and what to send back), `readiness
 
 One failure gives one issue. When a lower layer already registered a stage's failure (for example `http.403`), the
 stage verdict `doctor.<stage>.failed` goes to the trace only; otherwise the stage registers it. The replies the doctor
-provokes on purpose (TaskNotFound on the random id, TaskNotCancelable on the finished task) are never issues.
+provokes on purpose (TaskNotFound or InvalidParams on the random id, TaskNotCancelable on the finished task) are never issues.
 
 ## Running a custom benchmark (`agenteval eval`)
 
