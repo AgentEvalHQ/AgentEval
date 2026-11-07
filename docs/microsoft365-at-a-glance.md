@@ -38,7 +38,7 @@ selected is NOT MEASURED, never a guess.
 
 | You are | Start here | First command |
 |---|---|---|
-| A tester with a tenant | [The demo](../samples/AgentEval.Microsoft365Demo/README.md) | `dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only` |
+| A tester with a tenant | [The demo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md) | `dotnet run --project samples/AgentEval.Microsoft365Demo -- --readiness-only` |
 | A CLI user | [Microsoft 365](microsoft365.md) | `agenteval m365 doctor --m365-config workiq.json` |
 | A developer | [Using it in code](microsoft365.md#using-it-directly-in-code-no-cli) | `Microsoft365AgentFactory.BuildLive(config, iUnderstandLiveSideEffects: true)` |
 
@@ -69,9 +69,9 @@ means. In short:
 
 | What | Where |
 |---|---|
-| The provider: sign-in, the A2A client, the conversation, evidence, diagnostics, readiness | [`src/AgentEval.Microsoft365`](../src/AgentEval.Microsoft365/README.md) |
+| The provider: sign-in, the A2A client, the conversation, evidence, diagnostics, readiness | [`src/AgentEval.Microsoft365`](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.Microsoft365/README.md) |
 | The CLI target (`--sut microsoft365`) and `agenteval m365 doctor` | `src/AgentEval.Cli/Microsoft365` |
-| The tester demo, its offline tests, and its GitHub Copilot agent, skills and prompts | [`samples/AgentEval.Microsoft365Demo`](../samples/AgentEval.Microsoft365Demo/README.md), `samples/AgentEval.Microsoft365Demo.Tests`, `samples/AgentEval.Microsoft365Demo/.github` |
+| The tester demo, its offline tests, and its GitHub Copilot agent, skills and prompts | [`samples/AgentEval.Microsoft365Demo`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md), `samples/AgentEval.Microsoft365Demo.Tests`, `samples/AgentEval.Microsoft365Demo/.github` |
 | Two samples: Hello World and a live walkthrough | `samples/AgentEval.Samples/Microsoft365` (menu group R) |
 | A smoke dataset and the config template | `samples/datasets/m365-smoke.json`, `samples/datasets/m365-config.template.json` |
 | A GitHub Copilot agent and skill for the whole repository | `.github/agents/agenteval-m365.agent.md`, `.github/skills/m365-eval/SKILL.md` |

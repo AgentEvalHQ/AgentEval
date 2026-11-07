@@ -14,4 +14,4 @@ The [writer seal schema](https://agenteval.dev/aef/1/writer/seal.schema.json) an
 An intact manifest is distinct from a verified signer or an authorization decision. Readers must apply
 the specification's integrity checks and any applicable trust policy; this identifier is not an approval.
 
-See [AEF identifiers](../index.md) and the [AgentEval AEF guide](../../../aef.md).
+See [AEF identifiers](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef/1/index.md) and the [AgentEval AEF guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md).

@@ -165,7 +165,7 @@ in the `Query.*` partials. Mode C ingest/admin operations and live updates remai
 ## Versioning policy
 
 - **REST**: `/api/v1/`. Major bumps (`/api/v2/`) only on breaking schema change. Additive changes don't bump.
-- **GraphQL**: no version segment in the URL. The rc.1 AEF migration replaces the pre-1.0 legacy response records above; existing clients must migrate their selections. From 1.0, additive fields and `@deprecated` transitions preserve clients until a coordinated breaking release. See [the AEF migration](../aef.md).
+- **GraphQL**: no version segment in the URL. The rc.1 AEF migration replaces the pre-1.0 legacy response records above; existing clients must migrate their selections. From 1.0, additive fields and `@deprecated` transitions preserve clients until a coordinated breaking release. See [the AEF migration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md).
 
 Both surfaces select the same owned, verified AEF evidence. GraphQL returns focused `Workspace*` projections;
 REST streams captured artifacts or the documented trace/history representations, so their response shapes differ.

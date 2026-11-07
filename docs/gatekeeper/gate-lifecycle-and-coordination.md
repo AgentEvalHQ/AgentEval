@@ -188,16 +188,16 @@ registered gate; it does not prove the policy is semantically sufficient.
 
 ## Executable examples
 
-- [`14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs)
+- [`14_GatekeeperPoisonedToolKillChain`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs)
   demonstrates poisoned-result admission, durable fake MCP containment, declarative contracts, taint, egress,
   forbidden deletion, worm blocking and block-storm escalation.
-- [`15_GatekeeperHarnessOwnedToolMisuse`](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs)
+- [`15_GatekeeperHarnessOwnedToolMisuse`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs)
   discovers a real Harness-owned function at runtime, blocks its misuse and retains a benign control.
-- [`16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs)
+- [`16_GatekeeperJailbreakAndToolAbuse`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs)
   contrasts an obvious pre-model block with paraphrases stopped by authoritative tool contracts.
-- [`17_GatekeeperToolResultAdmission`](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs)
+- [`17_GatekeeperToolResultAdmission`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs)
   composes secret masking and output-size truncation before tool results become model context.
-- [`18_GatekeeperHostedToolCoverageBoundary`](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs)
+- [`18_GatekeeperHostedToolCoverageBoundary`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs)
   demonstrates construction-time refusal and honest acknowledgment of provider-hosted execution.
 
 These five are a deep-dive continuation once the recommended tour (00 → 16 → 14 → 04 → 10 → 23) is done, not a

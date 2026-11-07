@@ -3,9 +3,9 @@
 - **Status:** **Accepted (2026-10-08).** AEF is the 1.0 release candidate now, polished as it is implemented, and
   final at the `aef-1.0` tag, released together with AgentEval 1.0.
 - **Owner:** the AgentEval maintainers (lead editor of AEF: [@joslat](https://github.com/joslat)).
-- **Specification:** [`contracts/aef/`](../../contracts/aef/README.md). Normative text in
-  [`contracts/aef/1/spec/`](../../contracts/aef/1/spec/01-introduction.md); start with the
-  [primer](../../contracts/aef/1/primer.md).
+- **Specification:** [`contracts/aef/`](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/README.md). Normative text in
+  [`contracts/aef/1/spec/`](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/1/spec/01-introduction.md); start with the
+  [primer](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/1/primer.md).
 
 ## 1. Context
 
@@ -47,7 +47,7 @@ round 3), each round's findings reworked into the text, the schemas and the conf
    - the licence settled. *Amended 2026-10-20:* this said "the patent commitment for implementers in force", with
      the Community Specification License 1.0 drafted for the specification text. The lead editor decided that AEF 1.0
      is released under Apache-2.0 alone, with no separate patent commitment
-     ([GOVERNANCE.md](../../contracts/aef/GOVERNANCE.md#licence-and-patents)), so this condition is met.
+     ([GOVERNANCE.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/GOVERNANCE.md#licence-and-patents)), so this condition is met.
    - *Review recorded 2026-10-24:* three independent read-only reviewers assessed commit `e5637631` under all twelve
      standing dimensions, including governance. Their means were 9.55, 9.55 and 9.566666666666667; the equal-weight
      combined mean was 344/36 = 9.555555555555556. No BLOCKER or MAJOR was retained. Bounded MINOR corrections are

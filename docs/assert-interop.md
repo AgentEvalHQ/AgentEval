@@ -22,11 +22,11 @@ run it against a real ASSERT.
 For an offline evidence walkthrough, run
 `dotnet run --project samples/AgentEval.Samples -- --assert-evidence` from the repository root.
 Sample P2 writes a direct ASSERT-to-AEF import plus sealed per-case composites
-over the same saved transcripts. The [sample instructions](../samples/interop/assert-ai/README.md#offline-sealed-evidence-p2)
+over the same saved transcripts. The [sample instructions](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/interop/assert-ai/README.md#offline-sealed-evidence-p2)
 list the expected pass, fail, warning and unmeasured outcomes. The fixture is
 hand-authored; this example does not run a live ASSERT judge or establish live compatibility.
 
-Sample P3 (`--assert-multiturn`) demonstrates [saved multi-turn benchmark evidence](../samples/interop/assert-ai/multiturn-example/README.md):
+Sample P3 (`--assert-multiturn`) demonstrates [saved multi-turn benchmark evidence](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/interop/assert-ai/multiturn-example/README.md):
 one observation per conversation, measured-case rate denominators, and separate
 missing-score and judge-error counts.
 

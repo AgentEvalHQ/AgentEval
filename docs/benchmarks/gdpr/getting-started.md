@@ -19,9 +19,9 @@
 
 ## Quick Start
 
-> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see the [GDPR benchmark sample](../../../samples/AgentEval.Samples/Benchmarks/04_GdprBenchmark.cs) for an end-to-end example.
+> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see the [GDPR benchmark sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Benchmarks/04_GdprBenchmark.cs) for an end-to-end example.
 
-> **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+> **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)). See [CLI Reference — Environment variables](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#environment-variables) for the full contract.
 
 For example, to judge with Azure OpenAI (auto-detected when only these three are set), export the following before running:
 
@@ -91,7 +91,7 @@ GDPR is a compliance benchmark — it does **not** support a `--budget-tier` fil
 3. **Filter scenarios** via custom `IBenchmarkRunner` if you only care about specific pillars.
 4. **Enable judge caching** (`OutputStoreOptions.EnableJudgeCache`) to avoid re-invoking the LLM for identical (eval, prompt-version, input-hash) tuples on re-runs.
 
-For granular per-evaluator cost classification of the *agentic* benchmark suite (which `bench agentic` exposes alongside this compliance benchmark), see [`docs/benchmarks/agentic/cost-guidance.md`](../agentic/cost-guidance.md).
+For granular per-evaluator cost classification of the *agentic* benchmark suite (which `bench agentic` exposes alongside this compliance benchmark), see [`docs/benchmarks/agentic/cost-guidance.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/agentic/cost-guidance.md).
 
 ---
 
@@ -256,7 +256,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
+A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md).
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
@@ -297,9 +297,9 @@ The following are not validated by this benchmark:
 ## See Also
 
 - [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
-- [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
-- [CLI Reference](../../cli.md) — full reference for `agenteval bench gdpr`, `agenteval bench gdpr calibrate`, and `agenteval compliance render`.
-- [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
+- [Composite Evaluations](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
+- [CLI Reference](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full reference for `agenteval bench gdpr`, `agenteval bench gdpr calibrate`, and `agenteval compliance render`.
+- [The `.agenteval/` Workspace](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for a formal GDPR audit, DPIA, or legal opinion. Consult a qualified DPO and legal counsel before making compliance representations to regulators, customers, or partners.
 

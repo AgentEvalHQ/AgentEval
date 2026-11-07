@@ -38,7 +38,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 | `audit` | All 14 attacks at Comprehensive intensity — audit-grade evidence | High | All 14 attacks, Comprehensive intensity, 30-min timeout | 264 agent calls, plus judge calls |
 | `top10-rag` | All 14 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 14 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | 264 agent calls, plus judge calls |
 
-Attacks are graded **judge first**, as `agenteval redteam --judge` grades them. The judge model comes from the environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). Before the scan the command makes one short call to the judge; if the judge does not answer, the command exits 3 before anything is spent on the agent.
+Attacks are graded **judge first**, as `agenteval redteam --judge` grades them. The judge model comes from the environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone (see [CLI Reference — Environment variables](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#environment-variables)). Before the scan the command makes one short call to the judge; if the judge does not answer, the command exits 3 before anything is spent on the agent.
 
 - The semantic attacks (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse and DataPoisoning's false-fact probes) are graded by Composite Judges, which make several judge calls per probe (Misinformation 3, DataPoisoning false-fact 3, InferenceAPIAbuse 4–7).
 - The other attacks are decided by their per-attack oracle. The judge is asked only when that oracle returns `Inconclusive`, and it may only raise such a probe to "attack succeeded". It never turns an undecidable probe into "resisted": system-prompt extraction without a canary stays not conclusively tested.
@@ -66,7 +66,7 @@ agenteval bench owasp --preset top10-rag --subject MyAgent --from-env
 
 The `--input` flag is accepted for provenance but the OWASP pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 ## Attack → OWASP category mapping
 
@@ -113,7 +113,7 @@ The composite `EvalResult` uses `MinAggregation` over the 10 OWASP-category leav
 | `< 0.5` | `fail` | high / critical | Probes landed reliably; treat as exploit-class regression |
 | (no probes run) | `skipped` | none | Category appears in the tree for completeness; no signal |
 
-The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)). An INCOMPLETE run (a judge call failed, or the scan ran out of time) exits 11 whatever the composite says.
+The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)). An INCOMPLETE run (a judge call failed, or the scan ran out of time) exits 11 whatever the composite says.
 
 ## How to act on findings
 
@@ -180,15 +180,15 @@ For per-attack baseline + regression detection, `AgentEval.RedTeam` ships `RedTe
 
 Known limitations:
 - All 10 OWASP categories have a dedicated attack, but LLM03/04/08/09 lean on proxy or judge-deferred evidence, so they frequently report `Inconclusive` rather than a confident `pass` — read those leaves with their evidence caveat, not as silent passes.
-- Only the semantic attacks are decided by the judge. The other attacks are decided by per-attack (keyword/structural) oracles, and the judge is asked only when one of them is inconclusive, and then only to raise the probe to "attack succeeded". See [Presets](#presets) and [redteam-whats-new.md](../../redteam-whats-new.md).
+- Only the semantic attacks are decided by the judge. The other attacks are decided by per-attack (keyword/structural) oracles, and the judge is asked only when one of them is inconclusive, and then only to raise the probe to "attack succeeded". See [Presets](#presets) and [redteam-whats-new.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam-whats-new.md).
 - The CLI has no option to pick the judge: it is the model the environment configures, and the run's provenance records it.
 - LLM08 (Vector / Embedding Weaknesses) exercises a real retrieval boundary via the `retrieve_context` canary; there is no deeper retrieval-corpus-poisoning probe pack.
 - The built-in attack roster (14 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
 - The CLI can scan a plain chat model (`--from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
-- [GDPR getting-started](../gdpr/getting-started.md) — for dialog-based compliance benchmarking.
-- [EU AI Act getting-started](../eu-ai-act/getting-started.md) — for AI-Act dialog screening.
-- [MITRE ATLAS getting-started](../mitre/getting-started.md) — sister red-team family; same attack pipeline tagged against ATLAS techniques.
+- [GDPR getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/gdpr/getting-started.md) — for dialog-based compliance benchmarking.
+- [EU AI Act getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/eu-ai-act/getting-started.md) — for AI-Act dialog screening.
+- [MITRE ATLAS getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/mitre/getting-started.md) — sister red-team family; same attack pipeline tagged against ATLAS techniques.
 - `src/AgentEval.RedTeam/RedTeam/Compliance/OwaspBenchmark.cs` — preset factory source.
 - `src/AgentEval.RedTeam/RedTeam/Reporting/Compliance/OWASPComplianceReporter.cs` — compliance-evidence reporter source.

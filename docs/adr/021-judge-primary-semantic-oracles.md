@@ -3,7 +3,7 @@
 **Status:** Accepted — **B.1 + B.2 complete** (infrastructure + routing + oracle migration; agreement harness + κ/F1 + the directional B.3 gate). Accuracy measured live on `gpt-4o-mini` over a 298-case adversarial corpus: **keyword-primary 45 → evidence-anchored 14 → per-oracle discriminators 8 → grading-by-decomposition prototype 7** directional fabrications. **Phase C (grading by decomposition)** is the active workstream that drives the count toward 0; **B.3** (flip the default to `primary`, a major-version change) is gated on it.
 **Date:** 2026-06-18 (hardened after a 30-agent design review — see "Design-review log"; accuracy arc + Phase C added 2026-06-21)
 **Decision Makers:** AgentEval Contributors
-**Related:** [redteam-whats-new.md](../redteam-whats-new.md) · the RedTeam oracle-honesty arc
+**Related:** [redteam-whats-new.md](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam-whats-new.md) · the RedTeam oracle-honesty arc
 **Extended by:** [ADR-022 — Grading by Decomposition (Composite Sub-Evaluators), RedTeam Phase C](022-grading-by-decomposition-composite-sub-evaluators.md) — the route to the directional gate (B.3); judge-primary here is the foundation it builds on.
 
 ### Phase tracking
@@ -69,7 +69,7 @@ land highest (~88–90%** across JailbreakBench and the earlier PAIR study, Chao
 Exact numbers vary by study and dataset, but the ordering — **keyword << trained classifier <
 frontier judge** — is consistent. *(These figures are from public HarmBench / Llama Guard /
 JailbreakBench research and are summarised, with the same hedge, in
-[redteam-whats-new.md → "How the field deals with it"](../redteam-whats-new.md). We do not adopt
+[redteam-whats-new.md → "How the field deals with it"](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam-whats-new.md). We do not adopt
 any single number as canonical, and we do not claim a figure for our own judge until we measure
 it on our own corpus — see Decision §8.)*
 

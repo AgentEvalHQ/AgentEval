@@ -50,7 +50,7 @@ requires `suiteRef`) and `deployment`.
   change numeric observations or recompute sealed checkpoint outcomes.
 - Optional `description` is for humans; it does not affect the rule.
 
-The [catalogue schema](../schemas/requirements/1/catalogue.schema.json) is independent of AEF 1.0.
+The [catalogue schema](https://github.com/AgentEvalHQ/AgentEval/blob/main/schemas/requirements/1/catalogue.schema.json) is independent of AEF 1.0.
 Validation rejects unknown properties, duplicate IDs, padded/blank selectors and ambiguous rules.
 It does not certify that a selected metric exists in a future run or that a requirement is satisfied.
 

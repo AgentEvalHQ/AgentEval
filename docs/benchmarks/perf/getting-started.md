@@ -60,7 +60,7 @@ agenteval bench perf latency --subject MyAgent --endpoint http://localhost:11434
 
 The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses the same prompt for latency + throughput + cost measurements within a single run.
 
-`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 The cost leaf prices the model the agent used: the model the provider resolved for `--from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the cost is not measured: the cost leaf is skipped, no cost is reported, and a warning names the model.
 
@@ -87,7 +87,7 @@ The composite `EvalResult` aggregates 3 leaves (latency / throughput / cost) via
 | `>= 0.1` | `fail` | high | SLO breach |
 | `< 0.1` | `fail` | critical | Order-of-magnitude breach |
 
-The composite verdict is `pass` when composite score >= 0.6 AND no leaf is labelled `fail`. The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
+The composite verdict is `pass` when composite score >= 0.6 AND no leaf is labelled `fail`. The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)).
 
 ## How to act on findings
 
@@ -166,8 +166,8 @@ Known limitations:
 - The CLI measures a plain chat model: built with `--from-env` from any configured provider, an OpenAI-compatible `--endpoint`, or a built-in `--sut` target. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
-- [OWASP getting-started](../owasp/getting-started.md) — security red-team family.
-- [MITRE ATLAS getting-started](../mitre/getting-started.md) — security red-team family tagged against ATLAS.
-- [Memory getting-started](../memory/getting-started.md) — agent-state-stressing benchmarks (different scope: memory recall vs runtime perf).
+- [OWASP getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md) — security red-team family.
+- [MITRE ATLAS getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/mitre/getting-started.md) — security red-team family tagged against ATLAS.
+- [Memory getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/memory/getting-started.md) — agent-state-stressing benchmarks (different scope: memory recall vs runtime perf).
 - `src/AgentEval.Evals.Performance/PerformanceBenchmark.cs` — benchmark source + adapter.
 - `src/AgentEval.Cli/Commands/BenchPerfCommand.cs` — CLI subcommand source.

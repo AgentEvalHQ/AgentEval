@@ -209,8 +209,8 @@ Keep flat structure, rely on documentation.
 ## Related
 
 - [ADR-001: Metric Naming Prefixes](001-metric-naming-prefixes.md)
-- [Metrics Reference](../metrics-reference.md)
-- [Evaluation Guide](../evaluation-guide.md)
+- [Metrics Reference](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/metrics-reference.md)
+- [Evaluation Guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/evaluation-guide.md)
 
 ---
 

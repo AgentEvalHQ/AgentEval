@@ -107,7 +107,7 @@ var adapter = new MAFAgentAdapter(agent);
 var result = await harness.RunEvaluationAsync(adapter, testCase);
 ```
 
-See the [NuGetConsumer SK Demo](../samples/AgentEval.NuGetConsumer/SemanticKernelDemo.cs) for the full working example.
+See the [NuGetConsumer SK Demo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.NuGetConsumer/SemanticKernelDemo.cs) for the full working example.
 
 ### Plain IChatClient (No Framework)
 
@@ -241,8 +241,8 @@ Any provider that speaks `IChatClient` gets the full AgentEval evaluation suite 
 
 ## See Also
 
-- [Sample 27: Cross-Framework Evaluation](../samples/AgentEval.Samples/DataAndInfrastructure/07_CrossFrameworkEvaluation.cs) — Universal IChatClient adapter demo
-- [NuGet Consumer SK Demo](../samples/AgentEval.NuGetConsumer/SemanticKernelDemo.cs) — Real Semantic Kernel integration
+- [Sample 27: Cross-Framework Evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/DataAndInfrastructure/07_CrossFrameworkEvaluation.cs) — Universal IChatClient adapter demo
+- [NuGet Consumer SK Demo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.NuGetConsumer/SemanticKernelDemo.cs) — Real Semantic Kernel integration
 - [CLI Reference](cli.md) — Terminal-based evaluation for any provider
 - [Model Comparison](model-comparison.md) — Compare models across providers
 - [LLM-as-a-Judge](llm-as-judge.md) — Scoring with language models

@@ -132,7 +132,7 @@ The fixtures under `tests/AgentEval.Results.Tests/Observations/Fixtures` are
 produced with Google's protobuf runtime from the vendored upstream schemas.
 They cover full typed traces, message/oneof merging, all unknown wire types and
 scalar edge cases. Each binary fixture has an independently decoded JSON pair.
-See [fixture provenance and regeneration](../scripts/otlp-fixtures/README.md).
+See [fixture provenance and regeneration](https://github.com/AgentEvalHQ/AgentEval/blob/main/scripts/otlp-fixtures/README.md).
 Tests compare the complete models from both encodings and exercise malformed
 wire data, resource budgets, ownership and deterministic mutations. The decoder
 is a bounded schema implementation, not a claim of general protobuf conformance.

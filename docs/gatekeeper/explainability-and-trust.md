@@ -9,7 +9,7 @@ against captured calls, and combine available signals without treating missing e
 | What would another configuration decide? | `GateReplayer` | Baseline/candidate verdicts and the calls whose outcome diverges |
 | How strong is the available evidence? | `TrustScoreCalculator` | Availability-aware score plus measured/total signal counts |
 
-Start with sample [10](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs). In the
+Start with sample [10](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs). In the
 interactive launcher, open group **J** and choose **Explainability & Trust** — it is one of the six recommended
 samples. The sample walks through all three APIs; the sections below define their contracts and limits.
 
@@ -34,7 +34,7 @@ Attached via the optional `GateVerdict.Provenance` field — additive, same prec
 for both the Block path and the near-miss-Allow-with-Confidence path Fleet Correlation already reads.
 
 This is the complete, runnable core of it — the full version (with a benign turn shown for contrast, and
-console output) is Scene 1 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs):
+console output) is Scene 1 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs):
 
 ```csharp
 using AgentEval.Guardrails.Judges;
@@ -67,7 +67,7 @@ sequential, first-Block/Mutate-wins semantics the live `UseAgentEvalToolGate` pi
 found here is exactly what would have happened had the candidate configuration been live at capture time.
 
 This example is complete and runnable as written — no live model, no external state, just two gate lists and
-three tool calls (Scene 2 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
+three tool calls (Scene 2 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
 prints the console output for exactly this):
 
 ```csharp
@@ -97,7 +97,7 @@ network call and no live agent.
 
 **From the command line:** `agenteval log-file gate-replay <capture.jsonl> --baseline <gates.json> --candidate
 <gates.json>` runs the same comparison over the tool calls in a `--capture-fixture` capture, with each configuration
-written as a JSON array of gate ids and parameters (see [`agenteval log-file`](../cli.md#agenteval-log-file)). It
+written as a JSON array of gate ids and parameters (see [`agenteval log-file`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#agenteval-log-file)). It
 replays the gates that read a call's own arguments (`tool:forbidden-tool`, `tool:argument-pattern`,
 `tool:domain-allowlist`); a capture holds no tool results, so the gates that read the conversation are refused
 there. For those, build the `GatedToolCall`s with their full history (for example from an `AgentTrace`) and call
@@ -112,7 +112,7 @@ including gaps — is exactly the trap `WeightedSumAggregation`'s own comment wa
 aggregation strategies (`WeightedSumAggregation`/`WeightedMedianAggregation`/`MinAggregation`/
 `MajorityVoteAggregation`) to a cross-cutting mix of signal SOURCES, not just sub-evals of one eval tree.
 
-Complete and runnable as written (Scene 3 of the [sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
+Complete and runnable as written (Scene 3 of the [sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs)
 also folds in Scene 1's real gate verdict as one of the signals):
 
 ```csharp
@@ -143,7 +143,7 @@ when nothing could be scored at all.
 
 - [Gate reference](gate-reference.md) — the gate-family selection index, including `CompositeJudgeGate`'s Tribunal role.
 - [First recipes](examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring pattern.
-- [Explainability & Trust sample](../../samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
-- [Capability history](../gatekeeper-whats-new.md) — the compact chronology of Gatekeeper milestones.
-- [CLI Reference — Exit codes](../cli.md#exit-codes) — the benchmark-gate exit-code split
+- [Explainability & Trust sample](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/10_GatekeeperExplainabilityAndTrust.cs) — all three components, gradually, against a real judge gate.
+- [Capability history](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/gatekeeper-whats-new.md) — the compact chronology of Gatekeeper milestones.
+- [CLI Reference — Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes) — the benchmark-gate exit-code split
   (`9`/`10`/`11`), a related but separate honesty contract.

@@ -16,12 +16,12 @@ asks for the answer only. So every evidence channel carries an availability labe
 [the evidence model](#the-evidence-model).
 
 **Where to start.** [Microsoft 365 at a glance](microsoft365-at-a-glance.md) shows how the pieces fit, with a diagram
-and screenshots. The [demo project](../samples/AgentEval.Microsoft365Demo/README.md) is the fastest path: one command
+and screenshots. The [demo project](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md) is the fastest path: one command
 checks the connection, sends one prompt, runs a five-case benchmark and saves everything in one run folder. Its run
 folder also holds an AEF run of the benchmark. For your own code, read
 [Using it directly in code](#using-it-directly-in-code-no-cli). For the CLI, start with the
 [readiness check](#readiness-check-agenteval-m365-doctor). An external tester starts with the
-[demo README](../samples/AgentEval.Microsoft365Demo/README.md); the [tester guide](microsoft365-tester-guide.md) holds
+[demo README](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md); the [tester guide](microsoft365-tester-guide.md) holds
 the prerequisites and a CLI path for when the maintainers ask.
 
 ---
@@ -543,7 +543,7 @@ Symptoms without a code:
 
 ## See also
 
-- [The demo project](../samples/AgentEval.Microsoft365Demo/README.md): readiness, one prompt and a benchmark in one
+- [The demo project](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md): readiness, one prompt and a benchmark in one
   command, and one run folder to send back.
 - [Microsoft 365 tester guide](microsoft365-tester-guide.md) and its
   [results template](microsoft365-tester-RESULTS-TEMPLATE.md): the live validation an external tester runs.
