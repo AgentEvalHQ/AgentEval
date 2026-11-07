@@ -236,8 +236,8 @@ This decision will be validated by:
 
 ## Related Documents
 
-- [Model Comparison Guide](../model-comparison.md)
-- [stochastic evaluation Guide](../stochastic-evaluation.md)
+- [Model Comparison Guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/model-comparison.md)
+- [stochastic evaluation Guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/stochastic-evaluation.md)
 - [Sample14: stochastic evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/02_StochasticEvaluation.cs)
 - [Sample15: Model Comparison](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)
 

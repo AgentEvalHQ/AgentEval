@@ -136,7 +136,7 @@ A pillar that fails any threshold fails `calibrate`. The CI workflow (`.github/w
 
 ### Calibration quality today
 
-The project's latest figures are in [Calibration results](../calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 4 missed κ ≥ 0.70 by one case. They describe that judge model on that day. What is known about the earlier runs:
+The project's latest figures are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 4 missed κ ≥ 0.70 by one case. They describe that judge model on that day. What is known about the earlier runs:
 
 - The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
 - On those runs pillars 1–5 met the strict gate. Pillar 6 (governance), added later, met only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658 with gpt-4o-mini).
@@ -169,6 +169,6 @@ Treat the judge as uncalibrated for your deployment until you re-run `calibrate`
 ## Where to look next
 
 - [`getting-started.md`](getting-started.md) — how to actually run it.
-- [`../../composite-evals.md`](../../composite-evals.md) — the underlying composition primitives.
-- [`../../cli.md`](../../cli.md) — full CLI reference for `bench gdpr` and `bench gdpr calibrate`.
-- [`../../agenteval-workspace.md`](../../agenteval-workspace.md) — where evidence is written and how `agenteval doctor` validates it.
+- [`../../composite-evals.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying composition primitives.
+- [`../../cli.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full CLI reference for `bench gdpr` and `bench gdpr calibrate`.
+- [`../../agenteval-workspace.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/agenteval-workspace.md) — where evidence is written and how `agenteval doctor` validates it.

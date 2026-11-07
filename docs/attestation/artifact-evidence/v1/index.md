@@ -15,4 +15,4 @@ The earlier draft identifier under `/aef/1/` was retired when the profile was se
 it is not an alias for this identifier.
 
 An intact binding is distinct from a trusted signature or deployment approval.
-See the [AgentEval AEF guide](../../../aef.md) for companion export and verification commands.
+See the [AgentEval AEF guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md) for companion export and verification commands.

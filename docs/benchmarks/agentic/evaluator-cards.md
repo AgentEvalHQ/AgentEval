@@ -14,8 +14,8 @@ The authoritative source for each evaluator's full metadata — score formula, s
 threshold, expected inputs, recommended visualisation, and external compatibility — is the
 matching `EvaluatorCard` JSON under `src/AgentEval.Evals.Agentic/EvaluatorCards/<key>.json`.
 At runtime, Mission Control loads these into the GraphQL `evaluators` query (see
-[Mission Control Getting Started](../../missioncontrol/getting-started.md)), and the
-[Portal-Ready Evaluators](../../missioncontrol/portal-ready-evaluators.md) guide documents
+[Mission Control Getting Started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/missioncontrol/getting-started.md)), and the
+[Portal-Ready Evaluators](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/missioncontrol/portal-ready-evaluators.md) guide documents
 the schema for new evaluator authors. Phase 6 evaluators (memory, multi-turn, reasoning,
 calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-guidance.md).
 

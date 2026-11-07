@@ -156,7 +156,7 @@ The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/Agentic
 
 ### Calibration quality today
 
-The project's latest figures, for one judge model on one day, are in [Calibration results](../calibration-results.md). The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
+The project's latest figures, for one judge model on one day, are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md). The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
 
 | Category | Calibration status | Notes |
 |---|---|---|
@@ -204,5 +204,5 @@ Every category in this table runs at runtime and produces verdicts, whether or n
 - [`getting-started.md`](getting-started.md) — how to run it.
 - [`cost-guidance.md`](cost-guidance.md) — per-evaluator cost classification.
 - [`evaluator-cards.md`](evaluator-cards.md) — the canonical per-evaluator reference.
-- [`../../composite-evals.md`](../../composite-evals.md) — the underlying composition primitives.
-- [`../../cli.md`](../../cli.md) — full CLI reference for `bench agentic`.
+- [`../../composite-evals.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying composition primitives.
+- [`../../cli.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full CLI reference for `bench agentic`.

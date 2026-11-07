@@ -12,7 +12,7 @@ Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, th
 ## From 1.0.0-rc.1 to 1.0.0-rc.2
 
 The second candidate adds the experimental Microsoft 365 provider and moves to Microsoft Agent Framework 1.27. See
-the [full changelog](../CHANGELOG.md#100-rc2).
+the [full changelog](https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md#100-rc2).
 
 | Area | What changes | Update your consumer |
 |---|---|---|
@@ -29,7 +29,7 @@ the [full changelog](../CHANGELOG.md#100-rc2).
 
 This candidate makes unavailable measurements explicit and uses AEF as the CLI's default run record.
 It includes breaking changes before the stable 1.0 promise begins. See the
-[maturity policy](../README.md#feature-maturity) and [full changelog](../CHANGELOG.md#100-rc1).
+[maturity policy](https://github.com/AgentEvalHQ/AgentEval/blob/main/README.md#feature-maturity) and [full changelog](https://github.com/AgentEvalHQ/AgentEval/blob/main/CHANGELOG.md#100-rc1).
 
 ### Measurements and comparisons
 

@@ -14,4 +14,4 @@ The [writer overlay-seal schema](https://agenteval.dev/aef/1/writer/overlay-seal
 Verification includes the covered bytes and batch chain. A batch seal does not replace verification
 of the original run or establish signer trust by itself.
 
-See [AEF identifiers](../index.md) and the [AgentEval AEF guide](../../../aef.md).
+See [AEF identifiers](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef/1/index.md) and the [AgentEval AEF guide](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md).

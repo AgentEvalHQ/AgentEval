@@ -1,7 +1,7 @@
 # Microsoft 365 connector: tester results template
 
 Copy this file to `RESULTS.md` in the repository root, fill it in while you follow the
-[demo README](../samples/AgentEval.Microsoft365Demo/README.md), and send it with the zip. Write values exactly as the
+[demo README](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md), and send it with the zip. Write values exactly as the
 tool printed them. Leave a cell empty when a step did not run, and say why under *Free text*. Never paste a token, a
 key, the device code or the content of `workiq.json`.
 

@@ -69,7 +69,7 @@ because the judge round-trip is the correctness signal. It uses whichever provid
 OpenAI-compatible endpoint — and auto-detects when the selector is unset, so the
 `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` trio alone still works.
 Each provider's variables are listed in
-[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
+[CLI Reference — `AI_INFERENCE_PROVIDER`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
 When no provider resolves, the command prints why (for example, which variables are missing) and
 exits 3 (`RuntimeError`).
 
@@ -776,7 +776,7 @@ Pin `AnswerSeed` to measure the memory system's own variance; vary it to measure
 ## See also
 
 - [AEF aggregate diagnostics](aef-diagnostics.md) — distance buckets, forgetting counts and interrupted-run semantics.
-- [ADR-026](../../adr/026-typedmemeval-benchmark-family.md) — the design of record, including the
+- [ADR-026](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/adr/026-typedmemeval-benchmark-family.md) — the design of record, including the
   five places it pushes back on its own brief.
-- [LongMemEval getting started](../longmemeval/getting-started.md) — the harness this family reuses.
-- [Time-grounded probe](../longmemeval/time-grounded-probe.md) — the seed of TypedMemEval-Prospective.
+- [LongMemEval getting started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/longmemeval/getting-started.md) — the harness this family reuses.
+- [Time-grounded probe](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/longmemeval/time-grounded-probe.md) — the seed of TypedMemEval-Prospective.

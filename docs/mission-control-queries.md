@@ -326,7 +326,7 @@ to use installed Edge. This checks controlled API responses in a real browser;
 `SpaQueriesValidateTests` checks the actual SPA operations against the production
 GraphQL schema. `governance-live.mjs` exercises the production host with actual
 indexed evidence, signatures, waiver expiry and tamper refusal; see the
-[browser acceptance instructions](../scripts/mc-browser-smoke/README.md), including
+[browser acceptance instructions](https://github.com/AgentEvalHQ/AgentEval/blob/main/scripts/mc-browser-smoke/README.md), including
 how to target an installed CLI package.
 
 

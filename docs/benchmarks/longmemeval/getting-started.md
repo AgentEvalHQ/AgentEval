@@ -108,7 +108,7 @@ provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azur
 AI Foundry, or any OpenAI-compatible endpoint — and auto-detects when the
 selector is unset, so the `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` +
 `AZURE_OPENAI_DEPLOYMENT` trio alone still works. See
-[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)
+[CLI Reference — `AI_INFERENCE_PROVIDER`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to)
 for each provider's variables. When no provider resolves, the command prints
 why (for example, which variables are missing) and exits 3 (`RuntimeError`).
 
@@ -581,8 +581,8 @@ application's responsibility.
   `TemporalGroundingReport.SessionsWithDateLikeContent` counts how many sessions
   still contain one.
 
-See also [Memory benchmark](../memory/getting-started.md), the
-[CLI reference](../../cli.md), and the
+See also [Memory benchmark](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/memory/getting-started.md), the
+[CLI reference](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md), and the
 [LongMemEval paper](https://arxiv.org/abs/2410.10813). The
 [2026-07-29 live validation](live-validation-2026-07-29.md) records the
 provider-compatibility and judge-reliability calibration for this release.

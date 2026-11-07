@@ -1,7 +1,7 @@
 # Connect to a Microsoft 365 tenant
 
 This page sets up a Microsoft 365 tenant so that AgentEval can reach its agents over Work IQ, and checks the
-connection before any prompt is sent. It is the one place for these steps: the [demo](../samples/AgentEval.Microsoft365Demo/README.md),
+connection before any prompt is sent. It is the one place for these steps: the [demo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md),
 the [tester guide](microsoft365-tester-guide.md) and the [Microsoft 365 page](microsoft365.md) link here.
 
 Plan about 30 minutes, plus up to 30 minutes for a billing-plan assignment to take effect. The steps follow Microsoft's

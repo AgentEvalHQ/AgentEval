@@ -1153,7 +1153,7 @@ over-refusal lines per case, ASSERT's rates in `summary.json`, with optional gat
 off`, no prompt, response, transcript or judge reasoning is kept.
 
 **`import otel`** converts OpenTelemetry `gen_ai.evaluation.result` events (OTLP/JSON logs, one `LogsData` per line)
-into an AEF run, as [the OpenTelemetry interop page](../contracts/aef/1/interop/opentelemetry.md) maps them: a line
+into an AEF run, as [the OpenTelemetry interop page](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/1/interop/opentelemetry.md) maps them: a line
 per event, the run's id, subject and target mode from you, `contentCapture` `on` unless `--content-capture off`
 (then logs carrying content are refused), sealed as `ingest` unless `--no-seal`, and verified. Events the page refuses
 (two services, an event with no case or no name, a second event of one case with one name, …) exit `2`, naming the
@@ -1166,7 +1166,7 @@ withhold a reasoning blob); the output file must not exist. A run it cannot expo
 OpenTelemetry cannot hold, a reasoning blob that is not UTF-8 or is over 4 MiB) exits `2`, and nothing is written.
 
 **`import inspect`** converts an [Inspect](https://inspect.aisi.org.uk/) eval log in `.json` form (for an `.eval` log,
-run `inspect log dump` first) into an AEF run, as [the Inspect interop page](../contracts/aef/1/interop/inspect.md)
+run `inspect log dump` first) into an AEF run, as [the Inspect interop page](https://github.com/AgentEvalHQ/AgentEval/blob/main/contracts/aef/1/interop/inspect.md)
 maps it: a line per sample and score (`trial` = `epoch` − 1 when the log has more than one epoch), a rollup line per
 reduction, the summary recomputed from the lines in one lane `main`, and the run's usage from `stats`. The subject is
 `model:<eval.model>`; the target mode is yours, and `contentCapture` is `on` unless `--content-capture off` (then no

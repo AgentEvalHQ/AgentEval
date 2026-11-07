@@ -125,7 +125,7 @@ var dataset = await DatasetLoaderFactory.LoadAsync("samples/datasets/benchmark-t
 var prompts = dataset.Select(dc => dc.Input).ToList();
 ```
 
-A working end-to-end sample lives at [`samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs`](../samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs) — it loads prompts from JSONL, runs an agent against each, and evaluates the responses with `AgenticBenchmark.ToolCallAccuracy(judge)`.
+A working end-to-end sample lives at [`samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/DataAndInfrastructure/04_BenchmarkSystem.cs) — it loads prompts from JSONL, runs an agent against each, and evaluates the responses with `AgenticBenchmark.ToolCallAccuracy(judge)`.
 
 ---
 

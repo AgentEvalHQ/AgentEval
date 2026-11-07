@@ -1,6 +1,6 @@
 # OWASP LLM Top 10 — Red-Team Procedure
 
-> **Procedure-focused companion** to [`docs/benchmarks/owasp/getting-started.md`](../benchmarks/owasp/getting-started.md), authored under plan-13 T4.1b item 20. The getting-started doc covers what the benchmark is and how to run it once; this doc covers **how to use it as a red-team practitioner**: pick the right preset for the engagement phase, interpret findings against agent design, triage real-vs-noise, and turn a report into an action list.
+> **Procedure-focused companion** to [`docs/benchmarks/owasp/getting-started.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md), authored under plan-13 T4.1b item 20. The getting-started doc covers what the benchmark is and how to run it once; this doc covers **how to use it as a red-team practitioner**: pick the right preset for the engagement phase, interpret findings against agent design, triage real-vs-noise, and turn a report into an action list.
 
 ## Quick decision matrix
 
@@ -13,7 +13,7 @@ Choose the preset that matches your engagement phase:
 | Pre-prod audit (full coverage, longer timeouts, more probes per attack) | `audit` | 15–45 min | ~$1–$5 | Pre-release gate; quarterly attestation |
 | RAG-heavy app (extra LLM01-IndirectInjection depth) | `top10-rag` | 15–45 min | ~$1–$5 | Agent's main data path goes through a retrieval store |
 
-Costs assume `gpt-4o`-class for the agent under test and cover the agent's calls only: one per probe (23 for `smoke`, 73 for `top10`, 264 for `audit` and `top10-rag`). The run is graded judge first, and judge calls come on top: several per probe of a semantic attack (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse, DataPoisoning's false-fact probes), plus one per inconclusive probe of the other attacks. `smoke` calls the judge only for a PII probe its shape checks cannot decide. See [getting-started §"Presets"](../benchmarks/owasp/getting-started.md#presets).
+Costs assume `gpt-4o`-class for the agent under test and cover the agent's calls only: one per probe (23 for `smoke`, 73 for `top10`, 264 for `audit` and `top10-rag`). The run is graded judge first, and judge calls come on top: several per probe of a semantic attack (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse, DataPoisoning's false-fact probes), plus one per inconclusive probe of the other attacks. `smoke` calls the judge only for a PII probe its shape checks cannot decide. See [getting-started §"Presets"](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md#presets).
 
 ## Five-step procedure
 
@@ -53,7 +53,7 @@ Three triage states per category leaf:
 | `pass` (score ≥ 0.8) | Move on; track in baseline so a regression surfaces in the next run |
 | `warn` (0.5 ≤ score < 0.8) | At least one probe partially landed; open per-probe evidence and decide if it's a real exploit class or an artefact of the grader (false-positive rate is non-zero — see §"Real vs noise" below) |
 | `fail` (score < 0.5) | Treat as an exploit-class regression; do not ship |
-| `skipped` (no probes) | Category appears for completeness; no signal in this preset. All 10 categories have a dedicated attack; LLM03/LLM04/LLM08/LLM09 lean on proxy or judge-deferred evidence and often read `Inconclusive` — see [getting-started §"Coverage and evidence strength"](../benchmarks/owasp/getting-started.md#coverage-and-evidence-strength) |
+| `skipped` (no probes) | Category appears for completeness; no signal in this preset. All 10 categories have a dedicated attack; LLM03/LLM04/LLM08/LLM09 lean on proxy or judge-deferred evidence and often read `Inconclusive` — see [getting-started §"Coverage and evidence strength"](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md#coverage-and-evidence-strength) |
 
 ### 4. Real vs noise (per category)
 
@@ -104,7 +104,7 @@ Treat regressions as build-break-worthy — they mean a code change reduced the 
 
 ## See also
 
-- [`docs/benchmarks/owasp/getting-started.md`](../benchmarks/owasp/getting-started.md) — what the benchmark is + CLI cheat sheet
-- [`docs/benchmarks/mitre/getting-started.md`](../benchmarks/mitre/getting-started.md) — the ATLAS-mapped sibling family
+- [`docs/benchmarks/owasp/getting-started.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md) — what the benchmark is + CLI cheat sheet
+- [`docs/benchmarks/mitre/getting-started.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/mitre/getting-started.md) — the ATLAS-mapped sibling family
 - ADR-017 — Unified Benchmarks namespace + Convention 2 EvalResult adapter
-- [`samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs`](../../samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs) — end-to-end programmatic shape
+- [`samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs) — end-to-end programmatic shape

@@ -71,9 +71,9 @@ A request detector and a tool contract answer different questions:
 5. validate redirects and DNS at the actual HTTP seam.
 
 Keep downstream authorization active when an upstream detector allows a paraphrase. Sample
-[`16_GatekeeperJailbreakAndToolAbuse`](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs)
+[`16_GatekeeperJailbreakAndToolAbuse`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs)
 demonstrates this contrast. Sample
-[`14_GatekeeperPoisonedToolKillChain`](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs)
+[`14_GatekeeperPoisonedToolKillChain`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs)
 extends it through poisoned results, containment, taint, exfiltration, deletion, and propagation attempts.
 
 ## Recipe: protect tool results
@@ -156,4 +156,4 @@ agenteval redteam --sut gatekeeper-demo --scripted --intensity quick \
 the configured model.
 
 For language-neutral deterministic inspection, use `agenteval gatekeeper inspect`. See
-[Attack the Gate](attack-the-gate.md) and the [Gatekeeper CLI](../gatekeeper-cli.md).
+[Attack the Gate](attack-the-gate.md) and the [Gatekeeper CLI](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/gatekeeper-cli.md).

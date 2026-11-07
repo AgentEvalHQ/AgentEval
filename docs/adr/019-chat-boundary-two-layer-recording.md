@@ -34,7 +34,7 @@ We need a second capture layer one level down — at the `Microsoft.Extensions.A
 - White-box, audit-grade evidence: every round-trip, tool schema, finish reason, and provider verdict is observable and hash-anchorable.
 - Framework-agnostic by construction (recorder is MEAI-only in Core).
 - A structurally novel capability (Trace Fidelity) that no two-layer-less competitor can offer, plus an upstream-bug-report loop to `microsoft/agent-framework`.
-- A runtime policy gate ([guardrails](../guardrails.md)) reuses the same `IChatClient` seam.
+- A runtime policy gate ([guardrails](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/guardrails.md)) reuses the same `IChatClient` seam.
 
 **Negative / costs**
 - Trace volume grows (~N× for an N-turn loop); mitigated by tool-definition de-dup in Smoke/Standard presets (off in AuditGrade).

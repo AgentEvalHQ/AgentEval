@@ -142,7 +142,7 @@ A judge can fail to produce a verdict — Azure throttles requests, transient er
 
 ### Calibration quality today
 
-The project's latest figures are in [Calibration results](../calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 1 read INFRA-FAIL because one judge call timed out at the provider (its 24 measured cases cleared its gate). They describe that judge model on that day. What is known about the earlier runs:
+The project's latest figures are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 1 read INFRA-FAIL because one judge call timed out at the provider (its 24 measured cases cleared its gate). They describe that judge model on that day. What is known about the earlier runs:
 
 - The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
 - Results moved with the judge model: the source of `BenchEuAiActCalibrateCommand` records that pillars 3–5 passed with gpt-5-chat and fell to 71% / 78% / 73% accuracy with gpt-4o-mini (2026-05-24).
@@ -176,7 +176,7 @@ Treat the judge as uncalibrated for your deployment until you re-run `calibrate`
 ## Where to look next
 
 - [`getting-started.md`](getting-started.md) — how to actually run it.
-- [`../../composite-evals.md`](../../composite-evals.md) — the underlying composition primitives.
-- [`../../cli.md`](../../cli.md) — full CLI reference for `bench eu-ai-act` and `bench eu-ai-act calibrate`.
-- [`../../agenteval-workspace.md`](../../agenteval-workspace.md) — evidence layout and audit-chain mechanics.
+- [`../../composite-evals.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying composition primitives.
+- [`../../cli.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full CLI reference for `bench eu-ai-act` and `bench eu-ai-act calibrate`.
+- [`../../agenteval-workspace.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/agenteval-workspace.md) — evidence layout and audit-chain mechanics.
 - **EU AI Act text**: [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689).

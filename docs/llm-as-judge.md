@@ -352,9 +352,9 @@ For integration testing, use [Trace Record & Replay](tracing.md) to capture real
 
 ## Samples
 
-- **[Sample 05](../samples/AgentEval.Samples/MetricsAndQuality/01_ComprehensiveRAG.cs)**: RAG quality metrics with LLM judges
-- **[Sample 18](../samples/AgentEval.Samples/MetricsAndQuality/03_JudgeCalibration.cs)**: Multi-model calibrated judge with all 4 voting strategies
-- **[Sample 24](../samples/AgentEval.Samples/MetricsAndQuality/05_CalibratedEvaluatorDemo.cs)**: CalibratedEvaluator — multi-model harness evaluation with criteria
+- **[Sample 05](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MetricsAndQuality/01_ComprehensiveRAG.cs)**: RAG quality metrics with LLM judges
+- **[Sample 18](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MetricsAndQuality/03_JudgeCalibration.cs)**: Multi-model calibrated judge with all 4 voting strategies
+- **[Sample 24](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MetricsAndQuality/05_CalibratedEvaluatorDemo.cs)**: CalibratedEvaluator — multi-model harness evaluation with criteria
 
 ## Related Documentation
 

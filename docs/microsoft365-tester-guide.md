@@ -7,14 +7,14 @@ about an hour, most of it for the prerequisites.
 ## Part 1: run the demo
 
 The demo project runs the whole validation and writes one run folder to send back. Its README is your guide:
-[`samples/AgentEval.Microsoft365Demo`](../samples/AgentEval.Microsoft365Demo/README.md).
+[`samples/AgentEval.Microsoft365Demo`](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md).
 
 1. Set up everything in [What you need](#what-you-need).
-2. Follow the demo README's [Quick start](../samples/AgentEval.Microsoft365Demo/README.md#quick-start):
+2. Follow the demo README's [Quick start](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md#quick-start):
    `--readiness-only` first, then the full run with `--zip`. If the maintainers gave you a branch or a tag, check it
    out right after the clone.
 3. Send back the zip and the exit code, as its
-   [What to send back](../samples/AgentEval.Microsoft365Demo/README.md#what-to-send-back) says.
+   [What to send back](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md#what-to-send-back) says.
 
 Stop there unless the maintainers ask for the command-line results in
 [Part 2](#part-2-the-cli-path-only-if-the-maintainers-ask).
@@ -33,7 +33,7 @@ the steps in order, who does each one, and the first connection test.
 | The delegated permission **`WorkIQAgent.Ask`** with **admin consent** | The scope the service accepts. Without consent the sign-in fails with `AADSTS65001`. It covers reads **and writes** of the user's data. | The app's *API permissions* → *Add a permission* → *APIs my organization uses* → the Work IQ API (`api://workiq.svc.cloud.microsoft`) → *Delegated* → `WorkIQAgent.Ask` → *Add*. Then **Grant admin consent**. |
 | The **tenant id** and the app's **client id** | For `workiq.json`. | The app registration's *Overview* page: *Directory (tenant) ID* and *Application (client) ID*. |
 | A document titled **"Demo Q3 Planning"** in the test user's OneDrive or SharePoint | One case asks the agent to summarise and cite it. | Create any short document with that title. Without it the case can still PASS on a plain "not found", and then grounding and citations are not measured. Create it for the case to mean anything. |
-| **Judge (optional)** | A judge model grades the answers. Each call costs money. | **Demo:** `AI_INFERENCE_PROVIDER` and its variables ([table](../samples/AgentEval.Microsoft365Demo/README.md#the-judge-optional)), or `--no-judge`. An exported `OPENAI_API_KEY` is picked up and spends unless you pass `--no-judge`; the demo prints the judge it resolved before any call. **CLI `eval`** (Step 3): `--judge <url> --judge-model <model>`, with the key in `OPENAI_API_KEY`. **CLI `bench`** (Step 4): `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY`, `AZURE_OPENAI_JUDGE_DEPLOYMENT`. |
+| **Judge (optional)** | A judge model grades the answers. Each call costs money. | **Demo:** `AI_INFERENCE_PROVIDER` and its variables ([table](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md#the-judge-optional)), or `--no-judge`. An exported `OPENAI_API_KEY` is picked up and spends unless you pass `--no-judge`; the demo prints the judge it resolved before any call. **CLI `eval`** (Step 3): `--judge <url> --judge-model <model>`, with the key in `OPENAI_API_KEY`. **CLI `bench`** (Step 4): `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY`, `AZURE_OPENAI_JUDGE_DEPLOYMENT`. |
 | The **.NET 10 SDK**, **git** and a browser on any device | To build and run the code, and to complete the sign-in. | <https://dotnet.microsoft.com/download/dotnet/10.0>, <https://git-scm.com> |
 | Optional: a declarative agent's **agent id** | To test an agent other than Microsoft 365 Copilot itself. | The experimental `workiq list-agents` command of Microsoft's WorkIQ CLI, or the agent's Copilot Chat URL. Ids look like `U_abc.def`. |
 
@@ -311,7 +311,7 @@ The trace and issue files hold ids, codes, timings and file paths, never a promp
 **answers**. The `error` of a failed case in `m365-smoke.json` holds the judge's explanation, which may quote the answer.
 
 To redact, run the commands in the demo README's
-[What to send back](../samples/AgentEval.Microsoft365Demo/README.md#what-to-send-back) twice: with the folder set to
+[What to send back](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Microsoft365Demo/README.md#what-to-send-back) twice: with the folder set to
 `.agenteval/m365`, then to `m365-results`. They skip the sealed `aef/` folder, because any edit makes it invalid. If the
 answers in `aef/` cannot be shared, leave `aef/` out and say so. Then read the `output` and `error` fields of
 `m365-smoke.json` and replace any name you cannot share with `[name]`.

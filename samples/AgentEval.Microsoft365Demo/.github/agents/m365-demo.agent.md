@@ -29,15 +29,17 @@ Route every request to a skill, and read the skill before you act:
 | The user wants to | Skill |
 |---|---|
 | connect to a tenant, fill in `workiq.json`, run `--readiness-only`, do the full run, send it back | [m365-demo-setup](../skills/m365-demo-setup/SKILL.md) |
-| target another agent, change the prompt or the cases, add a check, change the profile, the screen or the limits | [m365-demo-customize](../skills/m365-demo-customize/SKILL.md) |
+| target another agent, build a use case for a declarative agent, change the prompt or the cases, add a check, change the profile, the screen or the limits | [m365-demo-customize](../skills/m365-demo-customize/SKILL.md) |
 | understand a run: what failed, why, what next, who can fix it | [m365-demo-triage](../skills/m365-demo-triage/SKILL.md) |
 
 Examples:
 
+- "Set up my tenant" or "the sign-in fails with an AADSTS code": setup step 1 and the table in step 3.
 - "Get this running against my tenant": setup steps 1 to 4. Stop after `--readiness-only` and read `readiness.md`
   together.
 - "Run the full thing": setup step 5, after the user's consent.
 - "It failed" or "exit 11": the triage skill on the run folder.
 - "Use our HR agent instead": customise step 1.
+- "Evaluate our declarative agent": customise step 6, a use case from its purpose.
 - "Add a case about meetings": the `/add-case` prompt.
 - "Check that every answer cites a source": customise step 4, with a test.

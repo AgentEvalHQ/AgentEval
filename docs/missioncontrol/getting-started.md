@@ -226,4 +226,4 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 - [`api-design.md`](api-design.md) — REST + GraphQL hybrid split.
 - [`portal-ready-evaluators.md`](portal-ready-evaluators.md) — how to write an evaluator that renders well in the portal.
 - [`charting.md`](charting.md) — what each SPA view draws, and with which Recharts component.
-- [`agenteval-workspace.md`](../agenteval-workspace.md) — the on-disk standard Mission Control reads from.
+- [`agenteval-workspace.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/agenteval-workspace.md) — the on-disk standard Mission Control reads from.

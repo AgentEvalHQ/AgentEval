@@ -1,12 +1,12 @@
 # Trace Fidelity
 
-**Does what the agent framework *reports* it did match what the model *actually saw*?** Trace Fidelity (Glass Box) reconciles two traces — the **agent-boundary** trace (the framework's self-report, built with `AgentBoundaryTraceBuilder.FromAgentResponse` from the run's final messages, aggregate usage and finish reason) and the **chat-boundary** trace (ground truth at the model interface, from [`TraceRecordingChatClient`](../tracing.md)) — and flags where they diverge. What it checks is the framework's account of the run, not the agent's answer: tool calls the framework omitted or reported without the model requesting them, tool arguments that differ between the two layers, retries it did not report, token totals it under-reports, and `content_filter`/`length` finish reasons it did not pass on.
+**Does what the agent framework *reports* it did match what the model *actually saw*?** Trace Fidelity (Glass Box) reconciles two traces — the **agent-boundary** trace (the framework's self-report, built with `AgentBoundaryTraceBuilder.FromAgentResponse` from the run's final messages, aggregate usage and finish reason) and the **chat-boundary** trace (ground truth at the model interface, from [`TraceRecordingChatClient`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/tracing.md)) — and flags where they diverge. What it checks is the framework's account of the run, not the agent's answer: tool calls the framework omitted or reported without the model requesting them, tool arguments that differ between the two layers, retries it did not report, token totals it under-reports, and `content_filter`/`length` finish reasons it did not pass on.
 
 > A trace recorded by `TraceRecordingAgent` can stand as the agent-boundary account, with one gap. On the non-streaming path it records the agent's finish reason and the tool calls the response carries in its messages (arguments included; approval-gated calls are not recorded as calls). On the streaming path it records tool calls with their arguments but **no finish reason**, because a streamed chunk carries none, so reconciling a streaming trace reports every `content_filter`/`length` chat turn as `suppressed_finish_reason`. That finding then says nothing about the framework.
 
 It is a **Shape-B benchmark family** (`trace-fidelity`, `CostTier.Free` — pure code, no LLM tokens).
 
-> See **[Glass Box](../glass-box.md)** for the full two-layer model, the per-executor
+> See **[Glass Box](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/glass-box.md)** for the full two-layer model, the per-executor
 > [`workflow-trace-fidelity`](workflow-trace-fidelity.md) variant, and the `glass-box-diagnostics` evaluators.
 
 ## The six discrepancy classes
@@ -52,5 +52,5 @@ When the evaluator finds a mismatch, you hold two things no MAF maintainer has: 
 
 ## Related
 
-- [Tracing — two recording layers](../tracing.md)
-- [Benchmarks overview](../benchmarks.md)
+- [Tracing — two recording layers](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/tracing.md)
+- [Benchmarks overview](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks.md)

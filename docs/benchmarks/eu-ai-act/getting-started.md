@@ -56,7 +56,7 @@ The following are not in scope for any automated dialog benchmark:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- A configured inference provider with a GPT-4o-class model for the judge (see Configuration below): the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). 
+- A configured inference provider with a GPT-4o-class model for the judge (see Configuration below): the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)). 
 
 ---
 
@@ -145,7 +145,7 @@ EU AI Act is a compliance benchmark — like GDPR, it does **not** expose a `--b
 
 When `audit` preset runs with both 3-judge consensus AND Mode-B per-criterion split configured, multi-judge takes precedence and Mode-B is silently skipped — you don't pay the 3 × N call cost simultaneously. This is a deliberate cost control documented in `src/AgentEval.Compliance.EuAiAct/Articles/Building/ScenarioToAtomicEval.cs` (KNOWN v1 LIMITATION block). See Known Limitations below.
 
-For per-evaluator cost classification of the agentic benchmark suite (`bench agentic`), see [`docs/benchmarks/agentic/cost-guidance.md`](../agentic/cost-guidance.md).
+For per-evaluator cost classification of the agentic benchmark suite (`bench agentic`), see [`docs/benchmarks/agentic/cost-guidance.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/agentic/cost-guidance.md).
 
 ---
 
@@ -199,7 +199,7 @@ A PDF report for boardroom presentation or compliance-officer review. Sections: 
 
 ## Configuration
 
-The judge comes from the provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs. With the selector unset, the first fully configured provider in that table's order is used. All three `AZURE_OPENAI_JUDGE_*` variables, when set, point the judge at its own Azure OpenAI endpoint and win over the selector. For example, to judge with Azure OpenAI (auto-detected when only these three are set):
+The judge comes from the provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs. With the selector unset, the first fully configured provider in that table's order is used. All three `AZURE_OPENAI_JUDGE_*` variables, when set, point the judge at its own Azure OpenAI endpoint and win over the selector. For example, to judge with Azure OpenAI (auto-detected when only these three are set):
 
 ```
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
@@ -207,7 +207,7 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-If no provider is configured, or the selected provider is missing variables, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+If no provider is configured, or the selected provider is missing variables, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#environment-variables) for the full contract.
 
 ---
 
@@ -229,7 +229,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 
 Two pillars run against documented relaxed thresholds with a written investigation path to retire them: **pillar 1 (Prohibited Practices)** because the rubric is strictly graded with borderline cases, and **pillar 6 (GPAI self-awareness)** because the small dataset is prone to small-N stochasticity. The relaxations are encoded in `src/AgentEval.Cli/Commands/BenchEuAiActCalibrateCommand.cs`.
 
-A pillar that fails any threshold fails the command. The golden datasets are embedded in the test assembly from `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`, so `calibrate` runs from a built source tree (for example `dotnet run --project src/AgentEval.Cli -- bench eu-ai-act calibrate`), not from the NuGet package. The Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
+A pillar that fails any threshold fails the command. The golden datasets are embedded in the test assembly from `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`, so `calibrate` runs from a built source tree (for example `dotnet run --project src/AgentEval.Cli -- bench eu-ai-act calibrate`), not from the NuGet package. The Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md).
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `eu-ai-act-judge-system.v1.md`, the same judge prompt `bench eu-ai-act` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
@@ -251,9 +251,9 @@ A pillar that fails any threshold fails the command. The golden datasets are emb
 
 - [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
 - **EU AI Act official text**: [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689)
-- [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
-- [CLI Reference](../../cli.md) — full reference for `agenteval bench eu-ai-act`, `agenteval bench eu-ai-act calibrate`, and `agenteval compliance render`.
-- [The `.agenteval/` Workspace](../../agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
+- [Composite Evaluations](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` primitives that power this benchmark.
+- [CLI Reference](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full reference for `agenteval bench eu-ai-act`, `agenteval bench eu-ai-act calibrate`, and `agenteval compliance render`.
+- [The `.agenteval/` Workspace](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/agenteval-workspace.md) — canonical layout, schema versions, audit chain, and `agenteval doctor`.
 
 > **Reminder**: this benchmark is a behavioral screening tool, not a legal compliance attestation. A passing score does not constitute or substitute for risk classification, conformity assessment, technical documentation, post-market monitoring, or any other obligation under Regulation (EU) 2024/1689. Consult qualified legal counsel and compliance personnel before making any EU AI Act compliance representations to regulators, customers, or partners.
 

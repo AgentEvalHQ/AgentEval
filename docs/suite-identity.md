@@ -2,7 +2,7 @@
 
 A case roster identifies which cases were observed. It does not identify the prompts, thresholds,
 weights, aggregation or configuration that defined their evaluation. AgentEval's external
-[suite manifest](../schemas/suites/1/definition.schema.json) separates these concepts.
+[suite manifest](https://github.com/AgentEvalHQ/AgentEval/blob/main/schemas/suites/1/definition.schema.json) separates these concepts.
 
 The manifest reader, deterministic hashing, native eval and dataset-runner bindings are implemented.
 Probe/composite adapters, supported CLI definition capture and strict suite comparison are available.

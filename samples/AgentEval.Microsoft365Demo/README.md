@@ -23,7 +23,8 @@ You need, in a non-production tenant:
 - optionally, a judge model for the benchmark's criteria ([The judge](#the-judge-optional)).
 
 [Connect to a Microsoft 365 tenant](../../docs/microsoft365-tenant-setup.md) gives every step in order, who does
-it, and the first connection test.
+it, and the first connection test. [Microsoft 365 at a glance](../../docs/microsoft365-at-a-glance.md) shows how the
+pieces fit, with screenshots.
 
 The permission covers reads **and writes** of the test user's data. The demo never approves an action or resends a
 prompt, and every step after the readiness check needs your consent.

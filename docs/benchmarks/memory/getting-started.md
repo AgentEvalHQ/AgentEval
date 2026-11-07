@@ -66,7 +66,7 @@ Needs a real model — there is no stub fallback. The command takes its model fr
 `AI_INFERENCE_PROVIDER` selects: Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry, or any OpenAI-compatible
 endpoint. With the selector unset it auto-detects, so a machine that sets only `AZURE_OPENAI_ENDPOINT` +
 `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` works as before. The variables each provider needs are listed in
-[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
+[CLI Reference — `AI_INFERENCE_PROVIDER`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
 When no provider resolves, the command prints why (for example, which variables are missing) and exits 3 (`RuntimeError`).
 
 One client plays both roles: the same model is the agent under test and the `MemoryJudge` that grades it. The
@@ -113,7 +113,7 @@ Per-category interpretation:
 | `< 50` | Fail — memory architecture is unable to handle the dimension at the preset's pressure level |
 
 CLI exit codes: `PASS` → exit 0, `WARN` → exit 10 (`GateWarning`), `FAIL` → exit 9 (`GateFailed`) — see
-[CLI Reference — Exit codes](../../cli.md#exit-codes). (This previously said WARN maps to exit 0 alongside
+[CLI Reference — Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes). (This previously said WARN maps to exit 0 alongside
 PASS — that was never accurate; WARN has always been non-zero, distinct from a clean PASS.)
 
 A run in which something was not measured is **INCOMPLETE** and exits 11 (`GateIndeterminate`): a category crashed,
@@ -194,7 +194,7 @@ Memory runs are stored canonically under `.agenteval/subjects/agents/{subject}/r
 - Mission Control — does not read `report-native.json`, so it cannot compare per-category scores; the canonical summary carries the verdict and `overall_score` only.
 - Programmatic post-processing of `MemoryBenchmarkResult.CategoryResults` for per-category tracking outside AgentEval.
 
-The `AgentEval.Memory` assembly also ships a `BaselineComparer` + `JsonFileBaselineStore` for per-agent baseline persistence and an HTML comparison report — see [Memory Evaluation](../../memory-evaluation.md) for a working example. The CLI does not expose them; use them from your own program.
+The `AgentEval.Memory` assembly also ships a `BaselineComparer` + `JsonFileBaselineStore` for per-agent baseline persistence and an HTML comparison report — see [Memory Evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/memory-evaluation.md) for a working example. The CLI does not expose them; use them from your own program.
 
 ## Limitations
 
@@ -210,8 +210,8 @@ Known limitations:
 - Mission Control does not read `report-native.json`, so it has no per-category view of a memory run.
 
 See also:
-- [LongMemEval getting-started](../longmemeval/getting-started.md) — sister memory family targeting paper-comparable academic baselines.
-- [Agentic getting-started](../agentic/getting-started.md) — broader agentic-quality benchmarks (including 5 memory-multiturn evaluators in the agentic dispatch table).
+- [LongMemEval getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/longmemeval/getting-started.md) — sister memory family targeting paper-comparable academic baselines.
+- [Agentic getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/agentic/getting-started.md) — broader agentic-quality benchmarks (including 5 memory-multiturn evaluators in the agentic dispatch table).
 - `src/AgentEval.Memory/Models/MemoryBenchmark.cs` — preset factory source (`Quick` / `Standard` / `Full` / `Diagnostic` / `Overflow`).
 - `src/AgentEval.Memory/Evaluators/MemoryBenchmarkRunner.cs` — runner source.
 - `src/AgentEval.Memory/Engine/MemoryJudge.cs` — LLM judge source.

@@ -42,7 +42,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 Preset aliases are accepted: `atlas-baseline` = `baseline`, `atlas-smoke` = `smoke`, `atlas-audit-grade` = `atlas-audit` = `audit` = `auditgrade`.
 
-Attacks are graded **judge first**, as `agenteval redteam --judge` grades them. The judge model comes from the environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). Before the scan the command makes one short call to the judge; if the judge does not answer, the command exits 3 before anything is spent on the agent.
+Attacks are graded **judge first**, as `agenteval redteam --judge` grades them. The judge model comes from the environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone (see [CLI Reference — Environment variables](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#environment-variables)). Before the scan the command makes one short call to the judge; if the judge does not answer, the command exits 3 before anything is spent on the agent.
 
 - The semantic attacks (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse and DataPoisoning's false-fact probes) are graded by Composite Judges, which make several judge calls per probe (Misinformation 3, DataPoisoning false-fact 3, InferenceAPIAbuse 4–7).
 - The other attacks are decided by their per-attack oracle. The judge is asked only when that oracle returns `Inconclusive`, and it may only raise such a probe to "attack succeeded". It never turns an undecidable probe into "resisted": system-prompt extraction without a canary stays not conclusively tested.
@@ -67,7 +67,7 @@ agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --from-env
 
 The `--input` flag is accepted for provenance but the MITRE pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 ## Output
 
@@ -92,7 +92,7 @@ The composite `EvalResult` uses `MinAggregation` over the per-technique leaves �
 | `< 0.5` | `fail` | high / critical | Probes landed reliably; treat as exploit-class regression |
 | `skipped` | `skipped` | none | `NotTested` (applicable but unprobed) or `NotApplicable` (not testable at agent-API layer) |
 
-The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)). An INCOMPLETE run (a judge call failed, or the scan ran out of time) exits 11 whatever the composite says.
+The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)). An INCOMPLETE run (a judge call failed, or the scan ran out of time) exits 11 whatever the composite says.
 
 ## How to act on findings
 
@@ -161,8 +161,8 @@ Known limitations:
 - The CLI can scan a plain chat model (`--from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/07_MitreBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
-- [OWASP getting-started](../owasp/getting-started.md) — sister red-team family; same attack pipeline tagged against OWASP categories.
-- [GDPR getting-started](../gdpr/getting-started.md) — for dialog-based compliance benchmarking.
-- [EU AI Act getting-started](../eu-ai-act/getting-started.md) — for AI-Act dialog screening.
+- [OWASP getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/owasp/getting-started.md) — sister red-team family; same attack pipeline tagged against OWASP categories.
+- [GDPR getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/gdpr/getting-started.md) — for dialog-based compliance benchmarking.
+- [EU AI Act getting-started](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/eu-ai-act/getting-started.md) — for AI-Act dialog screening.
 - `src/AgentEval.RedTeam/RedTeam/Compliance/MitreBenchmark.cs` — preset factory source.
 - `src/AgentEval.RedTeam/RedTeam/Reporting/Compliance/MITREATLASReporter.cs` — ATLAS reporter source.

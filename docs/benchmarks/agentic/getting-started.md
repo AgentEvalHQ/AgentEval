@@ -169,7 +169,7 @@ The suite can be run two ways:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- A judge model reachable through one of the CLI's inference providers (see Configuration below). If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). 
+- A judge model reachable through one of the CLI's inference providers (see Configuration below). If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#exit-codes)). 
 
 ---
 
@@ -386,7 +386,7 @@ AZURE_OPENAI_DEPLOYMENT=<your-deployment>
 
 If `AI_INFERENCE_PROVIDER` is unset, the CLI uses the first provider whose variables are all present, checking Azure OpenAI, Bitdeer, OpenAI, Foundry and OpenAI-compatible in that order. To grade with a different endpoint than the agent under test, set all three of `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY` and `AZURE_OPENAI_JUDGE_DEPLOYMENT`; when all three are set they take precedence for the judge.
 
-If no provider is configured, a selected provider is missing variables, or only some of the `AZURE_OPENAI_JUDGE_*` variables are set, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for every provider's variables and the full contract.
+If no provider is configured, a selected provider is missing variables, or only some of the `AZURE_OPENAI_JUDGE_*` variables are set, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#environment-variables) for every provider's variables and the full contract.
 
 Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigationEfficiency deterministic path, ToolCallSuccess deterministic path) do not call the judge. The `telemetry`, `judge-quality` and `stochastic-stability` presets use only such evaluators, so they run without a judge or a provider; every other preset needs a configured judge.
 
@@ -408,7 +408,7 @@ The calibration report records per-category accuracy (fraction of entries within
 - Cohen's kappa ≥ 0.70 per category.
 - Zero evaluation failures (judge errors) per category.
 
-A category that fails its threshold fails the command (exit code 9). The calibration report is written to `.agenteval/calibration/agentic-calibration-{date}.md` under the workspace root (`--root`, default the current directory) unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
+A category that fails its threshold fails the command (exit code 9). The calibration report is written to `.agenteval/calibration/agentic-calibration-{date}.md` under the workspace root (`--root`, default the current directory) unless you pass `--out`; the project's own results for its judge are in [Calibration results](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/calibration-results.md).
 
 **Calibration coverage is partial**: six of the eight scored categories — system, process and RAG quality among them — are gated at relaxed per-category thresholds rather than the 0.85 / 0.70 default, and the memory, multi-turn and trace-dependent reasoning evaluators are not calibrated at all, although they run and produce verdicts. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category picture.
 
@@ -477,12 +477,12 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
 ## References
 
 - [How It Works (plain-English)](how-it-works.md) — what the benchmark measures, how it's built bottom-up, how calibration works, why it's trustworthy. Read this first if you're new.
-- [GDPR Compliance Benchmark](../gdpr/getting-started.md) — the compliance benchmark pattern that this benchmark mirrors.
-- [EU AI Act Compliance Benchmark](../eu-ai-act/getting-started.md) — the second compliance benchmark.
-- [Composite Evaluations](../../composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
+- [GDPR Compliance Benchmark](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/gdpr/getting-started.md) — the compliance benchmark pattern that this benchmark mirrors.
+- [EU AI Act Compliance Benchmark](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/eu-ai-act/getting-started.md) — the second compliance benchmark.
+- [Composite Evaluations](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/composite-evals.md) — the underlying `CompositeEval` / `AtomicLlmEval` / `AtomicCodeEval` primitives.
 - [Cost Guidance](cost-guidance.md) — per-evaluator cost-tier classification and `--budget-tier` filtering.
 - [Evaluator Cards](evaluator-cards.md) — index of the shipped evaluators by category.
-- [CLI Reference](../../cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
+- [CLI Reference](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md) — full reference for `agenteval bench agentic` and `agenteval bench agentic calibrate`.
 
 > **Reminder**: this benchmark is a behavioral evaluation tool, not a compliance attestation, certification, or production-readiness guarantee. A passing score does not substitute for human review, monitoring, penetration testing, or domain-specific validation. Consult qualified domain and legal personnel before making any quality or compliance representations.
 

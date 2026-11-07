@@ -266,7 +266,7 @@ See [Pinning the answer model](benchmarks/longmemeval/getting-started.md#pinning
 [The oracle arm on its own](benchmarks/longmemeval/getting-started.md#the-oracle-arm-on-its-own), and the
 [time-grounded probe](benchmarks/longmemeval/time-grounded-probe.md).
 
-Sample [G8: LongMemEvalBenchmarkDemo](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) and [G10: LongMemEvalBaselineRepro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
+Sample [G8: LongMemEvalBenchmarkDemo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) and [G10: LongMemEvalBaselineRepro](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) reproduce the GPT-4o paper baseline.
 
 ### ✍️ Fluent Memory Assertions
 
@@ -333,7 +333,7 @@ The benchmark presets are the curated fast path. For domain-specific memory (med
 3. **Drive a runner** — `MemoryTestRunner` interleaves facts with optional noise turns and asks the queries
 4. **Add a judge variant** if your domain needs a custom rubric — `MemoryJudge` is extensible
 
-See [Sample G3 — Memory Scenarios](../samples/AgentEval.Samples/MemoryEvaluation/03_MemoryScenariosDemo.cs) for `ReachBackEvaluator` + `ReducerEvaluator`, and [Sample G6 — AIContextProvider Memory](../samples/AgentEval.Samples/MemoryEvaluation/09_MemoryAIContextProvider.cs) for MAF-pipeline-native memory.
+See [Sample G3 — Memory Scenarios](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/03_MemoryScenariosDemo.cs) for `ReachBackEvaluator` + `ReducerEvaluator`, and [Sample G6 — AIContextProvider Memory](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/09_MemoryAIContextProvider.cs) for MAF-pipeline-native memory.
 
 ---
 
@@ -341,16 +341,16 @@ See [Sample G3 — Memory Scenarios](../samples/AgentEval.Samples/MemoryEvaluati
 
 | # | Sample | What you'll learn |
 |---|---|---|
-| G1 | [Memory Basics](../samples/AgentEval.Samples/MemoryEvaluation/01_MemoryBasics.cs) | `MemoryJudge`, `MemoryTestRunner`, fluent assertions |
-| G2 | [Memory Benchmark Demo](../samples/AgentEval.Samples/MemoryEvaluation/02_MemoryBenchmarkDemo.cs) | Quick / Standard / Full presets with grades |
-| G3 | [Memory Scenarios](../samples/AgentEval.Samples/MemoryEvaluation/03_MemoryScenariosDemo.cs) | `ReachBackEvaluator`, `ReducerEvaluator` |
-| G4 | [Memory DI](../samples/AgentEval.Samples/MemoryEvaluation/04_MemoryDI.cs) | `AddAgentEvalMemory()`, `CanRememberAsync()` |
-| G5 | [Cross-Session Memory](../samples/AgentEval.Samples/MemoryEvaluation/05_MemoryCrossSession.cs) | Fact persistence across session resets |
-| G6 | [Benchmark Reporting](../samples/AgentEval.Samples/MemoryEvaluation/06_MemoryBenchmarkReporting.cs) | Multi-model HTML pentagon report |
-| G7 | [LongMemEval Benchmark](../samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) | Cross-platform research-grade evaluation |
-| G8 | [Run Single Benchmark](../samples/AgentEval.Samples/MemoryEvaluation/08_RunSingleBenchmark.cs) | Pick a preset, save a baseline, view report |
-| G9 | [AIContextProvider Memory](../samples/AgentEval.Samples/MemoryEvaluation/09_MemoryAIContextProvider.cs) | MAF-native pipeline memory |
-| G10 | [LongMemEval Baseline Repro](../samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) | Reproduce the GPT-4o paper baseline |
+| G1 | [Memory Basics](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/01_MemoryBasics.cs) | `MemoryJudge`, `MemoryTestRunner`, fluent assertions |
+| G2 | [Memory Benchmark Demo](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/02_MemoryBenchmarkDemo.cs) | Quick / Standard / Full presets with grades |
+| G3 | [Memory Scenarios](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/03_MemoryScenariosDemo.cs) | `ReachBackEvaluator`, `ReducerEvaluator` |
+| G4 | [Memory DI](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/04_MemoryDI.cs) | `AddAgentEvalMemory()`, `CanRememberAsync()` |
+| G5 | [Cross-Session Memory](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/05_MemoryCrossSession.cs) | Fact persistence across session resets |
+| G6 | [Benchmark Reporting](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/06_MemoryBenchmarkReporting.cs) | Multi-model HTML pentagon report |
+| G7 | [LongMemEval Benchmark](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/07_LongMemEvalBenchmarkDemo.cs) | Cross-platform research-grade evaluation |
+| G8 | [Run Single Benchmark](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/08_RunSingleBenchmark.cs) | Pick a preset, save a baseline, view report |
+| G9 | [AIContextProvider Memory](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/09_MemoryAIContextProvider.cs) | MAF-native pipeline memory |
+| G10 | [LongMemEval Baseline Repro](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MemoryEvaluation/10_LongMemEvalBaselineRepro.cs) | Reproduce the GPT-4o paper baseline |
 
 ---
 

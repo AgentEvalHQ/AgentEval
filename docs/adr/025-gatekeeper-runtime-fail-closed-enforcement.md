@@ -17,7 +17,7 @@ A layered, fail-closed middleware over the MAF agent pipeline, on two load-beari
 
 **1. Cannot-inspect ⇒ deny.** Every gate is fail-closed by construction: a gate that throws is caught and treated as a **Block** (never swallowed into a proceed); a session gate that can't read its context **Blocks**; a run-post gate that cannot inspect a stream under a blocking policy throws at stream start rather than let output through. A block always returns a non-null refusal, so it can never surface as MEAI's `"Success"` fabrication.
 
-**2. Honest evidence.** Every enforcement decision is recorded into the same [`AgentTrace`](../glass-box.md) the evaluators read, under `gate.*` keys. A gate that only *warns* records `action="Warn"` — it is **never** counted as a block, so `GlassBoxEvidence.GateBlockCount` can never claim it stopped a call that actually ran.
+**2. Honest evidence.** Every enforcement decision is recorded into the same [`AgentTrace`](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/glass-box.md) the evaluators read, under `gate.*` keys. A gate that only *warns* records `action="Warn"` — it is **never** counted as a block, so `GlassBoxEvidence.GateBlockCount` can never claim it stopped a call that actually ran.
 
 **The layers, split by cost budget:**
 
