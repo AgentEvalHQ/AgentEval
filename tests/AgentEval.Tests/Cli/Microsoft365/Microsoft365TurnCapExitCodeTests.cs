@@ -67,6 +67,7 @@ public sealed class Microsoft365TurnCapExitCodeTests : IDisposable
             File.WriteAllText(config, "{ \"tenantId\": \"11111111-1111-1111-1111-111111111111\", \"appClientId\": \"22222222-2222-2222-2222-222222222222\" }");
             var opts = new EvalOptions
             {
+                NoAef = true,
                 Dataset = new FileInfo(dataset),
                 Sut = Microsoft365SutTarget.SutName,
                 AckLiveSideEffects = true,

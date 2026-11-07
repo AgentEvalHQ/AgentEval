@@ -184,6 +184,7 @@ public class EvalCommandCopilotStudioSutTests
         Quiet = true,
         Runs = runs,
         Metrics = metrics,
+        NoAef = true, // a test never writes a run into the repository's own .agenteval workspace
     };
 
     private static FileInfo CreateTempDataset()

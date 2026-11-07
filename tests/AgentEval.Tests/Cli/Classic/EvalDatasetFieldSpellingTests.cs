@@ -36,6 +36,7 @@ public sealed class EvalDatasetFieldSpellingTests : IDisposable
         await File.WriteAllTextAsync(dataset.FullName, content);
         var opts = new EvalOptions
         {
+            NoAef = true,
             Dataset = dataset,
             Endpoint = "http://localhost:11434/v1",
             Model = "fake-model",

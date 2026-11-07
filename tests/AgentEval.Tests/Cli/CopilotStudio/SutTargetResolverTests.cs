@@ -244,6 +244,7 @@ public class SutTargetResolverTests
             var redteamTarget = new CopilotStudioRedTeamTarget();
             var redteamOpts = new RedTeamOptions
             {
+                NoAef = true,
                 Sut = "copilot-studio",
                 Parallelism = 1,
                 TargetOptions = new Dictionary<string, IRedTeamTargetOptions?>

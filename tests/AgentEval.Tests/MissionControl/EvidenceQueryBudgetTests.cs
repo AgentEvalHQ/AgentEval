@@ -98,7 +98,10 @@ public sealed class EvidenceQueryBudgetTests : IDisposable
         var path = new string('x', 850);
         writer.Upsert(new("root", path, new string('a', 64), IndexedEvidenceKind.Legacy, IndexedVerification.Unverified,
             new("run", null, null, null, null, null, null, "unknown"), [], [], null));
-        var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0");
+        var builder = WebApplication.CreateBuilder();
+        // A free loopback port, set on Kestrel itself: UseUrls writes the "urls" setting into the configuration
+        // that the next line clears, so the server fell back to port 5000 and collided with a parallel test run.
+        builder.WebHost.ConfigureKestrel(o => o.Listen(IPAddress.Loopback, 0));
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {

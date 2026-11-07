@@ -77,7 +77,7 @@ public class GatekeeperDemoSutTests
         // Through 0.42 the demo always ran the scripted model. Resolving a provider builds a client; it calls nothing.
         using (new ProviderEnvironmentScope())
         {
-            Assert.Equal("gatekeeper-demo (scripted)", new GatekeeperDemoRedTeamTarget().ResolvedName(new RedTeamOptions { Intensity = "quick", Format = "json" }));
+            Assert.Equal("gatekeeper-demo (scripted)", new GatekeeperDemoRedTeamTarget().ResolvedName(new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json" }));
         }
 
         using (new ProviderEnvironmentScope(
@@ -85,7 +85,7 @@ public class GatekeeperDemoSutTests
             ("OPENAI_COMPATIBLE_ENDPOINT", "http://127.0.0.1:9/v1"),
             ("OPENAI_COMPATIBLE_MODEL", "local-model")))
         {
-            var name = new GatekeeperDemoRedTeamTarget().ResolvedName(new RedTeamOptions { Intensity = "quick", Format = "json" });
+            var name = new GatekeeperDemoRedTeamTarget().ResolvedName(new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json" });
             Assert.Equal("gatekeeper-demo (real model local-model@openai-compatible)", name);
         }
     }
@@ -126,6 +126,7 @@ public class GatekeeperDemoSutTests
             ("OPENAI_COMPATIBLE_MODEL", "local-model"));
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Intensity = "quick",
             Format = "json",
             TargetOptions = new Dictionary<string, AgentEval.Cli.Commands.RedTeamTargets.IRedTeamTargetOptions?>(StringComparer.OrdinalIgnoreCase)

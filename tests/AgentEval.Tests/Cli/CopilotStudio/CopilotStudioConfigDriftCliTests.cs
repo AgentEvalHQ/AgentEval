@@ -174,6 +174,7 @@ public class CopilotStudioConfigDriftCliTests
         Format = "json",
         FailOn = "vuln",
         Quiet = true,
+        NoAef = true, // a test never writes a run into the repository's own .agenteval workspace
     };
 
     private static FileInfo WriteValidConfig(string schemaName = "cr1a2_agent")

@@ -201,6 +201,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Model = "gpt-4o",
             Intensity = "moderate",
             Format = "json",
@@ -216,6 +217,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Azure = false,
             Model = "gpt-4o",
             Intensity = "moderate",
@@ -233,7 +235,7 @@ public class RedTeamCommandTests
     {
         // A benign control is graded by the over-refusal judge, so without --judge the arm cannot run. The check is in
         // the step-1 validation, so it fails before the target, the import or a pack download is touched.
-        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", BenignControls = true, Intensity = "quick", Format = "json" };
+        var opts = new RedTeamOptions { NoAef = true, Sut = "gatekeeper-demo", BenignControls = true, Intensity = "quick", Format = "json" };
 
         var ex = Assert.Throws<ArgumentException>(() => RedTeamCommand.ValidateTimeouts(opts));
         Assert.Contains("--benign-controls needs --judge", ex.Message, StringComparison.Ordinal);
@@ -241,6 +243,7 @@ public class RedTeamCommandTests
         // With a judge the same options are valid.
         RedTeamCommand.ValidateTimeouts(new RedTeamOptions
         {
+            NoAef = true,
             Sut = "gatekeeper-demo", BenignControls = true, JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json",
         });
     }
@@ -250,7 +253,7 @@ public class RedTeamCommandTests
     [Fact]
     public async Task ExecuteAsync_UnknownSut_Throws()
     {
-        var opts = new RedTeamOptions { Sut = "bogus", Intensity = "quick", Format = "json" };
+        var opts = new RedTeamOptions { NoAef = true, Sut = "bogus", Intensity = "quick", Format = "json" };
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("--sut", ex.Message);
@@ -260,7 +263,7 @@ public class RedTeamCommandTests
     public async Task ExecuteAsync_GatekeeperDemo_ParallelismGreaterThanOne_Throws()
     {
         // The demo agent is stateful; concurrent probes would race it, so --parallelism>1 is rejected.
-        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", Parallelism = 2, Intensity = "quick", Format = "json" };
+        var opts = new RedTeamOptions { NoAef = true, Sut = "gatekeeper-demo", Parallelism = 2, Intensity = "quick", Format = "json" };
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("parallelism", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -270,7 +273,7 @@ public class RedTeamCommandTests
     public async Task ExecuteAsync_GatekeeperDemo_JudgeWithoutJudgeModel_Throws()
     {
         // The demo has no model of its own; --judge without --judge-model would use a non-existent model.
-        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json" };
+        var opts = new RedTeamOptions { NoAef = true, Sut = "gatekeeper-demo", JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json" };
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("--judge-model", ex.Message);
@@ -280,7 +283,7 @@ public class RedTeamCommandTests
     public async Task ExecuteAsync_GatekeeperDemo_AttackerWithoutAttackerModel_Throws()
     {
         // Symmetric to the judge check: --attacker without --attacker-model would use a non-existent model.
-        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", AttackerEndpoint = "https://attacker.example", Intensity = "quick", Format = "json" };
+        var opts = new RedTeamOptions { NoAef = true, Sut = "gatekeeper-demo", AttackerEndpoint = "https://attacker.example", Intensity = "quick", Format = "json" };
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("--attacker-model", ex.Message);
@@ -291,6 +294,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Azure = true,
             Endpoint = "https://test.openai.azure.com/",
             Intensity = "moderate",
@@ -307,6 +311,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Intensity = "moderate",
             Format = "json",
@@ -324,6 +329,7 @@ public class RedTeamCommandTests
         // fails fast rather than after an expensive scan.
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "moderate",
@@ -342,6 +348,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "moderate",
@@ -363,6 +370,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Model = "gpt-4o", Intensity = "moderate", Format = "json",
             TimeoutPerProbeSeconds = perProbe, TimeoutPerTurnSeconds = perTurn, DelaySeconds = delay,
         };
@@ -417,6 +425,7 @@ public class RedTeamCommandTests
         // A non-existent --baseline path must fail fast (before an expensive scan), with a clear message.
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "moderate",
@@ -443,7 +452,7 @@ public class RedTeamCommandTests
             {
                 Sut = "gatekeeper-demo", Intensity = "quick", Format = "json", Attacks = "PromptInjection", Quiet = true,
                 Output = new FileInfo(Path.Combine(dir, $"report-{Guid.NewGuid():N}.json")),
-                SaveBaseline = save, Baseline = compare, FailOn = "regression",
+                SaveBaseline = save, Baseline = compare, FailOn = "regression", NoAef = true,
             };
             AgentEval.Core.IEvaluableAgent Demo(string name) => GatekeeperDemoSut.Build(new AgentEval.Tracing.AgentTrace(), model: null, name);
 
@@ -469,6 +478,7 @@ public class RedTeamCommandTests
         // PAIR/TAP are attacker-LLM driven — without --attacker they must fail fast with a clear message (before scan).
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "quick",
@@ -690,6 +700,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Intensity = "moderate",
             Format = "markdown",
         };
@@ -715,6 +726,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Model = "gpt-4o",
             Intensity = "comprehensive",
             Format = "sarif",
@@ -753,6 +765,7 @@ public class RedTeamCommandTests
         // the command logic decides priority (quiet wins)
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Model = "gpt-4o",
             Intensity = "moderate",
             Format = "json",
@@ -902,7 +915,7 @@ public class RedTeamCommandTests
     public void BuildScanOptions_VerboseWithAttacker_KeepsAttackerClient()
     {
         Microsoft.Extensions.AI.IChatClient attacker = new TestHelpers.MockStreamingChatClient([], "unused");
-        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", Verbose = true };
+        var opts = new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", Verbose = true };
 
         var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, judgeClient: null, attackerClient: attacker);
 
@@ -915,11 +928,11 @@ public class RedTeamCommandTests
     {
         var judge = new TestHelpers.MockStreamingChatClient([], "unused");
         var withJudge = RedTeamCommand.BuildScanOptions(
-            new RedTeamOptions { Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judge, null);
+            new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judge, null);
         Assert.True(withJudge.ExplainFindings);
 
         var noJudge = RedTeamCommand.BuildScanOptions(
-            new RedTeamOptions { Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judgeClient: null, attackerClient: null);
+            new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", Explain = true }, null, Intensity.Quick, judgeClient: null, attackerClient: null);
         Assert.False(noJudge.ExplainFindings);   // --explain is a no-op without --judge
     }
 
@@ -927,7 +940,7 @@ public class RedTeamCommandTests
     public void BuildScanOptions_Quiet_SuppressesProgressButKeepsJudge()
     {
         Microsoft.Extensions.AI.IChatClient judge = new TestHelpers.MockStreamingChatClient([], "unused");
-        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", Verbose = true, Quiet = true };
+        var opts = new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", Verbose = true, Quiet = true };
 
         var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, judgeClient: judge, attackerClient: null);
 
@@ -941,6 +954,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Intensity = "quick", Format = "json",
             DelaySeconds = 2, Parallelism = 4, TimeoutPerProbeSeconds = 10,
         };
@@ -955,7 +969,7 @@ public class RedTeamCommandTests
     [Fact]
     public void BuildScanOptions_TimeoutPerTurnDefaultsToProbe_WhenZero()
     {
-        var opts = new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 15, TimeoutPerTurnSeconds = 0 };
+        var opts = new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 15, TimeoutPerTurnSeconds = 0 };
 
         var scan = RedTeamCommand.BuildScanOptions(opts, attacks: null, Intensity.Quick, null, null);
 
@@ -965,17 +979,17 @@ public class RedTeamCommandTests
     [Fact]
     public void BuildScanOptions_NegativeThrottle_Throws()
         => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
-            new RedTeamOptions { Intensity = "quick", Format = "json", DelaySeconds = -1 }, null, Intensity.Quick, null, null));
+            new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", DelaySeconds = -1 }, null, Intensity.Quick, null, null));
 
     [Fact] // Jun14-M12: a 0s per-probe timeout would silently zero a whole scan's coverage — reject it.
     public void BuildScanOptions_ZeroTimeoutPerProbe_Throws()
         => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
-            new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 0 }, null, Intensity.Quick, null, null));
+            new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 0 }, null, Intensity.Quick, null, null));
 
     [Fact] // Jun14-L11: an extreme timeout overflows CancelAfter / tick math mid-scan — fail fast at validation.
     public void BuildScanOptions_ExtremeTimeout_Throws()
         => Assert.Throws<ArgumentException>(() => RedTeamCommand.BuildScanOptions(
-            new RedTeamOptions { Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 5_000_000 }, null, Intensity.Quick, null, null));
+            new RedTeamOptions { NoAef = true, Intensity = "quick", Format = "json", TimeoutPerProbeSeconds = 5_000_000 }, null, Intensity.Quick, null, null));
 
     // L22: an unknown --package-registry value fails fast in step 1, before any import/download.
     [Fact]
@@ -983,6 +997,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "moderate",
@@ -1002,6 +1017,7 @@ public class RedTeamCommandTests
     {
         var opts = new RedTeamOptions
         {
+            NoAef = true,
             Endpoint = "http://localhost:11434/v1",
             Model = "gpt-4o",
             Intensity = "moderate",

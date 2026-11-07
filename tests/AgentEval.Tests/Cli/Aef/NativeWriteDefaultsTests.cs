@@ -52,7 +52,8 @@ public sealed class NativeWriteDefaultsTests
     {
         using var temp = TempWorkspace.Create("EvalOutput");
         await using var endpoint = await LocalChatEndpoint.StartAsync();
-        var options = Options(temp.Path, endpoint.Endpoint);
+        // With the fallback, the native run would go to the nearest workspace: here, the repository's own .agenteval.
+        var options = Options(temp.Path, endpoint.Endpoint, noAef: legacy);
         Assert.Equal(0, await NativeVerbIntegrationTests.WithCapture(false, () => EvalCommand.ExecuteAsync(options, CancellationToken.None), legacy));
         var destination = options.OutputDir!.FullName;
         Assert.Equal(legacy ? 1 : 0, Directory.GetFiles(destination, "results.jsonl", SearchOption.AllDirectories).Length);
@@ -76,13 +77,13 @@ public sealed class NativeWriteDefaultsTests
         Assert.Empty(endpoint.Requests);
     }
 
-    private static EvalOptions Options(string root, string endpoint, string? mode = null)
+    private static EvalOptions Options(string root, string endpoint, string? mode = null, bool noAef = false)
     {
         var dataset = Path.Combine(root, "dataset.yaml");
         File.WriteAllText(dataset, "- id: question\n  input: hello\n  expected: Hi\n");
         return new() { Dataset = new(dataset), Endpoint = endpoint, Model = "local-model", ApiKey = "local-test",
             Format = "directory", OutputDir = mode == "missing" ? null : new(Path.Combine(root, "output")), Quiet = true,
-            NoAef = mode == "disabled", Aef = mode == "conflict" ? new(Path.Combine(root, "other")) : null };
+            NoAef = mode == "disabled" || noAef, Aef = mode == "conflict" ? new(Path.Combine(root, "other")) : null };
     }
 
     [Fact]

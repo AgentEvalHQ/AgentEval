@@ -277,6 +277,8 @@ internal static class RedTeamOptionsTestExtensions
         Intensity = intensity ?? o.Intensity,
         Format = format ?? o.Format,
         FailOn = failOn ?? o.FailOn,
+        Aef = o.Aef,
+        NoAef = o.NoAef,
         MemoryTrials = trials ?? o.MemoryTrials,
         SystemPrompt = systemPrompt ?? o.SystemPrompt,
         BenignControls = benignControls || o.BenignControls,
