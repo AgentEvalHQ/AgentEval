@@ -31,12 +31,13 @@ public sealed class ShippedPromptPackTests
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
         Assert.True(schema.Evaluate(manifest).IsValid);
         var pack = await new JudgePromptPackLoader().LoadAsync(path);
-        var supported = PromptsCommand.SupportedDefinitions();
+        var supported = PromptsCommand.SupportedDefinitions().Append(
+            AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric())).ToArray();
         Assert.Equal(supported.Select(d => d.EvaluatorKey).Order(), pack.Definitions.Select(d => d.EvaluatorKey).Order());
         foreach (var baseline in supported)
         {
             var resolved = new JudgePromptResolver().Resolve(baseline, new() { Pack = pack, Locale = "sv-SE" });
-            Assert.Equal("authored", resolved.Definition.Status);
+            Assert.Equal(baseline.EvaluatorKey == "gate.over-refusal" ? "draft" : "authored", resolved.Definition.Status);
             Assert.Equal("sv-SE", resolved.Provenance.EffectiveLocale);
             Assert.Contains("ä", resolved.Definition.SystemText);
         }
@@ -70,6 +71,7 @@ public sealed class ShippedPromptPackTests
 
     [Theory]
     [InlineData("redTeamVerdictV1")]
+    [InlineData("gateDecisionV1")]
     [InlineData("redTeamLikertV1")]
     public async Task MetadataSchema_RedTeamPolicy_RejectsUnsupportedScaleAndReviewMetadata(string contract)
     {

@@ -150,6 +150,8 @@ public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportS
         public bool SufficientData { get; set; }
         public List<CalibrationCaseResult> Cases { get; set; } = [];
         public DateTimeOffset CapturedAt { get; set; }
+        public string? SplitLabel { get; set; }
+        public List<string> InstrumentDigests { get; set; } = [];
 
         public static CalibrationReportDto From(CalibrationReport r) => new()
         {
@@ -166,11 +168,13 @@ public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportS
             SufficientData = r.SufficientData,
             Cases = [.. r.Cases],
             CapturedAt = r.CapturedAt,
+            SplitLabel = r.SplitLabel,
+            InstrumentDigests = [.. r.InstrumentDigests],
         };
 
         public CalibrationReport ToReport() => new(
             Axis, TruePositives, TrueNegatives, FalsePositives, FalseNegatives, KappaVsGold,
             BaselineAccuracy, BeatsBaseline, MeetsThresholds, PromotionCriteriaConfigured, SufficientData,
-            Cases, CapturedAt);
+            Cases, CapturedAt, SplitLabel, InstrumentDigests);
     }
 }

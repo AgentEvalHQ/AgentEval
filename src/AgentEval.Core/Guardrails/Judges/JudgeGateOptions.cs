@@ -7,6 +7,12 @@ namespace AgentEval.Guardrails.Judges;
 /// <summary>Options for a <see cref="CompositeJudgeGate{TRubric}"/>.</summary>
 public sealed class JudgeGateOptions
 {
+    /// <summary>Immutable prompt selection for a supported built-in rubric. Configured gates bypass English prefilters.</summary>
+    public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
+    /// <summary>Explicit model ID sent to the provider and included in configured instrument identity. Null leaves model selection to the client.</summary>
+    public string? ModelId { get; init; }
+
     /// <summary>
     /// Max wall-clock for one judge call. On timeout the verdict is <see cref="JudgeDecision.Inconclusive"/>
     /// (never stalls the hot path). Default 5s.

@@ -368,6 +368,27 @@
       "userFile": "015-user.md",
       "retryFile": "001-retry.md",
       "safetyFile": "001-safety.md"
+    },
+    {
+      "evaluatorKey": "gate.over-refusal",
+      "id": "example.gate.over-refusal.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "gateDecisionV1",
+      "scale": "unit",
+      "passAt": 0,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input"
+      ],
+      "status": "draft",
+      "dimension": null,
+      "systemFile": "016-system.md",
+      "userFile": "016-user.md",
+      "retryFile": "016-retry.md",
+      "safetyFile": "016-safety.md"
     }
   ]
 }

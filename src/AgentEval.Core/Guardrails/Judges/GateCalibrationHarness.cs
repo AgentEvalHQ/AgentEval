@@ -55,7 +55,7 @@ public static class GateCalibrationHarness
             var bn = btp + btn + bfp + bfn;
             baselineAccuracy = bn == 0 ? 0.0 : (double)(btp + btn) / bn;
             // Beat = strictly more accurate AND no more missed attacks than the deterministic detector.
-            beatsBaseline = judgeAccuracy > baselineAccuracy.Value && fn <= bfn;
+            beatsBaseline = baseResults.All(r => r.Measured) && judgeAccuracy > baselineAccuracy.Value && fn <= bfn;
         }
 
         var meetsThresholds =
@@ -78,7 +78,8 @@ public static class GateCalibrationHarness
 
         var report = new CalibrationReport(
             goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds,
-            criteriaConfigured, sufficientData, judgeResults, capturedAt, options.SplitLabel);
+            criteriaConfigured, sufficientData, judgeResults, capturedAt, options.SplitLabel,
+            CalibrationRequirements.FindIn(judge).Select(c => c.InstrumentDigest).OfType<string>().Distinct(StringComparer.Ordinal).ToArray());
 
         activity?.SetTag("agenteval.calibration.accuracy", report.DecisiveAccuracy);
         activity?.SetTag("agenteval.calibration.dangerous_errors", report.DangerousErrorCount);
@@ -91,6 +92,7 @@ public static class GateCalibrationHarness
         IChatGate gate, JudgeGoldSet goldSet, int maxConcurrency, CancellationToken cancellationToken)
     {
         var results = new CalibrationCaseResult[goldSet.Cases.Count];
+        var required = CalibrationRequirements.FindIn(gate).Select(c => c.InstrumentDigest).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
         using var throttle = new SemaphoreSlim(Math.Max(1, maxConcurrency));
 
         var tasks = goldSet.Cases.Select(async (c, i) =>
@@ -99,7 +101,13 @@ public static class GateCalibrationHarness
             try
             {
                 var verdict = await gate.InspectAsync(c.Text, cancellationToken).ConfigureAwait(false);
-                results[i] = new CalibrationCaseResult(c.Text, c.ShouldBlock, verdict.Action == GateAction.Block);
+                var instruments = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
+                results[i] = new CalibrationCaseResult(c.Text, c.ShouldBlock, verdict.Action == GateAction.Block)
+                {
+                    Measured = instruments.All(instrument => instrument.Measured) &&
+                        required.All(d => instruments.Any(instrument => instrument.ConfigurationDigest == d)),
+                    JudgeInstruments = Array.AsReadOnly(instruments)
+                };
             }
             finally
             {
@@ -116,6 +124,7 @@ public static class GateCalibrationHarness
         int tp = 0, tn = 0, fp = 0, fn = 0;
         foreach (var r in results)
         {
+            if (!r.Measured) continue;
             if (r.ShouldBlock && r.Blocked)
             {
                 tp++;

@@ -54,6 +54,17 @@ public static class MultilingualPromptPacks
         Console.WriteLine($"Safety: {grounded.MetricName}, locale={grounded.JudgePrompt!.EffectiveLocale}, scripted score={grounded.Score}");
         Console.WriteLine($"Instrument: {measured.JudgePrompt.Digest}");
 
+        // Same immutable pack at the runtime-gate seam; no English refusal prefilter decides this case.
+        using var gateClient = new FakeChatClient("""{"decision":"BLOCKED","confidence":0.9,"rationale":"Omotiverad vägran.","evidence":["Nej"]}""");
+        var gate = new AgentEval.Guardrails.Judges.CompositeJudgeGate<AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric>(
+            new(), gateClient, new() { JudgePrompts = prompts });
+        var gateResult = await gate.JudgeTextAsync("Nej, det gör jag inte.");
+        if (gateResult?.Decision != AgentEval.Guardrails.Judges.JudgeDecision.Blocked ||
+            gateResult.Instrument?.Prompt.EffectiveLocale != "sv-SE" || gateClient.CallCount != 1)
+            throw new InvalidOperationException("The scripted runtime-gate localization check failed.");
+        Console.WriteLine($"Runtime over-refusal flag: {gateResult.Decision}; locale=sv-SE; instrument={gate.InstrumentDigest}");
+        Console.WriteLine("Use over-refusal as WarnOnly. This scripted run has no calibrated readiness or known provider model.");
+
         // A separate direct red-team instrument. AI-authored draft; this scripted case is not calibration.
         // Export this descriptor with JudgePromptPackLoader to edit it as Markdown + metadata.
         var verdictPrompt = RedTeamJudgePrompts.ForVerdict() with

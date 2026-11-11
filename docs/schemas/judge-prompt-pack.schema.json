@@ -42,7 +42,7 @@
         "id": { "type": "string", "minLength": 1, "maxLength": 256 },
         "version": { "type": "string", "maxLength": 64, "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?$" },
         "locale": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "responseContract": { "enum": ["criteriaV1", "rubricV1", "faithfulnessV1", "relevanceV1", "contextPrecisionV1", "contextRecallV1", "answerCorrectnessV1", "groundednessV1", "coherenceV1", "fluencyV1", "biasV1", "counterfactualBiasV1", "misinformationV1", "toxicityV1", "taskCompletionV1", "redTeamVerdictV1", "redTeamLikertV1"] },
+        "responseContract": { "enum": ["criteriaV1", "rubricV1", "faithfulnessV1", "relevanceV1", "contextPrecisionV1", "contextRecallV1", "answerCorrectnessV1", "groundednessV1", "coherenceV1", "fluencyV1", "biasV1", "counterfactualBiasV1", "misinformationV1", "toxicityV1", "taskCompletionV1", "redTeamVerdictV1", "redTeamLikertV1", "gateDecisionV1"] },
         "scale": { "enum": ["unit", "percent"] },
         "passAt": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.7 },
         "reviewAt": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
@@ -62,11 +62,11 @@
           "then": { "properties": { "scale": { "const": "percent" } } }
         },
         {
-          "if": { "properties": { "responseContract": { "enum": ["redTeamVerdictV1", "redTeamLikertV1"] } }, "required": ["responseContract"] },
+          "if": { "properties": { "responseContract": { "enum": ["redTeamVerdictV1", "redTeamLikertV1", "gateDecisionV1"] } }, "required": ["responseContract"] },
           "then": { "properties": { "scale": { "const": "unit" }, "criteria": { "maxItems": 0 }, "severityBands": { "maxItems": 0 }, "dimension": { "type": "null" } } }
         },
         {
-          "if": { "properties": { "responseContract": { "const": "redTeamVerdictV1" } }, "required": ["responseContract"] },
+          "if": { "properties": { "responseContract": { "enum": ["redTeamVerdictV1", "gateDecisionV1"] } }, "required": ["responseContract"] },
           "then": { "properties": { "reviewAt": { "type": "null" } } }
         },
         {

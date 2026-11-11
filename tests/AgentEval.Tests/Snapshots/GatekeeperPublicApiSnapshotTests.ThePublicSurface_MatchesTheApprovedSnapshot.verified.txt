@@ -36,6 +36,7 @@ static class AgentEval.Guardrails.GateCorrelationId
     static String New()
 sealed class AgentEval.Guardrails.GateProvenance : IEquatable<AgentEval.Guardrails.GateProvenance>
     AgentEval.Guardrails.GateProvenance <Clone>$()
+    AgentEval.Guardrails.Judges.JudgeGateInstrument JudgeInstrument { get; init; }
     Boolean Equals(AgentEval.Guardrails.GateProvenance other)
     Boolean Equals(Object obj)
     Double? ActualValue { get; init; }
@@ -119,7 +120,9 @@ sealed class AgentEval.Guardrails.Judges.CalibrationCaseResult : IEquatable<Agen
     Boolean Equals(Object obj)
     Boolean IsDangerousError { get; }
     Boolean IsFalsePositive { get; }
+    Boolean Measured { get; init; }
     Boolean ShouldBlock { get; init; }
+    IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateInstrument> JudgeInstruments { get; init; }
     Int32 GetHashCode()
     String Text { get; init; }
     String ToString()
@@ -141,6 +144,7 @@ sealed class AgentEval.Guardrails.Judges.CalibrationReport
     Boolean IsInlineReady { get; }
     Boolean IsStale(TimeSpan maxAge, TimeProvider clock = null)
     Boolean MeetsThresholds { get; }
+    Boolean ModelsIdentified { get; }
     Boolean PromotionCriteriaConfigured { get; }
     Boolean SufficientData { get; }
     Boolean? BeatsBaseline { get; }
@@ -150,18 +154,21 @@ sealed class AgentEval.Guardrails.Judges.CalibrationReport
     Double KappaVsGold { get; }
     Double? BaselineAccuracy { get; }
     IReadOnlyList<AgentEval.Guardrails.Judges.CalibrationCaseResult> Cases { get; }
+    IReadOnlyList<String> InstrumentDigests { get; }
     Int32 DangerousErrorCount { get; }
     Int32 FalseNegatives { get; }
     Int32 FalsePositives { get; }
     Int32 Total { get; }
     Int32 TrueNegatives { get; }
     Int32 TruePositives { get; }
+    Int32 UnmeasuredCases { get; }
     String Axis { get; }
     String SplitLabel { get; }
     Void AssertInlineReady()
 sealed class AgentEval.Guardrails.Judges.CompositeJudgeGate<TRubric> : AgentEval.Guardrails.IChatGate, AgentEval.Guardrails.Judges.IRequiresCalibration
     Boolean IsFlagged(AgentEval.Guardrails.Judges.JudgeVerdict verdict)
     String AxisName { get; }
+    String InstrumentDigest { get; }
     String PolicyName { get; }
     ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
     ValueTask<AgentEval.Guardrails.Judges.JudgeVerdict> JudgeTextAsync(String text, CancellationToken cancellationToken = default)
@@ -182,6 +189,8 @@ static class AgentEval.Guardrails.Judges.ExfiltrationIntentJudge
 static class AgentEval.Guardrails.Judges.GateCalibrationHarness
     const String ActivitySourceName
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> EvaluateAsync(AgentEval.Guardrails.IChatGate judge, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet, AgentEval.Guardrails.Judges.CalibrationOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.GateJudgePrompts
+    static JudgePromptDefinition ForRubric(AgentEval.Guardrails.Judges.IJudgeRubric rubric, Double blockThreshold = 0)
 static class AgentEval.Guardrails.Judges.GatekeeperFleetHealthIndex [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
     static AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport Compute(IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> reportsByAxis, TimeSpan staleAfter, TimeProvider clock = null)
 sealed class AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport : IEquatable<AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport> [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
@@ -222,6 +231,7 @@ interface AgentEval.Guardrails.Judges.IJudgeRubric
     String BuildPrompt(String text)
 interface AgentEval.Guardrails.Judges.IRequiresCalibration
     String AxisName { get; }
+    String InstrumentDigest { get; }
 static class AgentEval.Guardrails.Judges.IndirectInjectionJudge
     const String Axis
     static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
@@ -269,6 +279,30 @@ enum AgentEval.Guardrails.Judges.JudgeDecision
     Allowed
     Blocked
     Inconclusive
+sealed class AgentEval.Guardrails.Judges.JudgeGateCall : IEquatable<AgentEval.Guardrails.Judges.JudgeGateCall>
+    AgentEval.Guardrails.Judges.JudgeGateCall <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.Judges.JudgeGateCall other)
+    Boolean Equals(Object obj)
+    Boolean ResponseReceived { get; init; }
+    Int32 GetHashCode()
+    String ModelId { get; init; }
+    String ToString()
+    Void Deconstruct(out String ModelId, out Boolean ResponseReceived)
+    ctor(String ModelId, Boolean ResponseReceived)
+sealed class AgentEval.Guardrails.Judges.JudgeGateInstrument : IEquatable<AgentEval.Guardrails.Judges.JudgeGateInstrument>
+    AgentEval.Guardrails.Judges.JudgeGateInstrument <Clone>$()
+    Boolean BudgetExhausted { get; init; }
+    Boolean Equals(AgentEval.Guardrails.Judges.JudgeGateInstrument other)
+    Boolean Equals(Object obj)
+    Boolean Measured { get; init; }
+    IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateCall> Calls { get; init; }
+    Int32 GetHashCode()
+    JudgePromptProvenance Prompt { get; init; }
+    String ConfigurationDigest { get; init; }
+    String RequestedModelId { get; init; }
+    String ToString()
+    Void Deconstruct(out String ConfigurationDigest, out JudgePromptProvenance Prompt, out String RequestedModelId, out IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateCall> Calls, out Boolean Measured, out Boolean BudgetExhausted)
+    ctor(String ConfigurationDigest, JudgePromptProvenance Prompt, String RequestedModelId, IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateCall> Calls, Boolean Measured, Boolean BudgetExhausted = false)
 sealed class AgentEval.Guardrails.Judges.JudgeGateOptions
     AgentEval.Guardrails.Judges.JudgeSpendGovernor SpendGovernor { get; init; }
     Boolean FailClosedOnBudgetExhausted { get; init; }
@@ -276,7 +310,9 @@ sealed class AgentEval.Guardrails.Judges.JudgeGateOptions
     Double BlockThreshold { get; init; }
     Int32 MaxInputChars { get; init; }
     Int32 MaxOutputTokens { get; init; }
+    JudgePromptOptions JudgePrompts { get; init; }
     Single? Temperature { get; init; }
+    String ModelId { get; init; }
     TimeSpan Timeout { get; init; }
     ctor()
 sealed class AgentEval.Guardrails.Judges.JudgeGoldCase : IEquatable<AgentEval.Guardrails.Judges.JudgeGoldCase>
@@ -301,6 +337,7 @@ sealed class AgentEval.Guardrails.Judges.JudgeSpendGovernor
     ctor(Int32 maxCalls, Int64 maxTokens, TimeSpan? window = null, TimeProvider timeProvider = null)
 sealed class AgentEval.Guardrails.Judges.JudgeVerdict : IEquatable<AgentEval.Guardrails.Judges.JudgeVerdict>
     AgentEval.Guardrails.Judges.JudgeDecision Decision { get; init; }
+    AgentEval.Guardrails.Judges.JudgeGateInstrument Instrument { get; init; }
     AgentEval.Guardrails.Judges.JudgeVerdict <Clone>$()
     Boolean Equals(AgentEval.Guardrails.Judges.JudgeVerdict other)
     Boolean Equals(Object obj)

@@ -43,7 +43,9 @@ public enum JudgeResponseContract
     /// <summary>Attack verdict, confidence and reason; PassAt is the minimum confidence for a conclusive verdict.</summary>
     RedTeamVerdictV1,
     /// <summary>Native 1–5 rating, confidence and rationale; thresholds apply to the normalized rating.</summary>
-    RedTeamLikertV1
+    RedTeamLikertV1,
+    /// <summary>Runtime gate decision, confidence, rationale and evidence spans; PassAt is the block threshold.</summary>
+    GateDecisionV1
 }
 
 /// <summary>Immutable text and reading policy for one judge instrument. No executable templates or file paths.</summary>
@@ -131,6 +133,9 @@ public sealed record JudgePromptDefinition
             Require(ResponseContract != JudgeResponseContract.RedTeamLikertV1 || ReviewAt is not null,
                 "missing Likert ambiguity boundary", "retain ReviewAt below the attack-success PassAt boundary");
         }
+        if (ResponseContract == JudgeResponseContract.GateDecisionV1)
+            Require(Scale == RubricScoreScale.Unit && ReviewAt is null && Criteria.Count == 0 && SeverityBands.Count == 0 && Dimension is null,
+                "unsupported runtime gate reading policy", "retain Unit, PassAt and the fixed gate decision contract");
         Require(double.IsFinite(PassAt) && PassAt is >= 0 and <= 1, "invalid pass threshold", "use a finite value in [0, 1]");
         Require(ReviewAt is null || (double.IsFinite(ReviewAt.Value) && ReviewAt >= 0 && ReviewAt < PassAt), "invalid review threshold", "place review below pass");
         Require(Status is "draft" or "authored" or "calibrated", "unknown translation status", "use draft, authored or calibrated");

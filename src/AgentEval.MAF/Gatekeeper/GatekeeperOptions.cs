@@ -197,12 +197,12 @@ public sealed class GatekeeperOptions
                 var where = seam == "approval"
                     ? $" (found in approval gate '{name}', where its allow verdict auto-approves a tool call)"
                     : ReferenceEquals(calibratable, gate) ? string.Empty : $" (found inside {seam} gate '{name}')";
-                await EnsureInlineReadyAsync(calibratable.AxisName, where, cancellationToken).ConfigureAwait(false);
+                await EnsureInlineReadyAsync(calibratable.AxisName, calibratable.InstrumentDigest, where, cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    private async Task EnsureInlineReadyAsync(string axis, string where, CancellationToken cancellationToken)
+    private async Task EnsureInlineReadyAsync(string axis, string? instrumentDigest, string where, CancellationToken cancellationToken)
     {
         if (CalibrationReportStore is null)
         {
@@ -215,6 +215,10 @@ public sealed class GatekeeperOptions
         {
             throw new UncalibratedInlineJudgeException(axis, "no calibration report was found for this axis" + where);
         }
+
+        if (instrumentDigest is not null && !report.InstrumentDigests.Contains(instrumentDigest, StringComparer.Ordinal))
+            throw new UncalibratedInlineJudgeException(axis,
+                "the calibration report does not match the configured prompt, locale, model and execution policy; recalibrate this instrument" + where);
 
         if (!report.IsInlineReady)
         {

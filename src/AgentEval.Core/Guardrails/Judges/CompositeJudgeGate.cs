@@ -29,6 +29,12 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
     private readonly TRubric _rubric;
     private readonly IChatClient _fastModel;
     private readonly JudgeGateOptions _options;
+    private readonly ConfiguredGateJudge? _configured;
+
+    /// <inheritdoc/>
+    public string? InstrumentDigest => _configured?.Digest;
+
+    private double BlockThreshold => _configured?.BlockThreshold ?? _options.BlockThreshold;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
@@ -68,11 +74,14 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         }
 
         PolicyName = $"judge:{rubric.Axis}";
+        if (_options.JudgePrompts is not null) _configured = new(rubric, fastModel, _options);
     }
 
     /// <inheritdoc/>
     public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_configured is not null) return Map(await _configured.EvaluateAsync(BoundInput(text ?? string.Empty), cancellationToken).ConfigureAwait(false));
         if (string.IsNullOrEmpty(text) || !SafePrefilter(text))
         {
             return GateVerdict.Allow(PolicyName);   // cheap short-circuit — most turns never reach the model
@@ -92,20 +101,32 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         }
 
         var verdict = await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
+        return Map(verdict);
+    }
+
+    private GateVerdict Map(JudgeVerdict verdict)
+    {
+        var ruleName = PolicyName;
+        if (verdict.Instrument is { BudgetExhausted: true } exhausted)
+        {
+            var budgetAction = _options.FailClosedOnBudgetExhausted
+                ? GateVerdict.Block(PolicyName, verdict.Rationale!) : GateVerdict.Allow(PolicyName);
+            return budgetAction with { Provenance = GateProvenance.ForRule(PolicyName + ":budget-exhausted") with { JudgeInstrument = exhausted } };
+        }
         var evidence = verdict.Spans ?? Array.Empty<string>();
 
-        return verdict.Decision switch
+        var mapped = verdict.Decision switch
         {
             // !(<) rather than (>=) so a NaN confidence BLOCKS (fail-closed) instead of falling through to Allow.
-            JudgeDecision.Blocked when !(verdict.Confidence < _options.BlockThreshold) =>
+            JudgeDecision.Blocked when !(verdict.Confidence < BlockThreshold) =>
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} detected", verdict.Spans) with
                 {
-                    Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+                    Provenance = new GateProvenance(ruleName, evidence, Threshold: BlockThreshold, ActualValue: verdict.Confidence),
                 },
             JudgeDecision.Inconclusive when _options.FailClosedOnInconclusive =>
                 GateVerdict.Block(PolicyName, verdict.Rationale ?? $"{_rubric.Axis} judge inconclusive (fail-closed)") with
                 {
-                    Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+                    Provenance = new GateProvenance(ruleName, evidence, Threshold: BlockThreshold, ActualValue: verdict.Confidence),
                 },
             // A genuine Allowed decision carries NO confidence through, deliberately: JudgeVerdict.Confidence is
             // confidence IN THE DECISION, not confidence that something is wrong — JudgeVerdict.Allowed()
@@ -122,8 +143,12 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             _ => GateVerdict.Allow(PolicyName) with
             {
                 Confidence = verdict.Confidence,
-                Provenance = new GateProvenance(ruleName, evidence, Threshold: _options.BlockThreshold, ActualValue: verdict.Confidence),
+                Provenance = new GateProvenance(ruleName, evidence, Threshold: BlockThreshold, ActualValue: verdict.Confidence),
             },
+        };
+        return verdict.Instrument is null ? mapped : mapped with
+        {
+            Provenance = (mapped.Provenance ?? GateProvenance.ForRule(PolicyName)) with { JudgeInstrument = verdict.Instrument }
         };
     }
 
@@ -142,6 +167,8 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
     /// </remarks>
     public async ValueTask<JudgeVerdict?> JudgeTextAsync(string text, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_configured is not null) return await _configured.EvaluateAsync(BoundInput(text ?? string.Empty), cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrEmpty(text) || !SafePrefilter(text))
         {
             return null;
@@ -163,7 +190,7 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
     public bool IsFlagged(JudgeVerdict verdict)
     {
         ArgumentNullException.ThrowIfNull(verdict);
-        return verdict.Decision == JudgeDecision.Blocked && !(verdict.Confidence < _options.BlockThreshold);
+        return verdict.Decision == JudgeDecision.Blocked && !(verdict.Confidence < BlockThreshold);
     }
 
     // P5-3: bound the text the model sees to a head + tail sandwich when it exceeds MaxInputChars, so a
@@ -218,6 +245,7 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
             var messages = new List<ChatMessage> { new(ChatRole.User, _rubric.BuildPrompt(BoundInput(text))) };
             var options = new ChatOptions
             {
+                ModelId = _options.ModelId,
                 MaxOutputTokens = _options.MaxOutputTokens,
                 Temperature = _options.Temperature,
             };

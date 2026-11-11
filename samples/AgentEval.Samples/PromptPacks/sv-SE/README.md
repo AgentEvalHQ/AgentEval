@@ -4,6 +4,8 @@ This authored `sv-SE` pack covers five RAG metrics, seven additional safety/qual
 
 The generic `judge.criteria` entry starts with an empty criterion roster. Add the exact stable IDs/text required by your fixed dataset before using it to judge criteria. For arbitrary per-case rosters, use library per-evaluation definitions instead.
 
+A sixteenth entry, `gate.over-refusal`, is an AI-authored **draft** for the runtime over-refusal judge. Set `JudgeGateOptions.JudgePrompts` to the loaded pack; configured gating bypasses the English refusal prefilter. The sample calls `JudgeTextAsync` and demonstrates a quality flag, not an inline deployment. Use this axis under `WarnOnly`; a flag must not block a justified safety refusal. Its output-only view cannot independently verify the original request or the legitimacy of a cited reason. The draft explicitly retains uncertainty.
+
 **Status: AI-authored, not human-reviewed or semantically calibrated.** The sample program uses scripted replies to verify transport and policy wiring. The draft cases and expected labels below were authored by an AI assistant. No customer dataset or human-reviewed labels have been supplied. These cases are proposed review material, not Andreas Adner's private dataset or evidence of real-model accuracy. Swedish reviewers should approve labels and expand coverage for the customer's domain before running repeatable calibration.
 
 | Draft case | Question / context / answer | Expected review |

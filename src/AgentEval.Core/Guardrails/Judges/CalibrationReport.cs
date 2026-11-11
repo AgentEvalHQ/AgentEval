@@ -10,14 +10,20 @@ namespace AgentEval.Guardrails.Judges;
 /// <param name="Blocked">What the judge did.</param>
 public sealed record CalibrationCaseResult(string Text, bool ShouldBlock, bool Blocked)
 {
+    /// <summary>False when configured judging did not produce a conclusive measurement, even if enforcement allowed or blocked.</summary>
+    public bool Measured { get; init; } = true;
+
+    /// <summary>Configured instruments actually observed for this case, independent of the enforced action.</summary>
+    public IReadOnlyList<JudgeGateInstrument> JudgeInstruments { get; init; } = [];
+
     /// <summary>Whether the judge agreed with the gold label.</summary>
-    public bool Correct => Blocked == ShouldBlock;
+    public bool Correct => Measured && Blocked == ShouldBlock;
 
     /// <summary>A missed attack — should block, but allowed. The dangerous direction.</summary>
-    public bool IsDangerousError => ShouldBlock && !Blocked;
+    public bool IsDangerousError => Measured && ShouldBlock && !Blocked;
 
     /// <summary>A false alarm — benign, but blocked.</summary>
-    public bool IsFalsePositive => !ShouldBlock && Blocked;
+    public bool IsFalsePositive => Measured && !ShouldBlock && Blocked;
 }
 
 /// <summary>
@@ -30,6 +36,18 @@ public sealed class CalibrationReport
 {
     /// <summary>The calibrated axis.</summary>
     public string Axis { get; }
+
+    /// <summary>Declared configured instruments evaluated by this report. Empty for legacy axis-only calibration.</summary>
+    public IReadOnlyList<string> InstrumentDigests { get; }
+
+    /// <summary>Cases without a conclusive configured judge measurement; these are excluded from the confusion matrix.</summary>
+    public int UnmeasuredCases => Cases.Count(c => !c.Measured);
+
+    /// <summary>Whether configured instruments have explicit requested models and a single known observed model each.</summary>
+    public bool ModelsIdentified => Cases.SelectMany(c => c.JudgeInstruments).GroupBy(i => i.ConfigurationDigest).All(group =>
+        group.All(i => !string.IsNullOrWhiteSpace(i.RequestedModelId) && i.Calls.Count > 0 &&
+            i.Calls.Where(c => c.ResponseReceived).All(c => !string.IsNullOrWhiteSpace(c.ModelId))) &&
+        group.SelectMany(i => i.Calls).Where(c => c.ResponseReceived).Select(c => c.ModelId).Distinct(StringComparer.Ordinal).Count() == 1);
 
     /// <summary>Should-block AND blocked.</summary>
     public int TruePositives { get; }
@@ -104,7 +122,8 @@ public sealed class CalibrationReport
     /// the gold set is big enough (<see cref="SufficientData"/>), the thresholds are met, AND (if a baseline was
     /// supplied) the judge beats it. Only a judge that <see cref="IsInlineReady"/> should block live traffic.
     /// </summary>
-    public bool IsInlineReady => PromotionCriteriaConfigured && SufficientData && MeetsThresholds && (BeatsBaseline ?? true);
+    public bool IsInlineReady => PromotionCriteriaConfigured && SufficientData && MeetsThresholds && (BeatsBaseline ?? true)
+        && UnmeasuredCases == 0 && ModelsIdentified;
 
     /// <summary>
     /// When this report was produced (Gatekeeper next-wave item — calibration staleness). Stamped by
@@ -121,11 +140,12 @@ public sealed class CalibrationReport
         string axis, int tp, int tn, int fp, int fn, double kappa,
         double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds,
         bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases,
-        DateTimeOffset capturedAt, string? splitLabel = null)
+        DateTimeOffset capturedAt, string? splitLabel = null, IReadOnlyList<string>? instrumentDigests = null)
     {
         PromotionCriteriaConfigured = promotionCriteriaConfigured;
         SufficientData = sufficientData;
         Axis = axis;
+        InstrumentDigests = Array.AsReadOnly((instrumentDigests ?? []).ToArray());
         TruePositives = tp;
         TrueNegatives = tn;
         FalsePositives = fp;
@@ -163,7 +183,9 @@ public sealed class CalibrationReport
                 !PromotionCriteriaConfigured ? "no promotion bar was set (supply a DeterministicBaseline or a non-default threshold)" :
                 !SufficientData ? "the gold set is too small per direction to trust (raise MinCasesPerDirection or add cases)" :
                 !MeetsThresholds ? "the configured thresholds were not met" :
-                BeatsBaseline == false ? "it did not beat the deterministic baseline" : "unknown";
+                BeatsBaseline == false ? "it did not beat the deterministic baseline" :
+                UnmeasuredCases > 0 ? "configured judge measurements were inconclusive or unavailable" :
+                !ModelsIdentified ? "configured model identity was missing or inconsistent" : "unknown";
             var split = SplitLabel is not null ? $" [{SplitLabel} split]" : string.Empty;
             throw new InvalidOperationException(
                 $"Judge for axis '{Axis}'{split} is NOT inline-ready — {why} (accuracy {AccuracyInterval}, " +

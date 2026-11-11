@@ -45,11 +45,13 @@ public sealed class ParallelJudgeFanOut : IChatGate, IDelegatingGate
     public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
     {
         var verdicts = await Task.WhenAll(_judges.Select(j => RunOneAsync(j, text, cancellationToken))).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        var contributing = verdicts.Select(v => v.Provenance).OfType<GateProvenance>().ToArray();
 
         var blocks = verdicts.Where(v => v.Action == GateAction.Block).ToList();
         if (blocks.Count == 0)
         {
-            return GateVerdict.Allow(PolicyName);
+            return Retain(GateVerdict.Allow(PolicyName));
         }
 
         var reason = string.Join("; ", blocks.Select(b => $"{b.PolicyName}: {b.Reason}"));
@@ -58,7 +60,11 @@ public sealed class ParallelJudgeFanOut : IChatGate, IDelegatingGate
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        return GateVerdict.Block(PolicyName, reason, matches.Count > 0 ? matches : null);
+        return Retain(GateVerdict.Block(PolicyName, reason, matches.Count > 0 ? matches : null));
+
+        GateVerdict Retain(GateVerdict result) => contributing.Any(p => JudgeGateInstrumentation.Observed(p).Any())
+            ? result with { Provenance = new(PolicyName, [], Contributing: Array.AsReadOnly(contributing)) }
+            : result;
     }
 
     private static async Task<GateVerdict> RunOneAsync(IChatGate judge, string text, CancellationToken cancellationToken)

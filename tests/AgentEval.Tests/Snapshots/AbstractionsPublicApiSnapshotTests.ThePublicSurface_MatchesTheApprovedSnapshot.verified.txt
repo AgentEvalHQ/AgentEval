@@ -2646,6 +2646,7 @@ enum AgentEval.Prompts.JudgeResponseContract
     TaskCompletionV1
     RedTeamVerdictV1
     RedTeamLikertV1
+    GateDecisionV1
 sealed class AgentEval.Prompts.ResolvedJudgePrompt : IEquatable<AgentEval.Prompts.ResolvedJudgePrompt>
     AgentEval.Prompts.JudgePromptDefinition Definition { get; init; }
     AgentEval.Prompts.JudgePromptProvenance Provenance { get; init; }

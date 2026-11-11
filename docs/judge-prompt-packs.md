@@ -123,7 +123,8 @@ An authored translation needs a separately reviewed calibration set. Include sho
 | Agentic/compliance atomic leaves | Library graph export/preflight/binding; CLI family/preset authoring, benchmark selection and supplied-dataset calibration with instrument identity |
 | Direct `LLMJudgeEvaluator` / `LikertJudgeEvaluator` | Library export, immutable constructor/per-call selection, strict JSON reader and invocation provenance |
 | Supported red-team graphs | Library graph export/binding, scan-wide preflight, CLI selection and native leaf/graph provenance; see the supported attack list below |
-| Other red-team routes, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
+| Ten owned runtime judge rubrics through `JudgeGateOptions.JudgePrompts` | Configurable in the library; English prefilters bypassed; configured calibration identity required |
+| Auxiliary red-team routes, specialized runtime wrappers/CLI, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
 The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Configured `llm_toxicity` always invokes its selected model judge, including English-pattern matches; unconfigured toxicity retains its legacy scan and fallback. This changes the configured instrument and requires rebaselining. Upstream `MicrosoftEvaluatorAdapter` rejects explicit `JudgePrompts` before evaluating, including both adapter contracts. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
 
@@ -151,7 +152,7 @@ Configured calls use fenced probe/response data and one localized corrective ret
 
 `EvaluationResult.JudgeInstruments` records each invoked judge's selected locale/prompt identity and actual request settings, including reasoning-model temperature adaptation and provider-reported model IDs. Unknown model IDs remain null. `RubricDigest` additionally covers the fixed reader and observed effective model/settings; it excludes case text. A generic composite retains the invoked leaf observations without inventing a whole-graph digest from a short-circuited path. Scan evidence suppression and `ReasonRedactingEvaluator` remove captured prompt content.
 
-`ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped fifteen-entry Swedish pack covers the metric/generic catalogue; export a separate red-team pack. The new JSON transport and translated policies require independent calibration.
+`ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped Swedish pack covers the fifteen metric/generic definitions and one draft runtime over-refusal definition; export a separate red-team pack. The new JSON transport and translated policies require independent calibration.
 
 ### Red-team graphs and scans
 
@@ -200,7 +201,32 @@ This evidence framing is versioned as `redteam.probe-facts.v2` in configured ins
 
 Configured multi-turn judging bypasses the default English lexical refusal lock: an inconclusive localized judgment cannot become resistance solely because English refusal words appeared. Existing success, turn and duration limits remain. Tree judges receive the actual attempted prompt. Folded linear/tree results retain the invoked leaf observations from completed evaluations; missing/aborted observations remain unknown.
 
-Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection and runtime gate localization are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+
+### Runtime judge gates
+
+Export an owned rubric with `GateJudgePrompts.ForRubric(rubric)`, edit its Markdown and metadata, and pass the loaded selection through `JudgeGateOptions.JudgePrompts`. Supported rubrics are indirect injection, over-refusal, exfiltration intent, system-prompt extraction, ungrounded claims, intent/action mismatch, goal drift, tool-argument coherence, outbound delegation drift and crescendo trajectory. Arbitrary custom `IJudgeRubric` builders are rejected before calls when prompt selection is requested; their custom implementation remains available without this adapter.
+
+```csharp
+var pack = await new JudgePromptPackLoader().LoadAsync("prompts.json");
+var gate = new CompositeJudgeGate<OverRefusalRubric>(new(), chatClient,
+    new JudgeGateOptions
+    {
+        JudgePrompts = new() { Pack = pack, Locale = "sv-SE" },
+        ModelId = "your-provider-model-id",
+        Timeout = TimeSpan.FromSeconds(5)
+    });
+var observation = await gate.JudgeTextAsync("Nej, det gör jag inte.");
+// Over-refusal is an advisory quality flag: use WarnOnly when registering this axis.
+```
+
+Configured gates bypass English semantic prefilters and retain head/tail input bounds. `GateDecisionV1` requires exactly `decision` (`ALLOWED`, `BLOCKED`, `INCONCLUSIVE`), numeric `confidence`, nonempty `rationale`, and an `evidence` string array. The selected definition's `PassAt` is the block threshold; it overrides the exported/default `BlockThreshold`. Fail-open/fail-closed enforcement and budget-exhaustion policies remain explicit gate options. A malformed reply receives at most one localized correction, under the same total deadline; each actual dispatch reserves against the spend governor. Empty input and failed/unreadable calls remain unmeasured.
+
+`JudgeVerdict.Instrument` and `GateProvenance.JudgeInstrument` record resolved locale, prompt identity, optional captured content, requested model and actual provider-reported calls. Missing model IDs remain unknown. `InstrumentDigest` includes prompt, reader, prefilter, bounds, model/settings, deadline, enforcement and budget policy. The allow cache includes this identity and excludes unmeasured configured results, even when enforcement deliberately allows them. No mutable global prompt registry is used.
+
+Calibrate the same configured gate with `GateCalibrationHarness`. Reports retain configured identities and per-case observations, exclude unmeasured cases from the confusion matrix, and cannot establish readiness with unmeasured cases or missing/inconsistent configured model identities. `JsonFileCalibrationReportStore` preserves those records and the split label. `GatekeeperOptions.ValidateInlineJudgesAsync` rejects reports for another instrument, including legacy axis-only reports. This engineering readiness check does not certify human label quality; the shipped Swedish labels remain AI-authored and unreviewed.
+
+The gatekeeper CLI's selected-pack calibration/certificate workflow, specialized wrapper evidence review and red-team benign-control integration remain follow-up work. The library support above does not imply those callers are localized.
 
 ### Atomic rubrics and graphs
 

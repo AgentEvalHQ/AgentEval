@@ -33,6 +33,10 @@ public sealed record JudgeVerdict(
     IReadOnlyList<string>? Spans = null,
     string? Rationale = null)
 {
+    /// <summary>Observed configured instrument and calls; null for legacy/custom rubric execution.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JudgeGateInstrument? Instrument { get; init; }
+
     /// <summary>The axis was not present.</summary>
     public static JudgeVerdict Allowed(double confidence = 1.0) => new(JudgeDecision.Allowed, confidence);
 
