@@ -141,7 +141,7 @@ public sealed class BenchmarkPromptCommandTests : IDisposable
         using var client = new FakeChatClient();
         var judge = new ChatClientEvaluator(client);
         Assert.Throws<ArgumentException>(() => JudgePromptCliOptions.Preflight(
-            BenchAgenticCommand.ResolvePreset("telemetry", judge), judge, new() { Locale = "en" }));
+            BenchAgenticCommand.ResolvePreset("telemetry", judge), new() { Locale = "en" }));
         Assert.Equal(0, client.CallCount);
     }
 

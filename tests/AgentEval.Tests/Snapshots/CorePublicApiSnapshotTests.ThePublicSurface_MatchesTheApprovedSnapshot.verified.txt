@@ -1412,6 +1412,7 @@ static class AgentEval.Prompts.BuiltInJudgePrompts
     static AgentEval.Prompts.JudgePromptDefinition GetRag(System.String evaluatorKey)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> ForEval(AgentEval.Evals.IEval evaluation)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> Rag { get; }
+    static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.ResolvedJudgePrompt> ResolveForEval(AgentEval.Evals.IEval evaluation, AgentEval.Prompts.JudgePromptOptions options)
 sealed class AgentEval.Prompts.JudgePromptResolver : AgentEval.Prompts.IJudgePromptResolver
     AgentEval.Prompts.ResolvedJudgePrompt Resolve(AgentEval.Prompts.JudgePromptDefinition builtIn, AgentEval.Prompts.JudgePromptOptions options)
     ctor()

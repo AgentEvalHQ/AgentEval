@@ -223,7 +223,7 @@ public static class BenchAgenticCommand
                     "answer see an empty one. Pass --response/--response-file to grade a specific answer.");
             }
         }
-        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
         catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
         {
             Console.Error.WriteLine(ex.Message);

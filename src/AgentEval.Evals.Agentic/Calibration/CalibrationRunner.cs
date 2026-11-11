@@ -4,6 +4,7 @@
 
 using AgentEval.Evals;
 using AgentEval.Evals.Meta;
+using AgentEval.Prompts;
 
 namespace AgentEval.Evals.Agentic.Calibration;
 
@@ -44,6 +45,9 @@ namespace AgentEval.Evals.Agentic.Calibration;
 public sealed class CalibrationRunner
 {
     private readonly Func<string, IEval?> _evaluatorResolver;
+
+    /// <summary>Optional immutable selection used for preflight and every case in this run.</summary>
+    public JudgePromptOptions? JudgePrompts { get; init; }
 
     /// <summary>
     /// Initialises a new <see cref="CalibrationRunner"/>.
@@ -88,6 +92,22 @@ public sealed class CalibrationRunner
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(datasets);
+        if (limitPerCategory is < 1)
+            throw new ArgumentOutOfRangeException(nameof(limitPerCategory), limitPerCategory, "must be at least 1.");
+
+        // Snapshot the configured instances once. A bad locale in a later category must fail
+        // before earlier cases incur model calls, and execution must use the instances preflighted.
+        Dictionary<string, IEval?>? selected = null;
+        if (JudgePrompts is not null)
+        {
+            selected = datasets.SelectMany(d => limitPerCategory is int limit ? d.Entries.Take(limit) : d.Entries)
+                .Select(e => e.EvaluatorKey).Distinct(StringComparer.Ordinal)
+                .ToDictionary(key => key, _evaluatorResolver, StringComparer.Ordinal);
+            var instrumentCount = selected.Values.Where(e => e is not null)
+                .Sum(e => BuiltInJudgePrompts.ResolveForEval(e!, JudgePrompts).Count);
+            if (instrumentCount == 0)
+                throw new ArgumentException("The selected calibration cases contain no configurable judge instruments.", nameof(JudgePrompts));
+        }
 
         var perCategory = new Dictionary<string, CalibrationCategoryReport>();
 
@@ -106,7 +126,7 @@ public sealed class CalibrationRunner
             var entries = limitPerCategory is int limit ? ds.Entries.Take(limit) : ds.Entries;
             foreach (var entry in entries)
             {
-                var eval = _evaluatorResolver(entry.EvaluatorKey);
+                var eval = selected is null ? _evaluatorResolver(entry.EvaluatorKey) : selected[entry.EvaluatorKey];
                 if (eval is null)
                 {
                     Console.Error.WriteLine(
@@ -114,13 +134,15 @@ public sealed class CalibrationRunner
                         $"no evaluator dispatched for key '{entry.EvaluatorKey}' (unknown, or carved out) — skipping.");
                     skippedUnknownKey++;
                     skippedKeys[entry.EvaluatorKey] = skippedKeys.GetValueOrDefault(entry.EvaluatorKey) + 1;
+                    if (caseSink is not null)
+                        await caseSink(CalibrationCaseRecord.ForUndispatched(ds.CategoryKey, entry), ct).ConfigureAwait(false);
                     continue;
                 }
 
                 EvalResult result;
                 try
                 {
-                    result = await eval.EvaluateAsync(entry.ToEvalInput(), ct);
+                    result = await eval.EvaluateAsync(entry.ToEvalInput() with { JudgePrompts = JudgePrompts }, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -270,6 +292,11 @@ public sealed record CalibrationCaseRecord(
         entry.ExpectedVerdict, entry.ExpectedScoreMin, entry.ExpectedScoreMax,
         Label: null, Value: null, Passed: null, Error: $"{ex.GetType().Name}: {ex.Message}", Leaves: []);
 
+    internal static CalibrationCaseRecord ForUndispatched(string category, CalibrationEntry entry) => new(
+        category, entry.ScenarioId, entry.EvaluatorKey, EvaluatorVersion: null,
+        entry.ExpectedVerdict, entry.ExpectedScoreMin, entry.ExpectedScoreMax,
+        Label: null, Value: null, Passed: null, Error: "No evaluator dispatched (unknown or explicitly carved out).", Leaves: []);
+
     private static IEnumerable<EvalResult> Flatten(EvalResult node) =>
         node.Details.SubResults is { Count: > 0 } subs ? subs.SelectMany(Flatten) : [node];
 }
@@ -305,9 +332,23 @@ public sealed record CalibrationLeafRecord(
     string? PromptHash,
     string? AggregationStrategy = null)
 {
+    /// <summary>Full resolved instrument identity and locale, without captured prompt or case content.</summary>
+    public JudgePromptProvenance? JudgePrompt { get; init; }
+
+    /// <summary>Full legacy or configured instrument digest, when available.</summary>
+    public string? RubricDigest { get; init; }
+
+    /// <summary>The actual configured judge provider, when known.</summary>
+    public string? JudgeProvider { get; init; }
+
     internal static CalibrationLeafRecord From(EvalResult leaf) => new(
         leaf.Metric.Key, leaf.Score.Label, leaf.Score.Value, leaf.Score.Passed,
         leaf.Details.Dimensions is { Count: > 0 } d ? new Dictionary<string, double>(d) : null,
         leaf.Provenance.Type, leaf.Provenance.JudgeModel, leaf.Provenance.PromptId, leaf.Provenance.PromptHash,
-        leaf.Details.AggregationStrategy);
+        leaf.Details.AggregationStrategy)
+    {
+        JudgePrompt = leaf.Provenance.JudgePrompt is { } prompt ? prompt with { Content = null } : null,
+        RubricDigest = leaf.Provenance.RubricDigest,
+        JudgeProvider = leaf.Provenance.JudgeProvider
+    };
 }

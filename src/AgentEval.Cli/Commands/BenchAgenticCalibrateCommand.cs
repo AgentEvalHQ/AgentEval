@@ -280,8 +280,20 @@ public static class BenchAgenticCalibrateCommand
         string? recordsPath = null,
         int? limitPerCategory = null,
         CalibrationJudgeIdentity? evaluatorOverrideIdentity = null,
-        Func<string, IEvaluator, string?, IEval?>? evalResolver = null)
+        Func<string, IEvaluator, string?, IEval?>? evalResolver = null, CalibrationCliOptions.Selection? selection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try
+        {
+            selection?.ValidateOutput(outPathOverride);
+            promptOptions = selection is null ? null : await selection.Prompts.LoadAsync(ct);
+        }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (limitPerCategory is < 1)
         {
             Console.Error.WriteLine("--limit must be at least 1.");
@@ -342,7 +354,7 @@ public static class BenchAgenticCalibrateCommand
             if (!resolved.TryGetValue(key, out var eval))
             {
                 // Not dispatched on these goldens (B6c-7): left out by key, counted as carved_out in the report.
-                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : resolveEval(key, judge, judgeModelName);
+                eval = selection?.Dataset is null && s_notCalibratableOnTheseGoldens.Contains(key) ? null : resolveEval(key, judge, judgeModelName);
                 resolved[key] = eval;
             }
             return eval;
@@ -359,17 +371,28 @@ public static class BenchAgenticCalibrateCommand
 
         // ── Load calibration datasets from the test assembly ─────────────────
         IReadOnlyList<AgentEval.Evals.Agentic.Calibration.CalibrationDataset> datasets;
+        CalibrationDatasetIdentity datasetIdentity;
         try
         {
-            var testAssembly = CalibrationGoldenAssembly.TryLocate();
-            if (testAssembly is null)
+            if (selection?.Dataset is { } datasetFile)
             {
-                Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
-                return 1;
+                var loaded = await CalibrationCliOptions.LoadAsync(datasetFile, new CalibrationDatasetLoader().LoadAsync, ct);
+                datasets = [loaded.Dataset];
+                datasetIdentity = loaded.Identity;
             }
+            else
+            {
+                var testAssembly = CalibrationGoldenAssembly.TryLocate();
+                if (testAssembly is null)
+                {
+                    Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
+                    return 1;
+                }
 
-            var datasetLoader = new AgentEval.Evals.Agentic.Calibration.CalibrationDatasetLoader();
-            datasets = await datasetLoader.LoadAllFromAssemblyAsync(testAssembly);
+                var datasetLoader = new AgentEval.Evals.Agentic.Calibration.CalibrationDatasetLoader();
+                datasets = await datasetLoader.LoadAllFromAssemblyAsync(testAssembly, ct);
+                datasetIdentity = CalibrationCliOptions.EmbeddedIdentity(datasets);
+            }
 
             if (datasets.Count == 0)
             {
@@ -382,7 +405,7 @@ public static class BenchAgenticCalibrateCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to load agentic calibration datasets: {ex.Message}");
-            return 1;
+            return selection?.Dataset is not null ? ExitCodes.UsageError : 1;
         }
 
         // ── Run calibration ──────────────────────────────────────────────────
@@ -390,7 +413,7 @@ public static class BenchAgenticCalibrateCommand
         AgentEval.Evals.Agentic.Calibration.CalibrationReport report;
         try
         {
-            var runner = new AgentEval.Evals.Agentic.Calibration.CalibrationRunner(Resolver);
+            var runner = new AgentEval.Evals.Agentic.Calibration.CalibrationRunner(Resolver) { JudgePrompts = promptOptions };
             if (recordsPath is null)
             {
                 report = await runner.RunAsync(datasets, caseSink: null, limitPerCategory, ct);
@@ -399,29 +422,41 @@ public static class BenchAgenticCalibrateCommand
             {
                 var dir = Path.GetDirectoryName(Path.GetFullPath(recordsPath));
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                await using var writer = new StreamWriter(recordsPath, append: false);
+                StreamWriter? writer = null;
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
-                report = await runner.RunAsync(
-                    datasets,
-                    async (record, token) =>
-                    {
-                        // The record type belongs to the runner and knows nothing of providers, so the judge is
-                        // added here, on every line: a records file must say which judge produced it on its own.
-                        var line = System.Text.Json.JsonSerializer.SerializeToNode(record, jsonOptions)!.AsObject();
-                        line["judgeProvider"] = judgeIdentity.Provider;
-                        line["judgeModel"] = judgeIdentity.Model;
-                        await writer.WriteLineAsync(line.ToJsonString(jsonOptions).AsMemory(), token);
-                        await writer.FlushAsync(token);
-                    },
-                    limitPerCategory,
-                    ct);
-                Console.WriteLine($"Per-case records written: {recordsPath}");
+                try
+                {
+                    report = await runner.RunAsync(
+                        datasets,
+                        async (record, token) =>
+                        {
+                            // The record type belongs to the runner and knows nothing of providers, so the judge is
+                            // added here, on every line: a records file must say which judge produced it on its own.
+                            var line = System.Text.Json.JsonSerializer.SerializeToNode(record, jsonOptions)!.AsObject();
+                            line["judgeProvider"] = judgeIdentity.Provider;
+                            line["judgeModel"] = judgeIdentity.Model;
+                            line["datasetDigest"] = datasetIdentity.Digest;
+                            line["datasetSource"] = datasetIdentity.Source;
+                            line["labelReview"] = "unverified";
+                            writer ??= new StreamWriter(recordsPath, append: false);
+                            await writer.WriteLineAsync(line.ToJsonString(jsonOptions).AsMemory(), token);
+                            await writer.FlushAsync(token);
+                        },
+                        limitPerCategory,
+                        ct);
+                }
+                finally
+                {
+                    if (writer is not null) await writer.DisposeAsync();
+                }
+
+                if (writer is not null) Console.WriteLine($"Per-case records written: {recordsPath}");
             }
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Agentic calibration run failed: {ex.Message}");
-            return 1;
+            return JudgePromptCliOptions.IsConfigurationError(ex) ? ExitCodes.UsageError : 1;
         }
 
         // ── Write Markdown report ────────────────────────────────────────────
@@ -434,7 +469,7 @@ public static class BenchAgenticCalibrateCommand
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report, judgeIdentity);
+            var md = BuildMarkdownReport(report, judgeIdentity, datasetIdentity);
             if (limitPerCategory is int lim)
                 md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per category.** A wiring check, not a baseline: " +
                      "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
@@ -516,7 +551,7 @@ public static class BenchAgenticCalibrateCommand
 
     internal static string BuildMarkdownReport(
         AgentEval.Evals.Agentic.Calibration.CalibrationReport report,
-        CalibrationJudgeIdentity judge)
+        CalibrationJudgeIdentity judge, CalibrationDatasetIdentity? datasetIdentity = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Agentic Evaluator Calibration Report");
@@ -524,6 +559,7 @@ public static class BenchAgenticCalibrateCommand
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
         judge.AppendMarkdownHeader(sb);
+        datasetIdentity?.AppendMarkdownHeader(sb);
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 

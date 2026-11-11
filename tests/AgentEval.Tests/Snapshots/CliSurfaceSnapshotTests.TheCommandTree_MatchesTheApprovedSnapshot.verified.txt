@@ -172,9 +172,9 @@ command agenteval
             option --context String [1..1]
             option --context-file String [1..1]
             option --input String [1..1]
-            option --judge-fallback-locale String [1..1]
-            option --judge-locale String [1..1]
-            option --judge-prompt-pack FileInfo [1..1]
+            option --judge-fallback-locale String [1..1] recursive
+            option --judge-locale String [1..1] recursive
+            option --judge-prompt-pack FileInfo [1..1] recursive
             option --no-aef Boolean [0..1] default=false
             option --preset String [1..1]
             option --reference String [1..1]
@@ -187,6 +187,7 @@ command agenteval
             option --sut String [1..1]
             option --trace String [1..1]
             command calibrate
+                option --dataset FileInfo [1..1]
                 option --limit Int32? [1..1]
                 option --out String [1..1]
                 option --records String [1..1]
@@ -204,9 +205,9 @@ command agenteval
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
-            option --judge-fallback-locale String [1..1]
-            option --judge-locale String [1..1]
-            option --judge-prompt-pack FileInfo [1..1]
+            option --judge-fallback-locale String [1..1] recursive
+            option --judge-locale String [1..1] recursive
+            option --judge-prompt-pack FileInfo [1..1] recursive
             option --m365-capture-raw DirectoryInfo [1..1]
             option --m365-config FileInfo [1..1]
             option --m365-max-turns Int32 [1..1] default=0
@@ -224,6 +225,8 @@ command agenteval
             option --subject-version String [1..1]
             option --sut String [1..1]
             command calibrate
+                option --allow-surrogate-rubrics Boolean [0..1] default=false
+                option --dataset FileInfo [1..1]
                 option --decisions Boolean [0..1] default=false
                 option --limit Int32? [1..1]
                 option --out String [1..1]
@@ -234,9 +237,9 @@ command agenteval
             option --from-env (--azure-from-env) Boolean [0..1] default=false
             option --i-understand-live-side-effects Boolean [0..1] default=false
             option --input String [1..1]
-            option --judge-fallback-locale String [1..1]
-            option --judge-locale String [1..1]
-            option --judge-prompt-pack FileInfo [1..1]
+            option --judge-fallback-locale String [1..1] recursive
+            option --judge-locale String [1..1] recursive
+            option --judge-prompt-pack FileInfo [1..1] recursive
             option --m365-capture-raw DirectoryInfo [1..1]
             option --m365-config FileInfo [1..1]
             option --m365-max-turns Int32 [1..1] default=0
@@ -254,6 +257,8 @@ command agenteval
             option --subject-version String [1..1]
             option --sut String [1..1]
             command calibrate
+                option --allow-surrogate-rubrics Boolean [0..1] default=false
+                option --dataset FileInfo [1..1]
                 option --decisions Boolean [0..1] default=false
                 option --limit Int32? [1..1]
                 option --out String [1..1]

@@ -8,7 +8,7 @@ using AgentEval.Evals.Agentic.Conversation;
 
 namespace AgentEval.Evals.Agentic.Calibration;
 
-/// <summary>A single hand-labeled calibration entry used to evaluate judge accuracy.</summary>
+/// <summary>A labelled calibration entry used to measure agreement. This type does not establish human review of its label.</summary>
 public sealed record CalibrationEntry(
     string ScenarioId,
     string EvaluatorKey,

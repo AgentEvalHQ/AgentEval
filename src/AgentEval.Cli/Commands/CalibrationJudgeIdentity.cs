@@ -104,13 +104,15 @@ internal sealed record CalibrationJudgeIdentity(string Provider, string Model)
         return new($"{settings.DisplayName} ({how})", model);
     }
 
-    /// <summary>Writes the two header lines of a calibration report, each followed by a blank line.</summary>
+    /// <summary>Writes the judge identity and the limits of fixture-label review.</summary>
     internal void AppendMarkdownHeader(StringBuilder sb)
     {
         ArgumentNullException.ThrowIfNull(sb);
         sb.AppendLine($"Judge provider: {Provider}");
         sb.AppendLine();
         sb.AppendLine($"Judge model: {Model}");
+        sb.AppendLine();
+        sb.AppendLine("Label review: not verified by this run. Agreement with fixture labels does not establish human-reviewed customer accuracy.");
         sb.AppendLine();
     }
 

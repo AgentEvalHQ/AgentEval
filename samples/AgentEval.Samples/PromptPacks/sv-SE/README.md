@@ -18,3 +18,14 @@ The generic `judge.criteria` entry starts with an empty criterion roster. Add th
 | Diacritics and mixed language | Swedish query and answer, English evidence naming Örebro | Meaning should determine support, not language matching or lost diacritics. |
 
 See [the guide](../../../../docs/judge-prompt-packs.md) for CLI, override precedence, privacy, supported scope and calibration requirements. Thanks to [@adner](https://github.com/adner) (Andreas Adner) for the feedback motivating this work.
+
+The accompanying [relevance calibration JSONL](calibration-relevance.jsonl) is a runnable four-case **AI-authored draft**, with no customer data or human review. With a configured judge provider, the following makes real model calls and records agreement with these draft labels:
+
+```sh
+agenteval bench agentic calibrate \
+  --dataset samples/AgentEval.Samples/PromptPacks/sv-SE/calibration-relevance.jsonl \
+  --judge-prompt-pack samples/AgentEval.Samples/PromptPacks/sv-SE/prompts.json \
+  --judge-locale sv-SE --out ./relevance-sv-review.md --records ./relevance-sv-cases.jsonl
+```
+
+Use `--limit 1` for a single-call wiring check; it does not apply the agreement gate. Even the full four-case run is too small and unreviewed to establish accuracy. Keep disagreements, expand the cases, obtain independent label review, and reserve held-out cases before making a customer-domain claim. Case records include the dataset digest and actual instrument identity, and explicitly mark label review as unverified.

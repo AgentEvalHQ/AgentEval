@@ -49,8 +49,8 @@ internal static class JudgeFactory
     internal const string EuAiActJudgeSystemPromptFile = "eu-ai-act-judge-system.v1.md";
 
     /// <summary>
-    /// The GDPR judge — one resolver for the benchmark AND its calibration, so the instrument that is calibrated is
-    /// the instrument that runs.
+    /// Shared GDPR family instructions for the benchmark and calibration. Exact instrument parity also
+    /// requires matching scenario keys, criteria, prompt selection and scoring policy.
     /// </summary>
     /// <remarks>
     /// Before this existed, <c>bench gdpr</c> loaded and sent <see cref="GdprJudgeSystemPromptFile"/> while

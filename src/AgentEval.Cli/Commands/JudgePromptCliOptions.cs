@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.CommandLine;
-using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Prompts;
 
@@ -18,8 +17,11 @@ internal sealed class JudgePromptCliOptions
     private readonly Option<string?> _fallback = new("--judge-fallback-locale")
         { Description = "Explicit fallback locale; missing definitions otherwise fail before evaluation." };
 
-    internal JudgePromptCliOptions(Command command)
+    internal JudgePromptCliOptions(Command command, bool recursive = false)
     {
+        _pack.Recursive = recursive;
+        _locale.Recursive = recursive;
+        _fallback.Recursive = recursive;
         command.Add(_pack);
         command.Add(_locale);
         command.Add(_fallback);
@@ -48,21 +50,13 @@ internal sealed class JudgePromptCliOptions
         };
     }
 
-    internal static void Preflight(IEval graph, IEvaluator judge, JudgePromptOptions? options)
+    internal static void Preflight(IEval graph, JudgePromptOptions? options)
     {
         if (options is null) return;
-        var definitions = BuiltInJudgePrompts.ForEval(graph);
+        var definitions = BuiltInJudgePrompts.ResolveForEval(graph, options);
         if (definitions.Count == 0)
             throw new ArgumentException("Expected: a benchmark with a configurable judge. Actual: this selection has no judge instruments. Suggestions: omit --judge-prompt-pack or select a judged preset. Because: a pack cannot localize code-only rules.");
-        if (judge is not IJudgePromptBindable bindable)
-            throw new NotSupportedException("Expected: a prompt-pack-capable judge. Actual: this judge does not support binding. Suggestions: use ChatClientEvaluator or implement IJudgePromptBindable. Because: requested localization cannot be ignored.");
-        foreach (var definition in definitions)
-        {
-            var resolved = new JudgePromptResolver().Resolve(definition, options);
-            var bound = bindable.WithPromptDefinition(definition, options);
-            if ((bound as IResolvedJudgePromptSource)?.ResolvedPrompt?.Provenance.Digest != resolved.Provenance.Digest)
-                throw new NotSupportedException("Expected: the selected prompt identity after binding. Actual: the judge did not preserve it. Suggestions: implement IResolvedJudgePromptSource consistently. Because: preflight and execution must use the same instrument.");
-        }
+
     }
 
     internal static bool IsConfigurationError(Exception ex) =>

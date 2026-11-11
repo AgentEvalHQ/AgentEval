@@ -15,7 +15,29 @@ public static class BuiltInJudgePrompts
     /// Traverses composites, scenario wrappers, definition wrappers and declared instrument dependencies.
     /// Code-only leaves contribute no prompt; other judge implementations need their own adapter.
     /// </summary>
-    public static IReadOnlyList<JudgePromptDefinition> ForEval(IEval evaluation)
+    public static IReadOnlyList<JudgePromptDefinition> ForEval(IEval evaluation) => Collect(evaluation, null);
+
+    /// <summary>
+    /// Preflights every declared atomic judge using the same per-invocation selection as execution.
+    /// Returns resolved instruments without invoking a model; unsupported binding, missing locales,
+    /// incompatible contracts and conflicting keys fail before any evaluation begins.
+    /// </summary>
+    public static IReadOnlyList<ResolvedJudgePrompt> ResolveForEval(IEval evaluation, JudgePromptOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var resolver = new JudgePromptResolver();
+        var resolved = new Dictionary<string, ResolvedJudgePrompt>(StringComparer.Ordinal);
+        _ = Collect(evaluation, atomic =>
+        {
+            var selected = resolver.Resolve(atomic.CapturePromptDefinition(), options);
+            if (atomic.CaptureDefinition(options).RubricDigest != selected.Provenance.Digest)
+                throw new NotSupportedException("Expected: the selected prompt identity after binding. Actual: the judge did not preserve it. Suggestions: implement IResolvedJudgePromptSource consistently. Because: preflight and execution must use the same instrument.");
+            resolved[selected.Definition.EvaluatorKey] = selected;
+        });
+        return Array.AsReadOnly(resolved.Values.OrderBy(p => p.Definition.EvaluatorKey, StringComparer.Ordinal).ToArray());
+    }
+
+    private static IReadOnlyList<JudgePromptDefinition> Collect(IEval evaluation, Action<AtomicLlmEval>? preflight)
     {
         ArgumentNullException.ThrowIfNull(evaluation);
         var definitions = new Dictionary<string, JudgePromptDefinition>(StringComparer.Ordinal);
@@ -38,6 +60,7 @@ public static class BuiltInJudgePrompts
                             && JsonSerializer.Serialize(existing) != JsonSerializer.Serialize(definition))
                             throw new ArgumentException($"Expected: one definition per evaluator key. Actual: conflicting '{definition.EvaluatorKey}' instruments. Suggestions: assign distinct keys or export each instrument separately. Because: a pack cannot silently choose between different criteria or policies.", nameof(evaluation));
                         definitions[definition.EvaluatorKey] = definition;
+                        preflight?.Invoke(atomic);
                         break;
                     case IEvalDefinitionWrapper wrapper: Visit(wrapper.DefinitionInner, depth + 1); break;
                     case AgentScenarioEval scenario: Visit(scenario.Inner, depth + 1); break;

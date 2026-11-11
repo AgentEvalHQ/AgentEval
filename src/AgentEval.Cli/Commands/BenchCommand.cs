@@ -196,7 +196,7 @@ public static class BenchCommand
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
         }
-        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
         catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
         {
             Console.Error.WriteLine(ex.Message);

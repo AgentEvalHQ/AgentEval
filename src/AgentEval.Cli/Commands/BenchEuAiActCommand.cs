@@ -196,7 +196,7 @@ public static class BenchEuAiActCommand
                 "I should clearly identify myself as an AI assistant when interacting with users. " +
                 "For high-risk decisions, I'll defer to human review.";
         }
-        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
         catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
         {
             Console.Error.WriteLine(ex.Message);
