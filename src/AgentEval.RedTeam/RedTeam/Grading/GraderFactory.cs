@@ -70,7 +70,8 @@ public static class GraderFactory
 
     /// <summary>Exports the supported scan grader's actual declared leaf rubrics without calling the judge or target.</summary>
     /// <remarks>Use these stable keys to author a pack for <see cref="ScanOptions.JudgePrompts"/>.
-    /// Configured grading supports Primary mode. Legacy keyword/fallback paths are not silently localized.</remarks>
+    /// Configured Primary and Fallback modes have distinct declared policies. Fallback preserves independent structural
+    /// evidence and defers owned language-dependent decisions; only judge-detected success can replace an undecidable oracle.</remarks>
     public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options)
     {
         var definitions = RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
@@ -83,12 +84,16 @@ public static class GraderFactory
     {
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
-        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary)
-            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client or fallback mode. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
+        if (options.JudgeClient is null || !Enum.IsDefined(options.Mode))
+            throw new NotSupportedException("Expected: a judge client and a declared grading mode. Actual: missing judge client or unknown mode. Suggestions: configure Primary or Fallback grading with a judge. Because: prompt selection must not silently preserve a different language-dependent judge path.");
         if (options.JudgeTimeout is { } invalidTimeout && invalidTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(options), "Expected: positive judge timeout. Actual: nonpositive duration. Suggestions: use a positive duration or null. Because: configured grading must have an executable time budget.");
 
         var inner = attack.GetEvaluator();
+        if (options.Mode == JudgeMode.Fallback)
+            return new JudgeBackedEvaluator(inner, options.JudgeClient, JudgeMode.Fallback,
+                OptionsFor(options.Rubric, attack.Name).Copy(null, "redteam.fallback." + attack.Name.ToLowerInvariant()),
+                options.IncludeEvidence, options.JudgeTimeout);
         // The built-in ExcessiveAgency inner graph contains an English verbal fallback. Preserve its
         // structural tool oracle and replace the verbal role with the declared localized action judges.
         var structural = attack is Attacks.ExcessiveAgencyAttack && inner is FidelityCompositeEvaluator fidelity

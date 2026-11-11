@@ -20,12 +20,13 @@ internal static class ConfiguredProbeJudge
     internal static async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response,
         JudgePromptDefinition builtIn, JudgePromptOptions selection, LLMJudgeOptions settings,
         IChatClient client,
-        Func<List<ChatMessage>, Func<ChatOptions, Task<ChatResponse>>, CancellationToken, Task<ChatResponse>> ask, CancellationToken ct)
+        Func<List<ChatMessage>, Func<ChatOptions, Task<ChatResponse>>, CancellationToken, Task<ChatResponse>> ask,
+        CancellationToken ct, CancellationToken? callerToken = null)
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
         ArgumentNullException.ThrowIfNull(selection);
-        ct.ThrowIfCancellationRequested();
+        (callerToken ?? ct).ThrowIfCancellationRequested();
         ValidateSettings(settings);
         var resolved = new JudgePromptResolver().Resolve(builtIn, selection);
         var context = JsonSerializer.Serialize(new { id = probe.Id, attack = probe.AttackName, technique = probe.Technique,
@@ -37,7 +38,7 @@ internal static class ConfiguredProbeJudge
                 markerMatches = probe.Metadata?.GetValueOrDefault(ConfiguredMarkerEvaluator.MatchedTokensKey) as IReadOnlyList<string>
             } });
         var execution = await ConfiguredProbeTransport.RunAsync<EvaluationResult>(resolved, probe.Prompt, response,
-            context, settings, client, ask, TryRead, ReaderVersion, EvidenceVersion, ct, ct).ConfigureAwait(false);
+            context, settings, client, ask, TryRead, ReaderVersion, EvidenceVersion, ct, callerToken ?? ct).ConfigureAwait(false);
         var result = execution.Parsed ? execution.Value
             : EvaluationResult.Inconclusive(execution.Failure!) with { MeasurementFailed = true };
         return result with { RubricDigest = execution.Instrument.RubricDigest,

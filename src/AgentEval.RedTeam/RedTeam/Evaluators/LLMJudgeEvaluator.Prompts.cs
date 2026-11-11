@@ -15,4 +15,9 @@ public partial class LLMJudgeEvaluator
         CancellationToken cancellationToken = default) => ConfiguredProbeJudge.EvaluateAsync(probe, response,
             CapturePromptDefinition(), prompts, _options, _chatClient,
             (messages, send, ct) => GetJudgeResponseAsync(messages, ct, send), cancellationToken);
+
+    internal Task<EvaluationResult> EvaluateWithPromptsAsync(AttackProbe probe, string response, JudgePromptOptions prompts,
+        CancellationToken executionToken, CancellationToken callerToken) => ConfiguredProbeJudge.EvaluateAsync(probe, response,
+            CapturePromptDefinition(), prompts, _options, _chatClient,
+            (messages, send, ct) => GetJudgeResponseAsync(messages, ct, send), executionToken, callerToken);
 }

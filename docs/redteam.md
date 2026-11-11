@@ -985,7 +985,7 @@ bool canResist = await agent.CanResistAsync(Attack.PromptInjection);
 
 ## `agenteval redteam` — CLI reference
 
-The low-level scanner. **Everything the library can do is reachable from the CLI**: target/auth (with per-role keys), the real-attack-surface harness, the attacker-LLM multi-turn strategies, every export + compliance format, and an honest baseline/regression gate. The options compose freely.
+Scan a target, export findings, or compare a baseline. Prompt-pack compatibility is listed in the [judge guide](judge-prompt-packs.md#red-team-graphs-and-scans).
 
 | Group | Options |
 |-------|---------|
@@ -995,7 +995,10 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | **Benchmark packs** | `--pack <name\|list>` (download + run an external pack — HarmBench / JailbreakBench / CyberSecEval — alongside the built-ins; `list` shows the catalog), `--accept-license` (required; no data is bundled, datasets carry harmful content) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
-| **Judge grading** | `--judge-mode fallback\|primary` (fallback = judge only adjudicates Inconclusive verdicts, and may only raise one to Succeeded, never to Resisted; primary = the judge grades the semantic, text-only probes first via grading-by-decomposition — needs `--judge`), `--judge-rubric evidence-anchored\|strict\|lenient` (**default `evidence-anchored`** — grounds every conclusive verdict in a verbatim quote, carries the per-oracle discriminators, and is the rubric the published agreement (κ) and fabrication numbers were measured under; `strict` = precision-oriented/no discriminators; `lenient` = recall-oriented), `--judge-timeout <seconds>` (grading timeout — bounds the single-judge/fallback path per call and the default composite path as a total grading bound, abstaining on timeout; `0` shares the per-probe budget) |
+| **Judge mode** | `--judge-mode primary\|fallback`: primary judges semantic probes first; fallback can only raise Inconclusive to Succeeded. Requires `--judge`. See [localized fallback](judge-prompt-packs.md#localized-fallback-judging) |
+| **Judge rubric** | `--judge-rubric evidence-anchored\|strict\|lenient`: quoted evidence (default), fewer false alarms, or fewer missed attacks. Published agreement/fabrication results apply to the measured evidence-anchored configuration |
+| **Judge timeout** | `--judge-timeout <seconds>`: per call for fallback, total grading for primary; `0` shares the probe budget |
+| **Judge prompts** | `--judge-prompt-pack <manifest>`, `--judge-locale <locale>`, `--judge-fallback-locale <locale>`. [Export, translate and use a pack](judge-prompt-packs.md#red-team-graphs-and-scans) |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
 | **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |
 | **Calibration** | `--calibration <cohort.json>` (per-attack z-score vs a *your-own* reference cohort — flags the model where it's unusually vulnerable relative to peers) |
@@ -1221,13 +1224,13 @@ var result = await AttackPipeline.Create()
 
 ### Explainable findings (`--explain`)
 
-Attach an **LLM-generated rationale** to each Succeeded/Inconclusive finding that narrates *why* the verdict was reached **and which evidence fidelity** backs it — the auditor-facing differentiator (it never changes the verdict; it explains it).
+Explain Succeeded/Inconclusive findings and their evidence fidelity without changing the verdict.
 
 ```bash
 agenteval redteam --endpoint $URL --model $MODEL --judge $JUDGE_URL --explain
 ```
 
-Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export. It also requires evidence to be unredacted (`--explain` is suppressed when evidence is redacted, since the rationale quotes the raw response). Legacy narration applies to single-turn findings. With prompt selection enabled, narration also supports folded multi-turn and tree findings, using their actual transcript and established fidelity. Export `prompts export ./narrative-pack --family redteam --preset explanation` to author the separate `redteam.explanation` contract, or use `--preset supported` for the complete scan pack. Missing selected translations fail before target calls. Narration has separate declared and observed identity; its failure never changes a verdict. See [localized explanations](judge-prompt-packs.md#localized-explanations).
+Requires `--judge` and unredacted evidence; otherwise narration is skipped. The text appears in `ProbeResult.Rationale` and JSON export. Prompt selection also enables conversation/tree explanations. See [localized explanations](judge-prompt-packs.md#localized-explanations) for export, overrides and provenance.
 
 ### Output & compliance formats, per-role keys
 

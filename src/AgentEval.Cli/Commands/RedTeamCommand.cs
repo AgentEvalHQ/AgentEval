@@ -126,11 +126,11 @@ internal static class RedTeamCommand
             { Description = "Model for judge (default: same as --model)" };
         // ADR-021 (Phase B.1): judge grading mode + rubric + per-call timeout.
         var judgeModeOpt = new Option<string>("--judge-mode")
-            { DefaultValueFactory = _ => "primary", Description = "How the judge grades: 'primary' (default — ADR-023 B.3 flip; the Composite Judges grade semantic/text-only probes first, keyword oracle advisory) or 'fallback' (legacy — judge only adjudicates Inconclusive verdicts). 'primary' requires --judge; without it, a run is byte-identical to the keyword oracle." };
+            { DefaultValueFactory = _ => "primary", Description = "'primary' (default): judge semantic probes first. 'fallback': judge Inconclusive results, adopting only attack success. Needs --judge; otherwise uses code/keyword oracles. Both modes support judge prompt packs." };
         var judgeRubricOpt = new Option<string>("--judge-rubric")
-            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric for --judge-mode primary: 'evidence-anchored' (default — a conclusive verdict must be grounded in a verbatim quote from the response, which targets BOTH false alarms and missed hits, carries the per-oracle discriminators, and is the rubric the published κ/fabrication numbers were measured under), 'strict' (precision-oriented — only clear compromise ⇒ Succeeded; fewer false alarms but more missed hits; no discriminators), or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded; catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
+            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric: 'evidence-anchored' (default; requires quoted evidence), 'strict' (fewer false alarms) or 'lenient' (fewer missed attacks). Explicit prompt-pack instructions replace the selected rubric text." };
         var judgeTimeoutOpt = new Option<double>("--judge-timeout")
-            { DefaultValueFactory = _ => 0, Description = "Grading timeout (seconds): bounds the single-judge/fallback path per judge call (keeps the advisory keyword verdict on timeout) AND the default judge-primary composite path as a total grading bound (abstains → Inconclusive on timeout). 0 = no separate bound; grading shares the per-probe budget (--timeout-per-probe)." };
+            { DefaultValueFactory = _ => 0, Description = "Grading timeout in seconds: per judge call for fallback, total grading for primary. 0 shares the probe budget. Configured timeouts are failed measurements; legacy fallback retains the advisory verdict." };
 
         // Attacker (LLM that drives attacker-LLM multi-turn attacks: Crescendo / PAIR / TAP)
         var attackerEndpointOpt = new Option<string?>("--attacker")

@@ -267,6 +267,12 @@ public partial class LLMJudgeEvaluator : IProbeEvaluator
 /// </summary>
 public class LLMJudgeOptions
 {
+    internal LLMJudgeOptions Copy(AgentEval.Prompts.JudgePromptOptions? prompts, string? key) => new()
+    {
+        JudgePrompts = prompts, PromptKey = key, Temperature = Temperature, MaxTokens = MaxTokens,
+        CustomSystemPrompt = CustomSystemPrompt, CustomUserPromptTemplate = CustomUserPromptTemplate
+    };
+
     /// <summary>Optional immutable prompt selection for this judge instance; concrete judges also accept per-call overrides.</summary>
     public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
 

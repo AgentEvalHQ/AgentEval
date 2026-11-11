@@ -296,21 +296,15 @@ public sealed class LocalizedProbeGraphTests
         Assert.All(result.JudgeInstruments, i => Assert.Equal(capture, i.Prompt.Content is not null));
     }
 
-    [Theory]
-    [InlineData("fallback")]
-    [InlineData("missing-client")]
-    public async Task Scan_UnsupportedConfiguredRoute_RejectsBeforeTargetCalls(string route)
+    [Fact]
+    public async Task Scan_ConfiguredPromptsWithoutJudge_RejectsBeforeTargetCalls()
     {
-        using var client = Client();
         var subject = new Subject();
         await Assert.ThrowsAsync<NotSupportedException>(() => new RedTeamRunner().ScanAsync(subject, new()
         {
-            AttackTypes = [new SupplyChainAttack()], JudgeClient = route == "missing-client" ? null : client,
-            JudgePrompts = new(), Mode = route == "fallback" ? JudgeMode.Fallback : JudgeMode.Primary,
-            ExplainFindings = route == "explain", RunBenignControls = route == "benign"
+            AttackTypes = [new SupplyChainAttack()], JudgePrompts = new()
         }));
         Assert.Equal(0, subject.Calls);
-        Assert.Equal(0, client.CallCount);
     }
 
     [Fact]

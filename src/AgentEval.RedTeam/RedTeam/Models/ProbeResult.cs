@@ -155,14 +155,12 @@ public record ProbeResult
     public int? NodesExplored { get; init; }
 
     /// <summary>
-    /// ADR-021 (§5): grading provenance for a judge-primary verdict — which grader shipped, and the
-    /// keyword-vs-judge disagreement. <c>null</c> on every non-judge-primary path (the default), so a
-    /// fallback run is byte-identical. Lifted from the decorator's <c>grader_provenance</c> metadata by
-    /// <see cref="GradingMetadata.ProvenanceOf"/> at the conclusive construction sites.
+    /// Advisory and judge outcomes, including attempted configured fallback judgments.
+    /// Lifted from evaluator metadata through <see cref="GradingMetadata.ProvenanceOf"/>.
     /// </summary>
     public GraderProvenance? Grading { get; init; }
 
-    /// <summary>True when a judge-primary verdict disagreed with the advisory keyword oracle (§5).
+    /// <summary>True when the judge verdict disagreed with the advisory oracle.
     /// Computed from <see cref="Grading"/>; <c>false</c> when no judge ran.</summary>
     public bool GraderDisagreed => Grading is { } g && g.Disagreed;
 }

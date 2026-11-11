@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Red-team fallback judging accepts localized prompt packs while preserving its success-only adoption rule and structural evidence checks. English heuristics no longer bypass the selected judge; failed/timed-out attempts retain provenance. Added CLI presets, regression tests and a scripted sample. See [localized fallback](docs/judge-prompt-packs.md#localized-fallback-judging).
+
 - Configured red-team explanations now use a separate `redteam.explanation` prompt contract, including per-call and per-scan overrides, strict bounded parsing, localized retry and actual-call provenance. Single-turn, conversation and tree scans retain the established verdict when narration is unavailable; caller cancellation propagates. CLI authoring, native evidence and suite identity keep narrative and verdict instruments separate. See [localized explanations](docs/judge-prompt-packs.md#localized-explanations).
 
 - Localized benign controls reuse the shared over-refusal gate, preflight translations before target calls, and retain configuration/observed-model identity in native evidence. English prefilters cannot skip configured Swedish judging; unavailable or budget-exhausted judgments stay inconclusive. Added explicit control settings, CLI authoring preset, regression/round-trip tests and an offline sample. Controls remain outside attack scores; translated customer accuracy is unverified.

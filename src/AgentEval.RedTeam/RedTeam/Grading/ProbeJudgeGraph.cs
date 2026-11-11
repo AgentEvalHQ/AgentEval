@@ -51,6 +51,26 @@ internal static class ProbeJudgeGraph
                         return Leaf(judge.CapturePromptDefinition(), judge.Settings, judge.Name, judge.EvaluateWithPromptsAsync);
                     case LikertJudgeEvaluator judge:
                         return Leaf(judge.CapturePromptDefinition(), judge.Settings, judge.Name, judge.EvaluateWithPromptsAsync);
+                    case JudgeBackedEvaluator fallback when fallback.Mode == JudgeMode.Fallback:
+                    {
+                        if (fallback.JudgeTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout.TotalMilliseconds > uint.MaxValue - 1))
+                            throw Invalid("invalid fallback judge timeout", "use a positive duration below the timer limit or null");
+                        if (fallback.Inner is not FallbackDeferredEvaluator)
+                        {
+                            var expanded = ConfiguredFallbackGraders.Adapt(fallback);
+                            if (!fallback.IncludeEvidence) expanded = new ReasonRedactingEvaluator(expanded);
+                            return Walk(expanded, depth + 1, requested);
+                        }
+                        var advisory = Walk(fallback.Inner, depth + 1, requested);
+                        var judged = Walk(new LLMJudgeEvaluator(fallback.JudgeClient, fallback.Settings), depth + 1, requested);
+                        var leaf = (BoundLeaf)judged.Evaluator;
+                        return (new JudgeBackedEvaluator(advisory.Evaluator, fallback.JudgeClient, JudgeMode.Fallback,
+                            fallback.Settings.Copy(leaf.Options, fallback.Settings.PromptKey), fallback.IncludeEvidence, fallback.JudgeTimeout),
+                            new("fallback-success-only.v1", fallback.JudgeTimeout?.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                [advisory.Identity, judged.Identity]));
+                    }
+                    case FallbackDeferredEvaluator deferred:
+                        return (deferred, new("semantic-deferral.v1", null, []));
                     case CompositeEvaluator composite when composite.GetType() == typeof(CompositeEvaluator):
                     {
                         if (!Enum.IsDefined(composite.Strategy)) throw Invalid("unknown aggregation strategy", "use a declared aggregation strategy");
@@ -200,7 +220,7 @@ internal static class ProbeJudgeGraph
             evaluate(probe, response, options, cancellationToken);
     }
 
-    private sealed class MetadataRequiredEvaluator(IProbeEvaluator inner, string[] keys) : IProbeEvaluator
+    internal sealed class MetadataRequiredEvaluator(IProbeEvaluator inner, string[] keys) : IProbeEvaluator
     {
         internal IProbeEvaluator Inner => inner;
         internal string[] Keys => keys;

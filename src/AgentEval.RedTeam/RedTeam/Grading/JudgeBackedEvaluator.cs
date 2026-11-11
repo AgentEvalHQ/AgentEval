@@ -23,8 +23,8 @@ namespace AgentEval.RedTeam;
 /// </list>
 /// The decorator is <b>stateless</b> (a single instance is shared across parallel probe workers) and
 /// <b>merges</b> the inner result's immutable <see cref="EvaluationResult.Metadata"/> (copy-then-set),
-/// never replacing it. On judge timeout/error it keeps the advisory keyword verdict — never fabricates,
-/// never aborts the scan.
+/// never replacing it. Configured failures retain attempted-call provenance and cannot establish resistance.
+/// Legacy judge timeouts retain the advisory verdict. Caller cancellation propagates.
 /// </summary>
 public sealed class JudgeBackedEvaluator : IProbeEvaluator
 {
@@ -34,6 +34,13 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
     private readonly LLMJudgeOptions _rubric;
     private readonly bool _includeEvidence;
     private readonly TimeSpan? _judgeTimeout;
+
+    internal IProbeEvaluator Inner => _inner;
+    internal IChatClient JudgeClient => _judge;
+    internal JudgeMode Mode => _mode;
+    internal LLMJudgeOptions Settings => _rubric;
+    internal bool IncludeEvidence => _includeEvidence;
+    internal TimeSpan? JudgeTimeout => _judgeTimeout;
 
     /// <summary>Creates a judge-backed decorator. Built once per attack by <see cref="GraderFactory"/>.</summary>
     public JudgeBackedEvaluator(
@@ -124,8 +131,8 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
     }
 
     /// <summary>Runs the judge over text, under its own linked CTS when <see cref="ScanOptions.JudgeTimeout"/>
-    /// is set. Returns <c>null</c> only on a judge-specific timeout (the outer scan was not cancelled) so the
-    /// caller keeps the keyword verdict; a real outer cancellation propagates.</summary>
+    /// is set. Configured timeouts retain failed-measurement provenance; legacy timeouts return <c>null</c>.
+    /// Caller cancellation propagates.</summary>
     private async Task<EvaluationResult?> RunJudgeAsync(AttackProbe probe, string responseText, CancellationToken ct)
     {
         var judge = new LLMJudgeEvaluator(_judge, _rubric);
@@ -134,6 +141,8 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
+        if (_rubric.JudgePrompts is { } prompts)
+            return await judge.EvaluateWithPromptsAsync(probe, responseText, prompts, cts.Token, ct).ConfigureAwait(false);
         try
         {
             return await judge.EvaluateAsync(probe, responseText, cts.Token).ConfigureAwait(false);
@@ -168,8 +177,12 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
     private EvaluationResult WithProvenance(EvaluationResult keyword, GraderProvenance provenance, EvaluationResult? attempted = null)
     {
         var instruments = _includeEvidence ? attempted?.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(attempted?.JudgeInstruments);
-        return keyword with { JudgeInstruments = instruments ?? keyword.JudgeInstruments,
+        var retained = keyword with { JudgeInstruments = instruments ?? keyword.JudgeInstruments,
             Metadata = Merge(keyword.Metadata, fidelityOverride: null, provenance with { JudgeInstruments = instruments }) };
+        if (attempted is not { } observed) return retained;
+        var combined = ProbeResultAggregation.Retain(retained, [keyword, observed]);
+        return _includeEvidence ? combined : combined with
+        { JudgeInstruments = ProbeJudgeProvenance.WithoutContent(combined.JudgeInstruments) };
     }
 
     /// <summary>Copy-then-set: never mutate the inner result's immutable Metadata, never drop its keys

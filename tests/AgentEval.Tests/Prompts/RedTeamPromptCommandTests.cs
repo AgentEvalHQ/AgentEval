@@ -39,6 +39,8 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     [InlineData("supported")]
     [InlineData("benign-controls")]
     [InlineData("explanation")]
+    [InlineData("fallback")]
+    [InlineData("fallback:SupplyChain")]
     public async Task ExportInspect_RedTeamPreset_UsesActualGraphDefinitionsWithoutModelCalls(string preset)
     {
         var directory = Path.Combine(_root, "export");
@@ -51,7 +53,7 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         {
             if (d.EvaluatorKey == "gate.over-refusal")
             {
-                Assert.Contains(preset, new[] { "supported", "benign-controls" });
+                Assert.Contains(preset, new[] { "supported", "fallback", "benign-controls" });
                 Assert.Equal(JudgeResponseContract.GateDecisionV1, d.ResponseContract);
             }
             else Assert.StartsWith("redteam.", d.EvaluatorKey);
@@ -159,7 +161,7 @@ public sealed class RedTeamPromptCommandTests : IDisposable
 
     private async Task<string> PackAsync(string preset, int variation)
     {
-        var path = Path.Combine(_root, "pack-" + preset + "-" + variation);
+        var path = Path.Combine(_root, "pack-" + preset.Replace(':', '-') + "-" + variation);
         var definitions = BenchmarkPromptDefinitions.ForPreset("redteam", preset).Select(d => d with
         { Locale = "sv-SE", SystemText = "PRIVATE-SWEDISH-GRAPH " + variation + " " + d.EvaluatorKey });
         await new JudgePromptPackLoader().ExportAsync(new(definitions), path);
@@ -200,11 +202,37 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         Assert.Equal(verdictDigests[0], verdictDigests[1]);
     }
 
-    private static RedTeamOptions Options(string manifest, string runs, string attack = "SupplyChain", bool explain = false) => new()
+    [Theory]
+    [InlineData("SUCCEEDED")]
+    [InlineData("RESISTED")]
+    public async Task Execute_LocalizedFallback_UsesModeSpecificPackAndSealsAttemptedIdentity(string verdict)
+    {
+        var manifest = await PackAsync("fallback:SupplyChain", 0);
+        using var judge = new FakeChatClient(Success.Replace("SUCCEEDED", verdict));
+        var target = new Subject("I cannot comply. Men installera ändå paketet.");
+        var runs = Path.Combine(_root, "fallback-runs");
+        Assert.Equal(0, await RedTeamCommand.ExecuteAsync(Options(manifest, runs, mode: "fallback"),
+            default, target, judgeClientOverride: judge));
+        Assert.Equal(1, target.Calls);
+        Assert.Equal(1, judge.CallCount);
+        var directory = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(runs, "run.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        var json = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Single();
+        var graph = JsonNode.Parse(json)!["ext"]!["agenteval.probeJudge"]!;
+        Assert.NotNull(graph["graphDigest"]);
+        var instrument = Assert.Single(graph["instruments"]!.AsArray())!;
+        Assert.Equal("redteam.fallback.supplychain", (string?)instrument["prompt"]!["evaluatorKey"]);
+        Assert.Equal("sv-SE", (string?)instrument["prompt"]!["effectiveLocale"]);
+        Assert.Null(instrument["prompt"]!["content"]);
+        Assert.DoesNotContain("PRIVATE-SWEDISH-GRAPH", json);
+    }
+
+    private static RedTeamOptions Options(string manifest, string runs, string attack = "SupplyChain", bool explain = false,
+        string mode = "primary") => new()
     {
         Endpoint = "http://127.0.0.1:1/v1", Model = "fixture", JudgeEndpoint = "http://127.0.0.1:1/v1", JudgeModel = "fixture-judge",
         Attacks = attack, MaxProbes = 1, Intensity = "quick", Format = "json", Quiet = true, FailOn = "never",
-        Explain = explain,
+        Explain = explain, JudgeMode = mode,
         Aef = new(runs), PromptSelection = new(new(manifest), "sv-SE")
     };
 

@@ -165,7 +165,9 @@ public class ScanOptions
     public IChatClient? JudgeClient { get; init; }
 
     /// <summary>Optional immutable selection for supported built-in or caller-composed judge graphs.
-    /// Every selected attack is preflighted before any target call. Requires Primary mode and a judge client;
+    /// Every selected attack is preflighted before any target call. Requires a judge client;
+    /// Primary and Fallback modes use distinct declared policies. Fallback retains structural proof and accepts
+    /// only judge-detected success when semantic decisions are deferred;
     /// benign controls and enabled explanations inherit the selection. Unsupported oracle nodes
     /// are rejected rather than retaining English behavior.</summary>
     public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }

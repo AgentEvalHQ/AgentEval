@@ -31,6 +31,8 @@ This diagnostic exits 1: the two-case, unreviewed dataset cannot establish certi
 
 See [the guide](../../../../docs/judge-prompt-packs.md) for CLI, override precedence, privacy, supported scope and calibration requirements. Thanks to [@adner](https://github.com/adner) (Andreas Adner) for the feedback motivating this work.
 
+The offline sample also builds separate security definitions for graph binding, explanations and [fallback judging](../../../../docs/judge-prompt-packs.md#localized-fallback-judging). Its scripted fallback shows why a negative judge reply leaves an inconclusive result unchanged.
+
 The accompanying [relevance calibration JSONL](calibration-relevance.jsonl) is a runnable four-case **AI-authored draft**, with no customer data or human review. With a configured judge provider, the following makes real model calls and records agreement with these draft labels:
 
 ```sh
