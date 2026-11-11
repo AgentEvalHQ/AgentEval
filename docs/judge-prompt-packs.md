@@ -46,6 +46,8 @@ Register these configured instances using the host's existing DI registrations. 
 
 The legacy `ChatClientEvaluator(chatClient, systemPrompt)` path also preserves customer system text when a built-in binds its rubric. This is a **text-only override**: the bound rubric's numeric scale and reader policy still apply. Use a full prompt definition to change thresholds, scale or retry/user framing together. Unconfigured default English evaluators retain their legacy prompt path.
 
+Exporting a `ChatClientEvaluator`-backed leaf retains the system instructions that judge carries, including family fallback or customer text. Merely selecting English without supplying a replacement also preserves those instructions. An explicit pack entry or complete override can replace them deliberately.
+
 ## CLI execution
 
 ```sh

@@ -18,6 +18,15 @@ public partial class ChatClientEvaluator : IJudgePromptBindable, IResolvedJudgeP
     /// <inheritdoc />
     public bool HasPromptConfiguration => _promptOptions is not null;
 
+    // Export the instructions this judge actually carries, including a family fallback or
+    // explicit customer text. Reader policy remains the leaf's; a selected replacement is explicit.
+    internal JudgePromptDefinition DescribePrompt(string key, IReadOnlyList<string> criteria, EvalRubric? rubric, double passAt = .70) =>
+        BuiltInJudgePrompts.ForEvaluator(key, criteria, rubric, passAt) with
+        {
+            Id = _systemPromptId,
+            SystemText = _systemPrompt + BuiltInJudgePrompts.EvaluatorResponseInstructions(rubric is not null)
+        };
+
     private ChatClientEvaluator(ChatClientEvaluator source, EvalRubric? rubric, string? dimension,
         JudgePromptOptions? options, JudgePromptDefinition? definition)
         : this(source._chatClient,
@@ -57,7 +66,7 @@ public partial class ChatClientEvaluator : IJudgePromptBindable, IResolvedJudgeP
     {
         ct.ThrowIfCancellationRequested();
         var declared = criteria.ToArray();
-        var baseline = _promptDefinition ?? BuiltInJudgePrompts.ForEvaluator("judge.criteria", declared, _rubric);
+        var baseline = _promptDefinition ?? DescribePrompt("judge.criteria", declared, _rubric);
         if (request?.JudgeCriteria is { } identified && _promptDefinition is null) baseline = baseline with { Criteria = identified };
         var resolved = new JudgePromptResolver().Resolve(baseline, options);
         var definition = resolved.Definition;

@@ -249,7 +249,9 @@ public sealed partial class AtomicLlmEval : AtomicEval
     /// <summary>Exports this leaf's built-in text, stable criterion IDs and reader policy without invoking its judge.</summary>
     public JudgePromptDefinition CapturePromptDefinition()
     {
-        var definition = BuiltInJudgePrompts.ForEvaluator(Key, _criteria, _declaredRubric, _declaredPassThreshold);
+        var definition = _evaluator is AgentEval.Core.ChatClientEvaluator chat
+            ? chat.DescribePrompt(Key, _criteria, _declaredRubric, _declaredPassThreshold)
+            : BuiltInJudgePrompts.ForEvaluator(Key, _criteria, _declaredRubric, _declaredPassThreshold);
         var slots = EvidenceSlots().ToArray();
         return slots.Length == 0 ? definition : definition with
         {

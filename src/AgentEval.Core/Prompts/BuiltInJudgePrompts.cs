@@ -73,11 +73,7 @@ public static class BuiltInJudgePrompts
             SeverityBands = rubric?.SeverityBands ?? [], Dimension = dimension, Status = "authored",
             SystemText = (dimension is null ? rubric?.Text ?? ChatClientEvaluator.DefaultSystemPrompt
                 : rubric!.Text.Replace("{dimension}", dimension, StringComparison.Ordinal)) +
-                "\n\nConfigured response contract: criterion verdicts use the declared stable id, never translated text as identity. " +
-                "Each verdict contains id, a JSON boolean met, and explanation; applicable:false is permitted only when explicitly inapplicable. " +
-                "Return each declared criterion exactly once when returning criterion verdicts. " +
-                (rubric is null ? "criteriaResults, overallScore, summary and improvements are required."
-                    : "score and reasoning are required. Criterion verdicts are optional; use criteriaResults or criteria_results, never both."),
+                EvaluatorResponseInstructions(rubric is not null),
             DataSlots = ["input", "output", "context", "reference"],
             Criteria = criteria.Select((c, i) => new JudgeCriterion("criterion-" + (i + 1), c)).ToArray(),
             UserTemplate = "{{safety}}\n\nINPUT:\n{{input}}\n\nOUTPUT:\n{{output}}\n\nCONTEXT:\n{{context}}\n\nREFERENCE:\n{{reference}}\n\nCRITERIA:\n{{criteria}}" +
@@ -87,6 +83,13 @@ public static class BuiltInJudgePrompts
             RetryText = "Return exactly one complete JSON object on the declared score scale, without markdown or prose. Include all fields required by the response contract."
         };
     }
+
+    internal static string EvaluatorResponseInstructions(bool rubric) =>
+        "\n\nConfigured response contract: criterion verdicts use the declared stable id, never translated text as identity. " +
+        "Each verdict contains id, a JSON boolean met, and explanation; applicable:false is permitted only when explicitly inapplicable. " +
+        "Return each declared criterion exactly once when returning criterion verdicts. " +
+        (!rubric ? "criteriaResults, overallScore, summary and improvements are required."
+            : "score and reasoning are required. Criterion verdicts are optional; use criteriaResults or criteria_results, never both.");
 
     /// <summary>English definitions for the five supported RAG metrics. Opt-in v2 framing leaves legacy calls unchanged.</summary>
     public static IReadOnlyList<JudgePromptDefinition> Rag { get; } = Array.AsReadOnly(new[]
