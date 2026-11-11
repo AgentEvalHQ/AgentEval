@@ -10,6 +10,12 @@ namespace AgentEval.RedTeam.Evaluators;
 
 internal static class ConfiguredProbeJudge
 {
+    internal static void ValidateSettings(LLMJudgeOptions settings)
+    {
+        if (!float.IsFinite(settings.Temperature) || settings.Temperature < 0 || settings.MaxTokens <= 0)
+            throw new ArgumentException("Expected: finite nonnegative temperature and positive MaxTokens. Actual: invalid judge settings. Suggestions: correct LLMJudgeOptions before evaluation. Because: invalid settings cannot identify a usable judge instrument.", nameof(settings));
+    }
+
     internal static async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response,
         JudgePromptDefinition builtIn, JudgePromptOptions selection, LLMJudgeOptions settings,
         IChatClient client,
@@ -19,12 +25,17 @@ internal static class ConfiguredProbeJudge
         ArgumentNullException.ThrowIfNull(response);
         ArgumentNullException.ThrowIfNull(selection);
         ct.ThrowIfCancellationRequested();
-        if (!float.IsFinite(settings.Temperature) || settings.Temperature < 0 || settings.MaxTokens <= 0)
-            throw new ArgumentException("Expected: finite nonnegative temperature and positive MaxTokens. Actual: invalid judge settings. Suggestions: correct LLMJudgeOptions before evaluation. Because: invalid settings cannot identify a usable judge instrument.", nameof(settings));
+        ValidateSettings(settings);
         var resolved = new JudgePromptResolver().Resolve(builtIn, selection);
         var definition = resolved.Definition;
         var user = JudgePromptRenderer.Render(definition, probe.Prompt, response,
-            JsonSerializer.Serialize(new { id = probe.Id, attack = probe.AttackName, technique = probe.Technique }));
+            JsonSerializer.Serialize(new { id = probe.Id, attack = probe.AttackName, technique = probe.Technique,
+                oracleFacts = new
+                {
+                    falseFact = Fact(Attacks.DataPoisoningAttack.FalseFactMetadataKey),
+                    trueFact = Fact(Attacks.DataPoisoningAttack.TrueFactMetadataKey),
+                    entity = Fact(Attacks.MisinformationAttack.EntityMetadataKey)
+                } }));
         var provenance = JudgePromptRenderer.Provenance(resolved, user);
         var calls = new List<ProbeJudgeCall>();
         var messages = new List<ChatMessage> { new(ChatRole.System, definition.SystemText), new(ChatRole.User, user) };
@@ -46,6 +57,8 @@ internal static class ConfiguredProbeJudge
             if (attempt == 0) messages.Add(new(ChatRole.User, definition.RetryText));
         }
         return Attach(EvaluationResult.Inconclusive("Expected: a complete configured judge reply. Actual: invalid after one corrective retry. Suggestions: inspect the selected contract and provider output. Because: an unreadable reply cannot establish an attack verdict."));
+
+        string? Fact(string key) => probe.Metadata?.TryGetValue(key, out var value) == true && value is string text ? text : null;
 
         async Task<ChatResponse> SendAsync(ChatOptions options)
         {

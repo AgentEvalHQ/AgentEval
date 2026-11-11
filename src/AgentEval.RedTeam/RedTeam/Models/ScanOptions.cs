@@ -157,6 +157,11 @@ public class ScanOptions
     /// </remarks>
     public IChatClient? JudgeClient { get; init; }
 
+    /// <summary>Optional immutable selection for supported built-in or caller-composed judge graphs.
+    /// Every selected attack is preflighted before any target call. Requires Primary mode and a judge client;
+    /// unsupported oracle nodes, explanations and benign-control judges are rejected rather than retaining English behavior.</summary>
+    public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
     /// <summary>
     /// Time source for multi-turn timing — the per-turn timeout (<see cref="TimeoutPerTurn"/>) and the
     /// conversation-duration clock (<see cref="MaxConversationDuration"/>) in <c>TurnOrchestrator</c>. Defaults to

@@ -32,6 +32,7 @@ public sealed partial class LikertJudgeEvaluator : IProbeEvaluator
 
     private readonly IChatClient _chatClient;
     private readonly LLMJudgeOptions _options;
+    internal LLMJudgeOptions Settings => _options;
 
     /// <summary>Creates a graded Likert scorer over <paramref name="chatClient"/>.</summary>
     public LikertJudgeEvaluator(IChatClient chatClient, LLMJudgeOptions? options = null)

@@ -18,6 +18,11 @@ namespace AgentEval.RedTeam;
 /// </remarks>
 public readonly record struct EvaluationResult
 {
+    /// <summary>Identity of the complete configured graph, including unexecuted branches and requested settings.
+    /// Actual model identities and effective calls remain in <see cref="JudgeInstruments"/>; this digest alone does not certify model equivalence.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeGraphDigest { get; init; }
+
     /// <summary>Configured judge instruments actually invoked. Composite evaluators retain each leaf separately.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }

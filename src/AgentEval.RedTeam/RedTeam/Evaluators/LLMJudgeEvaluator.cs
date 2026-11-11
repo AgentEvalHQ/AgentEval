@@ -27,6 +27,7 @@ public partial class LLMJudgeEvaluator : IProbeEvaluator
 
     private readonly IChatClient _chatClient;
     private readonly LLMJudgeOptions _options;
+    internal LLMJudgeOptions Settings => _options;
 
     /// <summary>
     /// Initializes a new LLMJudgeEvaluator with the specified chat client.

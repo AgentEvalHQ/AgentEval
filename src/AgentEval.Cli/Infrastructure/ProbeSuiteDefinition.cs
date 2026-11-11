@@ -38,13 +38,15 @@ internal static class ProbeSuiteDefinition
             var probes = JsonSerializer.SerializeToNode(arm.Probes)!.AsArray();
             inputs["probes." + index++] = SuiteDefinitionManifest.Hash(AefJsonWriter.Document(new JsonObject { ["probes"] = probes }));
             ids.AddRange(arm.Probes.Select(p => arm.Control ? "benign/" + p.Id : arm.Attack.Name + "/" + p.Id));
-            arms.Add(new JsonObject
+            var armDefinition = new JsonObject
             {
                 ["name"] = arm.Attack.Name, ["type"] = arm.Attack.GetType().FullName,
                 ["control"] = arm.Control, ["severity"] = arm.Attack.DefaultSeverity.ToString(),
                 ["maxTurns"] = arm.Attack is IMultiTurnAttack multi ? multi.MaxTurns : 1,
                 ["measurable"] = arm.Attack.NotMeasurableReason is null,
-            });
+            };
+            if (arm.JudgeGraphDigest is not null) armDefinition["judgeGraphDigest"] = arm.JudgeGraphDigest;
+            arms.Add(armDefinition);
         }
         if (ids.Count == 0) return null;
         foreach (var assembly in new[]

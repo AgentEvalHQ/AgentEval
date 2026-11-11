@@ -86,7 +86,7 @@ public sealed class TreeOrchestrator
                         nodes++;
 
                         reply = await _target.InvokeAsync(prompt, nodeCts.Token).ConfigureAwait(false);
-                        verdict = await ScoreAsync(evaluator, seed, reply, nodeCts.Token).ConfigureAwait(false);
+                        verdict = await ScoreAsync(evaluator, seed with { Prompt = prompt }, reply, nodeCts.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {

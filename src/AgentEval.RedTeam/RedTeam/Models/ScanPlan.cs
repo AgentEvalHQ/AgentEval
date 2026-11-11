@@ -7,7 +7,11 @@ namespace AgentEval.RedTeam;
 /// <param name="Attack">The configured attack that executes and grades these probes.</param>
 /// <param name="Probes">The ordered probes the runner will execute; generators are not called again.</param>
 /// <param name="Control">Whether this is the benign-control arm.</param>
-public sealed record PlannedAttack(IAttackType Attack, IReadOnlyList<AttackProbe> Probes, bool Control = false);
+public sealed record PlannedAttack(IAttackType Attack, IReadOnlyList<AttackProbe> Probes, bool Control = false)
+{
+    /// <summary>Complete configured grading graph identity captured before any target or judge call; null for legacy graders.</summary>
+    public string? JudgeGraphDigest { get; init; }
+}
 
 /// <summary>Pre-execution scan declaration, delivered before any subject or judge call.</summary>
 /// <remarks>Inspect only: callbacks must not mutate referenced attacks, options or probe metadata.</remarks>

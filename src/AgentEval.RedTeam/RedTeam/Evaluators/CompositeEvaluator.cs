@@ -17,6 +17,7 @@ public class CompositeEvaluator : IProbeEvaluator
 {
     private readonly IProbeEvaluator[] _evaluators;
     private readonly AggregationStrategy _strategy;
+    internal AggregationStrategy Strategy => _strategy;
 
     /// <summary>
     /// Strategy for aggregating results from multiple evaluators.

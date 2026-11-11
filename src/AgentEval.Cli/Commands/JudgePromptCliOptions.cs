@@ -31,6 +31,7 @@ internal sealed class JudgePromptCliOptions
 
     internal sealed record Selection(FileInfo? Pack, string? Locale = null, string? FallbackLocale = null)
     {
+        internal bool IsSpecified => Pack is not null || Locale is not null || FallbackLocale is not null;
         internal Task<JudgePromptOptions?> LoadAsync(CancellationToken ct) => JudgePromptCliOptions.LoadAsync(Pack, Locale, FallbackLocale, ct);
     }
 

@@ -10,6 +10,10 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record ProbeResult
 {
+    /// <summary>Full configured graph identity, including declared branches that did not execute. Actual model calls are recorded separately.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeGraphDigest { get; init; }
+
     /// <summary>Configured leaf judges actually invoked. Captured text is omitted when scan evidence is disabled.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
+using AgentEval.Prompts;
 
 namespace AgentEval.RedTeam;
 
@@ -23,6 +24,9 @@ public static class GraderFactory
     {
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
+
+        if (options.JudgePrompts is { } prompts)
+            return RedTeamJudgePrompts.Bind(ConfiguredGraph(attack, options), prompts);
 
         var inner = attack.GetEvaluator();
         if (options.JudgeClient is null)
@@ -55,6 +59,34 @@ public static class GraderFactory
 
         return new JudgeBackedEvaluator(
             inner, options.JudgeClient, options.Mode, OptionsFor(options.Rubric, attack.Name), options.IncludeEvidence, options.JudgeTimeout);
+    }
+
+    /// <summary>Exports the supported scan grader's actual declared leaf rubrics without calling the judge or target.</summary>
+    /// <remarks>Use these stable keys to author a pack for <see cref="ScanOptions.JudgePrompts"/>.
+    /// Configured grading supports Primary mode. Legacy keyword/fallback paths are not silently localized.</remarks>
+    public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options) =>
+        RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
+
+    private static IProbeEvaluator ConfiguredGraph(IAttackType attack, ScanOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(attack);
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary || options.ExplainFindings || options.RunBenignControls)
+            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client, fallback mode, explanations or benign-control judging. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
+        if (options.JudgeTimeout is { } invalidTimeout && invalidTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(options), "Expected: positive judge timeout. Actual: nonpositive duration. Suggestions: use a positive duration or null. Because: configured grading must have an executable time budget.");
+
+        var inner = attack.GetEvaluator();
+        // The built-in ExcessiveAgency inner graph contains an English verbal fallback. Preserve its
+        // structural tool oracle and replace the verbal role with the declared localized action judges.
+        var structural = attack is Attacks.ExcessiveAgencyAttack && inner is FidelityCompositeEvaluator fidelity
+            ? fidelity.Behavioral : inner;
+        var graph = attack is IToolAwareAttack
+            ? DecomposedGraders.TryBuildToolAwareFor(attack.Name, structural, options.JudgeClient)
+            : DecomposedGraders.TryBuildFor(attack.Name, options.JudgeClient);
+        graph ??= inner; // Caller-composed graphs are accepted only if every node is explicitly supported by the binder.
+        if (!options.IncludeEvidence) graph = new ReasonRedactingEvaluator(graph);
+        return options.JudgeTimeout is { } timeout ? new TimeoutEvaluator(graph, timeout) : graph;
     }
 
     /// <summary>Maps a <see cref="JudgeRubric"/> to the matching <see cref="LLMJudgeOptions"/>. <see cref="JudgeRubric.Strict"/>

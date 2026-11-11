@@ -105,7 +105,9 @@ internal static class RedTeamAef
                     Turns = probe.TurnsUsed,
                     DurationMs = probe.Duration?.TotalMilliseconds,
                     Annotator = state is AefState.Error or AefState.NotApplicable ? null : Grader(probe),
-                    RubricDigest = Grader(probe) == AefAnnotatorKind.Llm ? probe.Grading?.RubricDigest : null,
+                    RubricDigest = Grader(probe) == AefAnnotatorKind.Llm ? probe.RubricDigest ?? probe.Grading?.RubricDigest : null,
+                    JudgeGraphDigest = probe.JudgeGraphDigest,
+                    JudgeInstruments = Instruments(probe, captureContent),
                 });
             }
         }
@@ -136,14 +138,25 @@ internal static class RedTeamAef
                     _ => null,
                 },
                 RubricDigest = control.GradedBy == GradingProvenanceKind.Judge ? control.RubricDigest : null,
+                JudgeGraphDigest = control.JudgeGraphDigest,
+                JudgeInstruments = Instruments(control, captureContent),
             });
         }
 
         return lines;
     }
 
-    private static AefAnnotatorKind Grader(ProbeResult probe) =>
-        probe.Grading?.ShippedBy == GradingProvenanceKind.Judge ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code;
+    private static AefAnnotatorKind? Grader(ProbeResult probe) => (probe.GradedBy ?? probe.Grading?.ShippedBy) switch
+    {
+        GradingProvenanceKind.Judge => AefAnnotatorKind.Llm,
+        GradingProvenanceKind.Heuristic => AefAnnotatorKind.Code,
+        _ => probe.JudgeGraphDigest is not null || probe.JudgeInstruments is not null ? null : AefAnnotatorKind.Code
+    };
+
+    private static IReadOnlyList<AefProbeJudgeInstrument>? Instruments(ProbeResult probe, bool captureContent) =>
+        (probe.JudgeInstruments ?? probe.Grading?.JudgeInstruments)?.Select(i => new AefProbeJudgeInstrument(
+            captureContent ? i.Prompt : i.Prompt with { Content = null }, i.RubricDigest,
+            Array.AsReadOnly(i.Calls.Select(c => new AefProbeJudgeCall(c.ModelId, c.Temperature, c.MaxOutputTokens, c.ResponseReceived)).ToArray()))).ToArray();
 
     private static AefNativeContent Content(ProbeResult probe, bool judgeGraded = false) => new()
     {

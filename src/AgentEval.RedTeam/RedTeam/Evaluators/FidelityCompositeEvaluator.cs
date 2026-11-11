@@ -14,6 +14,8 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
 {
     private readonly IProbeEvaluator _behavioral;
     private readonly IProbeEvaluator _verbalFallback;
+    internal IProbeEvaluator Behavioral => _behavioral;
+    internal IProbeEvaluator Verbal => _verbalFallback;
 
     /// <summary>Creates a composite that prefers the behavioral verdict and falls back to verbal analysis.</summary>
     public FidelityCompositeEvaluator(IProbeEvaluator behavioral, IProbeEvaluator verbalFallback)

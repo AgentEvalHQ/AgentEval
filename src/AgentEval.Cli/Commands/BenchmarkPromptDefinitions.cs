@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Prompts;
+using AgentEval.RedTeam;
 using Microsoft.Extensions.AI;
 using Gdpr = AgentEval.Compliance.Gdpr.Articles;
 using Eu = AgentEval.Compliance.EuAiAct.Articles;
@@ -15,6 +16,16 @@ internal static class BenchmarkPromptDefinitions
     {
         BenchListCommand.AnchorAssemblies();
         using var client = new NoNetworkChatClient();
+        if (family == "redteam")
+        {
+            string[] supported = ["SupplyChain", "InsecureOutput", "InferenceAPIAbuse", "DataPoisoning", "Misinformation", "ExcessiveAgency"];
+            var names = preset is null || preset == "supported" ? supported
+                : supported.Where(n => string.Equals(n, preset, StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (names.Length == 0)
+                throw new NotSupportedException($"Expected: a supported red-team judge graph. Actual: preset '{preset}'. Suggestions: select supported or {string.Join(", ", supported)}. Because: unsupported detectors cannot silently keep English rules.");
+            return names.SelectMany(n => GraderFactory.CapturePromptDefinitions(Attack.ByName(n)!, new() { JudgeClient = client }))
+                .DistinctBy(d => d.EvaluatorKey).OrderBy(d => d.EvaluatorKey, StringComparer.Ordinal).ToArray();
+        }
         var judge = JudgeFactory.CreateFamily(client, family);
         if (family == "agentic")
             return BuiltInJudgePrompts.ForEval(BenchAgenticCommand.ResolvePreset(preset ?? "agentic-execution", judge, subjectId: "prompt-export"));
@@ -30,7 +41,7 @@ internal static class BenchmarkPromptDefinitions
     }
 
     // A descriptor must never create a provider client, depend on credentials or call a model.
-    private sealed class NoNetworkChatClient : IChatClient
+    internal sealed class NoNetworkChatClient : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("Prompt authoring never invokes a judge.");

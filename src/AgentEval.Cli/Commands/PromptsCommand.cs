@@ -45,9 +45,9 @@ internal static class PromptsCommand
     }
 
     private static Option<string?> FamilyOption() => new("--family")
-        { Description = "Benchmark family: agentic | gdpr | eu-ai-act. Omit for RAG and generic judges." };
+        { Description = "Judge family: agentic | gdpr | eu-ai-act | redteam. Omit for RAG and generic judges." };
     private static Option<string?> PresetOption() => new("--preset")
-        { Description = "Family preset, including supported domain-pack compositions. Requires --family." };
+        { Description = "Family preset; redteam uses an attack name or supported. Requires --family." };
 
     internal static IReadOnlyList<JudgePromptDefinition> SupportedDefinitions(string? family = null, string? preset = null)
     {

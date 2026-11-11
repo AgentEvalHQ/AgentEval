@@ -23,4 +23,17 @@ internal static class AefPromptProvenance
         result["agenteval.judgePrompt"] = JsonSerializer.SerializeToNode(includeContent ? prompt : prompt with { Content = null }, JsonOptions);
         return result;
     }
+
+    internal static JsonObject? AttachProbe(JsonObject? extensions, string? graphDigest,
+        IReadOnlyList<AefProbeJudgeInstrument>? instruments, bool includeContent)
+    {
+        if (graphDigest is null && instruments is null) return extensions;
+        var result = extensions?.DeepClone().AsObject() ?? new JsonObject();
+        result["agenteval.probeJudge"] = JsonSerializer.SerializeToNode(new
+        {
+            graphDigest,
+            instruments = instruments?.Select(i => includeContent ? i : i with { Prompt = i.Prompt with { Content = null } }).ToArray()
+        }, JsonOptions);
+        return result;
+    }
 }

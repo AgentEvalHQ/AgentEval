@@ -21,6 +21,7 @@ namespace AgentEval.RedTeam.Evaluators;
 public sealed class ToolInvocationEvaluator : IProbeEvaluator
 {
     private readonly IReadOnlyCollection<string> _forbiddenTools;
+    internal IReadOnlyCollection<string> ForbiddenTools => _forbiddenTools;
 
     /// <summary>Creates the evaluator with the set of tool names whose invocation indicates a compromise.</summary>
     public ToolInvocationEvaluator(IEnumerable<string> forbiddenTools)

@@ -122,7 +122,8 @@ An authored translation needs a separately reviewed calibration set. Include sho
 | Tool/system-policy/evaluator-note atomic framing | Fixed, fenced slots selected by the leaf; required slots cannot be omitted by a replacement |
 | Agentic/compliance atomic leaves | Library graph export/preflight/binding; CLI family/preset authoring, benchmark selection and supplied-dataset calibration with instrument identity |
 | Direct `LLMJudgeEvaluator` / `LikertJudgeEvaluator` | Library export, immutable constructor/per-call selection, strict JSON reader and invocation provenance |
-| Red-team scan-wide built-in graphs, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
+| Supported red-team graphs | Library graph export/binding, scan-wide preflight, CLI selection and native leaf/graph provenance; see the supported attack list below |
+| Other red-team routes, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
 The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Configured `llm_toxicity` always invokes its selected model judge, including English-pattern matches; unconfigured toxicity retains its legacy scan and fallback. This changes the configured instrument and requires rebaselining. Upstream `MicrosoftEvaluatorAdapter` rejects explicit `JudgePrompts` before evaluating, including both adapter contracts. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
 
@@ -150,7 +151,42 @@ Configured calls use fenced probe/response data and one localized corrective ret
 
 `EvaluationResult.JudgeInstruments` records each invoked judge's selected locale/prompt identity and actual request settings, including reasoning-model temperature adaptation and provider-reported model IDs. Unknown model IDs remain null. `RubricDigest` additionally covers the fixed reader and observed effective model/settings; it excludes case text. A generic composite retains the invoked leaf observations without inventing a whole-graph digest from a short-circuited path. Scan evidence suppression and `ReasonRedactingEvaluator` remove captured prompt content.
 
-This direct library path does not yet select packs for the built-in scan-wide decomposition, narrative `ExplainAsync`, the red-team CLI or native red-team AEF export. `ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped fifteen-entry Swedish pack covers the metric/generic catalogue; export a separate red-team pack. Runtime/prefilter and graph localization remain separate work. The new JSON transport and translated policies require independent calibration.
+`ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped fifteen-entry Swedish pack covers the metric/generic catalogue; export a separate red-team pack. The new JSON transport and translated policies require independent calibration.
+
+### Red-team graphs and scans
+
+The configured built-in graphs currently cover **SupplyChain, InsecureOutput, InferenceAPIAbuse, DataPoisoning, Misinformation and ExcessiveAgency**. Export the graph you will run; the existing InsecureOutput/InferenceAPIAbuse environment switches select different declared branches and therefore different graph identities.
+
+```bash
+agenteval prompts export ./security-judges --family redteam --preset SupplyChain
+# Translate the Markdown files and set each definition's locale to sv-SE.
+agenteval prompts validate ./security-judges/prompts.json --family redteam --preset SupplyChain
+agenteval redteam --endpoint http://localhost:1234/v1 --model target \
+  --judge http://localhost:1234/v1 --judge-model judge --attacks SupplyChain \
+  --judge-prompt-pack ./security-judges/prompts.json --judge-locale sv-SE
+```
+
+Use `--preset supported` to export the union of supported built-in graph definitions. Shared refusal leaves have one stable key. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
+
+```csharp
+var definitions = GraderFactory.CapturePromptDefinitions(attack, new ScanOptions { JudgeClient = judgeClient });
+// Export definitions, translate, then load a separate security pack.
+var result = await new RedTeamRunner().ScanAsync(agent, new ScanOptions
+{
+    AttackTypes = [attack], JudgeClient = judgeClient,
+    JudgePrompts = new() { Pack = translatedPack, Locale = "sv-SE" }
+});
+```
+
+For caller-composed supported graphs, use `RedTeamJudgePrompts.ForEvaluator(graph)` and `RedTeamJudgePrompts.Bind(graph, selection)`. Binding snapshots the topology, validates all leaves (including branches later skipped by short-circuiting), rejects cycles/depth/size violations and conflicting keys, and preserves outcome filters and conjunction policies. A single override cannot replace multiple differently keyed leaves; use a pack. Every selected scan attack is preflighted before any target call, even if fail-fast would later skip it.
+
+Ground-truth pairs and planted misinformation entities stay in whitelisted, fenced `context.oracleFacts` fields. They are never interpolated into the configured system message. Missing required facts abstain without inventing a judge call. The DataPoisoning trigger-marker branch remains deterministic. ExcessiveAgency retains observed forbidden-tool evidence and uses selected action judges for verbal assessment.
+
+`JudgeGraphDigest` identifies the complete declared graph, selected leaf definitions, reader/settings and policies, including unexecuted branches. It is **not** proof that every leaf ran or that providers used identical models. `JudgeInstruments` records actual completed-turn/node observations and request attempts separately. Native AEF retains both under `ext.agenteval.probeJudge`; content-off writing strips captured prompt text independently of in-process capture. The CLI includes the preflight graph digest in suite identity before execution.
+
+Configured multi-turn judging bypasses the default English lexical refusal lock: an inconclusive localized judgment cannot become resistance solely because English refusal words appeared. Existing success, turn and duration limits remain. Tree judges receive the actual attempted prompt. Folded linear/tree results retain the invoked leaf observations from completed evaluations; missing/aborted observations remain unknown.
+
+Unsupported graph nodes fail explicitly. Current unsupported scan routes include other built-in attack oracles, fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection and runtime gate localization are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
 
 ### Atomic rubrics and graphs
 

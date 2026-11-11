@@ -9,6 +9,14 @@ namespace AgentEval.RedTeam.Evaluators;
 /// <summary>Exportable descriptors for configured security verdict and graded-compliance judges.</summary>
 public static class RedTeamJudgePrompts
 {
+    /// <summary>Exports every supported declared leaf, including short-circuited branches, without provider calls.</summary>
+    /// <remarks>Unsupported wrappers and language-dependent detectors are rejected. Different rubrics require distinct stable keys.</remarks>
+    public static IReadOnlyList<JudgePromptDefinition> ForEvaluator(IProbeEvaluator evaluator) => ProbeJudgeGraph.Export(evaluator);
+
+    /// <summary>Validates and immutably binds every supported graph leaf before evaluation can start.</summary>
+    /// <remarks>The original graph is unchanged. Use a pack for a graph with multiple keys; a single override applies to one matching key.</remarks>
+    public static IProbeEvaluator Bind(IProbeEvaluator evaluator, JudgePromptOptions prompts) => ProbeJudgeGraph.Bind(evaluator, prompts);
+
     /// <summary>Preserves caller system/user instructions while declaring the configured verdict response contract.</summary>
     public static JudgePromptDefinition ForVerdict(LLMJudgeOptions? options = null) => Create(options ?? new(), false);
 

@@ -45,6 +45,12 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Resolve attacks to run
         var attacks = ResolveAttacks(options);
 
+        // Validate every selected graph before running any target, including attacks later skipped
+        // by fail-fast. Legacy scans retain their existing lazy grader resolution.
+        cancellationToken.ThrowIfCancellationRequested();
+        var preparedGraders = options.JudgePrompts is null ? null
+            : attacks.ToDictionary(a => a, a => GraderFactory.For(a, options));
+
         // Materialize each attack's probe list ONCE and reuse it for both the progress total and
         // execution — GetProbes builds a fresh List per call, so the previous count-then-execute
         // pattern ran every generator at least twice per scan (PERF-10).
@@ -73,7 +79,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
         var benignProbes = benignArm?.GetProbes(options.Intensity) ?? [];
         if (options.OnPlanPrepared is { } prepared)
         {
-            var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())).ToList();
+            var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())
+                { JudgeGraphDigest = ProbeJudgeGraph.CapturedDigest(preparedGraders?.GetValueOrDefault(a)) }).ToList();
             if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true));
             prepared(new ScanPlan(options, arms.AsReadOnly()));
         }
@@ -108,7 +115,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     completedProbes,
                     progressTotal,
                     sw,
-                    scanToken);
+                    scanToken,
+                    preparedGraders?.GetValueOrDefault(attack));
 
                 completedProbes += probesExecuted;
                 attackResults.Add(attackResult);
@@ -209,13 +217,14 @@ public sealed class RedTeamRunner : IRedTeamRunner
         int completedProbesBefore,
         int totalProbes,
         Stopwatch sw,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProbeEvaluator? preparedGrader = null)
     {
         // ADR-021 (B.1): resolve grading once at this seam. GraderFactory wraps the oracle in a
         // JudgeBackedEvaluator when a JudgeClient is configured (owning the former inline judge blocks
         // for the single-turn runner AND both orchestrators); with no judge it returns the bare oracle,
         // so a no-judge run is byte-identical. The wrapped evaluator flows to all three paths below.
-        var evaluator = GraderFactory.For(attack, options);
+        var evaluator = preparedGrader ?? GraderFactory.For(attack, options);
         // `probes` is materialized once by the caller (incl. MaxProbesPerAttack) — see PERF-10.
 
         // RA3-05 / T5-1: bounded-concurrency path only when the caller opts in; Parallelism <= 1 keeps the
@@ -593,6 +602,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Surface = probe.Surface,
                 Grading = grading,
                 GradedBy = evalResult.GradedBy,
+                JudgeGraphDigest = evalResult.JudgeGraphDigest,
                 RubricDigest = evalResult.RubricDigest,
                 JudgeInstruments = options.IncludeEvidence ? evalResult.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(evalResult.JudgeInstruments),
             };
@@ -677,6 +687,9 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private static ProbeResult BuildFoldedProbeResult(AttackProbe probe, MultiTurnResult mt, Severity attackSeverity, TimeSpan elapsed, ScanOptions options)
     {
         var transcript = string.Join("\n", mt.Transcript.Select(t => $"{t.Role}: {t.Content}"));
+        var instruments = ProbeJudgeProvenance.Observed(mt.PerTurnResults);
+        var deciding = mt.DecidingTurn is { } turn && turn > 0 && turn <= mt.PerTurnResults.Count
+            ? mt.PerTurnResults[turn - 1] : (EvaluationResult?)null;
         return new ProbeResult
         {
             ProbeId = probe.Id,
@@ -695,6 +708,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ConversationFidelity = mt.ConversationFidelity,
             AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
             Grading = mt.Grading,                 // ADR-021 §5: judge-primary grading provenance, carried across the fold
+            GradedBy = deciding?.GradedBy,
+            RubricDigest = deciding?.RubricDigest,
+            JudgeGraphDigest = ProbeJudgeProvenance.CommonGraphDigest(mt.PerTurnResults),
+            JudgeInstruments = options.IncludeEvidence ? instruments : ProbeJudgeProvenance.WithoutContent(instruments),
             TurnsUsed = mt.NodesExplored is null ? mt.TurnsUsed : null,
             DecidingTurn = mt.DecidingTurn,
             NodesExplored = mt.NodesExplored,
