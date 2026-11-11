@@ -31,6 +31,11 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     [InlineData("Crescendo")]
     [InlineData("PAIR")]
     [InlineData("TAP")]
+    [InlineData("Jailbreak")]
+    [InlineData("PIILeakage")]
+    [InlineData("EncodingEvasion")]
+    [InlineData("VectorEmbedding")]
+    [InlineData("ToolEscalation")]
     [InlineData("supported")]
     public async Task ExportInspect_RedTeamPreset_UsesActualGraphDefinitionsWithoutModelCalls(string preset)
     {
@@ -73,13 +78,13 @@ public sealed class RedTeamPromptCommandTests : IDisposable
 
     [Theory]
     [InlineData("missing-leaf")]
-    [InlineData("unsupported-attack")]
+    [InlineData("unsupported-explanation")]
     public async Task Execute_InvalidSelection_FailsBeforeTargetConstructionOrCalls(string problem)
     {
         var manifest = await PackAsync(problem == "missing-leaf" ? "Misinformation" : "SupplyChain", 0);
         var target = new Subject();
         using var judge = new FakeChatClient();
-        var options = Options(manifest, Path.Combine(_root, "runs"), problem == "unsupported-attack" ? "Jailbreak" : "SupplyChain");
+        var options = Options(manifest, Path.Combine(_root, "runs"), explain: problem == "unsupported-explanation");
         if (problem == "missing-leaf")
             await Assert.ThrowsAsync<ArgumentException>(() => RedTeamCommand.ExecuteAsync(options, default, target, judgeClientOverride: judge));
         else
@@ -109,6 +114,35 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Execute_DefaultRoster_UsesExportedUnionAndProducesIntactNativeEvidence()
+    {
+        var manifest = await PackAsync("supported", 0);
+        var target = new Subject();
+        using var judge = new FakeChatClient(Enumerable.Repeat(Success.Replace("SUCCEEDED", "INCONCLUSIVE"), 100).ToArray());
+        var runs = Path.Combine(_root, "default-roster");
+        var exit = await RedTeamCommand.ExecuteAsync(Options(manifest, runs, ""), default, target, judgeClientOverride: judge);
+        Assert.Equal(0, exit); // --fail-on never still writes all inconclusive results honestly.
+        Assert.True(target.Calls > 0);
+        Assert.True(judge.CallCount > 0);
+        var runFile = Assert.Single(Directory.GetFiles(runs, "run.json", SearchOption.AllDirectories));
+        var directory = Path.GetDirectoryName(runFile)!;
+        var verified = AefRunVerifier.Verify(directory);
+        Assert.True(verified.Outcome == AefOutcome.Intact, System.Text.Json.JsonSerializer.Serialize(verified.Problems));
+        Assert.Equal(AgentEval.RedTeam.Attack.All.Count, File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Length);
+        Assert.All(judge.ReceivedMessages, m => Assert.StartsWith("PRIVATE-SWEDISH-GRAPH", m.First().Text));
+    }
+
+    [Fact]
+    public async Task Export_CodeOnlySystemPromptOracle_ExplainsWhyNoTranslationExists()
+    {
+        using var error = new StringWriter();
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, await PromptsCommand.ExportAsync(Path.Combine(_root, "code-only"), null, TextWriter.Null, error,
+            family: "redteam", preset: "SystemPromptExtraction"));
+        Assert.Contains("code-only", error.ToString());
+        Assert.Contains("no model instructions", error.ToString());
+    }
+
+    [Fact]
     public void Parse_JudgeSelectionFlags_AreAvailableOnRedTeam()
     {
         var parse = RedTeamCommand.Create().Parse(["--endpoint", "http://127.0.0.1:1/v1", "--model", "fixture",
@@ -125,10 +159,11 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         return Path.Combine(path, "prompts.json");
     }
 
-    private static RedTeamOptions Options(string manifest, string runs, string attack = "SupplyChain") => new()
+    private static RedTeamOptions Options(string manifest, string runs, string attack = "SupplyChain", bool explain = false) => new()
     {
         Endpoint = "http://127.0.0.1:1/v1", Model = "fixture", JudgeEndpoint = "http://127.0.0.1:1/v1", JudgeModel = "fixture-judge",
         Attacks = attack, MaxProbes = 1, Intensity = "quick", Format = "json", Quiet = true, FailOn = "never",
+        Explain = explain,
         Aef = new(runs), PromptSelection = new(new(manifest), "sv-SE")
     };
 

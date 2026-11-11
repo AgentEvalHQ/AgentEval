@@ -179,6 +179,7 @@ public sealed class ToolEscalationAttack : IAttackType, IToolAwareAttack, IMulti
 public sealed class ToolEscalationEvaluator : IProbeEvaluator
 {
     private readonly string[] _forbiddenTools;
+    internal IReadOnlyList<string> ForbiddenTools => _forbiddenTools;
 
     /// <summary>Creates the evaluator for the given set of forbidden canary tool names.</summary>
     public ToolEscalationEvaluator(string[] forbiddenTools)

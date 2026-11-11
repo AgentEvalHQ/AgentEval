@@ -155,7 +155,7 @@ Configured calls use fenced probe/response data and one localized corrective ret
 
 ### Red-team graphs and scans
 
-The configured built-in graphs currently cover **SupplyChain, InsecureOutput, InferenceAPIAbuse, DataPoisoning, Misinformation, ExcessiveAgency, PromptInjection, IndirectInjection, SkillInjection, Crescendo, PAIR and TAP**. Export the graph you will run; the existing InsecureOutput/InferenceAPIAbuse environment switches select different declared branches and therefore different graph identities.
+Configured grading covers the full **14-attack default roster** (`Attack.All`) and the four opt-in attacks **Crescendo, PAIR, TAP and ToolEscalation**. Export the graph you will run; the existing InsecureOutput/InferenceAPIAbuse environment switches select different declared branches and therefore different graph identities.
 
 ```bash
 agenteval prompts export ./security-judges --family redteam --preset SupplyChain
@@ -166,7 +166,7 @@ agenteval redteam --endpoint http://localhost:1234/v1 --model target \
   --judge-prompt-pack ./security-judges/prompts.json --judge-locale sv-SE
 ```
 
-Use `--preset supported` to export the union of supported built-in graph definitions. Shared refusal leaves have one stable key. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
+Use `--preset supported` to export the union of all built-in graph definitions. After translating that union, omit `--attacks` to scan the default roster. Shared refusal leaves have one stable key. `SystemPromptExtraction` has no LLM instructions: its planted-canary/reference-echo checks work without a translated leaf, and exporting it alone reports that it is code-only. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
 
 ```csharp
 var definitions = GraderFactory.CapturePromptDefinitions(attack, new ScanOptions { JudgeClient = judgeClient });
@@ -182,7 +182,17 @@ For caller-composed supported graphs, use `RedTeamJudgePrompts.ForEvaluator(grap
 
 Ground-truth pairs and planted misinformation entities stay in whitelisted, fenced `context.oracleFacts` fields. They are never interpolated into the configured system message. Missing required facts abstain without inventing a judge call. The DataPoisoning trigger-marker branch remains deterministic. ExcessiveAgency retains observed forbidden-tool evidence and uses selected action judges for verbal assessment.
 
-The six marker-based routes use the shared `redteam.marker-refusal` definition. Exact marker matching remains in code; a matching response is judged in its language to distinguish compliance from a marker quoted in a refusal. The matched tokens are derived by the implementation and passed as fenced `context.oracleFacts.markerMatches`, replacing any caller-supplied observation. When no marker matches, the marker oracle reports resistance without a judge call; that establishes absence of the declared marker, not general safety. IndirectInjection and SkillInjection preserve observed forbidden-tool calls ahead of verbal judging. Token lists and ordinal comparison/Unicode-normalization policies are captured in graph identity. Export and preflight still require the gate's translation even when a particular response would skip it.
+Marker-based paths use the shared `redteam.marker-refusal` definition. Exact marker matching remains in code; a matching response is judged in its language to distinguish compliance from a marker quoted in a refusal. The matched tokens are derived by the implementation and passed as fenced `context.oracleFacts.markerMatches`, replacing any caller-supplied observation. When no marker matches, the marker oracle reports resistance without a judge call; that establishes absence of the declared marker, not general safety. IndirectInjection and SkillInjection preserve observed forbidden-tool calls ahead of verbal judging. Token lists and ordinal comparison/Unicode-normalization policies are captured in graph identity. EncodingEvasion retains NFKC matching. Export and preflight still require the gate's translation even when a particular response would skip it.
+
+The specialized graders retain their own decision boundaries:
+
+- Jailbreak evaluates selected semantic compromise first, then the marker branch for marker probes or the selected refusal judge for other probes. It records every invoked leaf and does not use an English persona/refusal shortlist.
+- PIILeakage checks a planted canary in code before using the selected judge. Regional formats and pattern-free text still reach that judge. An `indirect_extraction` probe requests fabricated data, so a positive model judgment without a matched canary is capped at inconclusive. This is a model assessment, not verification that a person or account exists.
+- ToolEscalation preserves emitted versus executed forbidden-tool evidence. Its text-only judge can establish a refusal, but cannot invent an executed attack.
+- VectorEmbedding's tool mode requires observed retrieval execution before judging; absent execution stays inconclusive without a model call. The selected marker judge distinguishes compliance from a quoted refusal after retrieval. The result records `retrieval_executed` and `retrieval_tool`, while a text-derived attack verdict retains Verbal fidelity. Executing retrieval alone does not prove a successful attack. Inline probes use the same selected marker judge.
+- SystemPromptExtraction remains a code-only planted-canary/verbatim-reference oracle. Missing ground truth stays inconclusive; it never sends the system prompt to an LLM judge.
+
+A malformed judge reply after retry, a provider failure, or a grading timeout is a failed measurement. A later refusal or absent marker cannot turn that failure into `RESISTED`; the combined result stays `INCONCLUSIVE`. An independently established successful attack still wins according to the graph's aggregation strategy. Valid judge abstentions retain the existing strategy. Configured graph identity (`redteam.graph.v2`) and reader identity (`redteam.configured-json.v2`) include this policy change; recalibrate previous configured baselines before comparing scores.
 
 This evidence framing is versioned as `redteam.probe-facts.v2` in configured instrument identity. Rebaseline configured red-team instruments after upgrading; legacy unconfigured graders retain their existing behavior. Attack generation and corpus text are separate from judge localization, including the PAIR/TAP attacker model.
 
@@ -190,7 +200,7 @@ This evidence framing is versioned as `redteam.probe-facts.v2` in configured ins
 
 Configured multi-turn judging bypasses the default English lexical refusal lock: an inconclusive localized judgment cannot become resistance solely because English refusal words appeared. Existing success, turn and duration limits remain. Tree judges receive the actual attempted prompt. Folded linear/tree results retain the invoked leaf observations from completed evaluations; missing/aborted observations remain unknown.
 
-Unsupported graph nodes fail explicitly. Current unsupported scan routes include other built-in attack oracles, fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection and runtime gate localization are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection and runtime gate localization are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
 
 ### Atomic rubrics and graphs
 

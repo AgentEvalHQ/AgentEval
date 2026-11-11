@@ -110,7 +110,7 @@ public class CompositeEvaluator : IProbeEvaluator
             }
         }
 
-        return ProbeJudgeProvenance.Retain(Aggregate(results, allMatched), results);
+        return ProbeResultAggregation.Retain(Aggregate(results, allMatched), results);
     }
 
     private EvaluationResult Aggregate(List<EvaluationResult> results, List<string> allMatched)

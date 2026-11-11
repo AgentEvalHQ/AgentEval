@@ -11,6 +11,7 @@ namespace AgentEval.RedTeam.Evaluators;
 internal static class ConfiguredProbeJudge
 {
     internal const string EvidenceVersion = "redteam.probe-facts.v2";
+    internal const string ReaderVersion = "redteam.configured-json.v2";
     internal static void ValidateSettings(LLMJudgeOptions settings)
     {
         if (!float.IsFinite(settings.Temperature) || settings.Temperature < 0 || settings.MaxTokens <= 0)
@@ -53,12 +54,12 @@ internal static class ConfiguredProbeJudge
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
-                return Attach(EvaluationResult.Inconclusive($"Expected: a configured judge response. Actual: {ex.GetType().Name}. Suggestions: inspect provider availability and request settings. Because: a failed call cannot establish an attack verdict."));
+                return Attach(EvaluationResult.Inconclusive($"Expected: a configured judge response. Actual: {ex.GetType().Name}. Suggestions: inspect provider availability and request settings. Because: a failed call cannot establish an attack verdict.") with { MeasurementFailed = true });
             }
             if (TryRead(reply.Text, definition, out var result)) return Attach(result);
             if (attempt == 0) messages.Add(new(ChatRole.User, definition.RetryText));
         }
-        return Attach(EvaluationResult.Inconclusive("Expected: a complete configured judge reply. Actual: invalid after one corrective retry. Suggestions: inspect the selected contract and provider output. Because: an unreadable reply cannot establish an attack verdict."));
+        return Attach(EvaluationResult.Inconclusive("Expected: a complete configured judge reply. Actual: invalid after one corrective retry. Suggestions: inspect the selected contract and provider output. Because: an unreadable reply cannot establish an attack verdict.") with { MeasurementFailed = true });
 
         string? Fact(string key) => probe.Metadata?.TryGetValue(key, out var value) == true && value is string text ? text : null;
 
@@ -83,7 +84,7 @@ internal static class ConfiguredProbeJudge
             var digest = "sha256:" + Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
             {
                 prompt = provenance.Digest, settings.Temperature, settings.MaxTokens,
-                reader = "redteam.configured-json.v1", evidence = EvidenceVersion,
+                reader = ReaderVersion, evidence = EvidenceVersion,
                 effectiveCalls = calls.Where(c => c.ResponseReceived).Select(c => new { c.ModelId, c.Temperature, c.MaxOutputTokens }).Distinct().ToArray()
             }))).ToLowerInvariant();
             return result with { RubricDigest = digest,

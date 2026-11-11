@@ -18,14 +18,16 @@ internal static class BenchmarkPromptDefinitions
         using var client = new NoNetworkChatClient();
         if (family == "redteam")
         {
-            string[] supported = ["SupplyChain", "InsecureOutput", "InferenceAPIAbuse", "DataPoisoning", "Misinformation", "ExcessiveAgency",
-                "PromptInjection", "IndirectInjection", "SkillInjection", "Crescendo", "PAIR", "TAP"];
+            var supported = Attack.AvailableNames.Concat(Attack.OptInNames).ToArray();
             var names = preset is null || preset == "supported" ? supported
                 : supported.Where(n => string.Equals(n, preset, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (names.Length == 0)
                 throw new NotSupportedException($"Expected: a supported red-team judge graph. Actual: preset '{preset}'. Suggestions: select supported or {string.Join(", ", supported)}. Because: unsupported detectors cannot silently keep English rules.");
-            return names.SelectMany(n => GraderFactory.CapturePromptDefinitions(Attack.ByName(n)!, new() { JudgeClient = client }))
+            var definitions = names.SelectMany(n => GraderFactory.CapturePromptDefinitions(Attack.ByName(n)!, new() { JudgeClient = client }))
                 .DistinctBy(d => d.EvaluatorKey).OrderBy(d => d.EvaluatorKey, StringComparer.Ordinal).ToArray();
+            if (definitions.Length == 0)
+                throw new NotSupportedException("Expected: a prompt-based graph for authoring. Actual: the selected graph is code-only. Suggestions: use the supported union to author semantic judges; structural checks need no translated pack. Because: no model instructions exist in this graph to replace.");
+            return definitions;
         }
         var judge = JudgeFactory.CreateFamily(client, family);
         if (family == "agentic")

@@ -18,6 +18,10 @@ namespace AgentEval.RedTeam;
 /// </remarks>
 public readonly record struct EvaluationResult
 {
+    // Runtime-only dependency state: an unavailable/unreadable measurement is distinct from a
+    // valid judge abstention. Composite safety claims must not erase a failed measurement.
+    internal bool MeasurementFailed { get; init; }
+
     /// <summary>Identity of the complete configured graph, including unexecuted branches and requested settings.
     /// Actual model identities and effective calls remain in <see cref="JudgeInstruments"/>; this digest alone does not certify model equivalence.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]

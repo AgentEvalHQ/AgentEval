@@ -50,7 +50,7 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
                                // case) — otherwise the verbal compromise check below would be wrongly suppressed.
 
         var verbal = await _verbalFallback.EvaluateAsync(probe, response.Text, cancellationToken).ConfigureAwait(false);
-        return WithFidelity(verbal, EvidenceFidelity.Verbal);
+        return WithFidelity(ProbeResultAggregation.Retain(verbal, [behavioral, verbal]), EvidenceFidelity.Verbal);
     }
 
     private static EvaluationResult WithFidelity(EvaluationResult source, EvidenceFidelity fidelity)

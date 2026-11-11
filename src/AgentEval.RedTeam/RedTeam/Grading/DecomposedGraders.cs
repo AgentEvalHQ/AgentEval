@@ -913,12 +913,12 @@ public sealed class ConjunctionGate : IProbeEvaluator
             var r = await runOne(check).ConfigureAwait(false);
             observed.Add(r);
             if (r.Outcome != EvaluationOutcome.Succeeded)               // a leaf did not fire → the gate is open → defer
-                return ProbeJudgeProvenance.Retain(EvaluationResult.Inconclusive($"gate '{_label}' open at {check.Name} ({r.Outcome})"), observed);
+                return ProbeResultAggregation.Retain(EvaluationResult.Inconclusive($"gate '{_label}' open at {check.Name} ({r.Outcome})"), observed);
             reasons.Add(r.Reason ?? check.Name);
             confidence = Math.Min(confidence, r.Confidence);
         }
         var reason = $"gate '{_label}' closed: {string.Join(" ∧ ", reasons)}";
-        return ProbeJudgeProvenance.Retain(_result == EvaluationOutcome.Succeeded
+        return ProbeResultAggregation.Retain(_result == EvaluationOutcome.Succeeded
             ? EvaluationResult.Succeeded(reason, confidence: confidence)
             : EvaluationResult.Resisted(reason, confidence: confidence), observed);
     }
@@ -988,7 +988,8 @@ public sealed class TimeoutEvaluator(IProbeEvaluator inner, TimeSpan timeout) : 
         catch (OperationCanceledException) when (cts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
             // Our timeout fired (not the caller's cancellation) → abstain rather than fabricate a verdict.
-            return EvaluationResult.Inconclusive($"judge grading exceeded the --judge-timeout ({timeout.TotalSeconds:0.#}s)");
+            return EvaluationResult.Inconclusive($"judge grading exceeded the --judge-timeout ({timeout.TotalSeconds:0.#}s)")
+                with { MeasurementFailed = true };
         }
     }
 }

@@ -85,6 +85,13 @@ public static class MultilingualPromptPacks
             throw new InvalidOperationException("The scripted red-team graph binding failed.");
         Console.WriteLine($"Security graph: {graphResult.JudgeGraphDigest}; observed leaves={graphResult.JudgeInstruments?.Count}");
 
+        // Discover the actual default roster without credentials or model calls. Code-only oracles add no prompts.
+        using var descriptorClient = new FakeChatClient();
+        var rosterDefinitions = Attack.All.SelectMany(attack => GraderFactory.CapturePromptDefinitions(attack,
+            new ScanOptions { JudgeClient = descriptorClient })).DistinctBy(d => d.EvaluatorKey).ToArray();
+        if (descriptorClient.CallCount != 0) throw new InvalidOperationException("Prompt authoring invoked a model.");
+        Console.WriteLine($"Default security roster: {Attack.All.Count} attacks, {rosterDefinitions.Length} distinct prompt definitions; no model calls during export.");
+
         Console.WriteLine("Edit the Markdown messages or metadata, reload the pack, and rerun. The digest changes with the actual instrument.");
         Console.WriteLine("Before relying on quality scores, have Swedish reviewers label representative cases and calibrate the real judge separately.");
     }

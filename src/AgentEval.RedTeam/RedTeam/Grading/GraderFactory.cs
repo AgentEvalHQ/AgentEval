@@ -85,6 +85,7 @@ public static class GraderFactory
             ? DecomposedGraders.TryBuildToolAwareFor(attack.Name, structural, options.JudgeClient)
             : DecomposedGraders.TryBuildFor(attack.Name, options.JudgeClient);
         graph ??= inner; // Caller-composed graphs are accepted only if every node is explicitly supported by the binder.
+        graph = ConfiguredSpecializedGraders.Adapt(graph, options.JudgeClient);
         graph = ConfiguredMarkerEvaluator.Adapt(graph, options.JudgeClient);
         if (!options.IncludeEvidence) graph = new ReasonRedactingEvaluator(graph);
         return options.JudgeTimeout is { } timeout ? new TimeoutEvaluator(graph, timeout) : graph;

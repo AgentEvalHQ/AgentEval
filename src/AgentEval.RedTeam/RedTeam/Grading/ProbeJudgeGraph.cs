@@ -97,6 +97,27 @@ internal static class ProbeJudgeGraph
                         return (new ConfiguredMarkerEvaluator(matcher.Evaluator, judge.Evaluator),
                             new("marker-refusal.v1", null, [matcher.Identity, judge.Identity]));
                     }
+                    case ConfiguredJailbreakEvaluator jailbreak:
+                    {
+                        var positive = Walk(jailbreak.Compromise, depth + 1, requested);
+                        var marker = Walk(jailbreak.Marker, depth + 1, requested);
+                        var refusal = Walk(jailbreak.Refusal, depth + 1, requested);
+                        return (new ConfiguredJailbreakEvaluator(positive.Evaluator, marker.Evaluator, refusal.Evaluator),
+                            new("jailbreak-semantic-marker-dispatch.v1", null, [positive.Identity, marker.Identity, refusal.Identity]));
+                    }
+                    case ConfiguredPiiEvaluator pii:
+                    {
+                        var child = Walk(pii.Judge, depth + 1, requested);
+                        return (new ConfiguredPiiEvaluator(child.Evaluator), new("pii-canary-first-fabrication-guard.v1", null, [child.Identity]));
+                    }
+                    case SystemPromptEvaluator systemPrompt:
+                        return (systemPrompt, new("system-prompt-canary-or-verbatim-echo.v1", null, []));
+                    case VectorEmbeddingEvaluator vector when vector.IsConfigured:
+                    {
+                        var child = Walk(vector.Inlined, depth + 1, requested);
+                        return (new VectorEmbeddingEvaluator(vector.Marker, vector.RetrieveTool, child.Evaluator),
+                            new("retrieval-boundary-marker.v1", JsonSerializer.Serialize(new { vector.Marker, vector.RetrieveTool }), [child.Identity]));
+                    }
                     case DataPoisoningDecomposedEvaluator poison:
                     {
                         var child = Walk(poison.FalseFactJudge, depth + 1, requested);
@@ -151,7 +172,7 @@ internal static class ProbeJudgeGraph
                         throw Invalid("conflicting definitions for one evaluator key and locale", "assign stable distinct PromptKey values to different rubrics");
                     definitions[key] = (resolved.Definition, resolved.Provenance.Digest);
                     var policy = JsonSerializer.Serialize(new { prompt = resolved.Provenance.Digest, settings.Temperature, settings.MaxTokens,
-                        reader = "redteam.configured-json.v1", evidence = ConfiguredProbeJudge.EvidenceVersion });
+                        reader = ConfiguredProbeJudge.ReaderVersion, evidence = ConfiguredProbeJudge.EvidenceVersion });
                     return (new BoundLeaf(name, definition, settings, options, evaluate), new("judge", policy, []));
                 }
             }
@@ -160,7 +181,7 @@ internal static class ProbeJudgeGraph
     }
 
     private static string Digest(Node identity) => "sha256:" + Convert.ToHexString(SHA256.HashData(
-        JsonSerializer.SerializeToUtf8Bytes(new { graphVersion = "redteam.graph.v1", root = identity }))).ToLowerInvariant();
+        JsonSerializer.SerializeToUtf8Bytes(new { graphVersion = "redteam.graph.v2", root = identity }))).ToLowerInvariant();
 
     private static ArgumentException Invalid(string actual, string suggestion) => new(
         $"Expected: a bounded unambiguous probe-judge graph. Actual: {actual}. Suggestions: {suggestion}. Because: every declared leaf must be validated before execution.");
@@ -203,10 +224,20 @@ internal static class ProbeJudgeGraph
         internal string Digest => digest;
         internal IReadOnlyList<JudgePromptDefinition> Definitions => definitions;
         public string Name => inner.Name;
-        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default) =>
-            Attach(await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
-        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default) =>
-            Attach(await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
+        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, string response, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Attach(result);
+        }
+        public async Task<EvaluationResult> EvaluateAsync(AttackProbe probe, AgentResponse response, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Attach(result);
+        }
 
         private EvaluationResult Attach(EvaluationResult result)
         {
