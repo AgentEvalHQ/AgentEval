@@ -130,7 +130,8 @@ public sealed class PdfProviderTests
         var provider = new CaptureProvider();
         using var host = new ServiceCollection().AddSingleton(provider).AddAgentEvalPdfProvider<CaptureProvider>("custom").BuildServiceProvider();
         var result = Result();
-        var options = new EvalResultRenderOptions(new(SubjectKind.Agent, "Åsa"), IncludeProvenance: false);
+        // Keep the numeric privacy sentinels out of the unrelated generated timestamp.
+        var options = new EvalResultRenderOptions(new(SubjectKind.Agent, "Åsa"), GeneratedAt: Generated, IncludeProvenance: false);
         var bytes = await host.GetRequiredService<IPdfRendererRegistry>().ForEvalResults().RenderAsync(result, options);
         Assert.Equal("custom-pdf", Encoding.UTF8.GetString(bytes));
         var serialized = JsonSerializer.Serialize(provider.Last);
@@ -140,6 +141,42 @@ public sealed class PdfProviderTests
         Assert.DoesNotContain("999", serialized);
         Assert.DoesNotContain("0.234", serialized);
         Assert.Equal(0, result.Score.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Adapter_ProvenanceSelection_PreservesPublicFactsContainingTheSameNumbers(bool includeProvenance)
+    {
+        var provider = new CaptureProvider();
+        using var host = new ServiceCollection().AddSingleton(provider).AddAgentEvalPdfProvider<CaptureProvider>("custom").BuildServiceProvider();
+        var result = Result();
+        result = result with { Details = result.Details with { Evidence = [new("test", "ref", "Public evidence: 999 items, value 0.234")] } };
+        var generatedAt = Generated.AddTicks(9999);
+        await host.GetRequiredService<IPdfRendererRegistry>().ForEvalResults().RenderAsync(result,
+            new(new(SubjectKind.Agent, "Åsa"), GeneratedAt: generatedAt, IncludeProvenance: includeProvenance));
+
+        var document = Assert.IsType<ReportDocument>(provider.Last);
+        Assert.Equal(generatedAt, document.GeneratedAt);
+        Assert.Contains("999", JsonSerializer.Serialize(document.GeneratedAt)); // Reproduces the hosted CI sentinel collision.
+        var serialized = JsonSerializer.Serialize(document);
+        Assert.Contains("Public evidence: 999 items, value 0.234", serialized);
+        var paragraphs = document.Sections.SelectMany(section => section.Paragraphs).ToArray();
+        if (includeProvenance)
+        {
+            Assert.Contains("PRIVATE-JUDGE", serialized);
+            Assert.Contains("PRIVATE-PROMPT", serialized);
+            Assert.Contains("Tokens: 999", paragraphs);
+            Assert.Contains($"Est. cost (USD): {0.234:F4}", paragraphs);
+        }
+        else
+        {
+            Assert.DoesNotContain("PRIVATE-JUDGE", serialized);
+            Assert.DoesNotContain("PRIVATE-PROMPT", serialized);
+            Assert.DoesNotContain("Provenance", paragraphs);
+            Assert.DoesNotContain(paragraphs, paragraph => paragraph.StartsWith("Tokens:", StringComparison.Ordinal));
+            Assert.DoesNotContain(paragraphs, paragraph => paragraph.StartsWith("Est. cost (USD):", StringComparison.Ordinal));
+        }
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 using System.Security.Cryptography;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Cli.Pdf;
@@ -49,28 +50,48 @@ public sealed class PdfCompanionTests : IDisposable
     }
 
     [Theory]
-    [InlineData("gdpr", "GDPR")]
-    [InlineData("eu-ai-act", "EU-AI-Act")]
-    public async Task Render_RecordedComplianceReports_PreservesFactsAndWithholdsUnknownSensitivity(string family, string regulation)
+    [InlineData("gdpr", "GDPR", 0, "30 %")]
+    [InlineData("gdpr", "GDPR", 1, "30%")]
+    [InlineData("gdpr", "GDPR", 2, "%30")]
+    [InlineData("gdpr", "GDPR", 3, "% 30")]
+    [InlineData("eu-ai-act", "EU-AI-Act", 0, "30 %")]
+    [InlineData("eu-ai-act", "EU-AI-Act", 1, "30%")]
+    [InlineData("eu-ai-act", "EU-AI-Act", 2, "%30")]
+    [InlineData("eu-ai-act", "EU-AI-Act", 3, "% 30")]
+    public async Task Render_RecordedComplianceReports_PreservesFactsAndWithholdsUnknownSensitivity(
+        string family, string regulation, int percentPattern, string expectedPercentage)
     {
-        var (result, report) = CreateComplianceReport(family, regulation);
-        var source = AefCompositeRunWriter.Write(Path.Combine(directory.FullName, family), result, AefCompositeRunWriter.Undescribed, new()
+        // Linux's invariant default and local user cultures need not share percent spacing or placement.
+        // Exercise every positive-percent layout explicitly, without relying on a host's ICU/NLS defaults.
+        var previousCulture = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.PercentPositivePattern = percentPattern;
+        CultureInfo.CurrentCulture = culture;
+        try
         {
-            SubjectRef = "agent:swedish", TargetMode = AefTargetMode.Mocked, Lane = family, SuiteRef = $"bench:{family}/smoke",
-            ContentCapture = AefContentCapture.On,
-            ComplianceArtifacts = [new() { Bytes = JsonSerializer.SerializeToUtf8Bytes(report, report.GetType(), JsonOptions), CaseIds = ["article"] }]
-        }, Generated, Generated.AddSeconds(1)).Directory;
-        var before = Hashes(source);
-        var output = Path.Combine(directory.FullName, family + ".pdf");
-        Assert.Equal(0, await PdfCommand.RunAsync(["render", "--run", source, "--output", output]));
-        using var pdf = UglyToad.PdfPig.PdfDocument.Open(output);
-        var text = string.Join("\n", pdf.GetPages().Select(p => ContentOrderTextExtractor.GetText(p)));
-        foreach (var marker in new[] { "RECOMMENDATION-MARKER", "DISCLAIMER-MARKER", "PROMPT-VERSION", "MODEL-VERSION", "scenario", "30%", "FAIL", "metadata unavailable" })
-            Assert.Contains(marker, text);
-        Assert.DoesNotContain("PRIVATE-SCENARIO-MARKER", text);
-        Assert.DoesNotContain("PRIVATE-REFERENCE", text);
-        Assert.Equal(before, Hashes(source));
-        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(source).Outcome);
+            var (result, report) = CreateComplianceReport(family, regulation);
+            var source = AefCompositeRunWriter.Write(Path.Combine(directory.FullName, family), result, AefCompositeRunWriter.Undescribed, new()
+            {
+                SubjectRef = "agent:swedish", TargetMode = AefTargetMode.Mocked, Lane = family, SuiteRef = $"bench:{family}/smoke",
+                ContentCapture = AefContentCapture.On,
+                ComplianceArtifacts = [new() { Bytes = JsonSerializer.SerializeToUtf8Bytes(report, report.GetType(), JsonOptions), CaseIds = ["article"] }]
+            }, Generated, Generated.AddSeconds(1)).Directory;
+            var before = Hashes(source);
+            var output = Path.Combine(directory.FullName, family + ".pdf");
+            Assert.Equal(0, await PdfCommand.RunAsync(["render", "--run", source, "--output", output]));
+            using var pdf = UglyToad.PdfPig.PdfDocument.Open(output);
+            var text = string.Join("\n", pdf.GetPages().Select(p => ContentOrderTextExtractor.GetText(p)));
+            foreach (var marker in new[] { "RECOMMENDATION-MARKER", "DISCLAIMER-MARKER", "PROMPT-VERSION", "MODEL-VERSION", "scenario", expectedPercentage, "FAIL", "metadata unavailable" })
+                Assert.Contains(marker, text);
+            Assert.DoesNotContain("PRIVATE-SCENARIO-MARKER", text);
+            Assert.DoesNotContain("PRIVATE-REFERENCE", text);
+            Assert.Equal(before, Hashes(source));
+            Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(source).Outcome);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
     }
 
     [Theory]

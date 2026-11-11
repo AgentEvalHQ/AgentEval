@@ -4,7 +4,7 @@ This authored `sv-SE` pack covers five RAG metrics, rubric-bound relevance, and 
 
 The generic `judge.criteria` entry starts with an empty criterion roster. Add the exact stable IDs/text required by your fixed dataset before using it to judge criteria. For arbitrary per-case rosters, use library per-evaluation definitions instead.
 
-**Status: authored, not semantically calibrated.** The sample program uses scripted replies to verify transport and policy wiring. The draft cases below are proposed review material, not Andreas Adner's private dataset or evidence of real-model accuracy. Swedish reviewers should approve labels and expand coverage for the customer's domain before running repeatable calibration.
+**Status: AI-authored, not human-reviewed or semantically calibrated.** The sample program uses scripted replies to verify transport and policy wiring. The draft cases and expected labels below were authored by an AI assistant. No customer dataset or human-reviewed labels have been supplied. These cases are proposed review material, not Andreas Adner's private dataset or evidence of real-model accuracy. Swedish reviewers should approve labels and expand coverage for the customer's domain before running repeatable calibration.
 
 | Draft case | Question / context / answer | Expected review |
 |---|---|---|

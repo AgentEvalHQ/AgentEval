@@ -64,6 +64,42 @@ public sealed class CliGitProvenanceTests : IDisposable
         Assert.Null(snapshot.GitDirty);
     }
 
+    [Fact]
+    public async Task StopProcessAsync_RunningChild_WaitsForExitBeforeReturning()
+    {
+        var info = new ProcessStartInfo(OperatingSystem.IsWindows() ? "ping" : "sleep")
+        {
+            WorkingDirectory = _root, UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        foreach (var arg in OperatingSystem.IsWindows() ? new[] { "-n", "31", "127.0.0.1" } : new[] { "30" })
+            info.ArgumentList.Add(arg);
+        using var process = Process.Start(info)!;
+        try
+        {
+            Assert.False(process.HasExited);
+            await CliGitProvenance.StopProcessAsync(process);
+            Assert.True(process.HasExited);
+            // A second cleanup is harmless and does not attempt to kill an unrelated process.
+            await CliGitProvenance.StopProcessAsync(process);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task StopProcessAsync_UnstartedProcess_RemainsBestEffort()
+    {
+        using var process = new Process();
+        await CliGitProvenance.StopProcessAsync(process);
+    }
+
     private async Task Git(params string[] args)
     {
         var info = new ProcessStartInfo("git") { WorkingDirectory = _root, UseShellExecute = false,

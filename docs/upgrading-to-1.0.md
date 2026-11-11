@@ -20,6 +20,7 @@ These changes describe the development branch after rc.2. They are not included 
 | Groundedness and scoring | Existing constructors retain legacy semantics. Support-focused Groundedness and criteria-fraction scoring are explicit options with distinct policy identities. | Choose [Groundedness options](groundedness-policies.md) and [score selection](judge-score-policies.md) deliberately. Use `MeasuredScore` for exact fractions and rebaseline comparisons when changing policy. |
 | Judge localization | Supported built-in RAG and text-only judges accept versioned prompt packs and per-evaluation overrides. | Follow [prompt-pack authoring](judge-prompt-packs.md). Validate coverage and contracts before running; unsupported families fail explicitly. Swedish semantic calibration remains separate from the authored example. |
 | Cost estimates | Returned model identity and reported cached input participate in pricing; absent cache information remains explicitly undiscounted. | Read `CostEstimate` status/provenance, use a per-run `PricingResolver` for deployment aliases or customer rates, and do not treat an unknown cost as zero. See [cost estimation](cost-estimation.md). |
+| Microsoft Extensions AI | AI, the OpenAI adapter and evaluation packages use 11.0.0; .NET 8, 9 and 10 remain supported. | Align direct `Microsoft.Extensions.AI*` references to 11.0.0 and restore the dependency graph. Do not retain an older transitive pin that overrides the required contract assembly or target-specific dependency floors. |
 
 ## From 1.0.0-rc.1 to 1.0.0-rc.2
 
