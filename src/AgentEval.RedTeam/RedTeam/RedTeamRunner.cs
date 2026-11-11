@@ -594,6 +594,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Grading = grading,
                 GradedBy = evalResult.GradedBy,
                 RubricDigest = evalResult.RubricDigest,
+                JudgeInstruments = options.IncludeEvidence ? evalResult.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(evalResult.JudgeInstruments),
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

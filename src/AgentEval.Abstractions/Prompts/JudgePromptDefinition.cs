@@ -39,7 +39,11 @@ public enum JudgeResponseContract
     /// <summary>Harmful-content categories and severity.</summary>
     ToxicityV1,
     /// <summary>Task score with one identified verdict per completion criterion.</summary>
-    TaskCompletionV1
+    TaskCompletionV1,
+    /// <summary>Attack verdict, confidence and reason; PassAt is the minimum confidence for a conclusive verdict.</summary>
+    RedTeamVerdictV1,
+    /// <summary>Native 1–5 rating, confidence and rationale; thresholds apply to the normalized rating.</summary>
+    RedTeamLikertV1
 }
 
 /// <summary>Immutable text and reading policy for one judge instrument. No executable templates or file paths.</summary>
@@ -62,7 +66,7 @@ public sealed record JudgePromptDefinition
     public required string Locale { get; init; }
     /// <summary>The fixed machine-readable response shape.</summary>
     public required JudgeResponseContract ResponseContract { get; init; }
-    /// <summary>The numeric scale requested from the judge.</summary>
+    /// <summary>The numeric reading scale. Fixed native-rating contracts declare their normalized policy scale.</summary>
     public required RubricScoreScale Scale { get; init; }
     /// <summary>Pass boundary, normalized to [0, 1] regardless of response scale.</summary>
     public double PassAt { get; init; } = 0.70;
@@ -117,6 +121,16 @@ public sealed record JudgePromptDefinition
         Require(Enum.IsDefined(ResponseContract) && Enum.IsDefined(Scale), "unknown response contract or scale", "select a supported contract and scale");
         Require(ResponseContract != JudgeResponseContract.CriteriaV1 || Scale == RubricScoreScale.Percent,
             "criteria replies require the 0–100 scale", "use Percent for CriteriaV1");
+        if (ResponseContract is JudgeResponseContract.RedTeamVerdictV1 or JudgeResponseContract.RedTeamLikertV1)
+        {
+            Require(Scale == RubricScoreScale.Unit, "red-team contracts require unit confidence/normalized rating policy", "retain Unit and the fixed native response fields");
+            Require(SeverityBands.Count == 0 && Criteria.Count == 0 && Dimension is null,
+                "unsupported red-team severity/criterion/dimension policy", "retain the exported verdict contract");
+            Require(ResponseContract != JudgeResponseContract.RedTeamVerdictV1 || ReviewAt is null,
+                "a review threshold on an explicit verdict contract", "use PassAt as the minimum conclusive confidence");
+            Require(ResponseContract != JudgeResponseContract.RedTeamLikertV1 || ReviewAt is not null,
+                "missing Likert ambiguity boundary", "retain ReviewAt below the attack-success PassAt boundary");
+        }
         Require(double.IsFinite(PassAt) && PassAt is >= 0 and <= 1, "invalid pass threshold", "use a finite value in [0, 1]");
         Require(ReviewAt is null || (double.IsFinite(ReviewAt.Value) && ReviewAt >= 0 && ReviewAt < PassAt), "invalid review threshold", "place review below pass");
         Require(Status is "draft" or "authored" or "calibrated", "unknown translation status", "use draft, authored or calibrated");

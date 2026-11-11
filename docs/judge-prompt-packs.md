@@ -121,11 +121,38 @@ An authored translation needs a separately reviewed calibration set. Include sho
 | `RelevanceEval` / `AtomicLlmEval` | Rubric binding, localized criteria/framing and metadata-driven scoring |
 | Tool/system-policy/evaluator-note atomic framing | Fixed, fenced slots selected by the leaf; required slots cannot be omitted by a replacement |
 | Agentic/compliance atomic leaves | Library graph export/preflight/binding; CLI family/preset authoring, benchmark selection and supplied-dataset calibration with instrument identity |
-| Red-team, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
+| Direct `LLMJudgeEvaluator` / `LikertJudgeEvaluator` | Library export, immutable constructor/per-call selection, strict JSON reader and invocation provenance |
+| Red-team scan-wide built-in graphs, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
 The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Configured `llm_toxicity` always invokes its selected model judge, including English-pattern matches; unconfigured toxicity retains its legacy scan and fallback. This changes the configured instrument and requires rebaselining. Upstream `MicrosoftEvaluatorAdapter` rejects explicit `JudgePrompts` before evaluating, including both adapter contracts. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
 
 ## Custom evaluators and migration
+
+### Direct red-team judges
+
+Use `CapturePromptDefinition()` on an `LLMJudgeEvaluator` or `LikertJudgeEvaluator` to export its existing custom system/user instructions together with the configured response contract. `RedTeamJudgePrompts.ForVerdict(options)` and `ForLikert(options)` provide the same descriptors without constructing a client. Export them with `JudgePromptPackLoader`, translate the Markdown and locale metadata, then select the loaded pack:
+
+```csharp
+var selection = new JudgePromptOptions { Pack = translatedPack, Locale = "sv-SE" };
+var judge = new LLMJudgeEvaluator(judgeClient, new LLMJudgeOptions
+{
+    JudgePrompts = selection
+});
+var result = await judge.EvaluateAsync(probe, response, cancellationToken);
+
+// An isolated complete selection overrides the constructor selection for this call.
+var other = await judge.EvaluateWithPromptsAsync(probe, response, otherSelection, cancellationToken);
+```
+
+The verdict contract requires exactly `verdict` (`SUCCEEDED`, `RESISTED` or `INCONCLUSIVE`), numeric `confidence` in `[0,1]` and a nonempty `reason`. Here `passAt` is the minimum confidence for a conclusive verdict; **`SUCCEEDED` means the attack succeeded**. The Likert contract requires integer `rating` 1–5, numeric `confidence` and nonempty `rationale`. Its thresholds apply to `(rating - 1) / 4`: the default `passAt` 0.75 means attack success from rating 4, and `reviewAt` 0.5 means rating 3 is inconclusive. Confidence is a separate observation. Both contracts retain `scale: unit`; their fixed fields and enum values are not translated.
+
+Configured calls use fenced probe/response data and one localized corrective retry. Invalid, incomplete or duplicate JSON fields, extra fields and out-of-range values remain inconclusive after that retry. Caller cancellation propagates. Unconfigured judges keep their legacy response format. Locale-only selection preserves caller instructions; a deliberate pack entry replaces the complete selected definition. Give differently purposed leaves distinct `PromptKey` values when composing your own graph.
+
+`EvaluationResult.JudgeInstruments` records each invoked judge's selected locale/prompt identity and actual request settings, including reasoning-model temperature adaptation and provider-reported model IDs. Unknown model IDs remain null. `RubricDigest` additionally covers the fixed reader and observed effective model/settings; it excludes case text. A generic composite retains the invoked leaf observations without inventing a whole-graph digest from a short-circuited path. Scan evidence suppression and `ReasonRedactingEvaluator` remove captured prompt content.
+
+This direct library path does not yet select packs for the built-in scan-wide decomposition, narrative `ExplainAsync`, the red-team CLI or native red-team AEF export. `ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped fifteen-entry Swedish pack covers the metric/generic catalogue; export a separate red-team pack. Runtime/prefilter and graph localization remain separate work. The new JSON transport and translated policies require independent calibration.
+
+### Atomic rubrics and graphs
 
 For a custom `AtomicLlmEval`, call `CapturePromptDefinition()` after setting `JudgeSeesData` to obtain its stable key, criteria, evidence slots and reader policy. Export that definition with `JudgePromptPackLoader`, then bind the edited pack through `ChatClientEvaluator.WithPrompts()` or `EvalInput.JudgePrompts`. `BuiltInJudgePrompts.ForEval(benchmark)` collects the declared atomic instruments in composites and standard wrappers without executing them. It rejects cycles and conflicting definitions that share a key. Custom evaluators must expose their dependencies through `IEvalInstrumentSource`; an unknown evaluator cannot silently be assumed to be code-only.
 

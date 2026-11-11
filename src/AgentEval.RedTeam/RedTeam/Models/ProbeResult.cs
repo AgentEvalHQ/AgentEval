@@ -10,6 +10,10 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record ProbeResult
 {
+    /// <summary>Configured leaf judges actually invoked. Captured text is omitted when scan evidence is disabled.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>Observed source of the verdict when explicitly reported; null means unknown.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public GradingProvenanceKind? GradedBy { get; init; }

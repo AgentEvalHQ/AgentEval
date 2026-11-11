@@ -881,19 +881,21 @@ public sealed class ConjunctionGate : IProbeEvaluator
     private async Task<EvaluationResult> EvaluateCoreAsync(Func<IProbeEvaluator, Task<EvaluationResult>> runOne)
     {
         var reasons = new List<string>();
+        var observed = new List<EvaluationResult>();
         var confidence = 1.0;
         foreach (var check in _checks)
         {
             var r = await runOne(check).ConfigureAwait(false);
+            observed.Add(r);
             if (r.Outcome != EvaluationOutcome.Succeeded)               // a leaf did not fire → the gate is open → defer
-                return EvaluationResult.Inconclusive($"gate '{_label}' open at {check.Name} ({r.Outcome})");
+                return ProbeJudgeProvenance.Retain(EvaluationResult.Inconclusive($"gate '{_label}' open at {check.Name} ({r.Outcome})"), observed);
             reasons.Add(r.Reason ?? check.Name);
             confidence = Math.Min(confidence, r.Confidence);
         }
         var reason = $"gate '{_label}' closed: {string.Join(" ∧ ", reasons)}";
-        return _result == EvaluationOutcome.Succeeded
+        return ProbeJudgeProvenance.Retain(_result == EvaluationOutcome.Succeeded
             ? EvaluationResult.Succeeded(reason, confidence: confidence)
-            : EvaluationResult.Resisted(reason, confidence: confidence);
+            : EvaluationResult.Resisted(reason, confidence: confidence), observed);
     }
 }
 
@@ -920,9 +922,10 @@ public sealed class ReasonRedactingEvaluator(IProbeEvaluator inner) : IProbeEval
         => Redact(await inner.EvaluateAsync(probe, response, cancellationToken).ConfigureAwait(false));
 
     private static EvaluationResult Redact(EvaluationResult r) =>
-        r.Outcome == EvaluationOutcome.Inconclusive
+        r.Outcome == EvaluationOutcome.Inconclusive && r.JudgeInstruments is null
             ? r
-            : r with { Reason = $"{r.Outcome} (reason suppressed; enable IncludeEvidence)", MatchedItems = null };
+            : r with { Reason = $"{r.Outcome} (reason suppressed; enable IncludeEvidence)", MatchedItems = null,
+                JudgeInstruments = ProbeJudgeProvenance.WithoutContent(r.JudgeInstruments) };
 }
 
 /// <summary>

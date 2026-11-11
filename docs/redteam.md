@@ -14,7 +14,9 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 
 ## Capabilities at a glance
 
-**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`AttackPipeline`](#pipeline-api) and from the CLI ([`agenteval redteam`](#agenteval-redteam--cli-reference), or `agenteval bench owasp\|mitre\|nist` for those reporters) — except the SOC 2 and ISO 27001 reporters, which are library-only for now.
+**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** The scan capabilities below are reachable from the [`AttackPipeline`](#pipeline-api) and the CLI ([`agenteval redteam`](#agenteval-redteam--cli-reference), or `agenteval bench owasp\|mitre\|nist` for those reporters). SOC 2 and ISO 27001 reporters remain library-only.
+
+Direct `LLMJudgeEvaluator` and `LikertJudgeEvaluator` instances also support [versioned judge prompt packs](judge-prompt-packs.md#direct-red-team-judges) through the library, including localized retry text and strict response validation. This does not yet configure the built-in scan-wide judge graphs or the red-team CLI. Attack probe packs (`--pack`) and judge instruction packs are separate features.
 
 | Capability | What it adds | Where |
 |------------|--------------|-------|

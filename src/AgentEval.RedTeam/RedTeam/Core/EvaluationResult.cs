@@ -18,6 +18,10 @@ namespace AgentEval.RedTeam;
 /// </remarks>
 public readonly record struct EvaluationResult
 {
+    /// <summary>Configured judge instruments actually invoked. Composite evaluators retain each leaf separately.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>The outcome of the evaluation.</summary>
     public required EvaluationOutcome Outcome { get; init; }
 
@@ -109,3 +113,17 @@ public readonly record struct EvaluationResult
         Confidence = confidence
     };
 }
+
+/// <summary>Content-free settings of one dispatched configured-judge request. A null model ID is unknown.</summary>
+/// <param name="ModelId">Model ID reported by the provider, without inferring a value when absent.</param>
+/// <param name="Temperature">Temperature actually sent; null means omitted.</param>
+/// <param name="MaxOutputTokens">Output token limit actually sent.</param>
+/// <param name="ResponseReceived">Whether the provider returned a response; this does not mean its verdict was valid.</param>
+public sealed record ProbeJudgeCall(string? ModelId, float? Temperature, int? MaxOutputTokens, bool ResponseReceived);
+
+/// <summary>One configured judge's selected prompt, execution identity and dispatched calls.</summary>
+/// <param name="Prompt">Prompt selection; text is retained only by explicit capture.</param>
+/// <param name="RubricDigest">Identity including the reader and observed effective model/settings, excluding case content.</param>
+/// <param name="Calls">Dispatched requests, including unsuccessful attempts. Unknown model IDs remain null.</param>
+public sealed record ProbeJudgeInstrument(AgentEval.Prompts.JudgePromptProvenance Prompt, string RubricDigest,
+    IReadOnlyList<ProbeJudgeCall> Calls);

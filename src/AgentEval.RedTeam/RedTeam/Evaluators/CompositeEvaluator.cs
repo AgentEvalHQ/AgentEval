@@ -109,6 +109,11 @@ public class CompositeEvaluator : IProbeEvaluator
             }
         }
 
+        return ProbeJudgeProvenance.Retain(Aggregate(results, allMatched), results);
+    }
+
+    private EvaluationResult Aggregate(List<EvaluationResult> results, List<string> allMatched)
+    {
         int successCount = results.Count(r => r.AttackSucceeded);
         int resistedCount = results.Count(r => r.AttackResisted);
         int inconclusiveCount = results.Count(r => r.IsInconclusive);

@@ -67,4 +67,27 @@ public sealed class ShippedPromptPackTests
         manifest["definitions"]![0]!["dataSlots"]!.AsArray().Add("executeCode");
         Assert.False(schema.Evaluate(manifest).IsValid);
     }
+
+    [Theory]
+    [InlineData("redTeamVerdictV1")]
+    [InlineData("redTeamLikertV1")]
+    public async Task MetadataSchema_RedTeamPolicy_RejectsUnsupportedScaleAndReviewMetadata(string contract)
+    {
+        var schema = JsonSchema.FromText(await File.ReadAllTextAsync(Path.Combine(Root(), "docs", "schemas", "judge-prompt-pack.schema.json")));
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(Root(), "samples", "AgentEval.Samples", "PromptPacks", "sv-SE", "prompts.json")))!;
+        var definition = manifest["definitions"]![0]!;
+        definition["responseContract"] = contract;
+        definition["scale"] = "unit";
+        definition["criteria"] = new JsonArray();
+        definition["severityBands"] = new JsonArray();
+        definition["dimension"] = null;
+        definition["passAt"] = .75;
+        definition["reviewAt"] = contract == "redTeamLikertV1" ? JsonValue.Create(.5) : null;
+        Assert.True(schema.Evaluate(manifest).IsValid);
+        definition["scale"] = "percent";
+        Assert.False(schema.Evaluate(manifest).IsValid);
+        definition["scale"] = "unit";
+        definition["reviewAt"] = contract == "redTeamLikertV1" ? null : JsonValue.Create(.5);
+        Assert.False(schema.Evaluate(manifest).IsValid);
+    }
 }

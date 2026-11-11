@@ -90,7 +90,11 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
             // tested" into a pass; until 0.43 this path did exactly that. Record provenance only when the judge verdict ships.
             if (keyword.Outcome != EvaluationOutcome.Inconclusive) return keyword;
             var judged = await RunJudgeAsync(probe, responseText, ct).ConfigureAwait(false);
-            if (judged is not { Outcome: EvaluationOutcome.Succeeded }) return keyword;
+            if (judged is not { Outcome: EvaluationOutcome.Succeeded })
+                return judged is { JudgeInstruments: not null } attempted
+                    ? WithProvenance(keyword, new GraderProvenance(keyword.Outcome, attempted.Outcome,
+                        GradingMetadata.EvidenceClassOf(keyword), GradingProvenanceKind.Heuristic), attempted)
+                    : keyword;
             return AdoptJudge(keyword, judged.Value, new GraderProvenance(
                 keyword.Outcome, judged.Value.Outcome, GradingMetadata.EvidenceClassOf(keyword), GradingProvenanceKind.Judge));
         }
@@ -102,7 +106,7 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
         // Judge timed out (null), errored, or abstained (Inconclusive) → keep the advisory keyword verdict.
         if (judge is not { Outcome: not EvaluationOutcome.Inconclusive })
             return WithProvenance(keyword, new GraderProvenance(
-                keyword.Outcome, judge?.Outcome ?? EvaluationOutcome.Inconclusive, evidence, GradingProvenanceKind.Heuristic));
+                keyword.Outcome, judge?.Outcome ?? EvaluationOutcome.Inconclusive, evidence, GradingProvenanceKind.Heuristic), judge);
 
         // Asymmetric missed-hit guard: a judge Resisted may only CONFIRM a keyword Resisted — it may never
         // manufacture a safety claim from a keyword that is not already Resisted. So a judge Resisted neither
@@ -112,7 +116,7 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
         // compromises), the security-favourable direction. (ADR-021 §4; missed-vuln > false-alarm.)
         if (judge.Value.Outcome == EvaluationOutcome.Resisted && keyword.Outcome != EvaluationOutcome.Resisted)
             return WithProvenance(keyword, new GraderProvenance(
-                keyword.Outcome, judge.Value.Outcome, evidence, GradingProvenanceKind.Heuristic));
+                keyword.Outcome, judge.Value.Outcome, evidence, GradingProvenanceKind.Heuristic), judge);
 
         // Conclusive judge verdict ships (capped, redacted on a redacted scan).
         return AdoptJudge(keyword, judge.Value, new GraderProvenance(
@@ -151,13 +155,22 @@ public sealed class JudgeBackedEvaluator : IProbeEvaluator
         return judge with
         {
             Reason = reason,
-            Metadata = Merge(keyword.Metadata, capped, provenance is null ? null : provenance with { RubricDigest = judge.RubricDigest }),
+            JudgeInstruments = _includeEvidence ? judge.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(judge.JudgeInstruments),
+            Metadata = Merge(keyword.Metadata, capped, provenance is null ? null : provenance with
+            {
+                RubricDigest = judge.RubricDigest,
+                JudgeInstruments = _includeEvidence ? judge.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(judge.JudgeInstruments)
+            }),
         };
     }
 
     /// <summary>Keep the advisory keyword verdict (and its fidelity) but stamp judge-primary provenance.</summary>
-    private static EvaluationResult WithProvenance(EvaluationResult keyword, GraderProvenance provenance)
-        => keyword with { Metadata = Merge(keyword.Metadata, fidelityOverride: null, provenance) };
+    private EvaluationResult WithProvenance(EvaluationResult keyword, GraderProvenance provenance, EvaluationResult? attempted = null)
+    {
+        var instruments = _includeEvidence ? attempted?.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(attempted?.JudgeInstruments);
+        return keyword with { JudgeInstruments = instruments ?? keyword.JudgeInstruments,
+            Metadata = Merge(keyword.Metadata, fidelityOverride: null, provenance with { JudgeInstruments = instruments }) };
+    }
 
     /// <summary>Copy-then-set: never mutate the inner result's immutable Metadata, never drop its keys
     /// (evidence_class, observed_tools, likert_score, …). Adds the capped fidelity (when a judge verdict

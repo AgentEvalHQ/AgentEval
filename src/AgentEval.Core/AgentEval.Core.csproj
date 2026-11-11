@@ -14,6 +14,8 @@
     <InternalsVisibleTo Include="AgentEval.MAF" />
     <!-- One "is there a reference answer" test (ReferenceText) for F1 here and the agentic similarity judges. -->
     <InternalsVisibleTo Include="AgentEval.Evals.Agentic" />
+    <!-- Configured security judges share implementation-owned data fencing and bounded JSON validation. -->
+    <InternalsVisibleTo Include="AgentEval.RedTeam" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
     <!-- Distinguish embedded family fallback instructions from explicit customer overrides. -->
     <InternalsVisibleTo Include="AgentEval.Cli" />
