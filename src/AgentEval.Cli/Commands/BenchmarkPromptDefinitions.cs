@@ -18,7 +18,8 @@ internal static class BenchmarkPromptDefinitions
         using var client = new NoNetworkChatClient();
         if (family == "redteam")
         {
-            string[] supported = ["SupplyChain", "InsecureOutput", "InferenceAPIAbuse", "DataPoisoning", "Misinformation", "ExcessiveAgency"];
+            string[] supported = ["SupplyChain", "InsecureOutput", "InferenceAPIAbuse", "DataPoisoning", "Misinformation", "ExcessiveAgency",
+                "PromptInjection", "IndirectInjection", "SkillInjection", "Crescendo", "PAIR", "TAP"];
             var names = preset is null || preset == "supported" ? supported
                 : supported.Where(n => string.Equals(n, preset, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (names.Length == 0)

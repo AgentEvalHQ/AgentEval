@@ -155,7 +155,7 @@ Configured calls use fenced probe/response data and one localized corrective ret
 
 ### Red-team graphs and scans
 
-The configured built-in graphs currently cover **SupplyChain, InsecureOutput, InferenceAPIAbuse, DataPoisoning, Misinformation and ExcessiveAgency**. Export the graph you will run; the existing InsecureOutput/InferenceAPIAbuse environment switches select different declared branches and therefore different graph identities.
+The configured built-in graphs currently cover **SupplyChain, InsecureOutput, InferenceAPIAbuse, DataPoisoning, Misinformation, ExcessiveAgency, PromptInjection, IndirectInjection, SkillInjection, Crescendo, PAIR and TAP**. Export the graph you will run; the existing InsecureOutput/InferenceAPIAbuse environment switches select different declared branches and therefore different graph identities.
 
 ```bash
 agenteval prompts export ./security-judges --family redteam --preset SupplyChain
@@ -181,6 +181,10 @@ var result = await new RedTeamRunner().ScanAsync(agent, new ScanOptions
 For caller-composed supported graphs, use `RedTeamJudgePrompts.ForEvaluator(graph)` and `RedTeamJudgePrompts.Bind(graph, selection)`. Binding snapshots the topology, validates all leaves (including branches later skipped by short-circuiting), rejects cycles/depth/size violations and conflicting keys, and preserves outcome filters and conjunction policies. A single override cannot replace multiple differently keyed leaves; use a pack. Every selected scan attack is preflighted before any target call, even if fail-fast would later skip it.
 
 Ground-truth pairs and planted misinformation entities stay in whitelisted, fenced `context.oracleFacts` fields. They are never interpolated into the configured system message. Missing required facts abstain without inventing a judge call. The DataPoisoning trigger-marker branch remains deterministic. ExcessiveAgency retains observed forbidden-tool evidence and uses selected action judges for verbal assessment.
+
+The six marker-based routes use the shared `redteam.marker-refusal` definition. Exact marker matching remains in code; a matching response is judged in its language to distinguish compliance from a marker quoted in a refusal. The matched tokens are derived by the implementation and passed as fenced `context.oracleFacts.markerMatches`, replacing any caller-supplied observation. When no marker matches, the marker oracle reports resistance without a judge call; that establishes absence of the declared marker, not general safety. IndirectInjection and SkillInjection preserve observed forbidden-tool calls ahead of verbal judging. Token lists and ordinal comparison/Unicode-normalization policies are captured in graph identity. Export and preflight still require the gate's translation even when a particular response would skip it.
+
+This evidence framing is versioned as `redteam.probe-facts.v2` in configured instrument identity. Rebaseline configured red-team instruments after upgrading; legacy unconfigured graders retain their existing behavior. Attack generation and corpus text are separate from judge localization, including the PAIR/TAP attacker model.
 
 `JudgeGraphDigest` identifies the complete declared graph, selected leaf definitions, reader/settings and policies, including unexecuted branches. It is **not** proof that every leaf ran or that providers used identical models. `JudgeInstruments` records actual completed-turn/node observations and request attempts separately. Native AEF retains both under `ext.agenteval.probeJudge`; content-off writing strips captured prompt text independently of in-process capture. The CLI includes the preflight graph digest in suite identity before execution.
 

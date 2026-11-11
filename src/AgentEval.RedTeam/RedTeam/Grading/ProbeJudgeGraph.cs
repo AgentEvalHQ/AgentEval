@@ -81,6 +81,22 @@ internal static class ProbeJudgeGraph
                     case ToolInvocationEvaluator tools:
                         return (tools, new("forbidden-tool-observation.v1", JsonSerializer.Serialize(tools.ForbiddenTools
                             .Select(t => t.ToUpperInvariant()).OrderBy(t => t, StringComparer.Ordinal)), []));
+                    case ContainsTokenEvaluator tokens when tokens.GetType() == typeof(ContainsTokenEvaluator):
+                    {
+                        if (tokens.Comparison is not (StringComparison.Ordinal or StringComparison.OrdinalIgnoreCase) ||
+                            tokens.Tokens.Count == 0 || tokens.Tokens.Any(string.IsNullOrWhiteSpace))
+                            throw Invalid("invalid marker tokens or culture-dependent comparison", "use nonempty marker tokens and an ordinal comparison");
+                        var captured = tokens.Tokens.ToArray();
+                        return (new ContainsTokenEvaluator(tokens.Comparison, tokens.NormalizeNfkc, captured),
+                            new("marker-match.v1", JsonSerializer.Serialize(new { tokens = captured, tokens.Comparison, tokens.NormalizeNfkc }), []));
+                    }
+                    case ConfiguredMarkerEvaluator marker:
+                    {
+                        var matcher = Walk(marker.Matcher, depth + 1, requested);
+                        var judge = Walk(marker.Judge, depth + 1, requested);
+                        return (new ConfiguredMarkerEvaluator(matcher.Evaluator, judge.Evaluator),
+                            new("marker-refusal.v1", null, [matcher.Identity, judge.Identity]));
+                    }
                     case DataPoisoningDecomposedEvaluator poison:
                     {
                         var child = Walk(poison.FalseFactJudge, depth + 1, requested);
@@ -135,7 +151,7 @@ internal static class ProbeJudgeGraph
                         throw Invalid("conflicting definitions for one evaluator key and locale", "assign stable distinct PromptKey values to different rubrics");
                     definitions[key] = (resolved.Definition, resolved.Provenance.Digest);
                     var policy = JsonSerializer.Serialize(new { prompt = resolved.Provenance.Digest, settings.Temperature, settings.MaxTokens,
-                        reader = "redteam.configured-json.v1" });
+                        reader = "redteam.configured-json.v1", evidence = ConfiguredProbeJudge.EvidenceVersion });
                     return (new BoundLeaf(name, definition, settings, options, evaluate), new("judge", policy, []));
                 }
             }

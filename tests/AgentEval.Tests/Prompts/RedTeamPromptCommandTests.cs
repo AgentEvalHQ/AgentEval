@@ -25,6 +25,12 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     [InlineData("DataPoisoning")]
     [InlineData("Misinformation")]
     [InlineData("ExcessiveAgency")]
+    [InlineData("PromptInjection")]
+    [InlineData("IndirectInjection")]
+    [InlineData("SkillInjection")]
+    [InlineData("Crescendo")]
+    [InlineData("PAIR")]
+    [InlineData("TAP")]
     [InlineData("supported")]
     public async Task ExportInspect_RedTeamPreset_UsesActualGraphDefinitionsWithoutModelCalls(string preset)
     {
@@ -73,7 +79,7 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         var manifest = await PackAsync(problem == "missing-leaf" ? "Misinformation" : "SupplyChain", 0);
         var target = new Subject();
         using var judge = new FakeChatClient();
-        var options = Options(manifest, Path.Combine(_root, "runs"), problem == "unsupported-attack" ? "PromptInjection" : "SupplyChain");
+        var options = Options(manifest, Path.Combine(_root, "runs"), problem == "unsupported-attack" ? "Jailbreak" : "SupplyChain");
         if (problem == "missing-leaf")
             await Assert.ThrowsAsync<ArgumentException>(() => RedTeamCommand.ExecuteAsync(options, default, target, judgeClientOverride: judge));
         else
@@ -81,6 +87,25 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         Assert.Equal(0, target.Calls);
         Assert.Equal(0, judge.CallCount);
         Assert.False(Directory.Exists(Path.Combine(_root, "runs")));
+    }
+
+    [Fact]
+    public async Task Execute_MarkerGraph_UsesSelectedJudgeAndSealsItsObservedIdentity()
+    {
+        var manifest = await PackAsync("PromptInjection", 0);
+        var target = new Subject("I cannot comply. PWNED 41414141 INJECTED");
+        using var judge = new FakeChatClient(Success);
+        var runs = Path.Combine(_root, "marker-runs");
+        Assert.Equal(0, await RedTeamCommand.ExecuteAsync(Options(manifest, runs, "PromptInjection"), default, target, judgeClientOverride: judge));
+        Assert.Equal(1, target.Calls);
+        Assert.Equal(1, judge.CallCount);
+        var directory = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(runs, "run.json", SearchOption.AllDirectories)))!;
+        var verification = AefRunVerifier.Verify(directory);
+        Assert.True(verification.Outcome == AefOutcome.Intact, System.Text.Json.JsonSerializer.Serialize(verification.Problems));
+        var line = JsonNode.Parse(File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Single())!;
+        Assert.NotNull(line["ext"]!["agenteval.probeJudge"]!["graphDigest"]);
+        Assert.Single(line["ext"]!["agenteval.probeJudge"]!["instruments"]!.AsArray());
+        Assert.DoesNotContain("PRIVATE-SWEDISH-GRAPH", string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
     }
 
     [Fact]
@@ -107,14 +132,14 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         Aef = new(runs), PromptSelection = new(new(manifest), "sv-SE")
     };
 
-    private sealed class Subject : IEvaluableAgent
+    private sealed class Subject(string response = "Svar") : IEvaluableAgent
     {
         public string Name => "cli-graph-fixture";
         public int Calls { get; private set; }
         public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
         {
             Calls++;
-            return Task.FromResult(new AgentResponse { Text = "Svar" });
+            return Task.FromResult(new AgentResponse { Text = response });
         }
     }
 }
