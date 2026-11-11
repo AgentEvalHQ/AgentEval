@@ -1434,9 +1434,13 @@ sealed class AgentEval.RedTeam.ProbeJudgeInstrument : IEquatable<AgentEval.RedTe
     AgentEval.RedTeam.ProbeJudgeInstrument <Clone>$()
     Boolean Equals(AgentEval.RedTeam.ProbeJudgeInstrument other)
     Boolean Equals(Object obj)
+    Boolean? BudgetExhausted { get; init; }
+    Boolean? Measured { get; init; }
     IReadOnlyList<AgentEval.RedTeam.ProbeJudgeCall> Calls { get; init; }
     Int32 GetHashCode()
     JudgePromptProvenance Prompt { get; init; }
+    String ConfigurationDigest { get; init; }
+    String RequestedModelId { get; init; }
     String RubricDigest { get; init; }
     String ToString()
     Void Deconstruct(out JudgePromptProvenance Prompt, out String RubricDigest, out IReadOnlyList<AgentEval.RedTeam.ProbeJudgeCall> Calls)
@@ -2081,6 +2085,7 @@ class AgentEval.RedTeam.ScanOptions
     Int32 MaxProbesPerAttack { get; init; }
     Int32 Parallelism { get; init; }
     Int32 ProgressReportInterval { get; init; }
+    JudgeGateOptions BenignControlJudgeOptions { get; init; }
     JudgePromptOptions JudgePrompts { get; init; }
     TimeProvider TimeProvider { get; init; }
     TimeSpan DelayBetweenProbes { get; init; }

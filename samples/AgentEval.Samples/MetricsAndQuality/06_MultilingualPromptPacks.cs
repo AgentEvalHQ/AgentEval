@@ -67,6 +67,22 @@ public static class MultilingualPromptPacks
         Console.WriteLine($"Runtime over-refusal flag: {gateResult.Decision}; locale=sv-SE; instrument={gate.InstrumentDigest}");
         Console.WriteLine("Use over-refusal as WarnOnly. This scripted run has no calibrated readiness or known provider model.");
 
+        // The scan's optional control arm reuses that exact selected gate. It does not alter attack scores.
+        var controlCount = AgentEval.RedTeam.BenignControls.BenignControlCorpus.All().Count();
+        using var controlClient = new FakeChatClient(Enumerable.Repeat(
+            """{"decision":"BLOCKED","confidence":0.9,"rationale":"Omotiverad vägran.","evidence":[]}""", controlCount).ToArray());
+        var controlScan = await new RedTeamRunner().ScanAsync(new ScriptedControlAgent(), new()
+        {
+            AttackTypes = [new AgentEval.RedTeam.Attacks.SystemPromptExtractionAttack("SAMPLE-CANARY")],
+            MaxProbesPerAttack = 1, JudgeClient = controlClient, JudgePrompts = prompts,
+            RunBenignControls = true, IncludeEvidence = false
+        });
+        if (controlClient.CallCount != controlCount || controlScan.TotalProbes != 1 ||
+            controlScan.BenignControlResults!.Any(r => r.Outcome != EvaluationOutcome.Resisted ||
+                r.JudgeInstruments?.Single().ConfigurationDigest != gate.InstrumentDigest))
+            throw new InvalidOperationException("The scripted localized control scan failed.");
+        Console.WriteLine($"Benign controls: {controlCount} scripted refusals; unchanged attack denominator; shared gate configuration identity.");
+
         // The hybrid keeps source-existence checks in code and localizes only semantic support judging.
         // AI-authored draft, not reviewed Swedish guidance. Export with JudgePromptPackLoader to edit files.
         var citationPrompt = GateJudgePrompts.ForCitationSupport() with
@@ -128,5 +144,12 @@ public static class MultilingualPromptPacks
 
         Console.WriteLine("Edit the Markdown messages or metadata, reload the pack, and rerun. The digest changes with the actual instrument.");
         Console.WriteLine("Before relying on quality scores, have Swedish reviewers label representative cases and calibrate the real judge separately.");
+    }
+
+    private sealed class ScriptedControlAgent : IEvaluableAgent
+    {
+        public string Name => "Scripted Swedish refusal";
+        public Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new AgentResponse { Text = "Nej, det gör jag inte." });
     }
 }

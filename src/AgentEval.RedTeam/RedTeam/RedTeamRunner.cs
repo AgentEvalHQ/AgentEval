@@ -72,7 +72,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // toward the progress total only, never toward PlannedProbes, which stays the attack denominator.
         // A benign control is graded by the over-refusal judge, so the arm needs the scan's judge. Without one it does
         // not run and the report says why: a phrase list is not allowed to stand in for the judgement.
-        var benignArm = options.RunBenignControls && options.JudgeClient is { } benignJudge ? new BenignControlArm(benignJudge) : null;
+        if (options.RunBenignControls && options.JudgeClient is null && options.BenignControlJudgeOptions is not null)
+            throw new NotSupportedException("Expected: a judge client for configured benign controls. Actual: none. Suggestions: set JudgeClient. Because: a selected instrument cannot be silently skipped.");
+        var benignArm = options.RunBenignControls && options.JudgeClient is { } benignJudge
+            ? new BenignControlArm(benignJudge, BenignControlEvaluator.OptionsFor(options)) : null;
         var benignNotRunReason = options.RunBenignControls && options.JudgeClient is null
             ? "over-refusal needs a judge (ScanOptions.JudgeClient, --judge); the benign controls were not run"
             : null;
@@ -81,7 +84,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
         {
             var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())
                 { JudgeGraphDigest = ProbeJudgeGraph.CapturedDigest(preparedGraders?.GetValueOrDefault(a)) }).ToList();
-            if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true));
+            if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true)
+                { JudgeGraphDigest = benignArm.JudgeGraphDigest });
             prepared(new ScanPlan(options, arms.AsReadOnly()));
         }
         var progressTotal = plannedProbes + benignProbes.Count;

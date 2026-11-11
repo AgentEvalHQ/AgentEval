@@ -858,10 +858,14 @@ agenteval redteam --endpoint $TARGET --model $MODEL --judge $JUDGE_URL --benign-
 - **How a benign control is graded: by the over-refusal judge, never by a phrase list.**
   - This is Gatekeeper's over-refusal judge, with the same rubric and options, running on your `--judge` model. A
     broad prefilter, covering hard refusals and soft declines such as "I'd rather not", picks which replies reach
-    it. A reply with no refusal signal is an answer and costs no call.
+    it in legacy unconfigured scans. A reply with no refusal signal then costs no call. With a selected prompt pack,
+    the shared gate bypasses this English prefilter and judges the reply in its language; see
+    [localized benign controls](judge-prompt-packs.md#localized-benign-controls).
   - A judge that cannot decide (timeout, error, unparseable) makes the case inconclusive, which never counts as an
     answer.
-  - Certify the judge for your model with `agenteval gatekeeper calibrate --gate judge:over-refusal --certify`.
+  - Calibrate the exact selected prompt and settings for your model with `agenteval gatekeeper calibrate --gate judge:over-refusal`.
+    Certification additionally requires the readiness checks and an eligible human-reviewed held-out dataset;
+    translating a prompt does not transfer the English instrument's certificate.
   - Without `--judge`, `--benign-controls` is refused up front. In the library the arm does not run, and the line
     says `not measured: over-refusal needs a judge`.
   - **Why not a phrase list:** on the first live run (GLM-5.3-Flash) a phrase list flagged a complete answer to

@@ -661,7 +661,7 @@ internal static class RedTeamCommand
         var scanOptions = BuildScanOptions(opts, attacks, intensity, judgeClient, attackerClient,
             includeEvidence: selectedTarget?.IncludeEvidence ?? true, onProbeCompleted: partialScan.Add,
             onPlanPrepared: opts.NoAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ProbeSuiteDefinition.Create(opts, plan, resolvedName),
-            judgePrompts: promptSelection);
+            judgePrompts: promptSelection, judgeModel: opts.JudgeModel ?? resolvedName);
 
         // 6. Run scan
         if (!opts.Quiet)
@@ -1079,7 +1079,7 @@ internal static class RedTeamCommand
         IChatClient? attackerClient,
         bool includeEvidence = true,
         Action<IAttackType, ProbeResult, bool>? onProbeCompleted = null, Action<ScanPlan>? onPlanPrepared = null,
-        JudgePromptOptions? judgePrompts = null)
+        JudgePromptOptions? judgePrompts = null, string? judgeModel = null)
     {
         Action<ScanProgress>? onProgress = opts.Verbose && !opts.Quiet
             ? progress => Console.Error.WriteLine(
@@ -1100,6 +1100,11 @@ internal static class RedTeamCommand
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
             JudgePrompts = judgePrompts,
+            BenignControlJudgeOptions = opts.BenignControls && judgePrompts is not null ? new()
+            {
+                ModelId = judgeModel ?? opts.JudgeModel ?? opts.Model ?? opts.DeploymentName,
+                Timeout = opts.JudgeTimeoutSeconds > 0 ? TimeSpan.FromSeconds(opts.JudgeTimeoutSeconds) : new AgentEval.Guardrails.Judges.JudgeGateOptions().Timeout
+            } : null,
             // ADR-021 (B.1): judge grading mode/rubric/timeout. Mode is orthogonal to --judge: 'primary' with no
             // judgeClient is an inert no-op (the GraderFactory returns the bare oracle).
             Mode = ParseJudgeMode(opts.JudgeMode),

@@ -26,7 +26,13 @@ public static class GraderFactory
         ArgumentNullException.ThrowIfNull(options);
 
         if (options.JudgePrompts is { } prompts)
-            return RedTeamJudgePrompts.Bind(ConfiguredGraph(attack, options), prompts);
+        {
+            var graph = ConfiguredGraph(attack, options);
+            // Preflight controls even for CLI descriptor validation and fail-fast scans that may skip the arm.
+            if (options.RunBenignControls)
+                _ = new BenignControls.BenignControlEvaluator(options.JudgeClient!, BenignControls.BenignControlEvaluator.OptionsFor(options));
+            return RedTeamJudgePrompts.Bind(graph, prompts);
+        }
 
         var inner = attack.GetEvaluator();
         if (options.JudgeClient is null)
@@ -64,15 +70,19 @@ public static class GraderFactory
     /// <summary>Exports the supported scan grader's actual declared leaf rubrics without calling the judge or target.</summary>
     /// <remarks>Use these stable keys to author a pack for <see cref="ScanOptions.JudgePrompts"/>.
     /// Configured grading supports Primary mode. Legacy keyword/fallback paths are not silently localized.</remarks>
-    public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options) =>
-        RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
+    public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options)
+    {
+        var definitions = RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
+        return options.RunBenignControls ? [.. definitions, AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(
+            new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric(), options.BenignControlJudgeOptions?.BlockThreshold ?? 0)] : definitions;
+    }
 
     private static IProbeEvaluator ConfiguredGraph(IAttackType attack, ScanOptions options)
     {
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
-        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary || options.ExplainFindings || options.RunBenignControls)
-            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client, fallback mode, explanations or benign-control judging. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
+        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary || options.ExplainFindings)
+            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client, fallback mode or explanations. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
         if (options.JudgeTimeout is { } invalidTimeout && invalidTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(options), "Expected: positive judge timeout. Actual: nonpositive duration. Suggestions: use a positive duration or null. Because: configured grading must have an executable time budget.");
 

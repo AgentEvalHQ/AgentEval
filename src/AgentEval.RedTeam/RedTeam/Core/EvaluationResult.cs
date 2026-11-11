@@ -135,4 +135,21 @@ public sealed record ProbeJudgeCall(string? ModelId, float? Temperature, int? Ma
 /// <param name="RubricDigest">Identity including the reader and observed effective model/settings, excluding case content.</param>
 /// <param name="Calls">Dispatched requests, including unsuccessful attempts. Unknown model IDs remain null.</param>
 public sealed record ProbeJudgeInstrument(AgentEval.Prompts.JudgePromptProvenance Prompt, string RubricDigest,
-    IReadOnlyList<ProbeJudgeCall> Calls);
+    IReadOnlyList<ProbeJudgeCall> Calls)
+{
+    /// <summary>Shared runtime gate configuration identity, when this probe uses a gate instrument. Compare alongside observed model identities.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ConfigurationDigest { get; init; }
+
+    /// <summary>Explicit requested model, distinct from the model identities actually returned in Calls.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RequestedModelId { get; init; }
+
+    /// <summary>Whether the shared gate obtained a valid conclusive measurement; null when not reported.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Measured { get; init; }
+
+    /// <summary>Whether a shared gate reservation was denied; null when not reported.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? BudgetExhausted { get; init; }
+}

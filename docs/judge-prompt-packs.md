@@ -168,7 +168,7 @@ agenteval redteam --endpoint http://localhost:1234/v1 --model target \
   --judge-prompt-pack ./security-judges/prompts.json --judge-locale sv-SE
 ```
 
-Use `--preset supported` to export the union of all built-in graph definitions. After translating that union, omit `--attacks` to scan the default roster. Shared refusal leaves have one stable key. `SystemPromptExtraction` has no LLM instructions: its planted-canary/reference-echo checks work without a translated leaf, and exporting it alone reports that it is code-only. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
+Use `--preset supported` to export the union of all built-in graph definitions, including the shared `gate.over-refusal` definition for optional benign controls. Use `--preset benign-controls` to export that control definition alone. After translating that union, omit `--attacks` to scan the default roster. Shared refusal leaves have one stable key. `SystemPromptExtraction` has no LLM instructions: its planted-canary/reference-echo checks work without a translated leaf, and exporting it alone reports that it is code-only. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
 
 ```csharp
 var definitions = GraderFactory.CapturePromptDefinitions(attack, new ScanOptions { JudgeClient = judgeClient });
@@ -202,7 +202,19 @@ This evidence framing is versioned as `redteam.probe-facts.v2` in configured ins
 
 Configured multi-turn judging bypasses the default English lexical refusal lock: an inconclusive localized judgment cannot become resistance solely because English refusal words appeared. Existing success, turn and duration limits remain. Tree judges receive the actual attempted prompt. Folded linear/tree results retain the invoked leaf observations from completed evaluations; missing/aborted observations remain unknown.
 
-Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode, narrative explanations and benign-control judging. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode and narrative explanations. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+
+### Localized benign controls
+
+Set `RunBenignControls = true` alongside the scan's `JudgePrompts` selection (CLI: `--benign-controls` with `--judge-prompt-pack` and `--judge-locale`). The selected pack must contain `gate.over-refusal`; missing translations fail before any target call, even if fail-fast would skip the control arm. Configured controls bypass the legacy English refusal prefilter, so Swedish replies are actually judged. The original control corpus is unchanged: translating its judge does not translate or revalidate the corpus.
+
+The control uses the same `CompositeJudgeGate<OverRefusalRubric>` instrument as runtime gate calibration. Optional `ScanOptions.BenignControlJudgeOptions` supplies model ID, temperature, token/input limits, deadline, thresholds and spend governor. Its own `JudgePrompts` wins over the scan selection; otherwise it inherits that selection. Explicit control options without a prompt selection use the configured English instrument. A supplied options object's deadline wins over `ScanOptions.JudgeTimeout`; without the object, the scan timeout overrides the gate's five-second default. The CLI forwards the selected judge model and `--judge-timeout` to the control gate. Explicit configured prompt thresholds follow the shared resolver's precedence.
+
+`JudgeInstruments[].ConfigurationDigest` is the exact shared gate configuration identity. Compare it **and the observed models** with calibration; a default English certificate cannot certify a translated or differently configured instrument. `RubricDigest` includes observed model identities, while the control's `JudgeGraphDigest` also identifies the benign outcome mapping. Requested model, actual calls/settings, measurement and budget-exhaustion state survive native AEF round trips. Content-off scans and exports strip captured prompt content.
+
+Over-refusal maps to a refused/failed benign control; an answer maps to a passed control. Empty replies, ambiguous or unreadable judgments, provider errors, timeouts and exhausted budgets stay inconclusive, never answers or refusals. Gate fail-open/fail-closed enforcement settings do not turn an unavailable measurement into a control score. Controls remain outside attack/compliance denominators.
+
+This remains an **output-only** over-refusal instrument. It cannot prove that a refusal was justified against the actual request, and an incorrectly asserted safety reason can under-report over-refusal. A request-aware instrument would require a separately versioned policy and calibration. The repository's Swedish examples are AI-authored and unreviewed.
 
 ### Runtime judge gates
 

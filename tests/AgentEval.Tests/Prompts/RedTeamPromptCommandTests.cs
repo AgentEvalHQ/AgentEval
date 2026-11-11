@@ -37,6 +37,7 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     [InlineData("VectorEmbedding")]
     [InlineData("ToolEscalation")]
     [InlineData("supported")]
+    [InlineData("benign-controls")]
     public async Task ExportInspect_RedTeamPreset_UsesActualGraphDefinitionsWithoutModelCalls(string preset)
     {
         var directory = Path.Combine(_root, "export");
@@ -45,7 +46,15 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         Assert.Equal(0, await PromptsCommand.InspectAsync(manifest, true, TextWriter.Null, TextWriter.Null, family: "redteam", preset: preset));
         var pack = await new JudgePromptPackLoader().LoadAsync(manifest);
         Assert.Equal(BenchmarkPromptDefinitions.ForPreset("redteam", preset).Select(d => d.SystemText), pack.Definitions.Select(d => d.SystemText));
-        Assert.All(pack.Definitions, d => Assert.StartsWith("redteam.", d.EvaluatorKey));
+        Assert.All(pack.Definitions, d =>
+        {
+            if (d.EvaluatorKey == "gate.over-refusal")
+            {
+                Assert.Contains(preset, new[] { "supported", "benign-controls" });
+                Assert.Equal(JudgeResponseContract.GateDecisionV1, d.ResponseContract);
+            }
+            else Assert.StartsWith("redteam.", d.EvaluatorKey);
+        });
     }
 
     [Fact]

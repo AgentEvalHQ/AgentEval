@@ -139,6 +139,13 @@ public class ScanOptions
     /// </remarks>
     public bool RunBenignControls { get; init; } = false;
 
+    /// <summary>Optional shared over-refusal gate settings for benign controls. Its prompt selection takes precedence
+    /// over <see cref="JudgePrompts"/>; otherwise the scan selection is inherited. When supplied, these settings
+    /// (including Timeout) take precedence over <see cref="JudgeTimeout"/>. Without them, gate defaults apply and
+    /// JudgeTimeout overrides the default gate deadline. Explicit options without either prompt selection use the
+    /// configured English instrument. Inert unless <see cref="RunBenignControls"/> is enabled.</summary>
+    public AgentEval.Guardrails.Judges.JudgeGateOptions? BenignControlJudgeOptions { get; init; }
+
     /// <summary>
     /// Whether to include prompt/response in failure details.
     /// Set to false for sensitive content.
@@ -159,7 +166,8 @@ public class ScanOptions
 
     /// <summary>Optional immutable selection for supported built-in or caller-composed judge graphs.
     /// Every selected attack is preflighted before any target call. Requires Primary mode and a judge client;
-    /// unsupported oracle nodes, explanations and benign-control judges are rejected rather than retaining English behavior.</summary>
+    /// benign controls inherit the selection and bypass English prefilters. Unsupported oracle nodes and explanations
+    /// are rejected rather than retaining English behavior.</summary>
     public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
 
     /// <summary>

@@ -422,7 +422,7 @@ dotnet run -- 110   # Microsoft 365 Live Walkthrough  (R2)
 
 | # | Sample | What You'll Learn | Provider? | Time |
 |---|--------|-------------------|-----------|------|
-| 1 | **Multilingual Prompt Packs** | Load Swedish Markdown + metadata; exercise RAG, rubric, runtime and hybrid citation judges; inspect locale/digest provenance | No, scripted | 5 min |
+| 1 | **Multilingual Prompt Packs** | Load Swedish Markdown + metadata; exercise RAG, rubric, runtime, hybrid citation and benign-control judges; inspect locale/digest provenance | No, scripted | 5 min |
 
 ```bash
 dotnet run -- --sample MultilingualPromptPacks
