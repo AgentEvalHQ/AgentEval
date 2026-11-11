@@ -1,4 +1,4 @@
-﻿class AgentEval.Adapters.MicrosoftEvaluatorAdapter : AgentEval.Core.IMetric, AgentEval.Evals.IEval
+class AgentEval.Adapters.MicrosoftEvaluatorAdapter : AgentEval.Core.IMetric, AgentEval.Evals.IEval
     System.String Category { get; }
     System.String Description { get; }
     System.String JudgeModel { get; init; }
@@ -999,6 +999,7 @@ sealed class AgentEval.Evals.AtomicLlmDefinition : System.IEquatable<AgentEval.E
     ctor()
 sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
     AgentEval.Evals.AtomicLlmDefinition CaptureDefinition()
+    AgentEval.Evals.AtomicLlmDefinition CaptureDefinition(AgentEval.Prompts.JudgePromptOptions options)
     AgentEval.Evals.JudgeInputData JudgeSeesData { get; init; }
     AgentEval.Prompts.JudgePromptDefinition CapturePromptDefinition()
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
@@ -1085,6 +1086,8 @@ enum AgentEval.Evals.JudgeInputData
     SystemMessage
     ExpectedActions
     Context
+    EvaluatorNotes
+    EvaluatorPolicy
 sealed class AgentEval.Evals.MajorityVoteAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
@@ -1407,6 +1410,7 @@ sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.O
 static class AgentEval.Prompts.BuiltInJudgePrompts
     static AgentEval.Prompts.JudgePromptDefinition ForEvaluator(System.String key, System.Collections.Generic.IReadOnlyList<System.String> criteria, AgentEval.Core.EvalRubric rubric = null, System.Double passAt = 0.7)
     static AgentEval.Prompts.JudgePromptDefinition GetRag(System.String evaluatorKey)
+    static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> ForEval(AgentEval.Evals.IEval evaluation)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> Rag { get; }
 sealed class AgentEval.Prompts.JudgePromptResolver : AgentEval.Prompts.IJudgePromptResolver
     AgentEval.Prompts.ResolvedJudgePrompt Resolve(AgentEval.Prompts.JudgePromptDefinition builtIn, AgentEval.Prompts.JudgePromptOptions options)

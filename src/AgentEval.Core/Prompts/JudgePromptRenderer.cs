@@ -12,7 +12,7 @@ internal static class JudgePromptRenderer
 {
     internal static string Render(JudgePromptDefinition definition, string? input, string? output,
         string? context = null, string? reference = null, string? dimension = null,
-        IReadOnlyList<JudgeCriterion>? criteria = null)
+        IReadOnlyList<JudgeCriterion>? criteria = null, EvaluationEvidence? evidence = null)
     {
         return Regex.Replace(definition.UserTemplate, @"\{\{([A-Za-z]+)\}\}", match => match.Groups[1].Value switch
         {
@@ -20,6 +20,12 @@ internal static class JudgePromptRenderer
             "output" => PromptSafety.Fence(output),
             "context" => PromptSafety.Fence(context),
             "reference" => PromptSafety.Fence(reference),
+            "toolCalls" => PromptSafety.Fence(evidence?.ToolCalls),
+            "toolDefinitions" => PromptSafety.Fence(evidence?.ToolDefinitions),
+            "systemMessage" => PromptSafety.Fence(evidence?.SystemMessage),
+            "expectedActions" => PromptSafety.Fence(evidence?.ExpectedActions),
+            "evaluatorNotes" => PromptSafety.Fence(evidence?.EvaluatorNotes),
+            "evaluatorPolicy" => PromptSafety.Fence(evidence?.EvaluatorPolicy),
             "dimension" => PromptSafety.Fence(dimension),
             "criteria" => JsonSerializer.Serialize((criteria ?? definition.Criteria).Select(c => new { id = c.Id, text = c.Text })),
             "safety" => definition.SafetyText,

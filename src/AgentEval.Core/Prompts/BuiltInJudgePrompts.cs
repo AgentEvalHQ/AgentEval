@@ -2,12 +2,63 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using AgentEval.Core;
+using AgentEval.Evals;
+using System.Text.Json;
 
 namespace AgentEval.Prompts;
 
 /// <summary>Exportable descriptors for the built-in judges supporting declarative prompt packs.</summary>
 public static class BuiltInJudgePrompts
 {
+    /// <summary>
+    /// Exports declared atomic judge definitions from a configured evaluation graph without invoking it.
+    /// Traverses composites, scenario wrappers, definition wrappers and declared instrument dependencies.
+    /// Code-only leaves contribute no prompt; other judge implementations need their own adapter.
+    /// </summary>
+    public static IReadOnlyList<JudgePromptDefinition> ForEval(IEval evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        var definitions = new Dictionary<string, JudgePromptDefinition>(StringComparer.Ordinal);
+        var path = new HashSet<IEval>(ReferenceEqualityComparer.Instance);
+        Visit(evaluation, 0);
+        return Array.AsReadOnly(definitions.Values.OrderBy(d => d.EvaluatorKey, StringComparer.Ordinal).ToArray());
+
+        void Visit(IEval eval, int depth)
+        {
+            if (depth > EvalTreeLimits.MaxTreeWalkDepth || !path.Add(eval))
+                throw new ArgumentException("Expected: a bounded acyclic evaluation graph. Actual: a cycle or excessive nesting. Suggestions: inspect the configured wrappers. Because: prompt export must terminate without executing evaluators.", nameof(evaluation));
+            try
+            {
+                switch (eval)
+                {
+                    case AtomicLlmEval atomic:
+                        var definition = atomic.CapturePromptDefinition();
+                        definition.Validate();
+                        if (definitions.TryGetValue(definition.EvaluatorKey, out var existing)
+                            && JsonSerializer.Serialize(existing) != JsonSerializer.Serialize(definition))
+                            throw new ArgumentException($"Expected: one definition per evaluator key. Actual: conflicting '{definition.EvaluatorKey}' instruments. Suggestions: assign distinct keys or export each instrument separately. Because: a pack cannot silently choose between different criteria or policies.", nameof(evaluation));
+                        definitions[definition.EvaluatorKey] = definition;
+                        break;
+                    case IEvalDefinitionWrapper wrapper: Visit(wrapper.DefinitionInner, depth + 1); break;
+                    case AgentScenarioEval scenario: Visit(scenario.Inner, depth + 1); break;
+                    case CompositeEval composite:
+                        foreach (var component in composite.Components) Visit(component.Eval, depth + 1);
+                        break;
+                    case MultiJudgeWrapper multiple:
+                        foreach (var judge in multiple.Judges) Visit(judge.Eval, depth + 1);
+                        break;
+                    case IEvalInstrumentSource source:
+                        foreach (var instrument in source.DefinitionInstruments) Visit(instrument, depth + 1);
+                        break;
+                    case AtomicCodeEval or IEvalConfigurationSource: break;
+                    default:
+                        throw new NotSupportedException($"Expected: a declared evaluation graph. Actual: '{eval.GetType().FullName}' does not expose its instruments. Suggestions: implement IEvalInstrumentSource or export its adapter's definition separately. Because: prompt export cannot assume an unknown evaluator is code-only.");
+                }
+            }
+            finally { path.Remove(eval); }
+        }
+    }
+
     /// <summary>Describes a criteria or rubric-bound judge without changing the legacy execution path.</summary>
     public static JudgePromptDefinition ForEvaluator(string key, IReadOnlyList<string> criteria,
         EvalRubric? rubric = null, double passAt = .70)

@@ -65,7 +65,7 @@ public partial class ChatClientEvaluator : IJudgePromptBindable, IResolvedJudgeP
             throw new ArgumentException("Expected: CriteriaV1 or RubricV1 for ChatClientEvaluator. Actual: a metric response contract. Suggestions: use the corresponding RAG metric. Because: each evaluator owns its response parser.");
         var user = JudgePromptRenderer.Render(definition, input, output,
             request?.Context is { } passages ? string.Join("\n\n", passages) : null,
-            request?.GroundTruth, definition.Dimension);
+            request?.GroundTruth, definition.Dimension, evidence: request?.Evidence);
         List<ChatMessage> messages = [new(ChatRole.System, definition.SystemText), new(ChatRole.User, user)];
         long? inputTokens = 0, outputTokens = 0, cachedTokens = 0;
         var (parsed, response) = await InvokeAndParseAsync(messages, ct, definition).ConfigureAwait(false);

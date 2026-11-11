@@ -24,6 +24,9 @@ public sealed class EvaluationRequest
     /// <summary>Reference answer, separate from retrieved context and the target input.</summary>
     public string? GroundTruth { get; init; }
 
+    /// <summary>Additional immutable agentic evidence, rendered only into declared, fenced data slots.</summary>
+    public EvaluationEvidence? Evidence { get; init; }
+
     /// <summary>Creates a request, copying the criteria and ordered context passages.</summary>
     /// <param name="input">The original agent input.</param>
     /// <param name="output">The agent output.</param>
@@ -75,7 +78,7 @@ public sealed class EvaluationRequest
     {
         ArgumentNullException.ThrowIfNull(options);
         return new(Input, Output, Criteria, Context, ContextSource, RequiresContext)
-        { JudgeCriteria = JudgeCriteria, GroundTruth = GroundTruth, JudgePrompts = options };
+        { JudgeCriteria = JudgeCriteria, GroundTruth = GroundTruth, Evidence = Evidence, JudgePrompts = options };
     }
 
     /// <summary>Creates a request with snapshotted, unique criterion identities and localized text.</summary>

@@ -1,4 +1,4 @@
-﻿class AgentEval.Calibration.CalibratedJudgeOptions
+class AgentEval.Calibration.CalibratedJudgeOptions
     AgentEval.Calibration.VotingStrategy Strategy { get; set; }
     Boolean CalculateConfidenceInterval { get; set; }
     Boolean ContinueOnJudgeFailure { get; set; }
@@ -418,6 +418,19 @@ static class AgentEval.Core.EvaluationDefaults
     const Int32 DefaultMaxExpectedToolCalls
     const Int32 DefaultPassingScore
     static TimeSpan DefaultMaxToolDuration
+sealed class AgentEval.Core.EvaluationEvidence : IEquatable<AgentEval.Core.EvaluationEvidence>
+    AgentEval.Core.EvaluationEvidence <Clone>$()
+    Boolean Equals(AgentEval.Core.EvaluationEvidence other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String EvaluatorNotes { get; init; }
+    String EvaluatorPolicy { get; init; }
+    String ExpectedActions { get; init; }
+    String SystemMessage { get; init; }
+    String ToString()
+    String ToolCalls { get; init; }
+    String ToolDefinitions { get; init; }
+    ctor()
 class AgentEval.Core.EvaluationOptions
     AgentEval.Core.JudgeScorePolicy ScorePolicy { get; init; }
     AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
@@ -433,6 +446,7 @@ class AgentEval.Core.EvaluationOptions
     ctor()
 sealed class AgentEval.Core.EvaluationRequest
     AgentEval.Core.EvaluationContextSource ContextSource { get; }
+    AgentEval.Core.EvaluationEvidence Evidence { get; init; }
     AgentEval.Core.EvaluationRequest WithPrompts(AgentEval.Prompts.JudgePromptOptions options)
     AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
     Boolean RequiresContext { get; }

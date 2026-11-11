@@ -29,6 +29,9 @@ public enum JudgeResponseContract
 /// <summary>Immutable text and reading policy for one judge instrument. No executable templates or file paths.</summary>
 public sealed record JudgePromptDefinition
 {
+    private static bool IsDataSlot(string slot) => slot is "input" or "output" or "context" or "reference"
+        or "toolCalls" or "toolDefinitions" or "systemMessage" or "expectedActions" or "evaluatorNotes" or "evaluatorPolicy";
+
     private IReadOnlyList<JudgeCriterion> _criteria = Array.Empty<JudgeCriterion>();
     private IReadOnlyList<RubricSeverityBand> _severityBands = Array.Empty<RubricSeverityBand>();
     private IReadOnlyList<string> _dataSlots = Array.Empty<string>();
@@ -110,11 +113,11 @@ public sealed record JudgePromptDefinition
         Require(slots.Contains("safety", StringComparer.Ordinal), "missing safety instruction slot", "include {{safety}} in UserTemplate");
         Require(slots[0] == "safety", "safety instruction follows data", "place {{safety}} before all data slots");
         Require(slots.Distinct(StringComparer.Ordinal).Count() == slots.Count, "duplicate template slots", "render each slot once");
-        Require(DataSlots.Count <= 8 && DataSlots.All(s => s is "input" or "output" or "context" or "reference"),
-            "unsupported data slot", "use input, output, context or reference");
+        Require(DataSlots.Count <= 10 && DataSlots.All(IsDataSlot),
+            "unsupported data slot", "retain the fixed evidence slots from the exported definition");
         Require(DataSlots.Distinct(StringComparer.Ordinal).Count() == DataSlots.Count && DataSlots.All(s => slots.Contains(s, StringComparer.Ordinal)),
             "missing or repeated data declarations", "retain each declared data slot in UserTemplate");
-        Require(slots.Where(s => s is "input" or "output" or "context" or "reference").All(s => DataSlots.Contains(s, StringComparer.Ordinal)),
+        Require(slots.Where(IsDataSlot).All(s => DataSlots.Contains(s, StringComparer.Ordinal)),
             "undeclared data slots", "declare every data slot in DataSlots");
         Require(Criteria.Count <= 256 && Criteria.All(c => c is not null && c.Text.Length <= 32768) &&
             Criteria.Select(c => c.Id).Distinct(StringComparer.Ordinal).Count() == Criteria.Count, "invalid criterion list", "use unique IDs and bounded instructions");
@@ -148,9 +151,9 @@ public sealed record JudgePromptDefinition
         var slots = matches.Select(m => m.Groups[1].Value).ToArray();
         var remainder = Regex.Replace(template, @"\{\{([A-Za-z]+)\}\}", "", RegexOptions.CultureInvariant);
         if (remainder.Contains("{{", StringComparison.Ordinal) || remainder.Contains("}}", StringComparison.Ordinal) ||
-            slots.Any(s => s is not ("input" or "output" or "context" or "reference" or "criteria" or "dimension" or "safety")))
+            slots.Any(s => !IsDataSlot(s) && s is not ("criteria" or "dimension" or "safety")))
             throw new ArgumentException("Expected: known, well-formed prompt slots. Actual: an unsupported template expression. " +
-                "Suggestions: use only input/output/context/reference/criteria/dimension/safety slots. Because: templates do not execute expressions.", nameof(template));
+                "Suggestions: use only the fixed evidence, criteria, dimension and safety slots. Because: templates do not execute expressions.", nameof(template));
         return Array.AsReadOnly(slots);
     }
 }
