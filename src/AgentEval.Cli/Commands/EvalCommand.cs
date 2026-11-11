@@ -319,23 +319,14 @@ internal static partial class EvalCommand
         // 1. Resolve --sut, if set — the same shared seam `redteam`/`bench` use. Built-in
         // targets own their own validation (consent gates, required config, etc.) via ISutTarget.Validate,
         // invoked inside TryResolve.
-        AgentEval.Prompts.JudgePromptOptions? promptOptions = null;
-        if (opts.JudgePromptPack is { } packFile)
+        var promptOptions = await JudgePromptCliOptions.LoadAsync(opts.JudgePromptPack, opts.JudgeLocale, opts.JudgeFallbackLocale, ct);
+        if (promptOptions is not null)
         {
-            promptOptions = new()
-            {
-                Pack = await new AgentEval.Prompts.JudgePromptPackLoader().LoadAsync(packFile.FullName, ct),
-                Locale = opts.JudgeLocale ?? "en", FallbackLocale = opts.JudgeFallbackLocale,
-                CaptureContent = AefCliOptions.ContentCapture == AefContentCapture.On
-            };
-            // Fail before invoking the target: a requested locale may never leave an unsupported
-            // English judge or language-dependent keyword prefilter running silently.
+            // Fail before invoking the target: requested localization may never be silently ignored.
             _ = PromptInstruments(promptOptions, selectedMetrics, [], includeCriteriaJudge: false);
             if (opts.Runs > 1 && selectedMetrics?.Any(n => n.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
                 throw new ArgumentException("Prompt-pack metric evaluation requires --runs 1; this CLI's stochastic path does not execute named metrics. Use the library for repeated localized RAG metrics.");
         }
-        else if (opts.JudgeLocale is not null || opts.JudgeFallbackLocale is not null)
-            throw new ArgumentException("--judge-locale and --judge-fallback-locale require --judge-prompt-pack.");
 
         var sutTargets = (sutTargetsOverride ?? SutTargetResolver.BuiltInTargets()).Where(t => t.SupportedVerbs.Contains("eval")).ToList();
         var commonTargetOptions = new CommonTargetOptions

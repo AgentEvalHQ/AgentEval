@@ -21,7 +21,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench eu-ai-act</c> subcommand.
 /// Runs an EU AI Act benchmark against an agent response, persists the full evidence chain,
-/// and writes both a Markdown and a PDF report.
+/// and writes a Markdown report. PDF generation is an optional separate output.
 /// </summary>
 public static class BenchEuAiActCommand
 {
@@ -52,8 +52,16 @@ public static class BenchEuAiActCommand
         bool noAef = false,
         string? subjectVersion = null,
         bool agentIsLive = false,
-        int runs = 1, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        int runs = 1, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (runs < 1)
         {
             Console.Error.WriteLine("Error: --runs must be at least 1.");
@@ -188,7 +196,14 @@ public static class BenchEuAiActCommand
                 "I should clearly identify myself as an AI assistant when interacting with users. " +
                 "For high-risk decisions, I'll defer to human review.";
         }
-        var evalInput = new EvalInput(Query: inputText, Response: agentResponse);
+        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: inputText, Response: agentResponse) { JudgePrompts = promptOptions };
 
         if (agent is null && !gradesSuppliedResponse)
         {

@@ -129,6 +129,7 @@ internal static class CliCommandTree
         benchGdprCmd.Add(benchNoAefOpt);
         benchGdprCmd.Add(benchSubjectVersionOpt);
         var (benchGdprSutOpt, benchGdprAckOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
+        var benchGdprPrompts = new JudgePromptCliOptions(benchGdprCmd);
         benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
@@ -175,7 +176,7 @@ internal static class CliCommandTree
             return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
                 aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
                 agentIsLive: agentOverride is not null,
-                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut), promptSelection: benchGdprPrompts.Read(parseResult));
         });
 
         // bench gdpr calibrate
@@ -230,6 +231,7 @@ internal static class CliCommandTree
         benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
         benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
         var (benchEuAiActSutOpt, benchEuAiActAckOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
+        var benchEuAiActPrompts = new JudgePromptCliOptions(benchEuAiActCmd);
         benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -279,7 +281,7 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1,
-                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut), promptSelection: benchEuAiActPrompts.Read(parseResult));
         });
         // bench eu-ai-act calibrate
         var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -340,6 +342,7 @@ internal static class CliCommandTree
         benchAgenticCmd.Add(benchAgenticAefOpt);
         benchAgenticCmd.Add(benchAgenticNoAefOpt);
         benchAgenticCmd.Add(benchAgenticSubjectVersionOpt);
+        var benchAgenticPrompts = new JudgePromptCliOptions(benchAgenticCmd);
         benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
@@ -372,7 +375,7 @@ internal static class CliCommandTree
             return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock,
                 reference: reference.Text, context: context.Text, ct: ct,
                 aef: parseResult.GetValue(benchAgenticAefOpt), noAef: parseResult.GetValue(benchAgenticNoAefOpt),
-                subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt));
+                subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt), promptSelection: benchAgenticPrompts.Read(parseResult));
         });
         // bench agentic calibrate
         var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };

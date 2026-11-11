@@ -49,8 +49,16 @@ public static class BenchAgenticCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null)
+        string? subjectVersion = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         // A blank reference or context is none: the checks that need one then report not measured, as without the flag.
         reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
         context = string.IsNullOrWhiteSpace(context) ? null : context;
@@ -215,7 +223,14 @@ public static class BenchAgenticCommand
                     "answer see an empty one. Pass --response/--response-file to grade a specific answer.");
             }
         }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference);
+        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference) { JudgePrompts = promptOptions };
         if (glassBoxTrace is not null)
         {
             // The agent's instructions as the trace recorded them: the judges whose rubric grades the response against

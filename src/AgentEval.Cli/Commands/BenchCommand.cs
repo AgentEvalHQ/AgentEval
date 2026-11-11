@@ -21,7 +21,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench gdpr</c> subcommand.
 /// Runs a GDPR benchmark against an agent response, persists the full evidence chain,
-/// and writes both a Markdown and a PDF report.
+/// and writes a Markdown report. PDF generation is an optional separate output.
 /// </summary>
 public static class BenchCommand
 {
@@ -53,8 +53,16 @@ public static class BenchCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (runs < 1)
         {
             Console.Error.WriteLine("Error: --runs must be at least 1.");
@@ -188,7 +196,14 @@ public static class BenchCommand
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
         }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse);
+        try { JudgePromptCliOptions.Preflight(benchmark, judge, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: query, Response: agentResponse) { JudgePrompts = promptOptions };
 
         if (isMock)
         {

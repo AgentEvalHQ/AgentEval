@@ -61,11 +61,25 @@ If the dataset also has `evaluation_criteria` and `--judge` is supplied, include
 
 Named CLI metrics currently execute only with `--runs 1`. Combining their prompt packs with `--runs > 1` is rejected rather than ignored. The harness's criteria judge supports localized concurrent stochastic runs through the library and CLI criteria path. The CLI preflights selected instruments before invoking the target and includes their digests in the declared suite identity.
 
+Benchmark families use the same selection flags. Export the selected preset's actual leaf instruments, including family instructions and domain-pack additions:
+
+```sh
+agenteval prompts export ./gdpr-prompts --family gdpr --preset smoke
+# Translate the messages and criteria, preserving keys/IDs; set locale to sv-SE.
+agenteval prompts validate ./gdpr-prompts/prompts.json --family gdpr --preset smoke
+agenteval bench gdpr --preset smoke --subject my-agent --input "User question" --response "Agent answer" \
+  --judge-prompt-pack ./gdpr-prompts/prompts.json --judge-locale sv-SE --runs 3
+```
+
+`--family agentic` and `--family eu-ai-act` work the same way. Pass the matching `--preset` when validating or inspecting; without a family the authoring commands use the original RAG/generic catalogue. The three benchmark commands validate all selected judge contracts before invoking the target. GDPR and EU AI Act repeated runs retain the selected prompt identity in each trial. Code-only presets reject a pack with no judge to configure; missing required evidence remains unmeasured.
+
+These benchmark flags do not configure the existing `calibrate` subcommands. Those commands remain a separate workflow: some embedded compliance cases use surrogate substance rubrics with synthetic scenario IDs, rather than a production scenario's exact criteria. Agreement on those cases does not establish calibration of the exported production instrument. Use the library's actual graph with matching cases for instrument-specific review while the CLI calibration integration is completed.
+
 ## Metadata and safety
 
 Each definition declares `evaluatorKey`, `id`, semantic `version`, `locale`, `responseContract`, `scale`, `passAt`, optional `reviewAt`/`severityBands`, stable `criteria`, `dataSlots`, translation `status`, and four relative Markdown file paths: `systemFile`, `userFile`, `retryFile`, `safetyFile`. Thresholds are normalized to `[0,1]`; `scale` is `unit` or `percent`. `CriteriaV1` uses percent. Machine contracts are selected from known versions, not loaded executable code. The [v1 metadata schema](schemas/judge-prompt-pack.schema.json) supports editor validation; always run `prompts validate` too, which checks files, templates and evaluator compatibility.
 
-Only `{{input}}`, `{{output}}`, `{{context}}`, `{{reference}}`, `{{criteria}}`, `{{dimension}}` and `{{safety}}` are recognized. The safety slot must precede data. Every case-data substitution is fenced by the implementation, including marker neutralization; substitution happens once. A translation cannot remove required data slots, change stable criterion IDs or select another response shape. System text cannot contain case-data slots. These controls reduce injection risk; an LLM can still disregard instructions.
+Templates recognize `{{input}}`, `{{output}}`, `{{context}}`, `{{reference}}`, `{{criteria}}`, `{{dimension}}`, `{{safety}}` and the six atomic evidence slots listed below. The safety slot must precede data. Every case-data substitution is fenced by the implementation, including marker neutralization; substitution happens once. A translation cannot remove required data slots, change stable criterion IDs or select another response shape. System text cannot contain case-data slots. These controls reduce injection risk; an LLM can still disregard instructions.
 
 Configured responses undergo bounded, implementation-owned JSON validation, including numeric scales, required arrays/booleans and duplicate/unknown criterion IDs. One corrective retry uses the selected localized retry text and original evidence. An invalid reply remains unmeasured. Prompt metadata determines rubric thresholds and score bands rather than merely describing different instructions while the reader uses an old policy.
 
@@ -88,7 +102,7 @@ An authored translation needs a separately reviewed calibration set. Include sho
 | `ChatClientEvaluator` criteria transport | Invocation-owned selection and stable criterion IDs |
 | `RelevanceEval` / `AtomicLlmEval` | Rubric binding, localized criteria/framing and metadata-driven scoring |
 | Tool/system-policy/evaluator-note atomic framing | Fixed, fenced slots selected by the leaf; required slots cannot be omitted by a replacement |
-| Agentic/compliance atomic leaves | Library export and binding through the declared evaluation graph; broader CLI evaluation/calibration integration remains in progress |
+| Agentic/compliance atomic leaves | Library graph export/binding and CLI family/preset export, validation and benchmark selection; CLI calibration integration remains in progress |
 | Red-team, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
 The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Unsupported library LLM metrics and upstream `MicrosoftEvaluatorAdapter` reject explicit `JudgePrompts` before evaluating, including both adapter contracts. The CLI rejects these combinations before invoking the target. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
@@ -101,6 +115,6 @@ The additional data slots are `toolCalls`, `toolDefinitions`, `systemMessage`, `
 
 Configured `JailbreakResistanceEval` uses one invocation of the selected judge, bypassing the legacy language-dependent pattern shortlist. This prevents an English pattern miss from becoming a Swedish pass and preserves the selected threshold and prompt identity. Its unconfigured per-pattern behavior remains unchanged. Recalibrate this new instrument; no localized pattern-accuracy claim is implied.
 
-The CLI authoring catalogue currently exposes the first supported built-in starting points; custom and additional composite keys can use the library loader and binding API directly. A new machine response shape requires an `IEvaluator` implementation with its own parser. Implement `IJudgePromptBindable` and `IResolvedJudgePromptSource` if that evaluator also accepts these definitions; unsupported contracts must fail before a provider call. Executable parsers are never loaded from a pack.
+The CLI authoring catalogue includes RAG/generic judges and the selected agentic/GDPR/EU AI Act preset. Custom composite keys can use the library loader and binding API directly. A new machine response shape requires an `IEvaluator` implementation with its own parser. Implement `IJudgePromptBindable` and `IResolvedJudgePromptSource` if that evaluator also accepts these definitions; unsupported contracts must fail before a provider call. Executable parsers are never loaded from a pack.
 
 Opting into a pack creates a new instrument digest, including when selecting the exported English draft. Re-establish baselines for that instrument instead of treating earlier English scores as calibrated translations. Existing context-free default calls retain their legacy path. Explicit customer system text now survives rubric binding; the CLI's embedded family fallback still yields to a leaf's own rubric. If customer text relied on being discarded, remove that override explicitly. A text-only system override does not change the bound reader's numeric scale or thresholds.
