@@ -4,6 +4,7 @@
 
 using AgentEval.Cli.Commands;
 using AgentEval.Core;
+using AgentEval.Testing;
 using Xunit;
 
 namespace AgentEval.Tests.Cli;
@@ -227,6 +228,28 @@ public class JudgeFactoryFamilyPromptTests : IDisposable
         var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands", file));
 
         Assert.Contains(resolver, source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    public void CreateFamily_OfflineClient_MatchesRuntimePromptAndBinding(string family)
+    {
+        ConfigureAzureJudge();
+        var (runtime, _, exit) = family == "gdpr"
+            ? JudgeFactory.ResolveGdpr(null, "test") : JudgeFactory.ResolveEuAiAct(null, "test");
+        Assert.Equal(0, exit);
+        using var client = new FakeChatClient("No call expected");
+        var offline = JudgeFactory.CreateFamily(client, family);
+        var actual = Assert.IsType<ChatClientEvaluator>(runtime);
+        Assert.Equal(actual.SystemPromptId, offline.SystemPromptId);
+        Assert.Equal(actual.PromptMaterial, offline.PromptMaterial);
+        var rubric = new EvalRubric { Id = "selected-leaf", Text = "Leaf policy", Scale = RubricScoreScale.Unit };
+        var runtimeBound = Assert.IsType<ChatClientEvaluator>(((IRubricBindable)actual).WithRubric(rubric, null));
+        var offlineBound = Assert.IsType<ChatClientEvaluator>(((IRubricBindable)offline).WithRubric(rubric, null));
+        Assert.Equal(runtimeBound.PromptMaterial, offlineBound.PromptMaterial);
+        Assert.Equal("selected-leaf", offlineBound.SystemPromptId);
+        Assert.Empty(client.ReceivedMessages);
     }
 
     [Fact]

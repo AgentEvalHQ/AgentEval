@@ -82,8 +82,8 @@ public sealed class GoalTrackingEval : IEvalDefinitionWrapper
 
         // Embed the full history so the judge can identify the original goal from turn 1 —
         // preserving every other EvalInput field via WithEnrichedQuery (BUG-57).
-        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
-            input, ConversationHistoryHelper.FormatTranscript(history));
+        var enriched = ConversationHistoryHelper.WithJudgeHistory(
+            input, history, _inner.HasPromptSelection(input));
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

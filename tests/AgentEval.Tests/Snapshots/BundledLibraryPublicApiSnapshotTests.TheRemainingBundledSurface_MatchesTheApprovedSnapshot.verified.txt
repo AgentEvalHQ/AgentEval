@@ -1394,13 +1394,16 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationDatasetLoader
     ctor()
 sealed class AgentEval.Evals.Agentic.Calibration.CalibrationEntry : IEquatable<AgentEval.Evals.Agentic.Calibration.CalibrationEntry>
     AgentEval.Evals.Agentic.Calibration.CalibrationEntry <Clone>$()
+    AgentEval.Evals.Agentic.Conversation.ConversationTurn CorrectionTurn { get; init; }
     AgentEval.Evals.EvalInput ToEvalInput()
     Boolean Equals(AgentEval.Evals.Agentic.Calibration.CalibrationEntry other)
     Boolean Equals(Object obj)
     Double ExpectedScoreMax { get; init; }
     Double ExpectedScoreMin { get; init; }
     IReadOnlyList<AgentEval.Evals.Agentic.Conversation.ConversationTurn> ConversationHistory { get; init; }
+    IReadOnlyList<AgentEval.Evals.ExpectedAction> ExpectedActions { get; init; }
     IReadOnlyList<AgentEval.Evals.ToolCall> ToolCalls { get; init; }
+    IReadOnlyList<AgentEval.Evals.ToolDefinition> ToolDefinitions { get; init; }
     Int32 GetHashCode()
     String AgentResponse { get; init; }
     String Context { get; init; }
@@ -1408,7 +1411,9 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationEntry : IEquatable<A
     String ExpectedVerdict { get; init; }
     String GroundTruth { get; init; }
     String Input { get; init; }
+    String Plan { get; init; }
     String Rationale { get; init; }
+    String ReasoningTrace { get; init; }
     String ScenarioId { get; init; }
     String SystemMessage { get; init; }
     String ToString()

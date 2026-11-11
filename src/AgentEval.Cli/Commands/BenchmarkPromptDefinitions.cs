@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using AgentEval.Benchmarks;
-using AgentEval.Core;
 using AgentEval.Prompts;
 using Microsoft.Extensions.AI;
 using Gdpr = AgentEval.Compliance.Gdpr.Articles;
@@ -17,17 +15,7 @@ internal static class BenchmarkPromptDefinitions
     {
         BenchListCommand.AnchorAssemblies();
         using var client = new NoNetworkChatClient();
-        var judge = family switch
-        {
-            "agentic" => new ChatClientEvaluator(client),
-            "gdpr" => new ChatClientEvaluator(client,
-                EmbeddedPromptLoader.Load(typeof(GdprBenchmark).Assembly, JudgeFactory.GdprJudgeSystemPromptFile),
-                JudgeFactory.GdprJudgeSystemPromptFile, preserveSystemPromptOnBinding: false),
-            "eu-ai-act" => new ChatClientEvaluator(client,
-                EmbeddedPromptLoader.Load(typeof(EuAiActBenchmark).Assembly, JudgeFactory.EuAiActJudgeSystemPromptFile),
-                JudgeFactory.EuAiActJudgeSystemPromptFile, preserveSystemPromptOnBinding: false),
-            _ => throw new ArgumentException("Unknown prompt family. Expected: agentic, gdpr or eu-ai-act.")
-        };
+        var judge = JudgeFactory.CreateFamily(client, family);
         if (family == "agentic")
             return BuiltInJudgePrompts.ForEval(BenchAgenticCommand.ResolvePreset(preset ?? "agentic-execution", judge, subjectId: "prompt-export"));
         if (family == "gdpr")

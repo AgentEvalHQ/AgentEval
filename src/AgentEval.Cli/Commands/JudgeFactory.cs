@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Reflection;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Benchmarks;
 using AgentEval.Providers;
@@ -59,19 +58,35 @@ internal static class JudgeFactory
     /// </remarks>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveGdpr(
         IEvaluator? evaluatorOverride, string judgeKind) =>
-        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile);
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, "gdpr");
 
     /// <summary>The EU AI Act judge — one resolver for the benchmark AND its calibration (see <see cref="ResolveGdpr"/>).</summary>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveEuAiAct(
         IEvaluator? evaluatorOverride, string judgeKind) =>
-        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile);
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, "eu-ai-act");
 
     private static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveWithFamilyPrompt(
-        IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
-        evaluatorOverride is not null
-            ? (evaluatorOverride, "override", 0)
-            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile,
-                preserveSystemPromptOnBinding: false);
+        IEvaluator? evaluatorOverride, string judgeKind, string family)
+    {
+        if (evaluatorOverride is not null) return (evaluatorOverride, "override", 0);
+        var prompt = FamilyPrompt(family);
+        return Resolve(null, judgeKind, prompt.Text, prompt.Id, preserveSystemPromptOnBinding: false);
+    }
+
+    /// <summary>Constructs the same family judge around a supplied client, including offline descriptor clients.</summary>
+    internal static ChatClientEvaluator CreateFamily(IChatClient client, string family)
+    {
+        if (family == "agentic") return new(client);
+        var prompt = FamilyPrompt(family);
+        return new(client, prompt.Text, prompt.Id, preserveSystemPromptOnBinding: false);
+    }
+
+    private static (string Text, string Id) FamilyPrompt(string family) => family switch
+    {
+        "gdpr" => (EmbeddedPromptLoader.Load(typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile), GdprJudgeSystemPromptFile),
+        "eu-ai-act" => (EmbeddedPromptLoader.Load(typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile), EuAiActJudgeSystemPromptFile),
+        _ => throw new ArgumentException("Expected: agentic, gdpr or eu-ai-act. Actual: unknown prompt family. Suggestions: select a supported family. Because: offline export and execution must share an instrument.", nameof(family))
+    };
 
     /// <summary>
     /// Resolves the judge to use for a bench run.

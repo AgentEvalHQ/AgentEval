@@ -44,6 +44,21 @@ public sealed record CalibrationEntry(
     /// </summary>
     public IReadOnlyList<ToolCall>? ToolCalls { get; init; }
 
+    /// <summary>Available tool schemas, preserved for judges that validate calls against their definitions.</summary>
+    public IReadOnlyList<ToolDefinition>? ToolDefinitions { get; init; }
+
+    /// <summary>Declared expected actions, preserved independently of observed tool calls.</summary>
+    public IReadOnlyList<ExpectedAction>? ExpectedActions { get; init; }
+
+    /// <summary>The recorded correction turn consumed by SelfCorrectionQualityEval.</summary>
+    public ConversationTurn? CorrectionTurn { get; init; }
+
+    /// <summary>An explicitly recorded reasoning trace; no hidden reasoning is inferred.</summary>
+    public string? ReasoningTrace { get; init; }
+
+    /// <summary>An explicitly recorded plan, independent of language-dependent response heuristics.</summary>
+    public string? Plan { get; init; }
+
     /// <summary>
     /// The agent's instructions (its system message); passed as <see cref="EvalInput.SystemMessage"/>. The
     /// <c>task_adherence</c> rule, procedural, presentation and authorization judges grade the response against them and
@@ -59,10 +74,20 @@ public sealed record CalibrationEntry(
         Context: Context,
         GroundTruth: GroundTruth,
         ToolCalls: ToolCalls,
+        ToolDefinitions: ToolDefinitions,
+        ExpectedActions: ExpectedActions,
         SystemMessage: SystemMessage,
-        Metadata: ConversationHistory is { Count: > 0 } history
-            ? new Dictionary<string, object> { [ConversationHistoryHelper.MetadataKey] = history }
-            : null);
+        Metadata: EvidenceMetadata());
+
+    private IReadOnlyDictionary<string, object>? EvidenceMetadata()
+    {
+        var metadata = new Dictionary<string, object>();
+        if (ConversationHistory is { Count: > 0 }) metadata[ConversationHistoryHelper.MetadataKey] = ConversationHistory;
+        if (CorrectionTurn is not null) metadata[ConversationHistoryHelper.CorrectionTurnMetadataKey] = CorrectionTurn;
+        if (ReasoningTrace is not null) metadata[Reasoning.ReasoningCorrectnessEval.MetadataKey] = ReasoningTrace;
+        if (Plan is not null) metadata[Reasoning.PlanFormulationQualityEval.MetadataKey] = Plan;
+        return metadata.Count == 0 ? null : metadata;
+    }
 }
 
 /// <summary>A named collection of calibration entries for a single agentic category.</summary>

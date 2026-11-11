@@ -80,8 +80,8 @@ public sealed class TurnCoherenceEval : IEvalDefinitionWrapper
 
         // Only the immediately-preceding turn is needed (MEDIUM cost tier — small context).
         // Preserve every other EvalInput field via WithEnrichedQuery (BUG-57).
-        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
-            input, ConversationHistoryHelper.FormatPreviousTurn(history[^1]));
+        var enriched = ConversationHistoryHelper.WithJudgeHistory(
+            input, history, _inner.HasPromptSelection(input), previousOnly: true);
 
         return await _inner.EvaluateAsync(enriched, ct);
     }
