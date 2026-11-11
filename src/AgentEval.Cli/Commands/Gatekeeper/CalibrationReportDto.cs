@@ -9,7 +9,11 @@ using AgentEval.Guardrails.Judges;
 namespace AgentEval.Cli.Commands.Gatekeeper;
 
 /// <summary>One calibration case in the report (text truncated / redacted so gold-set payloads aren't persisted at length).</summary>
-internal sealed record CalibrationCaseDto(string Text, bool ShouldBlock, bool Blocked);
+internal sealed record CalibrationCaseDto(string Text, bool ShouldBlock, bool Blocked)
+{
+    public bool Measured { get; init; } = true;
+    public IReadOnlyList<JudgeGateInstrument> JudgeInstruments { get; init; } = [];
+}
 
 /// <summary>JSON projection of a <see cref="CalibrationReport"/> printed by <c>gatekeeper calibrate</c>.</summary>
 internal sealed record CalibrationReportDto
@@ -21,7 +25,7 @@ internal sealed record CalibrationReportDto
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    public string SchemaVersion { get; init; } = "1.1";
+    public string SchemaVersion { get; init; } = "1.2";
     public string Axis { get; init; } = "";
     public string? SplitLabel { get; init; }
     public int TruePositives { get; init; }
@@ -43,6 +47,12 @@ internal sealed record CalibrationReportDto
     public bool PromotionCriteriaConfigured { get; init; }
     public bool SufficientData { get; init; }
     public bool IsInlineReady { get; init; }
+    public int UnmeasuredCases { get; init; }
+    public bool ModelsIdentified { get; init; }
+    public IReadOnlyList<string> InstrumentDigests { get; init; } = [];
+    public GateDatasetProvenance? Dataset { get; init; }
+    public bool? CertificateEligible { get; init; }
+    public GateCalibrationPolicy? CalibrationPolicy { get; init; }
     public IReadOnlyList<CalibrationCaseDto>? Cases { get; init; }
 
     public static CalibrationReportDto From(CalibrationReport r, bool redactCaseText) => new()
@@ -68,9 +78,13 @@ internal sealed record CalibrationReportDto
         PromotionCriteriaConfigured = r.PromotionCriteriaConfigured,
         SufficientData = r.SufficientData,
         IsInlineReady = r.IsInlineReady,
+        UnmeasuredCases = r.UnmeasuredCases,
+        ModelsIdentified = r.ModelsIdentified,
+        InstrumentDigests = r.InstrumentDigests,
         // a gold case can itself contain a secret-shaped span → elide entirely for the redact axes, else truncate.
         Cases = r.Cases.Select(c => new CalibrationCaseDto(
-            redactCaseText ? "[redacted]" : Truncate(c.Text, 80), c.ShouldBlock, c.Blocked)).ToList(),
+            redactCaseText ? "[redacted]" : Truncate(c.Text, 80), c.ShouldBlock, c.Blocked)
+            { Measured = c.Measured, JudgeInstruments = c.JudgeInstruments.Select(GateVerdictDto.WithoutContent).ToArray() }).ToList(),
     };
 
     private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
@@ -90,4 +104,9 @@ internal sealed record CalibrationCertificate(
     string GoldSetHash,
     bool IsInlineReady,
     string CertifiedAtUtc,
-    CalibrationReportDto Report);
+    CalibrationReportDto Report,
+    string? InstrumentDigest = null,
+    GateDatasetProvenance? Dataset = null);
+
+internal sealed record GateCalibrationPolicy(int MaxDangerousErrors, int MinCasesPerDirection, int MaxConcurrency,
+    string BaselinePolicy, string BaselineLocale);

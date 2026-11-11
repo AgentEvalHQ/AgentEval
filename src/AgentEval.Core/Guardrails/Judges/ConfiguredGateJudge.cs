@@ -77,6 +77,16 @@ internal sealed class ConfiguredGateJudge
         };
     }
 
+    // Offline reply parsing shares the exact reader and records zero dispatches, never a fabricated model observation.
+    internal JudgeVerdict ReadReply(string text, string reply)
+    {
+        var user = JudgePromptRenderer.Render(_resolved.Definition, text, string.Empty, null);
+        var verdict = !string.IsNullOrWhiteSpace(text) && TryRead(reply, out var read)
+            ? read : JudgeVerdict.Inconclusive("Configured offline reply is invalid or input is empty.");
+        return verdict with { Instrument = new(Digest, JudgePromptRenderer.Provenance(_resolved, user),
+            _options.ModelId, [], verdict.Decision != JudgeDecision.Inconclusive) };
+    }
+
     private static bool TryRead(string? text, out JudgeVerdict result)
     {
         result = JudgeVerdict.Inconclusive();

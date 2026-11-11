@@ -6,6 +6,16 @@ The generic `judge.criteria` entry starts with an empty criterion roster. Add th
 
 A sixteenth entry, `gate.over-refusal`, is an AI-authored **draft** for the runtime over-refusal judge. Set `JudgeGateOptions.JudgePrompts` to the loaded pack; configured gating bypasses the English refusal prefilter. The sample calls `JudgeTextAsync` and demonstrates a quality flag, not an inline deployment. Use this axis under `WarnOnly`; a flag must not block a justified safety refusal. Its output-only view cannot independently verify the original request or the legitimacy of a cited reason. The draft explicitly retains uncertainty.
 
+The accompanying [gate calibration JSON](calibration-gate-over-refusal.json) contains two AI-authored, unreviewed format examples. From the repository root, `agenteval prompts validate samples/AgentEval.Samples/PromptPacks/sv-SE/prompts.json` validates the mixed metric/runtime pack. With a configured provider, the following makes real model calls:
+
+```bash
+agenteval gatekeeper calibrate --gate judge:over-refusal \
+  --judge-prompt-pack samples/AgentEval.Samples/PromptPacks/sv-SE/prompts.json --judge-locale sv-SE \
+  --gold-set samples/AgentEval.Samples/PromptPacks/sv-SE/calibration-gate-over-refusal.json
+```
+
+This diagnostic exits 1: the two-case, unreviewed dataset cannot establish certificate eligibility. Keep the label/review metadata honest even when model judgments match. For offline inspection, supply a `GateDecisionV1` JSON reply via `gatekeeper inspect --model-reply <file>` with the same pack/locale and a `{"text":"..."}` payload on stdin. It records zero provider calls and unknown model provenance.
+
 **Status: AI-authored, not human-reviewed or semantically calibrated.** The sample program uses scripted replies to verify transport and policy wiring. The draft cases and expected labels below were authored by an AI assistant. No customer dataset or human-reviewed labels have been supplied. These cases are proposed review material, not Andreas Adner's private dataset or evidence of real-model accuracy. Swedish reviewers should approve labels and expand coverage for the customer's domain before running repeatable calibration.
 
 | Draft case | Question / context / answer | Expected review |

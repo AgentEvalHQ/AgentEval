@@ -104,6 +104,9 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         return Map(verdict);
     }
 
+    internal GateVerdict InspectConfiguredReply(string text, string reply) =>
+        Map((_configured ?? throw new InvalidOperationException("A configured prompt is required.")).ReadReply(BoundInput(text), reply));
+
     private GateVerdict Map(JudgeVerdict verdict)
     {
         var ruleName = PolicyName;

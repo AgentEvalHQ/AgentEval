@@ -5,6 +5,8 @@ AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal
 call for a versioned gate verdict + exit code.
 
 For declarative judge localization, use `agenteval prompts export`, `validate` and `inspect`, then select the pack with `eval --judge-prompt-pack ... --judge-locale sv-SE`. The same flags work on `bench agentic`, `bench gdpr` and `bench eu-ai-act`; export and validate those instruments with the matching `--family` and `--preset`. These settings are independent of the target's `--system-prompt`. See [judge prompt packs](judge-prompt-packs.md) for supported metrics, fixed criterion rosters and the Swedish example.
+Runtime judges also accept these flags through `gatekeeper calibrate` and `gatekeeper inspect`; export with `prompts export <directory> --family gatekeeper [--preset <axis>]`. Configured certificates bind the exact instrument and supplied `--gold-set`, including held-out human-review metadata. AI-authored draft cases remain diagnostic. See the [runtime gate workflow](judge-prompt-packs.md#runtime-judge-gates).
+
 
 ## Installation
 
@@ -654,7 +656,7 @@ drop straight into CI.
 ```
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect   --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
-agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify]
+agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify] [--judge-prompt-pack <manifest> --judge-locale <locale>] [--gold-set <dataset.json>]
 ```
 
 **Subcommands**

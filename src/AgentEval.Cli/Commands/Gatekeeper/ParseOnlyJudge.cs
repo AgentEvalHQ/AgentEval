@@ -18,6 +18,11 @@ internal static class ParseOnlyJudge
     public static GateVerdict Evaluate(IJudgeRubric rubric, string text, string modelReply, JudgeGateOptions? options = null)
     {
         options ??= new JudgeGateOptions();
+        if (options.JudgePrompts is not null)
+        {
+            using var noNetwork = new BenchmarkPromptDefinitions.NoNetworkChatClient();
+            return new CompositeJudgeGate<IJudgeRubric>(rubric, noNetwork, options).InspectConfiguredReply(text, modelReply);
+        }
         var policy = $"judge:{rubric.Axis}";
 
         if (string.IsNullOrEmpty(text) || !SafePrefilter(rubric, text))

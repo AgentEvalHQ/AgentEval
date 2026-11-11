@@ -4,6 +4,8 @@
 using System.CommandLine;
 using System.Text.Json;
 using AgentEval.Core;
+using AgentEval.Cli.Commands.Gatekeeper;
+using AgentEval.Guardrails.Judges;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Quality;
 using AgentEval.Prompts;
@@ -45,12 +47,18 @@ internal static class PromptsCommand
     }
 
     private static Option<string?> FamilyOption() => new("--family")
-        { Description = "Judge family: agentic | gdpr | eu-ai-act | redteam. Omit for RAG and generic judges." };
+        { Description = "Judge family: agentic | gdpr | eu-ai-act | redteam | gatekeeper. Omit for RAG and generic judges." };
     private static Option<string?> PresetOption() => new("--preset")
         { Description = "Family preset; redteam uses an attack name or supported. Requires --family." };
 
     internal static IReadOnlyList<JudgePromptDefinition> SupportedDefinitions(string? family = null, string? preset = null)
     {
+        if (family == "gatekeeper")
+        {
+            var axes = preset is null or "supported" ? JudgeAxisRegistry.Axes : [preset];
+            return axes.Select(axis => GateJudgePrompts.ForRubric((JudgeAxisRegistry.For(axis)
+                ?? throw new ArgumentException($"Unknown gatekeeper axis '{axis}'.")).Rubric())).ToArray();
+        }
         if (family is not null) return BenchmarkPromptDefinitions.ForPreset(family, preset);
         if (preset is not null) throw new ArgumentException("--preset requires --family.");
         BenchListCommand.AnchorAssemblies();
@@ -81,7 +89,7 @@ internal static class PromptsCommand
         try
         {
             var pack = await new JudgePromptPackLoader().LoadAsync(manifest, ct);
-            var supported = SupportedDefinitions(family, preset).ToDictionary(d => d.EvaluatorKey, StringComparer.Ordinal);
+            var supported = (family is null ? SupportedDefinitions().Concat(SupportedDefinitions("gatekeeper")) : SupportedDefinitions(family, preset)).ToDictionary(d => d.EvaluatorKey, StringComparer.Ordinal);
             var resolver = new JudgePromptResolver();
             var instruments = pack.Definitions.Select(definition =>
             {
