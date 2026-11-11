@@ -418,6 +418,20 @@ dotnet run -- 110   # Microsoft 365 Live Walkthrough  (R2)
 
 ---
 
+### S — Judge Customization
+
+| # | Sample | What You'll Learn | Provider? | Time |
+|---|--------|-------------------|-----------|------|
+| 1 | **Multilingual Prompt Packs** | Load Swedish Markdown + metadata, evaluate RAG and a rubric-bound judge, and inspect actual locale/digest provenance | No, scripted | 5 min |
+
+```bash
+dotnet run -- --sample MultilingualPromptPacks
+# Equivalent new numeric shortcut; existing 1–110 shortcuts are unchanged:
+dotnet run -- 111
+```
+
+The [shipped Swedish pack](PromptPacks/sv-SE/README.md) is a transport and configuration example, not a semantic calibration claim. See [prompt authoring](../../docs/judge-prompt-packs.md) for supported families, overrides, retry messages and real-data calibration.
+
 ## Prerequisites
 
 ### Choosing a provider
@@ -650,15 +664,19 @@ var paths = await BenchmarkSampleHelpers.WriteReportsViaStoreAsync(
     subject: ourAgent,
     benchmarkName: "GDPR",
     regulationOrBenchmark: "gdpr",
-    includePdf: true,
+    includePdf: false,                 // opt in explicitly to the registered PDFsharp provider
     regulationCodeForEvidence: "gdpr"); // writes regulator-grade evidence.json
 // Mission Control + `agenteval doctor` read the audit-chained .agenteval/ tree;
-// the human-friendly HTML / PDF / JSON sidecars land under output/{family}/.
+// HTML / JSON sidecars land under output/{family}/; PDF is generated only when requested.
 ```
+
+The sample project explicitly references the optional PDFsharp provider. When `includePdf: true`, the helper registers it with `AddAgentEvalPdfSharp()` and resolves it through `IPdfRendererRegistry`. Base library/CLI consumers do not inherit a PDF engine. See [PDF providers](../../docs/pdf-providers.md) for installation, alternate engines and the optional `agenteval-pdf` companion.
 
 ---
 
 ## Cost Optimisation Reference
+
+A4 (`--sample PerformanceMetrics --mock`) demonstrates cached input through the real harness using a labelled scripted client. A4 and D5 use `MAFIdentifiableAgentAdapter` to tag responses with the configured model identity because MAF does not expose the underlying `ChatResponse.ModelId` on this path. D5 shows the live streaming/non-streaming comparison and prints cache assumptions. `EvaluationOptions.ModelName` is an explicit pricing override; otherwise an AgentEval response identity precedes the agent's configured identity. Deployment aliases need matching rates through `PricingResolver`. Unknown usage is not zero, and cache discounts require reported counts plus a cached rate. See [cost estimation](../../docs/cost-estimation.md) for per-run pricing and estimate statuses. The rough figures below are illustrative, not current provider quotes.
 
 | Metric type | Cost / eval | Latency | Best for |
 |-------------|-------------|---------|----------|

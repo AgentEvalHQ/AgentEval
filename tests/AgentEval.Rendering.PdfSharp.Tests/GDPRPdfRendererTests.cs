@@ -20,7 +20,7 @@ namespace AgentEval.Tests.Compliance.Gdpr;
 // Rendered PDFs are read back as text. Under a fully parallel run the text came back as NUL characters (seen once
 // on net8.0, never alone), so these render outside the parallel phase, with the other tests that touch QuestPDF's
 // process-wide state.
-[Collection(AgentEval.Tests.Rendering.Pdf.QuestPdfLicenceCollection.Name)]
+[Collection(AgentEval.Tests.Rendering.Pdf.PdfProviderCollection.Name)]
 public class GDPRPdfRendererTests : IDisposable
 {
     private readonly string _tempDir;
@@ -142,7 +142,7 @@ public class GDPRPdfRendererTests : IDisposable
         var registry = BuildRegistry();
 
         // Act
-        var renderer = new GDPRPdfRenderer(registry);
+        var renderer = new GDPRPdfRenderer(registry, PdfTestRegistry.Create());
 
         // Assert
         Assert.NotNull(renderer);
@@ -154,7 +154,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_NullEvidence_Throws()
     {
         // Arrange
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var outputPath = Path.Combine(_tempDir, "report.pdf");
 
         // Act & Assert
@@ -168,7 +168,7 @@ public class GDPRPdfRendererTests : IDisposable
         // GAP-12: a token cancelled before render must be honored ahead of the synchronous QuestPDF
         // build AND the Directory.CreateDirectory side-effect — not after. The output directory must
         // not be created.
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
         var freshDir = Path.Combine(_tempDir, "should-not-be-created");
         var outputPath = Path.Combine(freshDir, "report.pdf");
@@ -186,7 +186,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_NullOutputPath_Throws()
     {
         // Arrange
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
 
         // Act & Assert — ArgumentNullException is a subclass of ArgumentException; accept either
@@ -199,7 +199,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_WhitespaceOutputPath_Throws()
     {
         // Arrange
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
 
         // Act & Assert
@@ -213,7 +213,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_GeneratesNonEmptyPdfFile()
     {
         // Arrange
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
         var outputPath = Path.Combine(_tempDir, "report.pdf");
 
@@ -236,7 +236,7 @@ public class GDPRPdfRendererTests : IDisposable
     {
         // Arrange
         var registry = BuildRegistry();
-        var renderer = new GDPRPdfRenderer(registry);
+        var renderer = new GDPRPdfRenderer(registry, PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
         var outputPath = Path.Combine(_tempDir, "report-with-registry.pdf");
 
@@ -252,7 +252,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_CreatesOutputDirectory_IfNotExisting()
     {
         // Arrange
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence();
         var nestedDir = Path.Combine(_tempDir, "nested", "sub", "dir");
         var outputPath = Path.Combine(nestedDir, "report.pdf");
@@ -268,7 +268,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_SmokePreset_EmptyPillars_GeneratesValidPdf()
     {
         // Arrange — smoke preset has no per-pillar entries
-        var renderer = new GDPRPdfRenderer();
+        var renderer = new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create());
         var evidence = MakeMinimalEvidence(preset: "smoke", hasPillars: false);
         var outputPath = Path.Combine(_tempDir, "smoke-report.pdf");
 
@@ -322,7 +322,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_RecordedHash_AppendixSaysNotVerifiedInThisReport()
     {
         var outputPath = Path.Combine(_tempDir, "chain-recorded.pdf");
-        await new GDPRPdfRenderer().RenderAsync(MakeMinimalEvidence(), outputPath);
+        await new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create()).RenderAsync(MakeMinimalEvidence(), outputPath);
 
         var text = ExtractTextWithoutWhitespace(outputPath);
 
@@ -338,7 +338,7 @@ public class GDPRPdfRendererTests : IDisposable
     public async Task RenderAsync_NoHash_AppendixSaysNoHashRecorded()
     {
         var outputPath = Path.Combine(_tempDir, "chain-absent.pdf");
-        await new GDPRPdfRenderer().RenderAsync(MakeMinimalEvidence(manifestHash: ""), outputPath);
+        await new GDPRPdfRenderer(pdfRenderers: PdfTestRegistry.Create()).RenderAsync(MakeMinimalEvidence(manifestHash: ""), outputPath);
 
         var text = ExtractTextWithoutWhitespace(outputPath);
 

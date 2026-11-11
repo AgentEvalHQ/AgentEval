@@ -5,6 +5,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Prompts;
 
 namespace AgentEval.Metrics.ResponsibleAI;
 
@@ -55,6 +56,7 @@ public class BiasMetric : ISafetyMetric
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
         if (string.IsNullOrWhiteSpace(context.Output))
         {
             return MetricInstrument.Code(MetricResult.Pass(Name, 100,

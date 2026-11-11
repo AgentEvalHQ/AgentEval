@@ -21,6 +21,9 @@ Upgrading from 0.43? See the [1.0 migration guide](https://github.com/AgentEvalH
 - 🔄 **Trace Record & Replay** — Deterministic CI testing without LLM calls
 - 🎯 **Calibrated Judge** — Several LLM judges score the same reply and vote, with their agreement reported
 - 🔌 **Extensible** — Adapter pattern for any agent framework
+- **Replaceable judge prompts** — Versioned Markdown + JSON/YAML packs for five RAG metrics and text-only Atomic/Relevance judges, with per-evaluation locale selection and provenance
+- **Cache-aware cost estimates** — Returned model identity, reported cached input and explicit rate/usage assumptions
+- **Optional PDF providers** — Install, register and select a renderer independently of the core package
 
 ## Quick Start
 
@@ -36,8 +39,8 @@ var harness = new MAFEvaluationHarness(evaluatorClient);
 // Wrap your Microsoft Agent Framework AIAgent for evaluation
 var agent = new MAFAgentAdapter(aiAgent);
 
-// Run evaluation with tool tracking. ModelName selects the price used to estimate cost;
-// without a name found in the price table, no cost is estimated.
+// Run evaluation with tool tracking. ModelName explicitly overrides pricing;
+// when omitted, returned model identity precedes configured agent identity.
 var result = await harness.RunEvaluationAsync(agent, new TestCase
 {
     Name = "Feature Planning Test",
@@ -117,7 +120,7 @@ var results = await comparer.CompareModelsAsync(
 Console.WriteLine(results.ToMarkdown());
 ```
 
-The quality, speed, cost and reliability scores rank the models against each other (best 100, worst 0), and cost is priced from a single model name. See [Model Comparison](https://agenteval.dev/model-comparison.html) for how the scores are computed.
+The quality, speed, cost and reliability scores rank the models against each other (best 100, worst 0). Leave the pricing override unset to use each run's returned model identity, then its configured identity. Unknown models remain unpriced; reported cached input is discounted only when its rate is known. See [cost estimation](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cost-estimation.md) and [Model Comparison](https://agenteval.dev/model-comparison.html).
 
 ## Quality Assurance
 
@@ -138,7 +141,9 @@ dotnet add package AgentEval --prerelease
 - `AgentEval.RedTeam` and `AgentEval.RedTeam.Gatekeeper` — Security testing, and red-team evaluators as runtime gates
 - `AgentEval.Evals.Agentic` and `AgentEval.Evals.Performance` — The agentic evaluator suite and the performance benchmarks
 - `AgentEval.Compliance.Core`, `AgentEval.Compliance.Gdpr` and `AgentEval.Compliance.EuAiAct` — Compliance benchmarks
-- `AgentEval.Rendering.Pdf` — PDF report rendering
+- `AgentEval.Rendering.Pdf` — engine-neutral report projections and compatibility facades; no PDF engine
+
+PDF generation requires the separate matching-version `AgentEval.Rendering.PdfSharp` provider, explicit `AddAgentEvalPdfSharp()` registration and an output request through `IPdfRendererRegistry`. The optional `AgentEval.Cli.Pdf` companion renders verified saved runs. These new packages are source/local-feed features until a release publishes them; see [PDF provider setup and migration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/pdf-providers.md).
 
 The Copilot Studio add-on (`AgentEval.MAF.CopilotStudio`) is not part of this package and is not on NuGet; build it from the [repository](https://github.com/AgentEvalHQ/AgentEval) if you need it.
 
@@ -158,6 +163,9 @@ services.AddAgentEvalAgentic();       // Agentic evaluator options (AgentEval.Ev
 
 ## Documentation
 
+- [Judge prompt packs and Swedish examples](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/judge-prompt-packs.md)
+- [Cache-aware cost estimation](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cost-estimation.md)
+- [Context propagation](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/judge-context.md), [Groundedness policies](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/groundedness-policies.md) and [criteria-met scoring](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/judge-score-policies.md)
 - [Getting Started](https://agenteval.dev/getting-started.html)
 - [Fluent Assertions](https://agenteval.dev/assertions.html)
 - [Metrics Reference](https://agenteval.dev/metrics-reference.html)

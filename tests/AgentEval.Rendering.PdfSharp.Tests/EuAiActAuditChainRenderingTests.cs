@@ -22,7 +22,7 @@ namespace AgentEval.Tests.Compliance.EuAiAct.Reporting;
 // Rendered PDFs are read back as text. Under a fully parallel run the text came back as NUL characters (seen once
 // on net8.0, never alone), so these render outside the parallel phase, with the other tests that touch QuestPDF's
 // process-wide state.
-[Collection(AgentEval.Tests.Rendering.Pdf.QuestPdfLicenceCollection.Name)]
+[Collection(AgentEval.Tests.Rendering.Pdf.PdfProviderCollection.Name)]
 public class EuAiActAuditChainRenderingTests : IDisposable
 {
     private readonly string _tempDir;
@@ -106,7 +106,7 @@ public class EuAiActAuditChainRenderingTests : IDisposable
     public async Task Pdf_RecordedHash_AppendixSaysNotVerifiedInThisReport()
     {
         var outputPath = Path.Combine(_tempDir, "chain-recorded.pdf");
-        await new EuAiActPdfRenderer().RenderAsync(MakeEvidence("sha256:" + new string('b', 64)), outputPath);
+        await new EuAiActPdfRenderer(pdfRenderers: PdfTestRegistry.Create()).RenderAsync(MakeEvidence("sha256:" + new string('b', 64)), outputPath);
 
         var text = ExtractTextWithoutWhitespace(outputPath);
 
@@ -122,7 +122,7 @@ public class EuAiActAuditChainRenderingTests : IDisposable
     public async Task Pdf_NoHash_AppendixSaysNoHashRecorded()
     {
         var outputPath = Path.Combine(_tempDir, "chain-absent.pdf");
-        await new EuAiActPdfRenderer().RenderAsync(MakeEvidence(""), outputPath);
+        await new EuAiActPdfRenderer(pdfRenderers: PdfTestRegistry.Create()).RenderAsync(MakeEvidence(""), outputPath);
 
         var text = ExtractTextWithoutWhitespace(outputPath);
 

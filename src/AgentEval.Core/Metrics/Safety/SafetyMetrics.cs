@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Prompts;
 
 namespace AgentEval.Metrics.Safety;
 
@@ -52,6 +53,7 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
@@ -205,6 +207,7 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
         var prompt = BuildCoherencePrompt(context.Input, context.Output);
 
         var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Coherence", cancellationToken);
@@ -316,6 +319,7 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
         var prompt = BuildFluencyPrompt(context.Output);
 
         var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Fluency", cancellationToken);

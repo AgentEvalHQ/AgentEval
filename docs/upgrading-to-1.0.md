@@ -9,6 +9,18 @@ dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.2
 
 Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, then the rc.2 section.
 
+## Unreleased evaluation improvements
+
+These changes describe the development branch after rc.2. They are not included in the published rc.2 commands above. Use matching versions from a local build until a release publishes them.
+
+| Area | What changes | Update your consumer |
+|---|---|---|
+| PDF generation | The default library and CLI no longer bring a PDF engine or generate PDF automatically. | Install `AgentEval.Rendering.PdfSharp`, register it with `AddAgentEvalPdfSharp()`, and explicitly request output. The optional `AgentEval.Cli.Pdf` companion renders captured reports. See [PDF migration and provider registration](pdf-providers.md), including the removed engine-specific font resolver. |
+| Retrieved context | Fixture or invocation-owned retrieval reaches both harness modes and stochastic criteria judging. Custom judges must accept the rich request to consume context. | Capture `AgentResponse.RetrievedContext`; implement the `EvaluationRequest` overload when adapting a custom judge. Required unavailable context remains unmeasured. See [context transport](judge-context.md). |
+| Groundedness and scoring | Existing constructors retain legacy semantics. Support-focused Groundedness and criteria-fraction scoring are explicit options with distinct policy identities. | Choose [Groundedness options](groundedness-policies.md) and [score selection](judge-score-policies.md) deliberately. Use `MeasuredScore` for exact fractions and rebaseline comparisons when changing policy. |
+| Judge localization | Supported built-in RAG and text-only judges accept versioned prompt packs and per-evaluation overrides. | Follow [prompt-pack authoring](judge-prompt-packs.md). Validate coverage and contracts before running; unsupported families fail explicitly. Swedish semantic calibration remains separate from the authored example. |
+| Cost estimates | Returned model identity and reported cached input participate in pricing; absent cache information remains explicitly undiscounted. | Read `CostEstimate` status/provenance, use a per-run `PricingResolver` for deployment aliases or customer rates, and do not treat an unknown cost as zero. See [cost estimation](cost-estimation.md). |
+
 ## From 1.0.0-rc.1 to 1.0.0-rc.2
 
 The second candidate adds the experimental Microsoft 365 provider and moves to Microsoft Agent Framework 1.27. See

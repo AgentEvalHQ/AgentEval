@@ -346,8 +346,7 @@ Report exports go to `.agenteval/benchmarks/agentic/{subject}/{timestamp}/`. The
 .agenteval/benchmarks/agentic/MyTravelAgent/2026-05-09_10-15-00/
 ├── agentic-result.json    # AgenticBenchmarkResult: composite tree, summary, critical findings,
 │                          #   recommendations, disclaimer, attestation
-├── report.md              # PR-friendly markdown report
-└── report.pdf             # PDF report (QuestPDF)
+└── report.md              # PR-friendly markdown report
 ```
 
 ### `agentic-result.json`
@@ -367,9 +366,17 @@ Validated against `agentic-result.schema.json` before writing. If validation fai
 
 A markdown report suitable for attaching to a pull request or GitHub release. Sections: executive summary, per-category table, per-evaluator results, critical findings, recommendations, and disclaimer.
 
-### `report.pdf`
+### Optional PDF report
 
-A PDF report for team review. Sections: cover page (with mandatory disclaimer banner), executive summary, per-category results, per-evaluator results, methodology note, and disclaimer. Generated using QuestPDF.
+PDF generation is opt-in. The stock CLI does not install a PDF engine or generate `report.pdf`. The optional `AgentEval.Cli.Pdf` tool explicitly registers the PDFsharp provider and can render a recorded agentic report with its cover, executive summary, per-category and per-evaluator results, methodology and disclaimer.
+
+Record the benchmark with `--aef .agenteval/aef --aef-content on`, then use the exact AEF run directory printed by that command:
+
+```bash
+agenteval-pdf render --run <recorded-aef-run-directory> --output ./agentic-report.pdf
+```
+
+Install the companion first as described in [optional PDF providers](../../pdf-providers.md). It verifies the sealed source and requires captured rich report content; it does not call a judge or change the evidence. Write the derived PDF outside the sealed run. The library API supports the same explicit provider registration.
 
 ---
 

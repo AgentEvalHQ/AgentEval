@@ -66,6 +66,10 @@ public class AgentResponse
 
     /// <summary>Additional properties from the underlying framework response.</summary>
     public IReadOnlyDictionary<string, object?>? AdditionalProperties { get; init; }
+
+    /// <summary>Ordered passages actually retrieved for this invocation; null means not captured, empty means none retrieved.</summary>
+    /// <remarks>Supply this explicitly in the agent adapter; the harness does not infer retrieval from arbitrary tool results.</remarks>
+    public IReadOnlyList<string>? RetrievedContext { get; init; }
 }
 
 /// <summary>
@@ -94,6 +98,10 @@ public class AgentResponseChunk
     /// Model used for the response (typically only populated on the final/complete chunk).
     /// </summary>
     public string? ModelId { get; init; }
+
+    /// <summary>Invocation-owned retrieval on the complete chunk; null means unavailable, empty means none retrieved.</summary>
+    /// <remarks>Only read when IsComplete is true. This is the full ordered collection, not a streaming delta.</remarks>
+    public IReadOnlyList<string>? RetrievedContext { get; init; }
 }
 
 /// <summary>
@@ -123,6 +131,14 @@ public class TokenUsage
 {
     public int PromptTokens { get; init; }
     public int CompletionTokens { get; init; }
+    /// <summary>Lossless provider input count when available; legacy integer counts may be saturated.</summary>
+    public long? ReportedInputTokenCount { get; init; }
+    /// <summary>Lossless provider output count when available; legacy integer counts may be saturated.</summary>
+    public long? ReportedOutputTokenCount { get; init; }
+    /// <summary>Cached subset of input tokens. Null means unreported; zero means explicitly none.</summary>
+    public long? CachedInputTokenCount { get; init; }
+    /// <summary>True when an aggregate contains multiple model identities without per-model token attribution.</summary>
+    public bool HasMixedModelUsage { get; init; }
     public int TotalTokens => (int)Math.Min((long)PromptTokens + CompletionTokens, int.MaxValue);
     
     /// <summary>Alias for PromptTokens for consistency.</summary>

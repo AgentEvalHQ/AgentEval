@@ -5,6 +5,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using AgentEval.Prompts;
 
 namespace AgentEval.Evals;
 
@@ -38,6 +39,9 @@ public enum JudgeInputData
     /// agent itself never saw.
     /// </summary>
     ExpectedActions = 8,
+
+    /// <summary>The retrieved context required to judge support for the answer.</summary>
+    Context = 16,
 }
 
 /// <summary>
@@ -110,6 +114,8 @@ public sealed class AtomicLlmEval : AtomicEval
     private readonly string _promptMaterial;
     private readonly string? _sentPromptId;
     private readonly AgentEval.Core.EvalRubric? _rubric;
+    private readonly AgentEval.Core.EvalRubric? _declaredRubric;
+    private readonly double _declaredPassThreshold;
     private string? _promptHash;
     private string? _rubricDigest;
 
@@ -198,16 +204,27 @@ public sealed class AtomicLlmEval : AtomicEval
             _rubric = rubric;
         }
 
-        _evaluator = evaluator;
         // A private copy: the PromptHash below fingerprints these criteria, so a caller mutating the list it passed
         // in must not change what is sent without changing what was recorded.
         _criteria = criteria?.ToArray() ?? throw new ArgumentNullException(nameof(criteria));
         if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
             throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
         _passThreshold = passThreshold;
+        _declaredPassThreshold = passThreshold;
+        _declaredRubric = _rubric;
         _judgeModel = judgeModel;
         _failureSeverity = failureSeverity;
         _rateResolver = rateResolver;
+
+        if (evaluator is IJudgePromptBindable { HasPromptConfiguration: true } promptBindable)
+        {
+            evaluator = promptBindable.WithPromptDefinition(CapturePromptDefinition());
+            var resolved = (evaluator as IResolvedJudgePromptSource)?.ResolvedPrompt
+                ?? throw new InvalidOperationException("Expected: resolved prompt metadata after binding. Actual: none. Suggestions: implement IResolvedJudgePromptSource. Because: the same policy must drive prompting and scoring.");
+            _rubric = resolved.Definition.ToRubric();
+            _passThreshold = resolved.Definition.PassAt;
+        }
+        _evaluator = evaluator;
 
         var promptSource = evaluator as AgentEval.Core.IJudgePromptSource;
         _sentPromptId = promptSource?.SystemPromptId ?? promptId;
@@ -219,8 +236,11 @@ public sealed class AtomicLlmEval : AtomicEval
         Sees == JudgeInputData.None
             ? _promptMaterial
             : _promptMaterial + "\u001f" + "judge-sees-tool-data:" + Sees))[..16];
-    private string RubricDigest => _rubricDigest ??= RubricIdentity.Digest(
-        ["atomic-llm-v1", JudgeInputFramingVersion, _promptMaterial, Sees.ToString(), .. _criteria]);
+    private string RubricDigest => (_evaluator as IResolvedJudgePromptSource)?.ResolvedPrompt?.Provenance.Digest ?? (_rubricDigest ??= RubricIdentity.Digest(
+        ["atomic-llm-v1", JudgeInputFramingVersion, _promptMaterial, Sees.ToString(), .. _criteria]));
+
+    /// <summary>Exports this leaf's built-in text, stable criterion IDs and reader policy without invoking its judge.</summary>
+    public JudgePromptDefinition CapturePromptDefinition() => BuiltInJudgePrompts.ForEvaluator(Key, _criteria, _declaredRubric, _declaredPassThreshold);
 
     /// <summary>Captures the declared instrument without invoking the judge or including prompt/criteria text.</summary>
     public AtomicLlmDefinition CaptureDefinition() => new()
@@ -269,7 +289,7 @@ public sealed class AtomicLlmEval : AtomicEval
         // ledger extract, the source document — asked "is this grounded?" while withholding the ground. The
         // judge then graded plausibility, and every such score was of a question nobody had actually posed.
         // IEvaluator takes (input, output, criteria), so the context travels with the input, labelled.
-        var judgeInput = string.IsNullOrWhiteSpace(input.Context)
+        var judgeInput = input.Context is null || (string.IsNullOrWhiteSpace(input.Context) && !JudgeNeedsData.HasFlag(JudgeInputData.Context))
             ? input.Query
             : $"{input.Query}\n\nContext the response must be faithful to:\n{input.Context}";
 
@@ -290,7 +310,32 @@ public sealed class AtomicLlmEval : AtomicEval
         judgeInput += InstructionSections(input, Sees);
         judgeInput += ToolSections(input, Sees);
 
-        var er = await _evaluator.EvaluateAsync(judgeInput, input.Response, _criteria, ct);
+        var evaluator = _evaluator;
+        if (input.JudgePrompts is { } promptOptions)
+        {
+            if (evaluator is not IJudgePromptBindable bindable)
+                throw new NotSupportedException("Expected: a prompt-pack-capable evaluator. Actual: this evaluator cannot bind a prompt definition. Suggestions: use ChatClientEvaluator or implement IJudgePromptBindable. Because: requested localization cannot be silently discarded.");
+            evaluator = bindable.WithPromptDefinition(CapturePromptDefinition(), promptOptions);
+        }
+        var resolvedPrompt = (evaluator as IResolvedJudgePromptSource)?.ResolvedPrompt;
+        var appliedRubric = resolvedPrompt?.Definition.ToRubric() ?? _rubric;
+        var passThreshold = resolvedPrompt?.Definition.PassAt ?? _passThreshold;
+        AgentEval.Core.EvaluationResult er;
+        if (resolvedPrompt is not null)
+        {
+            // This vertical covers text/RAG evidence. Tool, policy and deterministic-note framing
+            // must have their own localized slots before these wider families can opt in.
+            if ((Sees & ~JudgeInputData.Context) != JudgeInputData.None || HasExtraMetadata(JudgeNotesMetadataKey) || HasExtraMetadata(JudgePolicyMetadataKey))
+                throw new NotSupportedException("Expected: text/RAG inputs for this prompt-pack version. Actual: tool, system-policy or evaluator-note framing is required. Suggestions: retain the legacy path for this check until its localized framing is supported. Because: evidence must never be dropped or silently left in another language.");
+            var request = new AgentEval.Core.EvaluationRequest(input.Query, input.Response, _criteria,
+                input.Context is null ? null : [input.Context], requiresContext: JudgeNeedsData.HasFlag(JudgeInputData.Context))
+            { GroundTruth = input.GroundTruth };
+            er = await evaluator.EvaluateAsync(request, ct).ConfigureAwait(false);
+        }
+        else er = await evaluator.EvaluateAsync(judgeInput, input.Response, _criteria, ct).ConfigureAwait(false);
+
+        bool HasExtraMetadata(string key) => input.Metadata?.TryGetValue(key, out var value) == true &&
+            value is string text && !string.IsNullOrWhiteSpace(text);
 
         // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage.
         // Not priced is null, never $0: an IEvaluator that reports no token counts (test fakes,
@@ -298,23 +343,13 @@ public sealed class AtomicLlmEval : AtomicEval
         // cost unknown. A missing count is not a zero count, so the token total is complete or
         // absent too: with one count unreported it was the other count alone, read as the whole (T82).
         int? tokensUsed = null;
-        double? estimatedCost = null;
+        var costEstimate = AgentEval.Models.TokenCostEstimate.Calculate(
+            er.InputTokenCount, er.OutputTokenCount, er.CachedInputTokenCount,
+            (_rateResolver is not null ? _rateResolver(_judgeModel) : JudgeCostMap.GetRate(_judgeModel))?.ToTokenPricing())
+            with { ModelId = _judgeModel, ModelSource = "configured" };
+        double? estimatedCost = costEstimate.Amount is { } amount ? (double)amount : null;
         if (er.InputTokenCount is >= 0 and { } inT && er.OutputTokenCount is >= 0 and { } outT)
         {
-            if (_rateResolver is not null)
-            {
-                // LR7-F1: per-instance resolver wins over the static JudgeCostMap.
-                // Lets a tenant override list price with a negotiated rate without
-                // forking or mutating the process-global rate table.
-                var rate = _rateResolver(_judgeModel);
-                estimatedCost = inT > 0 || outT > 0
-                    ? (inT / 1000.0) * rate.InputRatePer1K + (outT / 1000.0) * rate.OutputRatePer1K
-                    : 0;
-            }
-            else
-            {
-                estimatedCost = JudgeCostMap.EstimateCost(_judgeModel, inT, outT);
-            }
             // EvalProvenance.TokensUsed is the legacy single-int totals field; sum the two
             // for backwards-compatible reporting. We clamp to int.MaxValue defensively even
             // though realistic judge transcripts are nowhere near that volume.
@@ -322,13 +357,13 @@ public sealed class AtomicLlmEval : AtomicEval
         }
 
         var dimensions = er.CriteriaResults?
-            .GroupBy(c => c.Criterion)
+            .GroupBy(c => c.Id ?? c.Criterion)
             .ToDictionary(g => g.Key, g => g.Last().Met ? 1.0 : 0.0)
             ?? new Dictionary<string, double>();
 
         var evidence = er.CriteriaResults?
             .Where(c => !string.IsNullOrEmpty(c.Explanation))
-            .Select(c => new EvalEvidence(Source: "criterion", Reference: c.Criterion, Message: c.Explanation))
+            .Select(c => new EvalEvidence(Source: "criterion", Reference: c.Id ?? c.Criterion, Message: c.Explanation))
             .ToList()
             ?? new List<EvalEvidence>();
 
@@ -357,7 +392,7 @@ public sealed class AtomicLlmEval : AtomicEval
         else
         {
             value = Math.Clamp(overall / 100.0, 0.0, 1.0);
-            passed = value >= _passThreshold;
+            passed = value >= passThreshold;
             // Compute severity from score; then take the maximum with failureSeverity (if set)
             // so that critical/high article metadata severity is surfaced without downgrading
             // score-derived severity for lower-severity articles.
@@ -374,8 +409,8 @@ public sealed class AtomicLlmEval : AtomicEval
             if (er.RubricScore is { } rubricScore)
             {
                 value = rubricScore;
-                passed = value >= _passThreshold;
-                var review = !passed && _rubric?.ReviewAt is { } reviewAt && value >= reviewAt;
+                passed = value >= passThreshold;
+                var review = !passed && appliedRubric?.ReviewAt is { } reviewAt && value >= reviewAt;
                 label = passed ? "pass" : review ? "warn" : "fail";
                 severity = passed
                     ? "none"
@@ -402,7 +437,7 @@ public sealed class AtomicLlmEval : AtomicEval
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
-            Score: new(value, null, label, passed, _passThreshold, severity, null),
+            Score: new(value, null, label, passed, passThreshold, severity, null),
             Details: new(
                 Dimensions: dimensions.Count > 0 ? dimensions : null,
                 Evidence: evidence.Count > 0 ? evidence : null,
@@ -417,11 +452,15 @@ public sealed class AtomicLlmEval : AtomicEval
             Provenance: new(
                 Type: "atomic-llm",
                 JudgeModel: _judgeModel,
-                PromptId: _sentPromptId,
-                PromptHash: PromptHash,
+                PromptId: er.JudgePrompt?.InstrumentId ?? _sentPromptId,
+                PromptHash: er.JudgePrompt is { } actualPrompt ? actualPrompt.Digest[7..23] : PromptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false) { RubricDigest = RubricDigest, JudgeProvider = (_evaluator as AgentEval.Core.IJudgeProviderSource)?.ProviderName },
+                CacheHit: false)
+            {
+                RubricDigest = er.JudgePrompt?.Digest ?? RubricDigest, JudgePrompt = er.JudgePrompt,
+                JudgeProvider = (evaluator as AgentEval.Core.IJudgeProviderSource)?.ProviderName, CostEstimate = costEstimate
+            },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -444,6 +483,8 @@ public sealed class AtomicLlmEval : AtomicEval
             missing.Add("no system message was captured (EvalInput.SystemMessage is empty)");
         if (JudgeNeedsData.HasFlag(JudgeInputData.ExpectedActions) && input.ExpectedActions is null or { Count: 0 })
             missing.Add("the case declares no expected actions (EvalInput.ExpectedActions is empty)");
+        if (JudgeNeedsData.HasFlag(JudgeInputData.Context) && input.Context is null)
+            missing.Add("no context was captured (EvalInput.Context is null)");
         return missing;
     }
 

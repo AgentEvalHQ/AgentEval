@@ -4,6 +4,8 @@ AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal
 `gatekeeper` verb group, a **language-neutral runtime-policy service** any process (Python, Node, bash, a CI step) can
 call for a versioned gate verdict + exit code.
 
+For declarative judge localization, use `agenteval prompts export`, `validate` and `inspect`, then select the pack with `eval --judge-prompt-pack ... --judge-locale sv-SE`. These settings are independent of the target's `--system-prompt`. See [judge prompt packs](judge-prompt-packs.md) for supported metrics, fixed criterion rosters and the Swedish example.
+
 ## Installation
 
 ```bash
@@ -836,7 +838,7 @@ parent directory is created.
 
 ### `agenteval compliance render`
 
-Re-render a PDF report from existing compliance evidence — no LLM cost (the evidence is already on disk).
+Re-render a Markdown report from existing compliance evidence — no LLM cost (the evidence is already on disk). PDF generation is provided by the optional `agenteval-pdf` companion; see [PDF providers](pdf-providers.md).
 
 **Synopsis**
 
@@ -857,13 +859,13 @@ The reader verifies native AEF runs under `.agenteval/aef/runs` and reads captur
 
 Missing captured content, malformed reports, conflicting identities and invalid native evidence exit `1`. A legacy sibling cannot recover content omitted by the native capture policy. Selecting the latest report does not silently substitute an older captured report when a newer native report is unavailable. The bounded native scan verifies candidates before subject filtering, so an invalid or incompletely scanned native source must be resolved before rendering.
 
-PDFs are written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.pdf`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
+Markdown is written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.md`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
 
 ---
 
 ### `agenteval render`
 
-Re-render Markdown and PDF from an original agentic report in verified AEF — no LLM cost.
+Re-render Markdown from an original agentic report in verified AEF — no LLM cost. The stock CLI does not install or initialize a PDF engine. Use the optional companion's explicit `agenteval-pdf render --run <verified-run> --output report.pdf` command for PDF output.
 
 **Synopsis**
 

@@ -14,12 +14,17 @@ internal static class WorkspaceRootDiscovery
         var dir = new DirectoryInfo(startDir);
         while (dir is not null)
         {
-            if (dir.GetFiles("*.sln").Length > 0 ||
-                dir.GetFiles("*.slnx").Length > 0)
-                return dir.FullName;
-
-            if (dir.GetDirectories(".git").Length > 0)
-                return dir.FullName;
+            try
+            {
+                if (dir.GetFiles("*.sln").Length > 0 ||
+                    dir.GetFiles("*.slnx").Length > 0 || dir.GetDirectories(".git").Length > 0)
+                    return dir.FullName;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException)
+            {
+                // Discovery is optional. An inaccessible or removed ancestor is not a workspace.
+                return null;
+            }
 
             dir = dir.Parent;
         }

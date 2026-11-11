@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "evaluatorKey": "judge.criteria",
+      "id": "example.judge.criteria.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "criteriaV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "output",
+        "context",
+        "reference"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "001-system.md",
+      "userFile": "001-user.md",
+      "retryFile": "001-retry.md",
+      "safetyFile": "001-safety.md"
+    },
+    {
+      "evaluatorKey": "llm_answer_correctness",
+      "id": "example.llm_answer_correctness.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "answerCorrectnessV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "output",
+        "reference"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "002-system.md",
+      "userFile": "002-user.md",
+      "retryFile": "002-retry.md",
+      "safetyFile": "002-safety.md"
+    },
+    {
+      "evaluatorKey": "llm_context_precision",
+      "id": "example.llm_context_precision.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "contextPrecisionV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "context"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "003-system.md",
+      "userFile": "003-user.md",
+      "retryFile": "003-retry.md",
+      "safetyFile": "003-safety.md"
+    },
+    {
+      "evaluatorKey": "llm_context_recall",
+      "id": "example.llm_context_recall.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "contextRecallV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "context",
+        "reference"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "004-system.md",
+      "userFile": "004-user.md",
+      "retryFile": "004-retry.md",
+      "safetyFile": "004-safety.md"
+    },
+    {
+      "evaluatorKey": "llm_faithfulness",
+      "id": "example.llm_faithfulness.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "faithfulnessV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "output",
+        "context"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "005-system.md",
+      "userFile": "005-user.md",
+      "retryFile": "005-retry.md",
+      "safetyFile": "005-safety.md"
+    },
+    {
+      "evaluatorKey": "llm_relevance",
+      "id": "example.llm_relevance.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "relevanceV1",
+      "scale": "percent",
+      "passAt": 0.7,
+      "reviewAt": null,
+      "criteria": [],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "output"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "006-system.md",
+      "userFile": "006-user.md",
+      "retryFile": "006-retry.md",
+      "safetyFile": "006-safety.md"
+    },
+    {
+      "evaluatorKey": "relevance",
+      "id": "example.relevance.sv.v1",
+      "version": "1.0.0",
+      "locale": "sv-SE",
+      "responseContract": "rubricV1",
+      "scale": "unit",
+      "passAt": 0.7,
+      "reviewAt": 0.4,
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "text": "Svaret besvarar användarens fråga utan betydande ovidkommande innehåll."
+        },
+        {
+          "id": "criterion-2",
+          "text": "Svaret täcker det som uttryckligen efterfrågas utan väsentliga utelämnanden."
+        },
+        {
+          "id": "criterion-3",
+          "text": "Svaret håller sig till ämnet utan irrelevanta sidospår."
+        }
+      ],
+      "severityBands": [],
+      "dataSlots": [
+        "input",
+        "output",
+        "context",
+        "reference"
+      ],
+      "status": "authored",
+      "dimension": null,
+      "systemFile": "007-system.md",
+      "userFile": "007-user.md",
+      "retryFile": "007-retry.md",
+      "safetyFile": "007-safety.md"
+    }
+  ]
+}

@@ -150,10 +150,10 @@ public class StochasticAssertions
     public StochasticAssertions HaveMinScoreAtLeast(int minimumScore, string? because = null)
     {
         var stats = RequireStatistics("minimum score", because);
-        if (stats.MinScore < minimumScore)
+        if (stats.ExactMinScore < minimumScore)
         {
             throw new StochasticAssertionException(
-                $"Expected minimum score >= {minimumScore}, but was {stats.MinScore}. " +
+                $"Expected minimum score >= {minimumScore}, but was {stats.ExactMinScore}. " +
                 "At least one run performed below the threshold." +
                 (because != null ? $" because {because}" : ""));
         }

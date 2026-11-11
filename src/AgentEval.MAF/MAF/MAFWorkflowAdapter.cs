@@ -529,11 +529,19 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
     {
         if (a is null) return b;
         if (b is null) return a;
-        return new TokenUsage
+        var inputA = a.ReportedInputTokenCount ?? a.PromptTokens;
+        var inputB = b.ReportedInputTokenCount ?? b.PromptTokens;
+        var cachedA = a.CachedInputTokenCount > inputA ? -1 : a.CachedInputTokenCount;
+        return TokenUsageMapping.FromUsage(new Microsoft.Extensions.AI.UsageDetails
         {
-            PromptTokens = a.PromptTokens + b.PromptTokens,
-            CompletionTokens = a.CompletionTokens + b.CompletionTokens,
-        };
+            InputTokenCount = TokenUsageMapping.Add(inputA, inputB),
+            OutputTokenCount = TokenUsageMapping.Add(a.ReportedOutputTokenCount ?? a.CompletionTokens,
+                b.ReportedOutputTokenCount ?? b.CompletionTokens),
+            CachedInputTokenCount = TokenUsageMapping.AddCached(cachedA, new()
+            {
+                InputTokenCount = inputB, CachedInputTokenCount = b.CachedInputTokenCount
+            })
+        }, a.HasMixedModelUsage || b.HasMixedModelUsage);
     }
 
     /// <summary>

@@ -106,6 +106,8 @@ public class ChatClientAgentAdapter
         var messages = BuildMessages(prompt);
         var textBuilder = new StringBuilder();
         var usageAccumulator = new StreamingUsageAccumulator();
+        string? returnedModel = null;
+        var mixedModels = false;
         // A call re-created for a rejected approval decision never ran: it is reported neither as started nor as
         // completed (MAF 1.25+ #9152; the same rule as ToolUsageExtractor's default path). A chunk carries no drop
         // count, so unlike the default extractor the stream omits the call without counting a drop or warning.
@@ -113,6 +115,11 @@ public class ChatClientAgentAdapter
 
         await foreach (var update in _chatClient.GetStreamingResponseAsync(messages, EffectiveChatOptions(), cancellationToken))
         {
+            if (!string.IsNullOrWhiteSpace(update.ModelId))
+            {
+                mixedModels |= returnedModel is not null && !StringComparer.OrdinalIgnoreCase.Equals(returnedModel, update.ModelId);
+                returnedModel = update.ModelId;
+            }
             // Handle text content
             if (!string.IsNullOrEmpty(update.Text))
             {
@@ -176,7 +183,8 @@ public class ChatClientAgentAdapter
         yield return new AgentResponseChunk
         {
             IsComplete = true,
-            Usage = usageAccumulator.ToTokenUsage()
+            Usage = usageAccumulator.ToTokenUsage(mixedModels),
+            ModelId = mixedModels ? null : returnedModel
         };
     }
 

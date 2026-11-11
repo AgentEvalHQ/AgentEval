@@ -158,8 +158,7 @@ Each run writes to `.agenteval/compliance/EU-AI-Act/{subject}/{timestamp}/`. The
 ├── evidence.json           # Standard ComplianceEvidence (the file `agenteval doctor` checks)
 ├── eu-ai-act-evidence.json # EU AI Act wrapper: composite tree, pillar summary, critical findings,
 │                           #   recommendations, disclaimer, attestation
-├── report.md               # PR-friendly markdown report
-└── report.pdf              # Boardroom-ready PDF (QuestPDF)
+└── report.md               # PR-friendly markdown report
 ```
 
 ### `evidence.json`
@@ -183,11 +182,19 @@ Validated against `eu-ai-act-evidence.schema.json` before writing. If schema val
 
 ### `report.md`
 
-A markdown report suitable for attaching to a pull request or GitHub release. Sections: executive summary, per-pillar table, per-control results, critical findings, recommendations, methodology note, and disclaimer. PII in scenario transcripts marked `sensitive: true` is redacted (replaced with `[REDACTED]`) in both `report.md` and `report.pdf`.
+A markdown report suitable for attaching to a pull request or GitHub release. Sections: executive summary, per-pillar table, per-control results, critical findings, recommendations, methodology note, and disclaimer. PII in scenario transcripts marked `sensitive: true` is redacted (replaced with `[REDACTED]`) in `report.md` and optional PDF output. The PDF projection also withholds scenario text and references when sensitivity metadata is unavailable.
 
-### `report.pdf`
+### Optional PDF report
 
-A PDF report for boardroom presentation or compliance-officer review. Sections: cover page (with mandatory disclaimer banner), executive summary, per-pillar results, per-control results, audit-chain appendix (run ID, manifest hash, timestamp), methodology note, and disclaimer. Generated using QuestPDF.
+PDF generation is opt-in. The stock CLI does not install a PDF engine or generate `report.pdf`. The optional `AgentEval.Cli.Pdf` companion explicitly registers the PDFsharp provider and preserves the cover and disclaimer, executive summary, per-pillar and per-control results, recorded audit references and methodology.
+
+Record the benchmark with `--aef .agenteval/aef --aef-content on`, then render the exact AEF run directory printed by that command:
+
+```bash
+agenteval-pdf render --run <recorded-aef-run-directory> --output ./eu-ai-act-report.pdf
+```
+
+See [optional PDF providers](../../pdf-providers.md) for installation and library registration. The companion verifies the sealed source and requires captured rich report content. It writes the derived report outside that source without rerunning evaluation or changing the seal. Verification of an imported container does not establish original execution custody.
 
 ### Audit chain
 

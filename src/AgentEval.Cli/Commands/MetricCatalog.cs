@@ -86,11 +86,13 @@ internal static class MetricCatalog
     /// names an LLM-based metric; ignored for code-based ones.
     /// </param>
     /// <param name="embeddings">Required for embedding metrics; ignored by code/LLM metrics.</param>
+    /// <param name="prompts">Optional immutable configuration for the supported RAG judges.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is not a known metric name.</exception>
     /// <exception cref="InvalidOperationException">
     /// The requested metric's evaluator client or embedding generator is missing.
     /// </exception>
-    public static IMetric Resolve(string name, IChatClient? evaluatorClient, IAgentEvalEmbeddings? embeddings = null)
+    public static IMetric Resolve(string name, IChatClient? evaluatorClient, IAgentEvalEmbeddings? embeddings = null,
+        Prompts.JudgePromptOptions? prompts = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -108,6 +110,16 @@ internal static class MetricCatalog
                     "already provides one for the default endpoint path; --sut targets have no model of their own).");
             }
 
+            if (prompts is not null)
+                return name.ToLowerInvariant() switch
+                {
+                    "llm_faithfulness" => new FaithfulnessMetric(evaluatorClient, prompts),
+                    "llm_relevance" => new RelevanceMetric(evaluatorClient, prompts),
+                    "llm_context_precision" => new ContextPrecisionMetric(evaluatorClient, prompts),
+                    "llm_context_recall" => new ContextRecallMetric(evaluatorClient, prompts),
+                    "llm_answer_correctness" => new AnswerCorrectnessMetric(evaluatorClient, prompts),
+                    _ => throw new ArgumentException($"Metric '{name}' does not yet support declarative prompt packs; it cannot silently use an English judge.", nameof(name))
+                };
             return llmFactory(evaluatorClient);
         }
 

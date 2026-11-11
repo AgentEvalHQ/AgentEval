@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Prompts;
 using AgentEval.Models;
 
 namespace AgentEval.Metrics.Agentic;
@@ -325,6 +326,7 @@ public class TaskCompletionMetric : IAgenticMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
         var criteriaList = string.Join("\n", _completionCriteria.Select((c, i) => $"{i + 1}. {c}"));
         var toolsUsed = context.ToolUsage != null 
             ? $"TOOLS USED: {string.Join(", ", context.ToolUsage.Calls.Select(c => c.Name))}" 

@@ -202,6 +202,20 @@ public class JudgeFactoryFamilyPromptTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ResolveFamily_EmbeddedDefault_YieldsToBoundRubric(bool gdpr)
+    {
+        ConfigureAzureJudge();
+        var (judge, _, exit) = gdpr ? JudgeFactory.ResolveGdpr(null, "test") : JudgeFactory.ResolveEuAiAct(null, "test");
+        Assert.Equal(0, exit);
+        var bound = Assert.IsType<ChatClientEvaluator>(Assert.IsAssignableFrom<IRubricBindable>(judge).WithRubric(
+            new EvalRubric { Id = "leaf.rubric", Text = "Leaf instructions on the unit scale.", Scale = RubricScoreScale.Unit }, null));
+        Assert.Equal("leaf.rubric", bound.SystemPromptId);
+        Assert.Contains("Leaf instructions on the unit scale.", bound.PromptMaterial);
+    }
+
+    [Theory]
     [InlineData("BenchCommand.cs", "JudgeFactory.ResolveGdpr(")]
     [InlineData("BenchCalibrateCommand.cs", "JudgeFactory.ResolveGdpr(")]
     [InlineData("BenchEuAiActCommand.cs", "JudgeFactory.ResolveEuAiAct(")]

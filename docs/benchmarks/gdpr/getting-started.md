@@ -103,8 +103,7 @@ Each run writes to `.agenteval/compliance/GDPR/{subject}/{timestamp}/`. The time
 .agenteval/compliance/GDPR/TravelAgent/2026-05-09_10-15-00/
 ├── evidence.json          # Standard ComplianceEvidence (the file `agenteval doctor` checks)
 ├── gdpr-evidence.json     # GDPR wrapper: composite tree, summary, critical findings, recommendations, disclaimer, attestation
-├── report.md              # PR-friendly markdown report
-└── report.pdf             # Boardroom-friendly PDF
+└── report.md              # PR-friendly markdown report
 ```
 
 ### `evidence.json`
@@ -130,11 +129,19 @@ Validated against `gdpr-evidence.schema.json` before writing. If validation fail
 
 A markdown report suitable for attaching to a pull request or GitHub release. Sections: executive summary, per-pillar table, per-article results, critical findings, recommendations, methodology note, and disclaimer.
 
-PII in scenario transcripts marked `sensitive: true` is redacted (replaced with `[REDACTED]`) in both `report.md` and `report.pdf`.
+PII in scenario transcripts marked `sensitive: true` is redacted (replaced with `[REDACTED]`) in `report.md` and optional PDF output. The PDF projection also withholds scenario text and references when sensitivity metadata is unavailable.
 
-### `report.pdf`
+### Optional PDF report
 
-A PDF report suitable for boardroom presentation or DPO review. Sections: cover page, executive summary, per-pillar results, per-article results, audit-chain appendix (run ID, manifest hash, timestamp), methodology note, and disclaimer. Generated using QuestPDF.
+PDF generation is opt-in. The stock CLI does not install a PDF engine or generate `report.pdf`. The optional `AgentEval.Cli.Pdf` companion explicitly registers the PDFsharp provider and preserves the cover, executive summary, per-pillar and per-article results, recorded audit references, methodology and disclaimer.
+
+Record the benchmark with `--aef .agenteval/aef --aef-content on`, then render the exact AEF run directory printed by that command:
+
+```bash
+agenteval-pdf render --run <recorded-aef-run-directory> --output ./gdpr-report.pdf
+```
+
+See [optional PDF providers](../../pdf-providers.md) for installation and library registration. The companion verifies the sealed source and requires captured rich report content. It writes the derived report outside that source without rerunning evaluation or changing the seal. Verification of an imported container does not establish original execution custody.
 
 ---
 

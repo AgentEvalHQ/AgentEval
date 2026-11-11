@@ -23,7 +23,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// This sample wires the preset-driven (Smoke / Standard / AuditGrade) running-
 /// sample shape used by H2–H8 over the LongMemEval runner: real model-backed
 /// agent (history-injectable) + LLM judge + canonical <c>.agenteval/</c> store
-/// + sidecar JSON / HTML / PDF. Set
+/// + sidecar JSON / HTML (PDF is opt-in). Set
 /// <c>AGENTEVAL_LONGMEMEVAL_WRITE_NATIVE_REPORT=true</c> to additionally write
 /// the unaltered <c>ExternalBenchmarkResult</c> to <c>report-native.json</c>.
 /// That opt-in artefact contains questions, answers, responses, and potentially
@@ -250,7 +250,7 @@ public static class LongMemEvalBenchmarkSample
         var truncated = LongMemEvalSampleSupport.PrintHaystackDelivery(answerClient.Calls);
 
         // ── Synthesise an EvalResult tree from the Shape-B result so we get
-        // canonical .agenteval/ persistence + sidecar JSON / HTML / PDF for free.
+        // canonical .agenteval/ persistence + sidecar JSON / HTML; PDF is opt-in.
         var evalTree = LongMemEvalEvalResultAdapter.ToEvalResult(
             result,
             presetName,
@@ -266,7 +266,7 @@ public static class LongMemEvalBenchmarkSample
             evalTree, subject,
             benchmarkName: "longmemeval",
             regulationOrBenchmark: $"LongMemEval — {presetName} preset (ICLR 2025)",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null, // not a compliance benchmark
             presetLabel: presetName,
             judgeModel: AIConfig.ModelDeployment);

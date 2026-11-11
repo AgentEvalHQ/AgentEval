@@ -13,7 +13,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <summary>
 /// Benchmarks H6: OWASP LLM Top 10 — runs an OWASP attack pipeline against a
 /// real model-backed agent and renders the resulting composite tree to
-/// JSON + HTML + PDF. The OWASP family is a Shape B / runner-style benchmark —
+/// JSON + HTML (PDF is opt-in). The OWASP family is a Shape B / runner-style benchmark —
 /// the pipeline generates its own attack probes via
 /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> using the agent supplied at
 /// <c>EvalInput.Metadata["agent"]</c>.
@@ -79,7 +79,7 @@ public static class OwaspBenchmarkSample
             result, subject,
             benchmarkName: "owasp",
             regulationOrBenchmark: $"OWASP LLM Top 10 — {run.PresetName} preset",
-            includePdf: true,
+            includePdf: false,
             // OWASP / MITRE reporters take a RedTeamResult — wired separately
             // below via WriteRedTeamComplianceEvidenceAsync so this helper
             // doesn't have to know about the red-team shape.

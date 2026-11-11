@@ -155,11 +155,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             Timestamp = _sessionStopwatch.Elapsed,
             Duration = turnStopwatch.Elapsed,
             ToolCalls = toolCalls,
-            TokenUsage = response.TokenUsage != null ? new TraceTokenUsage
-            {
-                PromptTokens = response.TokenUsage.PromptTokens,
-                CompletionTokens = response.TokenUsage.CompletionTokens
-            } : null
+            TokenUsage = response.TokenUsage != null ? TraceMapping.FromAgentUsage(response.TokenUsage) : null
         });
 
         return response.Text;

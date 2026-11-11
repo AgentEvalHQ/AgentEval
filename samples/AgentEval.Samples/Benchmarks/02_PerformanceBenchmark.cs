@@ -16,7 +16,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// Demonstrates:
 ///   1. The Convention-2 <c>EvaluateAsync(EvalInput) → EvalResult</c> adapter
 ///      on <see cref="PerformanceBenchmark"/> (added in v0.10.0).
-///   2. Generic HTML + PDF rendering of the resulting 3-leaf composite tree
+///   2. Generic HTML rendering of the resulting 3-leaf composite tree (PDF is opt-in)
 ///      (latency / throughput / cost).
 ///   3. Preset-driven scaling (Smoke / Standard / AuditGrade) without code
 ///      changes — see <see cref="BenchmarkSampleHelpers.ResolvePreset"/>.
@@ -64,9 +64,9 @@ public static class PerformanceBenchmarkSample
                 WarmupIterations = warmup,
                 ThroughputConcurrentRequests = concurrent,
                 ThroughputDuration = throughputDur,
-                // P0-1: pin the cost-leaf to the actual Azure deployment so the
-                // pricing-table lookup hits a real entry. Without this, the cost
-                // leaf falls back to agent.Name → pricing miss → silent $0 / PASS.
+                // A known operator-supplied key selects pricing. Otherwise each returned model
+                // is priced individually; unavailable usage/rates remain unmeasured, never $0/PASS.
+                // Reported cached input is discounted only when a cached rate is available.
                 CostModelName = AIConfig.ModelDeployment,
             }
         };
@@ -88,7 +88,7 @@ public static class PerformanceBenchmarkSample
             result, subject,
             benchmarkName: "performance",
             regulationOrBenchmark: $"AgentEval Performance Benchmark — {preset} preset",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
             judgeModel: AIConfig.ModelDeployment);

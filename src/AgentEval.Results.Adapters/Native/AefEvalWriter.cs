@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Models;
+using AgentEval.Core;
 using AgentEval.Output;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Suites;
@@ -289,10 +290,11 @@ public static partial class AefEvalWriter
             {
                 Role = AefUsageRole.Agent,
                 Model = g.Key,
-                InputTokens = g.All(p => p.PromptTokens is not null) ? g.Sum(p => (long)p.PromptTokens!.Value) : null,
-                OutputTokens = g.All(p => p.CompletionTokens is not null) ? g.Sum(p => (long)p.CompletionTokens!.Value) : null,
+                InputTokens = SumUsageCounts(g.Select(p => p.CostEstimate?.InputTokens ?? p.PromptTokens)),
+                OutputTokens = SumUsageCounts(g.Select(p => p.CostEstimate?.OutputTokens ?? p.CompletionTokens)),
+                CacheReadInputTokens = SumUsageCounts(g.Select(p => ValidCachedCount(p.CostEstimate))),
                 CostUsd = g.All(p => p.EstimatedCost is not null) ? g.Sum(p => (double)p.EstimatedCost!.Value) : null,
-                CostSource = g.All(p => p.EstimatedCost is not null) ? "AgentEval's estimate from the reported token usage" : null,
+                CostSource = g.All(p => p.EstimatedCost is not null) ? "Sum of AgentEval text-token estimates; see individual trial cost evidence" : null,
             })
             .Where(u => u.InputTokens is not null || u.OutputTokens is not null || u.CostUsd is not null)
             .ToList();
@@ -307,7 +309,7 @@ public static partial class AefEvalWriter
     // A judge that produced no verdict measured nothing: its Passed and Score are placeholders, so the case is an error
     // (a typed absence, [RES-1]), never a failure.
     private static AefState StateOf(TestResult result) =>
-        result.Error is not null || result.JudgeFailed ? AefState.Error : result.Passed ? AefState.Passed : AefState.Failed;
+        result.MeasuredScore is null ? AefState.Error : result.Passed ? AefState.Passed : AefState.Failed;
 
     // A case line is measured when it passed or failed; every other state it can take is a typed absence ([RES-1]).
     private static bool IsMeasured(AefState state) => state is AefState.Passed or AefState.Failed;
@@ -330,6 +332,8 @@ public static partial class AefEvalWriter
             : passed + unmeasured >= requirePasses ? AefState.Error
             : AefState.Failed;
         var scored = trials.Where(t => IsMeasured(stateOf(t)) && (scoreMeasuredOf?.Invoke(t) ?? true)).ToList();
+        JudgeScoreSelection.RequireCompatible(scored.Select(t => t.ScoreSelection));
+        Prompts.JudgePromptProvenance.RequireCompatible(scored.Select(t => t.JudgePrompt));
         return new AefResult
         {
             CaseId = caseId,
@@ -339,7 +343,7 @@ public static partial class AefEvalWriter
             Reason = incomplete ? "The case was interrupted before all requested trials completed" : state == AefState.Error
                 ? $"{unmeasured} of {trials.Count} trials were not measured, so whether at least {requirePasses} pass is undecided"
                 : null,
-            Scores = state == AefState.Error || scored.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = scored.Average(t => (double)t.Score) }],
+            Scores = state == AefState.Error || scored.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = scored.Average(t => t.MeasuredScore!.Value) }],
             Lane = Lane,
             Trials = new AefTrials(trials.Count, passed, AefTrialAggregation.AtLeast, states.Distinct().Count() == 1),
         };
@@ -353,6 +357,7 @@ public static partial class AefEvalWriter
         var (root, children) = MapBaseCase(result, caseId, passingScore, judgeModel, absence, scoreMeasured,
             path => writer.ResultIdOf(caseId, path));
         root = AefNativeContent.Attach(writer, root, content);
+        root = root with { Ext = AefPromptProvenance.Attach(root.Ext, result.JudgePrompt, content is not null) };
         var handle = writer.AddResult(root);
         foreach (var child in children) writer.AddResult(child, handle);
         return (handle, root);
@@ -368,9 +373,10 @@ public static partial class AefEvalWriter
         var criteria = result.JudgeFailed || absence is not null ? [] : result.CriteriaResults ?? [];
         for (var n = 0; n < criteria.Count; n++)
         {
-            children.Add(Child(caseId, $"{CasePath}/criteria/{n + 1}", "agenteval.judge.criterion", criteria[n].Met ? AefState.Passed : AefState.Failed) with
+            children.Add(Child(caseId, $"{CasePath}/criteria/{n + 1}", "agenteval.judge.criterion", !criteria[n].IsMeasured ? AefState.Error : !criteria[n].Applicable ? AefState.NotApplicable : criteria[n].Met ? AefState.Passed : AefState.Failed) with
             {
-                Annotator = HarnessAnnotator(result, judgeModel),
+                Annotator = criteria[n].IsMeasured && criteria[n].Applicable ? HarnessAnnotator(result, judgeModel) : null,
+                Reason = !criteria[n].IsMeasured ? "No valid criterion verdict was returned" : !criteria[n].Applicable ? "The criterion was explicitly marked inapplicable" : null,
             });
         }
 
@@ -400,7 +406,7 @@ public static partial class AefEvalWriter
             // assertions. The record then says so, instead of a threshold its score met.
             var failedByAssertion = root.State == AefState.Failed
                 && assertions.Any(a => a.Outcome == AssertionOutcome.Failed)
-                && !(scored && passingScore is { } threshold && result.Score < threshold);
+                && !(scored && passingScore is { } threshold && result.MeasuredScore < threshold);
             var decisive = failedByAssertion && resultIdOf is not null
                 ? Enumerable.Range(0, assertions.Count)
                     .Where(n => assertions[n].Outcome == AssertionOutcome.Failed)
@@ -418,10 +424,15 @@ public static partial class AefEvalWriter
                     RulePath = !measuredCase ? AefRulePath.NothingMeasured
                         : failedByAssertion ? AefRulePath.FailureEffect
                         : AefRulePath.Threshold,
-                    Score = scored ? result.Score : null,
+                    Score = scored ? result.MeasuredScore : null,
                     Threshold = scored ? passingScore : null,
-                    Measured = children.Count,   // passed, failed and inconclusive children are all measured (SUM-4)
+                    Measured = children.Count(c => c.State is AefState.Passed or AefState.Failed or AefState.Inconclusive),
                     Total = children.Count,
+                    Unmeasured = children.Any(c => c.State is AefState.Error or AefState.NotApplicable) ? new AefUnmeasured
+                    {
+                        Error = children.Count(c => c.State == AefState.Error),
+                        NotApplicable = children.Count(c => c.State == AefState.NotApplicable)
+                    } : null,
                     Decisive = decisive,
                 },
             };
@@ -468,13 +479,13 @@ public static partial class AefEvalWriter
                     ? new AefAnnotator { Kind = AefAnnotatorKind.Code } : null,
             Scores = metric.Measured ? [new AefScore { Metric = metric.MetricName, Value = metric.Score }] : null,
             Reason = outcome.Reason,
-            Ext = !metric.Measured && metric.NotMeasuredCause is { } cause ? new JsonObject
+            Ext = AefPromptProvenance.Attach(!metric.Measured && metric.NotMeasuredCause is { } cause ? new JsonObject
             {
                 ["agenteval.metric"] = new JsonObject
                 {
                     ["version"] = 1, ["notMeasuredCause"] = JsonNamingPolicy.CamelCase.ConvertName(cause.ToString()),
                 },
-            } : null,
+            } : null, metric.JudgePrompt),
         };
     }
 
@@ -545,10 +556,11 @@ public static partial class AefEvalWriter
                 {
                     Role = AefUsageRole.Agent,
                     Model = AefConverter.Text(performance.ModelUsed, 256),
-                    InputTokens = performance.PromptTokens,
-                    OutputTokens = performance.CompletionTokens,
+                    InputTokens = performance.CostEstimate?.InputTokens ?? performance.PromptTokens,
+                    OutputTokens = performance.CostEstimate?.OutputTokens ?? performance.CompletionTokens,
+                    CacheReadInputTokens = ValidCachedCount(performance.CostEstimate),
                     CostUsd = performance.EstimatedCost is { } c ? (double)c : null,
-                    CostSource = performance.EstimatedCost is null ? null : "AgentEval's estimate from the reported token usage",
+                    CostSource = performance.EstimatedCost is null ? null : CostSource(performance),
                 },
             };
         return new AefResult
@@ -562,15 +574,59 @@ public static partial class AefEvalWriter
             Reason = absence is not null ? absence.Reason
                 : result.Error is not null ? $"the evaluation threw {result.Error.GetType().Name}"
                 : result.JudgeFailed ? "the judge produced no verdict (an evaluation-infrastructure failure, not a grade)"
+                : result.MeasuredScore is null ? "the selected score is unavailable (no grade was measured)"
                 : null,
-            Scores = IsMeasured(state) && scoreMeasured ? [new AefScore { Metric = ScoreMetric, Value = result.Score }] : null,
+            Scores = IsMeasured(state) && scoreMeasured ? [new AefScore { Metric = ScoreMetric, Value = result.MeasuredScore!.Value }] : null,
             Lane = Lane,
             DurationMs = performance is { } p && p.EndTime > p.StartTime ? (p.EndTime - p.StartTime).TotalMilliseconds : null,
             Usage = usage,   // no test name: without a dataset id it is the start of the input ([RUN-11])
             Annotator = IsMeasured(state) ? HarnessAnnotator(result, judgeModel) : null,
             Trial = trial,
+            // Source/count are content-free provenance. Never persist retrieved passages here,
+            // even when the host has not enabled content capture.
+            Ext = EvaluationExtensions(result),
         };
     }
+
+    private static long? ValidCachedCount(TokenCostEstimate? estimate) =>
+        estimate?.CachedInputTokens is >= 0 and var count && count <= estimate.InputTokens ? count : null;
+
+    private static long? SumUsageCounts(IEnumerable<long?> counts)
+    {
+        long sum = 0;
+        foreach (var count in counts)
+        {
+            if (count is null or < 0 || count > 9007199254740991L - sum) return null;
+            sum += count.Value;
+        }
+        return sum;
+    }
+
+    private static string CostSource(PerformanceMetrics performance) => performance.CostEstimate is { } estimate
+        ? $"AgentEval text-token estimate: {estimate.Status}; usage {(estimate.UsageEstimated ? "estimated" : "reported")}; see agenteval.costEstimate"
+        : "AgentEval's estimate from the reported token usage";
+
+    private static JsonObject? EvaluationExtensions(TestResult result)
+    {
+        var ext = new JsonObject();
+        if (result.JudgeContextSource is { } source)
+            ext["agenteval.judgeContext"] = new JsonObject
+            {
+                ["version"] = 1, ["source"] = JsonNamingPolicy.CamelCase.ConvertName(source.ToString()),
+                ["documentCount"] = result.JudgeContextDocumentCount
+            };
+        if (result.ScoreSelection is { } selection)
+            ext["agenteval.scoreSelection"] = JsonSerializer.SerializeToNode(selection, CostJsonOptions);
+        var withCost = AefCostProvenance.Attach(ext.Count == 0 ? null : ext, result.Performance?.CostEstimate);
+        return AefPromptProvenance.Attach(withCost, result.JudgePrompt);
+    }
+
+    private static readonly JsonSerializerOptions CostJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
+
 }
 
 /// <summary>A native harness case, its immediate child evidence and any named metric declarations.</summary>

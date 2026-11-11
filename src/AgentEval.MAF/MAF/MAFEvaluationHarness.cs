@@ -63,7 +63,12 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         TestCaseValidator.Validate(testCase);
         
         options ??= new EvaluationOptions();
+        if (!Enum.IsDefined(options.ScorePolicy)) throw new ArgumentOutOfRangeException(nameof(options.ScorePolicy));
+        var definition = testCase.JudgeCriteria is { } identified
+            ? EvaluationRequest.ForCriteria(testCase.Input, "", identified, testCase.Context, requiresContext: testCase.RequiresContext)
+            : new EvaluationRequest(testCase.Input, "", testCase.EvaluationCriteria ?? [], testCase.Context, requiresContext: testCase.RequiresContext);
         var result = new TestResult { TestName = testCase.Name };
+        var fixtureContext = definition.Context;
         var metrics = options.TrackPerformance ? new PerformanceMetrics { WasStreaming = false } : null;
         var timeline = ToolCallTimeline.Create(testCase.Name);
 
@@ -97,7 +102,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             if (metrics != null)
             {
                 metrics.EndTime = DateTimeOffset.UtcNow;
-                metrics.ModelUsed = ModelForCost(options, agent);
+                metrics.ModelUsed = ModelForCost(options, agent, response.ModelId);
             }
             timeline.TotalDuration = DateTimeOffset.UtcNow - timeline.StartedAt;
 
@@ -161,14 +166,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                     metrics.TokensAreEstimated = true;
                 }
                 
-                // Calculate estimated cost (works with actual or estimated tokens)
-                if (metrics.ModelUsed != null && metrics.PromptTokens.HasValue && metrics.CompletionTokens.HasValue)
-                {
-                    metrics.EstimatedCost = ModelPricing.EstimateCost(
-                        metrics.ModelUsed,
-                        metrics.PromptTokens.Value,
-                        metrics.CompletionTokens.Value);
-                }
+                PriceUsage(metrics, options, agent, response.ModelId, response.TokenUsage);
             }
             
             // Capture performance metrics
@@ -180,17 +178,17 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
 
             _logger.LogDebug($"📤 Output: {Truncate(response.Text, 200)}");
 
+            result.JudgeContext = (response.RetrievedContext ?? fixtureContext) is { } context
+                ? Array.AsReadOnly(context.ToArray()) : null;
             // Evaluate with AI if criteria provided and evaluator available
             EvaluationResult? evaluation = null;
-            if (options.EvaluateResponse && _evaluator != null && testCase.EvaluationCriteria?.Any() == true)
+            if (options.ScorePolicy == JudgeScorePolicy.CriteriaMetFraction ||
+                (options.EvaluateResponse && (_evaluator != null || testCase.RequiresContext) && definition.Criteria.Count > 0))
             {
-                evaluation = await _evaluator.EvaluateAsync(
-                    testCase.Input,
-                    response.Text,
-                    testCase.EvaluationCriteria,
-                    cancellationToken);
+                evaluation = await EvaluateResponseAsync(definition, options, response.Text, fixtureContext,
+                    response.RetrievedContext, result, cancellationToken);
 
-                ApplyJudgeVerdict(result, testCase, evaluation);
+                ApplyJudgeVerdict(result, testCase, definition, options.ScorePolicy, evaluation);
             }
             else
             {
@@ -266,11 +264,17 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         TestCaseValidator.Validate(testCase);
         
         options ??= new EvaluationOptions();
+        if (!Enum.IsDefined(options.ScorePolicy)) throw new ArgumentOutOfRangeException(nameof(options.ScorePolicy));
+        var definition = testCase.JudgeCriteria is { } identified
+            ? EvaluationRequest.ForCriteria(testCase.Input, "", identified, testCase.Context, requiresContext: testCase.RequiresContext)
+            : new EvaluationRequest(testCase.Input, "", testCase.EvaluationCriteria ?? [], testCase.Context, requiresContext: testCase.RequiresContext);
         var result = new TestResult { TestName = testCase.Name };
         var metrics = new PerformanceMetrics { WasStreaming = true, ModelUsed = ModelForCost(options, agent) };
         WarnIfExpectedToolsUnenforced(testCase);
         var toolCalls = new Dictionary<string, ToolCallRecord>();
         var responseText = new System.Text.StringBuilder();
+        var fixtureContext = definition.Context;
+        IReadOnlyList<string>? retrievedContext = null;
         var isFirstToken = true;
         var toolOrder = 0;
         var timeline = ToolCallTimeline.Create(testCase.Name);
@@ -351,6 +355,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                 // Extract token usage from final chunk
                 if (chunk.IsComplete)
                 {
+                    retrievedContext = chunk.RetrievedContext?.ToArray();
                     if (chunk.Usage != null)
                     {
                         // Use actual token usage from provider
@@ -367,14 +372,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                         metrics.TokensAreEstimated = true;
                     }
                     
-                    // Calculate cost (works with actual or estimated tokens)
-                    if (metrics.ModelUsed != null && metrics.PromptTokens.HasValue && metrics.CompletionTokens.HasValue)
-                    {
-                        metrics.EstimatedCost = ModelPricing.EstimateCost(
-                            metrics.ModelUsed,
-                            metrics.PromptTokens.Value,
-                            metrics.CompletionTokens.Value);
-                    }
+                    PriceUsage(metrics, options, agent, chunk.ModelId, chunk.Usage);
                 }
             }
 
@@ -399,17 +397,17 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             _logger.LogDebug($"⏱️ {metrics}");
             _logger.LogDebug($"📤 Output: {Truncate(responseText.ToString(), 200)}");
 
+            result.JudgeContext = (retrievedContext ?? fixtureContext) is { } context
+                ? Array.AsReadOnly(context.ToArray()) : null;
             // Evaluate with AI if criteria provided
             EvaluationResult? evaluation = null;
-            if (options.EvaluateResponse && _evaluator != null && testCase.EvaluationCriteria?.Any() == true)
+            if (options.ScorePolicy == JudgeScorePolicy.CriteriaMetFraction ||
+                (options.EvaluateResponse && (_evaluator != null || testCase.RequiresContext) && definition.Criteria.Count > 0))
             {
-                evaluation = await _evaluator.EvaluateAsync(
-                    testCase.Input,
-                    responseText.ToString(),
-                    testCase.EvaluationCriteria,
-                    cancellationToken);
+                evaluation = await EvaluateResponseAsync(definition, options, responseText.ToString(), fixtureContext,
+                    retrievedContext, result, cancellationToken);
 
-                ApplyJudgeVerdict(result, testCase, evaluation);
+                ApplyJudgeVerdict(result, testCase, definition, options.ScorePolicy, evaluation);
             }
             else
             {
@@ -528,6 +526,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         CancellationToken cancellationToken, Action<TestResult>? onResult, Func<int, IDisposable?>? beginCase)
     {
         options ??= new EvaluationOptions();
+        if (!Enum.IsDefined(options.ScorePolicy)) throw new ArgumentOutOfRangeException(nameof(options.ScorePolicy));
         var results = new List<TestResult>();
 
         foreach (var datasetCase in testCases)
@@ -572,7 +571,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     {
         if (result.Passed)
         {
-            _logger.LogInformation($"\n✅ PASSED - Score: {result.Score}/100");
+            _logger.LogInformation($"\n✅ PASSED - Score: {result.MeasuredScore:F2}/100");
             _logger.LogDebug($"   {result.Details}");
         }
         else
@@ -580,7 +579,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             // Failure is already logged via LogFailure when result.Failure is set
             if (result.Failure == null)
             {
-                _logger.LogError($"\n❌ FAILED - Score: {result.Score}/100");
+                _logger.LogError($"\n❌ FAILED - Score: {result.MeasuredScore:F2}/100");
                 _logger.LogError($"   {result.Details}");
                 
                 if (result.Suggestions?.Any() == true)
@@ -617,7 +616,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             }
             var status = result.Passed ? "✅" : "❌";
             var level = result.Passed ? LogLevel.Information : LogLevel.Error;
-            _logger.Log(level, $"   {status} {result.TestName}: {result.Score}/100");
+            _logger.Log(level, $"   {status} {result.TestName}: {result.MeasuredScore:F2}/100");
         }
 
         if (summary.AllPassed)
@@ -641,14 +640,76 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         return text[..(maxLength - 3)] + "...";
     }
 
-    /// <summary>
-    /// The model a run's cost is priced at: <see cref="EvaluationOptions.ModelName"/> when set, else the model the agent
-    /// says it runs (<see cref="AgentEval.Comparison.IModelIdentifiable"/>). With options shared across agents, as
-    /// <c>StochasticRunner</c> and <c>ModelComparer</c> share them, the agent's own model is what prices each model's
-    /// runs at its own rate; before, every run was priced at the one options name, or not priced at all.
-    /// </summary>
-    private static string? ModelForCost(EvaluationOptions options, IEvaluableAgent agent) =>
-        options.ModelName ?? (agent as AgentEval.Comparison.IModelIdentifiable)?.ModelId;
+    // An explicit override wins, including a blank name used to disable pricing.
+    // An unknown returned identifier must not fall back to a different, known configured model.
+    private static string? ModelForCost(EvaluationOptions options, IEvaluableAgent agent, string? responseModel = null) =>
+        options.ModelName ?? (!string.IsNullOrWhiteSpace(responseModel) ? responseModel
+            : (agent as AgentEval.Comparison.IModelIdentifiable)?.ModelId);
+
+    private static void PriceUsage(PerformanceMetrics metrics, EvaluationOptions options,
+        IEvaluableAgent agent, string? responseModel, TokenUsage? usage)
+    {
+        metrics.ModelUsed = ModelForCost(options, agent, responseModel);
+        var pricing = options.PricingResolver is { } resolver
+            ? resolver(metrics.ModelUsed) : ModelPricing.GetTokenPricing(metrics.ModelUsed);
+        var ambiguous = usage?.HasMixedModelUsage == true && options.ModelName is null;
+        if (ambiguous) pricing = null;
+        metrics.CostEstimate = TokenCostEstimate.Calculate(
+            usage?.ReportedInputTokenCount ?? metrics.PromptTokens,
+            usage?.ReportedOutputTokenCount ?? metrics.CompletionTokens,
+            usage?.CachedInputTokenCount, pricing) with
+        {
+            ModelId = metrics.ModelUsed,
+            ModelSource = ambiguous ? "mixed" : options.ModelName is not null ? "override"
+                : !string.IsNullOrWhiteSpace(responseModel) ? "response"
+                : metrics.ModelUsed is not null ? "configured" : "unknown",
+            UsageEstimated = metrics.TokensAreEstimated
+        };
+        metrics.EstimatedCost = metrics.CostEstimate.Amount;
+    }
+
+    // Shared by both execution modes. Invocation-owned evidence, even an empty capture, wins
+    // over a deliberately supplied fixture. No shared TestCase or evaluator state is mutated.
+    private Task<EvaluationResult> EvaluateResponseAsync(EvaluationRequest definition, EvaluationOptions options, string output,
+        IReadOnlyList<string>? fixtureContext, IReadOnlyList<string>? retrievedContext,
+        TestResult result, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (options.ScorePolicy == JudgeScorePolicy.CriteriaMetFraction && definition.Criteria.Count == 0)
+            return Task.FromResult(new EvaluationResult { Summary =
+                "Expected: at least one declared criterion. Actual: no criteria. Suggestions: supply JudgeCriteria or EvaluationCriteria. " +
+                "Because: an empty denominator cannot yield a criterion fraction." });
+        var source = retrievedContext is null ? EvaluationContextSource.Fixture : EvaluationContextSource.Retrieved;
+        var request = definition.JudgeCriteria is { } identified
+            ? EvaluationRequest.ForCriteria(definition.Input, output, identified, retrievedContext ?? fixtureContext, source, definition.RequiresContext)
+            : new EvaluationRequest(definition.Input, output, definition.Criteria, retrievedContext ?? fixtureContext, source, definition.RequiresContext);
+        if (options.JudgePrompts is { } prompts) request = request.WithPrompts(prompts);
+        if (!options.EvaluateResponse)
+            return Task.FromResult(new EvaluationResult { EvaluationFailed = true, Summary =
+                "Expected: response evaluation enabled for criterion scoring. Actual: EvaluateResponse is false. " +
+                "Suggestions: enable response evaluation. Because: criterion scores require a judge verdict." });
+        if (request.Context is not null || request.RequiresContext)
+        {
+            result.JudgeContextSource = request.ContextSource;
+            result.JudgeContextDocumentCount = request.Context?.Count;
+        }
+
+        if (_evaluator is null || (request.RequiresContext && request.Context is null))
+            return Task.FromResult(new EvaluationResult
+            {
+                EvaluationFailed = true,
+                Summary = "Expected: an evaluator and the context required for judging. Actual: " +
+                    (_evaluator is null ? "no evaluator is configured." : "context is unavailable.") +
+                    " Suggestions: configure an evaluator and supply fixture or invocation-owned context. " +
+                    "Because: missing evidence cannot produce a measured score."
+            });
+
+        // Preserve the original dispatch for context-free decorators/proxies as well as ordinary
+        // implementations. Only evidence-bearing requests need the additive contract.
+        return request.Context is null && !request.RequiresContext && request.JudgeCriteria is null && request.JudgePrompts is null
+            ? _evaluator.EvaluateAsync(request.Input, request.Output, request.Criteria, cancellationToken)
+            : _evaluator.EvaluateAsync(request, cancellationToken);
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // TIMELINE & FAILURE REPORT HELPERS
@@ -703,23 +764,28 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     /// Missing or failed verdicts cannot pass, including at a zero passing threshold.
     /// The legacy TestResult score is unmeasured when JudgeFailed is set.
     /// </remarks>
-    private static void ApplyJudgeVerdict(TestResult result, TestCase testCase, EvaluationResult evaluation)
+    private static void ApplyJudgeVerdict(TestResult result, TestCase testCase, EvaluationRequest definition,
+        JudgeScorePolicy policy, EvaluationResult evaluation)
     {
-        if (evaluation.EvaluationFailed || evaluation.OverallScore is not { } score)
+        var selection = JudgeScoreSelector.Select(policy, evaluation, definition.Criteria, definition.JudgeCriteria);
+        result.ScoreSelection = selection;
+        result.JudgeRubricDigest = JudgeScoreSelector.BindInstrument(evaluation.RubricDigest, policy);
+        result.JudgePrompt = evaluation.JudgePrompt;
+        if (selection.SelectedScore is not { } score)
         {
             result.JudgeFailed = true;
             result.Score = 0;
             result.Passed = false;
             result.Details = "The judge produced no verdict (evaluation failed): " +
                              (string.IsNullOrWhiteSpace(evaluation.Summary) ? "no parseable judgement was returned" : evaluation.Summary) +
+                             " [" + selection.FailureCode + "]" +
                              ". This is an evaluation-infrastructure failure, not a grade — no score was measured.";
             result.Suggestions = evaluation.Improvements.ToList();
             result.CriteriaResults = evaluation.CriteriaResults.ToList();
             return;
         }
 
-        result.JudgeRubricDigest = evaluation.RubricDigest;
-        result.Score = score;
+        result.Score = (int)Math.Round(score);
         result.Passed = score >= testCase.PassingScore;
         result.Details = evaluation.Summary;
         result.Suggestions = evaluation.Improvements.ToList();
@@ -732,8 +798,8 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         var judgeFailed = result.JudgeFailed;
         var headline = judgeFailed
             ? $"Test '{testCase.Name}' could not be graded: the judge produced no verdict"
-            : result.Score < testCase.PassingScore
-                ? $"Test '{testCase.Name}' scored {result.Score}/100 (threshold: {testCase.PassingScore})"
+            : result.MeasuredScore < testCase.PassingScore
+                ? $"Test '{testCase.Name}' scored {result.MeasuredScore:F2}/100 (threshold: {testCase.PassingScore})"
                 : $"Test '{testCase.Name}' did not meet passing criteria";
 
         var report = new FailureReport
@@ -757,9 +823,9 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
         }
 
         // Add score-related reason
-        if (!judgeFailed && result.Score < testCase.PassingScore)
+        if (!judgeFailed && result.MeasuredScore < testCase.PassingScore)
         {
-            report.AddReason("Score", $"Score {result.Score} below passing threshold {testCase.PassingScore}", FailureSeverity.Error);
+            report.AddReason("Score", $"Score {result.MeasuredScore:F2} below passing threshold {testCase.PassingScore}", FailureSeverity.Error);
         }
         
         // Add empty output reason

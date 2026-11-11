@@ -304,11 +304,7 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
         {
             Text = responseEntry.Text ?? string.Empty,
             TokenUsage = responseEntry.TokenUsage != null
-                ? new TokenUsage
-                {
-                    PromptTokens = responseEntry.TokenUsage.PromptTokens,
-                    CompletionTokens = responseEntry.TokenUsage.CompletionTokens
-                }
+                ? TraceMapping.ToAgentUsage(responseEntry.TokenUsage)
                 : null
         };
     }

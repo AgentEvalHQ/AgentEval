@@ -5,6 +5,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Prompts;
 
 namespace AgentEval.Metrics.ResponsibleAI;
 
@@ -98,6 +99,9 @@ public class ToxicityMetric : ISafetyMetric
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        if (context.JudgePrompts is { } prompts && (_useLlmFallback || !JudgePromptResolver.CanUseEnglishPrefilter(prompts, Name)))
+            JudgePromptResolver.RejectUnsupported(prompts, Name);
+
         if (string.IsNullOrWhiteSpace(context.Output))
         {
             return MetricInstrument.Code(MetricResult.Pass(Name, 100,

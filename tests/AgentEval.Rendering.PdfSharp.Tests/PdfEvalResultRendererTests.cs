@@ -59,7 +59,7 @@ public class PdfEvalResultRendererTests
     [Fact]
     public void FormatIdAndFileExtension_OnPdfRenderer_ArePdfValues()
     {
-        var r = new PdfEvalResultRenderer();
+        var r = new PdfEvalResultRenderer(PdfTestRegistry.Create());
         Assert.Equal("pdf", r.FormatId);
         Assert.Equal(".pdf", r.FileExtension);
     }
@@ -70,7 +70,7 @@ public class PdfEvalResultRendererTests
     public async Task RenderAsync_SimpleAtomicResult_ProducesValidPdfWithSignature()
     {
         var result = MakeAtomic("smoke-1", 0.85, "pass", true, "none", evidence: "Looks good.");
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts());
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, DefaultOpts());
 
         Assert.NotNull(bytes);
         Assert.True(bytes.Length > 1000, $"PDF unexpectedly small: {bytes.Length} bytes");
@@ -92,7 +92,7 @@ public class PdfEvalResultRendererTests
         var inner = MakeComposite("inner-composite", 0.65, "warn", false, leaf1, leaf2);
         var root = MakeComposite("root-composite", 0.65, "warn", false, inner);
 
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts());
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(root, DefaultOpts());
 
         Assert.True(bytes.Length > 2000, $"Multi-page PDF unexpectedly small: {bytes.Length} bytes");
         // PDF signature check
@@ -100,15 +100,14 @@ public class PdfEvalResultRendererTests
         Assert.StartsWith("%PDF-", head);
     }
 
-    // ── QuestPDF community license is auto-accepted via static ctor ───────────
+    // Explicit provider registration replaces implicit engine initialization.
 
     [Fact]
-    public async Task StaticConstructor_OnFirstAccess_AcceptsQuestPdfCommunityLicense()
+    public async Task RenderAsync_ExplicitRegistration_ProducesPdfWithoutQuestPdf()
     {
-        // If the license wasn't set we'd see a license-related exception. The
-        // simplest assertion is that we can render without prior license setup.
+        // The optional provider renders without any process-wide license setup.
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts());
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, DefaultOpts());
         Assert.True(bytes.Length > 0);
     }
 
@@ -124,7 +123,7 @@ public class PdfEvalResultRendererTests
             Provenance: new("skipped", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(skipped, DefaultOpts());
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(skipped, DefaultOpts());
         Assert.True(bytes.Length > 0);
         Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(bytes, 0, 5));
     }
@@ -135,7 +134,7 @@ public class PdfEvalResultRendererTests
     public async Task RenderAsync_IncludeProvenanceFalse_StillProducesValidPdf()
     {
         var result = MakeAtomic("k", 0.9, "pass", true, "none");
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(includeProvenance: false));
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, DefaultOpts(includeProvenance: false));
         Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(bytes, 0, 5));
     }
 
@@ -148,7 +147,7 @@ public class PdfEvalResultRendererTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(), cts.Token));
+            () => new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, DefaultOpts(), cts.Token));
     }
 
     // ── Plan-13 T4.1b item 9: PdfPig parser checks ───────────────────────────
@@ -175,7 +174,7 @@ public class PdfEvalResultRendererTests
             AuditHash: distinctiveHash,
             AgentEvalVersion: "0.10.1-beta");
 
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, opts);
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, opts);
 
         var extractedText = ExtractAllTextFromPdf(bytes);
         Assert.Contains(distinctiveHash, extractedText);
@@ -192,7 +191,7 @@ public class PdfEvalResultRendererTests
             Provenance = new("atomic-llm", "llama3.1:8b", null, null, 2000, null, false),
         };
 
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(result, DefaultOpts(includeProvenance: true));
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(result, DefaultOpts(includeProvenance: true));
 
         Assert.Contains("not priced", ExtractAllTextFromPdf(bytes));
     }
@@ -219,7 +218,7 @@ public class PdfEvalResultRendererTests
             Provenance: new("atomic-code", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(leaf, DefaultOpts());
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(leaf, DefaultOpts());
         var extractedText = ExtractAllTextFromPdf(bytes);
 
         // Footer mentions "truncated" + a "more chars" qualifier — verifies both
@@ -244,7 +243,7 @@ public class PdfEvalResultRendererTests
             EvaluatedAt: DateTimeOffset.UtcNow);
 
         var opts = DefaultOpts() with { EvidenceTruncationLength = 0 };
-        var bytes = await new PdfEvalResultRenderer().RenderAsync(leaf, opts);
+        var bytes = await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(leaf, opts);
         var extractedText = ExtractAllTextFromPdf(bytes);
 
         Assert.DoesNotContain("more chars", extractedText, StringComparison.OrdinalIgnoreCase);
@@ -263,7 +262,7 @@ public class PdfEvalResultRendererTests
             Provenance: new("composite", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        var text = ExtractAllTextFromPdf(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        var text = ExtractAllTextFromPdf(await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(root, DefaultOpts()));
 
         Assert.Contains("ZQXJAILBREAKUNMEASURED", text, StringComparison.Ordinal);
         Assert.Contains("WHYSUMMARYQZX", text, StringComparison.Ordinal);
@@ -282,10 +281,10 @@ public class PdfEvalResultRendererTests
             Provenance: new("composite", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(root, DefaultOpts()));
         var cover = doc.GetPage(1).Text;
 
-        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(cover, "ONCEONLYNOTEZQ").Count);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "ONCEONLYNOTEZQ"));
         Assert.Contains("SECONDRECZQ", cover, StringComparison.Ordinal);
     }
 
@@ -302,7 +301,7 @@ public class PdfEvalResultRendererTests
             Provenance: new("composite", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(root, DefaultOpts()));
 
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(doc.GetPage(1).Text, "ZQSHORT").Count);
     }
@@ -320,7 +319,7 @@ public class PdfEvalResultRendererTests
             Provenance: new("composite", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
 
-        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer(PdfTestRegistry.Create()).RenderAsync(root, DefaultOpts()));
         var cover = doc.GetPage(1).Text;
 
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "ZQTINY"));
@@ -333,7 +332,7 @@ public class PdfEvalResultRendererTests
         using var doc = UglyToad.PdfPig.PdfDocument.Open(bytes);
         foreach (var page in doc.GetPages())
         {
-            sb.AppendLine(page.Text);
+            sb.AppendLine(UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor.ContentOrderTextExtractor.GetText(page));
         }
         return sb.ToString();
     }

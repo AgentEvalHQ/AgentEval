@@ -12,7 +12,7 @@ namespace AgentEval.Tests.RedTeam.Reporting.Pdf;
 /// </summary>
 public class PdfReportGeneratorTests
 {
-    private readonly PdfReportGenerator _generator = new();
+    private readonly PdfReportGenerator _generator = new(PdfTestRegistry.Create());
 
     [Fact]
     public void FormatName_ReturnsPDF()

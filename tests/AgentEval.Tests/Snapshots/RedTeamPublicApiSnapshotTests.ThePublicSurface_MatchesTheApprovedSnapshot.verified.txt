@@ -1923,18 +1923,13 @@ class AgentEval.RedTeam.Reporting.Pdf.BrandingOptions : IEquatable<AgentEval.Red
     String SecondaryColor { get; init; }
     String ToString()
     ctor()
-sealed class AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver : IFontResolver, IFontResolverMarker
-    Byte[] GetFont(String faceName)
-    FontResolverInfo ResolveTypeface(String familyName, Boolean isBold, Boolean isItalic)
-    ctor()
-    static AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver Instance { get; }
-    static Void Register()
 enum AgentEval.RedTeam.Reporting.Pdf.PageSize
     A4
     Letter
     Legal
 class AgentEval.RedTeam.Reporting.Pdf.PdfReportGenerator : AgentEval.RedTeam.Reporting.IReportExporter
     Byte[] GenerateExecutiveReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null)
+    ReportDocument CreateDocument(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options)
     String Export(AgentEval.RedTeam.RedTeamResult result)
     String FileExtension { get; }
     String FormatName { get; }
@@ -1942,6 +1937,7 @@ class AgentEval.RedTeam.Reporting.Pdf.PdfReportGenerator : AgentEval.RedTeam.Rep
     Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
     Task SaveAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null, CancellationToken cancellationToken = default)
     ctor()
+    ctor(IPdfRendererRegistry pdfRenderers = null, String providerId = null)
 class AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions : IEquatable<AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions>
     AgentEval.RedTeam.RedTeamResult BaselineResults { get; init; }
     AgentEval.RedTeam.Reporting.Pdf.BrandingOptions Branding { get; init; }

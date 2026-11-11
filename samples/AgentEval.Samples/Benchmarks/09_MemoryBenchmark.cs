@@ -20,7 +20,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// Memory is a Shape B / runner-style benchmark (ADR-017 Convention 3). This sample
 /// wires the preset-driven (Smoke / Standard / AuditGrade) running-sample shape used
 /// by H2–H9 over the Memory runner: real model-backed agent + LLM judge + canonical
-/// <c>.agenteval/</c> store + sidecar JSON / HTML / PDF. The native
+/// <c>.agenteval/</c> store + sidecar JSON / HTML (PDF is opt-in). The native
 /// <c>MemoryBenchmarkResult</c> is also written to <c>report-native.json</c> for
 /// power users who need the unaltered per-category shape (grade, stars, weak
 /// categories, recommendations).
@@ -36,7 +36,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// Requires a model provider (see AIConfig). Skips gracefully when missing. Mirrors the
 /// shape of <see cref="LongMemEvalBenchmarkSample"/> (H9) — same Shape-B-to-Shape-A
 /// bridging via <see cref="SynthesizeEvalResult"/> so the unified canonical store +
-/// sidecar JSON / HTML / PDF artefacts come out identical to every other Group-H
+/// sidecar JSON / HTML artefacts come out identical to every other Group-H
 /// sample. The unaltered native shape is preserved in <c>report-native.json</c>.
 /// </remarks>
 public static class MemoryBenchmarkSample
@@ -177,7 +177,7 @@ public static class MemoryBenchmarkSample
         }
 
         // ── Synthesise an EvalResult tree from the Shape-B result so we get
-        // canonical .agenteval/ persistence + sidecar JSON / HTML / PDF for free.
+        // canonical .agenteval/ persistence + sidecar JSON / HTML; PDF is opt-in.
         var evalTree = SynthesizeEvalResult(result, memoryPreset.Name);
 
         var subject = new SubjectIdentity(
@@ -190,7 +190,7 @@ public static class MemoryBenchmarkSample
             evalTree, subject,
             benchmarkName: "memory",
             regulationOrBenchmark: $"Memory benchmark — {memoryPreset.Name} preset",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null, // not a compliance benchmark
             presetLabel: memoryPreset.Name.ToLowerInvariant(),
             judgeModel: AIConfig.ModelDeployment);
@@ -218,7 +218,7 @@ public static class MemoryBenchmarkSample
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - Memory is a Shape B family — runner returns MemoryBenchmarkResult,");
         Console.WriteLine("     synthesised into an EvalResult tree (root + per-category leaves with weights).");
-        Console.WriteLine("   - report.json / report.html / report.pdf reflect the synthesised tree;");
+        Console.WriteLine("   - report.json / report.html reflect the synthesised tree; PDF output is opt-in;");
         Console.WriteLine("     report-native.json carries the unaltered MemoryBenchmarkResult shape");
         Console.WriteLine("     (grade, stars, weak categories, recommendations).");
         Console.WriteLine("   - Smoke=Quick (3 cats); Standard=8 cats; AuditGrade=Full (12 cats).");

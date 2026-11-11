@@ -103,6 +103,17 @@ jobs:
     - name: Pack CLI as dotnet tool
       run: dotnet pack src/AgentEval.Cli/AgentEval.Cli.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
 
+    - name: Pack optional PDF provider
+      run: dotnet pack src/AgentEval.Rendering.PdfSharp/AgentEval.Rendering.PdfSharp.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+
+    - name: Pack optional PDF companion
+      run: dotnet pack src/AgentEval.Cli.Pdf/AgentEval.Cli.Pdf.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:PackageVersion=${{ steps.version.outputs.version }} --output ./nupkgs
+
+    - name: Verify PDF is absent from default distributions
+      run: |
+        python3 -m unittest discover -s scripts/tests -p test_pdf_package_boundary.py
+        python3 scripts/verify-pdf-package-boundary.py --feed ./nupkgs
+
     # Between the pack and the push, because a NuGet package cannot be recalled. 0.23.0-beta
     # shipped assemblies stamped 0.16.0.0: the pack passed -p:PackageVersion, which moves the
     # nupkg's version and nothing else, while AssemblyVersion / FileVersion /
@@ -139,7 +150,7 @@ jobs:
     # A NuGet package cannot be recalled: refuse to publish a CLI tool whose `mc serve` would have no UI.
     - name: Verify the CLI tool contains the Mission Control UI
       run: |
-        pkg=$(ls ./nupkgs/AgentEval.Cli.*.nupkg | grep -v '\.snupkg$' | head -1)
+        pkg="./nupkgs/AgentEval.Cli.${{ steps.version.outputs.version }}.nupkg"
         if ! unzip -l "$pkg" | grep -q 'tools/net10.0/any/wwwroot/index.html'; then
           echo "::error::$pkg has no tools/net10.0/any/wwwroot/index.html: 'agenteval mc serve' would have no UI."
           exit 1
@@ -155,7 +166,7 @@ jobs:
         from zipfile import ZipFile
         from xml.etree import ElementTree
 
-        packages = list(Path('nupkgs').glob('AgentEval.Cli.*.nupkg'))
+        packages = list(Path('nupkgs').glob('AgentEval.Cli.${{ steps.version.outputs.version }}.nupkg'))
         if len(packages) != 1:
             raise SystemExit(f'Expected one CLI package; found {packages}')
         with ZipFile(packages[0]) as package:

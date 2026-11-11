@@ -70,7 +70,8 @@ internal static class JudgeFactory
         IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
         evaluatorOverride is not null
             ? (evaluatorOverride, "override", 0)
-            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
+            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile,
+                preserveSystemPromptOnBinding: false);
 
     /// <summary>
     /// Resolves the judge to use for a bench run.
@@ -89,6 +90,7 @@ internal static class JudgeFactory
     /// <see cref="IJudgePromptSource.SystemPromptId"/> and so recorded as provenance <c>PromptId</c>.
     /// Ignored when <paramref name="systemPrompt"/> is <c>null</c>.
     /// </param>
+    /// <param name="preserveSystemPromptOnBinding">True for customer text; false for the embedded family fallback that yields to a leaf rubric.</param>
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing
@@ -99,7 +101,8 @@ internal static class JudgeFactory
         IEvaluator? evaluatorOverride,
         string judgeKind = "benchmark",
         string? systemPrompt = null,
-        string? systemPromptId = null)
+        string? systemPromptId = null,
+        bool preserveSystemPromptOnBinding = true)
     {
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
@@ -107,7 +110,7 @@ internal static class JudgeFactory
         var (client, model, exitCode, provider) = ResolveChatClientWithProvider(judgeKind, systemPrompt?.Length);
         return client is null
             ? (null, "", exitCode)
-            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId) { ProviderName = provider }, model, 0);
+            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId, preserveSystemPromptOnBinding) { ProviderName = provider }, model, 0);
     }
 
     /// <summary>

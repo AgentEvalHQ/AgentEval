@@ -6,22 +6,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
-    <Description>Generic IEvalResultRenderer PDF implementation. Backed by QuestPDF (Community license). Renders any EvalResult composite tree into an audit-grade PDF with cover page, per-leaf detail sections, and an audit-chain footer. Family-specific renderers (GDPR, EU AI Act, Agentic) keep their bespoke shape; this one targets cross-family scenarios.</Description>
+    <Description>Engine-neutral PDF report projection and explicit provider registration. Engines are installed separately.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
-    <!--
-      Plan-13 T4.1e item 38 / lastreview/29 §5: AgentEval.Core ProjectReference dropped —
-      PdfEvalResultRenderer.cs references zero Core symbols (only AgentEval.Evals from
-      Abstractions + QuestPDF). Re-adding the reference would re-introduce a ~3 MB
-      transitive size impact for downstream consumers that pull this package without
-      Core. If a future renderer addition needs Core symbols, add the reference back here.
-    -->
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
 </Project>

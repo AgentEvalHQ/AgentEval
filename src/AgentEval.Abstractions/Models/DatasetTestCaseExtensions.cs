@@ -33,6 +33,15 @@ public static class DatasetTestCaseExtensions
     public static TestCase ToTestCase(
         this DatasetTestCase d,
         Func<GroundTruthToolCall?, string?>? groundTruthProjection = null)
+        => ToTestCase(d, requiresContext: false, groundTruthProjection);
+
+    /// <summary>Converts a dataset case with an explicit context requirement for criteria judging.</summary>
+    /// <param name="d">The dataset case.</param>
+    /// <param name="requiresContext">Whether unavailable context prevents judging.</param>
+    /// <param name="groundTruthProjection">Optional projection of structured tool ground truth.</param>
+    /// <returns>The execution case, including a snapshot of its context passages.</returns>
+    public static TestCase ToTestCase(this DatasetTestCase d, bool requiresContext,
+        Func<GroundTruthToolCall?, string?>? groundTruthProjection = null)
     {
         ArgumentNullException.ThrowIfNull(d);
 
@@ -50,6 +59,8 @@ public static class DatasetTestCaseExtensions
             Input = d.Input,
             ExpectedOutputContains = d.ExpectedOutput,
             EvaluationCriteria = d.EvaluationCriteria,
+            Context = d.Context is null ? null : Array.AsReadOnly(d.Context.ToArray()),
+            RequiresContext = requiresContext,
             ExpectedTools = d.ExpectedTools,
             GroundTruth = groundTruthProjection != null
                 ? groundTruthProjection(d.GroundTruth)
@@ -81,7 +92,7 @@ public static class DatasetTestCaseExtensions
     /// <b>Tool expectations are not carried here.</b> This method does not populate
     /// <see cref="EvaluationContext.ExpectedTools"/> or <see cref="EvaluationContext.ToolUsage"/>, so the
     /// tool-usage metrics have nothing to compare; set both yourself if you want them to run. Note also
-    /// that <see cref="TestCase.ExpectedTools"/> (populated by <see cref="ToTestCase"/>) is <b>not enforced
+    /// that <see cref="TestCase.ExpectedTools"/> (populated by <c>ToTestCase</c>) is <b>not enforced
     /// by the MAF evaluation harness</b> — see the remarks on that property (ADR-030 defect D-d, tracker AE-02).
     /// </para>
     /// </remarks>

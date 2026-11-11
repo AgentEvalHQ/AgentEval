@@ -56,7 +56,7 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void Create_Has37Options()
+    public void Create_Has40Options()
     {
         // dataset, endpoint, azure, model, deployment-name, api-key, system-prompt, system-prompt-file,
         // temperature, max-tokens, metrics, runs, success-threshold, judge, judge-model,
@@ -67,8 +67,9 @@ public class EvalCommandTests
         // + AEF (S1 #5a): aef, no-aef, subject, subject-version => 31
         // + --sut microsoft365 (Work IQ A2A, SutTargetResolver.AddOptionsTo("eval")): m365-config, m365-max-turns,
         // m365-profile, m365-capture-raw, m365-verbose, m365-trace = 6 => 37
+        // + judge-prompt-pack, judge-locale, judge-fallback-locale = 3 => 40
         var command = EvalCommand.Create();
-        Assert.Equal(37, command.Options.Count);
+        Assert.Equal(40, command.Options.Count);
     }
 
     [Theory]

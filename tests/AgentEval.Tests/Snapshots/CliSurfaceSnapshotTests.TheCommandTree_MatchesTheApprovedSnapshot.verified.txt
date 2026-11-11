@@ -456,7 +456,10 @@
         option --golden FileInfo [1..1]
         option --i-understand-live-side-effects Boolean [0..1] default=false
         option --judge String [1..1]
+        option --judge-fallback-locale String [1..1]
+        option --judge-locale String [1..1]
         option --judge-model String [1..1]
+        option --judge-prompt-pack FileInfo [1..1]
         option --m365-capture-raw DirectoryInfo [1..1]
         option --m365-config FileInfo [1..1]
         option --m365-max-turns Int32 [1..1] default=0
@@ -568,6 +571,16 @@
     command migrate
         option --apply Boolean [0..1] default=false
         option --root String [1..1]
+    command prompts
+        command export
+            argument <directory> String [1..1]
+            option --evaluator String [1..1]
+        command inspect
+            argument <manifest> String [1..1]
+            option --json Boolean [0..1] default=false
+        command validate
+            argument <manifest> String [1..1]
+            option --json Boolean [0..1] default=false
     command redteam
         option --accept-license Boolean [0..1] default=false
         option --aef DirectoryInfo [1..1]

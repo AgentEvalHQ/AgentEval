@@ -53,7 +53,10 @@ public sealed class MemoryProjectionObservationTests : IDisposable
         {
             // TypedTree is an AEF projection: its nongating "scored" state has never belonged to legacy EvalResult JSON.
             // Check the reused provenance contract without extending legacy labels or changing the typed outcome.
-            var provenance = JsonNode.Parse(schemaText)!["properties"]!["provenance"]!;
+            var wholeSchema = JsonNode.Parse(schemaText)!;
+            var provenance = wholeSchema["properties"]!["provenance"]!.DeepClone();
+            // Extracting a subschema must retain the definitions its local references resolve against.
+            provenance["$defs"] = wholeSchema["$defs"]!.DeepClone();
             var provenanceSchema = JsonSchema.FromText(provenance.ToJsonString());
             var document = JsonNode.Parse(output)!;
             Assert.Equal("scored", (string?)document["score"]!["label"]);

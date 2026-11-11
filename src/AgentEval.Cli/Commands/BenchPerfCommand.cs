@@ -255,14 +255,13 @@ public static class BenchPerfCommand
             {
                 Console.Error.WriteLine($"Warning: failed to write perf JSON report: {ex.Message}");
             }
-            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            var htmlPath = await GenericReportRenderer.WriteHtmlAsync(
                 result,
                 runDir,
                 subjectIdentity,
                 benchmarkLabel: $"Performance — {preset}",
                 runId: runId);
             if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
             ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)

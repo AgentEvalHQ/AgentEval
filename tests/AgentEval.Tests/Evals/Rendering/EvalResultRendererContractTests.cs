@@ -25,7 +25,7 @@ public class EvalResultRendererContractTests
     public static IEnumerable<object[]> Renderers => new[]
     {
         new object[] { "html", (Func<IEvalResultRenderer>)(() => new HtmlEvalResultRenderer()) },
-        new object[] { "pdf",  (Func<IEvalResultRenderer>)(() => new PdfEvalResultRenderer()) },
+        new object[] { "pdf",  (Func<IEvalResultRenderer>)(() => new PdfEvalResultRenderer(new AgentEval.Tests.Rendering.Pdf.TestPdfRegistry())) },
     };
 
     private static EvalResult MakeAtomic(string key, double value, string label, string severity) =>

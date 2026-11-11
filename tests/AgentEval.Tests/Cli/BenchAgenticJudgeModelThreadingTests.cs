@@ -120,7 +120,7 @@ public class BenchAgenticJudgeModelThreadingTests
             //     composite of composites → depth 7+.
             if (!ContainsThreadedValue(instance, ThreadedJudgeModel, maxDepth: 8))
             {
-                failures.Add($"{type.FullName}: threaded judgeModel='{ThreadedJudgeModel}' not stored anywhere on the instance graph (depth ≤ 4).");
+                failures.Add($"{type.FullName}: threaded judgeModel='{ThreadedJudgeModel}' not stored anywhere on the instance graph (depth ≤ 8).");
                 continue;
             }
             threadedCount++;
@@ -217,7 +217,8 @@ public class BenchAgenticJudgeModelThreadingTests
                     foreach (var item in systemEnum)
                     {
                         if (item is null) continue;
-                        if (!visited.Add(item)) continue;
+                        // Mark nodes when dequeued below; marking here skips their fields entirely.
+                        if (visited.Contains(item)) continue;
                         queue.Enqueue((item, depth + 1));
                     }
                 }

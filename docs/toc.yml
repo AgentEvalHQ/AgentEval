@@ -135,6 +135,18 @@
     href: metrics-reference.md
   - name: RAG Metrics
     href: rag-metrics.md
+  - name: Judge Prompt Packs
+    href: judge-prompt-packs.md
+  - name: Judge Context
+    href: judge-context.md
+  - name: Judge Score Policies
+    href: judge-score-policies.md
+  - name: Groundedness Policies
+    href: groundedness-policies.md
+  - name: Cost Estimation
+    href: cost-estimation.md
+  - name: Optional PDF Providers
+    href: pdf-providers.md
   - name: Agentic Metrics
     href: agentic-metrics.md
   - name: Embedding Metrics

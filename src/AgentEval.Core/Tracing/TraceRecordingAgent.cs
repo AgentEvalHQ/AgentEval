@@ -158,11 +158,7 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
             Text = SanitizeResponse(response.Text),
             DurationMs = stopwatch.ElapsedMilliseconds,
             IsStreaming = false,
-            TokenUsage = response.TokenUsage != null ? new TraceTokenUsage
-            {
-                PromptTokens = response.TokenUsage.PromptTokens,
-                CompletionTokens = response.TokenUsage.CompletionTokens
-            } : null,
+            TokenUsage = response.TokenUsage != null ? TraceMapping.FromAgentUsage(response.TokenUsage) : null,
             ToolCalls = ExtractToolCalls(response.RawMessages),
             FinishReason = response.FinishReason
         };
@@ -291,11 +287,7 @@ public sealed class TraceRecordingAgent : IEvaluableAgent, IStreamableAgent, IAs
                 // Capture token usage from final chunk
                 if (chunk.IsComplete && chunk.Usage != null)
                 {
-                    responseEntry.TokenUsage = new TraceTokenUsage
-                    {
-                        PromptTokens = chunk.Usage.PromptTokens,
-                        CompletionTokens = chunk.Usage.CompletionTokens
-                    };
+                    responseEntry.TokenUsage = TraceMapping.FromAgentUsage(chunk.Usage);
                 }
                 
                 previousChunkTime = currentTime;

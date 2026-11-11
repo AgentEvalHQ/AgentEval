@@ -285,8 +285,8 @@ public static class ModelComparisonExtensions
                 stats.MeanScore,
                 stats.MedianScore,
                 stats.StandardDeviation?.ToString("F2", CultureInfo.InvariantCulture) ?? "n/a",
-                stats.MinScore,
-                stats.MaxScore,
+                stats.ExactMinScore,
+                stats.ExactMaxScore,
                 stats.Percentile25?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a",
                 stats.Percentile75?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a",
                 stats.Percentile95?.ToString("F1", CultureInfo.InvariantCulture) ?? "n/a"));

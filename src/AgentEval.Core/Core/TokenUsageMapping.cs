@@ -25,8 +25,24 @@ internal static class TokenUsageMapping
             : null;
 
     /// <summary>A <see cref="TokenUsage"/> when both counts were reported and nonnegative, otherwise null.</summary>
-    public static TokenUsage? FromUsage(UsageDetails? usage) =>
-        Counts(usage) is { } c ? new TokenUsage { PromptTokens = c.Prompt, CompletionTokens = c.Completion } : null;
+    public static TokenUsage? FromUsage(UsageDetails? usage, bool hasMixedModelUsage = false) =>
+        Counts(usage) is { } c ? new TokenUsage
+        {
+            PromptTokens = c.Prompt, CompletionTokens = c.Completion,
+            ReportedInputTokenCount = usage!.InputTokenCount,
+            ReportedOutputTokenCount = usage.OutputTokenCount,
+            CachedInputTokenCount = usage.CachedInputTokenCount,
+            HasMixedModelUsage = hasMixedModelUsage
+        } : null;
+
+    // Invalid cache usage remains invalid even if a later attempt would hide it within the summed input.
+    internal static long? AddCached(long? total, UsageDetails? usage)
+    {
+        var cached = usage?.CachedInputTokenCount;
+        if (total < 0 || cached < 0 || cached > usage?.InputTokenCount) return -1;
+        if (total is { } sum && cached is { } count && count > long.MaxValue - sum) return -1;
+        return Add(total, cached);
+    }
 
     // Absence, invalid contributions and overflow remain unavailable on subsequent attempts.
     internal static long? Add(long? total, long? contribution) =>

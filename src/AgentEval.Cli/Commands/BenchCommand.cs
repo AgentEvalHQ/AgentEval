@@ -14,7 +14,6 @@ using AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 using AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
 using AgentEval.Compliance.Gdpr.DomainPacks.HR;
 using AgentEval.Compliance.Gdpr.Reporting;
-using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
 
 namespace AgentEval.Cli.Commands;
@@ -326,18 +325,7 @@ public static class BenchCommand
                 Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
             }
 
-            // PDF report
-            try
-            {
-                var pdfRenderer = new GDPRPdfRenderer(articles);
-                var pdfPath = Path.Combine(outputDir, "report.pdf");
-                await pdfRenderer.RenderAsync(evidence, pdfPath);
-                Console.WriteLine($"PDF report: {pdfPath}");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-            }
+            // PDF is an explicitly installed and requested output; use agenteval-pdf on the recorded run.
 
             ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;

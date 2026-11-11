@@ -5,6 +5,7 @@
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Prompts;
 
 namespace AgentEval.Metrics.RAG;
 
@@ -15,6 +16,7 @@ namespace AgentEval.Metrics.RAG;
 public class FaithfulnessMetric : IRAGMetric, IQualityMetric
 {
     private readonly IChatClient _chatClient;
+    private readonly JudgePromptOptions? _prompts;
     
     public string Name => "llm_faithfulness";
     public string Description => "Measures if the response is grounded in and faithful to the provided context (no hallucinations).";
@@ -32,9 +34,19 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     }
+
+    /// <summary>Creates a metric with invocation-isolated declarative prompt configuration.</summary>
+    public FaithfulnessMetric(IChatClient chatClient, JudgePromptOptions prompts) : this(chatClient)
+    {
+        _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if ((context.JudgePrompts ?? _prompts) is { } configured)
+            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
@@ -117,6 +129,7 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
 public class RelevanceMetric : IRAGMetric, IQualityMetric
 {
     private readonly IChatClient _chatClient;
+    private readonly JudgePromptOptions? _prompts;
     
     public string Name => "llm_relevance";
     public string Description => "Measures how relevant and on-topic the response is to the user's question.";
@@ -133,9 +146,19 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     }
+
+    /// <summary>Creates a metric with invocation-isolated declarative prompt configuration.</summary>
+    public RelevanceMetric(IChatClient chatClient, JudgePromptOptions prompts) : this(chatClient)
+    {
+        _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if ((context.JudgePrompts ?? _prompts) is { } configured)
+            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+
         var prompt = BuildRelevancePrompt(context.Input, context.Output);
 
         var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Relevance", cancellationToken);
@@ -206,6 +229,7 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
 public class ContextPrecisionMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
+    private readonly JudgePromptOptions? _prompts;
     
     public string Name => "llm_context_precision";
     public string Description => "Measures how much of the retrieved context is relevant and useful for answering the question.";
@@ -222,9 +246,19 @@ public class ContextPrecisionMetric : IRAGMetric
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     }
+
+    /// <summary>Creates a metric with invocation-isolated declarative prompt configuration.</summary>
+    public ContextPrecisionMetric(IChatClient chatClient, JudgePromptOptions prompts) : this(chatClient)
+    {
+        _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if ((context.JudgePrompts ?? _prompts) is { } configured)
+            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
@@ -298,6 +332,7 @@ public class ContextPrecisionMetric : IRAGMetric
 public class ContextRecallMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
+    private readonly JudgePromptOptions? _prompts;
     
     public string Name => "llm_context_recall";
     public string Description => "Measures whether the retrieved context contains all information needed to answer the question correctly.";
@@ -315,9 +350,19 @@ public class ContextRecallMetric : IRAGMetric
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     }
+
+    /// <summary>Creates a metric with invocation-isolated declarative prompt configuration.</summary>
+    public ContextRecallMetric(IChatClient chatClient, JudgePromptOptions prompts) : this(chatClient)
+    {
+        _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if ((context.JudgePrompts ?? _prompts) is { } configured)
+            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
@@ -403,6 +448,7 @@ public class ContextRecallMetric : IRAGMetric
 public class AnswerCorrectnessMetric : IRAGMetric
 {
     private readonly IChatClient _chatClient;
+    private readonly JudgePromptOptions? _prompts;
     
     public string Name => "llm_answer_correctness";
     public string Description => "Measures how correct the answer is compared to the expected ground truth.";
@@ -419,9 +465,19 @@ public class AnswerCorrectnessMetric : IRAGMetric
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
     }
+
+    /// <summary>Creates a metric with invocation-isolated declarative prompt configuration.</summary>
+    public AnswerCorrectnessMetric(IChatClient chatClient, JudgePromptOptions prompts) : this(chatClient)
+    {
+        _prompts = prompts ?? throw new ArgumentNullException(nameof(prompts));
+    }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if ((context.JudgePrompts ?? _prompts) is { } configured)
+            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+
         if (!ReferenceText.HasWords(context.GroundTruth))   // not measured, never a fail (B12i); "?" is none (round 17)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
