@@ -813,6 +813,8 @@ static class AgentEval.Core.PromptSafety
     const System.String UntrustedBegin
     const System.String UntrustedEnd
     static System.String Fence(System.String content)
+static class AgentEval.Core.Reporting.JudgePromptAttestation
+    static System.Collections.Generic.IReadOnlyDictionary<System.String, System.String> FromResult(AgentEval.Evals.EvalResult result)
 static class AgentEval.Core.Reporting.MarkdownSectionBuilder
     static System.Void AppendAuditChain(System.Text.StringBuilder sb, AgentEval.Output.SourceRunRef sourceRun, System.String previousEvidenceRef = null)
     static System.Void AppendMethodology(System.Text.StringBuilder sb, AgentEval.Evals.EvalResult compositeTree, System.String evaluatorModel, System.String judgeMode)

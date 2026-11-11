@@ -51,6 +51,7 @@ public sealed record EuAiActArticleSummary([property: JsonIgnore(Condition = Jso
 public sealed record EuAiActAttestation(string JudgeMode, IReadOnlyDictionary<string, string> PromptVersions);
 
 /// <summary>Options controlling how the EU AI Act compliance report is generated.</summary>
+/// <remarks>Observed configured prompt identities take precedence over PromptVersions. Unconfigured legacy trees retain the supplied map or legacy defaults.</remarks>
 public sealed record EuAiActReportOptions(
     string Preset = "standard",
     IReadOnlyList<string>? DomainPacks = null,

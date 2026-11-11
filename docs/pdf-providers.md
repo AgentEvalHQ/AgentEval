@@ -45,6 +45,8 @@ These types stay in their original namespaces, and their original constructor si
 
 Compliance scenario content is redacted before providers see it. Known sensitive cases are redacted; when sensitivity metadata is unavailable, scenario text is withheld while IDs, scores and status remain available. Pass the appropriate article registry to disclose known-safe scenario input. Missing measurements remain missing; changing a renderer never recalculates a verdict.
 
+For configured GDPR and EU AI Act judges, report attestations derive the evaluator key, instrument ID, version, effective locale and full digest from the observed leaf provenance. Those facts take precedence over a caller-supplied legacy `PromptVersions` map. Repeated identical instruments are deduplicated; differing identities for one result key are marked `MIXED`, and legacy leaves in a configured report are marked `UNIDENTIFIED`. Fully unconfigured legacy reports retain their previous map/default behavior. Attestation never copies captured system, user or retry text, and an instrument's locale does not establish that its rubric has been calibrated for that language.
+
 ## Select another engine
 
 Implement the small `IPdfReportRenderer` interface in a customer-owned package. Register it before building a new host; adding registrations to an already-built host's service collection does not update that host:

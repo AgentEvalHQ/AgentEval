@@ -51,6 +51,7 @@ public sealed record GdprArticleSummary([property: JsonIgnore(Condition = JsonIg
 public sealed record GdprAttestation(string JudgeMode, IReadOnlyDictionary<string, string> PromptVersions);
 
 /// <summary>Options controlling how the GDPR compliance report is generated.</summary>
+/// <remarks>Observed configured prompt identities take precedence over PromptVersions. Unconfigured legacy trees retain the supplied map or legacy defaults.</remarks>
 public sealed record GdprReportOptions(
     string Preset = "standard",
     IReadOnlyList<string>? DomainPacks = null,

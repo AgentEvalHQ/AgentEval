@@ -10,6 +10,7 @@ using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Output;
 using Json.Schema;
 using AgentEval.Compliance.Core;
+using AgentEval.Core.Reporting;
 
 namespace AgentEval.Compliance.EuAiAct.Reporting;
 
@@ -84,6 +85,12 @@ public sealed class EuAiActComplianceReporter
         ArgumentNullException.ThrowIfNull(compositeTree);
         options ??= new EuAiActReportOptions();
 
+        var promptVersions = JudgePromptAttestation.FromResult(compositeTree) ?? options.PromptVersions ?? new Dictionary<string, string>
+        {
+            ["eu-ai-act-judge-system"] = "v1",
+            ["per-criterion"] = "v1"
+        };
+
         var sourceManifest = await store.GetRunManifestAsync(sourceRunId, ct)
             ?? throw new InvalidOperationException($"Source run {sourceRunId} not found.");
 
@@ -128,11 +135,7 @@ public sealed class EuAiActComplianceReporter
             Disclaimer: Disclaimer,
             EuAiActAttestation: new EuAiActAttestation(
                 JudgeMode: options.JudgeMode,
-                PromptVersions: options.PromptVersions ?? new Dictionary<string, string>
-                {
-                    ["eu-ai-act-judge-system"] = "v1",
-                    ["per-criterion"] = "v1"
-                }));
+                PromptVersions: promptVersions));
 
         await WriteEuAiActEvidenceFileAsync(store, subject, baseEvidence.GeneratedAt, euAiActEvidence, ct);
         return euAiActEvidence;
