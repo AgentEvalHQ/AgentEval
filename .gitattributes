@@ -33,3 +33,6 @@ tests/AgentEval.Tests/Microsoft365/Fixtures/** -text
 
 # Keep the upstream bundled-font license verbatim, including its original whitespace.
 src/AgentEval.Rendering.PdfSharp/Fonts/OFL.txt -whitespace
+
+# Authored prompt text contributes to instrument identity; checkouts must not rewrite it.
+samples/AgentEval.Samples/PromptPacks/** text eol=lf
