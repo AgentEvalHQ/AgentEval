@@ -3,6 +3,7 @@
 
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using AgentEval.Comparison;
 using AgentEval.Core;
@@ -132,6 +133,51 @@ public sealed class LocalizedJudgeArtifactTests : IDisposable
         var lines = File.ReadLines(Path.Combine(directory, "results.ndjson")).Select(x => JsonNode.Parse(x)!).ToArray();
         Assert.Contains(lines, l => (string?)l["ext"]?["agenteval.judgePrompt"]?["effectiveLocale"] == "sv-SE");
         Assert.DoesNotContain("PRIVATE_", string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WriteTrials_ConfiguredJudgeAndMissingContext_PreservesMeasuredAndSkippedTrials(bool skippedFirst)
+    {
+        using var client = new FakeChatClient();
+        var eval = new AtomicLlmEval(new ChatClientEvaluator(client), "localized-context", "Context", "quality", "1.0.0", ["Supported"])
+        { JudgeNeedsData = JudgeInputData.Context };
+        var definition = eval.CapturePromptDefinition() with { Locale = "sv-SE" };
+        client.WithResponse(JsonSerializer.Serialize(new
+        {
+            overallScore = 90, summary = "Fixture", improvements = Array.Empty<string>(),
+            criteriaResults = definition.Criteria.Select(c => new { id = c.Id, met = true, explanation = "Fixture" })
+        }));
+        var selection = new JudgePromptOptions { Locale = "sv-SE", Override = definition };
+        var started = DateTimeOffset.UtcNow;
+        var measured = await eval.EvaluateAsync(new("q", "a", "evidence") { JudgePrompts = selection });
+        var skipped = await eval.EvaluateAsync(new("q", "a") { JudgePrompts = selection });
+        Assert.True(measured.Score.Passed);
+        Assert.Equal("skipped", skipped.Score.Label);
+        Assert.Null(skipped.Provenance.JudgePrompt);
+        Assert.Equal(1, client.CallCount);
+        var (directory, _) = AefCompositeRunWriter.WriteTrials(Path.Combine(_root, "runs"), measured,
+            skippedFirst ? [skipped, measured] : [measured, skipped], AefCompositeRunWriter.Undescribed,
+            new() { SubjectRef = "agent:fixture", TargetMode = AefTargetMode.Scripted, Lane = "agentic", SuiteRef = "bench:fixture" },
+            started, DateTimeOffset.UtcNow);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        var trials = File.ReadLines(Path.Combine(directory, "results.ndjson")).Select(x => JsonNode.Parse(x)!)
+            .Where(x => x["trial"] is not null).ToArray();
+        Assert.Equal(2, trials.Length);
+        Assert.Equal("sv-SE", (string?)Assert.Single(trials, t => (string?)t["state"] == "passed")["ext"]!["agenteval.judgePrompt"]!["effectiveLocale"]);
+        var skippedTrial = Assert.Single(trials, t => (string?)t["state"] == "skipped");
+        Assert.Null(skippedTrial["scores"]);
+        Assert.Null(skippedTrial["ext"]?["agenteval.judgePrompt"]);
+
+        var incompatible = measured with
+        {
+            Provenance = measured.Provenance with { JudgePrompt = measured.Provenance.JudgePrompt! with { Digest = "different-instrument" } }
+        };
+        Assert.Throws<InvalidOperationException>(() => AefCompositeRunWriter.WriteTrials(Path.Combine(_root, "incompatible"), measured,
+            [measured, skipped, incompatible], AefCompositeRunWriter.Undescribed,
+            new() { SubjectRef = "agent:fixture", TargetMode = AefTargetMode.Scripted, Lane = "agentic", SuiteRef = "bench:fixture" },
+            started, DateTimeOffset.UtcNow));
     }
 
     [Fact]

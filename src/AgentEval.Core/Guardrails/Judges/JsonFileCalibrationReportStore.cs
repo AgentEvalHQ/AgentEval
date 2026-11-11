@@ -152,6 +152,7 @@ public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportS
         public DateTimeOffset CapturedAt { get; set; }
         public string? SplitLabel { get; set; }
         public List<string> InstrumentDigests { get; set; } = [];
+        public string? CalibratedInstrumentDigest { get; set; }
 
         public static CalibrationReportDto From(CalibrationReport r) => new()
         {
@@ -170,11 +171,12 @@ public sealed partial class JsonFileCalibrationReportStore : ICalibrationReportS
             CapturedAt = r.CapturedAt,
             SplitLabel = r.SplitLabel,
             InstrumentDigests = [.. r.InstrumentDigests],
+            CalibratedInstrumentDigest = r.CalibratedInstrumentDigest,
         };
 
         public CalibrationReport ToReport() => new(
             Axis, TruePositives, TrueNegatives, FalsePositives, FalseNegatives, KappaVsGold,
             BaselineAccuracy, BeatsBaseline, MeetsThresholds, PromotionCriteriaConfigured, SufficientData,
-            Cases, CapturedAt, SplitLabel, InstrumentDigests);
+            Cases, CapturedAt, SplitLabel, InstrumentDigests, CalibratedInstrumentDigest);
     }
 }

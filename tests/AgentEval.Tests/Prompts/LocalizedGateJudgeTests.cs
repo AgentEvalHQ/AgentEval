@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AgentEval.Guardrails;
 using AgentEval.Guardrails.Judges;
 using AgentEval.Guardrails.Judges.Rubrics;
@@ -207,6 +208,7 @@ public sealed class LocalizedGateJudgeTests
         var report = await GateCalibrationHarness.EvaluateAsync(new JudgeVerdictCache(gate), Gold(), Options());
         Assert.True(report.IsInlineReady);
         Assert.Equal(gate.InstrumentDigest, Assert.Single(report.InstrumentDigests));
+        Assert.Equal(gate.InstrumentDigest, report.CalibratedInstrumentDigest);
         var directory = Path.Combine(Path.GetTempPath(), "agenteval-localized-calibration-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -216,9 +218,17 @@ public sealed class LocalizedGateJudgeTests
             var loaded = await store.LoadLatestAsync("over-refusal");
             Assert.Equal("synthetic-test", loaded!.SplitLabel);
             Assert.Equal(report.InstrumentDigests, loaded.InstrumentDigests);
+            Assert.Equal(report.CalibratedInstrumentDigest, loaded.CalibratedInstrumentDigest);
             var options = new GatekeeperOptions { CalibrationReportStore = store };
             options.PreGates.Add(new JudgeVerdictCache(gate));
             await options.ValidateInlineJudgesAsync();
+            var path = Assert.Single(Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories));
+            var oldReport = JsonNode.Parse(await File.ReadAllTextAsync(path))!.AsObject();
+            Assert.True(oldReport.Remove("CalibratedInstrumentDigest"));
+            await File.WriteAllTextAsync(path, oldReport.ToJsonString());
+            Assert.Null((await store.LoadLatestAsync("over-refusal"))!.CalibratedInstrumentDigest);
+            await Assert.ThrowsAsync<UncalibratedInlineJudgeException>(() => options.ValidateInlineJudgesAsync());
+            await store.SaveAsync(report);
             var changed = Gate(client, new() { JudgePrompts = Selection(threshold: .9), ModelId = "requested-model" });
             options.PreGates.Clear();
             options.PreGates.Add(new JudgeVerdictCache(changed));
@@ -227,6 +237,35 @@ public sealed class LocalizedGateJudgeTests
             Assert.True(legacy.IsInlineReady);
             await store.SaveAsync(legacy);
             options.PreGates.Clear(); options.PreGates.Add(gate);
+            await Assert.ThrowsAsync<UncalibratedInlineJudgeException>(() => options.ValidateInlineJudgesAsync());
+#pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Readiness_PassingPanel_DoesNotCertifyAnIndividualContributor(bool legacyCompanion)
+    {
+        var replies = new Queue<string>([Block, Allow]);
+        using var strongClient = new CallbackClient(_ => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, replies.Dequeue())) { ModelId = "observed-strong" }));
+        using var weakClient = new CallbackClient(_ => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, Allow)) { ModelId = "observed-weak" }));
+        var weak = Gate(weakClient);
+        IChatGate strong = legacyCompanion ? new LegacyPerfectGate()
+            : Gate(strongClient, new() { JudgePrompts = Selection(), ModelId = "strong-model" });
+        var report = await GateCalibrationHarness.EvaluateAsync(new ParallelJudgeFanOut([strong, weak]), Gold(), Options());
+        Assert.True(report.IsInlineReady);
+        Assert.Equal(legacyCompanion ? 1 : 2, report.InstrumentDigests.Count);
+        Assert.Null(report.CalibratedInstrumentDigest);
+        var directory = Path.Combine(Path.GetTempPath(), "agenteval-panel-calibration-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+#pragma warning disable AGENTEVAL_GATEKEEPER_PREVIEW001
+            var store = new JsonFileCalibrationReportStore(directory);
+            await store.SaveAsync(report);
+            var options = new GatekeeperOptions { CalibrationReportStore = store };
+            options.PreGates.Add(new JudgeVerdictCache(weak));
             await Assert.ThrowsAsync<UncalibratedInlineJudgeException>(() => options.ValidateInlineJudgesAsync());
 #pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
         }

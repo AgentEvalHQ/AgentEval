@@ -50,6 +50,7 @@ internal sealed record CalibrationReportDto
     public int UnmeasuredCases { get; init; }
     public bool ModelsIdentified { get; init; }
     public IReadOnlyList<string> InstrumentDigests { get; init; } = [];
+    public string? CalibratedInstrumentDigest { get; init; }
     public GateDatasetProvenance? Dataset { get; init; }
     public bool? CertificateEligible { get; init; }
     public GateCalibrationPolicy? CalibrationPolicy { get; init; }
@@ -81,6 +82,7 @@ internal sealed record CalibrationReportDto
         UnmeasuredCases = r.UnmeasuredCases,
         ModelsIdentified = r.ModelsIdentified,
         InstrumentDigests = r.InstrumentDigests,
+        CalibratedInstrumentDigest = r.CalibratedInstrumentDigest,
         // a gold case can itself contain a secret-shaped span → elide entirely for the redact axes, else truncate.
         Cases = r.Cases.Select(c => new CalibrationCaseDto(
             redactCaseText ? "[redacted]" : Truncate(c.Text, 80), c.ShouldBlock, c.Blocked)

@@ -40,6 +40,9 @@ public sealed class CalibrationReport
     /// <summary>Declared configured instruments evaluated by this report. Empty for legacy axis-only calibration.</summary>
     public IReadOnlyList<string> InstrumentDigests { get; }
 
+    /// <summary>The configured judge independently calibrated by this report; null for panels and legacy reports.</summary>
+    public string? CalibratedInstrumentDigest { get; }
+
     /// <summary>Cases without a conclusive configured judge measurement; these are excluded from the confusion matrix.</summary>
     public int UnmeasuredCases => Cases.Count(c => !c.Measured);
 
@@ -140,12 +143,14 @@ public sealed class CalibrationReport
         string axis, int tp, int tn, int fp, int fn, double kappa,
         double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds,
         bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases,
-        DateTimeOffset capturedAt, string? splitLabel = null, IReadOnlyList<string>? instrumentDigests = null)
+        DateTimeOffset capturedAt, string? splitLabel = null, IReadOnlyList<string>? instrumentDigests = null,
+        string? calibratedInstrumentDigest = null)
     {
         PromotionCriteriaConfigured = promotionCriteriaConfigured;
         SufficientData = sufficientData;
         Axis = axis;
         InstrumentDigests = Array.AsReadOnly((instrumentDigests ?? []).ToArray());
+        CalibratedInstrumentDigest = calibratedInstrumentDigest;
         TruePositives = tp;
         TrueNegatives = tn;
         FalsePositives = fp;

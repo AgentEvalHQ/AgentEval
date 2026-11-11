@@ -65,6 +65,8 @@ public sealed class LocalizedGatekeeperCommandTests : IDisposable
             Fingerprint, 0, 1, 1, true, null, _directory, output, error, default, Options(prompts), dataset));
         using var document = JsonDocument.Parse(output.ToString());
         Assert.True(document.RootElement.GetProperty("isInlineReady").GetBoolean()); // Statistical library bar only.
+        Assert.Equal(document.RootElement.GetProperty("instrumentDigests")[0].GetString(),
+            document.RootElement.GetProperty("calibratedInstrumentDigest").GetString());
         Assert.False(document.RootElement.GetProperty("certificateEligible").GetBoolean());
         var certificate = InlineReadinessStore.TryLoad("over-refusal", Fingerprint, _directory, Digest(prompts), dataset.Digest);
         Assert.NotNull(certificate);

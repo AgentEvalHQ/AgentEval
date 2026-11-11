@@ -509,7 +509,7 @@ public static class AefCompositeRunWriter
 
     private static void ValidateTrials(EvalResult rollup, IReadOnlyList<EvalResult> trials)
     {
-        Prompts.JudgePromptProvenance.RequireCompatible(trials.Select(t => t.Provenance.JudgePrompt));
+        Prompts.JudgePromptProvenance.RequireCompatible(trials.Where(t => IsMeasured(StateOf(t.Score))).Select(t => t.Provenance.JudgePrompt));
         var children = rollup.Details.SubResults ?? [];
         if (trials.Any(t => t.Metric.Key != rollup.Metric.Key || (t.Details.SubResults?.Count ?? 0) != children.Count))
             throw new ArgumentException("Trial trees must have the same ordered metric keys and structure as their rollup.", nameof(trials));

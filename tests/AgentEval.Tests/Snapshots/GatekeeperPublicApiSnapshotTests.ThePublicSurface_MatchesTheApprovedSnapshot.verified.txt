@@ -163,6 +163,7 @@ sealed class AgentEval.Guardrails.Judges.CalibrationReport
     Int32 TruePositives { get; }
     Int32 UnmeasuredCases { get; }
     String Axis { get; }
+    String CalibratedInstrumentDigest { get; }
     String SplitLabel { get; }
     Void AssertInlineReady()
 sealed class AgentEval.Guardrails.Judges.CompositeJudgeGate<TRubric> : AgentEval.Guardrails.IChatGate, AgentEval.Guardrails.Judges.IRequiresCalibration

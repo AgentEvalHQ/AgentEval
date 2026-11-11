@@ -79,7 +79,8 @@ public static class GateCalibrationHarness
         var report = new CalibrationReport(
             goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds,
             criteriaConfigured, sufficientData, judgeResults, capturedAt, options.SplitLabel,
-            CalibrationRequirements.FindIn(judge).Select(c => c.InstrumentDigest).OfType<string>().Distinct(StringComparer.Ordinal).ToArray());
+            CalibrationRequirements.FindIn(judge).Select(c => c.InstrumentDigest).OfType<string>().Distinct(StringComparer.Ordinal).ToArray(),
+            CalibrationRequirements.IndependentlyCalibratedDigest(judge));
 
         activity?.SetTag("agenteval.calibration.accuracy", report.DecisiveAccuracy);
         activity?.SetTag("agenteval.calibration.dangerous_errors", report.DangerousErrorCount);

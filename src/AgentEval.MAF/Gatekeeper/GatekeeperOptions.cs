@@ -216,9 +216,10 @@ public sealed class GatekeeperOptions
             throw new UncalibratedInlineJudgeException(axis, "no calibration report was found for this axis" + where);
         }
 
-        if (instrumentDigest is not null && !report.InstrumentDigests.Contains(instrumentDigest, StringComparer.Ordinal))
+        if (instrumentDigest is not null && !string.Equals(report.CalibratedInstrumentDigest, instrumentDigest, StringComparison.Ordinal))
             throw new UncalibratedInlineJudgeException(axis,
-                "the calibration report does not match the configured prompt, locale, model and execution policy; recalibrate this instrument" + where);
+                "Expected: independent calibration of this configured instrument. Actual: the report has no matching independently calibrated identity. "
+                + "Suggestions: recalibrate this instrument on its own. Because: panel accuracy does not establish a contributor's accuracy" + where);
 
         if (!report.IsInlineReady)
         {
