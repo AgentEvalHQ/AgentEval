@@ -99,7 +99,7 @@ The composite verdict is `pass` when composite score >= 0.6 AND no leaf is label
 - Latency `fail` — start with the recommendation embedded in the leaf (e.g. "P99 latency 8200ms exceeds threshold 5000ms. Consider caching, reducing prompt length, or upgrading the model tier."). Common root causes: bloated system prompt, oversized retrieval context, unnecessary tool round-trips, judge / safety filter overhead, network round-trip on cold connection.
 - Throughput `fail` — review the agent's concurrency story (connection pool, rate-limit budget, queue backpressure). The default 2-worker / 5s window catches obvious serialisation bugs; sustained-load testing requires a dedicated tool.
 - Cost `fail` — prompt-bloat is the dominant cause; check whether the system prompt has grown, whether retrieved context is being over-included, whether tool descriptions are verbose. Caching repeated prompts can substantially help for hot paths.
-- Cost leaf `pass` with "Cost unknown — no pricing data for model" — the model name isn't in `ModelPricing.GetPricing`. Either add a pricing entry or treat the cost result as advisory.
+- Cost leaf `skipped` because pricing or complete usage is unavailable — supply the correct model rate/identity or investigate the missing usage. It is not a passing cost measurement, even if measured latency and throughput allow the composite to pass.
 
 ## When to use this benchmark
 

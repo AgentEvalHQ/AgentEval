@@ -154,6 +154,12 @@ result.Should()
 **Attack types included (14):** Prompt Injection, Jailbreaks, PII Leakage, System Prompt Extraction, Indirect Injection, Excessive Agency, Insecure Output Handling, Inference API Abuse, Encoding Evasion, Supply Chain, Data & Model Poisoning, Vector & Embedding (RAG), Misinformation, Skill-Description Injection — covering all 10 OWASP LLM Top 10 categories. Plus opt-in multi-turn attacks (Crescendo, PAIR, TAP, ToolEscalation).
 
 ```csharp
+using AgentEval.RedTeam;
+using AgentEval.RedTeam.Reporting.Pdf;
+using AgentEval.Rendering.PdfSharp;
+using AgentEval.Reporting;
+using Microsoft.Extensions.DependencyInjection;
+
 // Advanced: Full pipeline control
 var result = await AttackPipeline
     .Create()
@@ -163,10 +169,16 @@ var result = await AttackPipeline
     .WithIntensity(Intensity.Comprehensive)
     .ScanAsync(agent);
 
-// Export an executive PDF report (AgentEval.RedTeam.Reporting.Pdf); JSON, Markdown,
-// JUnit and SARIF exporters live in AgentEval.RedTeam.Reporting
-await new PdfReportGenerator().ExportToFileAsync(result, "security-report.pdf");
+// Optional PDF: install the matching AgentEval.Rendering.PdfSharp package first.
+var pdfServices = new ServiceCollection();
+pdfServices.AddAgentEvalPdfSharp();
+using var pdfHost = pdfServices.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var pdfScope = pdfHost.CreateScope();
+var pdfRegistry = pdfScope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>();
+await new PdfReportGenerator(pdfRegistry).ExportToFileAsync(result, "security-report.pdf");
 ```
+
+PDF requires explicit installation, registration and output selection; see [PDF providers](pdf-providers.md). JSON, Markdown, JUnit and SARIF exporters remain available without a PDF engine.
 
 [Red Team Evaluation →](redteam.md)
 

@@ -16,9 +16,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 services.AddAgentEvalPdfSharp();
-using var host = services.BuildServiceProvider();
+using var host = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var scope = host.CreateScope();
 
-var registry = host.GetRequiredService<IPdfRendererRegistry>();
+var registry = scope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>();
 var pdf = registry.ForEvalResults("pdfsharp"); // IEvalResultRenderer
 byte[] bytes = await pdf.RenderAsync(result, options, cancellationToken);
 await File.WriteAllBytesAsync("report.pdf", bytes, cancellationToken);
@@ -29,6 +30,11 @@ Registration performs no layout, file writes, logo reads, or font initialization
 `IEvalResultRenderer` remains the generic result boundary. Rich family facades preserve their own summaries and metadata and delegate to the same registry:
 
 ```csharp
+using AgentEval.Compliance.Gdpr.Reporting.Pdf;
+using AgentEval.Compliance.EuAiAct.Reporting.Pdf;
+using AgentEval.Evals.Agentic.Reporting.Pdf;
+using AgentEval.RedTeam.Reporting.Pdf;
+
 await new GDPRPdfRenderer(articles, registry).RenderAsync(gdprEvidence, "gdpr.pdf", cancellationToken);
 await new EuAiActPdfRenderer(euArticles, registry).RenderAsync(euEvidence, "eu.pdf", cancellationToken);
 await new AgenticPdfRenderer(registry).RenderAsync(agenticResult, "agentic.pdf", cancellationToken);
@@ -41,11 +47,20 @@ Compliance scenario content is redacted before providers see it. Known sensitive
 
 ## Select another engine
 
-Implement the small `IPdfReportRenderer` interface in a customer-owned package and register it:
+Implement the small `IPdfReportRenderer` interface in a customer-owned package. Register it before building a new host; adding registrations to an already-built host's service collection does not update that host:
 
 ```csharp
-services.AddAgentEvalPdfProvider<CustomerPdfRenderer>("customer");
-var renderer = registry.ForEvalResults("customer");
+using AgentEval.Rendering.Pdf;
+using AgentEval.Reporting;
+using Microsoft.Extensions.DependencyInjection;
+
+var customerServices = new ServiceCollection();
+customerServices.AddAgentEvalPdfProvider<CustomerPdfRenderer>("customer");
+using var customerHost = customerServices.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var customerScope = customerHost.CreateScope();
+var customerRegistry = customerScope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>();
+var renderer = customerRegistry.ForEvalResults("customer");
+byte[] customerPdf = await renderer.RenderAsync(result, options, cancellationToken);
 ```
 
 The provider receives immutable `ReportDocument` sections, plain text, rectangular tables and portable presentation options. It does not receive family evaluators or vendor-specific layout objects. Treat report text as data; do not fetch URLs in evidence. Generic `IncludeProvenance=false` removes judge/model/prompt/token-cost facts before provider access.

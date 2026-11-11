@@ -205,7 +205,7 @@ What follows from this:
 
 ### What the Ranking Does Not Tell You
 
-- **How a run is priced.** The harness estimates a run's cost from its token counts and a model's price in `ModelPricing`: the model `EvaluationOptions.ModelName` names, or, when that is not set, the model the agent names itself (`IModelIdentifiable.ModelId`; `MAFIdentifiableAgentAdapter` for a MAF `AIAgent`). `StochasticRunner` passes the same `EvaluationOptions` for every model, so a `ModelName` there prices every model at that one model's rate, and the cost dimension then compares token usage, not prices: leave it unset and let each agent name its model. `AsEvaluableAgent` identifies its model from explicit `ChatOptions.ModelId`, otherwise `ChatClientMetadata.DefaultModelId`; its display name is not a pricing hint. An agent that names no model (`MAFAgentAdapter`, or a chat client with missing/blank model identity), or a model missing from the price table, leaves its runs unpriced: when any model has no cost, cost is not measured for the comparison (step 5). Add a missing price with `ModelPricing.SetPricing`, or set the cost weight to 0.
+- **How a run is priced.** The harness uses `EvaluationOptions.ModelName` as an explicit override, then the returned `AgentResponse.ModelId`, then configured `IModelIdentifiable.ModelId`. An unknown returned model stays unpriced instead of borrowing a configured model's rate. `StochasticRunner` passes the same options to every model, so leave `ModelName` unset when comparing their actual prices. `MAFIdentifiableAgentAdapter` tags responses with its configured model; `AsEvaluableAgent` preserves provider-returned identity and uses explicit `ChatOptions.ModelId` or client metadata as its configured fallback. Display names are not pricing hints. Reported cached input is discounted only when a cached rate is available. Read each run's `Performance.CostEstimate` for counts, rates, status and identity source; use a per-run `PricingResolver` for customer rates or deployment aliases. See [cost estimation](cost-estimation.md). An unpriced model leaves cost unavailable for comparison (step 5).
 - **Latency and cost cover only the runs that returned.** A model whose every run throws has neither, and no measured run either, so it is not ranked (step 2). A model with only some failed runs is timed and priced on the runs that returned: check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before reading its speed.
 - **Weights are not checked.** `ModelComparer` does not call `ScoringWeights.Validate()`. Weights that do not sum to 1 change the scale of `CompositeScore`, which is then no longer 0–100. Call `Validate()` on your weights yourself.
 - **Tokens may be estimated.** When the provider returns no token usage, the harness estimates tokens from the text (`PerformanceMetrics.TokensAreEstimated`), and a cost built on them is an estimate of an estimate.
@@ -354,23 +354,19 @@ supported row's units, list/sale prices and any promotion end date; retain the a
 and source. If rates change, update both `ModelPricing` and `JudgeCostMap` where they overlap, their
 comments and the table identity, then run the pricing consistency tests. If a source cannot be verified,
 keep its historical date/caveat rather than calling it current. Packages do not refresh rates automatically.
-For a deployment-specific price or discount, use `ModelPricing.SetPricing`; configure judge rates
-separately with `JudgeCostMap.Register`. Reports remain estimates, not invoices or spending caps.
+For deployment-specific rates, prefer `EvaluationOptions.PricingResolver` and a judge instance's
+`rateResolver`. `ModelPricing.SetPricing` and `JudgeCostMap.Register` remain application-wide defaults.
+Reports retain the rates actually used in cost provenance; they remain estimates, not invoices or spending caps.
 
-The built-in cost dimension prices each model at its own rate when each agent names its model ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price yourself, for agents that name no model, price each model's token usage at its own rate with `ModelPricing.EstimateCost`:
+The built-in cost dimension uses each run's recorded estimate ([see above](#what-the-ranking-does-not-tell-you)). Reuse `ModelResult.AverageCost` for a quality/price view; recalculating from averaged, integer-truncated token counts would discard cached usage, per-run model identity and the frozen rates. For the budget examples below, also require `TotalCost` so partially priced workloads cannot pass the cost filter:
 
 ```csharp
-using AgentEval.Models;
-
-// ModelId must match a ModelPricing entry (for example "gpt-4o" or "gpt-4o-mini");
-// otherwise, or when the runs recorded no tokens, the cost stays null: not measured.
+// A null total means at least one planned run was unpriced, or cost analysis was disabled.
+// AverageCost alone describes the priced runs and can exist for a partial workload.
 var priced = result.ModelResults
     .Select(m => (
         Model: m,
-        CostPerRun: m.StochasticResult.PromptTokenStats is { } prompt
-                    && m.StochasticResult.CompletionTokenStats is { } completion
-            ? ModelPricing.EstimateCost(m.ModelId, (int)prompt.Mean, (int)completion.Mean)
-            : null))
+        CostPerRun: m.TotalCost.HasValue ? m.AverageCost : null))
     .ToList();
 
 foreach (var (model, costPerRun) in priced)

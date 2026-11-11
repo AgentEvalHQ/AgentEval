@@ -564,6 +564,18 @@ await exporter.ExportToFileAsync(result, "security-report.md");
 Generate branded PDF reports suitable for executive and compliance audiences:
 
 ```csharp
+using AgentEval.RedTeam.Reporting.Pdf;
+using AgentEval.Rendering.PdfSharp;
+using AgentEval.Reporting;
+using Microsoft.Extensions.DependencyInjection;
+
+// Install the matching AgentEval.Rendering.PdfSharp package before opting into PDF.
+var pdfServices = new ServiceCollection();
+pdfServices.AddAgentEvalPdfSharp();
+using var pdfHost = pdfServices.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var pdfScope = pdfHost.CreateScope();
+var pdfRegistry = pdfScope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>();
+
 var pdfOptions = new PdfReportOptions
 {
     CompanyName = "Contoso",
@@ -576,9 +588,11 @@ var pdfOptions = new PdfReportOptions
     }
 };
 
-var generator = new PdfReportGenerator();
+var generator = new PdfReportGenerator(pdfRegistry);
 await generator.SaveAsync(result, "security-report.pdf", pdfOptions);
 ```
+
+This is an explicit optional export. The default library does not install a PDF engine; see [PDF providers](pdf-providers.md) for installation, alternate engines and the separate CLI companion.
 
 PDF reports include:
 - **Executive summary** with overall risk score (0-100)
