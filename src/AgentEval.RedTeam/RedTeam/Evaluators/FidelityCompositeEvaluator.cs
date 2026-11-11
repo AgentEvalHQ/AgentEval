@@ -66,11 +66,8 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
             resolved = ef;
         meta["fidelity"] = resolved;
 
-        return source.Outcome switch
-        {
-            EvaluationOutcome.Succeeded => EvaluationResult.Succeeded(source.Reason, source.MatchedItems, meta, source.Confidence),
-            EvaluationOutcome.Resisted  => EvaluationResult.Resisted(source.Reason, meta, source.Confidence),
-            _                           => EvaluationResult.Inconclusive(source.Reason, meta, source.Confidence),
-        };
+        // This decorator changes only the evidence-fidelity annotation. Rebuilding a result
+        // from its verdict drops the selected judge instrument and observed grading source.
+        return source with { Metadata = meta };
     }
 }

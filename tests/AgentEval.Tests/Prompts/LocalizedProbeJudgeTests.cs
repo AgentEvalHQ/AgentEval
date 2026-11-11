@@ -29,6 +29,32 @@ public sealed class LocalizedProbeJudgeTests
         new() { Locale = "sv-SE", Override = definition ?? Swedish(), CaptureContent = capture };
 
     [Theory]
+    [InlineData("SUCCEEDED", true)]
+    [InlineData("RESISTED", true)]
+    [InlineData("INCONCLUSIVE", true)]
+    [InlineData("SUCCEEDED", false)]
+    [InlineData("RESISTED", false)]
+    [InlineData("INCONCLUSIVE", false)]
+    public async Task Evaluate_FidelityFallback_PreservesConfiguredInstrument(string verdict, bool structured)
+    {
+        using var client = new FakeChatClient(Success.Replace("SUCCEEDED", verdict));
+        var judge = new LLMJudgeEvaluator(client, new() { JudgePrompts = Select() });
+        var composite = new FidelityCompositeEvaluator(new ToolInvocationEvaluator(["forbidden"]), judge);
+        var result = structured
+            ? await composite.EvaluateAsync(Probe(), new AgentResponse { Text = "Svar" })
+            : await composite.EvaluateAsync(Probe(), "Svar");
+
+        var instrument = Instrument(result);
+        Assert.Equal("sv-SE", instrument.Prompt.EffectiveLocale);
+        Assert.Equal(instrument.RubricDigest, result.RubricDigest);
+        Assert.Equal(GradingProvenanceKind.Judge, result.GradedBy);
+        Assert.Equal(EvidenceFidelity.Verbal, result.Metadata!["fidelity"]);
+        Assert.Equal(Enum.Parse<EvaluationOutcome>(verdict, ignoreCase: true), result.Outcome);
+        Assert.Equal(.9, result.Confidence);
+        Assert.Equal(1, client.CallCount);
+    }
+
+    [Theory]
     [InlineData("SUCCEEDED", EvaluationOutcome.Succeeded)]
     [InlineData("RESISTED", EvaluationOutcome.Resisted)]
     [InlineData("INCONCLUSIVE", EvaluationOutcome.Inconclusive)]
@@ -392,14 +418,19 @@ public sealed class LocalizedProbeJudgeTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Scan_LocalizedCustomJudge_PreservesVerdictIdentityAndEvidencePreference(bool capture)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Scan_LocalizedCustomJudge_PreservesVerdictIdentityAndEvidencePreference(bool capture, bool fidelityFallback)
     {
         using var client = new CallbackClient((_, _) => Task.FromResult(Reply(Success, "model-sv")));
         var judge = new LLMJudgeEvaluator(client, new() { JudgePrompts = Select() });
+        IProbeEvaluator evaluator = fidelityFallback
+            ? new FidelityCompositeEvaluator(new ToolInvocationEvaluator(["forbidden"]), judge)
+            : judge;
         var scan = await new RedTeamRunner().ScanAsync(new Subject(), new ScanOptions
-        { AttackTypes = [new CustomAttack(judge)], IncludeEvidence = capture, Parallelism = 2 });
+        { AttackTypes = [new CustomAttack(evaluator)], IncludeEvidence = capture, Parallelism = 2 });
         var result = Assert.Single(Assert.Single(scan.AttackResults).ProbeResults);
         Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
         var instrument = Assert.Single(result.JudgeInstruments!);
