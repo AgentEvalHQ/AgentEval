@@ -28,7 +28,7 @@ public sealed class PromptsCommandTests : IDisposable
         Assert.Equal(0, await PromptsCommand.ExportAsync(directory, null, output, error));
         var path = Path.Combine(directory, "prompts.json");
         var pack = await new JudgePromptPackLoader().LoadAsync(path);
-        Assert.Equal(7, pack.Definitions.Count);
+        Assert.Equal(15, pack.Definitions.Count);
         Assert.All(pack.Definitions, d => Assert.Equal("draft", d.Status));
         Assert.Contains(pack.Definitions, d => d.EvaluatorKey == "relevance" && d.ResponseContract == JudgeResponseContract.RubricV1);
         output.GetStringBuilder().Clear();
@@ -77,7 +77,7 @@ public sealed class PromptsCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("llm_toxicity")]
+    [InlineData("llm_toxicity")] // Supported metric, but this pack omits its Swedish definition.
     [InlineData("llm_faithfulness,code_toxicity")]
     public async Task Eval_UnsupportedJudgeOrLanguagePrefilter_FailsBeforeCallingTarget(string metrics)
     {
@@ -91,6 +91,35 @@ public sealed class PromptsCommandTests : IDisposable
             JudgePromptPack = new(Path.Combine(directory, "prompts.json")), JudgeLocale = "sv-SE"
         }, default, agentClientOverride: client));
         Assert.Empty(client.ReceivedMessages);
+    }
+
+    [Theory]
+    [MemberData(nameof(LocalizedMetricTests.Metrics), MemberType = typeof(LocalizedMetricTests))]
+    public async Task Eval_AdditionalLocalizedMetric_UsesSelectedPackAndSealsContentFreeEvidence(string key)
+    {
+        var definition = BuiltInJudgePrompts.GetMetric(key) with { Locale = "sv-SE", SystemText = "Privata svenska bedömningsinstruktioner." };
+        var packDirectory = Path.Combine(_root, "pack");
+        await new JudgePromptPackLoader().ExportAsync(new([definition]), packDirectory);
+        var dataset = Path.Combine(_root, "cases.jsonl");
+        await File.WriteAllTextAsync(dataset, """{"id":"one","input":"Fråga","context":["Underlag"]}""");
+        using var client = new FakeChatClient("Svar", LocalizedMetricTests.Reply(key));
+        var runs = Path.Combine(_root, "runs");
+        var exit = await EvalCommand.ExecuteAsync(new EvalOptions
+        {
+            Dataset = new(dataset), Endpoint = "http://localhost:1234/v1", Model = "scripted",
+            Format = "json", Quiet = true, Metrics = key, Aef = new(runs),
+            JudgePromptPack = new(Path.Combine(packDirectory, "prompts.json")), JudgeLocale = "sv-SE"
+        }, default, agentClientOverride: client);
+        Assert.Equal(0, exit);
+        Assert.Equal(2, client.CallCount);
+        Assert.Equal(definition.SystemText, client.ReceivedMessages.Last().First().Text);
+        var run = Assert.Single(Directory.GetFiles(runs, "run.json", SearchOption.AllDirectories));
+        var directory = Path.GetDirectoryName(run)!;
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        Assert.Contains("sv-SE", await File.ReadAllTextAsync(run));
+        var results = File.ReadLines(Path.Combine(directory, "results.ndjson")).Select(line => JsonNode.Parse(line)!).ToArray();
+        Assert.Contains(results, line => (string?)line["ext"]?["agenteval.judgePrompt"]?["effectiveLocale"] == "sv-SE");
+        Assert.DoesNotContain(definition.SystemText, string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
     }
 
     [Theory]

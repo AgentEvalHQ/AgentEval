@@ -25,6 +25,8 @@ namespace AgentEval.Metrics.Safety;
 /// </remarks>
 public class GroundednessMetric : IRAGMetric, ISafetyMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
     
     public string Name => "llm_groundedness";
@@ -44,6 +46,10 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         MetricCategory.Faithfulness | 
         MetricCategory.LLMEvaluated;
     
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public GroundednessMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     public GroundednessMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -53,7 +59,8 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
-        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput,
@@ -181,6 +188,8 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
 /// </summary>
 public class CoherenceMetric : IRAGMetric, IQualityMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
     
     public string Name => "llm_coherence";
@@ -198,6 +207,10 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
         MetricCategory.Coherence | 
         MetricCategory.LLMEvaluated;
     
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public CoherenceMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     public CoherenceMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -207,7 +220,8 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
-        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
         var prompt = BuildCoherencePrompt(context.Input, context.Output);
 
         var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Coherence", cancellationToken);
@@ -293,6 +307,8 @@ public class CoherenceMetric : IRAGMetric, IQualityMetric
 /// </summary>
 public class FluencyMetric : IRAGMetric, IQualityMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
     
     public string Name => "llm_fluency";
@@ -310,6 +326,10 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
         MetricCategory.Fluency | 
         MetricCategory.LLMEvaluated;
     
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public FluencyMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     public FluencyMetric(IChatClient chatClient)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
@@ -319,7 +339,8 @@ public class FluencyMetric : IRAGMetric, IQualityMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
-        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
         var prompt = BuildFluencyPrompt(context.Output);
 
         var (response, failed) = await JudgeReplyEvidence.AskAsync(_chatClient, prompt, Name, "Fluency", cancellationToken);

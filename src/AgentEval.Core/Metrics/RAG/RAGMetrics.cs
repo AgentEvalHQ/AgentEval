@@ -45,7 +45,7 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         if ((context.JudgePrompts ?? _prompts) is { } configured)
-            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
@@ -157,7 +157,7 @@ public class RelevanceMetric : IRAGMetric, IQualityMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         if ((context.JudgePrompts ?? _prompts) is { } configured)
-            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
 
         var prompt = BuildRelevancePrompt(context.Input, context.Output);
 
@@ -257,7 +257,7 @@ public class ContextPrecisionMetric : IRAGMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         if ((context.JudgePrompts ?? _prompts) is { } configured)
-            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
@@ -361,7 +361,7 @@ public class ContextRecallMetric : IRAGMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         if ((context.JudgePrompts ?? _prompts) is { } configured)
-            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
@@ -476,7 +476,7 @@ public class AnswerCorrectnessMetric : IRAGMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         if ((context.JudgePrompts ?? _prompts) is { } configured)
-            return await ConfiguredRagJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, configured, cancellationToken).ConfigureAwait(false);
 
         if (!ReferenceText.HasWords(context.GroundTruth))   // not measured, never a fail (B12i); "?" is none (round 17)
         {

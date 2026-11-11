@@ -1,4 +1,4 @@
-class AgentEval.Adapters.MicrosoftEvaluatorAdapter : AgentEval.Core.IMetric, AgentEval.Evals.IEval
+﻿class AgentEval.Adapters.MicrosoftEvaluatorAdapter : AgentEval.Core.IMetric, AgentEval.Evals.IEval
     System.String Category { get; }
     System.String Description { get; }
     System.String JudgeModel { get; init; }
@@ -1146,6 +1146,7 @@ class AgentEval.Metrics.Agentic.TaskCompletionMetric : AgentEval.Core.IAgenticMe
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.Collections.Generic.IEnumerable<System.String> completionCriteria = null)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.Collections.Generic.IEnumerable<System.String> completionCriteria, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 class AgentEval.Metrics.Agentic.ToolArgumentsMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
@@ -1265,6 +1266,7 @@ class AgentEval.Metrics.ResponsibleAI.BiasMetric : AgentEval.Core.IMetric, Agent
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateCounterfactualAsync(AgentEval.Core.EvaluationContext originalContext, AgentEval.Core.EvaluationContext counterfactualContext, System.String demographicDimension, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 class AgentEval.Metrics.ResponsibleAI.MisinformationMetric : AgentEval.Core.IMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Decimal? EstimatedCostPerEvaluation { get; }
@@ -1272,6 +1274,7 @@ class AgentEval.Metrics.ResponsibleAI.MisinformationMetric : AgentEval.Core.IMet
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 enum AgentEval.Metrics.ResponsibleAI.ToxicityCategory
     None
     HateSpeech
@@ -1289,6 +1292,7 @@ class AgentEval.Metrics.ResponsibleAI.ToxicityMetric : AgentEval.Core.IMetric, A
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor()
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.Boolean useLlmFallback = true)
 class AgentEval.Metrics.Retrieval.MRRMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
@@ -1322,6 +1326,7 @@ class AgentEval.Metrics.Safety.CoherenceMetric : AgentEval.Core.IMetric, AgentEv
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 class AgentEval.Metrics.Safety.FluencyMetric : AgentEval.Core.IMetric, AgentEval.Core.IQualityMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
@@ -1330,6 +1335,7 @@ class AgentEval.Metrics.Safety.FluencyMetric : AgentEval.Core.IMetric, AgentEval
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 class AgentEval.Metrics.Safety.GroundednessMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
@@ -1338,6 +1344,7 @@ class AgentEval.Metrics.Safety.GroundednessMetric : AgentEval.Core.IMetric, Agen
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
+    ctor(Microsoft.Extensions.AI.IChatClient chatClient, AgentEval.Prompts.JudgePromptOptions judgePrompts)
 sealed class AgentEval.Output.ComparabilityAxis : System.IEquatable<AgentEval.Output.ComparabilityAxis>
     AgentEval.Output.ComparabilityAxis <Clone>$()
     AgentEval.Output.ComparabilityAxisState State { get; init; }
@@ -1409,8 +1416,11 @@ sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.O
     ctor(System.String ScenarioId, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ComparabilityAxis> Axes, System.Double? BaselineScore, System.Double? CandidateScore, System.Boolean BaselinePassed, System.Boolean CandidatePassed, System.Boolean BaselineHasUsableFloor, System.Boolean CandidateHasUsableFloor, System.Boolean JudgeGradedItsOwnSubject)
 static class AgentEval.Prompts.BuiltInJudgePrompts
     static AgentEval.Prompts.JudgePromptDefinition ForEvaluator(System.String key, System.Collections.Generic.IReadOnlyList<System.String> criteria, AgentEval.Core.EvalRubric rubric = null, System.Double passAt = 0.7)
+    static AgentEval.Prompts.JudgePromptDefinition ForTaskCompletion(System.Collections.Generic.IReadOnlyList<System.String> criteria)
+    static AgentEval.Prompts.JudgePromptDefinition GetMetric(System.String evaluatorKey)
     static AgentEval.Prompts.JudgePromptDefinition GetRag(System.String evaluatorKey)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> ForEval(AgentEval.Evals.IEval evaluation)
+    static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> Metrics { get; }
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> Rag { get; }
     static System.Collections.Generic.IReadOnlyList<AgentEval.Prompts.ResolvedJudgePrompt> ResolveForEval(AgentEval.Evals.IEval evaluation, AgentEval.Prompts.JudgePromptOptions options)
 sealed class AgentEval.Prompts.JudgePromptResolver : AgentEval.Prompts.IJudgePromptResolver

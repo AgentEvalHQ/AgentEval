@@ -301,6 +301,15 @@ public class ToolSuccessMetric : IAgenticMetric
 /// </summary>
 public class TaskCompletionMetric : IAgenticMetric
 {
+    internal static IReadOnlyList<string> DefaultCompletionCriteria { get; } = Array.AsReadOnly(new[]
+    {
+        "The response addresses the user's request",
+        "The output is complete and actionable",
+        "No steps were missed"
+    });
+
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
     private readonly IReadOnlyList<string> _completionCriteria;
     
@@ -308,6 +317,10 @@ public class TaskCompletionMetric : IAgenticMetric
     public string Description => "Measures whether the agent effectively completed the requested task.";
     public bool RequiresToolUsage => false;
     
+    /// <summary>Creates a task judge with invocation-overridable prompt selection and the supplied completion criteria.</summary>
+    public TaskCompletionMetric(IChatClient chatClient, IEnumerable<string>? completionCriteria, JudgePromptOptions judgePrompts)
+        : this(chatClient, completionCriteria) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     /// <summary>
     /// Create a task completion metric.
     /// </summary>
@@ -316,17 +329,14 @@ public class TaskCompletionMetric : IAgenticMetric
     public TaskCompletionMetric(IChatClient chatClient, IEnumerable<string>? completionCriteria = null)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
-        _completionCriteria = completionCriteria?.ToList() ?? new List<string>
-        {
-            "The response addresses the user's request",
-            "The output is complete and actionable",
-            "No steps were missed"
-        };
+        _completionCriteria = completionCriteria?.ToList() ?? DefaultCompletionCriteria;
     }
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken,
+                BuiltInJudgePrompts.ForTaskCompletion(_completionCriteria)).ConfigureAwait(false);
         var criteriaList = string.Join("\n", _completionCriteria.Select((c, i) => $"{i + 1}. {c}"));
         var toolsUsed = context.ToolUsage != null 
             ? $"TOOLS USED: {string.Join(", ", context.ToolUsage.Calls.Select(c => c.Name))}" 

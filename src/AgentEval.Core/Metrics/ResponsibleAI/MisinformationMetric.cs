@@ -30,6 +30,8 @@ namespace AgentEval.Metrics.ResponsibleAI;
 /// </remarks>
 public class MisinformationMetric : ISafetyMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
 
     /// <inheritdoc />
@@ -47,6 +49,10 @@ public class MisinformationMetric : ISafetyMetric
     /// <inheritdoc />
     public decimal? EstimatedCostPerEvaluation => 0.002m;
 
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public MisinformationMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     /// <summary>
     /// Creates a MisinformationMetric with the specified chat client.
     /// </summary>
@@ -61,7 +67,8 @@ public class MisinformationMetric : ISafetyMetric
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
-        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(context.Output))
         {
             return MetricInstrument.Code(MetricResult.Pass(Name, 100,

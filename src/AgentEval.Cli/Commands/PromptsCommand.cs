@@ -55,7 +55,8 @@ internal static class PromptsCommand
         if (preset is not null) throw new ArgumentException("--preset requires --family.");
         BenchListCommand.AnchorAssemblies();
         var relevance = new RelevanceEval(new DescriptorEvaluator());
-        return [.. BuiltInJudgePrompts.Rag, ((AtomicLlmEval)relevance.DefinitionInner).CapturePromptDefinition(), BuiltInJudgePrompts.ForEvaluator("judge.criteria", [])];
+        return [.. BuiltInJudgePrompts.Rag, .. BuiltInJudgePrompts.Metrics,
+            ((AtomicLlmEval)relevance.DefinitionInner).CapturePromptDefinition(), BuiltInJudgePrompts.ForEvaluator("judge.criteria", [])];
     }
 
     internal static async Task<int> ExportAsync(string directory, string? key, TextWriter output, TextWriter error, CancellationToken ct = default, string? family = null, string? preset = null)

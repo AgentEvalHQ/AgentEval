@@ -24,7 +24,7 @@ internal static partial class EvalCommand
                     "Suggestions: remove this metric from the configured run or evaluate it separately with an explicit language policy. " +
                     "Because: prompt packs cannot replace this prefilter.");
             if (!key.StartsWith("llm_", StringComparison.Ordinal)) continue;
-            var definition = BuiltInJudgePrompts.Rag.FirstOrDefault(d => d.EvaluatorKey == key)
+            var definition = BuiltInJudgePrompts.Rag.Concat(BuiltInJudgePrompts.Metrics).FirstOrDefault(d => d.EvaluatorKey == key)
                 ?? throw new ArgumentException($"Metric '{key}' does not yet support prompt packs; requested localization cannot be ignored.");
             resolved.Add(resolver.Resolve(definition, options).Provenance);
         }

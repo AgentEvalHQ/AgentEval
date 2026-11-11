@@ -1,6 +1,6 @@
 # Localize and replace judge prompts
 
-Built-in RAG judges can load their instructions from Markdown plus JSON or YAML metadata. A Swedish rubric does not need a custom metric class. This configures the **judge**, independently of the target agent's system prompt or the report language.
+Built-in RAG, safety, quality and task-completion judges can load their instructions from Markdown plus JSON or YAML metadata. A Swedish rubric does not need a custom metric class. This configures the **judge**, independently of the target agent's system prompt or the report language.
 
 Thanks to [@adner](https://github.com/adner) (Andreas Adner) for identifying the private English RAG prompts and the rubric-binding limitations.
 
@@ -32,6 +32,12 @@ var pack = await new JudgePromptPackLoader().LoadAsync("my-prompts/prompts.json"
 var prompts = new JudgePromptOptions { Pack = pack, Locale = "sv-SE" };
 var faithfulness = new FaithfulnessMetric(chatClient, prompts);
 ```
+
+The additional metric constructors accept the same selection. For example, `new GroundednessMetric(chatClient, prompts)` uses the `llm_groundedness` entry. You can instead set `EvaluationContext.JudgePrompts` for one call. `BuiltInJudgePrompts.GetMetric(key)` exposes the exact descriptor for export or an invocation override.
+
+For custom task criteria, use `BuiltInJudgePrompts.ForTaskCompletion(criteria)` and `new TaskCompletionMetric(chatClient, criteria, prompts)`. Retain its stable criterion IDs when translating. The configured reader requires exactly one typed verdict for each ID. The CLI uses the default three task-completion criteria; custom rosters use the library API.
+
+`BiasMetric.EvaluateCounterfactualAsync` uses the separate `llm_bias_counterfactual` definition. Supply selection on either context, share the same selection if both declare it, or configure the metric constructor. The judge receives both inputs, both outputs and the demographic dimension as fenced data. Conflicting pair selections fail before a provider call. Its metric result retains the existing `llm_bias` name while prompt provenance identifies the counterfactual instrument.
 
 Rubric-bound text evaluation uses the same options:
 
@@ -89,6 +95,8 @@ Templates recognize `{{input}}`, `{{output}}`, `{{context}}`, `{{reference}}`, `
 
 Configured responses undergo bounded, implementation-owned JSON validation, including numeric scales, required arrays/booleans and duplicate/unknown criterion IDs. One corrective retry uses the selected localized retry text and original evidence. An invalid reply remains unmeasured. Prompt metadata determines rubric thresholds and score bands rather than merely describing different instructions while the reader uses an old policy.
 
+Specialized metrics retain their own response shapes, including machine enum values such as `severity`, `structureQuality` and `overallRisk`; translate narrative values, not enum tokens. Fabricated elements force a groundedness failure with a maximum score of 30/100. Potential fabrications force a misinformation failure with a maximum of 40/100. Lowering a pack's pass threshold cannot override those implementation rules. Groundedness still needs nonblank retrieved context; tool results alone do not substitute for it. Returned tool evidence is bounded and excludes call arguments as factual support. Task-completion tool data distinguishes requested, executed, failed and rejected calls.
+
 Manifests are UTF-8 JSON/YAML, at most 1 MiB and 256 definitions. Individual message files are at most 512 KiB, with a 16 MiB aggregate read bound and a 128 Ki-character message bound. Loading rejects duplicate keys, YAML anchors/aliases/tags/merge keys, excess nesting, unknown fields, absolute/traversing paths and symlinks/reparse points. Files must reside under the manifest directory. Treat pack directories as trusted local configuration, not concurrently mutable untrusted uploads.
 
 ## Identity, privacy and calibration
@@ -105,13 +113,17 @@ An authored translation needs a separately reviewed calibration set. Include sho
 |---|---|
 | `llm_faithfulness`, `llm_context_recall`, `llm_answer_correctness` | Complete configurable RAG prompts, contracts and retry path |
 | `llm_context_precision`, `llm_relevance` | Same configurable RAG path |
+| `llm_groundedness`, `llm_coherence`, `llm_fluency` | Specialized configurable contracts; groundedness fabrication cap remains enforced |
+| `llm_bias`, `llm_misinformation`, `llm_toxicity` | Configurable contracts and strict enum/type validation; misinformation cap remains enforced; configured toxicity bypasses the English prefilter |
+| Bias counterfactual comparison | Separate `llm_bias_counterfactual` pack entry through the library pair API |
+| `llm_task_completion` | Stable criterion IDs, typed verdicts and observed tool-activity evidence |
 | `ChatClientEvaluator` criteria transport | Invocation-owned selection and stable criterion IDs |
 | `RelevanceEval` / `AtomicLlmEval` | Rubric binding, localized criteria/framing and metadata-driven scoring |
 | Tool/system-policy/evaluator-note atomic framing | Fixed, fenced slots selected by the leaf; required slots cannot be omitted by a replacement |
 | Agentic/compliance atomic leaves | Library graph export/preflight/binding; CLI family/preset authoring, benchmark selection and supplied-dataset calibration with instrument identity |
 | Red-team, runtime gates/prefilters, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
-The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Unsupported library LLM metrics and upstream `MicrosoftEvaluatorAdapter` reject explicit `JudgePrompts` before evaluating, including both adapter contracts. The CLI rejects these combinations before invoking the target. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
+The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Configured `llm_toxicity` always invokes its selected model judge, including English-pattern matches; unconfigured toxicity retains its legacy scan and fallback. This changes the configured instrument and requires rebaselining. Upstream `MicrosoftEvaluatorAdapter` rejects explicit `JudgePrompts` before evaluating, including both adapter contracts. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
 
 ## Custom evaluators and migration
 
@@ -123,6 +135,6 @@ Configured `JailbreakResistanceEval` uses one invocation of the selected judge, 
 
 Configured conversation, correction, plan and reasoning wrappers encode their extra facts as JSON inside the existing fenced input/context slots. JSON field names remain stable machine keys; surrounding instructions come from the pack. Reference-aware wrappers use the dedicated reference slot without duplicating English reference instructions in the query. Configured reasoning correctness, plan formulation and goal decomposition judge a nonempty supplied response when explicit metadata is absent, bypassing their legacy English extraction shortlist. Empty/missing required evidence still remains unmeasured. Rebaseline these configured paths; unconfigured legacy framing and extraction remain available.
 
-The CLI authoring catalogue includes RAG/generic judges and the selected agentic/GDPR/EU AI Act preset. Custom composite keys can use the library loader and binding API directly. A new machine response shape requires an `IEvaluator` implementation with its own parser. Implement `IJudgePromptBindable` and `IResolvedJudgePromptSource` if that evaluator also accepts these definitions; unsupported contracts must fail before a provider call. Executable parsers are never loaded from a pack.
+The CLI authoring catalogue includes the fifteen default metric/generic definitions and the selected agentic/GDPR/EU AI Act preset. Custom composite keys can use the library loader and binding API directly. A new machine response shape requires an `IEvaluator` implementation with its own parser. Implement `IJudgePromptBindable` and `IResolvedJudgePromptSource` if that evaluator also accepts these definitions; unsupported contracts must fail before a provider call. Executable parsers are never loaded from a pack.
 
 Opting into a pack creates a new instrument digest, including when selecting the exported English draft. Re-establish baselines for that instrument instead of treating earlier English scores as calibrated translations. Existing context-free default calls retain their legacy path. Explicit customer system text now survives rubric binding; the CLI's embedded family fallback still yields to a leaf's own rubric. If customer text relied on being discarded, remove that override explicitly. A text-only system override does not change the bound reader's numeric scale or thresholds.

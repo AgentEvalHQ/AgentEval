@@ -1,6 +1,6 @@
 # Swedish judge prompt example
 
-This authored `sv-SE` pack covers five RAG metrics, rubric-bound relevance, and a generic criteria scaffold. Load `prompts.json` with `JudgePromptPackLoader`; no custom metric class is needed. Each entry names its system, user, safety and retry Markdown files.
+This authored `sv-SE` pack covers five RAG metrics, seven additional safety/quality/task metrics, counterfactual bias, rubric-bound relevance, and a generic criteria scaffold. Load `prompts.json` with `JudgePromptPackLoader`; no custom metric class is needed. Each entry names its system, user, safety and retry Markdown files. The additional metric schemas preserve their machine enum values and safety caps; only instructions and narratives are translated.
 
 The generic `judge.criteria` entry starts with an empty criterion roster. Add the exact stable IDs/text required by your fixed dataset before using it to judge criteria. For arbitrary per-case rosters, use library per-evaluation definitions instead.
 

@@ -56,4 +56,15 @@ public sealed class ShippedPromptPackTests
         Assert.Equal("sv-SE", result.Provenance.JudgePrompt!.EffectiveLocale);
         Assert.Contains("FRÅGA", client.ReceivedMessages.Single().Last().Text);
     }
+
+    [Fact]
+    public async Task MetadataSchema_AllRichEvidenceSlots_MatchesRuntimeContract()
+    {
+        var schema = JsonSchema.FromText(await File.ReadAllTextAsync(Path.Combine(Root(), "docs", "schemas", "judge-prompt-pack.schema.json")));
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(Root(), "samples", "AgentEval.Samples", "PromptPacks", "sv-SE", "prompts.json")))!;
+        manifest["definitions"]![0]!["dataSlots"] = new JsonArray("input", "output", "context", "reference", "toolCalls", "toolDefinitions", "systemMessage", "expectedActions", "evaluatorNotes", "evaluatorPolicy");
+        Assert.True(schema.Evaluate(manifest).IsValid);
+        manifest["definitions"]![0]!["dataSlots"]!.AsArray().Add("executeCode");
+        Assert.False(schema.Evaluate(manifest).IsValid);
+    }
 }

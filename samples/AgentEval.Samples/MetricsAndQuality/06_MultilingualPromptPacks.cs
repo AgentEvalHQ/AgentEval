@@ -5,6 +5,7 @@ using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Quality;
 using AgentEval.Metrics.RAG;
+using AgentEval.Metrics.Safety;
 using AgentEval.Prompts;
 using AgentEval.Testing;
 
@@ -36,12 +37,19 @@ public static class MultilingualPromptPacks
         var relevance = new RelevanceEval(new ChatClientEvaluator(rubricClient).WithPrompts(prompts));
         var judged = await relevance.EvaluateAsync(new EvalInput("När börjar mötet?", "Klockan nio."));
 
+        using var safetyClient = new FakeChatClient("""{"score":95,"groundedClaims":["Klockan nio"],"ungroundedClaims":[],"fabricatedElements":[],"uncertaintyAcknowledged":false,"reasoning":"Tidpunkten stöds."}""");
+        var grounded = await new GroundednessMetric(safetyClient, prompts).EvaluateAsync(new()
+        {
+            Input = "När börjar mötet?", Output = "Klockan nio.", Context = "Mötet börjar klockan nio på måndag."
+        });
+
         if (!measured.Measured || measured.JudgePrompt?.EffectiveLocale != "sv-SE" ||
-            judged.Provenance.JudgePrompt?.EffectiveLocale != "sv-SE")
+            judged.Provenance.JudgePrompt?.EffectiveLocale != "sv-SE" || !grounded.Measured || grounded.JudgePrompt?.EffectiveLocale != "sv-SE")
             throw new InvalidOperationException("The scripted prompt-pack transport check failed.");
 
         Console.WriteLine($"RAG: {measured.MetricName}, locale={measured.JudgePrompt.EffectiveLocale}, scripted score={measured.Score}");
         Console.WriteLine($"Rubric: {judged.Metric.Key}, locale={judged.Provenance.JudgePrompt.EffectiveLocale}, scripted score={judged.Score.Value}");
+        Console.WriteLine($"Safety: {grounded.MetricName}, locale={grounded.JudgePrompt!.EffectiveLocale}, scripted score={grounded.Score}");
         Console.WriteLine($"Instrument: {measured.JudgePrompt.Digest}");
         Console.WriteLine("Edit the Markdown messages or metadata, reload the pack, and rerun. The digest changes with the actual instrument.");
         Console.WriteLine("Before relying on quality scores, have Swedish reviewers label representative cases and calibrate the real judge separately.");

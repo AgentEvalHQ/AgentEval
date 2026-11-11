@@ -6,7 +6,7 @@ using AgentEval.Core;
 
 namespace AgentEval.Prompts;
 
-/// <summary>Implementation-owned validation for configured RAG response contracts.</summary>
+/// <summary>Implementation-owned validation for configured response contracts.</summary>
 internal static class JudgeResponseReader
 {
     internal static bool ValidateEvaluation(string? reply, JudgePromptDefinition definition)
@@ -76,7 +76,7 @@ internal static class JudgeResponseReader
     private static bool IsString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String;
 
-    internal static bool TryReadRag(string? reply, JudgePromptDefinition definition,
+    internal static bool TryReadMetric(string? reply, JudgePromptDefinition definition,
         out JsonElement root, out double score, out JudgeReplyFailure failure)
     {
         root = default;
@@ -95,25 +95,7 @@ internal static class JudgeResponseReader
             { failure = JudgeReplyFailure.ScoreNotANumber; return false; }
             if (!ChatClientEvaluator.TryReadOnScale(raw, definition.Scale, out var unit, out _))
             { failure = JudgeReplyFailure.ScoreOutOfRange; return false; }
-            string[] arrays = definition.ResponseContract switch
-            {
-                JudgeResponseContract.FaithfulnessV1 => ["faithfulClaims", "hallucinatedClaims"],
-                JudgeResponseContract.RelevanceV1 => ["irrelevantParts"],
-                JudgeResponseContract.ContextPrecisionV1 => ["relevantParts", "irrelevantParts"],
-                JudgeResponseContract.ContextRecallV1 => ["informationPresent", "informationMissing"],
-                JudgeResponseContract.AnswerCorrectnessV1 => ["factsCorrect", "factsIncorrect", "factsMissing"],
-                _ => throw new ArgumentException("Expected: a RAG response contract. Actual: unsupported contract. Suggestions: use the corresponding evaluator. Because: reply schemas are implementation-owned.")
-            };
-            if (!value.TryGetProperty("reasoning", out var reasoning) || reasoning.ValueKind != JsonValueKind.String) return false;
-            foreach (var name in arrays)
-                if (!value.TryGetProperty(name, out var array) || array.ValueKind != JsonValueKind.Array ||
-                    array.GetArrayLength() > 4096 || array.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.String)) return false;
-            if (definition.ResponseContract == JudgeResponseContract.RelevanceV1)
-                foreach (var name in new[] { "addressesQuestion", "staysOnTopic" })
-                    if (!value.TryGetProperty(name, out var boolean) || boolean.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
-            var allowed = arrays.Concat(new[] { "score", "reasoning" }).ToHashSet(StringComparer.Ordinal);
-            if (definition.ResponseContract == JudgeResponseContract.RelevanceV1) allowed.UnionWith(["addressesQuestion", "staysOnTopic"]);
-            if (value.EnumerateObject().Any(p => !allowed.Contains(p.Name))) return false;
+            if (!IsString(value, "reasoning") || !MetricResponseSchema.For(definition.ResponseContract).Validate(value, definition)) return false;
             root = value.Clone();
             score = unit * 100;
             failure = JudgeReplyFailure.None;

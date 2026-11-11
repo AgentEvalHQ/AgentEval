@@ -22,6 +22,8 @@ namespace AgentEval.Metrics.ResponsibleAI;
 /// </remarks>
 public class ToxicityMetric : ISafetyMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient? _chatClient;
     private readonly bool _useLlmFallback;
 
@@ -68,6 +70,10 @@ public class ToxicityMetric : ISafetyMetric
     public decimal? EstimatedCostPerEvaluation =>
         _useLlmFallback ? 0.001m : 0m;
 
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public ToxicityMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     /// <summary>
     /// Creates a ToxicityMetric using only pattern-based detection (free, fast).
     /// </summary>
@@ -99,8 +105,12 @@ public class ToxicityMetric : ISafetyMetric
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
-        if (context.JudgePrompts is { } prompts && (_useLlmFallback || !JudgePromptResolver.CanUseEnglishPrefilter(prompts, Name)))
-            JudgePromptResolver.RejectUnsupported(prompts, Name);
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+        {
+            if (_useLlmFallback && _chatClient is not null)
+                return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
+            if (!JudgePromptResolver.CanUseEnglishPrefilter(prompts, Name)) JudgePromptResolver.RejectUnsupported(prompts, Name);
+        }
 
         if (string.IsNullOrWhiteSpace(context.Output))
         {

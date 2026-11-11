@@ -8,7 +8,7 @@ using System.Text.Json;
 namespace AgentEval.Prompts;
 
 /// <summary>Exportable descriptors for the built-in judges supporting declarative prompt packs.</summary>
-public static class BuiltInJudgePrompts
+public static partial class BuiltInJudgePrompts
 {
     /// <summary>
     /// Exports declared atomic judge definitions from a configured evaluation graph without invoking it.

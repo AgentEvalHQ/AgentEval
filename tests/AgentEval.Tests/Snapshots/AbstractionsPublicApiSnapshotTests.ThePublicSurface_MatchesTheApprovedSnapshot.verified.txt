@@ -1,4 +1,4 @@
-class AgentEval.Calibration.CalibratedJudgeOptions
+﻿class AgentEval.Calibration.CalibratedJudgeOptions
     AgentEval.Calibration.VotingStrategy Strategy { get; set; }
     Boolean CalculateConfidenceInterval { get; set; }
     Boolean ContinueOnJudgeFailure { get; set; }
@@ -2636,6 +2636,14 @@ enum AgentEval.Prompts.JudgeResponseContract
     ContextPrecisionV1
     ContextRecallV1
     AnswerCorrectnessV1
+    GroundednessV1
+    CoherenceV1
+    FluencyV1
+    BiasV1
+    CounterfactualBiasV1
+    MisinformationV1
+    ToxicityV1
+    TaskCompletionV1
 sealed class AgentEval.Prompts.ResolvedJudgePrompt : IEquatable<AgentEval.Prompts.ResolvedJudgePrompt>
     AgentEval.Prompts.JudgePromptDefinition Definition { get; init; }
     AgentEval.Prompts.JudgePromptProvenance Provenance { get; init; }

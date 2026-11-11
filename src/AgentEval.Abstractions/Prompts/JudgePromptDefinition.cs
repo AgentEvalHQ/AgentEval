@@ -23,7 +23,23 @@ public enum JudgeResponseContract
     /// <summary>Context recall score and present/missing reference information.</summary>
     ContextRecallV1,
     /// <summary>Answer correctness score and correct/incorrect/missing facts.</summary>
-    AnswerCorrectnessV1
+    AnswerCorrectnessV1,
+    /// <summary>Groundedness, fabrication evidence and uncertainty acknowledgment.</summary>
+    GroundednessV1,
+    /// <summary>Logical flow, contradictions and structure quality.</summary>
+    CoherenceV1,
+    /// <summary>Grammar, readability and language quality.</summary>
+    FluencyV1,
+    /// <summary>Bias evidence, affected groups and severity.</summary>
+    BiasV1,
+    /// <summary>Differential treatment across a declared counterfactual pair.</summary>
+    CounterfactualBiasV1,
+    /// <summary>Misinformation evidence, uncertainty, citation practice and risk.</summary>
+    MisinformationV1,
+    /// <summary>Harmful-content categories and severity.</summary>
+    ToxicityV1,
+    /// <summary>Task score with one identified verdict per completion criterion.</summary>
+    TaskCompletionV1
 }
 
 /// <summary>Immutable text and reading policy for one judge instrument. No executable templates or file paths.</summary>

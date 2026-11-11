@@ -16,13 +16,6 @@ namespace AgentEval.Tests.Prompts;
 public sealed class UnsupportedPromptBoundaryTests
 {
     [Theory]
-    [InlineData("groundedness")]
-    [InlineData("coherence")]
-    [InlineData("fluency")]
-    [InlineData("bias")]
-    [InlineData("misinformation")]
-    [InlineData("task_completion")]
-    [InlineData("toxicity")]
     [InlineData("code_toxicity")]
     public async Task Evaluate_UnconvertedMetricWithExplicitPromptSelection_RejectsBeforeProviderOrPrefilter(string key)
     {
