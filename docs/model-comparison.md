@@ -559,7 +559,7 @@ Console.WriteLine(expensive.MeanScore is { } high && cheap.MeanScore is { } low
     ? $"Mean score drop: {high - low:F1} points"
     : "Mean score drop: n/a (a model has no measured run)");
 Console.WriteLine($"Pass rate:       {expensive.PassRate:P0} -> {cheap.PassRate:P0}");
-// For the price side, price each model's tokens at its own rate (see Cost-Quality Tradeoffs)
+// For the price side, use recorded costs from fully priced runs (see Cost-Quality Tradeoffs).
 ```
 
 ### Scenario 3: Multi-Provider Evaluation
@@ -644,7 +644,7 @@ weights.Validate();
 | What were the raw numbers? | `result.ModelResults`: pass rate, mean score, SD, latency, cost |
 | Is a difference real or noise? | `model.StochasticResult.Statistics?.ConfidenceInterval`, and enough runs |
 | Which model won across a suite? | `results.ToMarkdown()`: wins and average scores |
-| What does each model cost? | Its own tokens at its own rate: `ModelPricing.EstimateCost` |
+| What does each model cost? | Recorded `AverageCost`; require `TotalCost` for a fully priced workload |
 
 ---
 

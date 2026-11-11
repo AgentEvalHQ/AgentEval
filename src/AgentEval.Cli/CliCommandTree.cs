@@ -953,7 +953,7 @@ internal static class CliCommandTree
         var renderSubjectOpt = new Option<string?>("--subject") { Description = "Subject name to render evidence for" };
         var renderTsOpt = new Option<string?>("--ts") { Description = "Timestamp directory (yyyy-MM-dd_HH-mm-ss); defaults to most recent" };
         var renderRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-        var renderCmd = new Command("render", "Render a PDF report from existing compliance evidence (no LLM cost)");
+        var renderCmd = new Command("render", "Render a Markdown report from existing compliance evidence (no LLM cost)");
         renderCmd.Add(renderRegulationOpt);
         renderCmd.Add(renderSubjectOpt);
         renderCmd.Add(renderTsOpt);
