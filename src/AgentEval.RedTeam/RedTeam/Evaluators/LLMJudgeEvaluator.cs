@@ -106,8 +106,9 @@ public partial class LLMJudgeEvaluator : IProbeEvaluator
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
 
-        if (_options.JudgePrompts is not null)
-            throw new NotSupportedException("Expected: a separately supported narrative explanation instrument. Actual: a verdict prompt selection was supplied to ExplainAsync. Suggestions: use EvaluateWithPromptsAsync for the verdict; narrative localization is not yet supported. Because: verdict prompts cannot silently select an English explanation policy.");
+        if (_options.JudgePrompts is { } prompts)
+            return (await ExplainWithPromptsAsync(probe, response, outcome, fidelity, prompts, cancellationToken)
+                .ConfigureAwait(false)).Text ?? string.Empty;
 
         var messages = new List<ChatMessage>
         {

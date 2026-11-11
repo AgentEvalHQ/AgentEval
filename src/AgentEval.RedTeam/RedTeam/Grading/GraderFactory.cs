@@ -25,6 +25,7 @@ public static class GraderFactory
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
 
+        _ = ConfiguredProbeNarrator.Create(options);
         if (options.JudgePrompts is { } prompts)
         {
             var graph = ConfiguredGraph(attack, options);
@@ -73,16 +74,17 @@ public static class GraderFactory
     public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options)
     {
         var definitions = RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
-        return options.RunBenignControls ? [.. definitions, AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(
-            new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric(), options.BenignControlJudgeOptions?.BlockThreshold ?? 0)] : definitions;
+        if (options.RunBenignControls) definitions = [.. definitions, AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(
+            new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric(), options.BenignControlJudgeOptions?.BlockThreshold ?? 0)];
+        return options.ExplainFindings ? [.. definitions, RedTeamJudgePrompts.ForExplanation(options.ExplanationJudgeOptions)] : definitions;
     }
 
     private static IProbeEvaluator ConfiguredGraph(IAttackType attack, ScanOptions options)
     {
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
-        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary || options.ExplainFindings)
-            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client, fallback mode or explanations. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
+        if (options.JudgeClient is null || options.Mode != JudgeMode.Primary)
+            throw new NotSupportedException("Expected: Primary grading with a judge client and supported judge graphs. Actual: missing judge client or fallback mode. Suggestions: configure Primary grading and run unsupported judge families separately. Because: prompt selection must not silently preserve a different language-dependent judge path.");
         if (options.JudgeTimeout is { } invalidTimeout && invalidTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(options), "Expected: positive judge timeout. Actual: nonpositive duration. Suggestions: use a positive duration or null. Because: configured grading must have an executable time budget.");
 

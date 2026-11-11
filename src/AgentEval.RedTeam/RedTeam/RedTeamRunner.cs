@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using System.Diagnostics;
+using AgentEval.RedTeam.Evaluators;
 using System.IO;
 using AgentEval.Core;
 using AgentEval.RedTeam.BenignControls;
@@ -48,6 +49,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Validate every selected graph before running any target, including attacks later skipped
         // by fail-fast. Legacy scans retain their existing lazy grader resolution.
         cancellationToken.ThrowIfCancellationRequested();
+        var preparedNarrator = ConfiguredProbeNarrator.Create(options);
         var preparedGraders = options.JudgePrompts is null ? null
             : attacks.ToDictionary(a => a, a => GraderFactory.For(a, options));
 
@@ -83,7 +85,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
         if (options.OnPlanPrepared is { } prepared)
         {
             var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())
-                { JudgeGraphDigest = ProbeJudgeGraph.CapturedDigest(preparedGraders?.GetValueOrDefault(a)) }).ToList();
+                { JudgeGraphDigest = ProbeJudgeGraph.CapturedDigest(preparedGraders?.GetValueOrDefault(a)),
+                    ExplanationDigest = preparedNarrator?.Digest }).ToList();
             if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true)
                 { JudgeGraphDigest = benignArm.JudgeGraphDigest });
             prepared(new ScanPlan(options, arms.AsReadOnly()));
@@ -422,11 +425,12 @@ public sealed class RedTeamRunner : IRedTeamRunner
         CancellationToken cancellationToken)
     {
         using var scope = options.BeginProbeScope?.Invoke(attack, probe, !allowExplain);
-        var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, cancellationToken);
+        var narrator = allowExplain ? ConfiguredProbeNarrator.Create(options) : null;
+        var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, narrator, cancellationToken);
 
         // One stamp for every exit path below (not exercised, not deliverable, folded, scored, timed out, errored),
         // so no path can report a benign control as an attack.
-        return result with { Expectation = ProbeExpectation.PermissibilityOf(probe) };
+        return result with { Expectation = ProbeExpectation.PermissibilityOf(probe), ExplanationDigest = narrator?.Digest };
     }
 
     private async Task<ProbeResult> ExecuteProbeCoreAsync(
@@ -437,6 +441,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
         ScanOptions options,
         Severity attackSeverity,
         bool allowExplain,
+        ConfiguredProbeNarrator? narrator,
         CancellationToken cancellationToken)
     {
         var probeSw = Stopwatch.StartNew();
@@ -491,7 +496,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 treeCts.CancelAfter(treeBudget);
                 var tr = await new TreeOrchestrator(agent, options).RunAsync(treeAttack, probe, evaluator, treeCts.Token);
                 probeSw.Stop();
-                return BuildFoldedProbeResult(probe, tr, attackSeverity, probeSw.Elapsed, options);
+                var folded = BuildFoldedProbeResult(probe, tr, attackSeverity, probeSw.Elapsed, options);
+                return narrator is null ? folded : await narrator.AttachAsync(probe, folded, options.IncludeEvidence, treeCts.Token, cancellationToken);
             }
 
             if (attack is IMultiTurnAttack multiTurnAttack)
@@ -503,7 +509,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 convoCts.CancelAfter(convoBudget);
                 var mt = await new TurnOrchestrator(agent, options).RunAsync(multiTurnAttack, probe, evaluator, convoCts.Token);
                 probeSw.Stop();
-                return BuildFoldedProbeResult(probe, mt, attackSeverity, probeSw.Elapsed, options);
+                var folded = BuildFoldedProbeResult(probe, mt, attackSeverity, probeSw.Elapsed, options);
+                return narrator is null ? folded : await narrator.AttachAsync(probe, folded, options.IncludeEvidence, convoCts.Token, cancellationToken);
             }
 
             // Execute probe against agent. Wave B (Pillar 1): if the SUT is tool-capable AND the attack advertises
@@ -574,7 +581,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // is gated on IncludeEvidence exactly like Prompt/Response below — a redacted scan must not leak via the
             // explain channel. Gating here also avoids the (paid) LLM call entirely when evidence is redacted.
             string? rationale = null;
-            if (allowExplain && options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
+            if (narrator is null && allowExplain && options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
                 && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
             {
                 try
@@ -584,12 +591,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     rationale = string.IsNullOrWhiteSpace(text) ? null : text;
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { /* explain timed out — skip */ }
+                catch (OperationCanceledException) { throw; }
                 catch { /* explain is best-effort */ }
             }
 
             probeSw.Stop();
 
-            return new ProbeResult
+            var scored = new ProbeResult
             {
                 ProbeId = probe.Id,
                 Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
@@ -610,6 +618,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 RubricDigest = evalResult.RubricDigest,
                 JudgeInstruments = options.IncludeEvidence ? evalResult.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(evalResult.JudgeInstruments),
             };
+            return narrator is null ? scored : await narrator.AttachAsync(probe, scored, options.IncludeEvidence, probeCts.Token, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

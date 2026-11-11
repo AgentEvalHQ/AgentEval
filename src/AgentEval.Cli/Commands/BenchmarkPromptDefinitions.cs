@@ -20,13 +20,15 @@ internal static class BenchmarkPromptDefinitions
         {
             var control = AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric());
             if (preset == "benign-controls") return [control];
+            var explanation = AgentEval.RedTeam.Evaluators.RedTeamJudgePrompts.ForExplanation();
+            if (preset == "explanation") return [explanation];
             var supported = Attack.AvailableNames.Concat(Attack.OptInNames).ToArray();
             var names = preset is null || preset == "supported" ? supported
                 : supported.Where(n => string.Equals(n, preset, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (names.Length == 0)
-                throw new NotSupportedException($"Expected: a supported red-team judge graph. Actual: preset '{preset}'. Suggestions: select supported, benign-controls, or {string.Join(", ", supported)}. Because: unsupported detectors cannot silently keep English rules.");
+                throw new NotSupportedException($"Expected: a supported red-team judge graph. Actual: preset '{preset}'. Suggestions: select supported, explanation, benign-controls, or {string.Join(", ", supported)}. Because: unsupported detectors cannot silently keep English rules.");
             var leaves = names.SelectMany(n => GraderFactory.CapturePromptDefinitions(Attack.ByName(n)!, new() { JudgeClient = client }));
-            if (preset is null or "supported") leaves = leaves.Append(control);
+            if (preset is null or "supported") leaves = leaves.Append(control).Append(explanation);
             var definitions = leaves
                 .DistinctBy(d => d.EvaluatorKey).OrderBy(d => d.EvaluatorKey, StringComparer.Ordinal).ToArray();
             if (definitions.Length == 0)

@@ -315,11 +315,11 @@ public sealed class LocalizedProbeJudgeTests
     }
 
     [Fact]
-    public async Task Explain_ConfiguredVerdictSelection_RejectsUnsupportedNarrativeBeforeProvider()
+    public async Task Explain_ConfiguredVerdictSelection_RejectsWrongContractBeforeProvider()
     {
         using var client = new FakeChatClient("English narrative");
         var judge = new LLMJudgeEvaluator(client, new() { JudgePrompts = Select() });
-        await Assert.ThrowsAsync<NotSupportedException>(() => judge.ExplainAsync(Probe(), "Svar", EvaluationOutcome.Resisted, EvidenceFidelity.Verbal));
+        await Assert.ThrowsAsync<ArgumentException>(() => judge.ExplainAsync(Probe(), "Svar", EvaluationOutcome.Resisted, EvidenceFidelity.Verbal));
         Assert.Equal(0, client.CallCount);
     }
 

@@ -73,6 +73,7 @@ public sealed class ShippedPromptPackTests
     [InlineData("redTeamVerdictV1")]
     [InlineData("gateDecisionV1")]
     [InlineData("redTeamLikertV1")]
+    [InlineData("redTeamExplanationV1")]
     public async Task MetadataSchema_RedTeamPolicy_RejectsUnsupportedScaleAndReviewMetadata(string contract)
     {
         var schema = JsonSchema.FromText(await File.ReadAllTextAsync(Path.Combine(Root(), "docs", "schemas", "judge-prompt-pack.schema.json")));
@@ -83,7 +84,7 @@ public sealed class ShippedPromptPackTests
         definition["criteria"] = new JsonArray();
         definition["severityBands"] = new JsonArray();
         definition["dimension"] = null;
-        definition["passAt"] = .75;
+        definition["passAt"] = contract == "redTeamExplanationV1" ? 0 : .75;
         definition["reviewAt"] = contract == "redTeamLikertV1" ? JsonValue.Create(.5) : null;
         Assert.True(schema.Evaluate(manifest).IsValid);
         definition["scale"] = "percent";

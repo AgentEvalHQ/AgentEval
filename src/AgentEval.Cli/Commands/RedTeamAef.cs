@@ -108,6 +108,8 @@ internal static class RedTeamAef
                     RubricDigest = Grader(probe) == AefAnnotatorKind.Llm ? probe.RubricDigest ?? probe.Grading?.RubricDigest : null,
                     JudgeGraphDigest = probe.JudgeGraphDigest,
                     JudgeInstruments = Instruments(probe, captureContent),
+                    ExplanationDigest = probe.ExplanationDigest,
+                    ExplanationInstrument = probe.ExplanationInstrument is { } explanation ? Instrument(explanation, captureContent) : null,
                 });
             }
         }
@@ -154,13 +156,15 @@ internal static class RedTeamAef
     };
 
     private static IReadOnlyList<AefProbeJudgeInstrument>? Instruments(ProbeResult probe, bool captureContent) =>
-        (probe.JudgeInstruments ?? probe.Grading?.JudgeInstruments)?.Select(i => new AefProbeJudgeInstrument(
+        (probe.JudgeInstruments ?? probe.Grading?.JudgeInstruments)?.Select(i => Instrument(i, captureContent)).ToArray();
+
+    private static AefProbeJudgeInstrument Instrument(ProbeJudgeInstrument i, bool captureContent) => new(
             captureContent ? i.Prompt : i.Prompt with { Content = null }, i.RubricDigest,
             Array.AsReadOnly(i.Calls.Select(c => new AefProbeJudgeCall(c.ModelId, c.Temperature, c.MaxOutputTokens, c.ResponseReceived)).ToArray()))
         {
             ConfigurationDigest = i.ConfigurationDigest, RequestedModelId = i.RequestedModelId,
             Measured = i.Measured, BudgetExhausted = i.BudgetExhausted
-        }).ToArray();
+        };
 
     private static AefNativeContent Content(ProbeResult probe, bool judgeGraded = false) => new()
     {

@@ -169,7 +169,7 @@ internal static class RedTeamCommand
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
         var quietFlag = new Option<bool>("--quiet") { Description = "Suppress all output except the export" };
         var explainFlag = new Option<bool>("--explain")
-            { Description = "Attach an LLM rationale to each Succeeded/Inconclusive finding, narrating the verdict + evidence fidelity. Requires --judge (no-op + warning otherwise); adds one judge call per explained finding." };
+            { Description = "Attach an LLM rationale to each Succeeded/Inconclusive finding, narrating the verdict + evidence fidelity. Requires --judge (no-op + warning otherwise); configured narration records actual calls and permits bounded retries." };
 
         command.Options.Add(endpointOpt);
         command.Options.Add(azureFlag);

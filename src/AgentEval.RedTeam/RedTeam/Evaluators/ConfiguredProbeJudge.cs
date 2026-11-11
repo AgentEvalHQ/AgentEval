@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
-using System.Security.Cryptography;
 using System.Text.Json;
 using AgentEval.Prompts;
 using Microsoft.Extensions.AI;
@@ -29,68 +28,22 @@ internal static class ConfiguredProbeJudge
         ct.ThrowIfCancellationRequested();
         ValidateSettings(settings);
         var resolved = new JudgePromptResolver().Resolve(builtIn, selection);
-        var definition = resolved.Definition;
-        var user = JudgePromptRenderer.Render(definition, probe.Prompt, response,
-            JsonSerializer.Serialize(new { id = probe.Id, attack = probe.AttackName, technique = probe.Technique,
-                oracleFacts = new
-                {
-                    falseFact = Fact(Attacks.DataPoisoningAttack.FalseFactMetadataKey),
-                    trueFact = Fact(Attacks.DataPoisoningAttack.TrueFactMetadataKey),
-                    entity = Fact(Attacks.MisinformationAttack.EntityMetadataKey),
-                    markerMatches = probe.Metadata?.GetValueOrDefault(ConfiguredMarkerEvaluator.MatchedTokensKey) as IReadOnlyList<string>
-                } }));
-        var provenance = JudgePromptRenderer.Provenance(resolved, user);
-        var calls = new List<ProbeJudgeCall>();
-        var messages = new List<ChatMessage> { new(ChatRole.System, definition.SystemText), new(ChatRole.User, user) };
-        for (var attempt = 0; attempt < 2; attempt++)
-        {
-            ct.ThrowIfCancellationRequested();
-            ChatResponse reply;
-            try
+        var context = JsonSerializer.Serialize(new { id = probe.Id, attack = probe.AttackName, technique = probe.Technique,
+            oracleFacts = new
             {
-                reply = await ask(messages, SendAsync, ct).ConfigureAwait(false);
-                ct.ThrowIfCancellationRequested();
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception ex)
-            {
-                return Attach(EvaluationResult.Inconclusive($"Expected: a configured judge response. Actual: {ex.GetType().Name}. Suggestions: inspect provider availability and request settings. Because: a failed call cannot establish an attack verdict.") with { MeasurementFailed = true });
-            }
-            if (TryRead(reply.Text, definition, out var result)) return Attach(result);
-            if (attempt == 0) messages.Add(new(ChatRole.User, definition.RetryText));
-        }
-        return Attach(EvaluationResult.Inconclusive("Expected: a complete configured judge reply. Actual: invalid after one corrective retry. Suggestions: inspect the selected contract and provider output. Because: an unreadable reply cannot establish an attack verdict.") with { MeasurementFailed = true });
+                falseFact = Fact(Attacks.DataPoisoningAttack.FalseFactMetadataKey),
+                trueFact = Fact(Attacks.DataPoisoningAttack.TrueFactMetadataKey),
+                entity = Fact(Attacks.MisinformationAttack.EntityMetadataKey),
+                markerMatches = probe.Metadata?.GetValueOrDefault(ConfiguredMarkerEvaluator.MatchedTokensKey) as IReadOnlyList<string>
+            } });
+        var execution = await ConfiguredProbeTransport.RunAsync<EvaluationResult>(resolved, probe.Prompt, response,
+            context, settings, client, ask, TryRead, ReaderVersion, EvidenceVersion, ct, ct).ConfigureAwait(false);
+        var result = execution.Parsed ? execution.Value
+            : EvaluationResult.Inconclusive(execution.Failure!) with { MeasurementFailed = true };
+        return result with { RubricDigest = execution.Instrument.RubricDigest,
+            JudgeInstruments = Array.AsReadOnly(new[] { execution.Instrument }), GradedBy = GradingProvenanceKind.Judge };
 
         string? Fact(string key) => probe.Metadata?.TryGetValue(key, out var value) == true && value is string text ? text : null;
-
-        async Task<ChatResponse> SendAsync(ChatOptions options)
-        {
-            ct.ThrowIfCancellationRequested();
-            var index = calls.Count;
-            calls.Add(new(null, options.Temperature, options.MaxOutputTokens, false));
-            var reply = await client.GetResponseAsync(messages, options, ct).ConfigureAwait(false);
-            calls[index] = calls[index] with
-            {
-                ModelId = string.IsNullOrWhiteSpace(reply.ModelId) ? null : reply.ModelId,
-                ResponseReceived = true
-            };
-            return reply;
-        }
-
-        EvaluationResult Attach(EvaluationResult result)
-        {
-            // Case text and reply content never participate. Keep actual attempts separately: an unknown
-            // provider model remains null rather than being inferred from a deployment or client type.
-            var digest = "sha256:" + Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                prompt = provenance.Digest, settings.Temperature, settings.MaxTokens,
-                reader = ReaderVersion, evidence = EvidenceVersion,
-                effectiveCalls = calls.Where(c => c.ResponseReceived).Select(c => new { c.ModelId, c.Temperature, c.MaxOutputTokens }).Distinct().ToArray()
-            }))).ToLowerInvariant();
-            return result with { RubricDigest = digest,
-                JudgeInstruments = Array.AsReadOnly(new[] { new ProbeJudgeInstrument(provenance, digest, calls.AsReadOnly()) }),
-                GradedBy = GradingProvenanceKind.Judge };
-        }
     }
 
     private static bool TryRead(string? text, JudgePromptDefinition definition, out EvaluationResult result)

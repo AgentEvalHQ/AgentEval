@@ -11,6 +11,9 @@ public sealed record PlannedAttack(IAttackType Attack, IReadOnlyList<AttackProbe
 {
     /// <summary>Complete configured grading graph identity captured before any target or judge call; null for legacy graders.</summary>
     public string? JudgeGraphDigest { get; init; }
+
+    /// <summary>Declared narrative instrument, even when no finding ultimately needs an explanation.</summary>
+    public string? ExplanationDigest { get; init; }
 }
 
 /// <summary>Pre-execution scan declaration, delivered before any subject or judge call.</summary>

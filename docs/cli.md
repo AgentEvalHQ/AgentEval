@@ -637,7 +637,7 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--format` / `-o` | Export format and output destination. |
 | `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |
 | `--calibration` | Relative scoring against a reference cohort. |
-| `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
+| `--explain` | Attach an LLM rationale to successful/inconclusive findings (requires `--judge` and evidence). Selected packs must include `redteam.explanation`; export it with `prompts export --family redteam --preset explanation` or `supported`. Narrative identity is separate from the verdict; configured conversations/tree searches use their actual transcript. |
 | `--benign-controls` | Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs `--judge`; does not change the verdict). Selected packs must include `gate.over-refusal`; `prompts export --family redteam --preset supported` includes it. |
 | `--aef <dir>` / `--no-aef` | Where the sealed AEF run goes: by default a workspace's `.agenteval/aef`; `--aef` writes it anywhere and fails the command (exit 3) if it cannot; `--no-aef` writes none. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench). |
 | `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`), and its exact version. |

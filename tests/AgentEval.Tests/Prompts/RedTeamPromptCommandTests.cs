@@ -38,6 +38,7 @@ public sealed class RedTeamPromptCommandTests : IDisposable
     [InlineData("ToolEscalation")]
     [InlineData("supported")]
     [InlineData("benign-controls")]
+    [InlineData("explanation")]
     public async Task ExportInspect_RedTeamPreset_UsesActualGraphDefinitionsWithoutModelCalls(string preset)
     {
         var directory = Path.Combine(_root, "export");
@@ -87,17 +88,14 @@ public sealed class RedTeamPromptCommandTests : IDisposable
 
     [Theory]
     [InlineData("missing-leaf")]
-    [InlineData("unsupported-explanation")]
+    [InlineData("missing-explanation")]
     public async Task Execute_InvalidSelection_FailsBeforeTargetConstructionOrCalls(string problem)
     {
         var manifest = await PackAsync(problem == "missing-leaf" ? "Misinformation" : "SupplyChain", 0);
         var target = new Subject();
         using var judge = new FakeChatClient();
-        var options = Options(manifest, Path.Combine(_root, "runs"), explain: problem == "unsupported-explanation");
-        if (problem == "missing-leaf")
-            await Assert.ThrowsAsync<ArgumentException>(() => RedTeamCommand.ExecuteAsync(options, default, target, judgeClientOverride: judge));
-        else
-            await Assert.ThrowsAsync<NotSupportedException>(() => RedTeamCommand.ExecuteAsync(options, default, target, judgeClientOverride: judge));
+        var options = Options(manifest, Path.Combine(_root, "runs"), explain: problem == "missing-explanation");
+        await Assert.ThrowsAsync<ArgumentException>(() => RedTeamCommand.ExecuteAsync(options, default, target, judgeClientOverride: judge));
         Assert.Equal(0, target.Calls);
         Assert.Equal(0, judge.CallCount);
         Assert.False(Directory.Exists(Path.Combine(_root, "runs")));
@@ -166,6 +164,40 @@ public sealed class RedTeamPromptCommandTests : IDisposable
         { Locale = "sv-SE", SystemText = "PRIVATE-SWEDISH-GRAPH " + variation + " " + d.EvaluatorKey });
         await new JudgePromptPackLoader().ExportAsync(new(definitions), path);
         return Path.Combine(path, "prompts.json");
+    }
+
+    [Fact]
+    public async Task Execute_LocalizedExplanation_SealsSeparateInstrumentAndChangesSuiteIdentity()
+    {
+        var digests = new List<string>();
+        var verdictDigests = new List<string?>();
+        for (var variation = 0; variation < 2; variation++)
+        {
+            var path = Path.Combine(_root, "narrative-" + variation);
+            var definitions = BenchmarkPromptDefinitions.ForPreset("redteam", "SupplyChain")
+                .Append(AgentEval.RedTeam.Evaluators.RedTeamJudgePrompts.ForExplanation())
+                .Select(d => d with { Locale = "sv-SE", SystemText = "PRIVATE-CLI-NARRATIVE " + d.EvaluatorKey +
+                    (d.ResponseContract == JudgeResponseContract.RedTeamExplanationV1 ? variation : 0) });
+            await new JudgePromptPackLoader().ExportAsync(new(definitions), path);
+            using var judge = new FakeChatClient(Success, Success, """{"explanation":"Det observerade svaret stöder resultatet."}""");
+            var runs = Path.Combine(_root, "narrative-runs-" + variation);
+            Assert.Equal(0, await RedTeamCommand.ExecuteAsync(Options(Path.Combine(path, "prompts.json"), runs, explain: true),
+                default, new Subject(), judgeClientOverride: judge));
+            Assert.Equal(3, judge.CallCount);
+            var runFile = Assert.Single(Directory.GetFiles(runs, "run.json", SearchOption.AllDirectories));
+            var directory = Path.GetDirectoryName(runFile)!;
+            Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+            digests.Add((string)JsonNode.Parse(File.ReadAllText(runFile))!["suite"]!["digest"]!);
+            var line = JsonNode.Parse(File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Single())!;
+            var ext = line["ext"]!;
+            verdictDigests.Add((string?)ext["agenteval.probeJudge"]!["graphDigest"]);
+            Assert.Equal(2, ext["agenteval.probeJudge"]!["instruments"]!.AsArray().Count);
+            Assert.Equal("sv-SE", (string?)ext["agenteval.probeExplanation"]!["instrument"]!["prompt"]!["effectiveLocale"]);
+            Assert.True((bool?)ext["agenteval.probeExplanation"]!["instrument"]!["measured"]);
+            Assert.DoesNotContain("PRIVATE-CLI-NARRATIVE", string.Concat(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+        }
+        Assert.NotEqual(digests[0], digests[1]);
+        Assert.Equal(verdictDigests[0], verdictDigests[1]);
     }
 
     private static RedTeamOptions Options(string manifest, string runs, string attack = "SupplyChain", bool explain = false) => new()

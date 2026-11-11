@@ -10,6 +10,14 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record ProbeResult
 {
+    /// <summary>Declared narrative configuration, separate from the graph that establishes the verdict.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExplanationDigest { get; init; }
+
+    /// <summary>Actual narrative calls; null when narration did not execute. Never a verdict instrument.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ProbeJudgeInstrument? ExplanationInstrument { get; init; }
+
     /// <summary>Full configured graph identity, including declared branches that did not execute. Actual model calls are recorded separately.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? JudgeGraphDigest { get; init; }

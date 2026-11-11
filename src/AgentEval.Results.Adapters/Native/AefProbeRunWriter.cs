@@ -20,6 +20,12 @@ public sealed record AefProbeLine
     /// <summary>Complete declared graph identity, independent of the subset of leaves actually invoked.</summary>
     public string? JudgeGraphDigest { get; init; }
 
+    /// <summary>Declared narrative configuration, separate from verdict identity.</summary>
+    public string? ExplanationDigest { get; init; }
+
+    /// <summary>Observed narrative generation; never used as a verdict annotator.</summary>
+    public AefProbeJudgeInstrument? ExplanationInstrument { get; init; }
+
     /// <summary>Observed leaf instruments. The writer removes captured prompt text unless content capture is enabled.</summary>
     public IReadOnlyList<AefProbeJudgeInstrument>? JudgeInstruments { get; init; }
 
@@ -319,7 +325,9 @@ public static class AefProbeRunWriter
             Turns = line.Turns,
             DurationMs = line.DurationMs,
             Usage = line.Usage,
-            Ext = AefPromptProvenance.AttachProbe(null, line.JudgeGraphDigest, line.JudgeInstruments, includeContent),
+            Ext = AefPromptProvenance.AttachExplanation(
+                AefPromptProvenance.AttachProbe(null, line.JudgeGraphDigest, line.JudgeInstruments, includeContent),
+                line.ExplanationDigest, line.ExplanationInstrument, includeContent),
             Scores = conclusive ? [new AefScore { Metric = ResistedConclusiveMetric, Value = line.State == AefState.Passed ? 1 : 0 }] : null,
             Annotator = line.Annotator is { } kind
                 ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null,

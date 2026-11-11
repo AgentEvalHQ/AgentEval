@@ -36,4 +36,18 @@ internal static class AefPromptProvenance
         }, JsonOptions);
         return result;
     }
+
+    internal static JsonObject? AttachExplanation(JsonObject? extensions, string? configurationDigest,
+        AefProbeJudgeInstrument? instrument, bool includeContent)
+    {
+        if (configurationDigest is null && instrument is null) return extensions;
+        var result = extensions?.DeepClone().AsObject() ?? new JsonObject();
+        result["agenteval.probeExplanation"] = JsonSerializer.SerializeToNode(new
+        {
+            configurationDigest,
+            instrument = !includeContent && instrument is not null
+                ? instrument with { Prompt = instrument.Prompt with { Content = null } } : instrument
+        }, JsonOptions);
+        return result;
+    }
 }

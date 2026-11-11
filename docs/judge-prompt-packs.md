@@ -153,7 +153,7 @@ Configured calls use fenced probe/response data and one localized corrective ret
 
 `EvaluationResult.JudgeInstruments` records each invoked judge's selected locale/prompt identity and actual request settings, including reasoning-model temperature adaptation and provider-reported model IDs. Unknown model IDs remain null. `RubricDigest` additionally covers the fixed reader and observed effective model/settings; it excludes case text. A generic composite retains the invoked leaf observations without inventing a whole-graph digest from a short-circuited path. Scan evidence suppression and `ReasonRedactingEvaluator` remove captured prompt content.
 
-`ExplainAsync` rejects constructor prompt selection before calling the provider, because its separate narrative contract is not yet configurable. The shipped Swedish pack covers the fifteen metric/generic definitions and one draft runtime over-refusal definition; export a separate red-team pack. The new JSON transport and translated policies require independent calibration.
+`ExplainAsync` uses the separate `redteam.explanation` contract when constructor prompt selection is supplied. `ExplainWithPromptsAsync` accepts a per-call selection and returns text plus actual narrative provenance; supplying a verdict definition as its override is rejected. See [localized explanations](#localized-explanations). The shipped Swedish pack covers the fifteen metric/generic definitions and one draft runtime over-refusal definition; export a separate red-team pack. The new JSON transport and translated policies require independent calibration.
 
 ### Red-team graphs and scans
 
@@ -168,7 +168,7 @@ agenteval redteam --endpoint http://localhost:1234/v1 --model target \
   --judge-prompt-pack ./security-judges/prompts.json --judge-locale sv-SE
 ```
 
-Use `--preset supported` to export the union of all built-in graph definitions, including the shared `gate.over-refusal` definition for optional benign controls. Use `--preset benign-controls` to export that control definition alone. After translating that union, omit `--attacks` to scan the default roster. Shared refusal leaves have one stable key. `SystemPromptExtraction` has no LLM instructions: its planted-canary/reference-echo checks work without a translated leaf, and exporting it alone reports that it is code-only. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
+Use `--preset supported` to export the union of all built-in graph definitions, including `redteam.explanation` for enabled explanations and the shared `gate.over-refusal` definition for optional benign controls. Use `--preset benign-controls` to export that control definition alone. After translating that union, omit `--attacks` to scan the default roster. Shared refusal leaves have one stable key. `SystemPromptExtraction` has no LLM instructions: its planted-canary/reference-echo checks work without a translated leaf, and exporting it alone reports that it is code-only. Direct generic verdict/Likert descriptors and custom keys remain available through the library APIs.
 
 ```csharp
 var definitions = GraderFactory.CapturePromptDefinitions(attack, new ScanOptions { JudgeClient = judgeClient });
@@ -202,7 +202,35 @@ This evidence framing is versioned as `redteam.probe-facts.v2` in configured ins
 
 Configured multi-turn judging bypasses the default English lexical refusal lock: an inconclusive localized judgment cannot become resistance solely because English refusal words appeared. Existing success, turn and duration limits remain. Tree judges receive the actual attempted prompt. Folded linear/tree results retain the invoked leaf observations from completed evaluations; missing/aborted observations remain unknown.
 
-Unsupported custom graph nodes fail explicitly. Current unsupported scan routes include fallback mode and narrative explanations. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+Unsupported custom graph nodes fail explicitly. Fallback mode remains an unsupported configured scan route. The CLI also rejects selected packs with imported/transformed probes, live registry grading, memory-poisoning, legacy baseline save/compare or cohort calibration; those paths do not yet bind localized graph identity consistently. Attack generation, official corpora, `bench owasp`/`mitre`/`nist` selection are separate follow-up work. These restrictions prevent silent English fallback or pooling different instruments; they do not establish translated-domain accuracy.
+
+### Localized explanations
+
+`ExplainFindings = true` (CLI: `--explain`) uses `redteam.explanation` when a scan selects prompt packs. Export `--family redteam --preset explanation` to author it alone, or `--preset supported` to include it with the verdict and benign-control definitions. `GraderFactory.CapturePromptDefinitions` includes the narrative descriptor when the supplied scan options enable explanations.
+
+The `redTeamExplanationV1` response is exactly `{"explanation":"..."}`: a nonempty string of at most 8192 characters. It has no score or verdict; metadata uses `scale: unit`, `passAt: 0`, no review threshold, criteria or severity bands. The implementation rejects additional/duplicate fields and retries malformed output once with the selected retry text. Provider compatibility adaptation may add a call; provenance records every actual attempt and any reported model.
+
+System, user, safety and retry text can all be translated. Keep the exported `input`, `output` and `context` slots: the implementation fences the attack, response/transcript and already-established outcome/fidelity/reason as data. Explanations do not re-adjudicate findings. A provider failure, invalid output or owned deadline leaves the original verdict intact and records unavailable narration. Caller cancellation propagates.
+
+```csharp
+var scanOptions = new ScanOptions
+{
+    JudgeClient = judgeClient,
+    JudgePrompts = scanPrompts,
+    ExplainFindings = true,
+    ExplanationJudgeOptions = new()
+    {
+        JudgePrompts = narrativePrompts, // Optional role-specific selection, overriding scanPrompts.
+        MaxTokens = 1024
+    }
+};
+```
+
+Without role-specific selection, explanations inherit `ScanOptions.JudgePrompts`. Explicit `ExplanationJudgeOptions` without either selection enable the configured English instrument. Custom instructions and stable custom keys can be exported with `RedTeamJudgePrompts.ForExplanation(options)`; use a separate key from verdict contracts. Direct `ExplainWithPromptsAsync` overrides the constructor selection for that call without changing it.
+
+Configured single-turn, conversation and tree scans narrate successful/inconclusive findings from the actual response or folded transcript. Controls, unexercised probes and resisted findings do not receive narrative calls. Content-off scans preflight configuration but skip narration entirely. `JudgeTimeout` bounds narration within the remaining probe/conversation budget.
+
+`PlannedAttack.ExplanationDigest` and `ProbeResult.ExplanationDigest` identify the declared narrative configuration, including unused instruments. `ProbeResult.ExplanationInstrument` records actual calls separately from `JudgeInstruments`. Native AEF uses `agenteval.probeExplanation`; the full suite digest changes when its narrative configuration changes, while the verdict graph remains unchanged. Captured prompt content is stripped by content-off native exports. An explanation is neither a new verdict nor human validation of the original one.
 
 ### Localized benign controls
 

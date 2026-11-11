@@ -46,6 +46,7 @@ internal static class ProbeSuiteDefinition
                 ["measurable"] = arm.Attack.NotMeasurableReason is null,
             };
             if (arm.JudgeGraphDigest is not null) armDefinition["judgeGraphDigest"] = arm.JudgeGraphDigest;
+            if (arm.ExplanationDigest is not null) armDefinition["explanationDigest"] = arm.ExplanationDigest;
             arms.Add(armDefinition);
         }
         if (ids.Count == 0) return null;

@@ -166,7 +166,7 @@ public class ScanOptions
 
     /// <summary>Optional immutable selection for supported built-in or caller-composed judge graphs.
     /// Every selected attack is preflighted before any target call. Requires Primary mode and a judge client;
-    /// benign controls inherit the selection and bypass English prefilters. Unsupported oracle nodes and explanations
+    /// benign controls and enabled explanations inherit the selection. Unsupported oracle nodes
     /// are rejected rather than retaining English behavior.</summary>
     public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
 
@@ -214,9 +214,16 @@ public class ScanOptions
     /// <summary>
     /// When true and <see cref="JudgeClient"/> is set, attach an LLM-generated rationale (narrating the verdict +
     /// evidence fidelity) to Succeeded/Inconclusive findings (the <c>--explain</c> feature). Best-effort and opt-in:
-    /// it adds one judge call per explained finding and never changes a verdict. Default false (no extra LLM cost).
+    /// it never changes a verdict. Configured narration permits one corrective retry and provider compatibility
+    /// retries; actual calls are recorded separately. Default false (no extra LLM cost).
     /// </summary>
     public bool ExplainFindings { get; init; }
+
+    /// <summary>Optional narrative settings and customer instructions. Its prompt selection overrides
+    /// <see cref="JudgePrompts"/> for explanations only. Explicit settings without either selection use the configured
+    /// English narrative instrument. <see cref="JudgeTimeout"/> also bounds narration. Inert unless
+    /// <see cref="ExplainFindings"/> is true; content-off scans make no narrative calls.</summary>
+    public AgentEval.RedTeam.Evaluators.LLMJudgeOptions? ExplanationJudgeOptions { get; init; }
 
     /// <summary>
     /// Optional <b>attacker</b>-LLM client for LLM-driven multi-turn attacks (Wave C′: Crescendo / PAIR / TAP).

@@ -118,6 +118,9 @@ public sealed class JsonReportExporter : IReportExporter
                         Difficulty = p.Difficulty.ToString(),
                         Reason = p.Reason,
                         Rationale = p.Rationale,   // --explain: LLM rationale narrating verdict + fidelity (null unless requested)
+                        ExplanationDigest = p.ExplanationDigest,
+                        ExplanationInstrument = p.ExplanationInstrument is { } explanation
+                            ? explanation with { Prompt = explanation.Prompt with { Content = null } } : null,
                         // 5d: surface the emitted-vs-executed / by-surface evidence so a Behavioral/ToolOutput
                         // compromise is machine-distinguishable from a Verbal/UserMessage proxy.
                         Fidelity = p.Fidelity.ToString(),
@@ -366,6 +369,12 @@ public sealed class JsonReportExporter : IReportExporter
 
         /// <summary>--explain: LLM rationale narrating the verdict + fidelity. Omitted (null) unless requested.</summary>
         public string? Rationale { get; init; }
+
+        /// <summary>Declared narrative configuration; independent of verdict provenance.</summary>
+        public string? ExplanationDigest { get; init; }
+
+        /// <summary>Observed narrative calls without captured prompt content.</summary>
+        public ProbeJudgeInstrument? ExplanationInstrument { get; init; }
 
         /// <summary>Evidence tier behind the verdict: Verbal / IntentToAct / Behavioral (RC-1).</summary>
         public string Fidelity { get; init; } = "";

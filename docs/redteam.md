@@ -1227,7 +1227,7 @@ Attach an **LLM-generated rationale** to each Succeeded/Inconclusive finding tha
 agenteval redteam --endpoint $URL --model $MODEL --judge $JUDGE_URL --explain
 ```
 
-Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export. It also requires evidence to be unredacted (`--explain` is suppressed when evidence is redacted, since the rationale quotes the raw response). Currently the rationale is attached to **single-turn** findings only; folded multi-turn / Crescendo / TAP findings do not carry one.
+Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export. It also requires evidence to be unredacted (`--explain` is suppressed when evidence is redacted, since the rationale quotes the raw response). Legacy narration applies to single-turn findings. With prompt selection enabled, narration also supports folded multi-turn and tree findings, using their actual transcript and established fidelity. Export `prompts export ./narrative-pack --family redteam --preset explanation` to author the separate `redteam.explanation` contract, or use `--preset supported` for the complete scan pack. Missing selected translations fail before target calls. Narration has separate declared and observed identity; its failure never changes a verdict. See [localized explanations](judge-prompt-packs.md#localized-explanations).
 
 ### Output & compliance formats, per-role keys
 

@@ -298,7 +298,6 @@ public sealed class LocalizedProbeGraphTests
 
     [Theory]
     [InlineData("fallback")]
-    [InlineData("explain")]
     [InlineData("missing-client")]
     public async Task Scan_UnsupportedConfiguredRoute_RejectsBeforeTargetCalls(string route)
     {

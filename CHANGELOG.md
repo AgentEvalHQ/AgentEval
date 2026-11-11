@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Configured red-team explanations now use a separate `redteam.explanation` prompt contract, including per-call and per-scan overrides, strict bounded parsing, localized retry and actual-call provenance. Single-turn, conversation and tree scans retain the established verdict when narration is unavailable; caller cancellation propagates. CLI authoring, native evidence and suite identity keep narrative and verdict instruments separate. See [localized explanations](docs/judge-prompt-packs.md#localized-explanations).
+
 - Localized benign controls reuse the shared over-refusal gate, preflight translations before target calls, and retain configuration/observed-model identity in native evidence. English prefilters cannot skip configured Swedish judging; unavailable or budget-exhausted judgments stay inconclusive. Added explicit control settings, CLI authoring preset, regression/round-trip tests and an offline sample. Controls remain outside attack scores; translated customer accuracy is unverified.
 
 - Configured runtime wrappers now preserve selected prompts, execution settings and actual observations. Crescendo keeps policy-specific trajectory state; unavailable judgments cannot arm quarantine. Approval budget exhaustion cannot auto-approve or populate the allow cache. Outbound context failures remain unmeasured. Hybrid citation support accepts prompt packs through structured evidence, retains code-owned source-existence checks and exports a separate CLI authoring preset. See [runtime judge gates](docs/judge-prompt-packs.md#runtime-judge-gates).
