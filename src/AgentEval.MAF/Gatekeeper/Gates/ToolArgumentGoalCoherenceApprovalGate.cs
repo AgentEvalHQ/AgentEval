@@ -28,10 +28,11 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <para><b>Disclosed known limitations, not oversights:</b>
 /// (1) <see cref="IToolApprovalGate.IsAutoApprovableAsync"/> returns a bare <see cref="bool"/> — the judge's
 /// <see cref="GateVerdict.Reason"/> and <see cref="GateVerdict.Matches"/> evidence are computed but cannot be
-/// threaded through to the human reviewing the resulting escalation
+/// automatically threaded through to the human reviewing the resulting escalation
 /// (<c>AgentEvalToolApprovalExtensions.RecordEscalation</c> only ever logs a generic message). Fixing this
 /// needs a richer <see cref="IToolApprovalGate"/> contract shared by every approval gate, not a change scoped
-/// to this one. (2) The one production call site
+/// to this one. Callers can retain the actual verdict through <see cref="OnJudgment"/>.
+/// (2) The one production call site
 /// (<c>AgentEvalToolApprovalExtensions.AutoApproveWhenAllGatesAgree</c>) invokes
 /// <see cref="IsAutoApprovableAsync"/> with no cancellation token — MAF's <c>AutoApprovalRules</c> delegate
 /// signature has none to forward — so a judge call there always runs to its own internal
@@ -44,6 +45,11 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
 {
     private readonly IChatGate _judge;
     private readonly string _goal;
+    private readonly CompositeJudgeGate<ToolArgumentGoalCoherenceRubric>? _configured;
+    private readonly int _maxInputChars;
+
+    /// <summary>Optional per-call observer for the actual judge verdict and configured provenance, including unavailable measurements. Observer exceptions propagate.</summary>
+    public Action<GateVerdict>? OnJudgment { get; init; }
 
     /// <inheritdoc/>
     public string PolicyName { get; }
@@ -87,7 +93,11 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
                 nameof(options));
         }
 
-        _judge = ToolArgumentGoalCoherenceJudge.Create(fastModel, options, cache);
+        _maxInputChars = (options ?? new JudgeGateOptions()).MaxInputChars;
+        _configured = options?.JudgePrompts is not null
+            ? new CompositeJudgeGate<ToolArgumentGoalCoherenceRubric>(new(), fastModel, options, "approval.goal-tool-json.v1;oversize.reject.v1") : null;
+        IChatGate judge = _configured ?? ToolArgumentGoalCoherenceJudge.Create(fastModel, options, cache: false);
+        _judge = cache ? new JudgeVerdictCache(judge) : judge;
         _goal = goal;
         PolicyName = string.IsNullOrWhiteSpace(policyName) ? $"judge:{ToolArgumentGoalCoherenceJudge.Axis}" : policyName;
     }
@@ -96,11 +106,15 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
     public async ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        string argumentsJson;
+        string text;
         try
         {
-            argumentsJson = JsonSerializer.Serialize(call.Arguments, GateText.SerializerOptions);
+            var argumentsJson = JsonSerializer.Serialize(call.Arguments, GateText.SerializerOptions);
+            text = _configured is not null
+                ? JsonSerializer.Serialize(new { goal = _goal, toolName = call.Name, arguments = JsonSerializer.Deserialize<JsonElement>(argumentsJson) })
+                : ToolArgumentGoalCoherenceRubric.FormatCase(_goal, call.Name, argumentsJson);
         }
         catch (OperationCanceledException)
         {
@@ -117,11 +131,22 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
             // shapes for a problematic argument graph — a reference cycle, a depth limit, a custom converter
             // throwing its own type) — an approval gate that can't affirm a call is routine must escalate
             // regardless of WHY the affirmation failed, not just for one specific exception type.
-            return false;
+            return Unmeasured("Tool arguments could not be serialized for judging.");
         }
 
-        var text = ToolArgumentGoalCoherenceRubric.FormatCase(_goal, call.Name, argumentsJson);
+        if (_configured is not null && _maxInputChars > 0 && text.Length > _maxInputChars)
+            return Unmeasured("Configured approval evidence exceeds MaxInputChars; complete goal and arguments are required.");
         var verdict = await _judge.InspectAsync(text, cancellationToken).ConfigureAwait(false);
-        return verdict.Action == GateAction.Allow;
+        OnJudgment?.Invoke(verdict);
+        return verdict.Action == GateAction.Allow &&
+            verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) != true &&
+            JudgeGateInstrumentation.Observed(verdict.Provenance).All(i => i.Measured);
+    }
+
+    private bool Unmeasured(string reason)
+    {
+        OnJudgment?.Invoke(_configured?.RecordObservation(string.Empty, JudgeVerdict.Inconclusive(reason))
+            ?? GateVerdict.Block(PolicyName, reason));
+        return false;
     }
 }

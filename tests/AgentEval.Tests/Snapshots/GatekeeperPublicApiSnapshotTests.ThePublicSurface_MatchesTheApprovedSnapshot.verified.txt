@@ -190,6 +190,7 @@ static class AgentEval.Guardrails.Judges.GateCalibrationHarness
     const String ActivitySourceName
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> EvaluateAsync(AgentEval.Guardrails.IChatGate judge, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet, AgentEval.Guardrails.Judges.CalibrationOptions options = null, CancellationToken cancellationToken = default)
 static class AgentEval.Guardrails.Judges.GateJudgePrompts
+    static JudgePromptDefinition ForCitationSupport(Double blockThreshold = 0)
     static JudgePromptDefinition ForRubric(AgentEval.Guardrails.Judges.IJudgeRubric rubric, Double blockThreshold = 0)
 static class AgentEval.Guardrails.Judges.GatekeeperFleetHealthIndex [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
     static AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport Compute(IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> reportsByAxis, TimeSpan staleAfter, TimeProvider clock = null)
@@ -215,11 +216,14 @@ static class AgentEval.Guardrails.Judges.GoalHijackDriftJudge
     static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
 sealed class AgentEval.Guardrails.Judges.HallucinatedCitationJudge : AgentEval.Guardrails.IChatGate
+    String InstrumentDigest { get; }
     String PolicyName { get; }
     ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
     ctor(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null)
     static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet StructuredCalibrationGoldSet()
     static String FormatCase(IReadOnlyDictionary<String, String> retrievedSources, String citedSourceId, String claim)
+    static String FormatStructuredCase(IReadOnlyDictionary<String, String> retrievedSources, String citedSourceId, String claim)
 interface AgentEval.Guardrails.Judges.ICalibrationReportStore [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
     Task SaveAsync(AgentEval.Guardrails.Judges.CalibrationReport report, CancellationToken ct = default)
     Task<AgentEval.Guardrails.Judges.CalibrationReport> LoadLatestAsync(String axis, CancellationToken ct = default)
@@ -299,6 +303,7 @@ sealed class AgentEval.Guardrails.Judges.JudgeGateInstrument : IEquatable<AgentE
     Int32 GetHashCode()
     JudgePromptProvenance Prompt { get; init; }
     String ConfigurationDigest { get; init; }
+    String DeterministicRule { get; init; }
     String RequestedModelId { get; init; }
     String ToString()
     Void Deconstruct(out String ConfigurationDigest, out JudgePromptProvenance Prompt, out String RequestedModelId, out IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateCall> Calls, out Boolean Measured, out Boolean BudgetExhausted)
@@ -838,6 +843,7 @@ enum AgentEval.MAF.Gatekeeper.ContainmentTargetKind
 abstract class AgentEval.MAF.Gatekeeper.ContractPredicate
     String Argument { get; }
 sealed class AgentEval.MAF.Gatekeeper.CrescendoTrajectoryJudge : AgentEval.MAF.Gatekeeper.IShadowJudge
+    String InstrumentDigest { get; }
     Task<AgentEval.MAF.Gatekeeper.ShadowVerdict> JudgeAsync(AgentEval.MAF.Gatekeeper.ShadowJudgeContext context, CancellationToken cancellationToken = default)
     const Int32 DefaultArmThreshold
     const Int32 DefaultMaxTrackedTurns
@@ -2311,6 +2317,7 @@ sealed class AgentEval.MAF.Gatekeeper.ShadowVerdict : IEquatable<AgentEval.MAF.G
     Boolean Compromised { get; init; }
     Boolean Equals(AgentEval.MAF.Gatekeeper.ShadowVerdict other)
     Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateInstrument> JudgeInstruments { get; init; }
     Int32 GetHashCode()
     String Reason { get; init; }
     String ToString()
@@ -2349,6 +2356,7 @@ sealed class AgentEval.MAF.Gatekeeper.TaintTrackingGate : AgentEval.MAF.Gatekeep
     ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
     ctor(IEnumerable<String> sourceTools, IEnumerable<String> sinkTools, Int32 minTaintLength = 8, Boolean canonicalize = false)
 sealed class AgentEval.MAF.Gatekeeper.ToolArgumentGoalCoherenceApprovalGate : AgentEval.MAF.Gatekeeper.IToolApprovalGate
+    Action<AgentEval.Guardrails.GateVerdict> OnJudgment { get; init; }
     String PolicyName { get; }
     ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
     ctor(IChatClient fastModel, String goal, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, String policyName = null, Boolean cache = true)

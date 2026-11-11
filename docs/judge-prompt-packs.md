@@ -124,7 +124,8 @@ An authored translation needs a separately reviewed calibration set. Include sho
 | Direct `LLMJudgeEvaluator` / `LikertJudgeEvaluator` | Library export, immutable constructor/per-call selection, strict JSON reader and invocation provenance |
 | Supported red-team graphs | Library graph export/binding, scan-wide preflight, CLI selection and native leaf/graph provenance; see the supported attack list below |
 | Ten owned runtime judge rubrics through `JudgeGateOptions.JudgePrompts` | Configurable in the library; English prefilters bypassed; configured calibration identity required |
-| Auxiliary red-team routes, specialized runtime wrappers/CLI, memory and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
+| Runtime CLI, crescendo shadow, approval, outbound delegation and hybrid citation | Explicit selection supported; structured evidence, policy identity and actual observations retained |
+| Auxiliary red-team routes, memory evaluation and upstream MEAI paths | Follow-up coverage; do not assume a global pack localizes them |
 
 The supported RAG paths have no English keyword prefilter. Reference availability uses language-independent text checks. Configured `llm_toxicity` always invokes its selected model judge, including English-pattern matches; unconfigured toxicity retains its legacy scan and fallback. This changes the configured instrument and requires rebaselining. Upstream `MicrosoftEvaluatorAdapter` rejects explicit `JudgePrompts` before evaluating, including both adapter contracts. Code-only `code_toxicity` can share English options for other metrics, but rejects non-English selection or a definition targeting its keyword rules, even in English. Targeted adapters for the remaining surfaces remain separate work.
 
@@ -269,7 +270,36 @@ Reports distinguish statistical `isInlineReady` from `certificateEligible`; `cal
 
 Per-case reports retain measurement flags and content-free judge observations. Configured report case text is omitted unless content capture is explicitly enabled; sensitive axes always omit it. CLI verdict observations never include captured messages, and sensitive-axis rationales/evidence are omitted before panel aggregation. The existing keyword baseline remains English and is reported only as that baseline comparison, not a localized accuracy standard. Embedded gold sets can still be run diagnostically with a pack, but do not establish reviewed localization readiness.
 
-Specialized runtime wrapper evidence review and red-team benign-control integration remain follow-up work. CLI support for the stateless rubric cores does not imply those callers are localized.
+Runtime wrappers accept the same explicit selection:
+
+- `CrescendoTrajectoryJudge` forwards all execution settings, retains per-call `ShadowVerdict.JudgeInstruments`, and encodes trajectory evidence as JSON. Its instrument includes framing, excerpt/window bounds and the arming threshold. Configured session counters are isolated by instrument digest. Empty evidence, outages and budget exhaustion never count as escalation. Single-turn rubric calibration does not validate the stateful quarantine policy; test representative multi-turn conversations separately.
+- `ToolArgumentGoalCoherenceApprovalGate` encodes the fixed goal, tool name and arguments as JSON. Only a measured allow can auto-approve; unavailable judgments and exhausted budgets escalate to the application's human approval flow. `OnJudgment` can retain the actual verdict and provenance without shared mutable state. The callback may run concurrently, and its exceptions propagate. It does not change MAF's existing boolean approval contract or its lack of an ambient cancellation token.
+- `InterAgentBoundaryInjectionGate.CreateOutbound` keeps the trusted parent goal out of band and separate from outbound instructions. Missing/invalid context blocks without a model call and records an unmeasured observation. `MemoryWritePoisoningGate` forwards prompt selection to the shared indirect-injection judge; calibrate that seam on memory-write traffic.
+
+Configured citation support is a hybrid: source-ID existence remains an ordinal, implementation-owned check; support is judged using the selected prompt. Export its separate descriptor, translate all messages and load it through the same pack API:
+
+```bash
+agenteval prompts export ./citation-prompts --family gatekeeper --preset hallucinated-citation
+agenteval prompts validate ./citation-prompts/prompts.json --family gatekeeper --preset hallucinated-citation
+```
+
+```csharp
+var citationPack = await new JudgePromptPackLoader().LoadAsync("citation-prompts/prompts.json");
+var citation = new HallucinatedCitationJudge(chatClient, new JudgeGateOptions
+{
+    JudgePrompts = new() { Pack = citationPack, Locale = "sv-SE" },
+    ModelId = "your-provider-model-id"
+});
+var sources = new Dictionary<string, string> { ["S1"] = "Mötet börjar nio." };
+var verdict = await citation.InspectAsync(
+    HallucinatedCitationJudge.FormatStructuredCase(sources, "S1", "Mötet börjar nio."));
+```
+
+Use `FormatStructuredCase` with configured citation prompts. Legacy `FormatCase` remains for the unconfigured path; configured calls reject that ambiguous text grammar as unmeasured. Only the selected source and claim reach the model. Unknown source IDs block with `JudgeInstrument.DeterministicRule` and zero model calls. Invalid/duplicate fields and missing source content remain unmeasured. Structured citation, approval and trajectory wrappers reject evidence exceeding `MaxInputChars` rather than judging partial JSON; `0` retains the explicit unbounded semantic-input option. Citation parsing separately caps the envelope at 1,048,576 characters.
+
+`StructuredCalibrationGoldSet()` re-encodes the existing English citation cases without translating or relabeling them. A hybrid calibration report can combine structural and semantic observations, but code-only observations cannot establish a provider model identity. Prompt/content capture follows the normal explicit opt-in policy. Citation authoring is available in the CLI; the hybrid execution API is library-only, and is not registered as a semantic-only `gatekeeper inspect` axis that would omit source validation.
+
+Red-team benign-control integration and the broader remaining caller inventory are still follow-up work.
 
 ### Atomic rubrics and graphs
 

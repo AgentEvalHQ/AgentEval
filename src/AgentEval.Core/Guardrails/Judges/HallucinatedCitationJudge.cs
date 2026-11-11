@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
+using AgentEval.Prompts;
 
 namespace AgentEval.Guardrails.Judges;
 
@@ -19,7 +20,7 @@ namespace AgentEval.Guardrails.Judges;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Text format this gate inspects</b> (built by <see cref="FormatCase"/>):
+/// <b>Legacy text format</b> (built by <see cref="FormatCase"/> when no prompt selection is supplied):
 /// <code>
 /// RETRIEVED SOURCES:
 /// [S1] &lt;source 1 content&gt;
@@ -29,13 +30,14 @@ namespace AgentEval.Guardrails.Judges;
 /// </code>
 /// </para>
 /// <para>
-/// This class is NOT a <see cref="IJudgeRubric"/>/<see cref="CompositeJudgeGate{TRubric}"/> instance —
-/// the deterministic short-circuit (block BEFORE any model call when the citation doesn't exist) doesn't
-/// fit the single-model-call-per-inspection shape that primitive assumes, so this is a bespoke
-/// <see cref="IChatGate"/> implementation composing the same prefilter→model→parse discipline manually.
+/// With <see cref="JudgeGateOptions.JudgePrompts"/>, use <see cref="FormatStructuredCase"/> and
+/// <see cref="GateJudgePrompts.ForCitationSupport"/>. The hybrid retains its deterministic source-existence
+/// check and delegates semantic support judging to the shared configured executor. Missing or invalid
+/// evidence is unmeasured; it never silently falls back to the legacy text parser. Oversized semantic
+/// evidence is rejected rather than judged from a truncated source or claim.
 /// </para>
 /// </remarks>
-public sealed class HallucinatedCitationJudge : IChatGate
+public sealed class HallucinatedCitationJudge : IChatGate, IDelegatingGate
 {
     // Bounded lookahead, NOT a blind RegexOptions.Singleline — empirically verified before choosing this
     // shape (temporary diagnostic test, deleted before commit): adding Singleline alone (making `.` match
@@ -53,6 +55,12 @@ public sealed class HallucinatedCitationJudge : IChatGate
 
     private readonly IChatClient _fastModel;
     private readonly JudgeGateOptions _options;
+    private readonly CompositeJudgeGate<CitationSupportRubric>? _configured;
+
+    /// <summary>Configured hybrid instrument identity, including the structured evidence reader; null for legacy judging.</summary>
+    public string? InstrumentDigest => _configured?.InstrumentDigest;
+
+    IEnumerable<object> IDelegatingGate.InnerGates => _configured is null ? [] : [_configured];
 
     /// <summary>
     /// How the parse regexes are run. Test seam only: a test substitutes a matcher that throws
@@ -71,11 +79,15 @@ public sealed class HallucinatedCitationJudge : IChatGate
     {
         _fastModel = fastModel ?? throw new ArgumentNullException(nameof(fastModel));
         _options = options ?? new JudgeGateOptions();
+        if (_options.JudgePrompts is not null)
+            _configured = new(new(), fastModel, _options, "citation.structured-evidence.v1;source-exists.ordinal.v1;required-claim-source.v1;oversize.reject.v1");
     }
 
     /// <inheritdoc/>
     public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_configured is not null) return await InspectConfiguredAsync(text, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(text))
         {
             return GateVerdict.Allow(PolicyName);
@@ -149,6 +161,57 @@ public sealed class HallucinatedCitationJudge : IChatGate
         }
     }
 
+    /// <summary>Formats a configured citation case without delimiter ambiguity. Source IDs and content remain JSON data in any language.</summary>
+    public static string FormatStructuredCase(IReadOnlyDictionary<string, string> retrievedSources, string citedSourceId, string claim)
+    {
+        ArgumentNullException.ThrowIfNull(retrievedSources);
+        ArgumentException.ThrowIfNullOrWhiteSpace(citedSourceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(claim);
+        return JsonSerializer.Serialize(new { sources = retrievedSources, citedSourceId, claim });
+    }
+
+    private async ValueTask<GateVerdict> InspectConfiguredAsync(string text, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Length > 1048576)
+            return Unmeasured("Configured citation evidence is missing or exceeds the 1,048,576-character input limit.");
+        try
+        {
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 16 });
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || JudgeResponseReader.HasDuplicateProperties(root) ||
+                root.EnumerateObject().Any(p => p.Name is not ("sources" or "citedSourceId" or "claim")) ||
+                !root.TryGetProperty("sources", out var sources) || sources.ValueKind != JsonValueKind.Object ||
+                sources.EnumerateObject().Any(p => string.IsNullOrWhiteSpace(p.Name) || p.Value.ValueKind != JsonValueKind.String) ||
+                !root.TryGetProperty("citedSourceId", out var id) || id.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(id.GetString()) ||
+                !root.TryGetProperty("claim", out var claim) || claim.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(claim.GetString()))
+                return Unmeasured("Configured citation evidence requires sources, citedSourceId and claim; use FormatStructuredCase.");
+
+            if (!sources.TryGetProperty(id.GetString()!, out var source))
+                return _configured!.RecordObservation(text, JudgeVerdict.Blocked("Cited source was not retrieved.", [id.GetString()!]),
+                    "citation.source-missing.ordinal.v1");
+            if (string.IsNullOrWhiteSpace(source.GetString()))
+                return Unmeasured("The cited source content is empty; support cannot be measured.");
+
+            // Only the selected source and claim reach semantic judging; unrelated retrieval cannot inflate cost or support.
+            var evidence = JsonSerializer.Serialize(new { sourceContent = source.GetString(), claim = claim.GetString() });
+            if (_options.MaxInputChars > 0 && evidence.Length > _options.MaxInputChars)
+                return Unmeasured("Configured citation evidence exceeds MaxInputChars; complete source and claim are required.");
+            return await _configured!.InspectAsync(evidence, ct).ConfigureAwait(false);
+        }
+        catch (JsonException) { return Unmeasured("Configured citation evidence is malformed; use FormatStructuredCase."); }
+
+        GateVerdict Unmeasured(string reason) => _configured!.RecordObservation(string.Empty, JudgeVerdict.Inconclusive(reason));
+    }
+
+    /// <summary>The existing English calibration corpus encoded as unambiguous configured cases. Labels and language are unchanged.</summary>
+    public static JudgeGoldSet StructuredCalibrationGoldSet() => new("hallucinated-citation", CalibrationGoldSet().Cases.Select(item =>
+    {
+        var parsed = ParseCase(item.Text, static (regex, text) => regex.Match(text));
+        if (parsed.TimedOut || parsed.CitedId is null || parsed.Claim is null)
+            throw new InvalidOperationException("The built-in citation corpus did not match its declared format.");
+        return item with { Text = FormatStructuredCase(parsed.Sources, parsed.CitedId, parsed.Claim) };
+    }));
+
     /// <summary>Formats a retrieved-sources/cited-source/claim case into the text this gate inspects.</summary>
     public static string FormatCase(IReadOnlyDictionary<string, string> retrievedSources, string citedSourceId, string claim)
     {
@@ -165,18 +228,22 @@ public sealed class HallucinatedCitationJudge : IChatGate
     }
 
     private (IReadOnlyDictionary<string, string> Sources, string? CitedId, string? Claim, bool TimedOut) Parse(string text)
+        => ParseCase(text, RegexMatch);
+
+    private static (IReadOnlyDictionary<string, string> Sources, string? CitedId, string? Claim, bool TimedOut) ParseCase(
+        string text, Func<Regex, string, Match> regexMatch)
     {
         var sources = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
             // Match/NextMatch walks the same successive matches Regex.Matches enumerates.
-            for (var m = RegexMatch(SourceLine, text); m.Success; m = m.NextMatch())
+            for (var m = regexMatch(SourceLine, text); m.Success; m = m.NextMatch())
             {
                 sources[m.Groups["id"].Value.Trim()] = m.Groups["content"].Value.Trim();
             }
 
-            var citedMatch = RegexMatch(CitedSourceLine, text);
-            var claimMatch = RegexMatch(ClaimLine, text);
+            var citedMatch = regexMatch(CitedSourceLine, text);
+            var claimMatch = regexMatch(ClaimLine, text);
             var citedId = citedMatch.Success ? citedMatch.Groups["id"].Value.Trim() : null;
             var claim = claimMatch.Success ? claimMatch.Groups["claim"].Value.Trim() : null;
             return (sources, citedId, claim, false);
@@ -189,11 +256,13 @@ public sealed class HallucinatedCitationJudge : IChatGate
         }
     }
 
-    private static string BuildSupportPrompt(string sourceContent, string claim) =>
+    internal const string SupportInstructions =
         "You are a citation-support classifier. Below is the CONTENT of a source that was CITED to support a " +
         "claim, followed by the CLAIM itself. Decide whether the source content actually SUPPORTS the claim — " +
         "i.e. a careful reader could verify the claim using only this source. If the claim adds specific facts, " +
-        "numbers, or conclusions the source does not contain, it is NOT supported.\n" +
+        "numbers, or conclusions the source does not contain, it is NOT supported.\n";
+
+    private static string BuildSupportPrompt(string sourceContent, string claim) => SupportInstructions +
         "Reply with ONLY a JSON object: {\"supported\": <true|false>, \"confidence\": <0..1>, \"evidence\": " +
         "\"<the unsupported fragment, or empty>\"}.\n\nSOURCE CONTENT:\n\"\"\"\n" +
         TripleQuote.Replace(sourceContent, "\"\"") + "\n\"\"\"\n\nCLAIM:\n\"\"\"\n" + TripleQuote.Replace(claim, "\"\"") + "\n\"\"\"";

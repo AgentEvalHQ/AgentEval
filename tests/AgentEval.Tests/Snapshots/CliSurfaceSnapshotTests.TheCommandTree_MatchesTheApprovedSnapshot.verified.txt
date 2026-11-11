@@ -1,4 +1,4 @@
-command agenteval
+﻿command agenteval
     option --capture-fixture String [1..1] recursive
     option --help (-?, -h, /?, /h) Void [0..0] recursive
     option --log-file String [1..1] recursive
@@ -508,6 +508,14 @@ command agenteval
             option --deployment-name String [1..1]
             option --endpoint String [1..1]
             option --gate String [1..1] required
+            option --gold-set String [1..1]
+            option --judge-fallback-locale String [1..1]
+            option --judge-locale String [1..1]
+            option --judge-max-input-chars Int32? [1..1]
+            option --judge-max-output-tokens Int32? [1..1]
+            option --judge-prompt-pack FileInfo [1..1]
+            option --judge-temperature Single? [1..1]
+            option --judge-timeout-seconds Double? [1..1]
             option --max-concurrency Int32 [1..1] default=4
             option --max-dangerous-errors Int32 [1..1] default=0
             option --min-cases-per-direction Int32 [1..1] default=20
@@ -523,9 +531,17 @@ command agenteval
             option --endpoint String [1..1]
             option --forbidden String[] [1..100000]
             option --gate String [1..1] required
+            option --gold-set String[] [1..100000]
             option --guarded-tool String[] [1..100000]
             option --id-arg String[] [1..100000]
             option --input String [1..1]
+            option --judge-fallback-locale String [1..1]
+            option --judge-locale String [1..1]
+            option --judge-max-input-chars Int32? [1..1]
+            option --judge-max-output-tokens Int32? [1..1]
+            option --judge-prompt-pack FileInfo [1..1]
+            option --judge-temperature Single? [1..1]
+            option --judge-timeout-seconds Double? [1..1]
             option --keyword String[] [1..100000]
             option --keywords String [1..1]
             option --min-taint-length Int32? [1..1]
@@ -633,8 +649,11 @@ command agenteval
         option --intensity String [1..1] default="moderate"
         option --judge String [1..1]
         option --judge-api-key String [1..1]
+        option --judge-fallback-locale String [1..1]
+        option --judge-locale String [1..1]
         option --judge-mode String [1..1] default="primary"
         option --judge-model String [1..1]
+        option --judge-prompt-pack FileInfo [1..1]
         option --judge-rubric String [1..1] default="evidence-anchored"
         option --judge-timeout Double [1..1] default=0
         option --max-credits Int32 [1..1] default=0

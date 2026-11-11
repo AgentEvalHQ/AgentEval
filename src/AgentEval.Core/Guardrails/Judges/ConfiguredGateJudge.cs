@@ -16,7 +16,7 @@ internal sealed class ConfiguredGateJudge
     internal string Digest { get; }
     internal double BlockThreshold => _resolved.Definition.PassAt;
 
-    internal ConfiguredGateJudge(IJudgeRubric rubric, IChatClient client, JudgeGateOptions options)
+    internal ConfiguredGateJudge(IJudgeRubric rubric, IChatClient client, JudgeGateOptions options, string? evidencePolicy = null)
     {
         if (options.MaxOutputTokens <= 0 || options.Temperature is { } temperature && (!float.IsFinite(temperature) || temperature < 0) ||
             options.ModelId is { } model && (string.IsNullOrWhiteSpace(model) || model.Length > 512))
@@ -32,6 +32,9 @@ internal sealed class ConfiguredGateJudge
             timeoutTicks = options.Timeout.Ticks, options.FailClosedOnInconclusive, options.FailClosedOnBudgetExhausted,
             governor = options.SpendGovernor?.Configuration
         }))).ToLowerInvariant();
+        if (evidencePolicy is not null)
+            Digest = "sha256:" + Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+            { instrument = Digest, evidencePolicy }))).ToLowerInvariant();
     }
 
     internal async ValueTask<JudgeVerdict> EvaluateAsync(string text, CancellationToken ct)
@@ -85,6 +88,14 @@ internal sealed class ConfiguredGateJudge
             ? read : JudgeVerdict.Inconclusive("Configured offline reply is invalid or input is empty.");
         return verdict with { Instrument = new(Digest, JudgePromptRenderer.Provenance(_resolved, user),
             _options.ModelId, [], verdict.Decision != JudgeDecision.Inconclusive) };
+    }
+
+    internal JudgeVerdict RecordObservation(string text, JudgeVerdict verdict, string? deterministicRule = null)
+    {
+        var user = JudgePromptRenderer.Render(_resolved.Definition, text, string.Empty, null);
+        return verdict with { Instrument = new(Digest, JudgePromptRenderer.Provenance(_resolved, user),
+            _options.ModelId, [], verdict.Decision != JudgeDecision.Inconclusive)
+            { DeterministicRule = deterministicRule } };
     }
 
     private static bool TryRead(string? text, out JudgeVerdict result)

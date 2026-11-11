@@ -7,6 +7,8 @@ call for a versioned gate verdict + exit code.
 For declarative judge localization, use `agenteval prompts export`, `validate` and `inspect`, then select the pack with `eval --judge-prompt-pack ... --judge-locale sv-SE`. The same flags work on `bench agentic`, `bench gdpr` and `bench eu-ai-act`; export and validate those instruments with the matching `--family` and `--preset`. These settings are independent of the target's `--system-prompt`. See [judge prompt packs](judge-prompt-packs.md) for supported metrics, fixed criterion rosters and the Swedish example.
 Runtime judges also accept these flags through `gatekeeper calibrate` and `gatekeeper inspect`; export with `prompts export <directory> --family gatekeeper [--preset <axis>]`. Configured certificates bind the exact instrument and supplied `--gold-set`, including held-out human-review metadata. AI-authored draft cases remain diagnostic. See the [runtime gate workflow](judge-prompt-packs.md#runtime-judge-gates).
 
+The separate `--family gatekeeper --preset hallucinated-citation` authoring preset exports the hybrid citation support prompt. Execute that hybrid through the library's `HallucinatedCitationJudge.FormatStructuredCase` API; it is not a `gatekeeper inspect` registry axis.
+
 
 ## Installation
 

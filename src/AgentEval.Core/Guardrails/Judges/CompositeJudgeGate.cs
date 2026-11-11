@@ -44,6 +44,9 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
 
     /// <summary>Creates the gate from a single-axis rubric and the fast model that answers it.</summary>
     public CompositeJudgeGate(TRubric rubric, IChatClient fastModel, JudgeGateOptions? options = null)
+        : this(rubric, fastModel, options, evidencePolicy: null) { }
+
+    internal CompositeJudgeGate(TRubric rubric, IChatClient fastModel, JudgeGateOptions? options, string? evidencePolicy)
     {
         ArgumentNullException.ThrowIfNull(rubric);
         ArgumentNullException.ThrowIfNull(fastModel);
@@ -74,7 +77,7 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         }
 
         PolicyName = $"judge:{rubric.Axis}";
-        if (_options.JudgePrompts is not null) _configured = new(rubric, fastModel, _options);
+        if (_options.JudgePrompts is not null) _configured = new(rubric, fastModel, _options, evidencePolicy);
     }
 
     /// <inheritdoc/>
@@ -106,6 +109,9 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
 
     internal GateVerdict InspectConfiguredReply(string text, string reply) =>
         Map((_configured ?? throw new InvalidOperationException("A configured prompt is required.")).ReadReply(BoundInput(text), reply));
+
+    internal GateVerdict RecordObservation(string text, JudgeVerdict verdict, string? deterministicRule = null) =>
+        Map((_configured ?? throw new InvalidOperationException("A configured prompt is required.")).RecordObservation(BoundInput(text), verdict, deterministicRule));
 
     private GateVerdict Map(JudgeVerdict verdict)
     {

@@ -10,6 +10,9 @@ namespace AgentEval.Guardrails.Judges;
 /// <summary>Declared prompts for the owned runtime judge rubrics, without invoking arbitrary prompt builders.</summary>
 public static class GateJudgePrompts
 {
+    /// <summary>Exports the hybrid citation gate's semantic support instructions. Source-existence checks remain implemented in code.</summary>
+    public static JudgePromptDefinition ForCitationSupport(double blockThreshold = 0) => ForRubric(new CitationSupportRubric(), blockThreshold);
+
     /// <summary>Exports a supported built-in rubric for Markdown/metadata authoring. Custom rubrics require their own explicit adapter.</summary>
     public static JudgePromptDefinition ForRubric(IJudgeRubric rubric, double blockThreshold = 0)
     {
@@ -26,6 +29,7 @@ public static class GateJudgePrompts
             ToolArgumentGoalCoherenceRubric => ToolArgumentGoalCoherenceRubric.Instructions,
             InterAgentOutboundGoalDriftRubric => InterAgentOutboundGoalDriftRubric.Instructions,
             CrescendoTrajectoryRubric => CrescendoTrajectoryRubric.Instructions,
+            CitationSupportRubric => HallucinatedCitationJudge.SupportInstructions,
             _ => throw new NotSupportedException("Expected: a supported built-in runtime rubric. Actual: an undeclared custom rubric. Suggestions: keep its explicit custom implementation or supply an owned adapter. Because: arbitrary prompt builders and prefilters cannot be safely inferred.")
         };
         var key = "gate." + rubric.Axis;

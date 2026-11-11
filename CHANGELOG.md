@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Configured runtime wrappers now preserve selected prompts, execution settings and actual observations. Crescendo keeps policy-specific trajectory state; unavailable judgments cannot arm quarantine. Approval budget exhaustion cannot auto-approve or populate the allow cache. Outbound context failures remain unmeasured. Hybrid citation support accepts prompt packs through structured evidence, retains code-owned source-existence checks and exports a separate CLI authoring preset. See [runtime judge gates](docs/judge-prompt-packs.md#runtime-judge-gates).
+
 - Gatekeeper CLI prompt packs: export the ten runtime rubric definitions, select packs for inspect/calibrate, and bind certificates to the resolved instrument and supplied dataset/review identity. Configured reports retain unmeasured cases and observed models; cached judges cannot reuse legacy certificates. Offline reply parsing shares the configured reader without inventing provider calls. AI-authored/unreviewed datasets stay diagnostic.
 
 - Configured red-team grading now covers the entire default roster and all four opt-in attack types. Specialized jailbreak, PII, tool-escalation and retrieval adapters preserve their structural boundaries and observed leaf identity; system-prompt extraction remains code-only. Regional PII bypasses English pattern shortcuts, fabricated-data claims cannot override a planted-canary requirement, and retrieval execution is recorded separately from text-derived attack fidelity. The CLI union export supports a default-roster scan with one translated pack.

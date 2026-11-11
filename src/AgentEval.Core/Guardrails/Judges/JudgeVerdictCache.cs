@@ -116,7 +116,8 @@ public sealed class JudgeVerdictCache : IChatGate, IDelegatingGate
 
         // Cache only Allow (see class remarks).
         var observed = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
-        if (verdict.Action == GateAction.Allow && observed.All(i => i.Measured) &&
+        if (verdict.Action == GateAction.Allow && verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) != true &&
+            observed.All(i => i.Measured) &&
             _configuredInstruments.All(digest => observed.Any(i => i.ConfigurationDigest == digest)))
         {
             Admit(key, verdict);

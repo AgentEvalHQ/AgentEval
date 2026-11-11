@@ -45,7 +45,7 @@ public sealed class CalibrationReport
 
     /// <summary>Whether configured instruments have explicit requested models and a single known observed model each.</summary>
     public bool ModelsIdentified => Cases.SelectMany(c => c.JudgeInstruments).GroupBy(i => i.ConfigurationDigest).All(group =>
-        group.All(i => !string.IsNullOrWhiteSpace(i.RequestedModelId) && i.Calls.Count > 0 &&
+        group.All(i => !string.IsNullOrWhiteSpace(i.RequestedModelId) && (i.Calls.Count > 0 || i.DeterministicRule is not null) &&
             i.Calls.Where(c => c.ResponseReceived).All(c => !string.IsNullOrWhiteSpace(c.ModelId))) &&
         group.SelectMany(i => i.Calls).Where(c => c.ResponseReceived).Select(c => c.ModelId).Distinct(StringComparer.Ordinal).Count() == 1);
 

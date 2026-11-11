@@ -18,4 +18,9 @@ public sealed record JudgeGateCall(string? ModelId, bool ResponseReceived);
 /// <param name="Measured">Whether a valid conclusive judge measurement was obtained.</param>
 /// <param name="BudgetExhausted">Whether a required model reservation was denied.</param>
 public sealed record JudgeGateInstrument(string ConfigurationDigest, JudgePromptProvenance Prompt, string? RequestedModelId,
-    IReadOnlyList<JudgeGateCall> Calls, bool Measured, bool BudgetExhausted = false);
+    IReadOnlyList<JudgeGateCall> Calls, bool Measured, bool BudgetExhausted = false)
+{
+    /// <summary>Implementation-owned structural rule that decided this observation without a model call; null for semantic judging.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? DeterministicRule { get; init; }
+}

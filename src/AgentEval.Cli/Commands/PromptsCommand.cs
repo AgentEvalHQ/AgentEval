@@ -55,6 +55,9 @@ internal static class PromptsCommand
     {
         if (family == "gatekeeper")
         {
+            // This hybrid is authored here but executed through the library structured-evidence API.
+            // Registering only its support rubric as a CLI gate would skip source-existence validation.
+            if (preset == "hallucinated-citation") return [GateJudgePrompts.ForCitationSupport()];
             var axes = preset is null or "supported" ? JudgeAxisRegistry.Axes : [preset];
             return axes.Select(axis => GateJudgePrompts.ForRubric((JudgeAxisRegistry.For(axis)
                 ?? throw new ArgumentException($"Unknown gatekeeper axis '{axis}'.")).Rubric())).ToArray();
@@ -89,7 +92,7 @@ internal static class PromptsCommand
         try
         {
             var pack = await new JudgePromptPackLoader().LoadAsync(manifest, ct);
-            var supported = (family is null ? SupportedDefinitions().Concat(SupportedDefinitions("gatekeeper")) : SupportedDefinitions(family, preset)).ToDictionary(d => d.EvaluatorKey, StringComparer.Ordinal);
+            var supported = (family is null ? SupportedDefinitions().Concat(SupportedDefinitions("gatekeeper")).Append(GateJudgePrompts.ForCitationSupport()) : SupportedDefinitions(family, preset)).ToDictionary(d => d.EvaluatorKey, StringComparer.Ordinal);
             var resolver = new JudgePromptResolver();
             var instruments = pack.Definitions.Select(definition =>
             {
