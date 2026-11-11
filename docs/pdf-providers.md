@@ -82,9 +82,11 @@ dotnet tool install --global AgentEval.Cli.Pdf --version "<matching-package-vers
 agenteval-pdf render --run .agenteval/aef/runs/<year>/<month>/<run-id> --output ./report.pdf
 ```
 
-Replace `<matching-package-version>` with the exact version built into the local feed, including any prerelease suffix, and keep it aligned with the AgentEval/provider version you use. An explicit version selects that prerelease; without it, tool installation searches for stable releases by default. `--global` installs the command into your user's tool directory so the following `agenteval-pdf` command can be invoked directly. This local-feed example does not imply that the new package is already published.
+Use the exact version from your local feed, including its prerelease suffix, and keep library, provider and tool versions aligned. `--global` makes `agenteval-pdf` available on your user's tool path.
 
 The companion explicitly registers PDFsharp. It verifies the selected AEF run and renders captured original GDPR, EU AI Act or agentic report content without invoking an agent or judge. If a rich report was not captured, it fails. `--family generic` explicitly requests a summary of the available recorded AEF fields; it does not reconstruct missing rich content. The library's red-team facade remains available for an in-memory `RedTeamResult`; generic AEF rendering preserves recorded red-team fields without inventing an uncaptured executive envelope.
+
+For CLI benchmark runs, select `--aef-content on` when recording if you need a later rich report. With content capture off, use `--family generic` to render the remaining recorded fields.
 
 Derived output must be outside the sealed source run. Existing files require `--overwrite`, including files created by another writer while rendering is underway. Cancellation or rendering failure does not modify source evidence. Existing captured-PDF download/read paths do not require this tool or a PDF provider.
 

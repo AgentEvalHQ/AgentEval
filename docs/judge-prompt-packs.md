@@ -374,7 +374,7 @@ Use `FormatStructuredCase` with configured citation prompts. Legacy `FormatCase`
 
 `StructuredCalibrationGoldSet()` re-encodes the existing English citation cases without translating or relabeling them. A hybrid calibration report can combine structural and semantic observations, but code-only observations cannot establish a provider model identity. Prompt/content capture follows the normal explicit opt-in policy. Citation authoring is available in the CLI; the hybrid execution API is library-only, and is not registered as a semantic-only `gatekeeper inspect` axis that would omit source validation.
 
-Red-team benign-control integration and the broader remaining caller inventory are still follow-up work.
+Red-team integration is described under [localized benign controls](#localized-benign-controls); unsupported callers are listed in [supported scope](#supported-scope).
 
 ### Atomic rubrics and graphs
 

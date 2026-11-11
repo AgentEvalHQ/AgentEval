@@ -6,16 +6,32 @@ using AgentEval.Cli.Infrastructure;
 
 namespace AgentEval.Tests.Cli;
 
-public sealed class CliGitProvenanceTests : IDisposable
+public sealed class CliGitProvenanceTests : IAsyncLifetime
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "cli-git-" + Guid.NewGuid().ToString("N"));
     public CliGitProvenanceTests() => Directory.CreateDirectory(_root);
-    public void Dispose()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
     {
-        // Git marks object files read-only on Windows. Clear that flag only within this fixture.
-        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
-            File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
-        Directory.Delete(_root, true);
+        var elapsed = Stopwatch.StartNew();
+        while (Directory.Exists(_root))
+        {
+            try
+            {
+                // Git marks object files read-only on Windows. Clear only this fixture's attributes.
+                foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
+                Directory.Delete(_root, true);
+            }
+            catch (IOException error) when (OperatingSystem.IsWindows() && elapsed.Elapsed < TimeSpan.FromSeconds(5)
+                && (error.HResult & 0xffff) is 32 or 33 or 145)
+            {
+                // Parent exit does not guarantee every descendant/OS handle has finished closing.
+                // Retry sharing/lock/nonempty-directory races only; persistent failures still fail the test.
+                await Task.Delay(50);
+            }
+        }
     }
 
     [Fact]

@@ -10,8 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 services.AddAgentEvalPdfSharp();
-using var host = services.BuildServiceProvider();
-var pdf = host.GetRequiredService<IPdfRendererRegistry>().ForEvalResults("pdfsharp");
+using var host = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var scope = host.CreateScope();
+var pdf = scope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>().ForEvalResults("pdfsharp");
 byte[] bytes = await pdf.RenderAsync(result, options);
 ```
 
@@ -19,4 +20,4 @@ Installation does not register a provider, and registration does not generate fi
 
 The provider respects an existing PDFsharp font resolver; that resolver must support the selected font family. Otherwise the provider uses its bundled font bytes without requiring an operating-system font installation. No URL in report evidence is fetched.
 
-During development, build and pack from source; publication is a separate release action. See `docs/pdf-providers.md` for migration and optional CLI usage.
+During development, build and pack from source; publication is a separate release action. See [PDF setup and migration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/pdf-providers.md) for optional CLI usage and alternate providers.

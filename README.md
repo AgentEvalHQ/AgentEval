@@ -625,7 +625,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 AgentEval ships as two packages released together on one version: the `AgentEval` library and the `AgentEval.Cli` tool (see [Installation](#installation)). Maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
 
-**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target, the Microsoft 365 target). **1.0.0-rc.2 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
+**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target, the Microsoft 365 target). **1.0.0-rc.3 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
 
 | Front | Ships in | Maturity | Why |
 |---|---|---|---|
