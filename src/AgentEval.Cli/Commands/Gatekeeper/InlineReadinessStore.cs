@@ -114,8 +114,6 @@ internal static class InlineReadinessStore
             .Where(i => i is not null && i.ConfigurationDigest == certificate.InstrumentDigest).SelectMany(i => i.Calls ?? [])
             .Where(c => c?.ResponseReceived == true).Select(c => c.ModelId).Distinct(StringComparer.Ordinal).ToArray() ?? [];
         var observed = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
-        return expected.Length == 1 && !string.IsNullOrWhiteSpace(expected[0]) && observed.Length > 0 &&
-            observed.All(i => i.ConfigurationDigest == certificate.InstrumentDigest && i.Measured && i.Calls.Count > 0 &&
-                i.Calls.Where(c => c.ResponseReceived).All(c => c.ModelId == expected[0]));
+        return CalibrationBinding.MatchesObservedModels(certificate.InstrumentDigest, expected, observed);
     }
 }

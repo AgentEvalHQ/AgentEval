@@ -103,7 +103,27 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
     }
 
     /// <inheritdoc/>
-    public async ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+    public ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default) =>
+        IsAutoApprovableAsync(call, static verdict => verdict, cancellationToken);
+
+    internal async ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, Func<GateVerdict, GateVerdict> validate,
+        CancellationToken cancellationToken)
+    {
+        var verdict = validate(await InspectAsync(call, cancellationToken).ConfigureAwait(false));
+        OnJudgment?.Invoke(verdict);
+        return verdict.Action == GateAction.Allow &&
+            verdict.Provenance?.Calibration?.All(c => c.IsAccepted) != false &&
+            verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) != true &&
+            JudgeGateInstrumentation.Observed(verdict.Provenance).All(i => i.Measured);
+    }
+
+    /// <summary>Creates a calibration adapter for this configured approval gate. Each gold-case text is a JSON object
+    /// with exactly <c>toolName</c> (string) and <c>arguments</c> (object). The adapter applies this gate's fixed goal,
+    /// evidence limits and judge path. Invalid cases remain unmeasured. Requires <see cref="JudgeGateOptions.JudgePrompts"/>.</summary>
+    public IChatGate CreateCalibrationGate() => _configured is not null ? new ApprovalCalibrationGate(this)
+        : throw new InvalidOperationException("Expected: a configured approval judge. Actual: legacy prompt selection. Suggestions: supply JudgeGateOptions.JudgePrompts before creating the calibration adapter. Because: independent identity and measurement evidence require a configured instrument.");
+
+    private async ValueTask<GateVerdict> InspectAsync(FunctionCallContent call, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(call);
         cancellationToken.ThrowIfCancellationRequested();
@@ -136,17 +156,38 @@ public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, I
 
         if (_configured is not null && _maxInputChars > 0 && text.Length > _maxInputChars)
             return Unmeasured("Configured approval evidence exceeds MaxInputChars; complete goal and arguments are required.");
-        var verdict = await _judge.InspectAsync(text, cancellationToken).ConfigureAwait(false);
-        OnJudgment?.Invoke(verdict);
-        return verdict.Action == GateAction.Allow &&
-            verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) != true &&
-            JudgeGateInstrumentation.Observed(verdict.Provenance).All(i => i.Measured);
+        return await _judge.InspectAsync(text, cancellationToken).ConfigureAwait(false);
     }
 
-    private bool Unmeasured(string reason)
+    private GateVerdict Unmeasured(string reason) =>
+        _configured?.RecordObservation(string.Empty, JudgeVerdict.Inconclusive(reason)) ?? GateVerdict.Block(PolicyName, reason);
+
+    private sealed class ApprovalCalibrationGate(ToolArgumentGoalCoherenceApprovalGate owner) : IChatGate, IRequiresCalibration
     {
-        OnJudgment?.Invoke(_configured?.RecordObservation(string.Empty, JudgeVerdict.Inconclusive(reason))
-            ?? GateVerdict.Block(PolicyName, reason));
-        return false;
+        public string PolicyName => owner.PolicyName;
+        public string AxisName => ToolArgumentGoalCoherenceJudge.Axis;
+        public string? InstrumentDigest => owner._configured!.InstrumentDigest;
+
+        public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(text) || text.Length > 1_048_576)
+                return owner.Unmeasured("Approval calibration case is empty or exceeds the JSON input limit.");
+            FunctionCallContent call;
+            try
+            {
+                using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 16 });
+                var root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object || AgentEval.Prompts.JudgeResponseReader.HasDuplicateProperties(root) ||
+                    root.EnumerateObject().Any(p => p.Name is not ("toolName" or "arguments")) ||
+                    !root.TryGetProperty("toolName", out var name) || name.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(name.GetString()) ||
+                    !root.TryGetProperty("arguments", out var arguments) || arguments.ValueKind != JsonValueKind.Object)
+                    return owner.Unmeasured("Approval calibration requires toolName and arguments, with no additional fields.");
+                call = new FunctionCallContent("calibration", name.GetString()!,
+                    JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments.GetRawText()));
+            }
+            catch (JsonException) { return owner.Unmeasured("Approval calibration case is invalid JSON."); }
+            return await owner.InspectAsync(call, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

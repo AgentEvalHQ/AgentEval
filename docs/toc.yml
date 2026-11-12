@@ -137,6 +137,8 @@
     href: rag-metrics.md
   - name: Judge Prompt Packs
     href: judge-prompt-packs.md
+  - name: Calibration Reuse
+    href: calibration-reuse.md
   - name: Judge Context
     href: judge-context.md
   - name: Judge Score Policies

@@ -105,7 +105,8 @@ public static class GateCalibrationHarness
                 var instruments = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
                 results[i] = new CalibrationCaseResult(c.Text, c.ShouldBlock, verdict.Action == GateAction.Block)
                 {
-                    Measured = instruments.All(instrument => instrument.Measured) &&
+                    Measured = !JudgeGateInstrumentation.HasRejectedCalibration(verdict.Provenance) &&
+                        instruments.All(instrument => instrument.Measured) &&
                         required.All(d => instruments.Any(instrument => instrument.ConfigurationDigest == d)),
                     JudgeInstruments = Array.AsReadOnly(instruments)
                 };
