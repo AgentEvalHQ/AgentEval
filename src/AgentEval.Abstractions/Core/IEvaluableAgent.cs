@@ -61,6 +61,9 @@ public class AgentResponse
     /// <summary>Model used for the response.</summary>
     public string? ModelId { get; init; }
 
+    /// <summary>Multiple model identities were observed without per-model token attribution, even if token usage is unavailable.</summary>
+    public bool HasMixedModelUsage { get; init; }
+
     /// <summary>Finish reason from the underlying framework (e.g., "Stop", "MaxTokens").</summary>
     public string? FinishReason { get; init; }
 
@@ -98,6 +101,10 @@ public class AgentResponseChunk
     /// Model used for the response (typically only populated on the final/complete chunk).
     /// </summary>
     public string? ModelId { get; init; }
+
+    /// <summary>Multiple model identities were observed without per-model token attribution, even if usage is unavailable.</summary>
+    /// <remarks>Populate on the complete chunk, independently of <see cref="Usage"/>.</remarks>
+    public bool HasMixedModelUsage { get; init; }
 
     /// <summary>Invocation-owned retrieval on the complete chunk; null means unavailable, empty means none retrieved.</summary>
     /// <remarks>Only read when IsComplete is true. This is the full ordered collection, not a streaming delta.</remarks>

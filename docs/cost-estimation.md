@@ -10,6 +10,8 @@ For `MAFEvaluationHarness`, model selection is:
 
 An unknown returned ID stays unpriced; it does not fall back to a different known model. The `response` provenance label identifies the field used, not proof that an upstream SDK independently observed that ID. A deployment alias needs an explicit rate or model override.
 
+Responses containing multiple model identities without per-model attribution stay unpriced (`ModelSource = "mixed"`), even when usage is missing or invalid. `HasMixedModelUsage` survives trace recording and replay independently of token counts. Pricing requires an explicit model override; a rate resolver alone cannot remove this ambiguity.
+
 ## Cached input
 
 Provider `CachedInputTokenCount` is a **subset** of input tokens. With all counts and rates known:

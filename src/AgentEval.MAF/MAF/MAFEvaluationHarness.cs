@@ -166,7 +166,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                     metrics.TokensAreEstimated = true;
                 }
                 
-                PriceUsage(metrics, options, agent, response.ModelId, response.TokenUsage);
+                PriceUsage(metrics, options, agent, response.ModelId, response.TokenUsage, response.HasMixedModelUsage);
             }
             
             // Capture performance metrics
@@ -372,7 +372,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
                         metrics.TokensAreEstimated = true;
                     }
                     
-                    PriceUsage(metrics, options, agent, chunk.ModelId, chunk.Usage);
+                    PriceUsage(metrics, options, agent, chunk.ModelId, chunk.Usage, chunk.HasMixedModelUsage);
                 }
             }
 
@@ -647,13 +647,12 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             : (agent as AgentEval.Comparison.IModelIdentifiable)?.ModelId);
 
     private static void PriceUsage(PerformanceMetrics metrics, EvaluationOptions options,
-        IEvaluableAgent agent, string? responseModel, TokenUsage? usage)
+        IEvaluableAgent agent, string? responseModel, TokenUsage? usage, bool hasMixedModelUsage)
     {
-        metrics.ModelUsed = ModelForCost(options, agent, responseModel);
-        var pricing = options.PricingResolver is { } resolver
+        var ambiguous = (hasMixedModelUsage || usage?.HasMixedModelUsage == true) && options.ModelName is null;
+        metrics.ModelUsed = ambiguous ? null : ModelForCost(options, agent, responseModel);
+        var pricing = ambiguous ? null : options.PricingResolver is { } resolver
             ? resolver(metrics.ModelUsed) : ModelPricing.GetTokenPricing(metrics.ModelUsed);
-        var ambiguous = usage?.HasMixedModelUsage == true && options.ModelName is null;
-        if (ambiguous) pricing = null;
         metrics.CostEstimate = TokenCostEstimate.Calculate(
             usage?.ReportedInputTokenCount ?? metrics.PromptTokens,
             usage?.ReportedOutputTokenCount ?? metrics.CompletionTokens,

@@ -2053,6 +2053,7 @@ sealed class AgentEval.Tracing.ChatTurn
     AgentEval.Tracing.ChatRole Role { get; init; }
     AgentEval.Tracing.TraceError Error { get; init; }
     AgentEval.Tracing.TraceTokenUsage TokenUsage { get; init; }
+    System.Boolean HasMixedModelUsage { get; init; }
     System.Boolean IsAgentTurn { get; }
     System.Boolean IsUserTurn { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Tracing.TraceToolCall> ToolCalls { get; init; }
@@ -2114,6 +2115,7 @@ class AgentEval.Tracing.TraceEntry
     AgentEval.Tracing.TraceEntryType Type { get; set; }
     AgentEval.Tracing.TraceError Error { get; set; }
     AgentEval.Tracing.TraceTokenUsage TokenUsage { get; set; }
+    System.Boolean HasMixedModelUsage { get; set; }
     System.Boolean? IsStreaming { get; set; }
     System.Collections.Generic.Dictionary<System.String, System.Object> ProviderMetadata { get; set; }
     System.Collections.Generic.Dictionary<System.String, System.Object> RequestOptions { get; set; }

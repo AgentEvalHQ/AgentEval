@@ -155,7 +155,8 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
             Timestamp = _sessionStopwatch.Elapsed,
             Duration = turnStopwatch.Elapsed,
             ToolCalls = toolCalls,
-            TokenUsage = response.TokenUsage != null ? TraceMapping.FromAgentUsage(response.TokenUsage) : null
+            TokenUsage = response.TokenUsage != null ? TraceMapping.FromAgentUsage(response.TokenUsage) : null,
+            HasMixedModelUsage = response.HasMixedModelUsage || response.TokenUsage?.HasMixedModelUsage == true
         });
 
         return response.Text;
@@ -299,6 +300,7 @@ public sealed class ChatTraceRecorder : IAsyncDisposable
                     Text = turn.Content,
                     DurationMs = (long?)turn.Duration?.TotalMilliseconds,
                     TokenUsage = turn.TokenUsage,
+                    HasMixedModelUsage = turn.HasMixedModelUsage,
                     ToolCalls = turn.ToolCalls?.ToList(),
                     Error = turn.Error
                 });

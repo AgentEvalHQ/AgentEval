@@ -155,6 +155,11 @@ public class TraceEntry
     [JsonPropertyName("tokenUsage")]
     public TraceTokenUsage? TokenUsage { get; set; }
 
+    /// <summary>Multiple model identities were observed without per-model token attribution, independently of token usage.</summary>
+    [JsonPropertyName("hasMixedModelUsage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HasMixedModelUsage { get; set; }
+
     /// <summary>
     /// Streaming chunks (for StreamChunk entries or detailed Response).
     /// </summary>

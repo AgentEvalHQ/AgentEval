@@ -184,6 +184,7 @@ public class ChatClientAgentAdapter
         {
             IsComplete = true,
             Usage = usageAccumulator.ToTokenUsage(mixedModels),
+            HasMixedModelUsage = mixedModels,
             ModelId = mixedModels ? null : returnedModel
         };
     }

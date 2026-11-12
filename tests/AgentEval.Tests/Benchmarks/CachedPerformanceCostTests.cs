@@ -11,6 +11,24 @@ namespace AgentEval.Tests.Benchmarks;
 
 public sealed class CachedPerformanceCostTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunCostBenchmark_MixedResponse_RequiresExplicitPricingAssumption(bool explicitModel)
+    {
+        var agent = new CostAgent(_ => new()
+        {
+            Text = "answer", ModelId = "gpt-4o", HasMixedModelUsage = true,
+            TokenUsage = new() { PromptTokens = 100, CompletionTokens = 10 }
+        });
+        var result = await new PerformanceBenchmark(agent, new() { Verbose = false })
+            .RunCostBenchmarkAsync(["a"], explicitModel ? "gpt-4o" : "unknown-configured-id");
+        var estimate = Assert.Single(result.CostEstimates);
+        Assert.Equal(explicitModel, result.EstimatedCostUSD.HasValue);
+        Assert.Equal(explicitModel ? "override" : "mixed", estimate.ModelSource);
+        Assert.Equal(explicitModel ? "gpt-4o" : null, estimate.ModelId);
+    }
+
     [Fact]
     public async Task RunCostBenchmark_CachedUsage_UsesFrozenRatesForEveryResponse()
     {

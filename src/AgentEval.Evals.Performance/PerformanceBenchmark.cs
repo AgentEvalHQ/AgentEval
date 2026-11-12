@@ -426,13 +426,15 @@ public class PerformanceBenchmark
             var identity = explicitPricing is not null ? modelName
                 : !string.IsNullOrWhiteSpace(response.ModelId) ? response.ModelId : resolvedModelName;
             var usage = response.TokenUsage;
+            var ambiguous = (response.HasMixedModelUsage || usage?.HasMixedModelUsage == true) && explicitPricing is null;
+            if (ambiguous) identity = null;
             return TokenCostEstimate.Calculate(
                 usage?.ReportedInputTokenCount ?? usage?.PromptTokens,
                 usage?.ReportedOutputTokenCount ?? usage?.CompletionTokens,
-                usage?.CachedInputTokenCount, usage?.HasMixedModelUsage == true && explicitPricing is null
+                usage?.CachedInputTokenCount, ambiguous
                     ? null : pricingSnapshot.GetTokenPricing(identity)) with
             {
-                ModelId = identity, ModelSource = explicitPricing is not null ? "override"
+                ModelId = identity, ModelSource = ambiguous ? "mixed" : explicitPricing is not null ? "override"
                     : !string.IsNullOrWhiteSpace(response.ModelId) ? "response" : "configured"
             };
         }).ToArray();

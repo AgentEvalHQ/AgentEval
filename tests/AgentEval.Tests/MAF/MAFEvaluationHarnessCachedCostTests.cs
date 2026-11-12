@@ -8,10 +8,12 @@ using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Comparison;
 using AgentEval.Tests.Core;
+using AgentEval.Tracing;
 using AgentEval.Results.Adapters.Native;
 using AgentEval.Results.Writing;
 using AgentEval.Results.Integrity;
 using Microsoft.Extensions.AI;
+using ChatRole = Microsoft.Extensions.AI.ChatRole;
 using System.Text.Json.Nodes;
 using Xunit;
 
@@ -118,30 +120,115 @@ public sealed class MAFEvaluationHarnessCachedCostTests
             : harness.RunEvaluationAsync(agent, test, options);
     }
 
-    [Fact]
-    public async Task RunEvaluation_StreamingMixedModels_RequiresExplicitPricingAssumption()
+    [Theory]
+    [InlineData("complete")]
+    [InlineData("absent")]
+    [InlineData("missing-input")]
+    [InlineData("missing-output")]
+    [InlineData("negative")]
+    [InlineData("overflow")]
+    public async Task RunEvaluation_StreamingMixedModels_RequiresExplicitPricingAssumption(string usageMode)
     {
-        var adapter = new ChatClientAgentAdapter(new MixedModelClient(), chatOptions: new() { ModelId = "gpt-4o" });
+        var adapter = new ChatClientAgentAdapter(new MixedModelClient(usageMode), chatOptions: new() { ModelId = "gpt-4o" });
         var result = await Run(adapter, true, new() { EvaluateResponse = false });
         Assert.Null(result.Performance!.EstimatedCost);
         Assert.Equal("mixed", result.Performance.CostEstimate!.ModelSource);
+        Assert.Null(result.Performance.ModelUsed);
+        Assert.Equal(usageMode != "complete", result.Performance.CostEstimate.UsageEstimated);
+        Assert.True(result.Performance.PromptTokens > 0);
+        Assert.True(result.Performance.CompletionTokens > 0);
         var explicitPrice = await Run(adapter, true, new() { EvaluateResponse = false, ModelName = "gpt-4o" });
         Assert.NotNull(explicitPrice.Performance!.EstimatedCost);
         Assert.Equal("override", explicitPrice.Performance.CostEstimate!.ModelSource);
     }
 
-    private sealed class MixedModelClient : IChatClient
+    [Fact]
+    public async Task RunEvaluation_StreamingSingleModelWithoutUsage_StillEstimatesCost()
+    {
+        var adapter = new ChatClientAgentAdapter(new MixedModelClient("absent", "GPT-4O"));
+        var result = await Run(adapter, true, new() { EvaluateResponse = false });
+        Assert.NotNull(result.Performance!.EstimatedCost);
+        Assert.True(result.Performance.CostEstimate!.UsageEstimated);
+        Assert.Equal("response", result.Performance.CostEstimate.ModelSource);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunEvaluation_MixedStreamThroughTraceAndArtifact_RemainsUnpriced(bool streamingReplay)
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "agenteval-mixed-cost-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var recorder = new TraceRecordingAgent(
+                new ChatClientAgentAdapter(new MixedModelClient("absent")), "mixed",
+                new() { ModelId = "gpt-4o" });
+            await foreach (var _ in recorder.InvokeStreamingAsync("hello")) { }
+            var trace = await TraceSerializer.DeserializeFromStringAsync(await TraceSerializer.SerializeToStringAsync(recorder.Trace));
+            var entry = Assert.Single(trace.Entries, e => e.Type == TraceEntryType.Response);
+            Assert.True(entry.HasMixedModelUsage);
+            Assert.Null(entry.TokenUsage);
+            var replay = await new TraceReplayingAgent(trace).InvokeAsync("hello");
+            Assert.True(replay.HasMixedModelUsage);
+            Assert.Null(replay.TokenUsage);
+
+            var resolverCalls = 0;
+            var start = DateTimeOffset.UtcNow;
+            var result = await Run(new TraceReplayingAgent(trace), streamingReplay, new()
+            {
+                EvaluateResponse = false,
+                PricingResolver = _ => { resolverCalls++; return new(1, 1); }
+            });
+            Assert.Equal(0, resolverCalls);
+            Assert.Null(result.Performance!.EstimatedCost);
+            Assert.Equal("mixed", result.Performance.CostEstimate!.ModelSource);
+            var (directory, _) = AefEvalWriter.WriteTrials(folder, [[result]], ["case"], 1,
+                new AefEvalRunOptions
+                {
+                    SubjectRef = "agent:mixed-fixture", TargetMode = AefTargetMode.Scripted,
+                    DatasetName = "mixed-fixture", DatasetBytes = "{\"id\":\"case\",\"input\":\"hello\"}\n"u8.ToArray(),
+                    ContentCapture = AefContentCapture.Off
+                }, start, DateTimeOffset.UtcNow);
+            Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+            var trial = File.ReadLines(Path.Combine(directory, "results.ndjson"))
+                .Select(line => JsonNode.Parse(line)!).Single(line => line["trial"] is not null);
+            var evidence = trial["ext"]!["agenteval.costEstimate"]!;
+            Assert.Null(evidence["amount"]);
+            Assert.Null(evidence["modelId"]);
+            Assert.Equal("unpriced", evidence["status"]!.GetValue<string>());
+            Assert.Equal("mixed", evidence["modelSource"]!.GetValue<string>());
+            Assert.True(evidence["usageEstimated"]!.GetValue<bool>());
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    private sealed class MixedModelClient(string usageMode, string secondModel = "gpt-4o-mini") : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
             ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            foreach (var model in new[] { "gpt-4o", "gpt-4o-mini" })
-                yield return new ChatResponseUpdate(ChatRole.Assistant, "hello")
+            foreach (var model in new[] { "gpt-4o", secondModel })
+            {
+                var contents = new List<AIContent> { new TextContent("hello") };
+                if (usageMode != "absent")
                 {
-                    ModelId = model, Contents = [new UsageContent(new() { InputTokenCount = 100, OutputTokenCount = 10, CachedInputTokenCount = 0 })]
-                };
+                    contents.Add(new UsageContent(new()
+                    {
+                        InputTokenCount = usageMode switch
+                        {
+                            "missing-input" => null,
+                            "negative" => -1,
+                            "overflow" => model == "gpt-4o" ? long.MaxValue : 1,
+                            _ => 100
+                        },
+                        OutputTokenCount = usageMode == "missing-output" ? null : 10,
+                        CachedInputTokenCount = 0
+                    }));
+                }
+                yield return new ChatResponseUpdate(ChatRole.Assistant, contents) { ModelId = model };
+            }
             await Task.CompletedTask;
         }
         public object? GetService(Type serviceType, object? serviceKey = null) => null;

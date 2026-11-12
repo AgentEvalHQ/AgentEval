@@ -329,6 +329,7 @@ static class AgentEval.Core.AgentEvalLoggerExtensions
     static Void LogWarning(AgentEval.Core.IAgentEvalLogger logger, String message)
 class AgentEval.Core.AgentResponse
     AgentEval.Core.TokenUsage TokenUsage { get; init; }
+    Boolean HasMixedModelUsage { get; init; }
     IReadOnlyDictionary<String, Object> AdditionalProperties { get; init; }
     IReadOnlyList<Object> RawMessages { get; init; }
     IReadOnlyList<String> RetrievedContext { get; init; }
@@ -340,6 +341,7 @@ class AgentEval.Core.AgentResponseChunk
     AgentEval.Core.TokenUsage Usage { get; init; }
     AgentEval.Core.ToolCallInfo ToolCallStarted { get; init; }
     AgentEval.Core.ToolResultInfo ToolCallCompleted { get; init; }
+    Boolean HasMixedModelUsage { get; init; }
     Boolean IsComplete { get; init; }
     IReadOnlyList<String> RetrievedContext { get; init; }
     String ModelId { get; init; }
