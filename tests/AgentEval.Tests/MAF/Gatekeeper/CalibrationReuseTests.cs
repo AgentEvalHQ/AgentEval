@@ -59,6 +59,21 @@ public sealed class CalibrationReuseTests
     }
 
     [Fact]
+    public async Task Approval_SamePolicyNameAndSharedTrace_PreservesEveryReceipt()
+    {
+        var trace = new AgentEval.Tracing.AgentTrace();
+        var options = Options(await Calibrate(new LegacyGate())); options.Trace = trace;
+        options.ApprovalGates.Add(new LegacyApproval()); options.ApprovalGates.Add(new LegacyApproval());
+        await options.ValidateInlineJudgesAsync();
+        var call = new FunctionCallContent("id", "Search", new Dictionary<string, object?>());
+        await Task.WhenAll(options.ApprovalGates.SelectMany(g => Enumerable.Range(0, 2)
+            .Select(_ => g.IsAutoApprovableAsync(call).AsTask())));
+        Assert.Equal(4, trace.Metadata!.Keys.Count(k => k.StartsWith("calibration.approval.", StringComparison.Ordinal)));
+        Assert.All(trace.Metadata.Values, v => Assert.Equal(CalibrationUseKind.LegacyAxisOnly,
+            Assert.Single((IReadOnlyList<CalibrationUse>)((Dictionary<string, object?>)v!)["calibration"]!).Kind));
+    }
+
+    [Fact]
     public async Task Validate_NewLocaleAndRequestedModel_TransfersWithoutRewritingSourceEvidence()
     {
         using var client = new Client();
@@ -320,6 +335,12 @@ public sealed class CalibrationReuseTests
         public string PolicyName => "legacy";
         public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(text.Contains("CASE_BLOCK", StringComparison.Ordinal) ? GateVerdict.Block(PolicyName, "block") : GateVerdict.Allow(PolicyName));
+    }
+    private sealed class LegacyApproval : IToolApprovalGate, IRequiresCalibration
+    {
+        public string AxisName => "over-refusal";
+        public string PolicyName => "same-approval-name";
+        public ValueTask<bool> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default) => ValueTask.FromResult(true);
     }
     private sealed class Store(CalibrationReport report) : ICalibrationReportStore
     {

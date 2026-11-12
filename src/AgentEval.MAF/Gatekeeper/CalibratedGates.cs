@@ -34,7 +34,6 @@ internal sealed class CalibratedChatGate(IChatGate inner, IReadOnlyList<Calibrat
 internal sealed class CalibratedApprovalGate(IToolApprovalGate inner, IReadOnlyList<CalibrationBinding> bindings, AgentTrace? trace)
     : IToolApprovalGate, IDelegatingGate
 {
-    private int _sequence;
     internal IToolApprovalGate Inner => inner;
     public string PolicyName => inner.PolicyName;
     IEnumerable<object> IDelegatingGate.InnerGates => [inner];
@@ -50,7 +49,7 @@ internal sealed class CalibratedApprovalGate(IToolApprovalGate inner, IReadOnlyL
         GateVerdict Record(GateVerdict v)
         {
             var verdict = CalibrationEnforcement.Apply(v, bindings);
-            trace?.SetMetadata($"calibration.approval.{Interlocked.Increment(ref _sequence)}.{PolicyName}",
+            trace?.SetMetadata($"calibration.approval.{Guid.NewGuid():N}.{PolicyName}",
                 new Dictionary<string, object?> { ["function"] = call.Name, ["calibration"] = verdict.Provenance!.Calibration });
             return verdict;
         }
