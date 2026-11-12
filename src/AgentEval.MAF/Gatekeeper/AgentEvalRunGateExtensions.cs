@@ -455,13 +455,16 @@ public static class AgentEvalRunGateExtensions
         // F-C / P3-3: persist the verdict's GateProvenance for the first time (a judge's threshold/actual/evidence),
         // sensitive-axis-redacted like Reason/Matches so a sensitive judge's rationale is never leaked into the trace.
         var provenance = sensitive ? null : verdict.Provenance;
+        var extra = new Dictionary<string, object?> { ["matches"] = sensitive ? null : verdict.Matches };
+        // Calibration use contains identities and policy only, so it survives sensitive-axis rationale redaction.
+        if (verdict.Provenance?.Calibration is { } calibration) extra["calibration"] = calibration;
 
         var record = evidence.Build(
             stage: stage, policy: verdict.PolicyName, action: action, referenceId: referenceId,
             reason: sensitive ? "[redacted — sensitive judge axis; see SensitiveJudgeAxes.RedactAxes]" : verdict.Reason,
             severity: GateSeverityClassifier.Classify(verdict.PolicyName, failedClosedOnThrow),
             correlationId: ToolCorrelationScope.Current, provenance: provenance,
-            extra: new Dictionary<string, object?> { ["matches"] = sensitive ? null : verdict.Matches });
+            extra: extra);
         EmitEvidence(trace, evidence, seq, record);
     }
 }

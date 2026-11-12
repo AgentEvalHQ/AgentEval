@@ -20,6 +20,19 @@ namespace AgentEval.Tests.MAF;
 /// </summary>
 public sealed class MicrosoftEvaluatorAdapterTokenTotalTests
 {
+    [Fact]
+    public async Task CachedUsage_MultipleJudgeCalls_RetainsDiscountAndEvidence()
+    {
+        using var client = new AgentEval.Tests.Core.TokenUsageMappingTests.UsageChatClient(new()
+        {
+            InputTokenCount = 10000, OutputTokenCount = 1000, CachedInputTokenCount = 8000
+        });
+        var result = await ((IEval)new MicrosoftEvaluatorAdapter(new JudgeCallingEvaluator(2), client, name: "Fluency"))
+            .EvaluateAsync(Input);
+        Assert.Equal(0.05, result.Provenance.EstimatedCost!.Value, 10);
+        Assert.Equal(16000, result.Provenance.CostEstimate!.CachedInputTokens);
+        Assert.Equal(AgentEval.Models.TokenCostStatus.CacheAdjusted, result.Provenance.CostEstimate.Status);
+    }
     // Makes the given number of judge calls through the configuration, as the first-party evaluators do, then returns
     // one metric. Only the usage reporting is under test, never the grade.
     private sealed class JudgeCallingEvaluator(int calls) : MeaiIEvaluator

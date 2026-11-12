@@ -54,9 +54,24 @@ internal static class CliGitProvenance
         }
         catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
         {
-            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-            catch (Exception cleanup) when (cleanup is System.ComponentModel.Win32Exception or InvalidOperationException) { }
+            await StopProcessAsync(process).ConfigureAwait(false);
             return null;
+        }
+    }
+
+    // Kill requests termination; it does not wait for the process to release its working directory.
+    // Cleanup has its own bounded wait because the lookup token is already cancelled here.
+    internal static async Task StopProcessAsync(Process process)
+    {
+        try
+        {
+            if (process.HasExited) return;
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+        }
+        catch (Exception cleanup) when (cleanup is System.ComponentModel.Win32Exception or InvalidOperationException or TimeoutException)
+        {
+            // Provenance is best-effort even if the OS refuses termination or exit observation.
         }
     }
 }

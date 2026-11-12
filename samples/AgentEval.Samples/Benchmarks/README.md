@@ -10,14 +10,14 @@ end-to-end:
 - Grade the response with a real LLM judge — **H3 onward**. H2 Performance is
   metric-only (latency / throughput / cost against your live deployment) and
   does not create a judge; see the per-sample fidelity table below.
-- Render the unified `EvalResult` tree to JSON + HTML + PDF using the v0.10.1
-  generic renderers (`HtmlEvalResultRenderer`, `PdfEvalResultRenderer`).
+- Render the unified `EvalResult` tree to JSON and HTML. All benchmark sample
+  calls use `includePdf: false`; PDF generation is an explicit opt-in.
 - Write a canonical audit-chained run under the **repo-root `.agenteval/`**
   workspace via `FileSystemOutputStore` (the same one `agenteval init` creates —
   resolved by walking up to the nearest `*.sln`/`*.slnx`/`.git/` ancestor, so
   every AgentEval surface — CLI, samples, Mission Control, `agenteval doctor` —
   shares one workspace).
-- Mirror the HTML / PDF / bare-JSON sidecar to
+- Mirror the HTML and bare-JSON sidecars to
   `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/` for direct
   human consumption (this stays project-local).
 
@@ -27,7 +27,7 @@ reports:
 - **H1 Registry Discovery** — read-only walk of `BenchmarkFamilyRegistry.All`,
   no Azure needed.
 - **H13 Report Browser** — interactive browser over past runs written by the
-  running samples above; opens JSON / HTML / PDF in the OS default app.
+  running samples above; opens JSON / HTML and any previously generated PDF in the OS default app.
 
 **H9 LongMemEval** (ICLR 2025) and **H10 Memory** are Shape B benchmarks —
 their runners return native result records (`ExternalBenchmarkResult` /
@@ -35,7 +35,7 @@ their runners return native result records (`ExternalBenchmarkResult` /
 expect. Each sample bridges by synthesising an `EvalResult` tree (H9: root =
 overall accuracy + per-type composites + per-question leaves; H10: root =
 weighted overall score + per-category leaves) so they produce the same
-canonical store + JSON + HTML + PDF artefacts as every other running sample.
+canonical store + JSON + HTML artefacts as every other running sample. PDF is optional.
 The unaltered native shape is **also** written to `report-native.json`
 alongside `report.json`.
 
@@ -164,7 +164,7 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 | H10 | Memory                  | Real history-injectable agent + LLM judge running the canonical Memory benchmark suite. Quick/Standard/Full presets map to 3/8/12 categories. Shape-B `MemoryBenchmarkResult` synthesised into an `EvalResult` tree; native shape preserved in `report-native.json` (grade, stars, weak categories, recommendations). |
 | H11 | Foundry Hybrid          | A Foundry eval running INSIDE a composite eval — one run, one report (Foundry is sample-only). |
 | H12 | Foundry Hierarchy       | Foundry evals as weighted leaves inside a composite benchmark tree (Foundry is sample-only). |
-| H13 | Report Browser          | No agent. Opens previously-generated JSON / HTML / PDF artefacts.                                       |
+| H13 | Report Browser          | No agent. Opens previously-generated JSON / HTML and optional PDF artefacts.                            |
 
 ---
 
@@ -189,17 +189,34 @@ zero verdict. **H1 Registry Discovery** runs without credentials.
 ## Viewing past runs
 
 Sample **H13 Report Browser** (`10_ReportBrowser.cs`) lists every report under
-`samples/AgentEval.Samples/output/` and lets you re-open the HTML / PDF / JSON
-without re-running the benchmark.
+`samples/AgentEval.Samples/output/` and lets you re-open HTML / JSON and any
+previously generated PDF without re-running the benchmark.
 
 ---
 
 ## Where the rendering lives
 
 - `HtmlEvalResultRenderer` → `src/AgentEval.Core/Evals/Rendering/`
-- `PdfEvalResultRenderer` → `src/AgentEval.Rendering.Pdf/`
+- `PdfEvalResultRenderer` → engine-neutral adapter in `src/AgentEval.Rendering.Pdf/`
+- `AgentEval.Rendering.PdfSharp` → optional renderer implementation
 - The unified output writer + cost rollup helpers used by every sample live in
   `Benchmarks/_BenchmarkSampleHelpers.cs`.
+
+### Opt into PDF generation
+
+The sample project explicitly references the optional PDFsharp provider, but does
+not register or render it by default. To enable a sample's generic PDF, change
+that sample's `WriteReportsViaStoreAsync` call to `includePdf: true`. The helper
+then calls `AddAgentEvalPdfSharp()`, resolves `IPdfRendererRegistry`, and writes
+the PDF sidecar outside the canonical run directory. Installing the provider in
+another application still requires that application's explicit registration.
+
+For a rich GDPR, EU AI Act or agentic report from recorded CLI evidence, install
+the separate PDF companion and render an exact AEF run captured with
+`--aef-content on`. Its output must stay outside the sealed source. The sample's
+legacy store directory is not itself an AEF run. See
+[optional PDF providers](../../../docs/pdf-providers.md) for installation,
+registration and the verified-evidence workflow.
 
 ---
 
@@ -211,7 +228,7 @@ Samples H2 – H10 write to **two** locations per run:
 |-----------------------------------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | Manifest, scenarios, summary, compliance evidence | `<repo>/.agenteval/`                                              | **Canonical.** Same workspace `agenteval init` creates — resolved via the `*.sln`/`*.slnx`/`.git/` walk-up. Audit-chained; Mission Control + `agenteval doctor` read here.            |
 | HTML report                                   | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.html` | Direct browser open. Carries the canonical manifest's `ContentHash` in the audit-hash footer.                                    |
-| PDF report                                    | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.pdf`  | Direct PDF open. Same audit-hash footer.                                                                                          |
+| Optional PDF report                           | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.pdf`  | Only with `includePdf: true`; the helper explicitly registers the provider. Carries the recorded audit-hash reference.             |
 | Bare `report.json` (composite EvalResult)     | `samples/AgentEval.Samples/output/{family}/run-{utc}-{suffix}/report.json` | Legacy compat — what `10_ReportBrowser` reads to surface the score / label per run.                                              |
 
 ### Mission Control on a sample run

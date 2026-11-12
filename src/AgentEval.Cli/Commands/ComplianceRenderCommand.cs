@@ -5,18 +5,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Compliance.Gdpr.Articles;
-using AgentEval.Compliance.Gdpr.Articles.Building;
-using AgentEval.Compliance.Gdpr.Articles.Loading;
 using AgentEval.Compliance.Gdpr.Reporting;
-using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
 using AgentEval.Results.Adapters.Reading;
-using EuAiActLoader = AgentEval.Compliance.EuAiAct.Articles.Loading.ArticleScenarioYamlLoader;
-using EuAiActScenarioToAtomicEval = AgentEval.Compliance.EuAiAct.Articles.Building.ScenarioToAtomicEval;
-using EuAiActArticleCompositeBuilder = AgentEval.Compliance.EuAiAct.Articles.Building.ArticleCompositeBuilder;
-using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Compliance.EuAiAct.Reporting;
-using AgentEval.Compliance.EuAiAct.Reporting.Pdf;
 
 namespace AgentEval.Cli.Commands;
 
@@ -108,11 +100,11 @@ public static class ComplianceRenderCommand
             return 1;
         }
         var evidenceDir = Path.Combine(complianceDir, report.Timestamp);
-        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
+        var markdownPath = Path.Combine(evidenceDir, "report.md");
         Console.WriteLine($"Evidence integrity: {report.Run.Integrity}; signature trust: {report.Run.SignatureTrust}.");
         if (report.Run.Imported)
             Console.WriteLine("Imported: not sealed when it ran. Original execution provenance is not established by the ingest seal.");
-        if (isEuAiAct) return await RenderEuAiActAsync(report.Document, pdfPath);
+        if (isEuAiAct) return await RenderEuAiActAsync(report.Document, markdownPath);
 
         GdprComplianceEvidence evidence;
         try
@@ -125,42 +117,22 @@ public static class ComplianceRenderCommand
             return 1;
         }
 
-        // ── Build optional articles registry for PII redaction ───────────────
-        ArticlesRegistry? articles = registryOverride;
-        if (articles is null)
-        {
-            try
-            {
-                var loader = new ArticleScenarioYamlLoader();
-                var stubEval = new StubEvaluatorForRegistry();
-                var scenarioBuilder = new ScenarioToAtomicEval(stubEval, judgeModel: "none");
-                var articleBuilder = new ArticleCompositeBuilder(scenarioBuilder);
-                articles = new ArticlesRegistry(loader, articleBuilder);
-            }
-            catch
-            {
-                // Registry is optional — proceed without redaction on failure
-                articles = null;
-            }
-        }
-
-        // ── Render PDF ───────────────────────────────────────────────────────
         try
         {
             Directory.CreateDirectory(evidenceDir);
-            var renderer = new GDPRPdfRenderer(articles);
-            await renderer.RenderAsync(evidence, pdfPath);
-            Console.WriteLine($"PDF report written to: {pdfPath}");
+            await File.WriteAllTextAsync(markdownPath, new AgentEval.Compliance.Gdpr.Reporting.MarkdownRenderer().Render(evidence));
+            Console.WriteLine($"Markdown report written to: {markdownPath}");
+            Console.WriteLine("PDF is optional: use agenteval-pdf render --run <verified-run> --output report.pdf.");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to render PDF: {ex.Message}");
+            Console.Error.WriteLine($"Failed to render Markdown: {ex.Message}");
             return 1;
         }
     }
 
-    private static async Task<int> RenderEuAiActAsync(AefComplianceDocument document, string pdfPath)
+    private static async Task<int> RenderEuAiActAsync(AefComplianceDocument document, string markdownPath)
     {
         EuAiActComplianceEvidence evidence;
         try
@@ -173,64 +145,18 @@ public static class ComplianceRenderCommand
             return 1;
         }
 
-        // ── Build optional registry for PII redaction ────────────────────────
-        // Regression fix: this used to hard-fail (return 1) when the registry couldn't be loaded,
-        // contradicting its own "Registry is optional" comment and diverging from the GDPR path (above),
-        // which proceeds with a null registry (no redaction lookup) on the identical failure. Matches now —
-        // EuAiActPdfRenderer's constructor and every _articles?.GetSpec(...) call site already tolerate null.
-        EuAiActArticlesRegistry? articles = null;
         try
         {
-            var loader = new EuAiActLoader();
-            var stubEval = new StubEvaluatorForRegistry();
-            var scenarioBuilder = new EuAiActScenarioToAtomicEval(stubEval, judgeModel: "none");
-            var articleBuilder = new EuAiActArticleCompositeBuilder(scenarioBuilder);
-            articles = new EuAiActArticlesRegistry(loader, articleBuilder);
-        }
-        catch
-        {
-            // Registry is optional — proceed without redaction on failure
-            articles = null;
-        }
-
-        // ── Render PDF ───────────────────────────────────────────────────────
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(pdfPath)!);
-            var renderer = new EuAiActPdfRenderer(articles);
-            await renderer.RenderAsync(evidence, pdfPath);
-            Console.WriteLine($"PDF report written to: {pdfPath}");
+            Directory.CreateDirectory(Path.GetDirectoryName(markdownPath)!);
+            await File.WriteAllTextAsync(markdownPath, new AgentEval.Compliance.EuAiAct.Reporting.MarkdownRenderer().Render(evidence));
+            Console.WriteLine($"Markdown report written to: {markdownPath}");
+            Console.WriteLine("PDF is optional: use agenteval-pdf render --run <verified-run> --output report.pdf.");
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Failed to render PDF: {ex.Message}");
+            Console.Error.WriteLine($"Failed to render Markdown: {ex.Message}");
             return 1;
         }
-    }
-
-    /// <summary>
-    /// Minimal stub evaluator used ONLY to satisfy the <see cref="ArticlesRegistry"/>
-    /// constructor's <c>IEvaluator</c> dependency. The PDF render path reads a
-    /// pre-existing <c>gdpr-evidence.json</c> (or EU-AI-Act equivalent) end-to-end
-    /// and never invokes <see cref="EvaluateAsync"/> — no judgment occurs.
-    /// <para>
-    /// It is not a stand-in judge: it never grades, and there is no grading on the render path. The registry is
-    /// needed only for PII-redaction metadata lookup during PDF rendering. If
-    /// <see cref="EvaluateAsync"/> is ever called on this type, it throws — that
-    /// would indicate the render path regressed into a grading flow and should
-    /// fail loudly.
-    /// </para>
-    /// </summary>
-    private sealed class StubEvaluatorForRegistry : AgentEval.Core.IEvaluator
-    {
-        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(
-            string input, string output, IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException(
-                "StubEvaluatorForRegistry.EvaluateAsync was invoked. This stub is " +
-                "registry-construction-only — no grading should occur on the render " +
-                "path. If you see this, the render path has regressed into a " +
-                "judgment flow, which must resolve a real judge.");
     }
 }

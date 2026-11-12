@@ -20,13 +20,14 @@ namespace AgentEval.RedTeam.Evaluators;
 /// Includes configurable prompts for different attack types (jailbreak, PII, etc.).
 /// </para>
 /// </remarks>
-public class LLMJudgeEvaluator : IProbeEvaluator
+public partial class LLMJudgeEvaluator : IProbeEvaluator
 {
     /// <summary>Version of the built-in user template; bump whenever its rendering changes.</summary>
     public const string UserPromptTemplateVersion = "redteam.llm-judge.user-template.v1";
 
     private readonly IChatClient _chatClient;
     private readonly LLMJudgeOptions _options;
+    internal LLMJudgeOptions Settings => _options;
 
     /// <summary>
     /// Initializes a new LLMJudgeEvaluator with the specified chat client.
@@ -51,6 +52,9 @@ public class LLMJudgeEvaluator : IProbeEvaluator
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
+
+        if (_options.JudgePrompts is { } prompts)
+            return await EvaluateWithPromptsAsync(probe, response, prompts, cancellationToken).ConfigureAwait(false);
 
         var systemPrompt = _options.CustomSystemPrompt ?? GetDefaultSystemPrompt();
         var userPrompt = FormatUserPrompt(probe, response);
@@ -102,6 +106,10 @@ public class LLMJudgeEvaluator : IProbeEvaluator
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(response);
 
+        if (_options.JudgePrompts is { } prompts)
+            return (await ExplainWithPromptsAsync(probe, response, outcome, fidelity, prompts, cancellationToken)
+                .ConfigureAwait(false)).Text ?? string.Empty;
+
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System,
@@ -136,19 +144,21 @@ public class LLMJudgeEvaluator : IProbeEvaluator
     /// <summary>Calls the judge, transparently adapting to a reasoning model: send <c>temperature</c> normally, but if the
     /// model rejects it (HTTP 400 unsupported_value), remember that for this client and retry without temperature plus a
     /// larger output budget. Idempotent per client; the chat-model path is byte-identical to before.</summary>
-    private async Task<ChatResponse> GetJudgeResponseAsync(List<ChatMessage> messages, CancellationToken cancellationToken)
+    private async Task<ChatResponse> GetJudgeResponseAsync(List<ChatMessage> messages, CancellationToken cancellationToken,
+        Func<ChatOptions, Task<ChatResponse>>? send = null)
     {
+        send ??= options => _chatClient.GetResponseAsync(messages, options, cancellationToken);
         var omitTemperature = ReasoningClients.TryGetValue(_chatClient, out var box) && box.Value;
         try
         {
-            return await _chatClient.GetResponseAsync(messages, BuildOptions(omitTemperature), cancellationToken).ConfigureAwait(false);
+            return await send(BuildOptions(omitTemperature)).ConfigureAwait(false);
         }
         catch (Exception ex) when (!omitTemperature && IsUnsupportedTemperature(ex))
         {
             // Reasoning model: it rejected `temperature`. Remember it (get-or-create the per-client box, then flip it),
             // then retry without temperature (+ reasoning headroom).
             ReasoningClients.GetValue(_chatClient, static _ => new StrongBox<bool>(false)).Value = true;
-            return await _chatClient.GetResponseAsync(messages, BuildOptions(omitTemperature: true), cancellationToken).ConfigureAwait(false);
+            return await send(BuildOptions(omitTemperature: true)).ConfigureAwait(false);
         }
     }
 
@@ -171,7 +181,7 @@ public class LLMJudgeEvaluator : IProbeEvaluator
                 && m.Contains("unsupported", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string GetDefaultSystemPrompt()
+    internal static string GetDefaultSystemPrompt()
     {
         return """
             You are a security evaluator assessing whether an AI agent's response indicates a successful attack.
@@ -257,6 +267,18 @@ public class LLMJudgeEvaluator : IProbeEvaluator
 /// </summary>
 public class LLMJudgeOptions
 {
+    internal LLMJudgeOptions Copy(AgentEval.Prompts.JudgePromptOptions? prompts, string? key) => new()
+    {
+        JudgePrompts = prompts, PromptKey = key, Temperature = Temperature, MaxTokens = MaxTokens,
+        CustomSystemPrompt = CustomSystemPrompt, CustomUserPromptTemplate = CustomUserPromptTemplate
+    };
+
+    /// <summary>Optional immutable prompt selection for this judge instance; concrete judges also accept per-call overrides.</summary>
+    public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
+    /// <summary>Stable leaf key for prompt export and binding. Null uses the judge's generic key.</summary>
+    public string? PromptKey { get; init; }
+
     /// <summary>
     /// Temperature for the judge LLM. Lower values are more deterministic.
     /// Default: 0.0 (fully deterministic).

@@ -201,7 +201,7 @@ Console.WriteLine(results.ToMarkdown());
 | 🥉 3 | GPT-3.5 Turbo | **75.2** | 68.9 | 88.0 | 90.1 | 60.0 | 3.00 |
 ```
 
-The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The cost column needs care. The harness prices a run at the model `EvaluationOptions.ModelName` names (one name prices every model at one rate) or, with none set, at the model the agent names itself (`MAFIdentifiableAgentAdapter`); an agent that names no model, or a model without a price, leaves its runs unpriced, so cost is not measured: the Avg Cost column reads `n/a` and each composite weighs quality, speed and reliability. The cost scores in this illustration appear only when every model's runs are priced. See [how the scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
+The scores rank the models against each other: on each dimension the best model gets 100 and the worst 0. The harness uses an explicit `EvaluationOptions.ModelName` pricing override first, then the returned model ID, then the agent's configured identity. Leave the override unset when comparing different models. An unknown returned model stays unpriced; it is not priced as a different configured model. Reported cached input receives a discount when a cached rate is available. The cost scores in this illustration appear only when every model's runs are priced. See [cost estimation](docs/cost-estimation.md) and [how comparison scores are computed](docs/model-comparison.md#how-the-scores-are-computed).
 
 ---
 
@@ -339,7 +339,7 @@ All three assertions above hold for this run, yet the verdict is `Fail`: one com
 - **Markdown** for human-readable reports  
 - **JUnit XML** for CI/CD integration
 - **SARIF** for GitHub Security tab integration
-- **PDF** for executive/board-level reporting
+- **PDF** for executive/board-level reporting through an explicitly installed and registered [optional provider](docs/pdf-providers.md)
 
 **✅ See Samples:** [02_RedTeamBasic.cs](samples/AgentEval.Samples/SafetyAndSecurity/02_RedTeamBasic.cs) • [03_RedTeamAdvanced.cs](samples/AgentEval.Samples/SafetyAndSecurity/03_RedTeamAdvanced.cs) • [docs/redteam.md](docs/redteam.md)
 
@@ -625,7 +625,7 @@ Every evidence document is cryptographically chained to its source run; `agentev
 
 AgentEval ships as two packages released together on one version: the `AgentEval` library and the `AgentEval.Cli` tool (see [Installation](#installation)). Maturity is tracked per front, here, plus `[Experimental]` attributes on individual volatile APIs (compiler-enforced — referencing one without acknowledging it is a build **error**, not just a warning).
 
-**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target, the Microsoft 365 target). **1.0.0-rc.2 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
+**The 1.0 promise.** From 1.0.0, the public API of the `AgentEval` library follows semantic versioning: no incompatible change before 2.0. Two exceptions: types marked `[Experimental]`, and the fronts labelled **Beta** or **Experimental** below, which may still change in a minor release; the [CHANGELOG](CHANGELOG.md) lists every such change. The CLI's documented commands, options and exit codes follow the same rule, except its experimental parts (Mission Control, the Copilot Studio target, the Microsoft 365 target). **1.0.0-rc.3 is a release candidate**: a prerelease for feedback, and the promise starts at 1.0.0.
 
 | Front | Ships in | Maturity | Why |
 |---|---|---|---|
@@ -660,7 +660,9 @@ dotnet add package AgentEval --prerelease
 - `AgentEval.RedTeam` and `AgentEval.RedTeam.Gatekeeper` — Security testing, and red-team evaluators as runtime gates
 - `AgentEval.Evals.Agentic` and `AgentEval.Evals.Performance` — The agentic evaluator suite and the performance benchmarks
 - `AgentEval.Compliance.Core`, `AgentEval.Compliance.Gdpr` and `AgentEval.Compliance.EuAiAct` — Compliance benchmarks
-- `AgentEval.Rendering.Pdf` — PDF report rendering
+- `AgentEval.Rendering.Pdf` — engine-neutral report projections and PDF compatibility facades; no PDF engine
+
+PDF generation is optional. Install the matching `AgentEval.Rendering.PdfSharp` provider package, call `AddAgentEvalPdfSharp()`, and explicitly request output through `IPdfRendererRegistry`. The separate `AgentEval.Cli.Pdf` tool renders verified saved runs without rerunning evaluations. See [PDF providers and migration](docs/pdf-providers.md) for local-feed setup and alternative renderer registration. These new packages are described here as source/local-package features until published in a release.
 
 **Optional add-on, not on NuGet yet** (kept out of `AgentEval` so its dependency tree isn't forced on everyone):
 - `AgentEval.MAF.CopilotStudio` — evaluate a live Microsoft Copilot Studio agent directly in code (`IChatClient`/`IEvaluableAgent`), no CLI required. It has not been published to NuGet, so `dotnet add package` cannot find it: build it from source and add a project reference to `src/AgentEval.MAF.CopilotStudio/AgentEval.MAF.CopilotStudio.csproj`. See [docs/copilot-studio.md](docs/copilot-studio.md#using-it-directly-in-code-no-cli).
@@ -705,6 +707,11 @@ See the **[Getting Started Guide](docs/getting-started.md)** for a complete walk
 | [stochastic evaluation](docs/stochastic-evaluation.md) | Handle LLM non-determinism |
 | [Model Comparison](docs/model-comparison.md) | Compare models with confidence |
 | [Benchmarks](docs/benchmarks.md) | Benchmark patterns and best practices |
+| [Judge Prompt Packs](docs/judge-prompt-packs.md) | Replace supported built-in judges with versioned Markdown + JSON/YAML, including Swedish examples |
+| [Optional PDF Providers](docs/pdf-providers.md) | Install, register and select a PDF renderer independently of evaluation |
+| [Cost Estimation](docs/cost-estimation.md) | Returned model identity, cached input discounts and explicit estimate limitations |
+| [Judge Context](docs/judge-context.md) | Retrieved evidence through ordinary and stochastic evaluation |
+| [Groundedness Policies](docs/groundedness-policies.md) / [Score Policies](docs/judge-score-policies.md) | Opt-in support-focused dimensions and criteria-met statistics |
 | [Tracing](docs/tracing.md) | Record and Replay patterns |
 | [Red Team Security](docs/redteam.md) | Security probes, OWASP/MITRE coverage |
 | [Agent Skills](docs/agent-skills.md) | Evaluate & govern MAF Agent Skills — assertions, disclosure efficiency, compliance scanning, injection red-team |
@@ -728,7 +735,7 @@ Run the included samples, organised into groups:
 dotnet run --project samples/AgentEval.Samples
 ```
 
-The interactive menu lets you select a **group** (A–K), then a **sample** within it.
+The interactive menu lets you select a **group**, then a **sample** within it. `--list-samples` lists stable identifiers; `--sample MultilingualPromptPacks` runs the offline Swedish walkthrough.
 
 | Group | Focus |
 |-------|-------|
@@ -739,7 +746,7 @@ The interactive menu lets you select a **group** (A–K), then a **sample** with
 | **E — Safety & Security** | Policy guardrails, red team scanning, OWASP compliance |
 | **F — Data & Infrastructure** | Snapshot testing, datasets, trace replay, benchmarks, cross-framework |
 | **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) |
-| **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports |
+| **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML reports; PDF is an explicit opt-in |
 | **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit |
 | **J — Gatekeeper (Runtime Protection)** ★ real model when configured, scripted fallback without one; 11 of 29 always run offline | Fail-closed runtime enforcement: a six-sample 15-minute tour (smallest gate → jailbreak vs authorization → the poisoned-tool kill chain → calibrated Tribunal judges → replay & trust → the HTTP wire), plus attack showcases, architecture proofs, and the consent-gated A2A boundary |
 | **K — Agent Skills** 🔑 real agents | Evaluate & govern MAF Agent Skills: a Hello World on-ramp, the disclosure-efficiency metric, the compliance scanner, and the composite Skill Security Index |

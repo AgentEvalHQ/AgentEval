@@ -7,7 +7,6 @@ using AgentEval.Evals;
 using AgentEval.Benchmarks;
 using AgentEval.Evals.Agentic.Composition;
 using AgentEval.Evals.Agentic.Reporting;
-using AgentEval.Evals.Agentic.Reporting.Pdf;
 using AgentEval.Evals.Agentic.Safety;
 using AgentEval.Evals.Agentic.Safety.Policy;
 using AgentEval.Output;
@@ -18,7 +17,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench agentic</c> subcommand.
 /// Runs an agentic benchmark against an agent response, persists the full evidence chain,
-/// and writes a Markdown report and a PDF report (<c>report.pdf</c>).
+/// and writes a Markdown report. PDF generation is an optional separate output.
 /// </summary>
 public static class BenchAgenticCommand
 {
@@ -50,8 +49,16 @@ public static class BenchAgenticCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null)
+        string? subjectVersion = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         // A blank reference or context is none: the checks that need one then report not measured, as without the flag.
         reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
         context = string.IsNullOrWhiteSpace(context) ? null : context;
@@ -216,7 +223,14 @@ public static class BenchAgenticCommand
                     "answer see an empty one. Pass --response/--response-file to grade a specific answer.");
             }
         }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference);
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference) { JudgePrompts = promptOptions };
         if (glassBoxTrace is not null)
         {
             // The agent's instructions as the trace recorded them: the judges whose rubric grades the response against
@@ -311,17 +325,7 @@ public static class BenchAgenticCommand
                 Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
             }
 
-            // PDF report
-            try
-            {
-                var pdfPath = Path.Combine(outputDir, "report.pdf");
-                await new AgenticPdfRenderer().RenderAsync(result, pdfPath);
-                Console.WriteLine($"PDF report:      {pdfPath}");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-            }
+            // PDF is an explicitly installed and requested output; use agenteval-pdf on the recorded run.
 
             // ── All-skipped diagnostic ────────────────────────────────────────────
             // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped

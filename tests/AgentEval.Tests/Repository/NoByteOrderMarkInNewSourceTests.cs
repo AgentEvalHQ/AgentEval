@@ -40,8 +40,9 @@ public class NoByteOrderMarkInNewSourceTests
         var root = RepositoryRoot();
         Assert.NotNull(root);
 
-        var sources = Directory
-            .EnumerateFiles(root!, "*.cs", SearchOption.AllDirectories)
+        // Private strategy worktrees and tool caches are not public project source.
+        var sources = new[] { "src", "tests", "samples" }
+            .SelectMany(folder => Directory.EnumerateFiles(Path.Combine(root!, folder), "*.cs", SearchOption.AllDirectories))
             .Where(f => !IsGenerated(f))
             .ToList();
 

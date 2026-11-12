@@ -706,6 +706,7 @@ internal sealed class JailbreakContentEvaluator : IProbeEvaluator
 internal sealed class JailbreakOracleEvaluator : IProbeEvaluator
 {
     private readonly RefusalGatedEvaluator _markerGated;
+    internal IProbeEvaluator MarkerGate => _markerGated;
     private readonly JailbreakContentEvaluator _persona = new();
 
     // Jun14v3: the refusal gate now wraps ONLY the marker path (a planted token may be QUOTED inside a refusal). A

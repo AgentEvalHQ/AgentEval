@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has57Options()
+    public void Create_Has60Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -64,8 +64,9 @@ public class RedTeamCommandTests
         // + --transform (the 18 encoding codecs, reachable from the CLI) = 52
         // + --memory-trials (runs per case for --attacks memory-poisoning) = 53
         // + AEF (aef, no-aef, subject, subject-version) = 57
+        // + isolated judge prompt selection (pack, locale, explicit fallback) = 60
         var command = RedTeamCommand.Create();
-        Assert.Equal(57, command.Options.Count);
+        Assert.Equal(60, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).

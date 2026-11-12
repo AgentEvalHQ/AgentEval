@@ -155,6 +155,11 @@ public class TraceEntry
     [JsonPropertyName("tokenUsage")]
     public TraceTokenUsage? TokenUsage { get; set; }
 
+    /// <summary>Multiple model identities were observed without per-model token attribution, independently of token usage.</summary>
+    [JsonPropertyName("hasMixedModelUsage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HasMixedModelUsage { get; set; }
+
     /// <summary>
     /// Streaming chunks (for StreamChunk entries or detailed Response).
     /// </summary>
@@ -410,6 +415,22 @@ public class TraceToolCall
 /// </summary>
 public class TraceTokenUsage
 {
+    /// <summary>Lossless provider input count; absent in legacy traces.</summary>
+    [JsonPropertyName("reportedInputTokenCount")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ReportedInputTokenCount { get; set; }
+    /// <summary>Lossless provider output count; absent in legacy traces.</summary>
+    [JsonPropertyName("reportedOutputTokenCount")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ReportedOutputTokenCount { get; set; }
+    /// <summary>Cached subset of input; null means unreported, including legacy traces.</summary>
+    [JsonPropertyName("cachedInputTokenCount")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? CachedInputTokenCount { get; set; }
+    /// <summary>Aggregate usage cannot be attributed to one model.</summary>
+    [JsonPropertyName("hasMixedModelUsage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HasMixedModelUsage { get; set; }
     /// <summary>
     /// Number of tokens in the prompt.
     /// </summary>

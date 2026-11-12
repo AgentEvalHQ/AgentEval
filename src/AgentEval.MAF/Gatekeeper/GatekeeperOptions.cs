@@ -156,6 +156,10 @@ public sealed class GatekeeperOptions
     /// cache or panel) has earned the right to decide.</summary>
     public ICalibrationReportStore? CalibrationReportStore { get; set; }
 
+    /// <summary>How existing ready calibration evidence may be reused. Same-axis reuse is an explicit application
+    /// trust decision and is recorded as transferred evidence, never as measured target accuracy.</summary>
+    public CalibrationReusePolicy CalibrationReusePolicy { get; set; } = CalibrationReusePolicy.RequireMatchingInstrument;
+
     /// <summary>Escape hatch (Fable 5 §9 / P1-1): when <see langword="true"/>, <see cref="ValidateInlineJudgesAsync"/>
     /// skips the inline-judge calibration check. A loud, greppable opt-out — the fabrication-prone default is to
     /// REFUSE an un-proven inline judge.</summary>
@@ -173,7 +177,11 @@ public sealed class GatekeeperOptions
     /// like a judge registered directly. Only AgentEval's own wrapper types can be looked through: a judge inside a
     /// gate you wrote yourself is not visible to this check unless your gate is itself
     /// <see cref="IRequiresCalibration"/>. Async by design (the store is I/O-bound, so this is NOT folded into the
-    /// synchronous <c>UseGatekeeper</c> preflight) — call it before you trust a judge fleet inline. A no-op when
+    /// synchronous <c>UseGatekeeper</c> preflight). On success, replaces registered chat gates and stock judge
+    /// approval gates with per-registration wrappers that check runtime observations and attach calibration provenance.
+    /// Call before building the pipeline and use the resulting registrations; shared judge instances are not mutated.
+    /// Custom approval gates with configured judges must expose equivalent observation checks themselves and are rejected here.
+    /// A no-op when
     /// <see cref="AllowUncalibratedInlineJudge"/> is set or no such judge is registered.
     /// </summary>
     public async Task ValidateInlineJudgesAsync(CancellationToken cancellationToken = default)
@@ -183,45 +191,63 @@ public sealed class GatekeeperOptions
             return;
         }
 
-        var registered = PreGates.Select(g => (Gate: (object?)g, Seam: "pre", Name: g?.PolicyName))
-            .Concat(PostGates.Select(g => (Gate: (object?)g, Seam: "post", Name: g?.PolicyName)))
-            .Concat(ApprovalGates.Select(g => (Gate: (object?)g, Seam: "approval", Name: g?.PolicyName)));
-
-        foreach (var (gate, seam, name) in registered)
+        var policy = CalibrationReusePolicy;
+        var store = CalibrationReportStore;
+        if (!Enum.IsDefined(policy)) throw new ArgumentOutOfRangeException(nameof(CalibrationReusePolicy));
+        var pre = await ChatBindings(PreGates, "pre").ConfigureAwait(false);
+        var post = await ChatBindings(PostGates, "post").ConfigureAwait(false);
+        var approvals = new List<IToolApprovalGate>();
+        foreach (var registered in ApprovalGates)
         {
+            var gate = registered is CalibratedApprovalGate wrapped ? wrapped.Inner : registered;
+            var bindings = await Bindings(gate, "approval", gate.PolicyName).ConfigureAwait(false);
+            if (gate is not ToolArgumentGoalCoherenceApprovalGate && CalibrationRequirements.FindIn(gate).Any(c => c.InstrumentDigest is not null))
+                throw new UncalibratedInlineJudgeException(gate.PolicyName,
+                    "Expected: observable runtime judge verdicts. Actual: a custom approval gate hides them. Suggestions: use the stock judge approval gate or implement an explicit external calibration policy. Because: preflight alone cannot check the actual approval model");
+            approvals.Add(bindings.Count == 0 ? gate : new CalibratedApprovalGate(gate, bindings, Trace));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        // Install only after every gate passes: a failed validation leaves all registrations untouched.
+        Replace(PreGates, pre); Replace(PostGates, post); Replace(ApprovalGates, approvals);
+
+        async Task<IReadOnlyList<IChatGate>> ChatBindings(IEnumerable<IChatGate> registeredGates, string seam)
+        {
+            var gates = new List<IChatGate>();
+            foreach (var registered in registeredGates)
+            {
+                var gate = registered is CalibratedChatGate wrapped ? wrapped.Inner : registered;
+                var bindings = await Bindings(gate, seam, gate.PolicyName).ConfigureAwait(false);
+                gates.Add(bindings.Count == 0 ? gate : new CalibratedChatGate(gate, bindings));
+            }
+            return gates;
+        }
+
+        async Task<IReadOnlyList<CalibrationBinding>> Bindings(object gate, string seam, string name)
+        {
+            var bindings = new List<CalibrationBinding>();
             foreach (var calibratable in CalibrationRequirements.FindIn(gate))
             {
-                // A judge registered directly as a pre/post gate keeps the original message. A judge found inside a
-                // wrapper, or behind an approval gate, also says where it was found: the axis alone does not tell an
-                // operator which registered gate to look at.
                 var where = seam == "approval"
                     ? $" (found in approval gate '{name}', where its allow verdict auto-approves a tool call)"
                     : ReferenceEquals(calibratable, gate) ? string.Empty : $" (found inside {seam} gate '{name}')";
-                await EnsureInlineReadyAsync(calibratable.AxisName, where, cancellationToken).ConfigureAwait(false);
+                var axis = calibratable.AxisName;
+                if (store is null)
+                    throw new UncalibratedInlineJudgeException(axis, "no CalibrationReportStore is configured" + where);
+                var report = await store.LoadLatestAsync(axis, cancellationToken).ConfigureAwait(false);
+                if (report is null) throw new UncalibratedInlineJudgeException(axis, "no calibration report was found for this axis" + where);
+                try { bindings.Add(new CalibrationBinding(report, axis, calibratable.InstrumentDigest, policy)); }
+                catch (InvalidOperationException ex) { throw new UncalibratedInlineJudgeException(axis, ex.Message + where); }
             }
+            return bindings.AsReadOnly();
+        }
+
+        static void Replace<T>(IList<T> target, IEnumerable<T> values)
+        {
+            target.Clear();
+            foreach (var value in values) target.Add(value);
         }
     }
 
-    private async Task EnsureInlineReadyAsync(string axis, string where, CancellationToken cancellationToken)
-    {
-        if (CalibrationReportStore is null)
-        {
-            throw new UncalibratedInlineJudgeException(axis,
-                "no CalibrationReportStore is configured, so this inline judge cannot be proven calibration-ready" + where);
-        }
-
-        var report = await CalibrationReportStore.LoadLatestAsync(axis, cancellationToken).ConfigureAwait(false);
-        if (report is null)
-        {
-            throw new UncalibratedInlineJudgeException(axis, "no calibration report was found for this axis" + where);
-        }
-
-        if (!report.IsInlineReady)
-        {
-            throw new UncalibratedInlineJudgeException(axis,
-                "the latest calibration report is not inline-ready (it has not beaten its deterministic baseline on a gold set)" + where);
-        }
-    }
 #pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
 
     /// <summary>

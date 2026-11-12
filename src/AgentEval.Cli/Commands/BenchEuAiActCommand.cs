@@ -14,7 +14,6 @@ using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskCredit;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEducation;
 using AgentEval.Compliance.EuAiAct.DomainPacks.HighRiskEmployment;
 using AgentEval.Compliance.EuAiAct.Reporting;
-using AgentEval.Compliance.EuAiAct.Reporting.Pdf;
 using AgentEval.Output;
 
 namespace AgentEval.Cli.Commands;
@@ -22,7 +21,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench eu-ai-act</c> subcommand.
 /// Runs an EU AI Act benchmark against an agent response, persists the full evidence chain,
-/// and writes both a Markdown and a PDF report.
+/// and writes a Markdown report. PDF generation is an optional separate output.
 /// </summary>
 public static class BenchEuAiActCommand
 {
@@ -53,8 +52,16 @@ public static class BenchEuAiActCommand
         bool noAef = false,
         string? subjectVersion = null,
         bool agentIsLive = false,
-        int runs = 1, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        int runs = 1, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (runs < 1)
         {
             Console.Error.WriteLine("Error: --runs must be at least 1.");
@@ -189,7 +196,14 @@ public static class BenchEuAiActCommand
                 "I should clearly identify myself as an AI assistant when interacting with users. " +
                 "For high-risk decisions, I'll defer to human review.";
         }
-        var evalInput = new EvalInput(Query: inputText, Response: agentResponse);
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: inputText, Response: agentResponse) { JudgePrompts = promptOptions };
 
         if (agent is null && !gradesSuppliedResponse)
         {
@@ -313,18 +327,7 @@ public static class BenchEuAiActCommand
                 Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
             }
 
-            // PDF report
-            try
-            {
-                var pdfRenderer = new EuAiActPdfRenderer(articles);
-                var pdfPath = Path.Combine(outputDir, "report.pdf");
-                await pdfRenderer.RenderAsync(evidence, pdfPath);
-                Console.WriteLine($"PDF report: {pdfPath}");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-            }
+            // PDF is an explicitly installed and requested output; use agenteval-pdf on the recorded run.
 
             ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;

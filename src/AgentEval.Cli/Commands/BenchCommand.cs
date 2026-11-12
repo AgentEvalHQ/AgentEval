@@ -14,7 +14,6 @@ using AgentEval.Compliance.Gdpr.DomainPacks.ChildrensService;
 using AgentEval.Compliance.Gdpr.DomainPacks.Healthcare;
 using AgentEval.Compliance.Gdpr.DomainPacks.HR;
 using AgentEval.Compliance.Gdpr.Reporting;
-using AgentEval.Compliance.Gdpr.Reporting.Pdf;
 using AgentEval.Output;
 
 namespace AgentEval.Cli.Commands;
@@ -22,7 +21,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench gdpr</c> subcommand.
 /// Runs a GDPR benchmark against an agent response, persists the full evidence chain,
-/// and writes both a Markdown and a PDF report.
+/// and writes a Markdown report. PDF generation is an optional separate output.
 /// </summary>
 public static class BenchCommand
 {
@@ -54,8 +53,16 @@ public static class BenchCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        bool agentIsLive = false, string? agentEndpoint = null, IOutputStore? storeOverride = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null, JudgePromptCliOptions.Selection? promptSelection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (runs < 1)
         {
             Console.Error.WriteLine("Error: --runs must be at least 1.");
@@ -189,7 +196,14 @@ public static class BenchCommand
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
         }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse);
+        try { JudgePromptCliOptions.Preflight(benchmark, promptOptions); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
+        var evalInput = new EvalInput(Query: query, Response: agentResponse) { JudgePrompts = promptOptions };
 
         if (isMock)
         {
@@ -326,18 +340,7 @@ public static class BenchCommand
                 Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
             }
 
-            // PDF report
-            try
-            {
-                var pdfRenderer = new GDPRPdfRenderer(articles);
-                var pdfPath = Path.Combine(outputDir, "report.pdf");
-                await pdfRenderer.RenderAsync(evidence, pdfPath);
-                Console.WriteLine($"PDF report: {pdfPath}");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-            }
+            // PDF is an explicitly installed and requested output; use agenteval-pdf on the recorded run.
 
             ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;

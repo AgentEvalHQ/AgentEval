@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
-using MigraDoc.DocumentObjectModel;
+
 
 namespace AgentEval.RedTeam.Reporting.Pdf;
 
@@ -86,35 +86,7 @@ public record BrandingOptions
     /// </summary>
     public string FontFamily { get; init; } = "Arial";
 
-    /// <summary>
-    /// Gets as MigraDoc Color.
-    /// </summary>
-    internal Color GetPrimaryColor() => ParseHexColor(PrimaryColor);
 
-    /// <summary>
-    /// Gets as MigraDoc Color.
-    /// </summary>
-    internal Color GetSecondaryColor() => ParseHexColor(SecondaryColor);
-
-    private static Color ParseHexColor(string hex)
-    {
-        if (string.IsNullOrEmpty(hex))
-            return Colors.DarkBlue;
-
-        hex = hex.TrimStart('#');
-        if (hex.Length != 6)
-            return Colors.DarkBlue;
-
-        // LOW: tolerate malformed input — a non-hex 6-char branding string previously threw FormatException.
-        if (byte.TryParse(hex[..2], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var r) &&
-            byte.TryParse(hex[2..4], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var g) &&
-            byte.TryParse(hex[4..6], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var b))
-        {
-            return new Color(r, g, b);
-        }
-
-        return Colors.DarkBlue;
-    }
 }
 
 /// <summary>

@@ -11,6 +11,16 @@ namespace AgentEval.Tests.Cli.Aef;
 public sealed class PerformanceSuiteDefinitionTests
 {
     [Fact]
+    public async Task Capture_OnlyCachedRateChanges_ChangesIdentity()
+    {
+        var key = "perf-cache-pricing-" + Guid.NewGuid().ToString("N");
+        ModelPricing.SetPricing(key, new TokenPricing(1, 2, 0.1m));
+        var before = await Capture(new(), "q");
+        ModelPricing.SetPricing(key, new TokenPricing(1, 2, 0.2m));
+        var after = await Capture(new(), "q");
+        Assert.NotEqual(before.Digest, after.Digest);
+    }
+    [Fact]
     public async Task Capture_BeforeAgentCalls_HashesWorkloadAndDeclaresThreeChecks()
     {
         var first = await Capture(new(), "private workload");

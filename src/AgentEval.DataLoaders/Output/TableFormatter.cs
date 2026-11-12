@@ -48,11 +48,11 @@ public static class TableFormatter
         {
             if (scoreStats is not null)
             {
-                var scoreVariance = CalculateVariancePercent(scoreStats.MinScore, scoreStats.MaxScore, scoreStats.MeanScore);
+                var scoreVariance = CalculateVariancePercent(scoreStats.ExactMinScore, scoreStats.ExactMaxScore, scoreStats.MeanScore);
                 writer.WriteLine($"{indent}{{0,-25}} {{1,10}} {{2,10}} {{3,10:F1}} {{4,10}} {{5,10}}",
                     "Score",
-                    scoreStats.MinScore,
-                    scoreStats.MaxScore,
+                    scoreStats.ExactMinScore,
+                    scoreStats.ExactMaxScore,
                     scoreStats.MeanScore,
                     FormatVarianceWithColor(scoreVariance, options.UseColors),
                     scoreStats.SampleSize);

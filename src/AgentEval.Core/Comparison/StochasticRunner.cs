@@ -181,10 +181,14 @@ public class StochasticRunner : IStochasticRunner
         // Score of 0 and Passed of false as placeholders (the harness sets them): not a sample. IndividualResults keep every
         // run, and StochasticResult.NotMeasuredCount counts the rest.
         var measured = results.Where(StochasticResult.IsMeasured).ToList();
+        JudgeScoreSelection.RequireCompatible(measured.Select(r => r.ScoreSelection));
+        Prompts.JudgePromptProvenance.RequireCompatible(measured.Select(r => r.JudgePrompt));
         var scores = measured.Select(r => r.Score).ToList();
         var passResults = measured.Select(r => r.Passed).ToList();
 
-        var statistics = options.EnableStatisticalAnalysis
+        var statistics = measured.Any(r => r.ScoreSelection?.PolicyId == JudgeScoreSelection.FractionPolicyId)
+            ? CreateSelectedStatistics(measured.Select(r => r.MeasuredScore!.Value).ToArray(), passResults, options)
+            : options.EnableStatisticalAnalysis
             ? _statisticsCalculator.CreateStatistics(scores, passResults, options.ConfidenceLevel)
             : CreateMinimalStatistics(scores, passResults);
         // Over every planned run, not the measured ones: 1 pass and 4 errored runs is not a 100% pass rate.
@@ -200,6 +204,25 @@ public class StochasticRunner : IStochasticRunner
             Passed: passed);
     }
     
+    private StochasticStatistics? CreateSelectedStatistics(IReadOnlyList<double> scores,
+        IReadOnlyList<bool> passes, StochasticOptions options)
+    {
+        if (scores.Count == 0) return null;
+        bool analyze = options.EnableStatisticalAnalysis;
+        return new StochasticStatistics(
+            _statisticsCalculator.CalculatePassRate(passes)!.Value,
+            _statisticsCalculator.Mean(scores)!.Value,
+            _statisticsCalculator.Median(scores)!.Value,
+            analyze ? _statisticsCalculator.StandardDeviation(scores) : null,
+            (int)Math.Round(scores.Min()), (int)Math.Round(scores.Max()),
+            analyze ? _statisticsCalculator.Percentile(scores, 25) : null,
+            analyze ? _statisticsCalculator.Percentile(scores, 75) : null,
+            analyze ? _statisticsCalculator.Percentile(scores, 95) : null,
+            analyze ? _statisticsCalculator.CalculateConfidenceInterval(scores, options.ConfidenceLevel) : null,
+            scores.Count)
+        { ExactMinScore = scores.Min(), ExactMaxScore = scores.Max() };
+    }
+
     private static void ReportProgress(StochasticOptions options, Stopwatch stopwatch, int completedCount, TestResult result)
     {
         var avgDuration = stopwatch.Elapsed / completedCount;

@@ -174,14 +174,7 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
                 }
 
                 var isLast = chunk.Index == responseEntry.StreamingChunks.Count - 1;
-                var responseChunk = new AgentResponseChunk
-                {
-                    Text = chunk.Text,
-                    ToolCallStarted = toolCallInfo,
-                    IsComplete = isLast
-                };
-
-                yield return responseChunk;
+                yield return BuildChunk(chunk.Text, isLast, toolCallInfo);
             }
         }
         else
@@ -200,23 +193,24 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
                 }
 
                 var isLast = i + chunkSize >= text.Length;
-                yield return new AgentResponseChunk
-                {
-                    Text = chunkText,
-                    IsComplete = isLast
-                };
+                yield return BuildChunk(chunkText, isLast);
             }
 
             // If text was empty, yield one empty chunk
             if (string.IsNullOrEmpty(text))
             {
-                yield return new AgentResponseChunk
-                {
-                    Text = string.Empty,
-                    IsComplete = true
-                };
+                yield return BuildChunk(string.Empty, true);
             }
         }
+
+        AgentResponseChunk BuildChunk(string? text, bool complete, ToolCallInfo? toolCall = null) => new()
+        {
+            Text = text,
+            ToolCallStarted = toolCall,
+            IsComplete = complete,
+            Usage = complete ? TraceMapping.ToAgentUsage(responseEntry.TokenUsage) : null,
+            HasMixedModelUsage = complete && (responseEntry.HasMixedModelUsage || responseEntry.TokenUsage?.HasMixedModelUsage == true)
+        };
     }
 
     /// <summary>
@@ -303,12 +297,9 @@ public sealed class TraceReplayingAgent : IEvaluableAgent, IStreamableAgent
         return new AgentResponse
         {
             Text = responseEntry.Text ?? string.Empty,
+            HasMixedModelUsage = responseEntry.HasMixedModelUsage || responseEntry.TokenUsage?.HasMixedModelUsage == true,
             TokenUsage = responseEntry.TokenUsage != null
-                ? new TokenUsage
-                {
-                    PromptTokens = responseEntry.TokenUsage.PromptTokens,
-                    CompletionTokens = responseEntry.TokenUsage.CompletionTokens
-                }
+                ? TraceMapping.ToAgentUsage(responseEntry.TokenUsage)
                 : null
         };
     }

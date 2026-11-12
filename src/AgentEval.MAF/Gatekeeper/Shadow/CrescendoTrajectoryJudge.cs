@@ -55,7 +55,7 @@ namespace AgentEval.MAF.Gatekeeper;
 /// </remarks>
 public sealed class CrescendoTrajectoryJudge : IShadowJudge
 {
-    /// <summary>The session <c>StateBag</c> key this judge persists its tracked trajectory under.</summary>
+    /// <summary>The legacy session state key. Configured judges append their instrument digest to isolate trajectory counts by policy.</summary>
     public const string StateKey = "gatekeeper.crescendo.state";
 
     /// <summary>
@@ -77,11 +77,17 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
     private readonly IChatGate _turnJudge;
     private readonly int _maxTrackedTurns;
     private readonly int _armThreshold;
+    private readonly bool _configured;
+    private readonly int _maxInputChars;
+    private readonly string _stateKey;
+
+    /// <summary>Identity of the configured judge, trajectory framing, window and arming policy; null for the legacy path.</summary>
+    public string? InstrumentDigest => CalibrationRequirements.FindIn(_turnJudge).Single().InstrumentDigest;
 
     /// <summary>Creates the trajectory judge from a fast model. The underlying per-turn gate is never cached (each turn is unique).</summary>
     /// <param name="fastModel">The fast/mini chat model the underlying per-turn judge calls.</param>
     /// <param name="options">
-    /// Timeout/BlockThreshold/MaxOutputTokens for the underlying per-turn judge. <see cref="JudgeGateOptions.FailClosedOnInconclusive"/>
+    /// Prompt selection and execution policy for the underlying per-turn judge. <see cref="JudgeGateOptions.FailClosedOnInconclusive"/>
     /// is always forced to <see langword="false"/> for this judge regardless of what's passed here — see the
     /// class remarks for why.
     /// </param>
@@ -101,7 +107,13 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
             throw new ArgumentOutOfRangeException(nameof(armThreshold), armThreshold, "must be at least 1.");
         }
 
-        _turnJudge = CrescendoTrajectoryTurnJudge.Create(fastModel, BuildTurnJudgeOptions(options), cache: false);
+        _configured = options?.JudgePrompts is not null;
+        _maxInputChars = (options ?? new JudgeGateOptions()).MaxInputChars;
+        _turnJudge = _configured
+            ? new CompositeJudgeGate<CrescendoTrajectoryRubric>(new(), fastModel, BuildTurnJudgeOptions(options),
+                JsonSerializer.Serialize(new { framing = "crescendo.trajectory-json.v1", bounds = "oversize.reject.v1", maxTrackedTurns, armThreshold, MaxTurnExcerptChars }))
+            : CrescendoTrajectoryTurnJudge.Create(fastModel, BuildTurnJudgeOptions(options), cache: false);
+        _stateKey = InstrumentDigest is { } digest ? StateKey + "." + digest : StateKey;
         _maxTrackedTurns = maxTrackedTurns;
         _armThreshold = armThreshold;
     }
@@ -110,10 +122,14 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
     public async Task<ShadowVerdict> JudgeAsync(ShadowJudgeContext context, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var newTurnText = FormatTurn(context.InputText, context.ResponseText);
         if (string.IsNullOrWhiteSpace(newTurnText))
         {
+            if (_configured)
+                return Attach(ShadowVerdict.Clean("empty turn — judgment unmeasured"),
+                    await _turnJudge.InspectAsync(string.Empty, cancellationToken).ConfigureAwait(false));
             return ShadowVerdict.Clean("empty turn — nothing to judge");
         }
 
@@ -122,24 +138,22 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
         // a statement about a PATTERN across turns, and one unpersisted turn is not a pattern.
         if (context.Session is null)
         {
-            var soloVerdict = await _turnJudge.InspectAsync(
-                CrescendoTrajectoryRubric.FormatCase("(no prior turns tracked)", newTurnText), cancellationToken).ConfigureAwait(false);
-            return ShadowVerdict.Clean(soloVerdict.Action == GateAction.Block
+            var soloVerdict = await InspectTurnAsync(
+                FormatCase(CrescendoState.Empty, newTurnText), cancellationToken).ConfigureAwait(false);
+            return Attach(ShadowVerdict.Clean(IsEscalation(soloVerdict)
                 ? "turn escalates, but no session to track a trajectory against — not arming on a single turn"
-                : "no escalation");
+                : IsUnmeasured(soloVerdict) ? "turn judgment unmeasured" : "no escalation"), soloVerdict);
         }
 
         var state = ReadState(context.Session);
-        var summarySoFar = Summarize(state.Turns, state.TotalTurns);
 
-        var verdict = await _turnJudge
-            .InspectAsync(CrescendoTrajectoryRubric.FormatCase(summarySoFar, newTurnText), cancellationToken)
+        var verdict = await InspectTurnAsync(FormatCase(state, newTurnText), cancellationToken)
             .ConfigureAwait(false);
 
-        var escalated = verdict.Action == GateAction.Block;
+        var escalated = IsEscalation(verdict);
         var wasAlreadyArmed = state.EscalationCount >= _armThreshold;
         var escalationCount = state.EscalationCount + (escalated ? 1 : 0);
-        var turns = Append(state.Turns, new CrescendoTurnRecord(newTurnText, escalated));
+        var turns = Append(state.Turns, new CrescendoTurnRecord(newTurnText, escalated) { Measured = _configured ? !IsUnmeasured(verdict) : null });
         WriteState(context.Session, new CrescendoState(turns, escalationCount, state.TotalTurns + 1));
 
         // Arm exactly once, on the turn that CROSSES the threshold — not on every subsequent turn while already
@@ -147,16 +161,16 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
         // overwrite the audit trail with a misleading "latest shift" that didn't actually happen this turn).
         if (!wasAlreadyArmed && escalationCount >= _armThreshold)
         {
-            return ShadowVerdict.Compromise(
+            return Attach(ShadowVerdict.Compromise(
                 $"crescendo trajectory: {escalationCount} escalating turn-shift(s) observed (arm threshold {_armThreshold}); " +
-                $"latest shift: {verdict.Reason ?? "escalation detected"}");
+                $"latest shift: {verdict.Reason ?? "escalation detected"}"), verdict);
         }
 
-        return ShadowVerdict.Clean(wasAlreadyArmed
+        return Attach(ShadowVerdict.Clean(wasAlreadyArmed
             ? "no new action — session already quarantined from a prior turn"
             : escalated
                 ? $"turn escalates but below arm threshold ({escalationCount}/{_armThreshold})"
-                : "no escalation");
+                : IsUnmeasured(verdict) ? "turn judgment unmeasured" : "no escalation"), verdict);
     }
 
     /// <summary>
@@ -173,14 +187,45 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
             BlockThreshold = baseOptions.BlockThreshold,
             MaxOutputTokens = baseOptions.MaxOutputTokens,
             FailClosedOnInconclusive = false,
+            JudgePrompts = baseOptions.JudgePrompts,
+            ModelId = baseOptions.ModelId,
+            Temperature = baseOptions.Temperature,
+            MaxInputChars = baseOptions.MaxInputChars,
+            SpendGovernor = baseOptions.SpendGovernor,
+            FailClosedOnBudgetExhausted = baseOptions.FailClosedOnBudgetExhausted,
         };
     }
 
-    private static string FormatTurn(string? inputText, string? responseText)
+    private static bool IsUnmeasured(GateVerdict verdict) =>
+        verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) == true ||
+        JudgeGateInstrumentation.Observed(verdict.Provenance).Any(i => !i.Measured);
+
+    private static bool IsEscalation(GateVerdict verdict) => verdict.Action == GateAction.Block && !IsUnmeasured(verdict);
+
+    private static ShadowVerdict Attach(ShadowVerdict shadow, GateVerdict verdict) => shadow with
+    { JudgeInstruments = Array.AsReadOnly(JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray()) };
+
+    private ValueTask<GateVerdict> InspectTurnAsync(string evidence, CancellationToken ct) =>
+        _configured && _maxInputChars > 0 && evidence.Length > _maxInputChars
+            ? ValueTask.FromResult(((CompositeJudgeGate<CrescendoTrajectoryRubric>)_turnJudge).RecordObservation(
+                string.Empty, JudgeVerdict.Inconclusive("Configured trajectory evidence exceeds MaxInputChars.")))
+            : _turnJudge.InspectAsync(evidence, ct);
+
+    private string FormatCase(CrescendoState state, string newest) => _configured
+        ? JsonSerializer.Serialize(new
+        {
+            priorTurns = state.Turns.Select((turn, index) => new
+            { turnNumber = state.TotalTurns - state.Turns.Count + index + 1, content = turn.Text, escalated = turn.Escalated, measured = turn.Measured }),
+            currentTurn = newest
+        })
+        : CrescendoTrajectoryRubric.FormatCase(Summarize(state.Turns, state.TotalTurns), newest);
+
+    private string FormatTurn(string? inputText, string? responseText)
     {
         var input = string.IsNullOrWhiteSpace(inputText) ? null : Truncate(inputText, MaxTurnExcerptChars);
         var response = string.IsNullOrWhiteSpace(responseText) ? null : Truncate(responseText, MaxTurnExcerptChars);
 
+        if (_configured) return input is null && response is null ? string.Empty : JsonSerializer.Serialize(new { input, response });
         return (input, response) switch
         {
             (null, null) => string.Empty,
@@ -224,17 +269,20 @@ public sealed class CrescendoTrajectoryJudge : IShadowJudge
         return updated;
     }
 
-    private static CrescendoState ReadState(AgentSession session) =>
-        session.StateBag.TryGetValue<CrescendoState>(StateKey, out var state, JsonSerializerOptions.Default) && state is not null
+    private CrescendoState ReadState(AgentSession session) =>
+        session.StateBag.TryGetValue<CrescendoState>(_stateKey, out var state, JsonSerializerOptions.Default) && state is not null
             ? state
             : CrescendoState.Empty;
 
-    private static void WriteState(AgentSession session, CrescendoState state) =>
-        session.StateBag.SetValue(StateKey, state, JsonSerializerOptions.Default);
+    private void WriteState(AgentSession session, CrescendoState state) =>
+        session.StateBag.SetValue(_stateKey, state, JsonSerializerOptions.Default);
 }
 
 /// <summary>One tracked turn in a session's Crescendo trajectory: the formatted excerpt and whether it was flagged as an escalation.</summary>
-internal sealed record CrescendoTurnRecord(string Text, bool Escalated);
+internal sealed record CrescendoTurnRecord(string Text, bool Escalated)
+{
+    public bool? Measured { get; init; }
+}
 
 /// <summary>
 /// A session's persisted Crescendo-trajectory state — the rolling window of tracked turns, the

@@ -153,12 +153,11 @@ public class ComplianceRenderCommandTests : IDisposable
         var exit = await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry());
 
         Assert.Equal(capture ? 0 : 1, exit);
-        var pdf = Path.Combine(_root, ".agenteval", "compliance", "GDPR", subjectName, timestamp, "report.pdf");
+        var pdf = Path.Combine(_root, ".agenteval", "compliance", "GDPR", subjectName, timestamp, "report.md");
         if (capture)
         {
             Assert.True(File.Exists(pdf));
-            Assert.True(new FileInfo(pdf).Length > 1_000);
-            Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(pdf), 0, 4));
+            Assert.True(new FileInfo(pdf).Length > 100);
         }
         else Assert.False(File.Exists(pdf));
         Assert.Equal(seal, File.ReadAllBytes(Path.Combine(directory, "seal.json")));
@@ -193,7 +192,7 @@ public class ComplianceRenderCommandTests : IDisposable
         Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, "gdpr-evidence.json"), JsonSerializer.Serialize(evidence, s_jsonOpts));
         Assert.Equal(0, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.True(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.True(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     [Fact]
@@ -208,7 +207,7 @@ public class ComplianceRenderCommandTests : IDisposable
         var other = evidence with { Base = evidence.Base with { SourceRun = evidence.Base.SourceRun with { ManifestHash = "sha256:" + new string('c', 64) } } };
         File.WriteAllText(Path.Combine(legacy, "gdpr-evidence.json"), JsonSerializer.Serialize(other, s_jsonOpts));
         Assert.Equal(1, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.False(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     [Fact]
@@ -226,7 +225,7 @@ public class ComplianceRenderCommandTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ComplianceRender_EuAiActNativeOrLegacy_ProducesPdf(bool native)
+    public async Task ComplianceRender_EuAiActNativeOrLegacy_ProducesMarkdown(bool native)
     {
         const string subjectName = "EuAiActAgent";
         var gdpr = MakeFixtureEvidence(subjectName);
@@ -258,9 +257,8 @@ public class ComplianceRenderCommandTests : IDisposable
             File.WriteAllBytes(Path.Combine(target, "eu-ai-act-evidence.json"), bytes);
         }
         Assert.Equal(0, await ComplianceRenderCommand.RunAsync("eu-ai-act", subjectName, timestamp, _root));
-        var pdf = Path.Combine(target, "report.pdf");
-        Assert.True(new FileInfo(pdf).Length > 1000);
-        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(pdf), 0, 4));
+        var pdf = Path.Combine(target, "report.md");
+        Assert.True(new FileInfo(pdf).Length > 100);
     }
 
     [Fact]
@@ -274,7 +272,7 @@ public class ComplianceRenderCommandTests : IDisposable
         Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, "gdpr-evidence.json"), JsonSerializer.Serialize(evidence with { Disclaimer = "Different claim" }, s_jsonOpts));
         Assert.Equal(1, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.False(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     [Theory]
@@ -292,7 +290,7 @@ public class ComplianceRenderCommandTests : IDisposable
         WriteNativeEvidence(evidence, true, System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()));
         var timestamp = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         Assert.Equal(1, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.False(File.Exists(Path.Combine(_root, ".agenteval", "compliance", "GDPR", subjectName, timestamp, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(_root, ".agenteval", "compliance", "GDPR", subjectName, timestamp, "report.md")));
     }
 
     [Fact]
@@ -317,7 +315,7 @@ public class ComplianceRenderCommandTests : IDisposable
         Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, "gdpr-evidence.json"), JsonSerializer.Serialize(evidence, s_jsonOpts));
         Assert.Equal(1, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.False(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     [Fact]
@@ -332,7 +330,7 @@ public class ComplianceRenderCommandTests : IDisposable
         Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, "gdpr-evidence.json"), JsonSerializer.Serialize(evidence, s_jsonOpts));
         Assert.Equal(1, await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry()));
-        Assert.False(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     [Fact]
@@ -351,7 +349,7 @@ public class ComplianceRenderCommandTests : IDisposable
         var exit = await ComplianceRenderCommand.RunAsync("gdpr", subjectName, timestamp, _root, BuildRegistry());
 
         Assert.Equal(1, exit);
-        Assert.False(File.Exists(Path.Combine(legacy, "report.pdf")));
+        Assert.False(File.Exists(Path.Combine(legacy, "report.md")));
     }
 
     internal string WriteNativeEvidence(GdprComplianceEvidence evidence, bool capture, params byte[][] artifacts)
@@ -408,7 +406,7 @@ public class ComplianceRenderCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task ComplianceRender_ValidEvidence_ProducesPdfFile()
+    public async Task ComplianceRender_ValidEvidence_ProducesMarkdownFile()
     {
         // Arrange
         const string subjectName = "RenderTestAgent";
@@ -428,9 +426,9 @@ public class ComplianceRenderCommandTests : IDisposable
 
         var evidenceDir = Path.Combine(
             _root, ".agenteval", "compliance", "GDPR", subjectName, ts);
-        var pdfPath = Path.Combine(evidenceDir, "report.pdf");
-        Assert.True(File.Exists(pdfPath), $"Expected PDF at {pdfPath}");
-        Assert.True(new FileInfo(pdfPath).Length > 0, "PDF file should be non-empty");
+        var pdfPath = Path.Combine(evidenceDir, "report.md");
+        Assert.True(File.Exists(pdfPath), $"Expected Markdown at {pdfPath}");
+        Assert.True(new FileInfo(pdfPath).Length > 0, "Markdown file should be non-empty");
     }
 
     [Fact]
@@ -454,9 +452,9 @@ public class ComplianceRenderCommandTests : IDisposable
         // Assert
         Assert.Equal(0, exitCode);
 
-        // Verify the PDF was written in the latest ts directory
+        // Verify Markdown was written in the latest ts directory.
         var pdfPath = Path.Combine(
-            _root, ".agenteval", "compliance", "GDPR", subjectName, latestTs, "report.pdf");
-        Assert.True(File.Exists(pdfPath), $"Expected PDF at {pdfPath}");
+            _root, ".agenteval", "compliance", "GDPR", subjectName, latestTs, "report.md");
+        Assert.True(File.Exists(pdfPath), $"Expected Markdown at {pdfPath}");
     }
 }

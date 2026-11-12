@@ -43,7 +43,7 @@ internal static class CompositeSuiteDefinition
                     node["inner"] = inner;
                     return node;
                 case AtomicLlmEval atomic:
-                    var declaration = atomic.CaptureDefinition();
+                    var declaration = input.JudgePrompts is { } selection ? atomic.CaptureDefinition(selection) : atomic.CaptureDefinition();
                     var fixedPlaceholder = declaration.EvaluatorType == typeof(AgentEval.Cli.Commands.MockTarget.Judge);
                     if (!declaration.PromptIdentified && !fixedPlaceholder) return null;
                     node["judgeKind"] = fixedPlaceholder ? "fixed-placeholder" : "prompt-identified";

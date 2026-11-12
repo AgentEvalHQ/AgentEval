@@ -186,6 +186,7 @@ public static partial class AefEvalWriter
                 if (!_trials.TryGetValue(caseId, out var trials)) _trials.Add(caseId, trials = []);
                 if (trials.Count >= _plannedTrials) throw new ArgumentException("A case cannot exceed its planned trial count.", nameof(caseId));
                 var line = Line(result, caseId, trials.Count, _options.JudgeModel, absence, scoreMeasured);
+                line = line with { Ext = AefPromptProvenance.Attach(line.Ext, result.JudgePrompt, _options.ContentCapture == AefContentCapture.On) };
                 _writer.AddResult(AefNativeContent.Attach(_writer, line with { Usage = AefNativeUsage.Merge(usage, line.Usage) }, content));
                 trials.Add(result);
                 if (absence is not null) _absences[result] = absence;
@@ -235,6 +236,7 @@ public static partial class AefEvalWriter
                     _writer.SetMetrics(_metrics);
                 }
                 var child = MetricChild(caseId, metric, _options.MetricJudgeModel ?? _options.JudgeModel);
+                child = child with { Ext = AefPromptProvenance.Attach(child.Ext, metric.JudgePrompt, _options.ContentCapture == AefContentCapture.On) };
                 if (_options.ContentCapture == AefContentCapture.On && metric.Explanation is { } explanation)
                     child = AefNativeContent.Attach(_writer, child,
                         metric.Measured && metric.ModelGraded != false && metricId.StartsWith("llm_", StringComparison.Ordinal)

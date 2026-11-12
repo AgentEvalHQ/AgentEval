@@ -2200,8 +2200,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (succeeds)
         {
             Assert.Equal(markdown, File.ReadAllText(Path.Combine(directory, "report.md")));
-            using var pdf = UglyToad.PdfPig.PdfDocument.Open(File.ReadAllBytes(Path.Combine(directory, "report.pdf")));
-            Assert.Contains("subject", string.Join(" ", pdf.GetPages().Select(p => p.Text)));
+            Assert.False(File.Exists(Path.Combine(directory, "report.pdf")));
         }
     }
 

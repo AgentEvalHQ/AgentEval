@@ -6,16 +6,32 @@ using AgentEval.Cli.Infrastructure;
 
 namespace AgentEval.Tests.Cli;
 
-public sealed class CliGitProvenanceTests : IDisposable
+public sealed class CliGitProvenanceTests : IAsyncLifetime
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "cli-git-" + Guid.NewGuid().ToString("N"));
     public CliGitProvenanceTests() => Directory.CreateDirectory(_root);
-    public void Dispose()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
     {
-        // Git marks object files read-only on Windows. Clear that flag only within this fixture.
-        foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
-            File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
-        Directory.Delete(_root, true);
+        var elapsed = Stopwatch.StartNew();
+        while (Directory.Exists(_root))
+        {
+            try
+            {
+                // Git marks object files read-only on Windows. Clear only this fixture's attributes.
+                foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
+                Directory.Delete(_root, true);
+            }
+            catch (IOException error) when (OperatingSystem.IsWindows() && elapsed.Elapsed < TimeSpan.FromSeconds(5)
+                && (error.HResult & 0xffff) is 32 or 33 or 145)
+            {
+                // Parent exit does not guarantee every descendant/OS handle has finished closing.
+                // Retry sharing/lock/nonempty-directory races only; persistent failures still fail the test.
+                await Task.Delay(50);
+            }
+        }
     }
 
     [Fact]
@@ -62,6 +78,42 @@ public sealed class CliGitProvenanceTests : IDisposable
         Assert.Null(snapshot.GitCommit);
         Assert.Null(snapshot.GitBranch);
         Assert.Null(snapshot.GitDirty);
+    }
+
+    [Fact]
+    public async Task StopProcessAsync_RunningChild_WaitsForExitBeforeReturning()
+    {
+        var info = new ProcessStartInfo(OperatingSystem.IsWindows() ? "ping" : "sleep")
+        {
+            WorkingDirectory = _root, UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        foreach (var arg in OperatingSystem.IsWindows() ? new[] { "-n", "31", "127.0.0.1" } : new[] { "30" })
+            info.ArgumentList.Add(arg);
+        using var process = Process.Start(info)!;
+        try
+        {
+            Assert.False(process.HasExited);
+            await CliGitProvenance.StopProcessAsync(process);
+            Assert.True(process.HasExited);
+            // A second cleanup is harmless and does not attempt to kill an unrelated process.
+            await CliGitProvenance.StopProcessAsync(process);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task StopProcessAsync_UnstartedProcess_RemainsBestEffort()
+    {
+        using var process = new Process();
+        await CliGitProvenance.StopProcessAsync(process);
     }
 
     private async Task Git(params string[] args)

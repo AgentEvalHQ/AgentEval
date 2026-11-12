@@ -11,7 +11,7 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Cli.Commands.Gatekeeper;
 
 /// <summary>The resolved model client + a stable fingerprint (for the calibration certificate), or an exit code.</summary>
-internal sealed record ModelResolution(IChatClient? Client, string? Fingerprint, int ExitCode);
+internal sealed record ModelResolution(IChatClient? Client, string? Fingerprint, int ExitCode, string? RequestedModelId = null);
 
 /// <summary>
 /// Builds the judge <see cref="IChatClient"/> from CLI flags, mirroring <c>eval</c>'s branching: explicit Azure,
@@ -44,7 +44,7 @@ internal static class GatekeeperModelResolver
                 }
 
                 var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateAzure(azEndpoint, deploymentName!, apiKey), "judge", deploymentName);
-                return new(c, Fingerprint("azure", azEndpoint, deploymentName!), ExitCodes.Success);
+                return new(c, Fingerprint("azure", azEndpoint, deploymentName!), ExitCodes.Success, deploymentName);
             }
 
             if (!string.IsNullOrWhiteSpace(endpoint))
@@ -56,7 +56,7 @@ internal static class GatekeeperModelResolver
                 }
 
                 var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint!, model!, apiKey), "judge", model);
-                return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
+                return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success, model);
             }
 
             // Env fallback: the provider AI_INFERENCE_PROVIDER selects (Bitdeer, OpenAI, Foundry, Azure, any
@@ -74,7 +74,7 @@ internal static class GatekeeperModelResolver
                     ? EndpointFactory.CreateAzure(providerEndpoint, provider.Model!, key)
                     : EndpointFactory.CreateOpenAICompatible(providerEndpoint, provider.Model!, key);
                 return new(CliChatClientDiagnostics.Wrap(client, "judge", provider.Model),
-                    Fingerprint(provider.ProviderTag, providerEndpoint, provider.Model!), ExitCodes.Success);
+                    Fingerprint(provider.ProviderTag, providerEndpoint, provider.Model!), ExitCodes.Success, provider.Model);
             }
 
             stderr.WriteLine("  Error: no model backing. Pass --azure --deployment-name <d>, or --endpoint <url> --model <m>, " +

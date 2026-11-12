@@ -3,11 +3,25 @@
 Update the library and the CLI together:
 
 ```powershell
-dotnet add package AgentEval --version 1.0.0-rc.2
-dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.2
+dotnet add package AgentEval --version 1.0.0-rc.3
+dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.3
 ```
 
-Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, then the rc.2 section.
+Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, then the rc.2 and rc.3 sections.
+
+## From 1.0.0-rc.2 to 1.0.0-rc.3
+
+These changes require rc.3. Before that version is published, use matching packages from a local build/feed; rc.2 does not contain them.
+
+| Area | What changes | Update your consumer |
+|---|---|---|
+| PDF generation | The default library and CLI no longer bring a PDF engine or generate PDF automatically. | Install `AgentEval.Rendering.PdfSharp`, register it with `AddAgentEvalPdfSharp()`, and explicitly request output. The optional `AgentEval.Cli.Pdf` companion renders captured reports. See [PDF migration and provider registration](pdf-providers.md), including the removed engine-specific font resolver. |
+| Retrieved context | Fixture or invocation-owned retrieval reaches both harness modes and stochastic criteria judging. Custom judges must accept the rich request to consume context. | Capture `AgentResponse.RetrievedContext`; implement the `EvaluationRequest` overload when adapting a custom judge. Required unavailable context remains unmeasured. See [context transport](judge-context.md). |
+| Groundedness and scoring | Existing constructors retain legacy semantics. Support-focused Groundedness and criteria-fraction scoring are explicit options with distinct policy identities. | Choose [Groundedness options](groundedness-policies.md) and [score selection](judge-score-policies.md) deliberately. Use `MeasuredScore` for exact fractions and rebaseline comparisons when changing policy. |
+| Judge localization | Supported judges accept versioned prompt packs and per-evaluation overrides. Customer instructions survive export and locale-only selection. | Follow [prompt-pack authoring and supported scope](judge-prompt-packs.md). Export after configuring required evidence. Rebaseline configured instruments: prompt contracts, evidence framing and English-prefilter bypass can change judgments. Structural evidence checks and safety caps remain enforced. Unsupported routes reject explicit selection. Swedish examples are AI-authored and have no human label review. |
+| Cost estimates | Returned model identity and reported cached input participate in pricing; absent cache information remains explicitly undiscounted. | Read `CostEstimate` status/provenance, use a per-run `PricingResolver` for deployment aliases or customer rates, and do not treat an unknown cost as zero. See [cost estimation](cost-estimation.md). |
+| Runtime judge calibration | Matching evidence remains the default; explicit same-axis reuse records transferred evidence without claiming new accuracy. Legacy report/legacy judge compatibility remains. | Use `UseGatekeeperAsync` to install runtime checks, or validate before manually composing the resulting registrations. Select `CalibrationReusePolicy.AllowSameAxis` deliberately for cross-language/model reuse. Configured panels cannot certify individual members. See [calibration reuse](calibration-reuse.md). |
+| Microsoft Extensions AI | AI, the OpenAI adapter and evaluation packages use 11.0.0; .NET 8, 9 and 10 remain supported. | Align direct `Microsoft.Extensions.AI*` references to 11.0.0 and restore the dependency graph. Do not retain an older transitive pin that overrides the required contract assembly or target-specific dependency floors. |
 
 ## From 1.0.0-rc.1 to 1.0.0-rc.2
 

@@ -13,6 +13,7 @@ namespace AgentEval.RedTeam.Evaluators;
 public sealed class RefusalGatedEvaluator : IProbeEvaluator
 {
     private readonly IProbeEvaluator _inner;
+    internal IProbeEvaluator Inner => _inner;
     public RefusalGatedEvaluator(IProbeEvaluator inner) { ArgumentNullException.ThrowIfNull(inner); _inner = inner; }
     public string Name => $"RefusalGated({_inner.Name})";
 

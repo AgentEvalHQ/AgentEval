@@ -117,7 +117,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
         // surfaces on a complete AgentResponse (ExecutorAgentResponseEvent). Keyed by executor id;
         // consumed (and removed) when that executor's step is flushed, so a loop workflow that revisits
         // an executor does NOT re-report an earlier iteration's usage on a later step.
-        var ledger = new Dictionary<string, (TokenUsage? Usage, string? FinishReason)>(StringComparer.Ordinal);
+        var ledger = new Dictionary<string, (TokenUsage? Usage, string? FinishReason, bool UsageInvalid)>(StringComparer.Ordinal);
 
         // Look up and REMOVE an executor's ledger entry (consume-on-flush). Returns (null, null) if absent.
         (TokenUsage? Usage, string? FinishReason) TakeLedger(string executorId)
@@ -125,7 +125,7 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
             if (ledger.TryGetValue(executorId, out var value))
             {
                 ledger.Remove(executorId);
-                return value;
+                return (value.Usage, value.FinishReason);
             }
 
             return (null, null);
@@ -203,13 +203,15 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
                         {
                             // Repeat event for the same open step (retry / streamed-then-completed): SUM the
                             // tokens, keep the FIRST non-null finish reason.
-                            ledger[responseEvent.ExecutorId] = (
-                                SumUsage(prior.Usage, responseEvent.Usage),
-                                prior.FinishReason ?? responseEvent.FinishReason);
+                            var usage = prior.UsageInvalid ? null : SumUsage(prior.Usage, responseEvent.Usage);
+                            // Once a sum is invalid, later events cannot turn its partial remainder into a total.
+                            var invalid = prior.UsageInvalid || (prior.Usage is not null && responseEvent.Usage is not null && usage is null);
+                            ledger[responseEvent.ExecutorId] = (usage,
+                                prior.FinishReason ?? responseEvent.FinishReason, invalid);
                         }
                         else
                         {
-                            ledger[responseEvent.ExecutorId] = (responseEvent.Usage, responseEvent.FinishReason);
+                            ledger[responseEvent.ExecutorId] = (responseEvent.Usage, responseEvent.FinishReason, false);
                         }
                         break;
 
@@ -529,11 +531,19 @@ public class MAFWorkflowAdapter : IWorkflowEvaluableAgent
     {
         if (a is null) return b;
         if (b is null) return a;
-        return new TokenUsage
+        var inputA = a.ReportedInputTokenCount ?? a.PromptTokens;
+        var inputB = b.ReportedInputTokenCount ?? b.PromptTokens;
+        var cachedA = a.CachedInputTokenCount > inputA ? -1 : a.CachedInputTokenCount;
+        return TokenUsageMapping.FromUsage(new Microsoft.Extensions.AI.UsageDetails
         {
-            PromptTokens = a.PromptTokens + b.PromptTokens,
-            CompletionTokens = a.CompletionTokens + b.CompletionTokens,
-        };
+            InputTokenCount = TokenUsageMapping.Add(inputA, inputB),
+            OutputTokenCount = TokenUsageMapping.Add(a.ReportedOutputTokenCount ?? a.CompletionTokens,
+                b.ReportedOutputTokenCount ?? b.CompletionTokens),
+            CachedInputTokenCount = TokenUsageMapping.AddCached(cachedA, new()
+            {
+                InputTokenCount = inputB, CachedInputTokenCount = b.CachedInputTokenCount
+            })
+        }, a.HasMixedModelUsage || b.HasMixedModelUsage);
     }
 
     /// <summary>

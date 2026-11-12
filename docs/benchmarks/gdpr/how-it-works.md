@@ -150,7 +150,7 @@ Treat the judge as uncalibrated for your deployment until you re-run `calibrate`
 
 1. **Speed.** A smoke run finishes in seconds. A standard run finishes in a few minutes. You get fast feedback on whether your agent is starting to drift on a regulation that takes years to learn manually.
 2. **Repeatability.** The same scenarios run on every release. You can see trends over time, not just one-shot snapshots.
-3. **Defensible evidence.** Each run produces a JSON evidence file, a markdown report, and a PDF — all sealed with an audit-chain hash that `agenteval doctor` can re-verify. You can hand the evidence to a DPO, attach it to a PR, or store it for an audit.
+3. **Reviewable evidence.** Each run produces JSON evidence and a Markdown report with recorded source-run references. PDF generation is [optional](../../pdf-providers.md). For a PDF from sealed AEF evidence, record with `--aef-content on` and use the companion to verify and render that exact run into an output outside the sealed directory. The derived report does not change the source seal or turn recorded references into proof of original execution custody.
 4. **Regulator-grade reasoning.** The judge's rubric is built from the actual EU regulation text. Citations in the report point to the specific article and sub-article that justify each verdict.
 5. **Calibration built in.** Hand-labelled golden sets ship with the benchmark and `calibrate` measures a judge against them; see *Calibration quality today* for what has and has not been measured.
 6. **Open and inspectable.** Every prompt, every scenario, every golden entry is in the repo. You can read why the judge graded the way it did, and disagree if you want.

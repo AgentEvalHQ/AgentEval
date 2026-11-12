@@ -43,7 +43,7 @@ QUESTION="Book me a flight to Lisbon next Friday."
 agenteval bench agentic --preset agentic-execution --subject MyAgent --input "$QUESTION" --response-file answer.txt
 ```
 
-This writes evidence to `.agenteval/compliance/agentic/MyAgent/<timestamp>/` (markdown, PDF, JSON, audit-chain-validated). The [agentic getting-started](benchmarks/agentic/getting-started.md) covers every preset.
+This writes JSON and Markdown reports to `.agenteval/benchmarks/agentic/MyAgent/<timestamp>/`. PDF generation requires an explicitly installed and registered provider or the separate PDF companion; see [optional PDF providers](pdf-providers.md). The [agentic getting-started](benchmarks/agentic/getting-started.md) covers every preset and captured AEF evidence.
 
 ## Quick Start — agentic programmatically
 

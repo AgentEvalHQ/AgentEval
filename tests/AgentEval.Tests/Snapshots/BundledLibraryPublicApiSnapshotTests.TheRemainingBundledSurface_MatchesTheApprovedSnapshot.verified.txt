@@ -1,4 +1,4 @@
-﻿assembly AgentEval
+assembly AgentEval
 static class AgentEval.DependencyInjection.AgentEvalFullServiceCollectionExtensions
     static IServiceCollection AddAgentEvalAll(IServiceCollection services, Action<AgentEval.DependencyInjection.AgentEvalServiceOptions> configure = null)
 assembly AgentEval.Abstractions
@@ -153,6 +153,9 @@ sealed class AgentEval.Compliance.EuAiAct.Calibration.CalibrationPillarReport : 
     Int32 GetHashCode()
     Int32 NotApplicable { get; init; }
     Int32 NotMeasured { get; init; }
+    Int32 ProductionEntries { get; init; }
+    Int32 SurrogateEntries { get; init; }
+    Int32 UnknownArticleEntries { get; init; }
     Int32 WithinScoreRange { get; init; }
     String Pillar { get; init; }
     String ToString()
@@ -164,11 +167,16 @@ sealed class AgentEval.Compliance.EuAiAct.Calibration.CalibrationReport : IEquat
     Boolean Equals(Object obj)
     DateTimeOffset GeneratedAt { get; init; }
     IReadOnlyDictionary<String, AgentEval.Compliance.EuAiAct.Calibration.CalibrationPillarReport> PerPillar { get; init; }
+    IReadOnlyList<AgentEval.Prompts.JudgePromptProvenance> Instruments { get; init; }
     Int32 GetHashCode()
     String ToString()
     Void Deconstruct(out DateTimeOffset GeneratedAt, out IReadOnlyDictionary<String, AgentEval.Compliance.EuAiAct.Calibration.CalibrationPillarReport> PerPillar)
     ctor(DateTimeOffset GeneratedAt, IReadOnlyDictionary<String, AgentEval.Compliance.EuAiAct.Calibration.CalibrationPillarReport> PerPillar)
 sealed class AgentEval.Compliance.EuAiAct.Calibration.CalibrationRunner
+    AgentEval.Evals.IEval CreateEvaluator(AgentEval.Compliance.EuAiAct.Calibration.CalibrationEntry entry)
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
+    Boolean RequireProductionScenarios { get; init; }
+    String JudgeModel { get; init; }
     Task<AgentEval.Compliance.EuAiAct.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Compliance.EuAiAct.Calibration.CalibrationDataset> datasets, CancellationToken ct = default)
     Task<AgentEval.Compliance.EuAiAct.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Compliance.EuAiAct.Calibration.CalibrationDataset> datasets, Int32? limitPerPillar, CancellationToken ct = default)
     ctor(AgentEval.Compliance.EuAiAct.Articles.EuAiActArticlesRegistry articles, AgentEval.Core.IEvaluator judge)
@@ -303,8 +311,11 @@ sealed class AgentEval.Compliance.EuAiAct.Reporting.MarkdownRenderer
     String Render(AgentEval.Compliance.EuAiAct.Reporting.EuAiActComplianceEvidence evidence)
     ctor()
 sealed class AgentEval.Compliance.EuAiAct.Reporting.Pdf.EuAiActPdfRenderer
+    AgentEval.Reporting.ReportDocument CreateDocument(AgentEval.Compliance.EuAiAct.Reporting.EuAiActComplianceEvidence ev)
     Task RenderAsync(AgentEval.Compliance.EuAiAct.Reporting.EuAiActComplianceEvidence evidence, String outputPath, CancellationToken ct = default)
+    ctor()
     ctor(AgentEval.Compliance.EuAiAct.Articles.EuAiActArticlesRegistry articles = null)
+    ctor(AgentEval.Compliance.EuAiAct.Articles.EuAiActArticlesRegistry articles = null, AgentEval.Reporting.IPdfRendererRegistry pdfRenderers = null, String providerId = null)
 sealed class AgentEval.Compliance.EuAiAct.Reporting.RecommendationExtractor
     IReadOnlyList<AgentEval.Compliance.Core.Recommendation> Build(AgentEval.Evals.EvalResult root)
     ctor()
@@ -445,6 +456,9 @@ sealed class AgentEval.Compliance.Gdpr.Calibration.CalibrationPillarReport : IEq
     Int32 GetHashCode()
     Int32 NotApplicable { get; init; }
     Int32 NotMeasured { get; init; }
+    Int32 ProductionEntries { get; init; }
+    Int32 SurrogateEntries { get; init; }
+    Int32 UnknownArticleEntries { get; init; }
     Int32 WithinScoreRange { get; init; }
     String Pillar { get; init; }
     String ToString()
@@ -456,11 +470,16 @@ sealed class AgentEval.Compliance.Gdpr.Calibration.CalibrationReport : IEquatabl
     Boolean Equals(Object obj)
     DateTimeOffset GeneratedAt { get; init; }
     IReadOnlyDictionary<String, AgentEval.Compliance.Gdpr.Calibration.CalibrationPillarReport> PerPillar { get; init; }
+    IReadOnlyList<AgentEval.Prompts.JudgePromptProvenance> Instruments { get; init; }
     Int32 GetHashCode()
     String ToString()
     Void Deconstruct(out DateTimeOffset GeneratedAt, out IReadOnlyDictionary<String, AgentEval.Compliance.Gdpr.Calibration.CalibrationPillarReport> PerPillar)
     ctor(DateTimeOffset GeneratedAt, IReadOnlyDictionary<String, AgentEval.Compliance.Gdpr.Calibration.CalibrationPillarReport> PerPillar)
 sealed class AgentEval.Compliance.Gdpr.Calibration.CalibrationRunner
+    AgentEval.Evals.IEval CreateEvaluator(AgentEval.Compliance.Gdpr.Calibration.CalibrationEntry entry)
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
+    Boolean RequireProductionScenarios { get; init; }
+    String JudgeModel { get; init; }
     Task<AgentEval.Compliance.Gdpr.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Compliance.Gdpr.Calibration.CalibrationDataset> datasets, CancellationToken ct = default)
     Task<AgentEval.Compliance.Gdpr.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Compliance.Gdpr.Calibration.CalibrationDataset> datasets, Int32? limitPerPillar, CancellationToken ct = default)
     ctor(AgentEval.Compliance.Gdpr.Articles.ArticlesRegistry articles, AgentEval.Core.IEvaluator judge)
@@ -579,8 +598,11 @@ sealed class AgentEval.Compliance.Gdpr.Reporting.MarkdownRenderer
     String Render(AgentEval.Compliance.Gdpr.Reporting.GdprComplianceEvidence evidence)
     ctor()
 sealed class AgentEval.Compliance.Gdpr.Reporting.Pdf.GDPRPdfRenderer
+    AgentEval.Reporting.ReportDocument CreateDocument(AgentEval.Compliance.Gdpr.Reporting.GdprComplianceEvidence ev)
     Task RenderAsync(AgentEval.Compliance.Gdpr.Reporting.GdprComplianceEvidence evidence, String outputPath, CancellationToken ct = default)
+    ctor()
     ctor(AgentEval.Compliance.Gdpr.Articles.ArticlesRegistry articles = null)
+    ctor(AgentEval.Compliance.Gdpr.Articles.ArticlesRegistry articles = null, AgentEval.Reporting.IPdfRendererRegistry pdfRenderers = null, String providerId = null)
 sealed class AgentEval.Compliance.Gdpr.Reporting.RecommendationExtractor
     IReadOnlyList<AgentEval.Compliance.Core.Recommendation> Build(AgentEval.Evals.EvalResult root)
     ctor()
@@ -1242,6 +1264,10 @@ class AgentEval.Output.UserInputStepData
     Dictionary<String, Object> Metadata { get; init; }
     String Message { get; init; }
     ctor()
+sealed class AgentEval.Prompts.JudgePromptPackLoader : AgentEval.Prompts.IJudgePromptPackLoader
+    Task ExportAsync(AgentEval.Prompts.JudgePromptPack pack, String directory, CancellationToken cancellationToken = default)
+    Task<AgentEval.Prompts.JudgePromptPack> LoadAsync(String manifestPath, CancellationToken cancellationToken = default)
+    ctor()
 assembly AgentEval.Evals.Agentic
 static class AgentEval.Benchmarks.AgenticBenchmark
     static AgentEval.Evals.CompositeEval AdversarialDirect(AgentEval.Core.IEvaluator judge, String judgeModel = null)
@@ -1368,13 +1394,16 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationDatasetLoader
     ctor()
 sealed class AgentEval.Evals.Agentic.Calibration.CalibrationEntry : IEquatable<AgentEval.Evals.Agentic.Calibration.CalibrationEntry>
     AgentEval.Evals.Agentic.Calibration.CalibrationEntry <Clone>$()
+    AgentEval.Evals.Agentic.Conversation.ConversationTurn CorrectionTurn { get; init; }
     AgentEval.Evals.EvalInput ToEvalInput()
     Boolean Equals(AgentEval.Evals.Agentic.Calibration.CalibrationEntry other)
     Boolean Equals(Object obj)
     Double ExpectedScoreMax { get; init; }
     Double ExpectedScoreMin { get; init; }
     IReadOnlyList<AgentEval.Evals.Agentic.Conversation.ConversationTurn> ConversationHistory { get; init; }
+    IReadOnlyList<AgentEval.Evals.ExpectedAction> ExpectedActions { get; init; }
     IReadOnlyList<AgentEval.Evals.ToolCall> ToolCalls { get; init; }
+    IReadOnlyList<AgentEval.Evals.ToolDefinition> ToolDefinitions { get; init; }
     Int32 GetHashCode()
     String AgentResponse { get; init; }
     String Context { get; init; }
@@ -1382,7 +1411,9 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationEntry : IEquatable<A
     String ExpectedVerdict { get; init; }
     String GroundTruth { get; init; }
     String Input { get; init; }
+    String Plan { get; init; }
     String Rationale { get; init; }
+    String ReasoningTrace { get; init; }
     String ScenarioId { get; init; }
     String SystemMessage { get; init; }
     String ToString()
@@ -1390,6 +1421,7 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationEntry : IEquatable<A
     ctor(String ScenarioId, String EvaluatorKey, String Input, String AgentResponse, String ExpectedVerdict, Double ExpectedScoreMin, Double ExpectedScoreMax, String Rationale)
 sealed class AgentEval.Evals.Agentic.Calibration.CalibrationLeafRecord : IEquatable<AgentEval.Evals.Agentic.Calibration.CalibrationLeafRecord>
     AgentEval.Evals.Agentic.Calibration.CalibrationLeafRecord <Clone>$()
+    AgentEval.Prompts.JudgePromptProvenance JudgePrompt { get; init; }
     Boolean Equals(AgentEval.Evals.Agentic.Calibration.CalibrationLeafRecord other)
     Boolean Equals(Object obj)
     Boolean Passed { get; init; }
@@ -1398,11 +1430,13 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationLeafRecord : IEquata
     Int32 GetHashCode()
     String AggregationStrategy { get; init; }
     String JudgeModel { get; init; }
+    String JudgeProvider { get; init; }
     String Key { get; init; }
     String Label { get; init; }
     String PromptHash { get; init; }
     String PromptId { get; init; }
     String ProvenanceType { get; init; }
+    String RubricDigest { get; init; }
     String ToString()
     Void Deconstruct(out String Key, out String Label, out Double Value, out Boolean Passed, out IReadOnlyDictionary<String, Double> Criteria, out String ProvenanceType, out String JudgeModel, out String PromptId, out String PromptHash, out String AggregationStrategy)
     ctor(String Key, String Label, Double Value, Boolean Passed, IReadOnlyDictionary<String, Double> Criteria, String ProvenanceType, String JudgeModel, String PromptId, String PromptHash, String AggregationStrategy = null)
@@ -1420,6 +1454,7 @@ sealed class AgentEval.Evals.Agentic.Calibration.CalibrationReport : IEquatable<
     Void Deconstruct(out DateTimeOffset GeneratedAt, out IReadOnlyDictionary<String, AgentEval.Evals.Agentic.Calibration.CalibrationCategoryReport> PerCategory)
     ctor(DateTimeOffset GeneratedAt, IReadOnlyDictionary<String, AgentEval.Evals.Agentic.Calibration.CalibrationCategoryReport> PerCategory)
 sealed class AgentEval.Evals.Agentic.Calibration.CalibrationRunner
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
     Task<AgentEval.Evals.Agentic.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Evals.Agentic.Calibration.CalibrationDataset> datasets, CancellationToken ct = default)
     Task<AgentEval.Evals.Agentic.Calibration.CalibrationReport> RunAsync(IReadOnlyList<AgentEval.Evals.Agentic.Calibration.CalibrationDataset> datasets, Func<AgentEval.Evals.Agentic.Calibration.CalibrationCaseRecord, CancellationToken, Task> caseSink, Int32? limitPerCategory, CancellationToken ct = default)
     ctor(Func<String, AgentEval.Evals.IEval> evaluatorResolver)
@@ -1660,6 +1695,18 @@ sealed class AgentEval.Evals.Agentic.Quality.FluencyEval : AgentEval.Evals.IEval
     String Version { get; }
     Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, CancellationToken ct = default)
     ctor(AgentEval.Core.IEvaluator judge, String judgeModel = null, Double passThreshold = 0.6)
+sealed class AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions : IEquatable<AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions>
+    AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions <Clone>$()
+    AgentEval.Evals.ComponentFailureEffect OnFailure { get; init; }
+    Boolean Enabled { get; init; }
+    Boolean Equals(AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions other)
+    Boolean Equals(Object obj)
+    Boolean Required { get; init; }
+    Double Weight { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out Double Weight, out Boolean Enabled, out Boolean Required, out AgentEval.Evals.ComponentFailureEffect OnFailure)
+    ctor(Double Weight, Boolean Enabled = true, Boolean Required = true, AgentEval.Evals.ComponentFailureEffect OnFailure = ComponentFailureEffect.Fail)
 sealed class AgentEval.Evals.Agentic.Quality.GroundednessEval : AgentEval.Evals.IEval, AgentEval.Evals.IEvalDefinitionWrapper
     AgentEval.Evals.IEval DefinitionInner { get; }
     String Category { get; }
@@ -1668,6 +1715,26 @@ sealed class AgentEval.Evals.Agentic.Quality.GroundednessEval : AgentEval.Evals.
     String Version { get; }
     Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, CancellationToken ct = default)
     ctor(AgentEval.Core.IEvaluator judge, String judgeModel = null, Double passThreshold = 0.75)
+    ctor(AgentEval.Core.IEvaluator judge, String judgeModel, Double passThreshold, AgentEval.Evals.Agentic.Quality.GroundednessOptions options)
+sealed class AgentEval.Evals.Agentic.Quality.GroundednessOptions : IEquatable<AgentEval.Evals.Agentic.Quality.GroundednessOptions>
+    AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions CitationAccuracy { get; init; }
+    AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions ClaimContradicted { get; init; }
+    AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions ClaimSupport { get; init; }
+    AgentEval.Evals.Agentic.Quality.GroundednessDimensionOptions Completeness { get; init; }
+    AgentEval.Evals.Agentic.Quality.GroundednessOptions <Clone>$()
+    AgentEval.Evals.Agentic.Quality.GroundednessPolicy Policy { get; init; }
+    Boolean Equals(AgentEval.Evals.Agentic.Quality.GroundednessOptions other)
+    Boolean Equals(Object obj)
+    Boolean RequireCitations { get; init; }
+    Boolean RequireContext { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    ctor()
+    static AgentEval.Evals.Agentic.Quality.GroundednessOptions Legacy { get; }
+    static AgentEval.Evals.Agentic.Quality.GroundednessOptions SupportFocused { get; }
+enum AgentEval.Evals.Agentic.Quality.GroundednessPolicy
+    LegacyV1
+    SupportFocusedV2
 sealed class AgentEval.Evals.Agentic.Quality.QaCompositeEval : AgentEval.Evals.IEval, AgentEval.Evals.IEvalDefinitionWrapper
     AgentEval.Evals.IEval DefinitionInner { get; }
     String Category { get; }
@@ -1828,8 +1895,10 @@ sealed class AgentEval.Evals.Agentic.Reporting.AgenticSummaryBuilder
     AgentEval.Evals.Agentic.Reporting.AgenticSummary Build(AgentEval.Evals.EvalResult root)
     ctor()
 sealed class AgentEval.Evals.Agentic.Reporting.Pdf.AgenticPdfRenderer
+    AgentEval.Reporting.ReportDocument CreateDocument(AgentEval.Evals.Agentic.Reporting.AgenticBenchmarkResult result)
     Task RenderAsync(AgentEval.Evals.Agentic.Reporting.AgenticBenchmarkResult result, String outputPath, CancellationToken ct = default)
     ctor()
+    ctor(AgentEval.Reporting.IPdfRendererRegistry pdfRenderers = null, String providerId = null)
 sealed class AgentEval.Evals.Agentic.Safety.CodeVulnerabilityEval : AgentEval.Evals.IEval, AgentEval.Evals.IEvalDefinitionWrapper
     AgentEval.Evals.IEval DefinitionInner { get; }
     String Category { get; }
@@ -2164,6 +2233,7 @@ class AgentEval.Benchmarks.CostBenchmarkResult
     Decimal? EstimatedCostUSD { get; init; }
     Double AverageInputTokensPerPrompt { get; init; }
     Double AverageOutputTokensPerPrompt { get; init; }
+    IReadOnlyList<AgentEval.Models.TokenCostEstimate> CostEstimates { get; init; }
     IReadOnlyList<Exception> Errors { get; init; }
     Int32 ResponsesWithoutUsage { get; init; }
     Int32 SuccessfulPrompts { get; init; }
@@ -4399,8 +4469,19 @@ static class AgentEval.Memory.Temporal.TemporalMemoryScenarios.CommonScenarios
 assembly AgentEval.RedTeam
 assembly AgentEval.RedTeam.Gatekeeper
 assembly AgentEval.Rendering.Pdf
+static class AgentEval.Rendering.Pdf.EvalReportProjection
+    static AgentEval.Reporting.ReportDocument Create(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options)
+    static IReadOnlyList<String> AuditChainLines(AgentEval.Output.SourceRunRef sourceRun)
+    static String TruncateEvidence(String text, Int32 maxLength)
 sealed class AgentEval.Rendering.Pdf.PdfEvalResultRenderer : AgentEval.Evals.IEvalResultRenderer
     String FileExtension { get; }
     String FormatId { get; }
     Task<Byte[]> RenderAsync(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options, CancellationToken ct = default)
     ctor()
+    ctor(AgentEval.Reporting.IPdfRendererRegistry renderers = null, String providerId = null)
+static class AgentEval.Rendering.Pdf.PdfReportFiles
+    static AgentEval.Reporting.IPdfReportRenderer RequireProvider(AgentEval.Reporting.IPdfRendererRegistry registry, String providerId = null)
+    static Task RenderAsync(AgentEval.Reporting.IPdfReportRenderer provider, AgentEval.Reporting.ReportDocument document, String outputPath, AgentEval.Reporting.PdfRenderOptions options = null, CancellationToken cancellationToken = default, Boolean overwrite = true)
+static class AgentEval.Rendering.Pdf.PdfServiceCollectionExtensions
+    static AgentEval.Evals.IEvalResultRenderer ForEvalResults(AgentEval.Reporting.IPdfRendererRegistry registry, String providerId = null)
+    static IServiceCollection AddAgentEvalPdfProvider<T>(IServiceCollection services, String providerId)

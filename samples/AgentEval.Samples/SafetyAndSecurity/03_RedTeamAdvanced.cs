@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 
+using AgentEval.Rendering.PdfSharp;
+using Microsoft.Extensions.DependencyInjection;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -35,6 +37,7 @@ public static class RedTeamAdvanced
 {
     private static readonly bool ShowFailureDetails = true; // Set false to hide prompts/responses
     private static readonly bool ExportReports = true;     // Set false to skip file exports
+    private static readonly bool ExportPdfReports = false; // Explicit optional provider/output demonstration
     
     public static async Task RunAsync()
     {
@@ -156,25 +159,29 @@ public static class RedTeamAdvanced
             await new MarkdownReportExporter().ExportToFileAsync(result, mdPath);
             await new JUnitReportExporter().ExportToFileAsync(result, junitPath);
 
-            // PDF Executive Report with branding
-            var pdfPath = Path.Combine(outputDir, "report.pdf");
-            var pdfOptions = new PdfReportOptions
+            // PDF Executive Report with branding, explicitly opted in.
+            if (ExportPdfReports)
             {
-                CompanyName = "Contoso",
-                AgentName = "SecurityTestAgent",
-                IncludeDetailedResults = true,
-                Branding = new BrandingOptions
+                var pdfPath = Path.Combine(outputDir, "report.pdf");
+                var pdfOptions = new PdfReportOptions
                 {
-                    PrimaryColor = "#0078D4",
-                    FontFamily = "Arial"
-                }
-            };
-            await new PdfReportGenerator().SaveAsync(result, pdfPath, pdfOptions);
+                    CompanyName = "Contoso",
+                    AgentName = "SecurityTestAgent",
+                    IncludeDetailedResults = true,
+                    Branding = new BrandingOptions
+                    {
+                        PrimaryColor = "#0078D4",
+                        FontFamily = "Arial"
+                    }
+                };
+                using var pdfHost = new ServiceCollection().AddAgentEvalPdfSharp().BuildServiceProvider();
+                await new PdfReportGenerator(pdfHost.GetRequiredService<AgentEval.Reporting.IPdfRendererRegistry>()).SaveAsync(result, pdfPath, pdfOptions);
+                Console.WriteLine($"  PDF:      {pdfPath}");
+            }
 
             Console.WriteLine($"  📄 JSON:     {jsonPath}");
             Console.WriteLine($"  📝 Markdown: {mdPath}");
             Console.WriteLine($"  🧪 JUnit:    {junitPath}");
-            Console.WriteLine($"  📊 PDF:      {pdfPath}");
             Console.WriteLine();
         }
 

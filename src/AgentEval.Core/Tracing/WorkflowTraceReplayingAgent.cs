@@ -158,11 +158,7 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 EndTime = tc.DurationMs is { } duration ? tc.StartedAt?.AddMilliseconds(duration) : null
             }).ToList(),
             TokenUsage = s.TokenUsage != null
-                ? new TokenUsage
-                {
-                    PromptTokens = s.TokenUsage.PromptTokens,
-                    CompletionTokens = s.TokenUsage.CompletionTokens
-                }
+                ? TraceMapping.ToAgentUsage(s.TokenUsage)
                 : null,
             IncomingEdge = s.IncomingEdge is not null ? ReplayEdge(s.IncomingEdge) : null,
             OutgoingEdges = s.OutgoingEdges?.Select(ReplayEdge).ToList()

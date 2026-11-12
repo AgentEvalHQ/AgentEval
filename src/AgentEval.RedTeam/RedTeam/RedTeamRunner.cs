@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using System.Diagnostics;
+using AgentEval.RedTeam.Evaluators;
 using System.IO;
 using AgentEval.Core;
 using AgentEval.RedTeam.BenignControls;
@@ -45,6 +46,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Resolve attacks to run
         var attacks = ResolveAttacks(options);
 
+        // Validate every selected graph before running any target, including attacks later skipped
+        // by fail-fast. Legacy scans retain their existing lazy grader resolution.
+        cancellationToken.ThrowIfCancellationRequested();
+        var preparedNarrator = ConfiguredProbeNarrator.Create(options);
+        var preparedGraders = options.JudgePrompts is null ? null
+            : attacks.ToDictionary(a => a, a => GraderFactory.For(a, options));
+
         // Materialize each attack's probe list ONCE and reuse it for both the progress total and
         // execution — GetProbes builds a fresh List per call, so the previous count-then-execute
         // pattern ran every generator at least twice per scan (PERF-10).
@@ -66,15 +74,21 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // toward the progress total only, never toward PlannedProbes, which stays the attack denominator.
         // A benign control is graded by the over-refusal judge, so the arm needs the scan's judge. Without one it does
         // not run and the report says why: a phrase list is not allowed to stand in for the judgement.
-        var benignArm = options.RunBenignControls && options.JudgeClient is { } benignJudge ? new BenignControlArm(benignJudge) : null;
+        if (options.RunBenignControls && options.JudgeClient is null && options.BenignControlJudgeOptions is not null)
+            throw new NotSupportedException("Expected: a judge client for configured benign controls. Actual: none. Suggestions: set JudgeClient. Because: a selected instrument cannot be silently skipped.");
+        var benignArm = options.RunBenignControls && options.JudgeClient is { } benignJudge
+            ? new BenignControlArm(benignJudge, BenignControlEvaluator.OptionsFor(options)) : null;
         var benignNotRunReason = options.RunBenignControls && options.JudgeClient is null
             ? "over-refusal needs a judge (ScanOptions.JudgeClient, --judge); the benign controls were not run"
             : null;
         var benignProbes = benignArm?.GetProbes(options.Intensity) ?? [];
         if (options.OnPlanPrepared is { } prepared)
         {
-            var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())).ToList();
-            if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true));
+            var arms = attacks.Select(a => new PlannedAttack(a, probesByAttack[a].ToList().AsReadOnly())
+                { JudgeGraphDigest = ProbeJudgeGraph.CapturedDigest(preparedGraders?.GetValueOrDefault(a)),
+                    ExplanationDigest = preparedNarrator?.Digest }).ToList();
+            if (benignArm is not null) arms.Add(new(benignArm, benignProbes.ToList().AsReadOnly(), Control: true)
+                { JudgeGraphDigest = benignArm.JudgeGraphDigest });
             prepared(new ScanPlan(options, arms.AsReadOnly()));
         }
         var progressTotal = plannedProbes + benignProbes.Count;
@@ -108,7 +122,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     completedProbes,
                     progressTotal,
                     sw,
-                    scanToken);
+                    scanToken,
+                    preparedGraders?.GetValueOrDefault(attack));
 
                 completedProbes += probesExecuted;
                 attackResults.Add(attackResult);
@@ -209,13 +224,14 @@ public sealed class RedTeamRunner : IRedTeamRunner
         int completedProbesBefore,
         int totalProbes,
         Stopwatch sw,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProbeEvaluator? preparedGrader = null)
     {
         // ADR-021 (B.1): resolve grading once at this seam. GraderFactory wraps the oracle in a
         // JudgeBackedEvaluator when a JudgeClient is configured (owning the former inline judge blocks
         // for the single-turn runner AND both orchestrators); with no judge it returns the bare oracle,
         // so a no-judge run is byte-identical. The wrapped evaluator flows to all three paths below.
-        var evaluator = GraderFactory.For(attack, options);
+        var evaluator = preparedGrader ?? GraderFactory.For(attack, options);
         // `probes` is materialized once by the caller (incl. MaxProbesPerAttack) — see PERF-10.
 
         // RA3-05 / T5-1: bounded-concurrency path only when the caller opts in; Parallelism <= 1 keeps the
@@ -409,11 +425,12 @@ public sealed class RedTeamRunner : IRedTeamRunner
         CancellationToken cancellationToken)
     {
         using var scope = options.BeginProbeScope?.Invoke(attack, probe, !allowExplain);
-        var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, cancellationToken);
+        var narrator = allowExplain ? ConfiguredProbeNarrator.Create(options) : null;
+        var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, narrator, cancellationToken);
 
         // One stamp for every exit path below (not exercised, not deliverable, folded, scored, timed out, errored),
         // so no path can report a benign control as an attack.
-        return result with { Expectation = ProbeExpectation.PermissibilityOf(probe) };
+        return result with { Expectation = ProbeExpectation.PermissibilityOf(probe), ExplanationDigest = narrator?.Digest };
     }
 
     private async Task<ProbeResult> ExecuteProbeCoreAsync(
@@ -424,6 +441,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
         ScanOptions options,
         Severity attackSeverity,
         bool allowExplain,
+        ConfiguredProbeNarrator? narrator,
         CancellationToken cancellationToken)
     {
         var probeSw = Stopwatch.StartNew();
@@ -478,7 +496,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 treeCts.CancelAfter(treeBudget);
                 var tr = await new TreeOrchestrator(agent, options).RunAsync(treeAttack, probe, evaluator, treeCts.Token);
                 probeSw.Stop();
-                return BuildFoldedProbeResult(probe, tr, attackSeverity, probeSw.Elapsed, options);
+                var folded = BuildFoldedProbeResult(probe, tr, attackSeverity, probeSw.Elapsed, options);
+                return narrator is null ? folded : await narrator.AttachAsync(probe, folded, options.IncludeEvidence, treeCts.Token, cancellationToken);
             }
 
             if (attack is IMultiTurnAttack multiTurnAttack)
@@ -490,7 +509,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 convoCts.CancelAfter(convoBudget);
                 var mt = await new TurnOrchestrator(agent, options).RunAsync(multiTurnAttack, probe, evaluator, convoCts.Token);
                 probeSw.Stop();
-                return BuildFoldedProbeResult(probe, mt, attackSeverity, probeSw.Elapsed, options);
+                var folded = BuildFoldedProbeResult(probe, mt, attackSeverity, probeSw.Elapsed, options);
+                return narrator is null ? folded : await narrator.AttachAsync(probe, folded, options.IncludeEvidence, convoCts.Token, cancellationToken);
             }
 
             // Execute probe against agent. Wave B (Pillar 1): if the SUT is tool-capable AND the attack advertises
@@ -561,7 +581,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // is gated on IncludeEvidence exactly like Prompt/Response below — a redacted scan must not leak via the
             // explain channel. Gating here also avoids the (paid) LLM call entirely when evidence is redacted.
             string? rationale = null;
-            if (allowExplain && options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
+            if (narrator is null && allowExplain && options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
                 && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
             {
                 try
@@ -571,12 +591,13 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     rationale = string.IsNullOrWhiteSpace(text) ? null : text;
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { /* explain timed out — skip */ }
+                catch (OperationCanceledException) { throw; }
                 catch { /* explain is best-effort */ }
             }
 
             probeSw.Stop();
 
-            return new ProbeResult
+            var scored = new ProbeResult
             {
                 ProbeId = probe.Id,
                 Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
@@ -593,8 +614,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Surface = probe.Surface,
                 Grading = grading,
                 GradedBy = evalResult.GradedBy,
+                JudgeGraphDigest = evalResult.JudgeGraphDigest,
                 RubricDigest = evalResult.RubricDigest,
+                JudgeInstruments = options.IncludeEvidence ? evalResult.JudgeInstruments : ProbeJudgeProvenance.WithoutContent(evalResult.JudgeInstruments),
             };
+            return narrator is null ? scored : await narrator.AttachAsync(probe, scored, options.IncludeEvidence, probeCts.Token, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -676,6 +700,9 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private static ProbeResult BuildFoldedProbeResult(AttackProbe probe, MultiTurnResult mt, Severity attackSeverity, TimeSpan elapsed, ScanOptions options)
     {
         var transcript = string.Join("\n", mt.Transcript.Select(t => $"{t.Role}: {t.Content}"));
+        var instruments = ProbeJudgeProvenance.Observed(mt.PerTurnResults);
+        var deciding = mt.DecidingTurn is { } turn && turn > 0 && turn <= mt.PerTurnResults.Count
+            ? mt.PerTurnResults[turn - 1] : (EvaluationResult?)null;
         return new ProbeResult
         {
             ProbeId = probe.Id,
@@ -694,6 +721,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ConversationFidelity = mt.ConversationFidelity,
             AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
             Grading = mt.Grading,                 // ADR-021 §5: judge-primary grading provenance, carried across the fold
+            GradedBy = deciding?.GradedBy,
+            RubricDigest = deciding?.RubricDigest,
+            JudgeGraphDigest = ProbeJudgeProvenance.CommonGraphDigest(mt.PerTurnResults),
+            JudgeInstruments = options.IncludeEvidence ? instruments : ProbeJudgeProvenance.WithoutContent(instruments),
             TurnsUsed = mt.NodesExplored is null ? mt.TurnsUsed : null,
             DecidingTurn = mt.DecidingTurn,
             NodesExplored = mt.NodesExplored,

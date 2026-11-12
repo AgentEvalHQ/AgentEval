@@ -23,6 +23,8 @@ public sealed class JudgeSpendGovernor
     private int _calls;
     private long _tokens;
 
+    internal object Configuration => new { MaxCalls = _maxCalls, MaxTokens = _maxTokens, WindowTicks = _window.Ticks };
+
     /// <summary>Creates the governor.</summary>
     /// <param name="maxCalls">Max judge model calls per window.</param>
     /// <param name="maxTokens">Max estimated tokens per window.</param>

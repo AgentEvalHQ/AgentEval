@@ -17,6 +17,18 @@ namespace AgentEval.Results.Adapters.Native;
 /// </summary>
 public sealed record AefProbeLine
 {
+    /// <summary>Complete declared graph identity, independent of the subset of leaves actually invoked.</summary>
+    public string? JudgeGraphDigest { get; init; }
+
+    /// <summary>Declared narrative configuration, separate from verdict identity.</summary>
+    public string? ExplanationDigest { get; init; }
+
+    /// <summary>Observed narrative generation; never used as a verdict annotator.</summary>
+    public AefProbeJudgeInstrument? ExplanationInstrument { get; init; }
+
+    /// <summary>Observed leaf instruments. The writer removes captured prompt text unless content capture is enabled.</summary>
+    public IReadOnlyList<AefProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>Observed content; ignored unless the run explicitly enables content capture.</summary>
     public AefNativeContent? Content { get; init; }
     /// <summary>The case id: <c>&lt;attack&gt;/&lt;probe&gt;</c> for a probe, <c>benign/&lt;probe&gt;</c> for a control.</summary>
@@ -230,7 +242,7 @@ public static class AefProbeRunWriter
             var resultIds = new List<string>();
             foreach (var line in lines)
             {
-                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane) with
+                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane, options.ContentCapture == AefContentCapture.On) with
                     { Evidence = artifactLinks.GetValueOrDefault(line.CaseId) },
                     options.ContentCapture == AefContentCapture.On ? line.Content : null)).ResultId);
             }
@@ -297,7 +309,7 @@ public static class AefProbeRunWriter
         return AefConverter.Sha256Of(Encoding.UTF8.GetBytes(string.Concat(ids.Select(id => id + "\n"))));
     }
 
-    private static AefResult Line(AefProbeLine line, string? judgeModel, string lane)
+    private static AefResult Line(AefProbeLine line, string? judgeModel, string lane, bool includeContent)
     {
         var conclusive = !line.Control && line.State is AefState.Passed or AefState.Failed;
         return new AefResult
@@ -313,6 +325,9 @@ public static class AefProbeRunWriter
             Turns = line.Turns,
             DurationMs = line.DurationMs,
             Usage = line.Usage,
+            Ext = AefPromptProvenance.AttachExplanation(
+                AefPromptProvenance.AttachProbe(null, line.JudgeGraphDigest, line.JudgeInstruments, includeContent),
+                line.ExplanationDigest, line.ExplanationInstrument, includeContent),
             Scores = conclusive ? [new AefScore { Metric = ResistedConclusiveMetric, Value = line.State == AefState.Passed ? 1 : 0 }] : null,
             Annotator = line.Annotator is { } kind
                 ? new AefAnnotator { Kind = kind, Model = kind == AefAnnotatorKind.Llm ? judgeModel : null,

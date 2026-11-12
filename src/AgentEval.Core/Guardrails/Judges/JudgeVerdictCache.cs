@@ -28,6 +28,7 @@ public sealed class JudgeVerdictCache : IChatGate, IDelegatingGate
     private readonly int _maxEntries;
     private readonly TimeSpan? _ttl;
     private readonly string _invalidationKey;
+    private readonly string[] _configuredInstruments;
     private readonly TimeProvider _timeProvider;
     private readonly Action<JudgeCacheEvent>? _onLookup;
 
@@ -88,12 +89,17 @@ public sealed class JudgeVerdictCache : IChatGate, IDelegatingGate
         _onLookup = onLookup;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _ttl = ttl;
-        _invalidationKey = invalidationKey ?? string.Empty;
+        var instruments = CalibrationRequirements.FindIn(inner).Select(c => c.InstrumentDigest).OfType<string>()
+            .Distinct(StringComparer.Ordinal).OrderBy(d => d, StringComparer.Ordinal).ToArray();
+        _configuredInstruments = instruments;
+        _invalidationKey = instruments.Length == 0 ? invalidationKey ?? string.Empty
+            : System.Text.Json.JsonSerializer.Serialize(new { invalidationKey, instruments });
     }
 
     /// <inheritdoc/>
     public async ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var safe = text ?? string.Empty;
         var key = HashOf(safe);
 
@@ -106,9 +112,13 @@ public sealed class JudgeVerdictCache : IChatGate, IDelegatingGate
 
         Interlocked.Increment(ref _misses);
         var verdict = await _inner.InspectAsync(safe, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Cache only Allow (see class remarks).
-        if (verdict.Action == GateAction.Allow)
+        var observed = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
+        if (verdict.Action == GateAction.Allow && verdict.Provenance?.RuleName.EndsWith(":budget-exhausted", StringComparison.Ordinal) != true &&
+            observed.All(i => i.Measured) &&
+            _configuredInstruments.All(digest => observed.Any(i => i.ConfigurationDigest == digest)))
         {
             Admit(key, verdict);
         }

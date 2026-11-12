@@ -18,6 +18,19 @@ namespace AgentEval.RedTeam;
 /// </remarks>
 public readonly record struct EvaluationResult
 {
+    // Runtime-only dependency state: an unavailable/unreadable measurement is distinct from a
+    // valid judge abstention. Composite safety claims must not erase a failed measurement.
+    internal bool MeasurementFailed { get; init; }
+
+    /// <summary>Identity of the complete configured graph, including unexecuted branches and requested settings.
+    /// Actual model identities and effective calls remain in <see cref="JudgeInstruments"/>; this digest alone does not certify model equivalence.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeGraphDigest { get; init; }
+
+    /// <summary>Configured judge instruments actually invoked. Composite evaluators retain each leaf separately.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>The outcome of the evaluation.</summary>
     public required EvaluationOutcome Outcome { get; init; }
 
@@ -108,4 +121,35 @@ public readonly record struct EvaluationResult
         Metadata = metadata,
         Confidence = confidence
     };
+}
+
+/// <summary>Content-free settings of one dispatched configured-judge request. A null model ID is unknown.</summary>
+/// <param name="ModelId">Model ID reported by the provider, without inferring a value when absent.</param>
+/// <param name="Temperature">Temperature actually sent; null means omitted.</param>
+/// <param name="MaxOutputTokens">Output token limit actually sent.</param>
+/// <param name="ResponseReceived">Whether the provider returned a response; this does not mean its verdict was valid.</param>
+public sealed record ProbeJudgeCall(string? ModelId, float? Temperature, int? MaxOutputTokens, bool ResponseReceived);
+
+/// <summary>One configured judge's selected prompt, execution identity and dispatched calls.</summary>
+/// <param name="Prompt">Prompt selection; text is retained only by explicit capture.</param>
+/// <param name="RubricDigest">Identity including the reader and observed effective model/settings, excluding case content.</param>
+/// <param name="Calls">Dispatched requests, including unsuccessful attempts. Unknown model IDs remain null.</param>
+public sealed record ProbeJudgeInstrument(AgentEval.Prompts.JudgePromptProvenance Prompt, string RubricDigest,
+    IReadOnlyList<ProbeJudgeCall> Calls)
+{
+    /// <summary>Shared runtime gate configuration identity, when this probe uses a gate instrument. Compare alongside observed model identities.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ConfigurationDigest { get; init; }
+
+    /// <summary>Explicit requested model, distinct from the model identities actually returned in Calls.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RequestedModelId { get; init; }
+
+    /// <summary>Whether the shared gate obtained a valid conclusive measurement; null when not reported.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Measured { get; init; }
+
+    /// <summary>Whether a shared gate reservation was denied; null when not reported.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? BudgetExhausted { get; init; }
 }

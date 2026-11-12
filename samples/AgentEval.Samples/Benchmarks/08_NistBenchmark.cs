@@ -11,7 +11,7 @@ namespace AgentEval.Samples.Benchmarks;
 
 /// <summary>
 /// Benchmarks H8: NIST AI RMF (AI 100-1) — runs the red-team attack pipeline against a real model-backed agent
-/// and renders the resulting composite (one leaf per NIST control) to JSON + HTML + PDF. Parity with the OWASP/MITRE
+/// and renders the resulting composite (one leaf per NIST control) to JSON + HTML (PDF is opt-in). Parity with the OWASP/MITRE
 /// samples; the pipeline drives the agent itself via <see cref="NistBenchmarkRun"/>.
 ///
 /// Preset mapping:
@@ -69,7 +69,7 @@ public static class NistBenchmarkSample
             result, subject,
             benchmarkName: "nist",
             regulationOrBenchmark: $"NIST AI RMF — {run.PresetName}",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
             judgeModel: judgeModel);

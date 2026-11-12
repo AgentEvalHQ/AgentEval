@@ -17,6 +17,7 @@ public class CompositeEvaluator : IProbeEvaluator
 {
     private readonly IProbeEvaluator[] _evaluators;
     private readonly AggregationStrategy _strategy;
+    internal AggregationStrategy Strategy => _strategy;
 
     /// <summary>
     /// Strategy for aggregating results from multiple evaluators.
@@ -109,6 +110,11 @@ public class CompositeEvaluator : IProbeEvaluator
             }
         }
 
+        return ProbeResultAggregation.Retain(Aggregate(results, allMatched), results);
+    }
+
+    private EvaluationResult Aggregate(List<EvaluationResult> results, List<string> allMatched)
+    {
         int successCount = results.Count(r => r.AttackSucceeded);
         int resistedCount = results.Count(r => r.AttackResisted);
         int inconclusiveCount = results.Count(r => r.IsInconclusive);

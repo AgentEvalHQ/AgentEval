@@ -124,8 +124,9 @@ judge detail allowed by `JudgeEvidenceMode`, and normalized evidence allowed by
 `EvidenceCaptureMode`. Treat it as sensitive data: restrict access, retention,
 and publication.
 
-The benchmark sample's JSON/HTML/PDF projection is safer by default: it contains
-counts and typed status only. The sample writes the raw native sidecar only when
+The benchmark sample's JSON/HTML projection contains counts and typed status only.
+PDF generation is an [explicit provider opt-in](../../pdf-providers.md) and uses
+the same projected facts. The sample writes the raw native sidecar only when
 `AGENTEVAL_LONGMEMEVAL_WRITE_NATIVE_REPORT=true`.
 
 ## Judge failure policy

@@ -64,10 +64,11 @@ public static partial class InterAgentBoundaryInjectionGate
     {
         ArgumentNullException.ThrowIfNull(fastModel);
         ArgumentNullException.ThrowIfNull(trustedGoalResolver);
-        var judge = CreateOutboundJudge(fastModel, options, cache);
+        var judge = CreateOutboundJudge(fastModel, options);
         var maxFormattedChars = options?.MaxInputChars ?? new JudgeGateOptions().MaxInputChars;
         return new OutboundTrustedGoalGate(
             trustedGoalResolver,
+            cache ? new JudgeVerdictCache(judge) : judge,
             judge,
             maxFormattedChars);
     }
@@ -117,7 +118,7 @@ public static partial class InterAgentBoundaryInjectionGate
         JudgeGateOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        var judge = CreateOutboundJudge(fastModel, options, cache: false);
+        var judge = CreateOutboundJudge(fastModel, options);
         return GateCalibrationHarness.EvaluateAsync(
             judge,
             goldSet ?? OutboundGoldSet(),
@@ -129,17 +130,15 @@ public static partial class InterAgentBoundaryInjectionGate
             cancellationToken);
     }
 
-    private static IChatGate CreateOutboundJudge(
+    private static CompositeJudgeGate<InterAgentOutboundGoalDriftRubric> CreateOutboundJudge(
         IChatClient fastModel,
-        JudgeGateOptions? options,
-        bool cache)
+        JudgeGateOptions? options)
     {
         ArgumentNullException.ThrowIfNull(fastModel);
-        IChatGate gate = new CompositeJudgeGate<InterAgentOutboundGoalDriftRubric>(
+        return new CompositeJudgeGate<InterAgentOutboundGoalDriftRubric>(
             new InterAgentOutboundGoalDriftRubric(),
             fastModel,
-            options);
-        return cache ? new JudgeVerdictCache(gate) : gate;
+            options, "outbound.goal-instruction-json.v1;required-trusted-goal.v1;goal-8000;instruction-16000;oversize.reject.v1");
     }
 
     private static void ValidatePart(
@@ -164,6 +163,7 @@ public static partial class InterAgentBoundaryInjectionGate
     private sealed class OutboundTrustedGoalGate(
         Func<CancellationToken, ValueTask<string?>> trustedGoalResolver,
         IChatGate inner,
+        CompositeJudgeGate<InterAgentOutboundGoalDriftRubric> judge,
         int maxFormattedChars) : IChatGate, IDelegatingGate
     {
         public string PolicyName => inner.PolicyName;
@@ -214,7 +214,11 @@ public static partial class InterAgentBoundaryInjectionGate
             return await inner.InspectAsync(formatted, cancellationToken).ConfigureAwait(false);
         }
 
-        private GateVerdict ContextFailure(string reason) =>
-            GateVerdict.Block(PolicyName, $"{OutboundAxis}: {reason} (fail-closed)");
+        private GateVerdict ContextFailure(string reason)
+        {
+            var blocked = GateVerdict.Block(PolicyName, $"{OutboundAxis}: {reason} (fail-closed)");
+            return judge.InstrumentDigest is null ? blocked : blocked with
+            { Provenance = judge.RecordObservation(string.Empty, JudgeVerdict.Inconclusive(reason)).Provenance };
+        }
     }
 }

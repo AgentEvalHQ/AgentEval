@@ -20,6 +20,8 @@ public class ThirdPartyNoticesPackagingTests
     [Theory]
     [InlineData("AgentEval")]
     [InlineData("AgentEval.Cli")]
+    [InlineData("AgentEval.Rendering.PdfSharp")]
+    [InlineData("AgentEval.Cli.Pdf")]
     public void PackableProject_PacksThirdPartyNoticesAtThePackageRoot(string project)
     {
         var projectDir = Path.Combine(LocateRepoRoot(), "src", project);

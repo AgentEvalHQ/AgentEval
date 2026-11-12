@@ -108,7 +108,8 @@ public sealed class PlanFormulationQualityEval : IEvalDefinitionWrapper
         ArgumentNullException.ThrowIfNull(input);
 
         // Resolve the plan text: prefer explicit metadata key, fall back to response scan.
-        var planText = ResolvePlan(input);
+        var configured = _inner.HasPromptSelection(input);
+        var planText = ResolvePlan(input, configured);
         if (planText is null)
             return Task.FromResult(EvalResult.Skipped(this,
                 $"No plan found: '{MetadataKey}' key absent from Metadata and no plan-like structure detected in Response."));
@@ -116,7 +117,9 @@ public sealed class PlanFormulationQualityEval : IEvalDefinitionWrapper
         // If the plan is separate from the response, inject it as context for the judge by
         // constructing a synthetic input where the plan text is prepended to the query context.
         var judgeInput = planText != input.Response
-            ? input with { Context = $"[Agent plan]\n{planText}\n\n{input.Context}".TrimEnd() }
+            ? input with { Context = configured
+                ? LocalizedJudgeEvidence.Serialize(new { plan = planText, context = input.Context })
+                : $"[Agent plan]\n{planText}\n\n{input.Context}".TrimEnd() }
             : input;
 
         return _inner.EvaluateAsync(judgeInput, ct);
@@ -125,7 +128,7 @@ public sealed class PlanFormulationQualityEval : IEvalDefinitionWrapper
     /// <summary>
     /// Returns the plan text to evaluate, or <c>null</c> if no plan can be located.
     /// </summary>
-    private static string? ResolvePlan(EvalInput input)
+    private static string? ResolvePlan(EvalInput input, bool configured)
     {
         // Priority 1: explicit metadata key.
         if (input.Metadata is not null &&
@@ -135,6 +138,10 @@ public sealed class PlanFormulationQualityEval : IEvalDefinitionWrapper
         {
             return planStr;
         }
+
+        // A configured rubric judges the supplied response directly. An English keyword
+        // miss must not hide a Swedish plan or reasoning trace from that instrument.
+        if (configured && !string.IsNullOrWhiteSpace(input.Response)) return input.Response;
 
         // Priority 2: look for plan-like structure in the response.
         if (input.Response is not null)

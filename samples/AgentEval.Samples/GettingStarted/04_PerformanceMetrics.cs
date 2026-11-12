@@ -42,7 +42,10 @@ public static class PerformanceMetrics
             Input = "Write a brief paragraph about the importance of software testing."
         };
 
-        var adapter = new MAFAgentAdapter(agent);
+        // MAF does not expose the underlying ChatResponse.ModelId here. Tag the
+        // configured identity explicitly; a deployment alias needs a PricingResolver.
+        var modelId = AIConfig.UseMock ? "gpt-4o-mini" : AIConfig.ModelDeployment;
+        var adapter = new MAFIdentifiableAgentAdapter(agent, modelId, modelId);
         Console.WriteLine("\ud83d\udcdd Step 3: Streaming response:");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write("   ");
@@ -88,6 +91,11 @@ public static class PerformanceMetrics
             Console.WriteLine($"   \ud83d\udcc8 Total Tokens:       {perf.TotalTokens}");
             if (perf.EstimatedCost.HasValue)
                 Console.WriteLine($"   \ud83d\udcb0 Estimated Cost:     ${perf.EstimatedCost.Value:F6}");
+            if (perf.CostEstimate is { } estimate)
+            {
+                Console.WriteLine($"   Cached input:        {estimate.CachedInputTokens?.ToString() ?? "unknown"} (subset of input)");
+                Console.WriteLine($"   Cost status:         {estimate.Status}; model source: {estimate.ModelSource}");
+            }
             if (perf.ToolCallCount > 0)
                 Console.WriteLine($"   \ud83d\udd27 Tool Calls:         {perf.ToolCallCount}");
             Console.WriteLine($"   \ud83d\udd04 Streaming:          {(perf.WasStreaming ? "Yes" : "No")}");
@@ -155,6 +163,11 @@ public static class PerformanceMetrics
     private static void PrintCostEstimationInfo()
     {
         Console.WriteLine("\n💡 COST ESTIMATION:");
+        Console.WriteLine("   This MAF adapter tags responses with the configured model identity.");
+        Console.WriteLine("   ModelName can override pricing; custom deployment aliases need matching rates.");
+        Console.WriteLine("   Cached input is discounted only with reported cache counts and a cached rate.");
+        Console.WriteLine("   Unknown cache usage stays an explicitly undiscounted estimate, not an invoice.");
+        Console.WriteLine("   Prefer per-run EvaluationOptions.PricingResolver for customer-specific rates.");
         Console.WriteLine("   AgentEval supports cost tracking for 9+ models:");
         Console.WriteLine("   • gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo");
         Console.WriteLine("   • claude-3-opus, claude-3-sonnet, claude-3-haiku");
@@ -241,7 +254,8 @@ public static class PerformanceMetrics
                 """);
             return Task.FromResult(new ChatResponse(response)
             {
-                Usage = new UsageDetails { InputTokenCount = 45, OutputTokenCount = 62 }
+                ModelId = "gpt-4o-mini", // Scripted identity and usage; no model call or charge.
+                Usage = new UsageDetails { InputTokenCount = 45, CachedInputTokenCount = 30, OutputTokenCount = 62 }
             });
         }
 
@@ -262,7 +276,8 @@ public static class PerformanceMetrics
 
             yield return new ChatResponseUpdate
             {
-                Contents = [new UsageContent(new UsageDetails { InputTokenCount = 45, OutputTokenCount = 62 })]
+                ModelId = "gpt-4o-mini",
+                Contents = [new UsageContent(new UsageDetails { InputTokenCount = 45, CachedInputTokenCount = 30, OutputTokenCount = 62 })]
             };
         }
 

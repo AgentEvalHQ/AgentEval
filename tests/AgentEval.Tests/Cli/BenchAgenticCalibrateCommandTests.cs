@@ -140,12 +140,23 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
         await BenchAgenticCalibrateCommand.RunCoreAsync(
             rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator(), recordsPath: recordsPath);
 
-        var keys = (await File.ReadAllLinesAsync(recordsPath)).Where(l => l.Length > 0)
+        var rows = (await File.ReadAllLinesAsync(recordsPath)).Where(l => l.Length > 0)
             .Select(l => JsonDocument.Parse(l).RootElement)
-            .Select(r => r.TryGetProperty("evaluatorKey", out var k) ? k.GetString() : r.GetProperty("EvaluatorKey").GetString())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        Assert.NotEmpty(keys);
-        Assert.All(BenchAgenticCalibrateCommand.s_notCalibratableOnTheseGoldens, k => Assert.DoesNotContain(k, keys));
+            .ToArray();
+        Assert.NotEmpty(rows);
+        // Undispatched cases remain auditable observations, with no invented score or judge result.
+        Assert.All(BenchAgenticCalibrateCommand.s_notCalibratableOnTheseGoldens, key =>
+        {
+            var unavailable = rows.Where(r => r.GetProperty("evaluatorKey").GetString() == key).ToArray();
+            Assert.NotEmpty(unavailable);
+            Assert.All(unavailable, r =>
+            {
+                Assert.Equal(JsonValueKind.Null, r.GetProperty("value").ValueKind);
+                Assert.Equal(JsonValueKind.Null, r.GetProperty("passed").ValueKind);
+                Assert.Equal(0, r.GetProperty("leaves").GetArrayLength());
+                Assert.Contains("No evaluator dispatched", r.GetProperty("error").GetString());
+            });
+        });
         Assert.All(BenchAgenticCalibrateCommand.s_notCalibratableOnTheseGoldens,
             k => Assert.NotNull(AgentEval.Evals.EvalRegistry.Shared.TryGet(k)));   // still registered for every other use
         Assert.Contains("Carved out by key (not dispatched)", await File.ReadAllTextAsync(outPath), StringComparison.Ordinal);

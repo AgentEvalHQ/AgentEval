@@ -457,6 +457,8 @@ public static class AefCompositeRunWriter
             });
         line = line with { Ext = AgentEval.Results.Adapters.Comparison.AefComparisonMetadata.Attach(line.Ext, node, contentCapture, comparisonSelected, comparisonId,
             name: comparisonId is null ? node.Metric.Name : comparisonName) };
+        line = line with { Ext = AefPromptProvenance.Attach(line.Ext, node.Provenance.JudgePrompt, contentCapture == AefContentCapture.On) };
+        line = line with { Ext = AefCostProvenance.Attach(line.Ext, node.Provenance.CostEstimate) };
         var handle = writer.AddResult(line, parent);
         capture?.Invoke(line, parent);
 
@@ -507,6 +509,7 @@ public static class AefCompositeRunWriter
 
     private static void ValidateTrials(EvalResult rollup, IReadOnlyList<EvalResult> trials)
     {
+        Prompts.JudgePromptProvenance.RequireCompatible(trials.Where(t => IsMeasured(StateOf(t.Score))).Select(t => t.Provenance.JudgePrompt));
         var children = rollup.Details.SubResults ?? [];
         if (trials.Any(t => t.Metric.Key != rollup.Metric.Key || (t.Details.SubResults?.Count ?? 0) != children.Count))
             throw new ArgumentException("Trial trees must have the same ordered metric keys and structure as their rollup.", nameof(trials));

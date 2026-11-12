@@ -57,7 +57,7 @@ internal static class MetricCatalog
             ["llm_fluency"] = c => new FluencyMetric(c),
             ["llm_bias"] = c => new BiasMetric(c),
             ["llm_misinformation"] = c => new MisinformationMetric(c),
-            ["llm_toxicity"] = c => new ToxicityMetric(c),   // pattern scan, then an LLM judge for what it does not match
+            ["llm_toxicity"] = c => new ToxicityMetric(c),   // legacy pattern scan/fallback; configured prompts use the selected judge directly
             ["llm_task_completion"] = c => new TaskCompletionMetric(c),
         };
 
@@ -86,11 +86,13 @@ internal static class MetricCatalog
     /// names an LLM-based metric; ignored for code-based ones.
     /// </param>
     /// <param name="embeddings">Required for embedding metrics; ignored by code/LLM metrics.</param>
+    /// <param name="prompts">Optional immutable configuration for supported metric judges.</param>
     /// <exception cref="ArgumentException"><paramref name="name"/> is not a known metric name.</exception>
     /// <exception cref="InvalidOperationException">
     /// The requested metric's evaluator client or embedding generator is missing.
     /// </exception>
-    public static IMetric Resolve(string name, IChatClient? evaluatorClient, IAgentEvalEmbeddings? embeddings = null)
+    public static IMetric Resolve(string name, IChatClient? evaluatorClient, IAgentEvalEmbeddings? embeddings = null,
+        Prompts.JudgePromptOptions? prompts = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -108,6 +110,23 @@ internal static class MetricCatalog
                     "already provides one for the default endpoint path; --sut targets have no model of their own).");
             }
 
+            if (prompts is not null)
+                return name.ToLowerInvariant() switch
+                {
+                    "llm_faithfulness" => new FaithfulnessMetric(evaluatorClient, prompts),
+                    "llm_relevance" => new RelevanceMetric(evaluatorClient, prompts),
+                    "llm_context_precision" => new ContextPrecisionMetric(evaluatorClient, prompts),
+                    "llm_context_recall" => new ContextRecallMetric(evaluatorClient, prompts),
+                    "llm_answer_correctness" => new AnswerCorrectnessMetric(evaluatorClient, prompts),
+                    "llm_groundedness" => new GroundednessMetric(evaluatorClient, prompts),
+                    "llm_coherence" => new CoherenceMetric(evaluatorClient, prompts),
+                    "llm_fluency" => new FluencyMetric(evaluatorClient, prompts),
+                    "llm_bias" => new BiasMetric(evaluatorClient, prompts),
+                    "llm_misinformation" => new MisinformationMetric(evaluatorClient, prompts),
+                    "llm_toxicity" => new ToxicityMetric(evaluatorClient, prompts),
+                    "llm_task_completion" => new TaskCompletionMetric(evaluatorClient, null, prompts),
+                    _ => throw new ArgumentException($"Metric '{name}' does not yet support declarative prompt packs; it cannot silently use an English judge.", nameof(name))
+                };
             return llmFactory(evaluatorClient);
         }
 

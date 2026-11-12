@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 using AgentEval.RedTeam.Evaluators;
+using AgentEval.Prompts;
 
 namespace AgentEval.RedTeam;
 
@@ -23,6 +24,16 @@ public static class GraderFactory
     {
         ArgumentNullException.ThrowIfNull(attack);
         ArgumentNullException.ThrowIfNull(options);
+
+        _ = ConfiguredProbeNarrator.Create(options);
+        if (options.JudgePrompts is { } prompts)
+        {
+            var graph = ConfiguredGraph(attack, options);
+            // Preflight controls even for CLI descriptor validation and fail-fast scans that may skip the arm.
+            if (options.RunBenignControls)
+                _ = new BenignControls.BenignControlEvaluator(options.JudgeClient!, BenignControls.BenignControlEvaluator.OptionsFor(options));
+            return RedTeamJudgePrompts.Bind(graph, prompts);
+        }
 
         var inner = attack.GetEvaluator();
         if (options.JudgeClient is null)
@@ -55,6 +66,46 @@ public static class GraderFactory
 
         return new JudgeBackedEvaluator(
             inner, options.JudgeClient, options.Mode, OptionsFor(options.Rubric, attack.Name), options.IncludeEvidence, options.JudgeTimeout);
+    }
+
+    /// <summary>Exports the supported scan grader's actual declared leaf rubrics without calling the judge or target.</summary>
+    /// <remarks>Use these stable keys to author a pack for <see cref="ScanOptions.JudgePrompts"/>.
+    /// Configured Primary and Fallback modes have distinct declared policies. Fallback preserves independent structural
+    /// evidence and defers owned language-dependent decisions; only judge-detected success can replace an undecidable oracle.</remarks>
+    public static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(IAttackType attack, ScanOptions options)
+    {
+        var definitions = RedTeamJudgePrompts.ForEvaluator(ConfiguredGraph(attack, options));
+        if (options.RunBenignControls) definitions = [.. definitions, AgentEval.Guardrails.Judges.GateJudgePrompts.ForRubric(
+            new AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric(), options.BenignControlJudgeOptions?.BlockThreshold ?? 0)];
+        return options.ExplainFindings ? [.. definitions, RedTeamJudgePrompts.ForExplanation(options.ExplanationJudgeOptions)] : definitions;
+    }
+
+    private static IProbeEvaluator ConfiguredGraph(IAttackType attack, ScanOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(attack);
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.JudgeClient is null || !Enum.IsDefined(options.Mode))
+            throw new NotSupportedException("Expected: a judge client and a declared grading mode. Actual: missing judge client or unknown mode. Suggestions: configure Primary or Fallback grading with a judge. Because: prompt selection must not silently preserve a different language-dependent judge path.");
+        if (options.JudgeTimeout is { } invalidTimeout && invalidTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(options), "Expected: positive judge timeout. Actual: nonpositive duration. Suggestions: use a positive duration or null. Because: configured grading must have an executable time budget.");
+
+        var inner = attack.GetEvaluator();
+        if (options.Mode == JudgeMode.Fallback)
+            return new JudgeBackedEvaluator(inner, options.JudgeClient, JudgeMode.Fallback,
+                OptionsFor(options.Rubric, attack.Name).Copy(null, "redteam.fallback." + attack.Name.ToLowerInvariant()),
+                options.IncludeEvidence, options.JudgeTimeout);
+        // The built-in ExcessiveAgency inner graph contains an English verbal fallback. Preserve its
+        // structural tool oracle and replace the verbal role with the declared localized action judges.
+        var structural = attack is Attacks.ExcessiveAgencyAttack && inner is FidelityCompositeEvaluator fidelity
+            ? fidelity.Behavioral : inner;
+        var graph = attack is IToolAwareAttack
+            ? DecomposedGraders.TryBuildToolAwareFor(attack.Name, structural, options.JudgeClient)
+            : DecomposedGraders.TryBuildFor(attack.Name, options.JudgeClient);
+        graph ??= inner; // Caller-composed graphs are accepted only if every node is explicitly supported by the binder.
+        graph = ConfiguredSpecializedGraders.Adapt(graph, options.JudgeClient);
+        graph = ConfiguredMarkerEvaluator.Adapt(graph, options.JudgeClient);
+        if (!options.IncludeEvidence) graph = new ReasonRedactingEvaluator(graph);
+        return options.JudgeTimeout is { } timeout ? new TimeoutEvaluator(graph, timeout) : graph;
     }
 
     /// <summary>Maps a <see cref="JudgeRubric"/> to the matching <see cref="LLMJudgeOptions"/>. <see cref="JudgeRubric.Strict"/>

@@ -75,6 +75,20 @@ verifies signed eval/redteam/bench evidence and their three-lane checkpoint with
 agenteval eval --azure --endpoint https://myresource.openai.azure.com/ --deployment-name gpt-4o --dataset agenteval.yaml --runs 5 --success-threshold 0.9
 ```
 
+### Customize supported judges
+
+Export, edit and validate a prompt pack without making model calls:
+
+```bash
+agenteval prompts export ./judge-pack
+agenteval prompts validate ./judge-pack/prompts.json
+agenteval prompts inspect ./judge-pack/prompts.json --json
+```
+
+Translate all four Markdown messages and criterion text, retain stable IDs and the response contract, and set the metadata locale. Use `eval --judge-prompt-pack <manifest> --judge-locale sv-SE` with supported RAG metrics or a criteria judge. Unsupported families fail explicitly. See [prompt packs](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/judge-prompt-packs.md) for complete runnable commands, fallback, coverage and calibration limits.
+
+Costs use returned model identity unless explicitly overridden. Reported cached input receives a discount only when its rate is available; missing data stays distinguishable from zero. See [cost estimation](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cost-estimation.md).
+
 ### Run benchmark families
 
 ```bash
@@ -119,12 +133,14 @@ agenteval migrate --apply                       # apply the migration
 ### Render reports (no LLM cost)
 
 ```bash
-# PDF from existing compliance evidence
+# Markdown from existing compliance evidence
 agenteval compliance render --regulation gdpr --subject my-agent
 
 # Markdown from existing agentic benchmark results
 agenteval render --benchmark agentic --subject my-agent
 ```
+
+PDF generation is optional. The stock CLI has no PDF engine and benchmarks do not generate PDFs automatically. The separate `AgentEval.Cli.Pdf` companion explicitly registers PDFsharp and renders verified recorded runs with `agenteval-pdf render --run <run-directory> --output report.pdf`. See [PDF providers](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/pdf-providers.md) for source/local-package installation and migration.
 
 ### Mission Control web portal (requires .NET 10)
 
@@ -189,7 +205,7 @@ agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset age
 | `init-workspace` | Initialize the canonical `.agenteval/` workspace                            |
 | `doctor`         | Validate the `.agenteval/` workspace structure and content hashes           |
 | `migrate`        | Migrate legacy output paths to the canonical `.agenteval/` layout           |
-| `compliance render` | Render a PDF report from existing compliance evidence (no LLM cost)      |
+| `compliance render` | Render a Markdown report from existing compliance evidence (no LLM cost) |
 | `render`         | Render a Markdown report from existing benchmark results (no LLM cost)      |
 | `mc serve`       | Start the Mission Control web portal (requires .NET 10)                     |
 

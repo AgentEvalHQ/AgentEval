@@ -29,6 +29,10 @@ internal static class GatekeeperCalibrateCommand
         var certDirOpt = new Option<string?>("--cert-dir") { Description = "Directory to write the certificate into (default .agenteval/gatekeeper/certs/); read back with inspect --cert-dir" };
 
         var cmd = new Command("calibrate", "Calibrate a judge axis against its gold set + baseline; optionally certify it.");
+        var prompts = new JudgePromptCliOptions(cmd);
+        var runtime = new GateRuntimeOptions(cmd);
+        var datasetOpt = new Option<string?>("--gold-set") { Description = "Labelled JSON calibration dataset with locale, split and review metadata." };
+        cmd.Options.Add(datasetOpt);
         cmd.Options.Add(gateOpt);
         model.AddTo(cmd);
         foreach (var o in new Option[] { maxDangerousOpt, minCasesOpt, maxConcOpt, certifyOpt, certPathOpt, certDirOpt })
@@ -38,16 +42,30 @@ internal static class GatekeeperCalibrateCommand
 
         cmd.SetAction(async (parse, ct) =>
         {
+            AgentEval.Prompts.JudgePromptOptions? selection;
+            GateCalibrationDataset? dataset;
+            GateRuntimeSettings settings;
+            try
+            {
+                selection = await prompts.Read(parse).LoadAsync(ct);
+                settings = runtime.Read(parse);
+                _ = settings.Bind(selection, null); // validate before provider resolution
+                dataset = GateCalibrationDataset.Load(parse.GetValue(datasetOpt));
+            }
+            catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+            { Console.Error.WriteLine(ex.Message); return ExitCodes.UsageError; }
             var (azure, endpoint, deployment, modelName, apiKey) = model.Read(parse);
             var mr = GatekeeperModelResolver.Resolve(azure, endpoint, deployment, modelName, apiKey, Console.Error);
             if (mr.Client is null)
             {
                 return mr.ExitCode;
             }
+            using var client = mr.Client;
 
-            return await RunAsync(parse.GetValue(gateOpt)!, mr.Client, mr.Fingerprint!,
+            return await RunAsync(parse.GetValue(gateOpt)!, client, mr.Fingerprint!,
                 parse.GetValue(maxDangerousOpt), parse.GetValue(minCasesOpt), parse.GetValue(maxConcOpt),
-                parse.GetValue(certifyOpt), parse.GetValue(certPathOpt), parse.GetValue(certDirOpt), Console.Out, Console.Error, ct);
+                parse.GetValue(certifyOpt), parse.GetValue(certPathOpt), parse.GetValue(certDirOpt), Console.Out, Console.Error, ct,
+                settings.Bind(selection, mr.RequestedModelId), dataset);
         });
 
         return cmd;
@@ -56,7 +74,8 @@ internal static class GatekeeperCalibrateCommand
     /// <summary>Testable core (model client + fingerprint supplied by the caller).</summary>
     public static async Task<int> RunAsync(
         string gate, IChatClient client, string fingerprint, int maxDangerousErrors, int minCasesPerDirection,
-        int maxConcurrency, bool certify, string? certPath, string? certDir, TextWriter stdout, TextWriter stderr, CancellationToken ct)
+        int maxConcurrency, bool certify, string? certPath, string? certDir, TextWriter stdout, TextWriter stderr, CancellationToken ct,
+        JudgeGateOptions? judgeOptions = null, GateCalibrationDataset? dataset = null)
     {
         if (!gate.StartsWith("judge:", StringComparison.Ordinal))
         {
@@ -72,17 +91,27 @@ internal static class GatekeeperCalibrateCommand
             return ExitCodes.UsageError;
         }
 
-        var gold = entry.GoldSet();
-        CalibrationReport report;
+        JudgeGoldSet gold;
+        AgentEval.Guardrails.IChatGate judge;
         try
         {
-            var judge = entry.Create(client, false);   // cache:false — measure the model, not a cached allow
+            dataset?.Validate(axis);
+            gold = dataset?.GoldSet() ?? entry.GoldSet();
+            judge = entry.Create(client, false, judgeOptions); // no allow-cache in calibration
+        }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        { stderr.WriteLine(ex.Message); return ExitCodes.UsageError; }
+        CalibrationReport report;
+        var baseline = entry.KeywordBaseline();
+        try
+        {
             report = await GateCalibrationHarness.EvaluateAsync(judge, gold, new CalibrationOptions
             {
-                DeterministicBaseline = entry.KeywordBaseline(),
+                DeterministicBaseline = baseline,
                 MaxDangerousErrors = maxDangerousErrors,
                 MinCasesPerDirection = minCasesPerDirection,
                 MaxConcurrency = maxConcurrency,
+                SplitLabel = dataset?.SplitLabel,
             }, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -91,17 +120,27 @@ internal static class GatekeeperCalibrateCommand
             return ExitCodes.RuntimeError;
         }
 
-        var dto = CalibrationReportDto.From(report, redactCaseText: GateVerdictDto.RedactAxes.Contains(axis));
+        var instrument = InlineReadinessStore.InstrumentOf(judge);
+        var needsReview = instrument is not null || dataset is not null;
+        var certificateEligible = report.IsInlineReady && (!needsReview || dataset is { Reviewed: true, SplitLabel: "held-out" });
+        var dto = CalibrationReportDto.From(report, redactCaseText: GateVerdictDto.RedactAxes.Contains(axis) ||
+            instrument is not null && judgeOptions?.JudgePrompts?.CaptureContent != true) with
+        {
+            Dataset = dataset?.Provenance, CertificateEligible = certificateEligible,
+            CalibrationPolicy = new(maxDangerousErrors, minCasesPerDirection, maxConcurrency, baseline.PolicyName, "en")
+        };
         stdout.WriteLine(dto.ToJson());
+        if (needsReview && !certificateEligible)
+            stderr.WriteLine("Configured/custom calibration is diagnostic until a reviewed held-out dataset and all readiness checks pass. Built-in keyword baselines remain English; no customer accuracy is implied.");
 
         if (certify)
         {
             var cert = new CalibrationCertificate(axis, fingerprint, InlineReadinessStore.GoldSetHash(gold),
-                report.IsInlineReady, DateTime.UtcNow.ToString("o"), dto);
+                certificateEligible, DateTime.UtcNow.ToString("o"), dto, instrument, dataset?.Provenance);
             var written = InlineReadinessStore.Save(cert, certPath, certDir);
-            stderr.WriteLine($"  certificate written: {written} (isInlineReady={report.IsInlineReady})");
+            stderr.WriteLine($"  certificate written: {written} (isInlineReady={certificateEligible})");
         }
 
-        return report.IsInlineReady ? ExitCodes.Success : ExitCodes.TestFailure;   // 0 / 1
+        return certificateEligible ? ExitCodes.Success : ExitCodes.TestFailure;   // 0 / 1
     }
 }

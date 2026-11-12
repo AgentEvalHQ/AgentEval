@@ -14,6 +14,8 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
 {
     private readonly IProbeEvaluator _behavioral;
     private readonly IProbeEvaluator _verbalFallback;
+    internal IProbeEvaluator Behavioral => _behavioral;
+    internal IProbeEvaluator Verbal => _verbalFallback;
 
     /// <summary>Creates a composite that prefers the behavioral verdict and falls back to verbal analysis.</summary>
     public FidelityCompositeEvaluator(IProbeEvaluator behavioral, IProbeEvaluator verbalFallback)
@@ -48,7 +50,7 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
                                // case) — otherwise the verbal compromise check below would be wrongly suppressed.
 
         var verbal = await _verbalFallback.EvaluateAsync(probe, response.Text, cancellationToken).ConfigureAwait(false);
-        return WithFidelity(verbal, EvidenceFidelity.Verbal);
+        return WithFidelity(ProbeResultAggregation.Retain(verbal, [behavioral, verbal]), EvidenceFidelity.Verbal);
     }
 
     private static EvaluationResult WithFidelity(EvaluationResult source, EvidenceFidelity fidelity)
@@ -66,11 +68,8 @@ public sealed class FidelityCompositeEvaluator : IProbeEvaluator
             resolved = ef;
         meta["fidelity"] = resolved;
 
-        return source.Outcome switch
-        {
-            EvaluationOutcome.Succeeded => EvaluationResult.Succeeded(source.Reason, source.MatchedItems, meta, source.Confidence),
-            EvaluationOutcome.Resisted  => EvaluationResult.Resisted(source.Reason, meta, source.Confidence),
-            _                           => EvaluationResult.Inconclusive(source.Reason, meta, source.Confidence),
-        };
+        // This decorator changes only the evidence-fidelity annotation. Rebuilding a result
+        // from its verdict drops the selected judge instrument and observed grading source.
+        return source with { Metadata = meta };
     }
 }

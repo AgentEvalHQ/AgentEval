@@ -98,7 +98,9 @@ public sealed class SelfCorrectionQualityEval : IEvalDefinitionWrapper
         // A with copy: a new EvalInput of four fields dropped the context and every other one the caller set (B12a).
         var enriched = input with
         {
-            Query = BuildEnrichedQuery(input.Query, input.Response, correction),
+            Query = _inner.HasPromptSelection(input)
+                ? LocalizedJudgeEvidence.Serialize(new { query = input.Query, originalResponse = input.Response, correctionTurn = correction })
+                : BuildEnrichedQuery(input.Query, input.Response, correction),
             Response = correction.Content,
         };
 

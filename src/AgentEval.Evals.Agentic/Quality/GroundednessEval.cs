@@ -10,8 +10,9 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <summary>
 /// Evaluates whether an AI response is factually grounded in the provided context.
 /// <para>
-/// Implemented as a <see cref="CompositeEval"/> with four <see cref="AtomicLlmEval"/>
-/// sub-dimensions (per findings-and-suggestions §4 and master analysis §5.3):
+/// Implemented as a <see cref="CompositeEval"/> of configured <see cref="AtomicLlmEval"/> dimensions.
+/// The legacy constructor retains the following four dimensions; SupportFocusedV2 omits source coverage
+/// and offers separately enabled, query-relative answer completeness:
 /// </para>
 /// <list type="table">
 ///   <listheader><term>Sub-dimension</term><description>Weight</description></listheader>
@@ -28,8 +29,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/>,
 /// <see cref="EvalInput.Response"/>, and ideally <see cref="EvalInput.Context"/>.
-/// If <see cref="EvalInput.Context"/> is absent, the judge will score based on the
-/// response alone and will typically return low scores for grounded claims.
+/// The support-focused policy requires captured context and reports missing evidence as unmeasured.
+/// The original constructor retains the legacy policy; use the options constructor to select SupportFocused.
 /// </para>
 /// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
@@ -66,96 +67,55 @@ public sealed class GroundednessEval : IEvalDefinitionWrapper
     /// <param name="judgeModel">Optional judge model identifier recorded in provenance.</param>
     /// <param name="passThreshold">Score fraction (0..1) at or above which the composite passes. Defaults to 0.75.</param>
     public GroundednessEval(IEvaluator judge, string? judgeModel = null, double passThreshold = 0.75)
+        : this(judge, judgeModel, passThreshold, GroundednessOptions.Legacy) { }
+
+    /// <summary>Creates a groundedness instrument with explicit, immutable scoring options.</summary>
+    /// <param name="judge">Judge used by active dimensions.</param>
+    /// <param name="judgeModel">Configured judge identity for provenance and pricing.</param>
+    /// <param name="passThreshold">Composite and dimension pass threshold in [0, 1].</param>
+    /// <param name="options">Use SupportFocused for claim support without a source-coverage penalty.</param>
+    public GroundednessEval(IEvaluator judge, string? judgeModel, double passThreshold, GroundednessOptions options)
     {
         ArgumentNullException.ThrowIfNull(judge);
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
+        var supportFocused = options.Policy == GroundednessPolicy.SupportFocusedV2;
+        var promptId = supportFocused ? "agenteval.groundedness.v2" : "agenteval.groundedness.v1";
+        var components = new List<EvalComponent>();
 
-        // Each sub-dimension uses the same prompt, differentiated by the {dimension} placeholder
-        // embedded in the prompt at runtime via criteria descriptions (the judge interprets them).
-        // Claim contradictions are zero-tolerance → severity=high; citation and coverage are medium.
-        var components = new[]
+        void Add(string key, string name, GroundednessDimensionOptions dimension, string severity, params string[] criteria)
         {
-            new EvalComponent(
-                Eval: new AtomicLlmEval(
-                    evaluator: judge,
-                    key: "claim_support",
-                    name: "Claim Support",
-                    category: "rag",
-                    version: "1.0.0",
-                    criteria: new[]
-                    {
-                        "Every factual claim in the response has direct supporting evidence in the provided context",
-                        "The response does not assert facts that cannot be derived from the context",
-                    },
-                    passThreshold: passThreshold,
-                    judgeModel: judgeModel,
-                    promptId: "agenteval.groundedness.v1",
-                    failureSeverity: "medium"),
-                Weight: 0.30) { OnFailure = ComponentFailureEffect.Fail },
+            if (!dimension.Enabled) return;
+            var eval = new AtomicLlmEval(judge, key, name, "rag", supportFocused ? "2.0.0" : "1.0.0",
+                criteria, passThreshold, judgeModel, promptId, severity)
+            {
+                JudgeNeedsData = options.RequireContext ? JudgeInputData.Context : JudgeInputData.None
+            };
+            components.Add(new(eval, dimension.Weight, dimension.Required) { OnFailure = dimension.OnFailure });
+        }
 
-            new EvalComponent(
-                Eval: new AtomicLlmEval(
-                    evaluator: judge,
-                    key: "claim_contradicted",
-                    name: "Claim Contradicted",
-                    category: "rag",
-                    version: "1.0.0",
-                    criteria: new[]
-                    {
-                        "No claims in the response are directly contradicted by information in the provided context",
-                        "The response does not state the opposite of what the context establishes",
-                    },
-                    passThreshold: passThreshold,
-                    judgeModel: judgeModel,
-                    promptId: "agenteval.groundedness.v1",
-                    // Contradictions are more severe — escalate to high
-                    failureSeverity: "high"),
-                Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },
+        Add("claim_support", "Claim Support", options.ClaimSupport, "medium",
+            "Every factual claim in the response has direct supporting evidence in the provided context",
+            "The response does not assert facts that cannot be derived from the context");
+        Add("claim_contradicted", "Claim Contradicted", options.ClaimContradicted, "high",
+            "No claims in the response are directly contradicted by information in the provided context",
+            "The response does not state the opposite of what the context establishes");
+        Add("citation_accuracy", "Citation Accuracy", options.CitationAccuracy, "medium",
+            "When the response cites a source, passage, or quote, the citation accurately represents what the context says",
+            options.RequireCitations
+                ? "Every factual claim requiring evidence has an explicit, accurate citation; absent citations do not pass"
+                : "No citations are fabricated or misattributed (responses with no citations trivially pass this criterion)");
+        if (supportFocused)
+            Add("answer_completeness", "Answer Completeness", options.Completeness, "medium",
+                "The response supplies the information needed to answer the query, without requiring unrelated context to be reproduced",
+                "A concise answer that fully resolves the query receives full credit even when the source contains additional facts");
+        else
+            Add("evidence_coverage", "Evidence Coverage", options.Completeness, "medium",
+                "The response leverages a substantial portion of the key evidence available in the context",
+                "The response does not ignore major context passages that are directly relevant to the query");
 
-            new EvalComponent(
-                Eval: new AtomicLlmEval(
-                    evaluator: judge,
-                    key: "citation_accuracy",
-                    name: "Citation Accuracy",
-                    category: "rag",
-                    version: "1.0.0",
-                    criteria: new[]
-                    {
-                        "When the response cites a source, passage, or quote, the citation accurately represents what the context says",
-                        "No citations are fabricated or misattributed (responses with no citations trivially pass this criterion)",
-                    },
-                    passThreshold: passThreshold,
-                    judgeModel: judgeModel,
-                    promptId: "agenteval.groundedness.v1",
-                    failureSeverity: "medium"),
-                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
-
-            new EvalComponent(
-                Eval: new AtomicLlmEval(
-                    evaluator: judge,
-                    key: "evidence_coverage",
-                    name: "Evidence Coverage",
-                    category: "rag",
-                    version: "1.0.0",
-                    criteria: new[]
-                    {
-                        "The response leverages a substantial portion of the key evidence available in the context",
-                        "The response does not ignore major context passages that are directly relevant to the query",
-                    },
-                    passThreshold: passThreshold,
-                    judgeModel: judgeModel,
-                    promptId: "agenteval.groundedness.v1",
-                    failureSeverity: "medium"),
-                Weight: 0.25) { OnFailure = ComponentFailureEffect.Warn },
-        };
-
-        _inner = new CompositeEval(
-            key: "groundedness",
-            name: "Groundedness",
-            category: "rag",
-            version: "1.1.0",
-            components: components,
-            aggregation: WeightedSumAggregation.Instance,
-            threshold: passThreshold);
+        _inner = new CompositeEval("groundedness", "Groundedness", "rag", supportFocused ? "2.0.0" : "1.1.0",
+            components.AsReadOnly(), WeightedSumAggregation.Instance, passThreshold);
     }
 
     /// <inheritdoc/>

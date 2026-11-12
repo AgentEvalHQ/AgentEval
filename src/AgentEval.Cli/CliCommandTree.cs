@@ -129,6 +129,7 @@ internal static class CliCommandTree
         benchGdprCmd.Add(benchNoAefOpt);
         benchGdprCmd.Add(benchSubjectVersionOpt);
         var (benchGdprSutOpt, benchGdprAckOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
+        var benchGdprPrompts = new JudgePromptCliOptions(benchGdprCmd, recursive: true);
         benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchPresetOpt) ?? "standard";
@@ -175,19 +176,20 @@ internal static class CliCommandTree
             return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
                 aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
                 agentIsLive: agentOverride is not null,
-                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchGdprSutTargets, sut), promptSelection: benchGdprPrompts.Read(parseResult));
         });
 
         // bench gdpr calibrate
         var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
         var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/gdpr-calibration-{date}.md)" };
         var calibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
-        var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
+        var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against labelled fixture datasets (label review is not verified by the command)");
         calibrateCmd.Add(calibrateRootOpt);
         calibrateCmd.Add(calibrateOutOpt);
         calibrateCmd.Add(calibrateDecisionsOpt);
         var calibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per pillar (the one-item stage before a full paid run; requires --out)" };
         calibrateCmd.Add(calibrateLimitOpt);
+        var gdprCalibrationOptions = new CalibrationCliOptions(calibrateCmd, benchGdprPrompts, compliance: true);
         calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var root = parseResult.GetValue(calibrateRootOpt);
@@ -198,7 +200,7 @@ internal static class CliCommandTree
                 parseResult.GetValue(calibrateDecisionsOpt),
                 (decisionJudge, decisionJudgeIdentity) => BenchCalibrateCommand.RunCoreAsync(
                     root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity,
-                    limitPerPillar: parseResult.GetValue(calibrateLimitOpt)));
+                    limitPerPillar: parseResult.GetValue(calibrateLimitOpt), selection: gdprCalibrationOptions.Read(parseResult)));
         });
         benchGdprCmd.Add(calibrateCmd);
 
@@ -230,6 +232,7 @@ internal static class CliCommandTree
         benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
         benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
         var (benchEuAiActSutOpt, benchEuAiActAckOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
+        var benchEuAiActPrompts = new JudgePromptCliOptions(benchEuAiActCmd, recursive: true);
         benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchEuAiActPresetOpt) ?? "standard";
@@ -279,18 +282,19 @@ internal static class CliCommandTree
                 aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
                 subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null,
                 runs: parseResult.GetValue(benchEuAiActRunsOpt) ?? 1,
-                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut));
+                subjectSettings: SutTargetResolver.RunSettingsFor(benchEuAiActSutTargets, sut), promptSelection: benchEuAiActPrompts.Read(parseResult));
         });
         // bench eu-ai-act calibrate
         var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
         var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/eu-ai-act-calibration-{date}.md)" };
         var euCalibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
-        var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
+        var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against labelled fixture datasets (label review is not verified by the command)");
         euCalibrateCmd.Add(euCalibrateRootOpt);
         euCalibrateCmd.Add(euCalibrateOutOpt);
         euCalibrateCmd.Add(euCalibrateDecisionsOpt);
         var euCalibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per pillar (the one-item stage before a full paid run; requires --out)" };
         euCalibrateCmd.Add(euCalibrateLimitOpt);
+        var euCalibrationOptions = new CalibrationCliOptions(euCalibrateCmd, benchEuAiActPrompts, compliance: true);
         euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var root = parseResult.GetValue(euCalibrateRootOpt);
@@ -300,7 +304,7 @@ internal static class CliCommandTree
                 parseResult.GetValue(euCalibrateDecisionsOpt),
                 (decisionJudge, decisionJudgeIdentity) => BenchEuAiActCalibrateCommand.RunCoreAsync(
                     root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity,
-                    limitPerPillar: parseResult.GetValue(euCalibrateLimitOpt)));
+                    limitPerPillar: parseResult.GetValue(euCalibrateLimitOpt), selection: euCalibrationOptions.Read(parseResult)));
         });
         benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -340,6 +344,7 @@ internal static class CliCommandTree
         benchAgenticCmd.Add(benchAgenticAefOpt);
         benchAgenticCmd.Add(benchAgenticNoAefOpt);
         benchAgenticCmd.Add(benchAgenticSubjectVersionOpt);
+        var benchAgenticPrompts = new JudgePromptCliOptions(benchAgenticCmd, recursive: true);
         benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
@@ -372,25 +377,26 @@ internal static class CliCommandTree
             return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock,
                 reference: reference.Text, context: context.Text, ct: ct,
                 aef: parseResult.GetValue(benchAgenticAefOpt), noAef: parseResult.GetValue(benchAgenticNoAefOpt),
-                subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt));
+                subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt), promptSelection: benchAgenticPrompts.Read(parseResult));
         });
         // bench agentic calibrate
         var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
         var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/agentic-calibration-{date}.md)" };
         var agenticCalibrateRecordsOpt = new Option<string?>("--records") { Description = "Also write one JSON line per evaluated case (verdict, every criterion's verdict, prompt id and hash) to this path, so the run can be re-analysed without repeating the calls" };
         var agenticCalibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per category (the one-item stage before a full paid run)" };
-        var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against hand-labeled golden datasets");
+        var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against labelled fixture datasets (label review is not verified by the command)");
         agenticCalibrateCmd.Add(agenticCalibrateRootOpt);
         agenticCalibrateCmd.Add(agenticCalibrateOutOpt);
         agenticCalibrateCmd.Add(agenticCalibrateRecordsOpt);
         agenticCalibrateCmd.Add(agenticCalibrateLimitOpt);
+        var agenticCalibrationOptions = new CalibrationCliOptions(agenticCalibrateCmd, benchAgenticPrompts, compliance: false);
         agenticCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var root = parseResult.GetValue(agenticCalibrateRootOpt);
             var outPath = parseResult.GetValue(agenticCalibrateOutOpt);
             var records = parseResult.GetValue(agenticCalibrateRecordsOpt);
             var limit = parseResult.GetValue(agenticCalibrateLimitOpt);
-            return await BenchAgenticCalibrateCommand.RunAsync(root, outPath, ct: ct, recordsPath: records, limitPerCategory: limit);
+            return await BenchAgenticCalibrateCommand.RunCoreAsync(root, outPath, evaluatorOverride: null, ct: ct, recordsPath: records, limitPerCategory: limit, selection: agenticCalibrationOptions.Read(parseResult));
         });
         benchAgenticCmd.Add(agenticCalibrateCmd);
 
@@ -953,7 +959,7 @@ internal static class CliCommandTree
         var renderSubjectOpt = new Option<string?>("--subject") { Description = "Subject name to render evidence for" };
         var renderTsOpt = new Option<string?>("--ts") { Description = "Timestamp directory (yyyy-MM-dd_HH-mm-ss); defaults to most recent" };
         var renderRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-        var renderCmd = new Command("render", "Render a PDF report from existing compliance evidence (no LLM cost)");
+        var renderCmd = new Command("render", "Render a Markdown report from existing compliance evidence (no LLM cost)");
         renderCmd.Add(renderRegulationOpt);
         renderCmd.Add(renderSubjectOpt);
         renderCmd.Add(renderTsOpt);
@@ -1091,6 +1097,7 @@ internal static class CliCommandTree
         rootCmd.Add(AefCommand.Create());                  // aef — verify/seal/view/checkpoint AEF 1.0 runs; export store v1, import ASSERT
         rootCmd.Add(DecideCommand.Create());               // decide — append a self-attested review without changing sealed results
         rootCmd.Add(RequirementsCommand.Create());         // requirements — external catalogue validation and evidence status
+        rootCmd.Add(PromptsCommand.Create());
         rootCmd.Add(AgentEval.Cli.Runner.RunnerManifest.Create());
         var aefRunCommand = AgentEval.Cli.Runner.RunCommand.Create();
         rootCmd.Add(aefRunCommand);

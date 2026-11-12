@@ -623,7 +623,7 @@ var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
 
 ## Package Structure
 
-The codebase is organized into internal projects shipped as a single NuGet package (`AgentEval`), which embeds its sub-project DLLs (`PrivateAssets="all"`). The CLI and Mission Control server/SPA are separate, non-packaged applications. One sub-tree — `AgentEval.MAF.CopilotStudio` — ships as its own, separate, opt-in NuGet package instead of being embedded in `AgentEval`, so its Copilot Studio SDK + MSAL dependency tree is never forced on consumers who don't use it.
+The default library is organized into internal projects embedded in the `AgentEval` NuGet package (`PrivateAssets="all"`). PDF engines are excluded: `AgentEval.Rendering.PdfSharp` is a separate optional provider package, and `AgentEval.Cli.Pdf` is a separate optional .NET tool. The stock CLI ships as the `AgentEval.Cli` .NET tool, with the Mission Control server/SPA as application components. `AgentEval.MAF.CopilotStudio` also ships as its own opt-in package rather than being embedded in `AgentEval`, so its Copilot Studio SDK + MSAL dependency tree is not imposed on other consumers.
 
 ```
 src/
@@ -636,7 +636,7 @@ src/
 ├── AgentEval.Compliance.Gdpr/    # GDPR compliance benchmark pack (pillars/articles/reporters)
 ├── AgentEval.Compliance.EuAiAct/ # EU AI Act compliance benchmark pack
 ├── AgentEval.Evals.Performance/  # PerformanceBenchmark (latency/throughput/cost)
-├── AgentEval.Rendering.Pdf/      # Generic QuestPDF EvalResult renderer
+├── AgentEval.Rendering.Pdf/      # Engine-neutral projections, provider registry and compatibility facades
 ├── AgentEval.MAF/                # Microsoft Agent Framework adapters + harnesses
 ├── AgentEval.Memory/             # Memory evaluation, benchmarks, LongMemEval, HTML reporting
 ├── AgentEval.RedTeam/            # Security testing: attacks, evaluators, OWASP/MITRE compliance reports
@@ -645,9 +645,11 @@ src/
 │
 │   # Its own, separate opt-in NuGet package (NOT embedded in AgentEval):
 ├── AgentEval.MAF.CopilotStudio/  # Copilot Studio live connector — IChatClient/IEvaluableAgent bridge, usable directly in code
+├── AgentEval.Rendering.PdfSharp/ # Optional PDFsharp/MigraDoc provider + bundled fonts
 │
-│   # Applications (NOT in the NuGet package):
-├── AgentEval.Cli/                # `agenteval` CLI (init/eval/list/bench/redteam/mc/doctor)
+│   # Tools/applications (NOT embedded in the AgentEval library package):
+├── AgentEval.Cli/                # `agenteval` .NET tool (init/eval/list/bench/redteam/mc/doctor), no PDF engine
+├── AgentEval.Cli.Pdf/            # Optional `agenteval-pdf` .NET tool; explicitly composes the provider
 ├── AgentEval.MissionControl/     # Read-only portal (GraphQL + REST, net10.0-only)
 └── AgentEval.MissionControl.Spa/ # React SPA served by Mission Control
 ```
@@ -851,7 +853,7 @@ catch (BehavioralPolicyViolationException ex)
 
 ## Internal Project Structure
 
-AgentEval ships as a **single NuGet package** (`AgentEval`) but is internally organized into focused projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md) for the original split and [ADR-018](adr/018-compliance-core-and-shared-extractions.md) for the `Compliance.Core` extraction).
+The default `AgentEval` NuGet package embeds focused internal projects for maintainability and compile-time dependency enforcement (see [ADR-016](adr/016-monolith-modularization.md) for the original split and [ADR-018](adr/018-compliance-core-and-shared-extractions.md) for the `Compliance.Core` extraction). Optional PDF implementations are separate distributions; installing the default library or stock CLI does not install an engine.
 
 ### Dependency Graph (embedded sub-projects)
 
@@ -861,15 +863,17 @@ AgentEval (NuGet package — umbrella, embeds all of the below via PrivateAssets
 ├── AgentEval.Core              → Abstractions + M.E.AI + M.E.AI.Eval.Quality + S.N.Tensors + M.E.DI
 ├── AgentEval.Compliance.Core   → Abstractions + Core
 ├── AgentEval.DataLoaders       → Abstractions + Core + YamlDotNet + JsonSchema.Net
-├── AgentEval.Evals.Agentic     → Abstractions + Core + JsonSchema.Net + QuestPDF + YamlDotNet + M.E.DI
-├── AgentEval.Compliance.Gdpr   → Abstractions + Core + Compliance.Core + DataLoaders + YamlDotNet + JsonSchema.Net + QuestPDF
-├── AgentEval.Compliance.EuAiAct→ Abstractions + Core + Compliance.Core + DataLoaders + YamlDotNet + JsonSchema.Net + QuestPDF
+├── AgentEval.Evals.Agentic     → Abstractions + Core + DataLoaders + Rendering.Pdf + JsonSchema.Net + YamlDotNet + M.E.DI
+├── AgentEval.Compliance.Gdpr   → Abstractions + Core + Compliance.Core + DataLoaders + Rendering.Pdf + YamlDotNet + JsonSchema.Net
+├── AgentEval.Compliance.EuAiAct→ Abstractions + Core + Compliance.Core + Compliance.Gdpr + DataLoaders + Rendering.Pdf + YamlDotNet + JsonSchema.Net
 ├── AgentEval.Evals.Performance → Abstractions + Core
-├── AgentEval.Rendering.Pdf     → Abstractions + QuestPDF
+├── AgentEval.Rendering.Pdf     → Abstractions + M.E.DI (no engine)
 ├── AgentEval.MAF               → Abstractions + Core + M.Agents.AI + M.Agents.AI.Workflows + OpenTelemetry.Api
 ├── AgentEval.Memory            → Abstractions + Core + M.E.AI + M.E.DI
-└── AgentEval.RedTeam           → Abstractions + Core + M.E.AI + M.E.DI + PdfSharp-MigraDoc
+└── AgentEval.RedTeam           → Abstractions + Core + Rendering.Pdf + M.E.AI + M.E.DI
 ```
+
+`AgentEval.Rendering.PdfSharp` depends on the matching `AgentEval` package and pins PDFsharp/MigraDoc 6.2.4. It supplies the renderer and bundled fonts; neither travels in the default package. `AgentEval.Cli.Pdf` explicitly composes that provider for verified saved AEF runs. Library hosts install a provider, register it with `AddAgentEvalPdfSharp()` (or `AddAgentEvalPdfProvider<T>()` for another engine), and request output through `IPdfRendererRegistry`. See [optional PDF providers](pdf-providers.md) for registration, selection and migration.
 
 Because the umbrella embeds the sub-project DLLs with `PrivateAssets="all"`, each sub-project's external `PackageReference`s must be re-declared on the umbrella by hand. `UmbrellaDependencyClosureTests` (ARC-10) is a build-time guard that fails when a sub-project adds a runtime package the umbrella does not mirror, so a missing transitive dependency can no longer ship silently (SEC-02 class of bug).
 
@@ -882,15 +886,17 @@ Because the umbrella embeds the sub-project DLLs with `PrivateAssets="all"`, eac
 | `AgentEval.Compliance.Core` | Shared, regulation-neutral compliance building blocks for the GDPR/EU-AI-Act packs (ARC-01) |
 | `AgentEval.DataLoaders` | Data loaders (JSON/YAML/CSV/JSONL), exporters, canonical output store |
 | `AgentEval.Evals.Agentic` | Agentic benchmark family + agentic reporting (`AgenticCategoryResolver`) |
-| `AgentEval.Compliance.Gdpr` / `.EuAiAct` | Regulation-specific pillars/articles, scenarios, reporters, PDF renderers |
+| `AgentEval.Compliance.Gdpr` / `.EuAiAct` | Regulation-specific pillars/articles, scenarios, reporters and engine-neutral PDF facades |
 | `AgentEval.Evals.Performance` | Latency/throughput/cost benchmark |
-| `AgentEval.Rendering.Pdf` | Generic QuestPDF `EvalResult` renderer |
+| `AgentEval.Rendering.Pdf` | Engine-neutral report projections, provider registry and `IEvalResultRenderer` adapter |
+| `AgentEval.Rendering.PdfSharp` | Separately installed PDFsharp/MigraDoc renderer; explicit registration and output |
+| `AgentEval.Cli.Pdf` | Separately installed PDF companion for verified recorded AEF evidence |
 | `AgentEval.MAF` | Microsoft Agent Framework adapters and harnesses |
 | `AgentEval.Memory` | Memory evaluation, benchmarks, LongMemEval |
 | `AgentEval.RedTeam` | Security scanning, attack types, evaluators, OWASP/MITRE compliance reports |
 | `AgentEval` (umbrella) | Packaging + `AddAgentEvalAll()` DI convenience method |
 
-All packaged projects use `RootNamespace=AgentEval` so consumers see no namespace changes.
+The modular split preserves existing public namespaces. Optional PDF provider registration is available in `AgentEval.Rendering.PdfSharp`.
 
 ---
 

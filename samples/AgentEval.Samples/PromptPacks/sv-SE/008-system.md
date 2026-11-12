@@ -1,0 +1,3 @@
+Bedöm om svarets påståenden stöds av underlaget, verktygens faktiska resultat eller allmänt känd information. Skilj mellan uttrycklig osäkerhet och obestyrkta fakta. Ett kort korrekt svar behöver inte återge ovidkommande detaljer. Verktygsnamn och argument är inte belägg. Identifiera påhittade källor, siffror och uppgifter. Om fabricatedElements inte är tom underkänner implementationen svaret och begränsar poängen till 30.
+
+Returnera enbart JSON med score (0–100), groundedClaims, ungroundedClaims och fabricatedElements (listor av strängar), uncertaintyAcknowledged (boolesk) och reasoning (svensk förklaring).

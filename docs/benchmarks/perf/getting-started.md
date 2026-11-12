@@ -39,8 +39,10 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Evals.Perfor
 Default thresholds (overridable via `PerformanceBenchmarkEvaluateOptions`):
 - P99 latency threshold: 5000 ms → score = 1 - (p99ms / 5000), clamped [0, 1].
 - Minimum throughput: 0.5 RPS → score = min(rps / 0.5, 1.0).
-- Maximum cost: $0.10 USD → score = 1 - (cost / 0.10), clamped [0, 1]. When pricing data is missing for the model, cost-leaf defaults to pass with score 1.0.
+- Maximum cost: $0.10 USD → score = 1 - (cost / 0.10), clamped [0, 1]. Missing usage or pricing makes the cost leaf not measured; it does not receive a passing score of 1.0.
 - Composite pass threshold: 0.6.
+
+The composite may pass its measured latency and throughput checks while cost is skipped. Inspect the cost leaf's measurement state and recommendations; a successful process exit is not evidence that an unknown-model cost was measured.
 
 Note: the `EvaluateAsync` adapter runs ALL THREE leaves (latency, throughput, cost) regardless of which sub-preset name is supplied — the sub-preset name is currently a label rather than a filter (the sub-preset selection is wired via the CLI subcommand structure, and no subcommand restricts which measurements run).
 
@@ -62,7 +64,9 @@ The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses 
 
 `--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
-The cost leaf prices the model the agent used: the model the provider resolved for `--from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the cost is not measured: the cost leaf is skipped, no cost is reported, and a warning names the model.
+The cost leaf uses its operator-supplied pricing key (`CostModelName`, the model resolved for `--from-env`, or `--model` for an endpoint) when that key has a known price. Otherwise, each response's returned model identity is priced individually. Unknown responses cannot make the whole workload look cheaper: an incomplete total remains unpriced. Rates are captured before the run so registry changes cannot alter a workload midway through evaluation.
+
+Reported cached input is a subset of total input. The calculation charges uncached input, cached input and output once each; the cached discount requires a known cached rate. Missing cache counts or rates retain an explicitly undiscounted estimate, and invalid counts remain unpriced. Per-response `CostEstimates` preserve counts, effective rates and statuses. See [cost estimation](../../cost-estimation.md) for the arithmetic and the distinction between an estimate and an invoice.
 
 ## Output
 
@@ -70,10 +74,11 @@ Each run writes to the canonical run dir under `.agenteval/subjects/agents/{subj
 
 - `report.json` — canonical eval-result shape (3-leaf composite, one leaf per metric).
 - `report.html` — HTML report, rendered by `GenericReportRenderer`.
-- `report.pdf` — PDF report, generated via `AgentEval.Rendering.Pdf` / QuestPDF.
 - The canonical `summary.json` / `manifest.json` carry the run-level audit-chain metadata (run ID, content hash, timestamp).
 
-The perf family does NOT emit a separate `report.md` markdown sidecar (unlike OWASP / MITRE / GDPR) — the canonical store entry + the HTML/PDF render covers the documented operator scenarios. HTML and PDF emission is best-effort with warning-fallback — failures do not abort the run.
+The perf family does not emit a separate `report.md` sidecar (unlike OWASP / MITRE / GDPR). HTML emission is best-effort with warning-fallback; a rendering failure does not abort the run. The stock CLI does not generate PDFs or install a PDF engine.
+
+PDF output requires an explicitly registered library provider or the separately installed companion; see [optional PDF providers](../../pdf-providers.md). To summarize an existing sealed AEF run, use `agenteval-pdf render --run <recorded-aef-run-directory> --family generic --output ./perf-report.pdf`. This renders recorded fields without rerunning the benchmark. Keep the PDF outside the sealed source directory.
 
 ## Interpreting results
 
@@ -94,7 +99,7 @@ The composite verdict is `pass` when composite score >= 0.6 AND no leaf is label
 - Latency `fail` — start with the recommendation embedded in the leaf (e.g. "P99 latency 8200ms exceeds threshold 5000ms. Consider caching, reducing prompt length, or upgrading the model tier."). Common root causes: bloated system prompt, oversized retrieval context, unnecessary tool round-trips, judge / safety filter overhead, network round-trip on cold connection.
 - Throughput `fail` — review the agent's concurrency story (connection pool, rate-limit budget, queue backpressure). The default 2-worker / 5s window catches obvious serialisation bugs; sustained-load testing requires a dedicated tool.
 - Cost `fail` — prompt-bloat is the dominant cause; check whether the system prompt has grown, whether retrieved context is being over-included, whether tool descriptions are verbose. Caching repeated prompts can substantially help for hot paths.
-- Cost leaf `pass` with "Cost unknown — no pricing data for model" — the model name isn't in `ModelPricing.GetPricing`. Either add a pricing entry or treat the cost result as advisory.
+- Cost leaf `skipped` because pricing or complete usage is unavailable — supply the correct model rate/identity or investigate the missing usage. It is not a passing cost measurement, even if measured latency and throughput allow the composite to pass.
 
 ## When to use this benchmark
 

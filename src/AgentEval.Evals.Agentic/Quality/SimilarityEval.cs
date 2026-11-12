@@ -83,6 +83,6 @@ public sealed class SimilarityEval : IEvalDefinitionWrapper
         if (!GroundTruthInput.Has(input))
             return Task.FromResult(EvalResult.Skipped(this,
                 "Similarity compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth): not measured."));
-        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+        return _inner.EvaluateAsync(_inner.HasPromptSelection(input) ? input : GroundTruthInput.Fold(input), ct);
     }
 }
