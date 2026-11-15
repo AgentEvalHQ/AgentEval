@@ -47,7 +47,7 @@ RUN npm run build
 
 
 # ─── Stage 2: .NET publish ────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS sdk
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS sdk
 WORKDIR /src
 
 # Copy package-version pins + SDK pin + project descriptors first for
@@ -72,7 +72,7 @@ RUN dotnet publish -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 
 # ─── Stage 3: runtime ────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 WORKDIR /app
 
 # SEC-14: no curl. The HEALTHCHECK below uses a self-contained internal probe
