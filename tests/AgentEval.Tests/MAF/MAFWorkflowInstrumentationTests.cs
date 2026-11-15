@@ -179,6 +179,35 @@ public sealed class MAFWorkflowInstrumentationTests
         Assert.Null(capture.Take("Worker"));
     }
 
+    // MAF 1.28 names the run span "invoke_workflow", followed by the workflow's name when it has one.
+    [Theory]
+    [InlineData("invoke_workflow")]
+    [InlineData("invoke_workflow Order flow")]
+    public void Capture_RunSpan_DecidesTheSessionOfItsOperations(string runSpan)
+    {
+        using var source = new ActivitySource("run.span");
+        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp(),
+            new Dictionary<string, ActivitySource> { ["Worker"] = source });
+        using (capture.Enter())
+        {
+            using (var session = source.StartActivity("workflow.session"))
+            {
+                session!.SetTag("session.id", capture.SessionId);
+                using var otherRun = source.StartActivity(runSpan);
+                Assert.NotNull(otherRun);
+                otherRun.SetTag("session.id", "another-run");
+                using (source.StartActivity("executor.process Worker")) { }
+            }
+            using var run = source.StartActivity(runSpan);
+            Assert.NotNull(run);
+            run.SetTag("session.id", capture.SessionId);
+            using (source.StartActivity("executor.process Worker")) { }
+        }
+        var delivery = Assert.IsType<MAFWorkflowTimingCapture.Delivery>(capture.Take("Worker"));
+        Assert.NotNull(delivery.End);
+        Assert.Null(capture.Take("Worker"));
+    }
+
     [Fact]
     public void Capture_MissingDelivery_CannotBorrowNextDelivery()
     {

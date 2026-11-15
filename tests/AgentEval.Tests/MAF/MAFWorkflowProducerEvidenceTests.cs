@@ -80,6 +80,37 @@ public sealed partial class MAFWorkflowShapesTests
         Assert.Equal(customSource ? 1 : 0, observed);
     }
 
+    // The timing capture finds an operation's run through these span names and their session.id tag. MAF 1.28
+    // renamed the run span (it was "workflow_invoke" through 1.27); another rename has to fail here.
+    [Theory]
+    [InlineData(null, "invoke_workflow")]
+    [InlineData("Order flow", "invoke_workflow Order flow")]
+    public async Task RunStreamingAsync_ExecutorSpan_NestsUnderRunAndSessionSpansTaggedWithTheSession(string? name, string runSpan)
+    {
+        using var source = new ActivitySource("pinned.workflow.spans");
+        var owners = new List<(string Name, string? Session)>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = candidate => ReferenceEquals(candidate, source),
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activity =>
+            {
+                if (activity.OperationName != "executor.process Start") return;
+                for (var owner = activity.Parent; owner is not null; owner = owner.Parent)
+                    lock (owners) owners.Add((owner.OperationName, owner.GetTagItem("session.id") as string));
+            }
+        };
+        ActivitySource.AddActivityListener(listener);
+        var start = Function("Start", () => "reply");
+        var builder = new MAFWorkflows.WorkflowBuilder(start).WithOutputFrom(start);
+        if (name is not null) builder = builder.WithName(name);
+        var workflow = builder.WithOpenTelemetry(activitySource: source).Build();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using (var run = await MAFWorkflows.InProcessExecution.RunStreamingAsync<string>(workflow, "input", sessionId: "pinned-session", cancellationToken: timeout.Token))
+            await foreach (var _ in run.WatchStreamAsync(blockOnPendingRequest: false, timeout.Token)) { }
+        lock (owners) Assert.Equal([(runSpan, "pinned-session"), ("workflow.session", "pinned-session")], owners);
+    }
+
     [Fact]
     public async Task ExecuteWorkflowAsync_ConcurrentRunsWithSameExecutorId_DoNotShareProducerSpans()
     {

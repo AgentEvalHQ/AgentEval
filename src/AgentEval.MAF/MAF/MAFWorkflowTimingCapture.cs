@@ -53,8 +53,13 @@ internal sealed class MAFWorkflowTimingCapture : IDisposable
     }
 
     private ActivitySamplingResult Sample(string name) => ReferenceEquals(Current.Value, this) &&
-        (name.StartsWith(OperationPrefix, StringComparison.Ordinal) || name is "workflow.session" or "workflow_invoke")
+        (name.StartsWith(OperationPrefix, StringComparison.Ordinal) || IsRunOwner(name))
             ? ActivitySamplingResult.AllData : ActivitySamplingResult.None;
+
+    // MAF 1.28 names the run span "invoke_workflow", followed by the workflow's name when it has one
+    // (it was "workflow_invoke" through 1.27). Both it and the session span carry session.id.
+    private static bool IsRunOwner(string name) => name is "workflow.session" or "invoke_workflow" ||
+        name.StartsWith("invoke_workflow ", StringComparison.Ordinal);
 
     private void Started(Activity activity)
     {
@@ -65,7 +70,7 @@ internal sealed class MAFWorkflowTimingCapture : IDisposable
         // Our builder guarantees session/invoke spans. Raw nested runs may be related to the evaluation,
         // but their operation durations must not replace the declared executor's duration.
         var owner = activity.Parent;
-        while (owner is not null && owner.OperationName is not ("workflow_invoke" or "workflow.session")) owner = owner.Parent;
+        while (owner is not null && !IsRunOwner(owner.OperationName)) owner = owner.Parent;
         if (owner?.GetTagItem("session.id") as string != SessionId) return;
         var delivery = new Delivery(TimeProvider.System.GetElapsedTime(_origin));
         _running.TryAdd(activity, delivery);

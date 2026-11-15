@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Dependencies:** the Microsoft Agent Framework core packages move from 1.27.0 to 1.28.0 (`Microsoft.Agents.AI`, `.OpenAI`, `.Workflows`, `.Workflows.Generators`, `.Harness`). An application that references these packages directly needs 1.28.0 or later beside this release. MAF 1.28 renames the workflow run span from `workflow_invoke` to `invoke_workflow`, followed by the workflow's name when it has one, and the tag `workflow.name` to `gen_ai.workflow.name`; it no longer writes the `executor.input`, `executor.output` and `message.content` tags. Update your own trace filters and dashboards if they match the old names. AgentEval's workflow timing reads the new span name, and its results do not change. The A2A, Foundry and AgentHooks previews stay on 1.23.
+
 ## [1.0.0-rc.3]
 
 Third release candidate: configurable judging, retrieved evidence, cached-token estimates and optional PDF providers. Thanks to Andreas Adner (@adner) for the feedback behind [#314](https://github.com/AgentEvalHQ/AgentEval/issues/314), [#315](https://github.com/AgentEvalHQ/AgentEval/issues/315), [#316](https://github.com/AgentEvalHQ/AgentEval/issues/316) and [#317](https://github.com/AgentEvalHQ/AgentEval/issues/317).

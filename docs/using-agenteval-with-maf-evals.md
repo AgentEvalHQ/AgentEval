@@ -30,7 +30,7 @@ simply:
 *final answer*. Grading with `IAgentEvaluator` is like having the full worked solution in front of
 you — every step (every tool call) is visible.
 
-**Why this changes tool-metric results (.NET MAF 1.24.0-1.27.0; the evaluation source is unchanged).** When you pass an `IEvaluator` to
+**Why this changes tool-metric results (.NET MAF 1.24.0-1.28.0; the evaluation source is unchanged).** When you pass an `IEvaluator` to
 `agent.EvaluateAsync`, MAF wraps it in an internal
 adapter that *splits* each conversation and forwards only the query half + the final response — the
 middle, where the agent actually **called the tools**, is dropped. So a code-based metric that checks
@@ -57,8 +57,8 @@ This is a projection check, not a model-quality test or proof that a real tool e
 invoking an MEAI evaluator directly, supplying a different `RawResponse`, or implementing a custom
 splitter can provide different evidence. The loss described here is in the built-in orchestration
 and adapter, not an AgentEval removal of tool turns. See the upstream
-[orchestration](https://github.com/microsoft/agent-framework/blob/dotnet-1.27.0/dotnet/src/Microsoft.Agents.AI/Evaluation/AgentEvaluationExtensions.cs)
-and [MEAI adapter](https://github.com/microsoft/agent-framework/blob/dotnet-1.27.0/dotnet/src/Microsoft.Agents.AI/Evaluation/MeaiEvaluatorAdapter.cs).
+[orchestration](https://github.com/microsoft/agent-framework/blob/dotnet-1.28.0/dotnet/src/Microsoft.Agents.AI/Evaluation/AgentEvaluationExtensions.cs)
+and [MEAI adapter](https://github.com/microsoft/agent-framework/blob/dotnet-1.28.0/dotnet/src/Microsoft.Agents.AI/Evaluation/MeaiEvaluatorAdapter.cs).
 
 **Recommendation:** use the native path.
 
