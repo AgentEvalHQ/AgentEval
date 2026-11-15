@@ -26,16 +26,17 @@ internal static class PerformanceSuiteDefinition
         // Snapshot keys are canonical: equally long substring matches use ordinal, case-insensitive order.
         inputs["pricing"] = SuiteDefinitionManifest.Hash(AefJsonWriter.Document(new JsonObject
         {
-            ["rates"] = new JsonArray(plan.Pricing.Rates.Select(p => (JsonNode?)new JsonObject
+            ["rates"] = new JsonArray(plan.Pricing.TokenRates.Select(p => (JsonNode?)new JsonObject
             {
                 ["model"] = p.Key, ["inputPer1K"] = p.Value.InputPer1K, ["outputPer1K"] = p.Value.OutputPer1K,
+                ["cachedInputPer1K"] = p.Value.CachedInputPer1K, ["source"] = p.Value.Source,
             }).ToArray()),
         }));
         inputs["pricingKey"] = SuiteDefinitionManifest.Hash(Encoding.UTF8.GetBytes(plan.CostModelName));
         return new SuiteDefinitionReader().Read(AefJsonWriter.Document(new JsonObject
         {
             ["schemaVersion"] = "1.0", ["kind"] = "composite", ["suiteRef"] = "bench:perf/" + preset,
-            ["definitionVersion"] = "performance-definition-2", ["frozen"] = true, ["inputs"] = inputs,
+            ["definitionVersion"] = "performance-definition-3", ["frozen"] = true, ["inputs"] = inputs,
             ["caseIds"] = new JsonArray("perf_benchmark", "perf_latency", "perf_throughput", "perf_cost"),
             ["definition"] = new JsonObject
             {
@@ -47,7 +48,7 @@ internal static class PerformanceSuiteDefinition
                 ["throughputConcurrentRequests"] = plan.ThroughputConcurrentRequests,
                 ["throughputDurationTicks"] = plan.ThroughputDuration.Ticks, ["maxCostUsd"] = plan.MaxCostUSD,
                 ["compositePassThreshold"] = plan.CompositePassThreshold, ["aggregation"] = "CapByWorst",
-                ["pricingPolicy"] = "initial-key-then-first-reported-model;exact-then-longest-substring;missing-skips-cost",
+                ["pricingPolicy"] = "known-override-else-per-response-model;exact-then-longest-substring;cached-subset;unknown-cache-undiscounted;missing-skips-cost",
                 ["trialsPerCase"] = 1,
             },
         }));

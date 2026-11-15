@@ -75,7 +75,7 @@ public sealed class ConfidenceCalibrationEval : IEvalDefinitionWrapper
         // When ground truth is available, enrich the query with it so the judge can
         // cross-check confidence claims against the reference answer.
         // A with copy: a new EvalInput of four fields dropped the context and every other one the caller set (B12a).
-        var effective = GroundTruthInput.Has(input)   // a blank reference is none, as everywhere (B12c)
+        var effective = !_inner.HasPromptSelection(input) && GroundTruthInput.Has(input)   // a blank reference is none, as everywhere (B12c)
             ? input with { Query = $"{input.Query}\n\n[Ground truth reference: {input.GroundTruth}]" }
             : input;
 

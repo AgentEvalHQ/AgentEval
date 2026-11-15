@@ -157,7 +157,7 @@ Treat the judge as uncalibrated for your deployment until you re-run `calibrate`
 
 1. **Speed.** A smoke run finishes in seconds; a standard run finishes in minutes. You see drift on a regulation that's measured in years to absorb manually.
 2. **Repeatability.** Same scenarios on every release. Trends visible over time.
-3. **Defensible evidence.** Each run produces JSON evidence, markdown report, and PDF — all audit-chain-hashed and re-verifiable by `agenteval doctor`.
+3. **Reviewable evidence.** Each run produces JSON evidence and a Markdown report with recorded source-run references. PDF generation is [optional](../../pdf-providers.md). For a PDF from sealed AEF evidence, record with `--aef-content on` and use the companion to verify and render that exact run into an output outside the sealed directory. The derived report does not change the source seal or turn recorded references into proof of original execution custody.
 4. **Regulator-grade reasoning.** The judge cites specific articles (Art 14(4)(b), Annex III(4)(b), Art 25(1)(b)) — not paraphrases.
 5. **Calibration built in.** Hand-labelled golden sets ship with the benchmark, and `calibrate` measures a judge against them. The two-class-dataset bug above is one example of what calibration catches that nothing else does; see *Calibration quality today* for what has and has not been measured.
 6. **Open and inspectable.** Every prompt, scenario, and golden entry sits in the repo.

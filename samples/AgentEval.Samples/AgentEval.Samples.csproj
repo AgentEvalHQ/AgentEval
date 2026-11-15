@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\src\AgentEval.Compliance.EuAiAct\AgentEval.Compliance.EuAiAct.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
+    <!-- This sample host explicitly opts in; the default library and CLI do not reference a provider. -->
+    <ProjectReference Include="..\..\src\AgentEval.Rendering.PdfSharp\AgentEval.Rendering.PdfSharp.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <!-- O1 runs the healthcare domain pack's own checks and runner, so the sample and the full project cannot drift.
          Its data\*.jsonl fixtures flow into this output through the reference. -->
@@ -55,6 +57,7 @@
   <ItemGroup>
     <!-- The expected exit code of every sample run offline, read next to the binary by OfflineSampleCheck. -->
     <None Include="offline-check-expected.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="PromptPacks\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

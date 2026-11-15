@@ -1,360 +1,65 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
-
 using AgentEval.Core.Reporting;
-
 using AgentEval.Evals;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using AgentEval.Reporting;
+using AgentEval.Rendering.Pdf;
 
 namespace AgentEval.Evals.Agentic.Reporting.Pdf;
 
-/// <summary>
-/// Renders an <see cref="AgenticBenchmarkResult"/> as a multi-page PDF report.
-/// Covers: L0 cover page, executive summary category table, per-category detail pages,
-/// per-evaluator failure pages, audit-chain appendix, and methodology appendix.
-/// </summary>
-/// <remarks>
-/// The static constructor declares the QuestPDF Community licence when no licence
-/// type has been set yet, so unit tests that instantiate this type do not need to
-/// configure it. A licence type the host application set earlier is left unchanged.
-/// </remarks>
-public sealed class AgenticPdfRenderer
+/// <summary>Renders rich agentic reports through an explicitly registered PDF provider.</summary>
+public sealed class AgenticPdfRenderer(IPdfRendererRegistry? pdfRenderers = null, string? providerId = null)
 {
-    /// <summary>
-    /// Ordered list of well-known agentic benchmark categories for table presentation.
-    /// Categories not in this list are appended alphabetically after the known ones.
-    /// </summary>
-    private static readonly string[] s_categoryOrder =
-    [
-        "system-outcome",
-        "agentic-process",
-        "rag",
-        "safety-security",
-        "operational",
-        "judge-quality"
-    ];
+    /// <summary>Preserves the original construction signature. Rendering requires an explicitly supplied registry.</summary>
+    public AgenticPdfRenderer() : this(null, null) { }
 
-    /// <summary>
-    /// Declares the QuestPDF Community licence when no licence type has been set yet. Runs once,
-    /// when the type is first used, so production code and unit tests work without extra setup.
-    /// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application set
-    /// earlier (for example Professional) is left unchanged.
-    /// </summary>
-    static AgenticPdfRenderer()
-    {
-        QuestPDF.Settings.License ??= LicenseType.Community;
-    }
-
-    /// <summary>
-    /// Renders <paramref name="result"/> to a PDF file at <paramref name="outputPath"/>.
-    /// The parent directory is created if it does not exist.
-    /// </summary>
-    /// <param name="result">The agentic benchmark result to render.</param>
-    /// <param name="outputPath">Absolute path of the output PDF file.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <summary>Explicitly renders a PDF through the selected provider and atomically writes the destination.</summary>
     public Task RenderAsync(AgenticBenchmarkResult result, string outputPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
-        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
-
-        var pdf = Document.Create(doc =>
-        {
-            // L0 Cover page
-            doc.Page(p => RenderL0Cover(p, result));
-
-            // Executive summary — per-category table
-            doc.Page(p => RenderExecutiveSummary(p, result));
-
-            // Per-category pages — one per non-empty category
-            foreach (var (categoryKey, _) in OrderedCategories(result.Summary.PerCategory))
-            {
-                // Find evaluators belonging to this category
-                var evaluatorsInCategory = result.Summary.PerEvaluator
-                    .Where(kv => GetEvaluatorCategory(kv.Key, result.CompositeTree) == categoryKey)
-                    .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                    .ToList();
-
-                doc.Page(p => RenderL1Category(p, categoryKey, result, evaluatorsInCategory));
-            }
-
-            // L2 Evaluator pages — one per failed or warned evaluator
-            var failedOrWarnedEvaluators = result.Summary.PerEvaluator
-                .Where(kv => kv.Value.Status is "FAIL" or "WARN" or "ERROR")
-                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .ToList();
-
-            foreach (var (evalKey, evalSummary) in failedOrWarnedEvaluators)
-            {
-                var evalResult = FindResultByKey(result.CompositeTree, evalKey);
-                doc.Page(p => RenderL2Evaluator(p, evalKey, evalSummary, evalResult));
-            }
-
-            // Appendices
-            doc.Page(p => RenderAuditChainAppendix(p, result));
-            doc.Page(p => RenderMethodologyAppendix(p, result));
-        });
-
-        ct.ThrowIfCancellationRequested(); // GAP-12
-        var dir = Path.GetDirectoryName(outputPath);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-
-        return Task.Run(() =>
-        {
-            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
-            pdf.GeneratePdf(outputPath);
-        }, ct);
+        ct.ThrowIfCancellationRequested();
+        return PdfReportFiles.RenderAsync(PdfReportFiles.RequireProvider(pdfRenderers, providerId), CreateDocument(result), outputPath, cancellationToken: ct);
     }
 
-    // ── L0 Cover page ────────────────────────────────────────────────────────
-
-    private static void RenderL0Cover(PageDescriptor page, AgenticBenchmarkResult result)
+    /// <summary>Projects the recorded family summary, evaluator details, methodology and custody facts.</summary>
+    public ReportDocument CreateDocument(AgenticBenchmarkResult result)
     {
-        page.Margin(40);
-        page.Content().Column(col =>
+        ArgumentNullException.ThrowIfNull(result);
+        var generic = EvalReportProjection.Create(result.CompositeTree, new(result.Subject,
+            Title: "Agentic Benchmark — " + FormatPresetTitle(result.Preset), RunId: result.SourceRunId,
+            GeneratedAt: result.GeneratedAt, AuditHash: result.SourceManifestHash, AgentEvalVersion: result.Attestation.AgentEvalVersion));
+        var sections = new List<ReportSection>
         {
-            col.Item().Text("Agentic Benchmark Report").FontSize(28).Bold();
-            col.Item().Text($"Preset: {FormatPresetTitle(result.Preset)} Preset").FontSize(14);
-            col.Item().PaddingTop(20).Text($"Subject: {result.Subject.Name} ({result.Subject.Kind})");
-            col.Item().Text($"Run ID: {result.SourceRunId}");
-            col.Item().Text($"Generated: {result.GeneratedAt:O}");
-
-            col.Item().PaddingTop(30)
-                .Background(StatusColor(result.Summary.OverallStatus))
-                .Padding(10)
-                .Text($"OVERALL: {result.Summary.OverallStatus} (score {result.Summary.OverallScoreText()})")
-                .FontColor(Colors.White).FontSize(20).Bold();
-
-            col.Item().PaddingTop(30).Text(result.Disclaimer).FontSize(10).Italic();
-        });
+            new(generic.Title, [$"Subject: {result.Subject.Name} ({result.Subject.Kind})", $"Run ID: {result.SourceRunId}",
+                $"Generated: {result.GeneratedAt:O}", $"OVERALL: {result.Summary.OverallStatus} (score {result.Summary.OverallScoreText()})", result.Disclaimer]),
+            new("Executive Summary", tables: [new(["Category", "Score", "Status", "Critical fails"],
+                result.Summary.PerCategory.Select(p => new[] { p.Key, ScoreFormatting.Percentage(p.Value.Score), p.Value.Status, string.Join(", ", p.Value.CriticalFails) }))]),
+            new("Per-evaluator", tables: [new(["Evaluator", "Score", "Status", "Severity", "Confidence"],
+                result.Summary.PerEvaluator.Select(p => new[] { p.Key, ScoreFormatting.Percentage(p.Value.Score), p.Value.Status, p.Value.Severity, p.Value.Confidence?.ToString("P0") ?? "n/a" }))]),
+            new("Critical findings", result.CriticalFindings.Select(f => $"{f.Metric.Key}: {ScoreFormatting.Percentage(f.Score.MeasuredValue())}; severity {f.Score.Severity}")),
+            new("Recommendations", result.Recommendations),
+        };
+        sections.AddRange(generic.Sections.Skip(1));
+        var audit = new List<string> { $"Source run ID: {result.SourceRunId}", $"Manifest hash: {result.SourceManifestHash}",
+            "Schema version: 1.0", $"AgentEval version: {result.Attestation.AgentEvalVersion}", $"Judge mode: {result.Attestation.JudgeMode}" };
+        audit.AddRange(result.Attestation.PromptVersions.Select(p => $"{p.Key}: {p.Value}"));
+        sections.Add(new("Appendix A: Audit Chain", audit));
+        sections.Add(Methodology(result));
+        return new(generic.Title, sections, result.GeneratedAt, result.Subject.Name, "AgentEval");
     }
 
-    // ── Executive summary — per-category table ───────────────────────────────
-
-    private static void RenderExecutiveSummary(PageDescriptor page, AgenticBenchmarkResult result)
+    private static ReportSection Methodology(AgenticBenchmarkResult result)
     {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Executive Summary").FontSize(20).Bold();
-            col.Item().PaddingBottom(10);
-
-            if (result.Summary.PerCategory.Count == 0)
-            {
-                col.Item().Text(
-                    "This preset does not roll up into categories (flat preset). " +
-                    "See the per-evaluator section.").FontSize(11);
-                return;
-            }
-
-            col.Item().Table(table =>
-            {
-                table.ColumnsDefinition(c =>
-                {
-                    c.RelativeColumn(3);
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn(2);
-                });
-
-                table.Header(h =>
-                {
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Category").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Critical fails").Bold();
-                });
-
-                foreach (var (key, cat) in OrderedCategories(result.Summary.PerCategory))
-                {
-                    table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(cat.Score)}");
-                    table.Cell().Padding(5).Text(cat.Status);
-                    table.Cell().Padding(5).Text(
-                        cat.CriticalFails.Count == 0 ? "—" : string.Join(", ", cat.CriticalFails));
-                }
-            });
-
-            // Overall summary row below the table
-            col.Item().PaddingTop(20)
-                .Background(StatusColor(result.Summary.OverallStatus))
-                .Padding(8)
-                .Text($"Overall: {result.Summary.OverallStatus} — {result.Summary.OverallScoreText()}")
-                .FontColor(Colors.White).FontSize(14).Bold();
-        });
-    }
-
-    // ── L1 Category page ─────────────────────────────────────────────────────
-
-    private static void RenderL1Category(
-        PageDescriptor page,
-        string categoryKey,
-        AgenticBenchmarkResult result,
-        IReadOnlyList<KeyValuePair<string, AgenticEvaluatorSummary>> evaluators)
-    {
-        result.Summary.PerCategory.TryGetValue(categoryKey, out var cat);
-
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text($"Category: {categoryKey}").FontSize(20).Bold();
-            if (cat is not null)
-            {
-                col.Item().Text(
-                    $"Score: {ScoreFormatting.Percentage(cat.Score)} — Status: {cat.Status.ToUpperInvariant()}")
-                    .FontSize(12);
-            }
-            col.Item().PaddingTop(15);
-
-            if (evaluators.Count == 0)
-            {
-                col.Item().Text("No evaluators mapped to this category.").FontSize(11).Italic();
-                return;
-            }
-
-            col.Item().Table(table =>
-            {
-                table.ColumnsDefinition(c =>
-                {
-                    c.RelativeColumn(3);
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                });
-
-                table.Header(h =>
-                {
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Evaluator").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Severity").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Confidence").Bold();
-                });
-
-                foreach (var (key, ev) in evaluators)
-                {
-                    var conf = ev.Confidence.HasValue ? $"{ev.Confidence.Value:P0}" : "—";
-                    table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(ev.Score)}");
-                    table.Cell().Padding(5).Text(ev.Status.ToUpperInvariant());
-                    table.Cell().Padding(5).Text(ev.Severity);
-                    table.Cell().Padding(5).Text(conf);
-                }
-            });
-        });
-    }
-
-    // ── L2 Evaluator page ────────────────────────────────────────────────────
-
-    private static void RenderL2Evaluator(
-        PageDescriptor page,
-        string evaluatorKey,
-        AgenticEvaluatorSummary evalSummary,
-        EvalResult? evalResult)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text($"Evaluator: {evaluatorKey}").FontSize(18).Bold();
-            col.Item().Text(
-                $"Score: {ScoreFormatting.Percentage(evalSummary.Score)} — Status: {evalSummary.Status.ToUpperInvariant()} — " +
-                $"Severity: {evalSummary.Severity}")
-                .FontSize(11);
-
-            if (evalSummary.Confidence.HasValue)
-                col.Item().Text($"Confidence: {evalSummary.Confidence.Value:P0}").FontSize(11);
-
-            col.Item().PaddingTop(15);
-
-            if (evalResult is null)
-            {
-                col.Item().Text("No detailed result available in composite tree.").FontSize(11).Italic();
-                return;
-            }
-
-            var subResults = evalResult.Details.SubResults ?? Array.Empty<EvalResult>();
-            col.Item().Text($"Sub-result count: {subResults.Count}").FontSize(11);
-            col.Item().PaddingTop(10);
-
-            // Top criteria failures — up to 5 failed sub-results
-            // Measured failures only (B10p): an errored, skipped or needs-review check is not a criteria failure.
-            var topFailures = subResults
-                .Where(s => s.Score.ReportStatus() == "FAIL")
-                .Take(5)
-                .ToList();
-
-            if (topFailures.Count > 0)
-            {
-                col.Item().Text("Top criteria failures").FontSize(14).Bold();
-                foreach (var failure in topFailures)
-                {
-                    col.Item().PaddingTop(10).Text(failure.Metric.Key).FontSize(12).Bold();
-
-                    var evidenceMsg = failure.Details.Evidence?.FirstOrDefault()?.Message;
-                    if (!string.IsNullOrEmpty(evidenceMsg))
-                        col.Item().Text($"Evidence: {TruncateForPreview(evidenceMsg, 200)}").FontSize(10);
-
-                    var reference = failure.Details.Evidence?.FirstOrDefault()?.Reference;
-                    if (!string.IsNullOrEmpty(reference))
-                        col.Item().Text($"Reference: {TruncateForPreview(reference, 300)}").FontSize(10).Italic();
-                }
-            }
-            else if (subResults.Count > 0)
-            {
-                col.Item().Text("All sub-results passed or no failures to display.").FontSize(11).Italic();
-            }
-        });
-    }
-
-    // ── Appendix A — Audit chain ─────────────────────────────────────────────
-
-    private static void RenderAuditChainAppendix(PageDescriptor page, AgenticBenchmarkResult result)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Appendix A: Audit Chain").FontSize(18).Bold();
-            col.Item().PaddingTop(15);
-
-            col.Item().Text($"Source run ID: {result.SourceRunId}");
-            col.Item().Text($"Manifest hash: {result.SourceManifestHash}");
-            col.Item().Text($"Schema version: 1.0");
-            col.Item().PaddingTop(10);
-
-            col.Item().Text($"AgentEval version: {result.Attestation.AgentEvalVersion}");
-            col.Item().Text($"Judge mode: {result.Attestation.JudgeMode}");
-            col.Item().PaddingTop(10);
-
-            col.Item().Text("Prompt versions:").Bold();
-            foreach (var kv in result.Attestation.PromptVersions)
-                col.Item().PaddingLeft(20).Text($"{kv.Key}: {kv.Value}");
-        });
-    }
-
-    // ── Appendix B — Methodology ─────────────────────────────────────────────
-
-    private static void RenderMethodologyAppendix(PageDescriptor page, AgenticBenchmarkResult result)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Appendix B: Methodology").FontSize(18).Bold();
-            col.Item().PaddingTop(15);
-
-            col.Item().Text($"Preset: {FormatPresetTitle(result.Preset)} Preset").Bold();
-            col.Item().PaddingTop(8).Text(GetPresetDescription(result.Preset)).FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Judge Mode").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(GetJudgeModeDescription(result.Attestation.JudgeMode)).FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Evaluation Categories").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "The agentic benchmark evaluates agent behavior across up to seven categories:\n" +
+        var paragraphs = new List<string>();
+        paragraphs.Add("Appendix B: Methodology");
+        paragraphs.Add($"Preset: {FormatPresetTitle(result.Preset)} Preset");
+        paragraphs.Add(GetPresetDescription(result.Preset));
+        paragraphs.Add("Judge Mode");
+        paragraphs.Add(GetJudgeModeDescription(result.Attestation.JudgeMode));
+        paragraphs.Add("Evaluation Categories");
+        paragraphs.Add("The agentic benchmark evaluates agent behavior across up to seven categories:\n" +
                 "  system-outcome — Did the agent achieve the intended task goal?\n" +
                 "  agentic-process — Were agentic reasoning steps, tool calls, and planning appropriate?\n" +
                 "  rag — Retrieval-Augmented Generation quality: relevance, grounding, and citation accuracy.\n" +
@@ -363,45 +68,28 @@ public sealed class AgenticPdfRenderer
                 "  judge-quality — Meta-evaluation of the judge's own scoring consistency.\n" +
                 "  agentic — Top-level composite rollup (present in flat presets).\n\n" +
                 "Overall score is the weighted composite across all active categories and evaluators. " +
-                "Pass/warn/fail thresholds are preset-specific (see preset description above).").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Severity Tiers").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "critical — the failure represents a significant, potentially harmful deviation " +
+                "Pass/warn/fail thresholds are preset-specific (see preset description above).");
+        paragraphs.Add("Severity Tiers");
+        paragraphs.Add("critical — the failure represents a significant, potentially harmful deviation " +
                 "from expected agent behavior (e.g. safety violations, complete task failure).\n" +
                 "high — important gap requiring remediation before production deployment.\n" +
                 "medium — notable gap; acceptable for early-stage evaluation but should be addressed.\n" +
                 "low — minor issue; recommend improvement but does not block deployment.\n" +
-                "none — informational; no behavioral impact.").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Prompt Provenance").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "Evaluator prompt files are AgentEval's own text, under AgentEval's MIT license. About half " +
+                "none — informational; no behavioral impact.");
+        paragraphs.Add("Prompt Provenance");
+        paragraphs.Add("Evaluator prompt files are AgentEval's own text, under AgentEval's MIT license. About half " +
                 "are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI " +
                 "Evaluation SDK (azure-sdk-for-python); none reproduces upstream prompt text. Each prompt " +
                 "file's header records its lineage and how it differs from the upstream evaluator. Each " +
                 "judge-backed check sends its file as the judge's system prompt and reads the reply on the " +
-                "file's own scale and bands; the versions below are the files each check sent.").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Prompt Versions").FontSize(14).Bold();
-            col.Item().PaddingTop(5);
-            foreach (var kv in result.Attestation.PromptVersions)
-                col.Item().Text($"  {kv.Key}: {kv.Value}").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Disclaimer").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(result.Disclaimer).FontSize(10).Italic();
-        });
+                "file's own scale and bands; the versions below are the files each check sent.");
+        paragraphs.Add("Prompt Versions");
+        foreach (var kv in result.Attestation.PromptVersions)
+        paragraphs.Add($"  {kv.Key}: {kv.Value}");
+        paragraphs.Add("Disclaimer");
+        paragraphs.Add(result.Disclaimer);
+        return new("Appendix B: Methodology", paragraphs.Skip(1));
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private static string StatusColor(string status) => status switch
-    {
-        "PASS" => Colors.Green.Medium,
-        "WARN" => Colors.Orange.Medium,
-        "FAIL" => Colors.Red.Medium,
-        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict on the agent (B9b)
-    };
 
     private static string FormatPresetTitle(string preset)
     {
@@ -412,25 +100,6 @@ public sealed class AgenticPdfRenderer
                 ? char.ToUpperInvariant(part[0]) + part[1..]
                 : part));
     }
-
-    internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
-    {
-        "none" =>
-            "No judge: every evaluator in this preset is computed in code from the answer, trace or telemetry; no " +
-            "language model graded anything.",
-        "single" or "mode-a" or "mode-b" or "real" or "llm" =>
-            "Single LLM judge mode: each scenario is evaluated by a single live language model call " +
-            "configured via the benchmark's judge pipeline. Results reflect genuine model behavior " +
-            "against each scenario's evaluation criteria.",
-        "panel" =>
-            "Panel judge mode: multiple independent LLM calls are made per scenario and their verdicts " +
-            "are aggregated. Provides higher reliability at increased cost.",
-        "adjudicated" =>
-            "Adjudicated judge mode: a panel of judges is convened and disagreements are resolved by a " +
-            "dedicated adjudicator model. Provides the highest fidelity evaluation.",
-        _ =>
-            $"Judge mode: {judgeMode}. Refer to benchmark configuration for details on the evaluation pipeline."
-    };
 
     private static string GetPresetDescription(string preset) => preset.ToLowerInvariant() switch
     {
@@ -458,45 +127,22 @@ public sealed class AgenticPdfRenderer
             "and aggregation rules."
     };
 
-    private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
-
-    /// <summary>
-    /// Returns per-category entries in canonical order: known categories first
-    /// (in <see cref="s_categoryOrder"/> order), then any additional categories alphabetically.
-    /// </summary>
-    private static IEnumerable<KeyValuePair<string, AgenticCategorySummary>> OrderedCategories(
-        IReadOnlyDictionary<string, AgenticCategorySummary> perCategory)
+    internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        var known = s_categoryOrder
-            .Where(perCategory.ContainsKey)
-            .Select(k => new KeyValuePair<string, AgenticCategorySummary>(k, perCategory[k]));
-
-        var extra = perCategory
-            .Where(kv => !s_categoryOrder.Contains(kv.Key, StringComparer.Ordinal))
-            .OrderBy(kv => kv.Key, StringComparer.Ordinal);
-
-        return known.Concat(extra);
-    }
-
-    /// <summary>
-    /// Attempts to determine the category of an evaluator by walking the composite tree.
-    /// Falls back to examining the evaluator key for known category keywords.
-    /// </summary>
-    private static string GetEvaluatorCategory(string evaluatorKey, EvalResult compositeTree)
-    {
-        // Walk the tree: if we find the evaluator as a direct child of a category node,
-        // return that category node's category label.
-        var result = FindResultByKey(compositeTree, evaluatorKey);
-        if (result?.Metric.Category is { Length: > 0 } cat)
-            return cat;
-
-        // ARC-11: shared last-resort heuristic (one keyword map across summary + PDF reports), instead of
-        // a divergent Contains set + "agentic" default that could bucket an evaluator differently from
-        // AgenticSummaryBuilder.
-        return AgenticCategoryResolver.InferCategoryFromKey(evaluatorKey);
-    }
-
-    private static string TruncateForPreview(string? text, int maxLen = 80)
-        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
+        "none" =>
+            "No judge: every evaluator in this preset is computed in code from the answer, trace or telemetry; no " +
+            "language model graded anything.",
+        "single" or "mode-a" or "mode-b" or "real" or "llm" =>
+            "Single LLM judge mode: each scenario is evaluated by a single live language model call " +
+            "configured via the benchmark's judge pipeline. Results reflect genuine model behavior " +
+            "against each scenario's evaluation criteria.",
+        "panel" =>
+            "Panel judge mode: multiple independent LLM calls are made per scenario and their verdicts " +
+            "are aggregated. Provides higher reliability at increased cost.",
+        "adjudicated" =>
+            "Adjudicated judge mode: a panel of judges is convened and disagreements are resolved by a " +
+            "dedicated adjudicator model. Provides the highest fidelity evaluation.",
+        _ =>
+            $"Judge mode: {judgeMode}. Refer to benchmark configuration for details on the evaluation pipeline."
+    };
 }

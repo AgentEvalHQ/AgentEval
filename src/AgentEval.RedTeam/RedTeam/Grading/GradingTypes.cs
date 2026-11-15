@@ -91,6 +91,10 @@ public sealed record GraderProvenance(
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? RubricDigest { get; init; }
 
+    /// <summary>Configured leaf judges that participated, including advisory or inconclusive attempts.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>True when the keyword and judge verdicts differ. Computed — never a third source of truth.</summary>
     public bool Disagreed => KeywordOutcome != JudgeOutcome;
 }

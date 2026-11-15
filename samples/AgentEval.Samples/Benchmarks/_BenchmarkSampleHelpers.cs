@@ -12,6 +12,9 @@ using AgentEval.Core.Evals.Rendering;
 using AgentEval.Evals;
 using AgentEval.Output;
 using AgentEval.Rendering.Pdf;
+using AgentEval.Rendering.PdfSharp;
+using AgentEval.Reporting;
+using Microsoft.Extensions.DependencyInjection;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting.Compliance;
 using AgentEval.Compliance.Gdpr.Articles;
@@ -57,7 +60,7 @@ internal enum SamplePreset
 
 /// <summary>
 /// Shared helpers for the v0.10.1 <c>Benchmarks/</c> sample suite. Centralises
-/// output-directory resolution, JSON + HTML + PDF rendering, console summary
+/// output-directory resolution, JSON + HTML rendering with optional PDF, console summary
 /// printing, and gentle "skip if no model provider is configured" boilerplate so the
 /// per-family samples can stay tight and read like a story.
 /// </summary>
@@ -216,7 +219,7 @@ internal static class BenchmarkSampleHelpers
     /// Persists <paramref name="result"/> through <em>both</em> the canonical
     /// <c>.agenteval/</c> output store (so Mission Control + <c>agenteval doctor</c>
     /// see the run with a valid audit chain) AND the legacy
-    /// <c>output/{family}/run-{ts}/</c> sidecar (HTML / PDF / bare JSON for
+    /// <c>output/{family}/run-{ts}/</c> sidecar (HTML / bare JSON and opt-in PDF for
     /// direct browser open + the <c>09_ReportBrowser</c> sample).
     /// </summary>
     /// <remarks>
@@ -224,11 +227,11 @@ internal static class BenchmarkSampleHelpers
     /// Architecture (v0.10.1, plan-25):
     /// <list type="bullet">
     ///   <item><description>Manifest, scenarios, summary, compliance evidence → canonical <c>.agenteval/</c> via <see cref="FileSystemOutputStore"/>.</description></item>
-    ///   <item><description>HTML / PDF / bare JSON → sidecar <c>output/{family}/run-{ts}/</c>.</description></item>
+    ///   <item><description>HTML / bare JSON and opt-in PDF → sidecar <c>output/{family}/run-{ts}/</c>.</description></item>
     /// </list>
     /// </para>
     /// <para>
-    /// The HTML + PDF renderers receive the canonical manifest's
+    /// The HTML renderer and, when requested, the registered PDF renderer receive the canonical manifest's
     /// <c>ContentHash</c> as their <c>auditHash</c> option so the rendered
     /// footer carries the real chain anchor — viewers can re-verify against
     /// the canonical run.
@@ -325,7 +328,7 @@ internal static class BenchmarkSampleHelpers
             }
         }
 
-        // ── 7. Sidecar artefacts (HTML / PDF / bare JSON) ──────────────────────
+        // ── 7. Sidecar artefacts (HTML / bare JSON and opt-in PDF) ─────────────
         var sidecarDir = EnsureRunDirectory(benchmarkName);
         var sidecarJsonPath = Path.Combine(sidecarDir, "report.json");
         var sidecarJsonOpts = new JsonSerializerOptions { WriteIndented = true };
@@ -348,7 +351,8 @@ internal static class BenchmarkSampleHelpers
         string? sidecarPdfPath = null;
         if (includePdf)
         {
-            var pdfBytes = await new PdfEvalResultRenderer().RenderAsync(result, renderOpts, ct);
+            using var pdfHost = new ServiceCollection().AddAgentEvalPdfSharp().BuildServiceProvider();
+            var pdfBytes = await pdfHost.GetRequiredService<IPdfRendererRegistry>().ForEvalResults().RenderAsync(result, renderOpts, ct);
             sidecarPdfPath = Path.Combine(sidecarDir, "report.pdf");
             await File.WriteAllBytesAsync(sidecarPdfPath, pdfBytes, ct);
         }
@@ -506,7 +510,7 @@ internal static class BenchmarkSampleHelpers
     /// <summary>
     /// Prints the v0.10.1 dual-location summary: canonical <c>.agenteval/</c> run dir
     /// (Mission Control reads here) plus sidecar <c>output/{family}/run-{ts}/</c>
-    /// (HTML / PDF / JSON for direct human consumption).
+    /// (HTML / JSON and opt-in PDF for direct human consumption).
     /// </summary>
     public static void PrintReportPaths(EvalResult result, SampleRunPaths paths)
     {

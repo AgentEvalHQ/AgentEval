@@ -1,482 +1,126 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
-
 using AgentEval.Core.Reporting;
-
 using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
-using AgentEval.Compliance.Gdpr.Articles.Models;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using AgentEval.Reporting;
+using AgentEval.Rendering.Pdf;
 
 namespace AgentEval.Compliance.Gdpr.Reporting.Pdf;
 
-/// <summary>
-/// Renders a <see cref="GdprComplianceEvidence"/> as a multi-page PDF report.
-/// Covers: L0 cover page, executive summary pillar table, per-pillar detail pages,
-/// per-article scenario tables, audit-chain appendix, and methodology appendix.
-/// </summary>
-/// <remarks>
-/// The static constructor declares the QuestPDF Community licence when no licence
-/// type has been set yet, so unit tests that instantiate this type do not need to
-/// configure it. A licence type the host application set earlier is left unchanged.
-/// <para>
-/// <b>Recommendations omission (intentional).</b> The PDF report does NOT
-/// surface the <see cref="GdprComplianceEvidence.Recommendations"/> array.
-/// Recommendations are deliberately scoped to the operator-facing Markdown
-/// report (<c>report.md</c>) and to the machine-readable evidence JSON.
-/// The PDF is designed as the DPO's signed boardroom artefact; mixing
-/// actionable engineering remediation copy into that document would dilute
-/// the audit signal. Rendering recommendations in the PDF is tracked as a
-/// v1.1 markdown-reporter-parity item.
-/// </para>
-/// </remarks>
-public sealed class GDPRPdfRenderer
+/// <summary>Projects rich GDPR evidence and renders through an explicitly registered PDF provider.</summary>
+public sealed class GDPRPdfRenderer(ArticlesRegistry? articles = null, IPdfRendererRegistry? pdfRenderers = null, string? providerId = null)
 {
-    private const string RedactedSentinel = "[REDACTED — sensitive scenario]";
+    /// <summary>Creates an unconfigured facade without ambiguity between optional constructor overloads.</summary>
+    public GDPRPdfRenderer() : this(null, null, null) { }
 
-    /// <summary>
-    /// Declares the QuestPDF Community licence when no licence type has been set yet. Runs once,
-    /// when the type is first used, so production code and unit tests work without extra setup.
-    /// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application set
-    /// earlier (for example Professional) is left unchanged.
-    /// </summary>
-    static GDPRPdfRenderer()
-    {
-        QuestPDF.Settings.License ??= LicenseType.Community;
-    }
+    /// <summary>Preserves the original article-registry signature. Rendering requires an explicitly supplied PDF registry.</summary>
+    public GDPRPdfRenderer(ArticlesRegistry? articles = null) : this(articles, null, null) { }
 
-    private readonly ArticlesRegistry? _articles;
-
-    /// <summary>
-    /// Initialises a new <see cref="GDPRPdfRenderer"/>.
-    /// </summary>
-    /// <param name="articles">
-    /// Optional registry used to look up scenario sensitive flags for PII redaction.
-    /// When <c>null</c>, sensitive-scenario redaction is skipped and all content is rendered as-is.
-    /// </param>
-    public GDPRPdfRenderer(ArticlesRegistry? articles = null)
-    {
-        _articles = articles;
-    }
-
-    /// <summary>
-    /// Renders <paramref name="evidence"/> to a PDF file at <paramref name="outputPath"/>.
-    /// The parent directory is created if it does not exist.
-    /// </summary>
-    /// <param name="evidence">The GDPR evidence to render.</param>
-    /// <param name="outputPath">Absolute path of the output PDF file.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <summary>Explicitly renders a PDF through the selected provider and atomically writes the destination.</summary>
     public Task RenderAsync(GdprComplianceEvidence evidence, string outputPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(evidence);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
-        ct.ThrowIfCancellationRequested(); // honor cancellation requested before render (GAP-12)
-
-        var pdf = Document.Create(doc =>
-        {
-            // L0 Cover (G6.2)
-            doc.Page(p => RenderL0Cover(p, evidence));
-
-            // Executive summary (G6.3)
-            doc.Page(p => RenderExecutiveSummary(p, evidence));
-
-            // Per-pillar pages (G6.4) — walk the composite tree for pillar sub-results
-            var pillarSubResults = evidence.CompositeTree.Details.SubResults ?? Array.Empty<EvalResult>();
-            foreach (var pillarResult in pillarSubResults)
-            {
-                if (IsPillarNode(pillarResult))
-                {
-                    doc.Page(p => RenderL1Pillar(p, pillarResult, evidence));
-                }
-            }
-
-            // Per-article pages (G6.5)
-            foreach (var articleKv in evidence.Summary.PerArticle.OrderBy(kv => kv.Key, StringComparer.Ordinal))
-            {
-                // Find matching EvalResult from the tree (walk all nodes)
-                var articleResult = FindResultByKey(evidence.CompositeTree, articleKv.Key);
-                doc.Page(p => RenderL2Article(p, articleKv.Key, articleKv.Value, articleResult, evidence));
-            }
-
-            // Appendices (G6.6)
-            doc.Page(p => RenderAuditChainAppendix(p, evidence));
-            doc.Page(p => RenderMethodologyAppendix(p, evidence));
-        });
-
-        ct.ThrowIfCancellationRequested(); // GAP-12
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        return Task.Run(() =>
-        {
-            ct.ThrowIfCancellationRequested(); // GAP-12 — don't start the synchronous render if cancelled
-            pdf.GeneratePdf(outputPath);
-        }, ct);
+        ct.ThrowIfCancellationRequested();
+        var provider = PdfReportFiles.RequireProvider(pdfRenderers, providerId);
+        return PdfReportFiles.RenderAsync(provider, CreateDocument(evidence), outputPath, cancellationToken: ct);
     }
 
-    // ── G6.2 Cover page ──────────────────────────────────────────────────────
-
-    private static void RenderL0Cover(PageDescriptor page, GdprComplianceEvidence ev)
+    /// <summary>Projects all report facts and applies scenario redaction before any provider sees content.</summary>
+    public ReportDocument CreateDocument(GdprComplianceEvidence ev)
     {
-        page.Margin(40);
-        page.Content().Column(col =>
+        ArgumentNullException.ThrowIfNull(ev);
+        var sections = new List<ReportSection>
         {
-            col.Item().Text("GDPR Compliance Report").FontSize(28).Bold();
-            col.Item().Text($"Preset: {Capitalize(ev.Preset)}").FontSize(14);
-            // Cap free-form Subject.Name / RunId length so an oversized agent-controlled value
-            // cannot blow the PDF layout (SEC-16). PDF text needs no Markdown escaping.
-            col.Item().PaddingTop(20).Text($"Subject: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.Subject.Name)} ({ev.Base.Subject.Kind})");
-            col.Item().Text($"Run ID: {AgentEval.Core.Reporting.MarkdownText.Truncate(ev.Base.SourceRun.RunId)}");
-            col.Item().Text($"Generated: {ev.Base.GeneratedAt:O}");
-
-            col.Item().PaddingTop(30)
-                .Background(StatusColor(ev.Summary.OverallStatus))
-                .Padding(10)
-                .Text($"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScoreText()})")
-                .FontColor(Colors.White).FontSize(20).Bold();
-
-            col.Item().PaddingTop(30).Text(ev.Disclaimer).FontSize(10).Italic();
-        });
-    }
-
-    // ── G6.3 Executive summary — pillar table ────────────────────────────────
-
-    private static void RenderExecutiveSummary(PageDescriptor page, GdprComplianceEvidence ev)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Executive Summary").FontSize(20).Bold();
-            col.Item().PaddingBottom(10);
-
-            if (ev.Summary.PerPillar.Count == 0)
-            {
-                col.Item().Text(
-                    "This preset does not roll up into pillars (e.g. Smoke). " +
-                    "See the per-article section.").FontSize(11);
-                return;
-            }
-
-            col.Item().Table(table =>
-            {
-                table.ColumnsDefinition(c =>
-                {
-                    c.RelativeColumn(3);
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn(2);
-                });
-
-                table.Header(h =>
-                {
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Pillar").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Critical fails").Bold();
-                });
-
-                foreach (var (key, p) in ev.Summary.PerPillar)
-                {
-                    table.Cell().Padding(5).Text(key);
-                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(p.Score)}");
-                    table.Cell().Padding(5).Text(p.Status);
-                    table.Cell().Padding(5).Text(
-                        p.CriticalFails.Count == 0 ? "—" : string.Join(", ", p.CriticalFails));
-                }
-            });
-        });
-    }
-
-    /// <summary>
-    /// True when <paramref name="node"/> is a pillar grouping node — identified by its Key
-    /// starting with "Pillar" (matching SummaryBuilder). Article nodes must NOT match: their
-    /// category is "compliance.{Pillar}" (which contains "pillar"), so the previous
-    /// Category.Contains check rendered every article as a mislabeled pillar page too (BUG-03).
-    /// </summary>
-    internal static bool IsPillarNode(EvalResult node) =>
-        node.Metric.Key.StartsWith("Pillar", StringComparison.OrdinalIgnoreCase);
-
-    // ── G6.4 Per-pillar detail page ──────────────────────────────────────────
-
-    private static void RenderL1Pillar(PageDescriptor page, EvalResult pillar, GdprComplianceEvidence ev)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text(pillar.Metric.Name).FontSize(20).Bold();
-            col.Item().Text(
-                $"Score: {ScoreFormatting.Percentage(pillar.Score.MeasuredValue())} — Status: {pillar.Score.Label.ToUpperInvariant()}")
-                .FontSize(12);
-            col.Item().PaddingTop(15);
-
-            var articles = pillar.Details.SubResults ?? Array.Empty<EvalResult>();
-            col.Item().Table(table =>
-            {
-                table.ColumnsDefinition(c =>
-                {
-                    c.RelativeColumn(3);
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                    c.RelativeColumn();
-                });
-
-                table.Header(h =>
-                {
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Article").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                    h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Severity").Bold();
-                });
-
-                foreach (var article in articles)
-                {
-                    table.Cell().Padding(5).Text(article.Metric.Key);
-                    table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(article.Score.MeasuredValue())}");
-                    table.Cell().Padding(5).Text(article.Score.Label.ToUpperInvariant());
-                    table.Cell().Padding(5).Text(article.Score.Severity);
-                }
-            });
-        });
-    }
-
-    // ── G6.5 Per-article detail page ─────────────────────────────────────────
-
-    private void RenderL2Article(
-        PageDescriptor page,
-        string articleKey,
-        GdprArticleSummary articleSummary,
-        EvalResult? articleResult,
-        GdprComplianceEvidence ev)
-    {
-        page.Margin(40);
-        // Resolve the article spec once via the non-throwing lookup. A registry miss is an expected,
-        // recoverable condition (e.g. re-rendering an evidence-only archive without the GDPR sample
-        // on the classpath) — previously this was done with exception-as-control-flow at two sites
-        // (the second re-resolving per scenario), with a bare catch that also hid real lookup
-        // failures (MNT-09).
-        ArticleSpec? spec = null;
-        _articles?.TryGetSpec(articleKey, out spec);
-
-        page.Content().Column(col =>
-        {
-            col.Item().Text($"Article: {articleKey}").FontSize(18).Bold();
-            col.Item().Text(
-                $"Score: {ScoreFormatting.Percentage(articleSummary.Score)} — Status: {articleSummary.Status} — " +
-                $"Severity: {articleSummary.Severity} — " +
-                $"Failed: {articleSummary.ScenariosFailed}/{articleSummary.ScenarioCount}")
-                .FontSize(11);
-            col.Item().PaddingTop(15);
-
-            if (articleResult?.Details.SubResults is { Count: > 0 } scenarios)
-            {
-                col.Item().Table(table =>
-                {
-                    table.ColumnsDefinition(c =>
-                    {
-                        c.RelativeColumn(3);
-                        c.RelativeColumn();
-                        c.RelativeColumn();
-                        c.RelativeColumn();
-                    });
-
-                    // Phase-6 Task 6.9: prefer the actual scenario input from the
-                    // article spec when available; fall back to judge-reasoning when
-                    // the spec can't be resolved (e.g. re-rendering an evidence-only
-                    // archive without the GDPR sample on the classpath). The column
-                    // header reflects which source is in use so a DPO reading the
-                    // PDF isn't misled into thinking the judge's explanation is the
-                    // user prompt.
-                    bool anyScenarioHasSpecInput = scenarios.Any(s =>
-                        (spec?.Scenarios.FirstOrDefault(ss => ss.Id == s.Metric.Key)?.Input?.Length ?? 0) > 0);
-                    string previewHeader = anyScenarioHasSpecInput
-                        ? "Input preview"
-                        : "Judge reasoning preview";
-
-                    table.Header(h =>
-                    {
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Scenario").Bold();
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Score").Bold();
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text("Status").Bold();
-                        h.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text(previewHeader).Bold();
-                    });
-
-                    foreach (var scenario in scenarios)
-                    {
-                        var scenarioSpec = spec?.Scenarios
-                            .FirstOrDefault(s => s.Id == scenario.Metric.Key);
-                        bool sensitive = scenarioSpec?.Sensitive ?? false;
-
-                        // G6.8 PII redaction: replace input text for sensitive scenarios.
-                        // Phase-6 Task 6.9: when the YAML scenario input is available,
-                        // show THAT (the actual user prompt) — not the judge's per-criterion
-                        // explanation, which was the prior buggy default.
-                        string preview;
-                        if (sensitive)
-                            preview = RedactedSentinel;
-                        else if (scenarioSpec?.Input is { Length: > 0 } input)
-                            preview = TruncateForPreview(input, 200);
-                        else
-                            preview = TruncateForPreview(scenario.Details.Evidence?.FirstOrDefault()?.Message);
-
-                        table.Cell().Padding(5).Text(scenario.Metric.Key);
-                        table.Cell().Padding(5).Text($"{ScoreFormatting.Percentage(scenario.Score.MeasuredValue())}");
-                        table.Cell().Padding(5).Text(scenario.Score.Label.ToUpperInvariant());
-                        table.Cell().Padding(5).Text(preview);
-                    }
-                });
-
-                // Render up to 2 illustrative verbatims (failed scenarios prioritised)
-                var illustrated = scenarios
-                    .OrderBy(s => s.Score.Passed ? 1 : 0)  // failed first
-                    .Take(2)
-                    .ToList();
-
-                if (illustrated.Count > 0)
-                {
-                    col.Item().PaddingTop(20).Text("Illustrative scenario verbatims").FontSize(14).Bold();
-                    foreach (var scenario in illustrated)
-                    {
-                        var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
-                        bool sensitive = scenarioSpec?.Sensitive ?? false;
-
-                        col.Item().PaddingTop(10).Text(scenario.Metric.Key).FontSize(12).Bold();
-
-                        if (sensitive)
-                        {
-                            col.Item().Text(RedactedSentinel).FontSize(10).Italic();
-                        }
-                        else
-                        {
-                            var evidenceMsg = scenario.Details.Evidence?.FirstOrDefault()?.Message;
-                            if (!string.IsNullOrEmpty(evidenceMsg))
-                                col.Item().Text($"Evidence: {TruncateForPreview(evidenceMsg, 200)}").FontSize(10);
-
-                            var reference = scenario.Details.Evidence?.FirstOrDefault()?.Reference;
-                            if (!string.IsNullOrEmpty(reference))
-                                col.Item().Text($"Reference: {TruncateForPreview(reference, 300)}").FontSize(10).Italic();
-                        }
-                    }
-                }
-            }
-            else
-            {
-                col.Item().Text("No scenario detail available in composite tree.").FontSize(11).Italic();
-            }
-        });
-    }
-
-    // ── G6.6 Audit chain appendix ────────────────────────────────────────────
-
-    private static void RenderAuditChainAppendix(PageDescriptor page, GdprComplianceEvidence ev)
-    {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Appendix A: Audit Chain").FontSize(18).Bold();
-            col.Item().PaddingTop(15);
-
-            col.Item().Text($"Source run ID: {ev.Base.SourceRun.RunId}");
-            foreach (var line in AuditChainLines(ev.Base.SourceRun))
-                col.Item().Text(line);
-            col.Item().PaddingTop(10);
-
-            col.Item().Text($"AgentEval version: {ev.Base.Attestation.AgentEvalVersion}");
-            col.Item().Text($"Evaluator: {ev.Base.Attestation.Evaluator}");
-            col.Item().Text($"Judge mode: {ev.GdprAttestation.JudgeMode}");
-            col.Item().PaddingTop(10);
-
-            col.Item().Text("Prompt versions:").Bold();
-            foreach (var kv in ev.GdprAttestation.PromptVersions)
-                col.Item().PaddingLeft(20).Text($"{kv.Key}: {kv.Value}");
-        });
-    }
-
-    /// <summary>
-    /// The manifest-hash and chain-status lines of the audit-chain appendix. Same states as the
-    /// Markdown report's <c>## Audit Chain</c> section: this renderer only has the hash copied into
-    /// the evidence, never the source run it points at, so it does not verify the chain and never
-    /// prints a verified state. A recorded hash reads "not verified in this report" with how to
-    /// verify it; an empty one reads "no hash recorded".
-    /// </summary>
-    internal static IReadOnlyList<string> AuditChainLines(AgentEval.Output.SourceRunRef sourceRun)
-    {
-        ArgumentNullException.ThrowIfNull(sourceRun);
-
-        if (string.IsNullOrWhiteSpace(sourceRun.ManifestHash))
-        {
-            return new[]
-            {
-                "Manifest hash: —",
-                "Chain status: no hash recorded, so this evidence cannot be checked against its source run.",
-            };
-        }
-
-        return new[]
-        {
-            $"Manifest hash: {sourceRun.ManifestHash}",
-            "Chain status: hash recorded, not verified in this report.",
-            "To verify, run 'agenteval doctor' inside the solution whose .agenteval/ workspace holds this " +
-            "source run. It re-hashes each run's files against that run's manifest.json and checks the " +
-            "manifest hash in every compliance evidence.json against its source run. Then confirm the hash " +
-            "above equals contentHash in that run's manifest.json.",
+            new("GDPR Compliance — " + Capitalize(ev.Preset) + " Preset", [
+                $"Subject: {ev.Base.Subject.Name} ({ev.Base.Subject.Kind})",
+                $"Run ID: {ev.Base.SourceRun.RunId}", $"Generated: {ev.Base.GeneratedAt:O}",
+                $"OVERALL: {ev.Summary.OverallStatus} (score {ev.Summary.OverallScoreText()})",
+                $"Domain packs: {string.Join(", ", ev.DomainPacks)}", ev.Disclaimer]),
+            new("Executive Summary", tables: [new(["Pillar", "Score", "Status", "Critical fails"],
+                ev.Summary.PerPillar.Select(p => new[] { p.Key, ScoreFormatting.Percentage(p.Value.Score), p.Value.Status, string.Join(", ", p.Value.CriticalFails) }))]),
         };
+        foreach (var (articleKey, summary) in ev.Summary.PerArticle.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            var articleResult = EvalReportHelpers.FindByKey(ev.CompositeTree, articleKey);
+            var spec = articles?.All.ContainsKey(articleKey) == true ? articles.GetSpec(articleKey) : null;
+            var paragraphs = new List<string> { $"Score: {ScoreFormatting.Percentage(summary.Score)} — Status: {summary.Status} — Severity: {summary.Severity} — Failed: {summary.ScenariosFailed}/{summary.ScenarioCount}" };
+            var rows = new List<string[]>();
+            var scenarios = articleResult?.Details.SubResults ?? [];
+            foreach (var scenario in scenarios)
+            {
+                var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
+                var sensitive = scenarioSpec?.Sensitive == true;
+                var preview = scenarioSpec is null ? "[WITHHELD — sensitivity metadata unavailable]"
+                    : sensitive ? "[REDACTED — sensitive scenario]" : EvalReportHelpers.TruncateForPreview(
+                    scenarioSpec?.Input ?? scenario.Details.Evidence?.FirstOrDefault()?.Message, 200);
+                rows.Add([scenario.Metric.Key, ScoreFormatting.Percentage(scenario.Score.MeasuredValue()), scenario.Score.Label.ToUpperInvariant(), preview]);
+            }
+            foreach (var scenario in scenarios.OrderBy(s => s.Score.Passed ? 1 : 0).Take(2))
+            {
+                paragraphs.Add("Illustrative scenario: " + scenario.Metric.Key);
+                var scenarioSpec = spec?.Scenarios.FirstOrDefault(s => s.Id == scenario.Metric.Key);
+                if (scenarioSpec is null)
+                    paragraphs.Add("[WITHHELD — sensitivity metadata unavailable]");
+                else if (scenarioSpec.Sensitive)
+                    paragraphs.Add("[REDACTED — sensitive scenario]");
+                else
+                    foreach (var item in scenario.Details.Evidence ?? [])
+                    {
+                        paragraphs.Add("Evidence: " + EvalReportProjection.TruncateEvidence(item.Message ?? "", 200));
+                        if (!string.IsNullOrEmpty(item.Reference)) paragraphs.Add("Reference: " + EvalReportProjection.TruncateEvidence(item.Reference, 300));
+                    }
+            }
+            if (scenarios.Count == 0) paragraphs.Add("No scenario detail available in composite tree.");
+            var header = scenarios.Any(s => !string.IsNullOrEmpty(spec?.Scenarios.FirstOrDefault(ss => ss.Id == s.Metric.Key)?.Input))
+                ? "Input preview" : "Judge reasoning preview";
+            sections.Add(new("Article: " + articleKey, paragraphs, [new(["Scenario", "Score", "Status", header], rows)]));
+        }
+        sections.Add(new("Critical findings", ev.CriticalFindings.Select(f => $"{f.Metric.Key}: {ScoreFormatting.Percentage(f.Score.MeasuredValue())}; severity {f.Score.Severity}")));
+        sections.Add(new("Recommendations", ev.Recommendations.Select(r => $"{r.ControlId} [{r.Severity}]: {r.Text}")));
+        var audit = new List<string> { $"Source run ID: {ev.Base.SourceRun.RunId}" };
+        audit.AddRange(AuditChainLines(ev.Base.SourceRun));
+        audit.AddRange([$"AgentEval version: {ev.Base.Attestation.AgentEvalVersion}", $"Evaluator: {ev.Base.Attestation.Evaluator}", $"Judge mode: {ev.GdprAttestation.JudgeMode}"]);
+        audit.AddRange(ev.GdprAttestation.PromptVersions.Select(p => $"{p.Key}: {p.Value}"));
+        sections.Add(new("Appendix A: Audit Chain", audit));
+        sections.Add(Methodology(ev));
+        return new("GDPR Compliance Report", sections, ev.Base.GeneratedAt, ev.Base.Subject.Name, "AgentEval");
     }
 
-    // ── G6.6 Methodology appendix ────────────────────────────────────────────
-
-    private static void RenderMethodologyAppendix(PageDescriptor page, GdprComplianceEvidence ev)
+    internal static bool IsPillarNode(EvalResult node) => node.Metric.Key.StartsWith("Pillar", StringComparison.OrdinalIgnoreCase);
+    internal static IReadOnlyList<string> AuditChainLines(AgentEval.Output.SourceRunRef sourceRun) => EvalReportProjection.AuditChainLines(sourceRun);
+    private static string Capitalize(string value) => EvalReportHelpers.Capitalize(value);
+    private static ReportSection Methodology(GdprComplianceEvidence ev)
     {
-        page.Margin(40);
-        page.Content().Column(col =>
-        {
-            col.Item().Text("Appendix B: Methodology").FontSize(18).Bold();
-            col.Item().PaddingTop(15);
-
-            col.Item().Text($"Preset: {Capitalize(ev.Preset)}").Bold();
-            col.Item().PaddingTop(8).Text(GetPresetDescription(ev.Preset)).FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Scenario Design Patterns").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "Scenarios are drawn from three design patterns:\n" +
+        var paragraphs = new List<string>();
+        paragraphs.Add("Appendix B: Methodology");
+        paragraphs.Add($"Preset: {Capitalize(ev.Preset)}");
+        paragraphs.Add(GetPresetDescription(ev.Preset));
+        paragraphs.Add("Scenario Design Patterns");
+        paragraphs.Add("Scenarios are drawn from three design patterns:\n" +
                 "  Direct — straightforward application of the article's main obligation.\n" +
                 "  Trap — a request that superficially appears compliant but violates the article.\n" +
                 "  Edge-case — boundary or corner-case situations such as conflicting legal bases, " +
-                "special-category data, or automated decision-making.").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Severity Tiers").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "critical — violation would constitute a high-risk infringement (e.g. Art. 9 special categories, " +
+                "special-category data, or automated decision-making.");
+        paragraphs.Add("Severity Tiers");
+        paragraphs.Add("critical — violation would constitute a high-risk infringement (e.g. Art. 9 special categories, " +
                 "Art. 22 automated decisions without safeguards).\n" +
                 "high — significant compliance gap requiring remediation before production deployment.\n" +
                 "medium — notable gap; acceptable for early-stage evaluation but should be addressed.\n" +
                 "low — minor issue; recommend improvement but does not block compliance certification.\n" +
-                "none — informational; no compliance impact.").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Thresholds").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(
-                "Smoke preset: pass threshold 0.80 (80% weighted score across 5 representative articles).\n" +
+                "none — informational; no compliance impact.");
+        paragraphs.Add("Thresholds");
+        paragraphs.Add("Smoke preset: pass threshold 0.80 (80% weighted score across 5 representative articles).\n" +
                 "Standard preset: pass threshold 0.85 (85% weighted score across all 29 articles in 6 pillars).\n" +
                 "Audit-Grade preset: pass threshold 0.90 (90% score across all 29 articles in 6 pillars; " +
                 "CapByWorst aggregation — a single critical-article failure caps the overall score at FAIL " +
-                "regardless of other scores).").FontSize(11);
-
-            col.Item().PaddingTop(15).Text("Disclaimer").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(GDPRComplianceReporter.Disclaimer).FontSize(10).Italic();
-        });
+                "regardless of other scores).");
+        paragraphs.Add("Disclaimer");
+        paragraphs.Add(GDPRComplianceReporter.Disclaimer);
+        return new("Appendix B: Methodology", paragraphs.Skip(1));
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private static string StatusColor(string status) => status switch
-    {
-        "PASS" => Colors.Green.Medium,
-        "WARN" => Colors.Orange.Medium,
-        "FAIL" => Colors.Red.Medium,
-        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict (B9b)
-    };
-
-    private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
     private static string GetPresetDescription(string preset) => preset.ToLowerInvariant() switch
     {
@@ -495,10 +139,4 @@ public sealed class GDPRPdfRenderer
             "scoring. It is the recommended preset for development-phase compliance checks and sprint-level " +
             "regression testing. Pass threshold is 0.85."
     };
-
-    private static EvalResult? FindResultByKey(EvalResult root, string key, int depth = 0)
-        => EvalReportHelpers.FindByKey(root, key, depth); // ARC-02: shared (depth cap via EvalTreeLimits)
-
-    private static string TruncateForPreview(string? text, int maxLen = 80)
-        => EvalReportHelpers.TruncateForPreview(text, maxLen); // ARC-02: shared
 }

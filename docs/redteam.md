@@ -14,7 +14,9 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 
 ## Capabilities at a glance
 
-**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`AttackPipeline`](#pipeline-api) and from the CLI ([`agenteval redteam`](#agenteval-redteam--cli-reference), or `agenteval bench owasp\|mitre\|nist` for those reporters) — except the SOC 2 and ISO 27001 reporters, which are library-only for now.
+**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** The scan capabilities below are reachable from the [`AttackPipeline`](#pipeline-api) and the CLI ([`agenteval redteam`](#agenteval-redteam--cli-reference), or `agenteval bench owasp\|mitre\|nist` for those reporters). SOC 2 and ISO 27001 reporters remain library-only.
+
+Direct `LLMJudgeEvaluator` and `LikertJudgeEvaluator` instances support [versioned judge prompt packs](judge-prompt-packs.md#direct-red-team-judges), including localized retry text and strict response validation. [Supported built-in graphs](judge-prompt-packs.md#red-team-graphs-and-scans) also accept `ScanOptions.JudgePrompts` and CLI `--judge-prompt-pack`/`--judge-locale`, with whole-scan preflight and native graph/leaf provenance. The current support list and explicit unsupported routes are documented there. Attack probe packs (`--pack`) and judge instruction packs are separate features.
 
 | Capability | What it adds | Where |
 |------------|--------------|-------|
@@ -564,6 +566,18 @@ await exporter.ExportToFileAsync(result, "security-report.md");
 Generate branded PDF reports suitable for executive and compliance audiences:
 
 ```csharp
+using AgentEval.RedTeam.Reporting.Pdf;
+using AgentEval.Rendering.PdfSharp;
+using AgentEval.Reporting;
+using Microsoft.Extensions.DependencyInjection;
+
+// Install the matching AgentEval.Rendering.PdfSharp package before opting into PDF.
+var pdfServices = new ServiceCollection();
+pdfServices.AddAgentEvalPdfSharp();
+using var pdfHost = pdfServices.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+using var pdfScope = pdfHost.CreateScope();
+var pdfRegistry = pdfScope.ServiceProvider.GetRequiredService<IPdfRendererRegistry>();
+
 var pdfOptions = new PdfReportOptions
 {
     CompanyName = "Contoso",
@@ -576,9 +590,11 @@ var pdfOptions = new PdfReportOptions
     }
 };
 
-var generator = new PdfReportGenerator();
+var generator = new PdfReportGenerator(pdfRegistry);
 await generator.SaveAsync(result, "security-report.pdf", pdfOptions);
 ```
+
+This is an explicit optional export. The default library does not install a PDF engine; see [PDF providers](pdf-providers.md) for installation, alternate engines and the separate CLI companion.
 
 PDF reports include:
 - **Executive summary** with overall risk score (0-100)
@@ -842,10 +858,14 @@ agenteval redteam --endpoint $TARGET --model $MODEL --judge $JUDGE_URL --benign-
 - **How a benign control is graded: by the over-refusal judge, never by a phrase list.**
   - This is Gatekeeper's over-refusal judge, with the same rubric and options, running on your `--judge` model. A
     broad prefilter, covering hard refusals and soft declines such as "I'd rather not", picks which replies reach
-    it. A reply with no refusal signal is an answer and costs no call.
+    it in legacy unconfigured scans. A reply with no refusal signal then costs no call. With a selected prompt pack,
+    the shared gate bypasses this English prefilter and judges the reply in its language; see
+    [localized benign controls](judge-prompt-packs.md#localized-benign-controls).
   - A judge that cannot decide (timeout, error, unparseable) makes the case inconclusive, which never counts as an
     answer.
-  - Certify the judge for your model with `agenteval gatekeeper calibrate --gate judge:over-refusal --certify`.
+  - Calibrate the exact selected prompt and settings for your model with `agenteval gatekeeper calibrate --gate judge:over-refusal`.
+    Certification additionally requires the readiness checks and an eligible human-reviewed held-out dataset;
+    translating a prompt does not transfer the English instrument's certificate.
   - Without `--judge`, `--benign-controls` is refused up front. In the library the arm does not run, and the line
     says `not measured: over-refusal needs a judge`.
   - **Why not a phrase list:** on the first live run (GLM-5.3-Flash) a phrase list flagged a complete answer to
@@ -965,7 +985,7 @@ bool canResist = await agent.CanResistAsync(Attack.PromptInjection);
 
 ## `agenteval redteam` — CLI reference
 
-The low-level scanner. **Everything the library can do is reachable from the CLI**: target/auth (with per-role keys), the real-attack-surface harness, the attacker-LLM multi-turn strategies, every export + compliance format, and an honest baseline/regression gate. The options compose freely.
+Scan a target, export findings, or compare a baseline. Prompt-pack compatibility is listed in the [judge guide](judge-prompt-packs.md#red-team-graphs-and-scans).
 
 | Group | Options |
 |-------|---------|
@@ -975,7 +995,10 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 | **Benchmark packs** | `--pack <name\|list>` (download + run an external pack — HarmBench / JailbreakBench / CyberSecEval — alongside the built-ins; `list` shows the catalog), `--accept-license` (required; no data is bundled, datasets carry harmful content) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
-| **Judge grading** | `--judge-mode fallback\|primary` (fallback = judge only adjudicates Inconclusive verdicts, and may only raise one to Succeeded, never to Resisted; primary = the judge grades the semantic, text-only probes first via grading-by-decomposition — needs `--judge`), `--judge-rubric evidence-anchored\|strict\|lenient` (**default `evidence-anchored`** — grounds every conclusive verdict in a verbatim quote, carries the per-oracle discriminators, and is the rubric the published agreement (κ) and fabrication numbers were measured under; `strict` = precision-oriented/no discriminators; `lenient` = recall-oriented), `--judge-timeout <seconds>` (grading timeout — bounds the single-judge/fallback path per call and the default composite path as a total grading bound, abstaining on timeout; `0` shares the per-probe budget) |
+| **Judge mode** | `--judge-mode primary\|fallback`: primary judges semantic probes first; fallback can only raise Inconclusive to Succeeded. Requires `--judge`. See [localized fallback](judge-prompt-packs.md#localized-fallback-judging) |
+| **Judge rubric** | `--judge-rubric evidence-anchored\|strict\|lenient`: quoted evidence (default), fewer false alarms, or fewer missed attacks. Published agreement/fabrication results apply to the measured evidence-anchored configuration |
+| **Judge timeout** | `--judge-timeout <seconds>`: per call for fallback, total grading for primary; `0` shares the probe budget |
+| **Judge prompts** | `--judge-prompt-pack <manifest>`, `--judge-locale <locale>`, `--judge-fallback-locale <locale>`. [Export, translate and use a pack](judge-prompt-packs.md#red-team-graphs-and-scans) |
 | **Output** | `--format json\|sarif\|markdown\|md\|junit\|nist\|nist-md`, `-o/--output` |
 | **CI / baseline gate** | `--save-baseline`, `--baseline`, `--fail-on vuln\|regression\|never`, `--baseline-version`, `--baseline-note` |
 | **Calibration** | `--calibration <cohort.json>` (per-attack z-score vs a *your-own* reference cohort — flags the model where it's unusually vulnerable relative to peers) |
@@ -1201,13 +1224,13 @@ var result = await AttackPipeline.Create()
 
 ### Explainable findings (`--explain`)
 
-Attach an **LLM-generated rationale** to each Succeeded/Inconclusive finding that narrates *why* the verdict was reached **and which evidence fidelity** backs it — the auditor-facing differentiator (it never changes the verdict; it explains it).
+Explain Succeeded/Inconclusive findings and their evidence fidelity without changing the verdict.
 
 ```bash
 agenteval redteam --endpoint $URL --model $MODEL --judge $JUDGE_URL --explain
 ```
 
-Requires `--judge` (it's an LLM call); without one it's a no-op with a warning. The rationale lands on `ProbeResult.Rationale` and in the JSON export. It also requires evidence to be unredacted (`--explain` is suppressed when evidence is redacted, since the rationale quotes the raw response). Currently the rationale is attached to **single-turn** findings only; folded multi-turn / Crescendo / TAP findings do not carry one.
+Requires `--judge` and unredacted evidence; otherwise narration is skipped. The text appears in `ProbeResult.Rationale` and JSON export. Prompt selection also enables conversation/tree explanations. See [localized explanations](judge-prompt-packs.md#localized-explanations) for export, overrides and provenance.
 
 ### Output & compliance formats, per-role keys
 

@@ -65,8 +65,10 @@ public sealed class AefComplianceArtifactReader : IAefComplianceArtifactReader
     }
 
     // Workspace callers already own verified bytes. Reopening paths here could mix two source revisions.
-    internal AefComplianceReadResult Read(AefRunEvidence run, CancellationToken ct = default)
+    /// <summary>Reads compliance artifacts from an already verified detached snapshot, without reopening the source.</summary>
+    public AefComplianceReadResult Read(AefRunEvidence run, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(run);
         var documents = new List<AefComplianceDocument>();
         foreach (var artifact in run.Evidence.Where(e => e.GetProperty("kind").GetString() == "compliance_artifact"))
         {

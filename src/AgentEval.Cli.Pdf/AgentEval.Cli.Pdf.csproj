@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>agenteval-pdf</ToolCommandName>
+    <PackageId>AgentEval.Cli.Pdf</PackageId>
+    <IsPackable>true</IsPackable>
+    <PackageLicenseExpression>MIT AND Apache-2.0 AND OFL-1.1</PackageLicenseExpression>
+    <Description>Optional AgentEval PDF companion. Renders verified recorded AEF evidence with an explicitly registered PDFsharp provider, without re-evaluation.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.Rendering.PdfSharp/AgentEval.Rendering.PdfSharp.csproj" />
+    <ProjectReference Include="../AgentEval.Results.Adapters/AgentEval.Results.Adapters.csproj" />
+    <ProjectReference Include="../AgentEval.Compliance.Gdpr/AgentEval.Compliance.Gdpr.csproj" />
+    <ProjectReference Include="../AgentEval.Compliance.EuAiAct/AgentEval.Compliance.EuAiAct.csproj" />
+    <ProjectReference Include="../AgentEval.Evals.Agentic/AgentEval.Evals.Agentic.csproj" />
+    <Compile Include="../AgentEval.Cli/Commands/BenchmarkReportJson.cs" Link="BenchmarkReportJson.cs" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
+    <None Include="../AgentEval.Rendering.PdfSharp/Fonts/OFL.txt" Pack="true" PackagePath="licenses/Lato/" />
+    <None Include="../../contracts/aef/LICENSE" Pack="true" PackagePath="licenses/aef/" />
+    <None Include="../../contracts/aef/NOTICE" Pack="true" PackagePath="licenses/aef/" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="AgentEval.Rendering.PdfSharp.Tests" /></ItemGroup>
+</Project>

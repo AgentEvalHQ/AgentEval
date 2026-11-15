@@ -15,7 +15,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// Benchmarks H4: GDPR — runs a real model-backed agent against every
 /// scenario in the chosen preset (Smoke / Standard / Audit-Grade) and grades
 /// each live response with a real LLM judge. The composite tree is then
-/// rendered to JSON + HTML + PDF using the v0.10.1 generic renderers.
+/// rendered to JSON + HTML using the generic renderers; PDF is opt-in.
 ///
 /// Preset mapping:
 /// <list type="bullet">
@@ -24,10 +24,10 @@ namespace AgentEval.Samples.Benchmarks;
 ///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="GdprBenchmark.AuditGrade(ArticlesRegistry)"/> (all 29 articles across 6 pillars, cap_by_worst, threshold 0.90)</item>
 /// </list>
 ///
-/// For Mode-A boardroom-grade PDFs with pillar tables, scenario verbatims, and
-/// the methodology appendix, prefer the CLI:
-///     <c>agenteval bench gdpr --preset standard --pdf</c>
-/// which delegates to the bespoke <c>GDPRPdfRenderer</c>.
+/// For a rich PDF with pillar tables, redacted scenario evidence and methodology,
+/// record a CLI benchmark with <c>--aef .agenteval/aef --aef-content on</c>, then use
+/// the separately installed <c>agenteval-pdf</c> companion to render the exact AEF run.
+/// See <c>docs/pdf-providers.md</c>; write derived output outside the sealed source.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -102,7 +102,7 @@ public static class GdprBenchmarkSample
             result, subject,
             benchmarkName: "gdpr",
             regulationOrBenchmark: $"GDPR — {presetLabel}",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: "gdpr",
             presetLabel: preset switch
             {
@@ -122,7 +122,8 @@ public static class GdprBenchmarkSample
         Console.WriteLine("   - Every scenario probed the real agent with its YAML 'input' — no hardcoded responses.");
         Console.WriteLine("   - The judge graded each live response against that scenario's evaluation_criteria.");
         Console.WriteLine("   - Standard / Audit-Grade scale up from 5 articles to all 29 articles across 6 pillars (weighted_sum vs cap_by_worst).");
-        Console.WriteLine("   - For boardroom-grade DPO reports with pillar tables + redaction, use:");
-        Console.WriteLine("       agenteval bench gdpr --preset standard --pdf");
+        Console.WriteLine("   - For an optional rich PDF, record the CLI benchmark with --aef .agenteval/aef --aef-content on.");
+        Console.WriteLine("     Install AgentEval.Cli.Pdf, then: agenteval-pdf render --run <recorded-aef-run-directory> --output ./gdpr-report.pdf");
+        Console.WriteLine("     See docs/pdf-providers.md; keep the derived PDF outside the sealed source.");
     }
 }

@@ -90,6 +90,10 @@ public class ModelComparer : IModelComparer
         List<ModelRanking> rankings;
         try
         {
+            JudgeScoreSelection.RequireCompatible(modelResults.SelectMany(m => m.StochasticResult.IndividualResults)
+                .Where(r => r.MeasuredScore is not null).Select(r => r.ScoreSelection));
+            Prompts.JudgePromptProvenance.RequireCompatible(modelResults.SelectMany(m => m.StochasticResult.IndividualResults)
+                .Where(r => r.MeasuredScore is not null).Select(r => r.JudgePrompt));
             var rankable = modelResults.Where(m => m.StochasticResult.MeasuredCount > 0).ToList();
             if (rankable.Count == 0)
             {

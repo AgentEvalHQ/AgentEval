@@ -1,0 +1,1 @@
+Svaret kunde inte läsas enligt det angivna kontraktet. Returnera endast giltig JSON med rätt fältnamn, datatyper och poängskala. Behåll exakt en bedömning per deklarerat kriterium om kontraktet kräver kriterier. Använd det ursprungliga underlaget.

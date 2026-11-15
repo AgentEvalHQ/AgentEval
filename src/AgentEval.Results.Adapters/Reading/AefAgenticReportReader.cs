@@ -23,6 +23,13 @@ public sealed class AefAgenticReportReader : IAefAgenticReportReader
 {
     private sealed record Candidate(AefReportArtifact Identity, AefAgenticReport? Report);
 
+    /// <summary>Reads a captured original report from one already verified detached snapshot.</summary>
+    public AefAgenticReport? Read(AefRunEvidence run)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return ReportMetadata(run)?.Report;
+    }
+
     /// <inheritdoc />
     public AefAgenticReport? Read(string nativeRunsRoot, IReadOnlyList<string> legacyDirectories,
         string subjectName, string? timestamp = null, CancellationToken ct = default)

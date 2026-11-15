@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Reflection;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Benchmarks;
 using AgentEval.Providers;
@@ -49,8 +48,8 @@ internal static class JudgeFactory
     internal const string EuAiActJudgeSystemPromptFile = "eu-ai-act-judge-system.v1.md";
 
     /// <summary>
-    /// The GDPR judge — one resolver for the benchmark AND its calibration, so the instrument that is calibrated is
-    /// the instrument that runs.
+    /// Shared GDPR family instructions for the benchmark and calibration. Exact instrument parity also
+    /// requires matching scenario keys, criteria, prompt selection and scoring policy.
     /// </summary>
     /// <remarks>
     /// Before this existed, <c>bench gdpr</c> loaded and sent <see cref="GdprJudgeSystemPromptFile"/> while
@@ -59,18 +58,35 @@ internal static class JudgeFactory
     /// </remarks>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveGdpr(
         IEvaluator? evaluatorOverride, string judgeKind) =>
-        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile);
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, "gdpr");
 
     /// <summary>The EU AI Act judge — one resolver for the benchmark AND its calibration (see <see cref="ResolveGdpr"/>).</summary>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveEuAiAct(
         IEvaluator? evaluatorOverride, string judgeKind) =>
-        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile);
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, "eu-ai-act");
 
     private static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveWithFamilyPrompt(
-        IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
-        evaluatorOverride is not null
-            ? (evaluatorOverride, "override", 0)
-            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
+        IEvaluator? evaluatorOverride, string judgeKind, string family)
+    {
+        if (evaluatorOverride is not null) return (evaluatorOverride, "override", 0);
+        var prompt = FamilyPrompt(family);
+        return Resolve(null, judgeKind, prompt.Text, prompt.Id, preserveSystemPromptOnBinding: false);
+    }
+
+    /// <summary>Constructs the same family judge around a supplied client, including offline descriptor clients.</summary>
+    internal static ChatClientEvaluator CreateFamily(IChatClient client, string family)
+    {
+        if (family == "agentic") return new(client);
+        var prompt = FamilyPrompt(family);
+        return new(client, prompt.Text, prompt.Id, preserveSystemPromptOnBinding: false);
+    }
+
+    private static (string Text, string Id) FamilyPrompt(string family) => family switch
+    {
+        "gdpr" => (EmbeddedPromptLoader.Load(typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile), GdprJudgeSystemPromptFile),
+        "eu-ai-act" => (EmbeddedPromptLoader.Load(typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile), EuAiActJudgeSystemPromptFile),
+        _ => throw new ArgumentException("Expected: agentic, gdpr or eu-ai-act. Actual: unknown prompt family. Suggestions: select a supported family. Because: offline export and execution must share an instrument.", nameof(family))
+    };
 
     /// <summary>
     /// Resolves the judge to use for a bench run.
@@ -89,6 +105,7 @@ internal static class JudgeFactory
     /// <see cref="IJudgePromptSource.SystemPromptId"/> and so recorded as provenance <c>PromptId</c>.
     /// Ignored when <paramref name="systemPrompt"/> is <c>null</c>.
     /// </param>
+    /// <param name="preserveSystemPromptOnBinding">True for customer text; false for the embedded family fallback that yields to a leaf rubric.</param>
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing
@@ -99,7 +116,8 @@ internal static class JudgeFactory
         IEvaluator? evaluatorOverride,
         string judgeKind = "benchmark",
         string? systemPrompt = null,
-        string? systemPromptId = null)
+        string? systemPromptId = null,
+        bool preserveSystemPromptOnBinding = true)
     {
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
@@ -107,7 +125,7 @@ internal static class JudgeFactory
         var (client, model, exitCode, provider) = ResolveChatClientWithProvider(judgeKind, systemPrompt?.Length);
         return client is null
             ? (null, "", exitCode)
-            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId) { ProviderName = provider }, model, 0);
+            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId, preserveSystemPromptOnBinding) { ProviderName = provider }, model, 0);
     }
 
     /// <summary>

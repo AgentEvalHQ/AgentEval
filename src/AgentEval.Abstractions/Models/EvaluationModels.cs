@@ -40,6 +40,17 @@ public class TestCase
     
     /// <summary>Criteria for AI-powered evaluation.</summary>
     public IReadOnlyList<string>? EvaluationCriteria { get; init; }
+
+    /// <summary>Criteria with stable IDs and localizable text. Supply this or EvaluationCriteria, not both.</summary>
+    public IReadOnlyList<JudgeCriterion>? JudgeCriteria { get; init; }
+
+    /// <summary>Explicit fixture passages for judging; null means unavailable, empty means captured empty.</summary>
+    /// <remarks>Invocation-owned AgentResponse.RetrievedContext takes precedence, including captured-empty retrieval.</remarks>
+    public IReadOnlyList<string>? Context { get; init; }
+
+    /// <summary>Require context for criteria judging; unavailable evidence produces an unmeasured judge result.</summary>
+    /// <remarks>Set this for groundedness criteria. No criterion-text or language heuristics infer this requirement.</remarks>
+    public bool RequiresContext { get; init; }
     
     /// <summary>Minimum score to pass (0-100). Defaults to <see cref="EvaluationDefaults.DefaultPassingScore"/>.</summary>
     public int PassingScore { get; init; } = EvaluationDefaults.DefaultPassingScore;
@@ -89,6 +100,14 @@ public class TestResult
     
     /// <summary>Score from 0-100.</summary>
     public int Score { get; set; }
+
+    /// <summary>Exact selected score evidence. Score remains a rounded compatibility display value.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JudgeScoreSelection? ScoreSelection { get; set; }
+
+    /// <summary>The measured score used for statistics and exports, without intermediate integer rounding.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double? MeasuredScore => JudgeFailed || HasError ? null : ScoreSelection is { } selection ? selection.SelectedScore : Score;
     
     /// <summary>Details about the test result.</summary>
     public string Details { get; set; } = "";
@@ -127,6 +146,23 @@ public class TestResult
     /// <summary>Full SHA-256 identity of the grading instrument and declared criteria, excluding case input/output; null when unknown.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? JudgeRubricDigest { get; set; }
+
+    /// <summary>The resolved prompt instrument and locale; full content requires explicit capture.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Prompts.JudgePromptProvenance? JudgePrompt { get; set; }
+
+    /// <summary>Source of judge context, including None for required but unavailable evidence; null for context-free judging.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvaluationContextSource? JudgeContextSource { get; set; }
+
+    /// <summary>Number of judge context passages; null when unavailable. Never contains passage text.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? JudgeContextDocumentCount { get; set; }
+
+    /// <summary>Invocation-owned evidence for subsequent IEval judging. Null is unavailable; empty is captured empty.</summary>
+    /// <remarks>Kept in memory and excluded from ordinary JSON serialization. Capturing evidence content requires an explicit export policy.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<string>? JudgeContext { get; set; }
     
     /// <summary>Tool usage information from the agent run.</summary>
     public ToolUsageReport? ToolUsage { get; set; }
@@ -205,7 +241,7 @@ public class TestSummary
     /// Average score over the measured tests (<see cref="MeasuredCount"/>), or <see langword="null"/> when nothing was
     /// measured (<see cref="HasMeasuredScore"/> is false): no score, never a placeholder 0.
     /// </summary>
-    public double? AverageScore => HasMeasuredScore ? Results.Where(r => !IsNotMeasured(r)).Average(r => r.Score) : null;
+    public double? AverageScore => HasMeasuredScore ? Results.Where(r => !IsNotMeasured(r)).Average(r => r.MeasuredScore) : null;
 
     /// <summary>
     /// Whether all tests passed. A test that was not measured did not pass, and an empty suite did not pass either:
@@ -214,7 +250,7 @@ public class TestSummary
     public bool AllPassed => Results.Count > 0 && Results.All(r => r.Passed);
 
     // A crashed run and a judge with no verdict are the same absence: no score was produced (T06, T13-4).
-    private static bool IsNotMeasured(TestResult result) => result.JudgeFailed || result.HasError;
+    private static bool IsNotMeasured(TestResult result) => result.MeasuredScore is null;
 
     /// <summary>
     /// Total duration over the timed tests (those with <see cref="TestResult.Performance"/>), or <see langword="null"/>

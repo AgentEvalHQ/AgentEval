@@ -139,6 +139,13 @@ public class ScanOptions
     /// </remarks>
     public bool RunBenignControls { get; init; } = false;
 
+    /// <summary>Optional shared over-refusal gate settings for benign controls. Its prompt selection takes precedence
+    /// over <see cref="JudgePrompts"/>; otherwise the scan selection is inherited. When supplied, these settings
+    /// (including Timeout) take precedence over <see cref="JudgeTimeout"/>. Without them, gate defaults apply and
+    /// JudgeTimeout overrides the default gate deadline. Explicit options without either prompt selection use the
+    /// configured English instrument. Inert unless <see cref="RunBenignControls"/> is enabled.</summary>
+    public AgentEval.Guardrails.Judges.JudgeGateOptions? BenignControlJudgeOptions { get; init; }
+
     /// <summary>
     /// Whether to include prompt/response in failure details.
     /// Set to false for sensitive content.
@@ -156,6 +163,14 @@ public class ScanOptions
     /// <see cref="EvidenceFidelity.IntentToAct"/> fidelity (text reasoning, not a tool trace).
     /// </remarks>
     public IChatClient? JudgeClient { get; init; }
+
+    /// <summary>Optional immutable selection for supported built-in or caller-composed judge graphs.
+    /// Every selected attack is preflighted before any target call. Requires a judge client;
+    /// Primary and Fallback modes use distinct declared policies. Fallback retains structural proof and accepts
+    /// only judge-detected success when semantic decisions are deferred;
+    /// benign controls and enabled explanations inherit the selection. Unsupported oracle nodes
+    /// are rejected rather than retaining English behavior.</summary>
+    public AgentEval.Prompts.JudgePromptOptions? JudgePrompts { get; init; }
 
     /// <summary>
     /// Time source for multi-turn timing — the per-turn timeout (<see cref="TimeoutPerTurn"/>) and the
@@ -201,9 +216,16 @@ public class ScanOptions
     /// <summary>
     /// When true and <see cref="JudgeClient"/> is set, attach an LLM-generated rationale (narrating the verdict +
     /// evidence fidelity) to Succeeded/Inconclusive findings (the <c>--explain</c> feature). Best-effort and opt-in:
-    /// it adds one judge call per explained finding and never changes a verdict. Default false (no extra LLM cost).
+    /// it never changes a verdict. Configured narration permits one corrective retry and provider compatibility
+    /// retries; actual calls are recorded separately. Default false (no extra LLM cost).
     /// </summary>
     public bool ExplainFindings { get; init; }
+
+    /// <summary>Optional narrative settings and customer instructions. Its prompt selection overrides
+    /// <see cref="JudgePrompts"/> for explanations only. Explicit settings without either selection use the configured
+    /// English narrative instrument. <see cref="JudgeTimeout"/> also bounds narration. Inert unless
+    /// <see cref="ExplainFindings"/> is true; content-off scans make no narrative calls.</summary>
+    public AgentEval.RedTeam.Evaluators.LLMJudgeOptions? ExplanationJudgeOptions { get; init; }
 
     /// <summary>
     /// Optional <b>attacker</b>-LLM client for LLM-driven multi-turn attacks (Wave C′: Crescendo / PAIR / TAP).

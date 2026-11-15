@@ -13,6 +13,7 @@ using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.Cli.CopilotStudio;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
+using AgentEval.Prompts;
 using AgentEval.MAF.CopilotStudio;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Attacks;
@@ -38,6 +39,7 @@ internal static class RedTeamCommand
     public static Command Create()
     {
         var command = new Command("redteam", "Run red team security scans against an AI agent");
+        var judgePrompts = new JudgePromptCliOptions(command);
 
         // Endpoint (mutually exclusive group)
         var endpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL" };
@@ -124,11 +126,11 @@ internal static class RedTeamCommand
             { Description = "Model for judge (default: same as --model)" };
         // ADR-021 (Phase B.1): judge grading mode + rubric + per-call timeout.
         var judgeModeOpt = new Option<string>("--judge-mode")
-            { DefaultValueFactory = _ => "primary", Description = "How the judge grades: 'primary' (default — ADR-023 B.3 flip; the Composite Judges grade semantic/text-only probes first, keyword oracle advisory) or 'fallback' (legacy — judge only adjudicates Inconclusive verdicts). 'primary' requires --judge; without it, a run is byte-identical to the keyword oracle." };
+            { DefaultValueFactory = _ => "primary", Description = "'primary' (default): judge semantic probes first. 'fallback': judge Inconclusive results, adopting only attack success. Needs --judge; otherwise uses code/keyword oracles. Both modes support judge prompt packs." };
         var judgeRubricOpt = new Option<string>("--judge-rubric")
-            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric for --judge-mode primary: 'evidence-anchored' (default — a conclusive verdict must be grounded in a verbatim quote from the response, which targets BOTH false alarms and missed hits, carries the per-oracle discriminators, and is the rubric the published κ/fabrication numbers were measured under), 'strict' (precision-oriented — only clear compromise ⇒ Succeeded; fewer false alarms but more missed hits; no discriminators), or 'lenient' (recall-oriented — any sign of compromise ⇒ Succeeded; catches more real compromises at the cost of more false alarms). For a scan where a missed vulnerability matters more than a false alarm, prefer 'lenient'." };
+            { DefaultValueFactory = _ => "evidence-anchored", Description = "Judge rubric: 'evidence-anchored' (default; requires quoted evidence), 'strict' (fewer false alarms) or 'lenient' (fewer missed attacks). Explicit prompt-pack instructions replace the selected rubric text." };
         var judgeTimeoutOpt = new Option<double>("--judge-timeout")
-            { DefaultValueFactory = _ => 0, Description = "Grading timeout (seconds): bounds the single-judge/fallback path per judge call (keeps the advisory keyword verdict on timeout) AND the default judge-primary composite path as a total grading bound (abstains → Inconclusive on timeout). 0 = no separate bound; grading shares the per-probe budget (--timeout-per-probe)." };
+            { DefaultValueFactory = _ => 0, Description = "Grading timeout in seconds: per judge call for fallback, total grading for primary. 0 shares the probe budget. Configured timeouts are failed measurements; legacy fallback retains the advisory verdict." };
 
         // Attacker (LLM that drives attacker-LLM multi-turn attacks: Crescendo / PAIR / TAP)
         var attackerEndpointOpt = new Option<string?>("--attacker")
@@ -167,7 +169,7 @@ internal static class RedTeamCommand
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
         var quietFlag = new Option<bool>("--quiet") { Description = "Suppress all output except the export" };
         var explainFlag = new Option<bool>("--explain")
-            { Description = "Attach an LLM rationale to each Succeeded/Inconclusive finding, narrating the verdict + evidence fidelity. Requires --judge (no-op + warning otherwise); adds one judge call per explained finding." };
+            { Description = "Attach an LLM rationale to each Succeeded/Inconclusive finding, narrating the verdict + evidence fidelity. Requires --judge (no-op + warning otherwise); configured narration records actual calls and permits bounded retries." };
 
         command.Options.Add(endpointOpt);
         command.Options.Add(azureFlag);
@@ -279,6 +281,7 @@ internal static class RedTeamCommand
                 JudgeRubric = parseResult.GetValue(judgeRubricOpt)!,
                 JudgeTimeoutSeconds = parseResult.GetValue(judgeTimeoutOpt),
                 JudgeApiKey = parseResult.GetValue(judgeApiKeyOpt),
+                PromptSelection = judgePrompts.Read(parseResult),
                 AttackerEndpoint = parseResult.GetValue(attackerEndpointOpt),
                 AttackerModel = parseResult.GetValue(attackerModelOpt),
                 AttackerApiKey = parseResult.GetValue(attackerApiKeyOpt),
@@ -317,6 +320,11 @@ internal static class RedTeamCommand
                 // configured spend ceiling, not a failure. See ExitCodes.BudgetExceeded's own remarks.
                 Console.Error.WriteLine($"  Error: {ex.Message}");
                 return ExitCodes.BudgetExceeded;
+            }
+            catch (Exception ex) when (opts.PromptSelection?.IsSpecified == true && JudgePromptCliOptions.IsConfigurationError(ex))
+            {
+                Console.Error.WriteLine($"  Error: {ex.Message}");
+                return ExitCodes.UsageError;
             }
             catch (Exception ex)
             {
@@ -394,8 +402,22 @@ internal static class RedTeamCommand
         string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase);
 
     internal static async Task<int> ExecuteAsync(
-        RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? memoryModelOverride = null)
+        RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? memoryModelOverride = null,
+        IChatClient? judgeClientOverride = null)
     {
+        var promptSelection = opts.PromptSelection is null ? null : await opts.PromptSelection.LoadAsync(ct).ConfigureAwait(false);
+        if (promptSelection is not null)
+        {
+            if (string.IsNullOrWhiteSpace(opts.JudgeEndpoint) || opts.ImportProbes is not null || opts.Pack is not null || opts.Transform is not null ||
+                string.Equals(opts.PackageRegistry?.Trim(), "live", StringComparison.OrdinalIgnoreCase) || opts.Calibration is not null || opts.Baseline is not null || opts.SaveBaseline is not null ||
+                MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
+                throw new NotSupportedException("Expected: a supported built-in graph with --judge and isolated prompt selection. Actual: missing judge or an unsupported import/transform/registry/memory/cohort route. Suggestions: select supported attacks without these options. Because: these routes do not yet bind localized graph identity consistently.");
+            using var descriptor = new BenchmarkPromptDefinitions.NoNetworkChatClient();
+            var selected = ResolveAttackTypes(opts.Attacks) ?? Attack.All;
+            if (selected.Count == 0) selected = Attack.All;
+            var prepared = BuildScanOptions(opts, selected, Intensity.Quick, descriptor, null, judgePrompts: promptSelection);
+            foreach (var attack in selected) _ = GraderFactory.For(attack, prepared);
+        }
         // `--attacks memory-poisoning` is not a probe scan: multi-session cases over a memory store, scored by the
         // memory-security checks (MemoryPoisoningRedTeamDriver). memoryModelOverride is its credential-free test seam.
         // First, so a probe-scan option beside it (--pack list too) is refused rather than acted on.
@@ -517,24 +539,7 @@ internal static class RedTeamCommand
         }
 
         // 3. Resolve attacks
-        IReadOnlyList<IAttackType>? attacks = null;
-        if (opts.Attacks is not null)
-        {
-            var attackNames = opts.Attacks
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            var resolvedAttacks = new List<IAttackType>();
-            foreach (var name in attackNames)
-            {
-                var attack = Attack.ByName(name);
-                if (attack is null)
-                    throw new ArgumentException(
-                        $"Unknown attack type: '{name}'. Available: {string.Join(", ", Attack.AvailableNames)}. " +
-                        $"Opt-in multi-turn (PAIR/TAP require --attacker): {string.Join(", ", Attack.OptInNames)}");
-                resolvedAttacks.Add(attack);
-            }
-            attacks = resolvedAttacks;
-        }
+        var attacks = ResolveAttackTypes(opts.Attacks);
 
         // Instrument SystemPromptExtraction with the canary so its evaluator can detect the exact-token leak. For the
         // full roster, RosterWithCanary swaps the SPE instance; for a narrowed --attacks set, swap in place. Skipped
@@ -629,7 +634,7 @@ internal static class RedTeamCommand
         // 5. Create ScanOptions
         // Per-role keys fall back to the target --api-key so the common single-gateway case stays a one-flag setup.
         using var judgeClient = opts.JudgeEndpoint is not null
-            ? new JudgeCallLedger(CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
+            ? new JudgeCallLedger(judgeClientOverride ?? CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
                 opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.JudgeApiKey ?? opts.ApiKey), "judge", opts.JudgeModel ?? resolvedName))
             : null;
 
@@ -655,7 +660,8 @@ internal static class RedTeamCommand
         AgentEval.Results.Suites.SuiteDefinitionManifest? suiteDefinition = null;
         var scanOptions = BuildScanOptions(opts, attacks, intensity, judgeClient, attackerClient,
             includeEvidence: selectedTarget?.IncludeEvidence ?? true, onProbeCompleted: partialScan.Add,
-            onPlanPrepared: opts.NoAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ProbeSuiteDefinition.Create(opts, plan, resolvedName));
+            onPlanPrepared: opts.NoAef ? null : plan => suiteDefinition = AgentEval.Cli.Infrastructure.ProbeSuiteDefinition.Create(opts, plan, resolvedName),
+            judgePrompts: promptSelection, judgeModel: opts.JudgeModel ?? resolvedName);
 
         // 6. Run scan
         if (!opts.Quiet)
@@ -1055,6 +1061,16 @@ internal static class RedTeamCommand
             throw new ArgumentException("--benign-controls needs --judge: each benign control is graded by the over-refusal judge.");
     }
 
+    private static IReadOnlyList<IAttackType>? ResolveAttackTypes(string? names)
+    {
+        if (names is null) return null;
+        return names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(name => Attack.ByName(name) ?? throw new ArgumentException(
+                $"Unknown attack type: '{name}'. Available: {string.Join(", ", Attack.AvailableNames)}. " +
+                $"Opt-in multi-turn (PAIR/TAP require --attacker): {string.Join(", ", Attack.OptInNames)}"))
+            .ToArray();
+    }
+
     internal static ScanOptions BuildScanOptions(
         RedTeamOptions opts,
         IReadOnlyList<IAttackType>? attacks,
@@ -1062,7 +1078,8 @@ internal static class RedTeamCommand
         IChatClient? judgeClient,
         IChatClient? attackerClient,
         bool includeEvidence = true,
-        Action<IAttackType, ProbeResult, bool>? onProbeCompleted = null, Action<ScanPlan>? onPlanPrepared = null)
+        Action<IAttackType, ProbeResult, bool>? onProbeCompleted = null, Action<ScanPlan>? onPlanPrepared = null,
+        JudgePromptOptions? judgePrompts = null, string? judgeModel = null)
     {
         Action<ScanProgress>? onProgress = opts.Verbose && !opts.Quiet
             ? progress => Console.Error.WriteLine(
@@ -1082,6 +1099,12 @@ internal static class RedTeamCommand
             RunBenignControls = opts.BenignControls,
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
+            JudgePrompts = judgePrompts,
+            BenignControlJudgeOptions = opts.BenignControls && judgePrompts is not null ? new()
+            {
+                ModelId = judgeModel ?? opts.JudgeModel ?? opts.Model ?? opts.DeploymentName,
+                Timeout = opts.JudgeTimeoutSeconds > 0 ? TimeSpan.FromSeconds(opts.JudgeTimeoutSeconds) : new AgentEval.Guardrails.Judges.JudgeGateOptions().Timeout
+            } : null,
             // ADR-021 (B.1): judge grading mode/rubric/timeout. Mode is orthogonal to --judge: 'primary' with no
             // judgeClient is an inert no-op (the GraderFactory returns the bare oracle).
             Mode = ParseJudgeMode(opts.JudgeMode),
@@ -1269,6 +1292,7 @@ internal sealed class RedTeamOptions
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
     public string? JudgeApiKey { get; init; }
+    public JudgePromptCliOptions.Selection? PromptSelection { get; init; }
     public string JudgeMode { get; init; } = "primary";            // ADR-023 B.3: default flipped to judge-primary
     public string JudgeRubric { get; init; } = "evidence-anchored"; // ADR-021 B.1 / R4: the measured/recommended default
     public double JudgeTimeoutSeconds { get; init; }        // ADR-021 B.1: 0 = share per-probe budget

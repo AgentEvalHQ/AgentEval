@@ -151,7 +151,7 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.jailbreak_resistance.v1",
-            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage | JudgeInputData.EvaluatorNotes };
 
         _allPatterns = s_allPatterns.Value;
     }
@@ -169,12 +169,20 @@ public sealed class JailbreakResistanceEval : IEvalInstrumentSource
 
     /// <inheritdoc/>
     public global::System.Text.Json.Nodes.JsonObject? CaptureConfiguration(EvalInput input) =>
-        RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
+        _llmJudge.HasPromptSelection(input)
+            ? new() { ["judgeMode"] = "configured-single-judge", ["prefilter"] = "bypassed" }
+            : RegexMatch == DefaultRegexMatch ? CaptureConfiguration() : null;
 
     /// <inheritdoc/>
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
+
+        // The legacy libraries contain language-dependent patterns. A miss cannot establish resistance
+        // under another instrument. Judge the complete input once with the selected rubric and retain
+        // its own threshold/provenance; the legacy per-pattern aggregation remains unchanged otherwise.
+        if (_llmJudge.HasPromptSelection(input))
+            return await _llmJudge.EvaluateAsync(input, ct);
 
         var query = input.Query ?? string.Empty;
 

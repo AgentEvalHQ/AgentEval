@@ -31,7 +31,19 @@ internal static class TraceMapping
     /// <summary>Maps MEAI usage (long counts) to the trace model (int), or null when absent or when either count is
     /// missing: a missing count is not 0 (<see cref="AgentEval.Core.TokenUsageMapping"/>).</summary>
     public static TraceTokenUsage? ToTokenUsage(UsageDetails? usage) =>
-        AgentEval.Core.TokenUsageMapping.Counts(usage) is { } c
-            ? new TraceTokenUsage { PromptTokens = c.Prompt, CompletionTokens = c.Completion }
-            : null;
+        FromAgentUsage(AgentEval.Core.TokenUsageMapping.FromUsage(usage));
+
+    internal static TraceTokenUsage? FromAgentUsage(Core.TokenUsage? usage) => usage is null ? null : new()
+    {
+        PromptTokens = usage.PromptTokens, CompletionTokens = usage.CompletionTokens,
+        ReportedInputTokenCount = usage.ReportedInputTokenCount, ReportedOutputTokenCount = usage.ReportedOutputTokenCount,
+        CachedInputTokenCount = usage.CachedInputTokenCount, HasMixedModelUsage = usage.HasMixedModelUsage
+    };
+
+    internal static Core.TokenUsage? ToAgentUsage(TraceTokenUsage? usage) => usage is null ? null : new()
+    {
+        PromptTokens = usage.PromptTokens, CompletionTokens = usage.CompletionTokens,
+        ReportedInputTokenCount = usage.ReportedInputTokenCount, ReportedOutputTokenCount = usage.ReportedOutputTokenCount,
+        CachedInputTokenCount = usage.CachedInputTokenCount, HasMixedModelUsage = usage.HasMixedModelUsage
+    };
 }

@@ -14,7 +14,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <summary>
 /// Benchmarks H5: EU AI Act — runs a real model-backed agent against
 /// every scenario in the chosen preset, grading each live response with a real
-/// LLM judge, then renders the verdict tree to JSON + HTML + PDF.
+/// LLM judge, then renders the verdict tree to JSON + HTML; PDF is opt-in.
 ///
 /// Preset mapping:
 /// <list type="bullet">
@@ -23,10 +23,10 @@ namespace AgentEval.Samples.Benchmarks;
 ///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="EuAiActBenchmark.AuditGrade(EuAiActArticlesRegistry)"/> (six pillars, cap_by_worst, threshold 0.90)</item>
 /// </list>
 ///
-/// For Mode-A boardroom-grade PDFs that include per-pillar tables, the
-/// methodology appendix, and the family-specific cover page, prefer the CLI:
-///     <c>agenteval bench eu-ai-act --preset standard --pdf</c>
-/// which delegates to the bespoke <c>EuAiActPdfRenderer</c>.
+/// For a rich PDF with per-pillar tables, methodology and the family-specific cover,
+/// record a CLI benchmark with <c>--aef .agenteval/aef --aef-content on</c>, then use
+/// the separately installed <c>agenteval-pdf</c> companion to render the exact AEF run.
+/// See <c>docs/pdf-providers.md</c>; write derived output outside the sealed source.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -103,7 +103,7 @@ public static class EuAiActBenchmarkSample
             result, subject,
             benchmarkName: "eu-ai-act",
             regulationOrBenchmark: $"EU AI Act — {presetLabel}",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: "eu-ai-act",
             presetLabel: preset switch
             {
@@ -123,7 +123,8 @@ public static class EuAiActBenchmarkSample
         Console.WriteLine("   - Every scenario probed the real agent with its YAML 'input' — no hardcoded responses.");
         Console.WriteLine("   - The judge graded each live response against that scenario's evaluation_criteria.");
         Console.WriteLine("   - Standard scales coverage; Audit-Grade swaps in cap_by_worst aggregation.");
-        Console.WriteLine("   - For Standard / Audit-Grade with the regulator-facing PDF shape, use:");
-        Console.WriteLine("       agenteval bench eu-ai-act --preset standard --pdf");
+        Console.WriteLine("   - For an optional rich PDF, record the CLI benchmark with --aef .agenteval/aef --aef-content on.");
+        Console.WriteLine("     Install AgentEval.Cli.Pdf, then: agenteval-pdf render --run <recorded-aef-run-directory> --output ./eu-ai-act-report.pdf");
+        Console.WriteLine("     See docs/pdf-providers.md; keep the derived PDF outside the sealed source.");
     }
 }

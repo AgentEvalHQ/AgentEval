@@ -83,7 +83,7 @@ public static class Program
         [
             new("Policy & Safety",           "Enterprise guardrails — NeverCallTool, PII detection, MustConfirmBefore", PolicySafetyEvaluation.RunAsync),
             new("Red Team Basic",            "One-liner security scan — 14 attack types, OWASP probes",              RedTeamBasic.RunAsync),
-            new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, PDF export, baselines",      RedTeamAdvanced.RunAsync),
+            new("Red Team Advanced",         "Custom attack pipeline, OWASP compliance, optional PDF export, baselines", RedTeamAdvanced.RunAsync),
         ]),
 
         new('F', "Data & Infrastructure", "",
@@ -117,7 +117,7 @@ public static class Program
             new("Registry Discovery",        "Walk BenchmarkFamilyRegistry — no Azure required",                     RegistryDiscoveryBenchmark.RunAsync),
             // Item 4 (plan-13 T4.1a): description now matches the actual runtime behaviour
             // — real Azure agent when creds are present, friendly-skip box otherwise.
-            new("Performance",               "Real Azure agent if creds present; friendly-skip otherwise — JSON+HTML+PDF",PerformanceBenchmarkSample.RunAsync),
+            new("Performance",               "Configured agent or explicit skip — JSON+HTML, PDF opt-in",            PerformanceBenchmarkSample.RunAsync),
             // Item 5 (plan-13 T4.1a): preset names dropped from the description string —
             // each sample resolves its own preset tier via BenchmarkSampleHelpers.ResolvePreset
             // (env var / CLI flag / interactive prompt). The previously-hardcoded preset list
@@ -250,6 +250,12 @@ public static class Program
         [
             new("Hello World",               "★ start here — build the live provider, ONE prompt, ONE assertion, the evidence availability line", Microsoft365HelloWorld.RunAsync),
             new("Live Walkthrough",          "evidence per channel, fresh vs continued context, a non-completed turn handled honestly, the turn budget", Microsoft365Walkthrough.RunAsync),
+        ]),
+
+        // Append new examples so existing numeric shortcuts remain stable. S1 = 111.
+        new('S', "Judge Customization", "★ offline — scripted transport checks; semantic calibration is separate",
+        [
+            new("Multilingual Prompt Packs", "Swedish Markdown + metadata; scripted RAG and rubric-bound walkthrough", MultilingualPromptPacks.RunAsync),
         ]),
     ];
 

@@ -17,4 +17,7 @@ public interface IRequiresCalibration
     /// <summary>The calibration axis id (matches <see cref="CalibrationReport.Axis"/> in the report store) whose
     /// <see cref="CalibrationReport.IsInlineReady"/> flag decides whether this gate may block inline.</summary>
     string AxisName { get; }
+
+    /// <summary>Configured instrument identity required in a matching calibration report; null preserves legacy axis-only matching.</summary>
+    string? InstrumentDigest => null;
 }

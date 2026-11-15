@@ -12,6 +12,15 @@ namespace AgentEval.Guardrails.Judges;
 /// </summary>
 internal static class CalibrationRequirements
 {
+    // Only the stock cache preserves its inner gate's decision unchanged. A panel's
+    // combined accuracy cannot certify any one contributor, even if only one has a digest.
+    internal static string? IndependentlyCalibratedDigest(object gate)
+    {
+        while (gate is JudgeVerdictCache cache)
+            gate = ((IDelegatingGate)cache).InnerGates.Single();
+        return (gate as IRequiresCalibration)?.InstrumentDigest;
+    }
+
     /// <summary>
     /// Returns each distinct <see cref="IRequiresCalibration"/> reachable from <paramref name="gate"/>: the gate itself
     /// when it requires calibration, then the gates it delegates to, outer before inner, in the order each wrapper

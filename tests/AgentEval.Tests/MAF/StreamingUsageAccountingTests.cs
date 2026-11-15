@@ -59,7 +59,11 @@ public sealed class StreamingUsageAccountingTests
         {
             Assert.Equal(input, performance.PromptTokens);
             Assert.Equal(output, performance.CompletionTokens);
-            Assert.Equal((input.Value * 0.0025m + output!.Value * 0.01m) / 1000m,
+            // Display counters retain their legacy int clamp. Pricing uses the complete long usage,
+            // so the large-valid-input case must not silently lose ten billed tokens.
+            var billedInput = contributions.Sum(c => c.InputTokenCount ?? 0);
+            var billedOutput = contributions.Sum(c => c.OutputTokenCount ?? 0);
+            Assert.Equal((billedInput * 0.0025m + billedOutput * 0.01m) / 1000m,
                 performance.EstimatedCost);
         }
         else

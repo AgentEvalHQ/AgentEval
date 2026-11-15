@@ -9,9 +9,11 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Rendering.PdfSharp.Tests" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../AgentEval.Rendering.Pdf/AgentEval.Rendering.Pdf.csproj" />
     <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
     <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" />
   </ItemGroup>
@@ -19,7 +21,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="PdfSharp-MigraDoc" />
   </ItemGroup>
 
 </Project>

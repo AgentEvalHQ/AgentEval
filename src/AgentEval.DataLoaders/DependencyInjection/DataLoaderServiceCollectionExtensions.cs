@@ -27,6 +27,7 @@ public static class DataLoaderServiceCollectionExtensions
 
         // Ensure core services are registered (idempotent via TryAdd*)
         services.AddAgentEval();
+        services.TryAddSingleton<Prompts.IJudgePromptPackLoader, Prompts.JudgePromptPackLoader>();
 
         // Register dataset loader factory as singleton (stateless, thread-safe)
         services.TryAddSingleton<IDatasetLoaderFactory>(sp =>

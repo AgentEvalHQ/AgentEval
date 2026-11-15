@@ -4,7 +4,7 @@ AgentEval is licensed under the MIT License (see [LICENSE](LICENSE)). The publis
 
 One part of AgentEval itself has a different licence: the AEF evidence format in `contracts/aef/` is under the Apache License 2.0 (see `contracts/aef/LICENSE` and `contracts/aef/NOTICE`). `AgentEval.Cli` embeds the AEF schemas, so its package is licensed `MIT AND Apache-2.0` and carries both files in `licenses/aef/`. The `AgentEval` library package does not contain AEF and stays MIT.
 
-This file is packed at the root of both published NuGet packages, `AgentEval` and `AgentEval.Cli`, so it travels with the binaries. The licence texts that must accompany redistributed copies are reproduced in [Licence texts](#licence-texts) at the end.
+This file is packed at the root of `AgentEval`, `AgentEval.Cli`, and the optional PDF provider/companion packages so it travels with their binaries. The optional PDF packages described below are source/release targets; availability follows the release that publishes them. The licence texts that must accompany redistributed copies are reproduced in [Licence texts](#licence-texts) at the end, with Lato's OFL text additionally carried in `licenses/Lato/OFL.txt` by the PDF packages.
 
 How this list was made: the package lists come from each packable project's `PackageReference` items, the project references it builds on, and the dependency graph NuGet restores for it (`obj/project.assets.json`), for the versions pinned in `Directory.Packages.props`. Each licence was read from that package version's `.nuspec` in the local NuGet cache (the `<license>` element, or `<licenseUrl>` where there is no `<license>`). Last checked: 2026-10-02. On 2026-11-06 the stable Microsoft Agent Framework rows were moved to 1.27.0, the version in `Directory.Packages.props` and in the restored graph; their 1.27.0 `.nuspec` files still say MIT. The preview Agent Framework packages (A2A, Foundry, AgentHooks) stay on 1.23. The other rows keep the 2026-10-02 date.
 
@@ -14,8 +14,10 @@ How this list was made: the package lists come from each packable project's `Pac
 |---------|------|------------------|
 | `AgentEval` | Library | Its own assembly plus 13 internal projects compiled into the same package: AgentEval.Abstractions, .Core, .Compliance.Core, .Compliance.Gdpr, .Compliance.EuAiAct, .DataLoaders, .Evals.Agentic, .Evals.Performance, .MAF, .Memory, .RedTeam, .RedTeam.Gatekeeper and .Rendering.Pdf. Third-party assemblies are **not** copied into the `.nupkg`: they are declared as NuGet dependencies, and NuGet restores them, with their own dependencies, into your project. |
 | `AgentEval.Cli` | .NET tool (`agenteval`) | The CLI and every project it references, including AgentEval.MAF.CopilotStudio and, in the net10.0 build only, AgentEval.MissionControl. A .NET tool package carries its dependencies inside the `.nupkg`, so this package **redistributes** the third-party assemblies listed in both the library section and the CLI section below. |
+| `AgentEval.Rendering.PdfSharp` | Optional library | The registered PDFsharp/MigraDoc provider; a normal dependency on `AgentEval`, no duplicated bundled AgentEval assemblies. Includes unchanged Lato fonts (SIL OFL 1.1); package expression `MIT AND OFL-1.1`. |
+| `AgentEval.Cli.Pdf` | Optional .NET tool (`agenteval-pdf`) | Explicit PDF output from verified recorded AEF runs. Carries PDFsharp/MigraDoc, Lato and the AEF schemas; package expression `MIT AND Apache-2.0 AND OFL-1.1`. |
 
-`AgentEval.MAF.CopilotStudio` sets `IsPackable=true`, but the release workflow packs and publishes only `AgentEval` and `AgentEval.Cli`, so it is not on NuGet. Its code reaches users only inside `AgentEval.Cli`. See [AgentEval.MAF.CopilotStudio (not published)](#agentevalmafcopilotstudio-not-published).
+`AgentEval.MAF.CopilotStudio` sets `IsPackable=true`, but the release workflow does not include it in the package list, so it is not on NuGet. Its code reaches users only inside `AgentEval.Cli`. See [AgentEval.MAF.CopilotStudio (not published)](#agentevalmafcopilotstudio-not-published).
 
 Not published: `AgentEval.MAF.AgentHooks` (`IsPackable=false`), the samples, the tests, and the Mission Control web UI (`src/AgentEval.MissionControl.Spa`, an npm project). The release workflow does not build the web UI, so its npm dependencies are not in the CLI package.
 
@@ -35,9 +37,7 @@ Direct dependencies, declared in the package:
 | System.Numerics.Tensors | 10.0.12 | MIT | https://github.com/dotnet/dotnet |
 | YamlDotNet | 16.3.0 | MIT | https://github.com/aaubry/YamlDotNet |
 | JsonSchema.Net | 7.3.4 | MIT | https://github.com/json-everything/json-everything |
-| PDFsharp-MigraDoc | 6.2.4 | MIT | https://github.com/empira/PDFsharp |
 | OpenTelemetry.Api | 1.18.0 | Apache-2.0 | https://github.com/open-telemetry/opentelemetry-dotnet |
-| QuestPDF | 2026.2.4 | QuestPDF licence: Community MIT licence or a paid licence, see [QuestPDF](#questpdf) | https://github.com/QuestPDF/library |
 
 OpenTelemetry.Api is referenced so that the version consumers resolve stays at or above the release that fixes GHSA-g94r-2vxg-569j. AgentEval's own code does not call it.
 
@@ -51,7 +51,6 @@ Transitive dependencies. The versions are the ones this repository restores with
 | JsonPointer.Net | 5.3.1 | MIT |
 | Microsoft.Agents.AI.Abstractions | 1.27.0 | MIT |
 | Microsoft.ML.Tokenizers | 2.0.0 | MIT |
-| PDFsharp | 6.2.4 | MIT |
 | Microsoft.Extensions.AI.Abstractions | 10.10.1 | MIT |
 | Microsoft.Extensions.AI.Evaluation | 10.10.0 | MIT |
 | Microsoft.Extensions.Compliance.Abstractions | 10.10.0 | MIT |
@@ -111,17 +110,17 @@ This package is not on NuGet (see above). If it were packed as configured, it wo
 
 ## Licences that need attention
 
-### QuestPDF
+### Optional PDF providers and fonts
 
-QuestPDF is not under a plain MIT licence.
+The default `AgentEval` and `AgentEval.Cli` graphs no longer include a PDF engine or its exclusive runtime/font assets. PDF output requires installing and registering a provider and explicitly requesting generation. Reading already-captured PDF bytes remains engine-free.
 
-- **The licence in the package.** QuestPDF 2026.2.4 ships `PackageLicense.md`, and its package metadata sets `requireLicenseAcceptance`. That file offers the "QuestPDF Community MIT License" free of charge to companies with annual gross revenue under USD 1M; to open-source projects, charitable organisations, and evaluation, learning or training use; and to anyone using QuestPDF as a transitive dependency. Other companies with annual gross revenue over USD 1M need a paid Professional licence (up to 10 developers using QuestPDF) or Enterprise licence (more than 10).
-- **The current terms.** The terms published at https://www.questpdf.com/license/ (Community License version 3.0, effective 6 July 2026, read on 2026-10-02) differ from the file in the package. Among other changes, they state that public-sector entities and publicly traded companies are not eligible for the Community licence regardless of revenue, and they describe the transitive-dependency case as users whose own code does not directly call QuestPDF APIs. Read the current terms yourself; this summary is not legal advice.
-- **What AgentEval sets.** Four renderers run `QuestPDF.Settings.License ??= LicenseType.Community` in their static constructors: `PdfEvalResultRenderer` (AgentEval.Rendering.Pdf), `GDPRPdfRenderer`, `EuAiActPdfRenderer` and `AgenticPdfRenderer`. That line declares which QuestPDF licence applies; it does not grant one. It sets Community only when no licence type has been set yet. If your code sets `QuestPDF.Settings.License` (for example to `LicenseType.Professional`) before the first of these renderers is used, your value is kept. The setting is process-wide: if your code has not set it by then, the Community value also applies to your own QuestPDF use in that process.
-- **When QuestPDF runs.** In the library, only when you use one of those four renderers. In the CLI, the `bench` commands for gdpr, eu-ai-act, agentic, owasp, mitre, nist and perf write a `report.pdf` on every run, with no option to turn it off, and the report-rendering commands write PDFs as well.
-- **What you need.** Whether you need a paid licence depends on QuestPDF's terms, not on the value AgentEval sets. An organisation that is not eligible for the Community licence (for example, one above the revenue threshold) and whose use is not covered by the transitive-dependency terms needs its own QuestPDF Professional or Enterprise licence before it produces PDF output with AgentEval.
+The optional `AgentEval.Rendering.PdfSharp` provider and `AgentEval.Cli.Pdf` companion use **PDFsharp-MigraDoc 6.2.4** and **PDFsharp 6.2.4**, both under MIT. The reviewed upstream license is <https://github.com/empira/PDFsharp/blob/v6.2.4/LICENSE>. PDFsharp 6.5.0 changed to AGPL/commercial licensing; do not treat a package upgrade as license-neutral. The patched System.Security.Cryptography.Pkcs 8.0.2 dependency floor remains required where the engine is installed.
 
-QuestPDF also bundles native components (Skia, HarfBuzz, qpdf, libjpeg-turbo, libpng, libwebp, zlib, expat, wuffs, libgrapheme and others) and the Lato font (SIL Open Font License 1.1). Their licence texts ship inside the QuestPDF package, in `ExternalDependencyLicenses/` and `LatoFont/OFL.txt`. QuestPDF's build targets copy the `LatoFont/` folder, `OFL.txt` included, into the build output. The native libraries (the package's `runtimes/` assets) reach the build output as well, and with it the `AgentEval.Cli` tool package. `ExternalDependencyLicenses/` is not copied, and this file does not reproduce those texts; read them in the QuestPDF package.
+The provider embeds four unchanged Lato fonts (Regular, Bold, Italic, BoldItalic). Copyright (c) 2010-2014 by tyPoland Lukasz Dziedzic (team@latofonts.com), Reserved Font Name "Lato". These fonts are distributed under the SIL Open Font License 1.1, included beside the source fonts and at `licenses/Lato/OFL.txt` in both optional packages. They are the unchanged font files supplied in the previously pinned QuestPDF 2026.2.4 distribution; the provider does not depend on or redistribute QuestPDF code/native engines.
+
+### QuestPDF in previous releases
+
+Previous releases bundled QuestPDF 2026.2.4. Its package license permits Community use for specified categories, including a transitive-dependency clause; later published terms differ, including their treatment of publicly traded/public-sector organizations and thin wrappers. Eligibility depends on the exact version and applicable terms. Removing QuestPDF from this implementation does not reinterpret prior releases' licenses. The current implementation does not set a QuestPDF license value or reference a QuestPDF engine.
 
 ### ChilliCream Nitro
 
@@ -199,10 +198,10 @@ Licences found in what is published:
 - **MIT**: most packages.
 - **Apache-2.0**: OpenTelemetry.Api, in both published packages.
 - **BSD-3-Clause**: Google.Protobuf, a transitive dependency of both published packages.
-- **QuestPDF licence** (Community MIT licence or paid, depending on who uses it and how): QuestPDF, in both published packages.
+- **SIL Open Font License 1.1**: unchanged Lato fonts in the optional PDF provider and companion only.
 - **ChilliCream License 1.0** (source-available): ChilliCream.Nitro.App, in the net10.0 build of `AgentEval.Cli` only.
 
-No package in these restored dependency graphs declares a GPL, LGPL or AGPL licence. QuestPDF bundles the Lato font under the SIL Open Font License 1.1.
+The reviewed PDFsharp 6.2.4 packages declare MIT; later PDFsharp versions have different licensing. The optional provider bundles Lato under SIL OFL 1.1. See the version-specific notes above.
 
 ## Licence texts
 
@@ -244,7 +243,7 @@ Copyright notices of the MIT-licensed packages that the published packages decla
 | PDFsharp, PDFsharp-MigraDoc | © 2026 empira |
 | JsonSchema.Net, JsonPointer.Net, Json.More.Net | None given in the `.nuspec`; see https://github.com/json-everything/json-everything |
 
-QuestPDF is not in this table: its terms are summarised under [QuestPDF](#questpdf), and its own licence file, `PackageLicense.md`, ships in the QuestPDF package.
+QuestPDF is no longer a dependency of these source packages. Prior-release terms are described under [QuestPDF in previous releases](#questpdf-in-previous-releases).
 
 ### Apache License 2.0
 

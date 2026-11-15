@@ -80,8 +80,8 @@ public sealed class LongConversationCoherenceEval : IEvalDefinitionWrapper
 
         // Synthesize an enriched query that includes the full history for the judge — preserving
         // every other EvalInput field via WithEnrichedQuery (BUG-57).
-        var enriched = ConversationHistoryHelper.WithEnrichedQuery(
-            input, ConversationHistoryHelper.FormatTranscript(history));
+        var enriched = ConversationHistoryHelper.WithJudgeHistory(
+            input, history, _inner.HasPromptSelection(input));
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

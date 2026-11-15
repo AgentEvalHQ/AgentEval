@@ -70,12 +70,60 @@
         "rubricDigest":  { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "tokensUsed":    { "type": ["integer", "null"] },
         "estimatedCost": { "type": ["number", "null"], "minimum": 0 },
-        "cacheHit":      { "type": "boolean" }
+        "cacheHit":      { "type": "boolean" },
+        "costEstimate": { "$ref": "#/$defs/tokenCostEstimate" },
+        "judgePrompt": { "$ref": "#/$defs/judgePrompt" }
       }
     },
     "evaluatedAt": { "type": "string", "format": "date-time" }
   },
   "$defs": {
+    "judgePrompt": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["evaluatorKey", "instrumentId", "version", "requestedLocale", "effectiveLocale", "origin", "fallbackUsed", "digest", "responseContract"],
+      "properties": {
+        "evaluatorKey": { "type": "string", "minLength": 1 },
+        "instrumentId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "requestedLocale": { "type": "string", "minLength": 1 },
+        "effectiveLocale": { "type": "string", "minLength": 1 },
+        "origin": { "enum": ["builtin", "pack", "override"] },
+        "fallbackUsed": { "type": "boolean" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "responseContract": { "enum": ["criteriaV1", "rubricV1", "faithfulnessV1", "relevanceV1", "contextPrecisionV1", "contextRecallV1", "answerCorrectnessV1"] },
+        "content": {
+          "type": ["object", "null"], "additionalProperties": false,
+          "required": ["systemText", "userMessage", "retryText"],
+          "properties": {
+            "systemText": { "type": "string" },
+            "userMessage": { "type": "string" },
+            "retryText": { "type": "string" }
+          }
+        }
+      }
+    },
+    "tokenCostEstimate": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "amount": { "type": ["number", "null"], "minimum": 0 },
+        "status": { "enum": ["unpriced", "zeroUsage", "standard", "cacheAdjusted", "undiscountedUnknownCache", "undiscountedMissingCacheRate", "invalid"] },
+        "inputTokens": { "type": ["integer", "null"] },
+        "outputTokens": { "type": ["integer", "null"] },
+        "cachedInputTokens": { "type": ["integer", "null"] },
+        "modelId": { "type": ["string", "null"] },
+        "modelSource": { "type": ["string", "null"] },
+        "usageEstimated": { "type": "boolean" },
+        "pricing": {
+          "type": ["object", "null"], "additionalProperties": false,
+          "properties": {
+            "inputPer1K": { "type": "number" }, "outputPer1K": { "type": "number" },
+            "cachedInputPer1K": { "type": ["number", "null"] }, "source": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
     "evidence": {
       "type": "object",
       "required": ["source", "reference", "message"],

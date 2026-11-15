@@ -41,6 +41,14 @@ public sealed record GateProvenance(
     double? ActualValue = null,
     IReadOnlyList<GateProvenance>? Contributing = null)
 {
+    /// <summary>Configured judge execution that produced this action, including unmeasured outcomes.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Judges.JudgeGateInstrument? JudgeInstrument { get; init; }
+
+    /// <summary>Calibration evidence checked for this verdict, including explicitly transferred evidence.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<Judges.CalibrationUse>? Calibration { get; init; }
+
     /// <summary>A provenance chain with no evidence, threshold, or contributing chain — just the rule name.</summary>
     public static GateProvenance ForRule(string ruleName) => new(ruleName, Array.Empty<string>());
 }

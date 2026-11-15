@@ -67,13 +67,12 @@ public sealed class PartialBenchmarkReportingTests : IDisposable
     [Fact]
     public async Task PartialBenchmark_Pdf_QualifiesCoverComponentAndLeafScores()
     {
-        using var doc = UglyToad.PdfPig.PdfDocument.Open(
-            await new PdfEvalResultRenderer().RenderAsync(await PartialBenchmark(), Options()));
+        var doc = EvalReportProjection.Create(await PartialBenchmark(), Options());
         static string Compact(string s) => Regex.Replace(s, @"\s+", "");
 
-        Assert.Contains("OVERALL:WARN(notmeasured)", Compact(doc.GetPage(1).Text));
-        Assert.Contains("perf_latencynotmeasuredWARN", Compact(doc.GetPage(2).Text));
-        Assert.Contains(doc.GetPages(), p => Compact(p.Text).Contains("Score:notmeasured"));
+        Assert.Contains("OVERALL:WARN(notmeasured)", Compact(string.Join(" ", doc.Sections[0].Paragraphs)));
+        Assert.Contains("perf_latencynotmeasuredWARN", Compact(string.Concat(doc.Sections[1].Tables.SelectMany(t => t.Rows.SelectMany(r => r)))));
+        Assert.Contains(doc.Sections, p => Compact(string.Join(" ", p.Paragraphs)).Contains("Score:notmeasured"));
     }
 
     [Theory]
@@ -115,8 +114,8 @@ public sealed class PartialBenchmarkReportingTests : IDisposable
         var result = Result("fail", 0, false);
         var html = Encoding.UTF8.GetString(await new HtmlEvalResultRenderer().RenderAsync(result, Options()));
         Assert.Contains($"<span class=\"score\">{0d.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)}</span>", html);
-        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(result, Options()));
-        Assert.Contains("OVERALL:FAIL(0%)", Regex.Replace(doc.GetPage(1).Text, @"\s+", ""));
+        var doc = EvalReportProjection.Create(result, Options());
+        Assert.Contains("OVERALL:FAIL(0%)", Regex.Replace(string.Join(" ", doc.Sections[0].Paragraphs), @"\s+", ""));
     }
 
     private static EvalResult Result(string label, double value, bool passed) => new(

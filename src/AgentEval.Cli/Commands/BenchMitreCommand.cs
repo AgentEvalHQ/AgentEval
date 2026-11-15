@@ -352,14 +352,13 @@ public static class BenchMitreCommand
             }
 
             // T0.5 (v1.1): emit generic HTML + PDF alongside JSON/MD for parity.
-            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            var htmlPath = await GenericReportRenderer.WriteHtmlAsync(
                 compositeEval,
                 outputDir,
                 subjectIdentity,
                 benchmarkLabel: "MITRE ATLAS",
                 runId: runId);
             if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
 
             ct.ThrowIfCancellationRequested();
 

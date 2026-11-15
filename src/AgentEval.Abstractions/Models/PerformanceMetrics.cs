@@ -70,6 +70,10 @@ public class PerformanceMetrics
     
     /// <summary>Estimated cost in USD (based on model pricing).</summary>
     public decimal? EstimatedCost { get; set; }
+
+    /// <summary>Usage, effective rates, model source, and cache assumptions behind the estimate.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public TokenCostEstimate? CostEstimate { get; set; }
     
     /// <summary>Model used for the request.</summary>
     public string? ModelUsed { get; set; }
@@ -109,7 +113,7 @@ public class PerformanceMetrics
 /// </summary>
 public static class ModelPricing
 {
-    /// <summary>Identity of the bundled pricing baseline; hosts may override individual rates with <see cref="SetPricing"/>.</summary>
+    /// <summary>Identity of the bundled pricing baseline; hosts may override individual rates with <see cref="SetPricing(string, decimal, decimal)"/>.</summary>
     public const string TableName = "agenteval-model-pricing-2026-10-21";
 
     /// <summary>
@@ -119,115 +123,109 @@ public static class ModelPricing
     public const string BaselineNotice = "Bundled pricing baseline: " + TableName +
         " (historical rates; custom/provider rates may differ; not a live quote).";
 
-    private static readonly ConcurrentDictionary<string, (decimal InputPer1K, decimal OutputPer1K)> _pricing = 
+    private static readonly ConcurrentDictionary<string, TokenPricing> _pricing =
         new(StringComparer.OrdinalIgnoreCase)
     {
         // OpenAI standard-tier list prices, checked against developers.openai.com/api/docs/pricing on 2026-10-07.
         // Rows the page no longer lists keep their last known value and say so. JudgeCostMap carries the same
         // prices for the models both tables know (ModelPricingConsistencyTests).
-        ["gpt-5.5"] = (0.005m, 0.03m),        // $5 / $30 per 1M
-        ["gpt-5"] = (0.00125m, 0.01m),        // $1.25 / $10 per 1M
-        ["gpt-5-chat"] = (0.005m, 0.02m),     // not on OpenAI's page (2026-10-07); last known value
-        ["gpt-5-mini"] = (0.00025m, 0.002m),  // $0.25 / $2 per 1M
-        ["gpt-5-nano"] = (0.00005m, 0.0004m), // $0.05 / $0.40 per 1M
-        ["gpt-4.1"] = (0.002m, 0.008m),
-        ["gpt-4.1-mini"] = (0.0004m, 0.0016m),
-        ["gpt-4.1-nano"] = (0.0001m, 0.0004m),
-        ["gpt-4o"] = (0.0025m, 0.01m),        // $2.50 / $10 per 1M
-        ["gpt-4o-2024-11-20"] = (0.0025m, 0.01m),
-        ["gpt-4o-mini"] = (0.00015m, 0.0006m),
-        ["gpt-4o-mini-2024-07-18"] = (0.00015m, 0.0006m),
-        ["gpt-4-turbo"] = (0.01m, 0.03m),
-        ["gpt-4-turbo-2024-04-09"] = (0.01m, 0.03m),
-        ["gpt-4"] = (0.03m, 0.06m),
-        ["gpt-4-0613"] = (0.03m, 0.06m),
-        ["gpt-3.5-turbo"] = (0.0005m, 0.0015m),
-        ["gpt-3.5-turbo-0125"] = (0.0005m, 0.0015m),
+        ["gpt-5.5"] = new(0.005m, 0.03m),        // $5 / $30 per 1M
+        ["gpt-5"] = new(0.00125m, 0.01m),        // $1.25 / $10 per 1M
+        ["gpt-5-chat"] = new(0.005m, 0.02m),     // not on OpenAI's page (2026-10-07); last known value
+        ["gpt-5-mini"] = new(0.00025m, 0.002m),  // $0.25 / $2 per 1M
+        ["gpt-5-nano"] = new(0.00005m, 0.0004m), // $0.05 / $0.40 per 1M
+        ["gpt-4.1"] = new(0.002m, 0.008m, 0.0005m) { Source = "https://developers.openai.com/api/docs/models/gpt-4.1 (standard text rates, 2026-11-11)" },
+        ["gpt-4.1-mini"] = new(0.0004m, 0.0016m),
+        ["gpt-4.1-nano"] = new(0.0001m, 0.0004m),
+        ["gpt-4o"] = new(0.0025m, 0.01m, 0.00125m) { Source = "https://developers.openai.com/api/docs/models/gpt-4o (standard text rates, 2026-11-11)" },        // $2.50 / $10 per 1M
+        ["gpt-4o-2024-11-20"] = new(0.0025m, 0.01m, 0.00125m) { Source = "https://developers.openai.com/api/docs/models/gpt-4o (standard text rates, 2026-11-11)" },
+        ["gpt-4o-mini"] = new(0.00015m, 0.0006m, 0.000075m) { Source = "https://developers.openai.com/api/docs/models/gpt-4o-mini (standard text rates, 2026-11-11)" },
+        ["gpt-4o-mini-2024-07-18"] = new(0.00015m, 0.0006m, 0.000075m) { Source = "https://developers.openai.com/api/docs/models/gpt-4o-mini (standard text rates, 2026-11-11)" },
+        ["gpt-4-turbo"] = new(0.01m, 0.03m),
+        ["gpt-4-turbo-2024-04-09"] = new(0.01m, 0.03m),
+        ["gpt-4"] = new(0.03m, 0.06m),
+        ["gpt-4-0613"] = new(0.03m, 0.06m),
+        ["gpt-3.5-turbo"] = new(0.0005m, 0.0015m),
+        ["gpt-3.5-turbo-0125"] = new(0.0005m, 0.0015m),
         
         // OpenAI reasoning models (o-series)
-        ["o1"] = (0.015m, 0.06m),
-        ["o1-preview"] = (0.015m, 0.06m),
-        ["o1-mini"] = (0.003m, 0.012m),
-        ["o3-mini"] = (0.0011m, 0.0044m),     // $1.10 / $4.40 per 1M
+        ["o1"] = new(0.015m, 0.06m),
+        ["o1-preview"] = new(0.015m, 0.06m),
+        ["o1-mini"] = new(0.003m, 0.012m),
+        ["o3-mini"] = new(0.0011m, 0.0044m),     // $1.10 / $4.40 per 1M
         
         // OpenAI embedding models
-        ["text-embedding-3-small"] = (0.00002m, 0m),  // Embedding models have no output cost
-        ["text-embedding-3-large"] = (0.00013m, 0m),
-        ["text-embedding-ada-002"] = (0.0001m, 0m),
+        ["text-embedding-3-small"] = new(0.00002m, 0m),  // Embedding models have no output cost
+        ["text-embedding-3-large"] = new(0.00013m, 0m),
+        ["text-embedding-ada-002"] = new(0.0001m, 0m),
 
         // Bitdeer AI serverless models, keyed by Bitdeer's model id: the prices bitdeer.ai/en/pricing/ai-models charged
         // on 2026-10-21. Rows marked "sale" show a struck-through list price and a lower sale price with no end date;
         // the row holds the observed sale price for historical estimates and the comment the list price. JudgeCostMap carries
         // the same chat-model prices.
-        ["zai-org/GLM-5.3-Flash"] = (0.000083m, 0.000275m),                      // sale; list $0.15 / $0.50 per 1M
-        ["zai-org/GLM-5.3"] = (0.00063m, 0.00198m),                              // sale; list $1.40 / $4.40 per 1M
-        ["deepseek-ai/DeepSeek-V4.1-Flash"] = (0.000144m, 0.000576m),            // sale; list $0.30 / $1.20 per 1M (also -1017)
-        ["deepseek-ai/DeepSeek-V4-Flash"] = (0.00014m, 0.00028m),                // $0.14 / $0.28 per 1M
-        ["Qwen/Qwen3.8-27B"] = (0.0004m, 0.0024m),                               // sale; list $0.50 / $3.00 per 1M
-        ["nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B"] = (0.0001m, 0.0004m),  // $0.10 / $0.40 per 1M
-        ["BAAI/bge-m3"] = (0.00001m, 0m),                                        // embeddings, $0.01 per 1M input
-        ["BAAI/bge-reranker-v2-m3"] = (0.00001m, 0m),                            // reranker, $0.01 per 1M input
+        ["zai-org/GLM-5.3-Flash"] = new(0.000083m, 0.000275m),                      // sale; list $0.15 / $0.50 per 1M
+        ["zai-org/GLM-5.3"] = new(0.00063m, 0.00198m),                              // sale; list $1.40 / $4.40 per 1M
+        ["deepseek-ai/DeepSeek-V4.1-Flash"] = new(0.000144m, 0.000576m),            // sale; list $0.30 / $1.20 per 1M (also -1017)
+        ["deepseek-ai/DeepSeek-V4-Flash"] = new(0.00014m, 0.00028m),                // $0.14 / $0.28 per 1M
+        ["Qwen/Qwen3.8-27B"] = new(0.0004m, 0.0024m),                               // sale; list $0.50 / $3.00 per 1M
+        ["nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B"] = new(0.0001m, 0.0004m),  // $0.10 / $0.40 per 1M
+        ["BAAI/bge-m3"] = new(0.00001m, 0m),                                        // embeddings, $0.01 per 1M input
+        ["BAAI/bge-reranker-v2-m3"] = new(0.00001m, 0m),                            // reranker, $0.01 per 1M input
 
         // Anthropic Claude models. Haiku 3.5 checked against platform.claude.com pricing on 2026-10-07 ($0.80 / $4,
         // retired except on Bedrock and Google Cloud); the other rows are retired models no longer listed there.
-        ["claude-3-5-sonnet"] = (0.003m, 0.015m),
-        ["claude-3-5-sonnet-20241022"] = (0.003m, 0.015m),
-        ["claude-3-5-haiku"] = (0.0008m, 0.004m),
-        ["claude-3-opus"] = (0.015m, 0.075m),
-        ["claude-3-sonnet"] = (0.003m, 0.015m),
-        ["claude-3-haiku"] = (0.00025m, 0.00125m),
-        ["claude-2.1"] = (0.008m, 0.024m),
-        ["claude-2.0"] = (0.008m, 0.024m),
+        ["claude-3-5-sonnet"] = new(0.003m, 0.015m),
+        ["claude-3-5-sonnet-20241022"] = new(0.003m, 0.015m),
+        ["claude-3-5-haiku"] = new(0.0008m, 0.004m),
+        ["claude-3-opus"] = new(0.015m, 0.075m),
+        ["claude-3-sonnet"] = new(0.003m, 0.015m),
+        ["claude-3-haiku"] = new(0.00025m, 0.00125m),
+        ["claude-2.1"] = new(0.008m, 0.024m),
+        ["claude-2.0"] = new(0.008m, 0.024m),
         
         // Google Gemini models
-        ["gemini-1.5-pro"] = (0.00125m, 0.005m),
-        ["gemini-1.5-pro-latest"] = (0.00125m, 0.005m),
-        ["gemini-1.5-flash"] = (0.000075m, 0.0003m),
-        ["gemini-1.0-pro"] = (0.0005m, 0.0015m),
-        ["gemini-pro"] = (0.0005m, 0.0015m),
+        ["gemini-1.5-pro"] = new(0.00125m, 0.005m),
+        ["gemini-1.5-pro-latest"] = new(0.00125m, 0.005m),
+        ["gemini-1.5-flash"] = new(0.000075m, 0.0003m),
+        ["gemini-1.0-pro"] = new(0.0005m, 0.0015m),
+        ["gemini-pro"] = new(0.0005m, 0.0015m),
         
         // Meta Llama models (via various providers)
-        ["llama-3.1-405b"] = (0.005m, 0.015m),  // Approximate pricing via cloud providers
-        ["llama-3.1-70b"] = (0.0009m, 0.0009m),
-        ["llama-3.1-8b"] = (0.0002m, 0.0002m),
-        ["llama-3-70b"] = (0.0009m, 0.0009m),
-        ["llama-3-8b"] = (0.0002m, 0.0002m),
+        ["llama-3.1-405b"] = new(0.005m, 0.015m),  // Approximate pricing via cloud providers
+        ["llama-3.1-70b"] = new(0.0009m, 0.0009m),
+        ["llama-3.1-8b"] = new(0.0002m, 0.0002m),
+        ["llama-3-70b"] = new(0.0009m, 0.0009m),
+        ["llama-3-8b"] = new(0.0002m, 0.0002m),
         
         // Mistral AI models
-        ["mistral-large"] = (0.002m, 0.006m),
-        ["mistral-medium"] = (0.0027m, 0.0081m),
-        ["mistral-small"] = (0.001m, 0.003m),
-        ["mistral-7b"] = (0.0002m, 0.0002m),
-        ["mixtral-8x7b"] = (0.0007m, 0.0007m),
-        ["mixtral-8x22b"] = (0.002m, 0.006m),
+        ["mistral-large"] = new(0.002m, 0.006m),
+        ["mistral-medium"] = new(0.0027m, 0.0081m),
+        ["mistral-small"] = new(0.001m, 0.003m),
+        ["mistral-7b"] = new(0.0002m, 0.0002m),
+        ["mixtral-8x7b"] = new(0.0007m, 0.0007m),
+        ["mixtral-8x22b"] = new(0.002m, 0.006m),
         
         // Cohere models
-        ["command-r-plus"] = (0.003m, 0.015m),
-        ["command-r"] = (0.0005m, 0.0015m),
-        ["command"] = (0.001m, 0.002m),
-        ["command-light"] = (0.0003m, 0.0006m),
+        ["command-r-plus"] = new(0.003m, 0.015m),
+        ["command-r"] = new(0.0005m, 0.0015m),
+        ["command"] = new(0.001m, 0.002m),
+        ["command-light"] = new(0.0003m, 0.0006m),
         
         // Azure OpenAI Service (same pricing as OpenAI but with different deployment names)
-        ["gpt-4o-deployment"] = (0.0025m, 0.01m),  // Common Azure deployment name
-        ["gpt-4o-mini-deployment"] = (0.00015m, 0.0006m),
-        ["gpt-35-turbo"] = (0.0005m, 0.0015m),     // Azure naming convention
+        ["gpt-4o-deployment"] = new(0.0025m, 0.01m),  // Common Azure deployment name
+        ["gpt-4o-mini-deployment"] = new(0.00015m, 0.0006m),
+        ["gpt-35-turbo"] = new(0.0005m, 0.0015m),     // Azure naming convention
         
         // GitHub Models (GitHub-hosted versions)
-        ["gpt-4o-github"] = (0.0025m, 0.01m),  // GitHub Models naming
-        ["claude-3-5-sonnet-github"] = (0.003m, 0.015m),
+        ["gpt-4o-github"] = new(0.0025m, 0.01m),  // GitHub Models naming
+        ["claude-3-5-sonnet-github"] = new(0.003m, 0.015m),
     };
     
     /// <summary>Estimate cost for a request.</summary>
     public static decimal? EstimateCost(string? modelName, int inputTokens, int outputTokens)
     {
-        if (string.IsNullOrEmpty(modelName))
-            return null;
-        
-        var pricing = GetPricing(modelName);
-        if (pricing == null)
-            return null;
-        
-        return (inputTokens / 1000m * pricing.Value.InputPer1K) + (outputTokens / 1000m * pricing.Value.OutputPer1K);
+        var pricing = GetTokenPricing(modelName);
+        return pricing is null ? null : TokenCostEstimate.Calculate(inputTokens, outputTokens, null, pricing).Amount;
     }
     
     /// <summary>Get pricing for a model.</summary>
@@ -254,10 +252,22 @@ public static class ModelPricing
         _ = modelName ?? throw new ArgumentNullException(nameof(modelName));
         _pricing.AddOrUpdate(
             modelName.ToLowerInvariant(),
-            (inputPer1K, outputPer1K),
-            (_, _) => (inputPer1K, outputPer1K));
+            new TokenPricing(inputPer1K, outputPer1K),
+            (_, _) => new TokenPricing(inputPer1K, outputPer1K));
     }
     
+    /// <summary>Sets an immutable rate card, including an optional cached-input rate.</summary>
+    public static void SetPricing(string modelName, TokenPricing pricing)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
+        ArgumentNullException.ThrowIfNull(pricing);
+        _pricing[modelName] = pricing;
+    }
+
+    /// <summary>Resolves the full rate card with the existing exact-then-longest match policy.</summary>
+    public static TokenPricing? GetTokenPricing(string? modelName) =>
+        ModelKeyMatcher.TryMatchLongestFirst(_pricing, modelName, out var pricing) ? pricing : null;
+
     /// <summary>Get all known model names.</summary>
     public static IEnumerable<string> KnownModels => _pricing.Keys;
 

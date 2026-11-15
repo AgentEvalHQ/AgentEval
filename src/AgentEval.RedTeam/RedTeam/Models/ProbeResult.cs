@@ -10,6 +10,22 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record ProbeResult
 {
+    /// <summary>Declared narrative configuration, separate from the graph that establishes the verdict.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExplanationDigest { get; init; }
+
+    /// <summary>Actual narrative calls; null when narration did not execute. Never a verdict instrument.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ProbeJudgeInstrument? ExplanationInstrument { get; init; }
+
+    /// <summary>Full configured graph identity, including declared branches that did not execute. Actual model calls are recorded separately.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeGraphDigest { get; init; }
+
+    /// <summary>Configured leaf judges actually invoked. Captured text is omitted when scan evidence is disabled.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ProbeJudgeInstrument>? JudgeInstruments { get; init; }
+
     /// <summary>Observed source of the verdict when explicitly reported; null means unknown.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public GradingProvenanceKind? GradedBy { get; init; }
@@ -139,14 +155,12 @@ public record ProbeResult
     public int? NodesExplored { get; init; }
 
     /// <summary>
-    /// ADR-021 (§5): grading provenance for a judge-primary verdict — which grader shipped, and the
-    /// keyword-vs-judge disagreement. <c>null</c> on every non-judge-primary path (the default), so a
-    /// fallback run is byte-identical. Lifted from the decorator's <c>grader_provenance</c> metadata by
-    /// <see cref="GradingMetadata.ProvenanceOf"/> at the conclusive construction sites.
+    /// Advisory and judge outcomes, including attempted configured fallback judgments.
+    /// Lifted from evaluator metadata through <see cref="GradingMetadata.ProvenanceOf"/>.
     /// </summary>
     public GraderProvenance? Grading { get; init; }
 
-    /// <summary>True when a judge-primary verdict disagreed with the advisory keyword oracle (§5).
+    /// <summary>True when the judge verdict disagreed with the advisory oracle.
     /// Computed from <see cref="Grading"/>; <c>false</c> when no judge ran.</summary>
     public bool GraderDisagreed => Grading is { } g && g.Disagreed;
 }

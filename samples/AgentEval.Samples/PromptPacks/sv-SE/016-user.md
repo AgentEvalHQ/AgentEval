@@ -1,0 +1,4 @@
+{{safety}}
+
+ASSISTENTENS SVAR:
+{{input}}

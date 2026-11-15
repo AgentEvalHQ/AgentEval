@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AgentEval.Guardrails.Judges;
+using AgentEval.Guardrails;
 
 namespace AgentEval.Cli.Commands.Gatekeeper;
 
@@ -31,8 +32,10 @@ internal static class InlineReadinessStore
     /// filename so a long user-supplied model/deployment name can't exceed the filesystem path limit — the full
     /// fingerprint is still stored inside the cert and verified on load.
     /// </summary>
-    public static string PathFor(string axis, string fingerprint, string? dir = null) =>
-        Path.Combine(dir ?? DefaultDir, $"{Safe(axis)}@{FingerprintHash(fingerprint)}.json");
+    public static string PathFor(string axis, string fingerprint, string? dir = null, string? instrumentDigest = null, string? datasetDigest = null) =>
+        Path.Combine(dir ?? DefaultDir, $"{Safe(axis)}@{FingerprintHash(fingerprint)}" +
+            (instrumentDigest is null ? "" : $"-{FingerprintHash(instrumentDigest)}") +
+            (datasetDigest is null ? "" : $"-{FingerprintHash(datasetDigest)}") + ".json");
 
     private static string FingerprintHash(string fingerprint) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint)))[..16].ToLowerInvariant();
@@ -56,9 +59,9 @@ internal static class InlineReadinessStore
     }
 
     /// <summary>Load the certificate matching <c>(axis, fingerprint)</c>, or null if none / unreadable.</summary>
-    public static CalibrationCertificate? TryLoad(string axis, string fingerprint, string? dir = null)
+    public static CalibrationCertificate? TryLoad(string axis, string fingerprint, string? dir = null, string? instrumentDigest = null, string? datasetDigest = null)
     {
-        var path = PathFor(axis, fingerprint, dir);
+        var path = PathFor(axis, fingerprint, dir, instrumentDigest, datasetDigest);
         if (!File.Exists(path))
         {
             return null;
@@ -68,7 +71,8 @@ internal static class InlineReadinessStore
         {
             var cert = JsonSerializer.Deserialize<CalibrationCertificate>(File.ReadAllText(path), Json);
             // guard against a mismatched/hand-edited cert being used for the wrong axis/model
-            return cert is not null && cert.Axis == axis && cert.ModelFingerprint == fingerprint ? cert : null;
+            return cert is not null && cert.Axis == axis && cert.ModelFingerprint == fingerprint &&
+                cert.InstrumentDigest == instrumentDigest && cert.Dataset?.Digest == datasetDigest ? cert : null;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -79,7 +83,7 @@ internal static class InlineReadinessStore
     /// <summary>Write a certificate. Returns the path written.</summary>
     public static string Save(CalibrationCertificate cert, string? path = null, string? dir = null)
     {
-        path ??= PathFor(cert.Axis, cert.ModelFingerprint, dir);
+        path ??= PathFor(cert.Axis, cert.ModelFingerprint, dir, cert.InstrumentDigest, cert.Dataset?.Digest);
         var parent = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(parent))
         {
@@ -91,4 +95,25 @@ internal static class InlineReadinessStore
     }
 
     private static string Safe(string s) => Unsafe.Replace(s, "_");
+
+    internal static string? InstrumentOf(IChatGate gate) => CalibrationRequirements.FindIn(gate)
+        .Select(c => c.InstrumentDigest).OfType<string>().Distinct(StringComparer.Ordinal).SingleOrDefault();
+
+    internal static bool IsValid(CalibrationCertificate? cert, JudgeGoldSet gold, string? instrumentDigest, GateCalibrationDataset? dataset) =>
+        cert?.IsInlineReady == true && cert.GoldSetHash == GoldSetHash(gold) &&
+        cert.InstrumentDigest == instrumentDigest && cert.Dataset?.Digest == dataset?.Digest &&
+        (dataset is null || dataset.Reviewed && dataset.SplitLabel == "held-out") &&
+        (instrumentDigest is null || dataset is not null && cert.Report is
+            { IsInlineReady: true, CertificateEligible: true, ModelsIdentified: true, UnmeasuredCases: 0 } &&
+            cert.Report.InstrumentDigests?.Contains(instrumentDigest, StringComparer.Ordinal) == true && cert.Report.Dataset == dataset.Provenance);
+
+    internal static bool MatchesObservedModels(CalibrationCertificate certificate, GateVerdict verdict)
+    {
+        if (certificate.InstrumentDigest is null) return true; // Legacy receipts have no observed model contract.
+        var expected = certificate.Report.Cases?.SelectMany(c => c?.JudgeInstruments ?? [])
+            .Where(i => i is not null && i.ConfigurationDigest == certificate.InstrumentDigest).SelectMany(i => i.Calls ?? [])
+            .Where(c => c?.ResponseReceived == true).Select(c => c.ModelId).Distinct(StringComparer.Ordinal).ToArray() ?? [];
+        var observed = JudgeGateInstrumentation.Observed(verdict.Provenance).ToArray();
+        return CalibrationBinding.MatchesObservedModels(certificate.InstrumentDigest, expected, observed);
+    }
 }

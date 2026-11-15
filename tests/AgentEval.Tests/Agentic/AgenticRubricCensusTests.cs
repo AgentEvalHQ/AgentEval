@@ -241,6 +241,10 @@ public class AgenticRubricCensusTests
             }
         }
 
+        // The public options constructor deliberately retains v1 as the legacy default.
+        // Exercise the explicit v2 policy with every selectable dimension as well.
+        built.Add(new AgentEval.Evals.Agentic.Quality.GroundednessEval(judge, "census", 0.75,
+            AgentEval.Evals.Agentic.Quality.GroundednessOptions.SupportFocused with { Completeness = new(0.25) }));
         return (built, unbuilt);
     }
 
@@ -331,6 +335,17 @@ public class AgenticRubricCensusTests
             }
         }
 
+        // Groundedness composes enabled dimensions through a shared local factory. Its
+        // prompt/key arguments are variables, so discover those declarations from live leaves.
+        var judge = new ChatClientEvaluator(new AgentEval.Tests.Evals.RubricJudgeTests.RecordingChatClient(_ => "{}"));
+        var variants = new[]
+        {
+            new AgentEval.Evals.Agentic.Quality.GroundednessEval(judge),
+            new AgentEval.Evals.Agentic.Quality.GroundednessEval(judge, "census", 0.75,
+                AgentEval.Evals.Agentic.Quality.GroundednessOptions.SupportFocused with { Completeness = new(0.25) })
+        };
+        foreach (var leaf in variants.SelectMany(LeavesIn))
+            leaves.Add(("GroundednessEval.cs", Private<EvalRubric>(leaf, "_rubric").Id, leaf.Key));
         return leaves;
     }
 

@@ -325,10 +325,9 @@ public static class BenchNistCommand
                 Console.Error.WriteLine($"Warning: failed to write NIST AI RMF Markdown report: {ex.Message}");
             }
 
-            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            var htmlPath = await GenericReportRenderer.WriteHtmlAsync(
                 compositeEval, outputDir, subjectIdentity, benchmarkLabel: "NIST AI RMF", runId: runId);
             if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
 
             ct.ThrowIfCancellationRequested();
 

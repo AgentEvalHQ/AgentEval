@@ -791,8 +791,10 @@ struct AgentEval.RedTeam.EvaluationResult : IEquatable<AgentEval.RedTeam.Evaluat
     Boolean IsInconclusive { get; }
     Double Confidence { get; init; }
     IReadOnlyDictionary<String, Object> Metadata { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.ProbeJudgeInstrument> JudgeInstruments { get; init; }
     IReadOnlyList<String> MatchedItems { get; init; }
     Int32 GetHashCode()
+    String JudgeGraphDigest { get; init; }
     String Reason { get; init; }
     String RubricDigest { get; init; }
     String ToString()
@@ -849,20 +851,28 @@ sealed class AgentEval.RedTeam.Evaluators.InsecureOutputEvaluator : AgentEval.Re
     Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
     ctor()
 class AgentEval.RedTeam.Evaluators.LLMJudgeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    JudgePromptDefinition CaptureExplanationPromptDefinition()
+    JudgePromptDefinition CapturePromptDefinition()
     String Name { get; }
     Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateWithPromptsAsync(AgentEval.RedTeam.AttackProbe probe, String response, JudgePromptOptions prompts, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.ProbeExplanation> ExplainWithPromptsAsync(AgentEval.RedTeam.AttackProbe probe, String response, AgentEval.RedTeam.EvaluationOutcome outcome, AgentEval.RedTeam.EvidenceFidelity fidelity, JudgePromptOptions prompts, CancellationToken cancellationToken = default)
     Task<String> ExplainAsync(AgentEval.RedTeam.AttackProbe probe, String response, AgentEval.RedTeam.EvaluationOutcome outcome, AgentEval.RedTeam.EvidenceFidelity fidelity, CancellationToken cancellationToken = default)
     const String UserPromptTemplateVersion
     ctor(IChatClient chatClient, AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
 class AgentEval.RedTeam.Evaluators.LLMJudgeOptions
     Int32 MaxTokens { get; init; }
+    JudgePromptOptions JudgePrompts { get; init; }
     Single Temperature { get; init; }
     String CustomSystemPrompt { get; init; }
     String CustomUserPromptTemplate { get; init; }
+    String PromptKey { get; init; }
     ctor()
 sealed class AgentEval.RedTeam.Evaluators.LikertJudgeEvaluator : AgentEval.RedTeam.IProbeEvaluator
+    JudgePromptDefinition CapturePromptDefinition()
     String Name { get; }
     Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+    Task<AgentEval.RedTeam.EvaluationResult> EvaluateWithPromptsAsync(AgentEval.RedTeam.AttackProbe probe, String response, JudgePromptOptions prompts, CancellationToken cancellationToken = default)
     const String LikertScoreKey
     const String RationaleKey
     ctor(IChatClient chatClient, AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
@@ -883,6 +893,12 @@ sealed class AgentEval.RedTeam.Evaluators.PackageHallucinationDetector : AgentEv
     String Name { get; }
     Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
     ctor(AgentEval.RedTeam.Evaluators.PackageEcosystem ecosystem, AgentEval.RedTeam.Evaluators.IPackageRegistry registry)
+static class AgentEval.RedTeam.Evaluators.RedTeamJudgePrompts
+    static AgentEval.RedTeam.IProbeEvaluator Bind(AgentEval.RedTeam.IProbeEvaluator evaluator, JudgePromptOptions prompts)
+    static IReadOnlyList<JudgePromptDefinition> ForEvaluator(AgentEval.RedTeam.IProbeEvaluator evaluator)
+    static JudgePromptDefinition ForExplanation(AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
+    static JudgePromptDefinition ForLikert(AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
+    static JudgePromptDefinition ForVerdict(AgentEval.RedTeam.Evaluators.LLMJudgeOptions options = null)
 sealed class AgentEval.RedTeam.Evaluators.RefusalDetector : AgentEval.RedTeam.IProbeEvaluator
     String Name { get; }
     Task<AgentEval.RedTeam.EvaluationResult> EvaluateAsync(AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
@@ -987,6 +1003,7 @@ sealed class AgentEval.RedTeam.Gatekeeper.ProbeEvaluatorGate : IToolGate
 static class AgentEval.RedTeam.GraderFactory
     static AgentEval.RedTeam.Evaluators.LLMJudgeOptions OptionsFor(AgentEval.RedTeam.JudgeRubric rubric, String oracle = null)
     static AgentEval.RedTeam.IProbeEvaluator For(AgentEval.RedTeam.IAttackType attack, AgentEval.RedTeam.ScanOptions options)
+    static IReadOnlyList<JudgePromptDefinition> CapturePromptDefinitions(AgentEval.RedTeam.IAttackType attack, AgentEval.RedTeam.ScanOptions options)
 sealed class AgentEval.RedTeam.GraderProvenance : IEquatable<AgentEval.RedTeam.GraderProvenance>
     AgentEval.RedTeam.EvaluationOutcome JudgeOutcome { get; init; }
     AgentEval.RedTeam.EvaluationOutcome KeywordOutcome { get; init; }
@@ -996,6 +1013,7 @@ sealed class AgentEval.RedTeam.GraderProvenance : IEquatable<AgentEval.RedTeam.G
     Boolean Disagreed { get; }
     Boolean Equals(AgentEval.RedTeam.GraderProvenance other)
     Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.RedTeam.ProbeJudgeInstrument> JudgeInstruments { get; init; }
     Int32 GetHashCode()
     String RubricDigest { get; init; }
     String ToString()
@@ -1391,6 +1409,8 @@ sealed class AgentEval.RedTeam.PlannedAttack : IEquatable<AgentEval.RedTeam.Plan
     Boolean Equals(Object obj)
     IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes { get; init; }
     Int32 GetHashCode()
+    String ExplanationDigest { get; init; }
+    String JudgeGraphDigest { get; init; }
     String ToString()
     Void Deconstruct(out AgentEval.RedTeam.IAttackType Attack, out IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes, out Boolean Control)
     ctor(AgentEval.RedTeam.IAttackType Attack, IReadOnlyList<AgentEval.RedTeam.AttackProbe> Probes, Boolean Control = false)
@@ -1402,6 +1422,44 @@ enum AgentEval.RedTeam.ProbeErrorKind
 static class AgentEval.RedTeam.ProbeEvaluatorExtensions
     static AgentEval.RedTeam.EvaluationResult Evaluate(AgentEval.RedTeam.IProbeEvaluator evaluator, AgentEval.RedTeam.AttackProbe probe, String response)
     static Task<Boolean> DidAttackSucceedAsync(AgentEval.RedTeam.IProbeEvaluator evaluator, AgentEval.RedTeam.AttackProbe probe, String response, CancellationToken cancellationToken = default)
+sealed class AgentEval.RedTeam.ProbeExplanation : IEquatable<AgentEval.RedTeam.ProbeExplanation>
+    AgentEval.RedTeam.ProbeExplanation <Clone>$()
+    AgentEval.RedTeam.ProbeJudgeInstrument Instrument { get; init; }
+    Boolean Equals(AgentEval.RedTeam.ProbeExplanation other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String FailureReason { get; init; }
+    String Text { get; init; }
+    String ToString()
+    Void Deconstruct(out String Text, out AgentEval.RedTeam.ProbeJudgeInstrument Instrument, out String FailureReason)
+    ctor(String Text, AgentEval.RedTeam.ProbeJudgeInstrument Instrument, String FailureReason = null)
+sealed class AgentEval.RedTeam.ProbeJudgeCall : IEquatable<AgentEval.RedTeam.ProbeJudgeCall>
+    AgentEval.RedTeam.ProbeJudgeCall <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.ProbeJudgeCall other)
+    Boolean Equals(Object obj)
+    Boolean ResponseReceived { get; init; }
+    Int32 GetHashCode()
+    Int32? MaxOutputTokens { get; init; }
+    Single? Temperature { get; init; }
+    String ModelId { get; init; }
+    String ToString()
+    Void Deconstruct(out String ModelId, out Single? Temperature, out Int32? MaxOutputTokens, out Boolean ResponseReceived)
+    ctor(String ModelId, Single? Temperature, Int32? MaxOutputTokens, Boolean ResponseReceived)
+sealed class AgentEval.RedTeam.ProbeJudgeInstrument : IEquatable<AgentEval.RedTeam.ProbeJudgeInstrument>
+    AgentEval.RedTeam.ProbeJudgeInstrument <Clone>$()
+    Boolean Equals(AgentEval.RedTeam.ProbeJudgeInstrument other)
+    Boolean Equals(Object obj)
+    Boolean? BudgetExhausted { get; init; }
+    Boolean? Measured { get; init; }
+    IReadOnlyList<AgentEval.RedTeam.ProbeJudgeCall> Calls { get; init; }
+    Int32 GetHashCode()
+    JudgePromptProvenance Prompt { get; init; }
+    String ConfigurationDigest { get; init; }
+    String RequestedModelId { get; init; }
+    String RubricDigest { get; init; }
+    String ToString()
+    Void Deconstruct(out JudgePromptProvenance Prompt, out String RubricDigest, out IReadOnlyList<AgentEval.RedTeam.ProbeJudgeCall> Calls)
+    ctor(JudgePromptProvenance Prompt, String RubricDigest, IReadOnlyList<AgentEval.RedTeam.ProbeJudgeCall> Calls)
 static class AgentEval.RedTeam.ProbeLabelSource
     const String Human
     const String MetadataKey
@@ -1419,6 +1477,7 @@ class AgentEval.RedTeam.ProbeResult : IEquatable<AgentEval.RedTeam.ProbeResult>
     AgentEval.RedTeam.GradingProvenanceKind? GradedBy { get; init; }
     AgentEval.RedTeam.InjectionSurface? Surface { get; init; }
     AgentEval.RedTeam.ProbeErrorKind ErrorKind { get; init; }
+    AgentEval.RedTeam.ProbeJudgeInstrument ExplanationInstrument { get; init; }
     AgentEval.RedTeam.ProbeResult <Clone>$()
     AgentEval.RedTeam.Severity Severity { get; init; }
     Boolean AttackerDriven { get; init; }
@@ -1428,6 +1487,7 @@ class AgentEval.RedTeam.ProbeResult : IEquatable<AgentEval.RedTeam.ProbeResult>
     Boolean HasError { get; }
     Boolean IsAmbiguous { get; }
     Boolean IsTimeout { get; }
+    IReadOnlyList<AgentEval.RedTeam.ProbeJudgeInstrument> JudgeInstruments { get; init; }
     IReadOnlyList<String> MatchedItems { get; init; }
     Int32 GetHashCode()
     Int32? DecidingTurn { get; init; }
@@ -1435,6 +1495,8 @@ class AgentEval.RedTeam.ProbeResult : IEquatable<AgentEval.RedTeam.ProbeResult>
     Int32? TurnsUsed { get; init; }
     RequestPermissibility Expectation { get; init; }
     String Error { get; init; }
+    String ExplanationDigest { get; init; }
+    String JudgeGraphDigest { get; init; }
     String ProbeId { get; init; }
     String Prompt { get; init; }
     String Rationale { get; init; }
@@ -1923,18 +1985,13 @@ class AgentEval.RedTeam.Reporting.Pdf.BrandingOptions : IEquatable<AgentEval.Red
     String SecondaryColor { get; init; }
     String ToString()
     ctor()
-sealed class AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver : IFontResolver, IFontResolverMarker
-    Byte[] GetFont(String faceName)
-    FontResolverInfo ResolveTypeface(String familyName, Boolean isBold, Boolean isItalic)
-    ctor()
-    static AgentEval.RedTeam.Reporting.Pdf.CrossPlatformFontResolver Instance { get; }
-    static Void Register()
 enum AgentEval.RedTeam.Reporting.Pdf.PageSize
     A4
     Letter
     Legal
 class AgentEval.RedTeam.Reporting.Pdf.PdfReportGenerator : AgentEval.RedTeam.Reporting.IReportExporter
     Byte[] GenerateExecutiveReport(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null)
+    ReportDocument CreateDocument(AgentEval.RedTeam.RedTeamResult result, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options)
     String Export(AgentEval.RedTeam.RedTeamResult result)
     String FileExtension { get; }
     String FormatName { get; }
@@ -1942,6 +1999,7 @@ class AgentEval.RedTeam.Reporting.Pdf.PdfReportGenerator : AgentEval.RedTeam.Rep
     Task ExportToFileAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, CancellationToken cancellationToken = default)
     Task SaveAsync(AgentEval.RedTeam.RedTeamResult result, String filePath, AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions options = null, CancellationToken cancellationToken = default)
     ctor()
+    ctor(IPdfRendererRegistry pdfRenderers = null, String providerId = null)
 class AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions : IEquatable<AgentEval.RedTeam.Reporting.Pdf.PdfReportOptions>
     AgentEval.RedTeam.RedTeamResult BaselineResults { get; init; }
     AgentEval.RedTeam.Reporting.Pdf.BrandingOptions Branding { get; init; }
@@ -2030,6 +2088,7 @@ class AgentEval.RedTeam.ScanOptions
     Action<AgentEval.RedTeam.IAttackType, AgentEval.RedTeam.ProbeResult, Boolean> OnProbeCompleted { get; init; }
     Action<AgentEval.RedTeam.ScanPlan> OnPlanPrepared { get; init; }
     Action<AgentEval.RedTeam.ScanProgress> OnProgress { get; init; }
+    AgentEval.RedTeam.Evaluators.LLMJudgeOptions ExplanationJudgeOptions { get; init; }
     AgentEval.RedTeam.Intensity Intensity { get; init; }
     AgentEval.RedTeam.JudgeMode Mode { get; init; }
     AgentEval.RedTeam.JudgeRubric Rubric { get; init; }
@@ -2044,6 +2103,8 @@ class AgentEval.RedTeam.ScanOptions
     Int32 MaxProbesPerAttack { get; init; }
     Int32 Parallelism { get; init; }
     Int32 ProgressReportInterval { get; init; }
+    JudgeGateOptions BenignControlJudgeOptions { get; init; }
+    JudgePromptOptions JudgePrompts { get; init; }
     TimeProvider TimeProvider { get; init; }
     TimeSpan DelayBetweenProbes { get; init; }
     TimeSpan MaxConversationDuration { get; init; }

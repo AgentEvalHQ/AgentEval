@@ -84,7 +84,23 @@ internal static class ToolResultEvidence
     /// The section for <paramref name="usage"/>: <see cref="Header"/> and one line per call that returned a result or an
     /// error, between the tags. Empty when there is none.
     /// </summary>
-    internal static string Render(ToolUsageReport? usage)
+    internal static string Render(ToolUsageReport? usage) => Render(usage, includeInstructions: true);
+
+    // Configured instructions come from the pack. Keep the existing bounded evidence,
+    // escaping and fair value allocation without inserting its legacy English policy.
+    internal static string RenderData(ToolUsageReport? usage) => Render(usage, includeInstructions: false);
+
+    internal static string RenderActivity(ToolUsageReport? usage) => usage is null ? "" : JsonSerializer.Serialize(new
+    {
+        calls = usage.Calls.Take(MaxListedCalls).Select(c => new
+        {
+            name = NameOf(c), executed = c.WasExecuted, failed = c.HasError,
+            approval = c.ApprovalState is { } state ? CutText(state, NameCharacterLimit) : null
+        }),
+        omittedCalls = Math.Max(0, usage.Calls.Count - MaxListedCalls)
+    }, Json);
+
+    private static string Render(ToolUsageReport? usage, bool includeInstructions)
     {
         var answered = usage?.Calls.Where(c => c.Result is not null || c.Exception is not null).ToList();
         if (answered is null || answered.Count == 0)
@@ -114,7 +130,7 @@ internal static class ToolResultEvidence
             share = share < MinimumShownCharacters ? 0 : Math.Max(MinimumShownCharacters - 1, (int)(share * 0.9));
         }
 
-        var sb = new StringBuilder(Header).Append('\n').Append(Open);
+        var sb = new StringBuilder(includeInstructions ? Header : "").Append('\n').Append(Open);
         foreach (var line in lines)
             sb.Append(line);
         return sb.Append(trailer).Append('\n').Append(Close).ToString();

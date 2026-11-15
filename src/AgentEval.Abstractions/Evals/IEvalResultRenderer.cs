@@ -37,40 +37,15 @@ namespace AgentEval.Evals;
 ///         token-cost rows so the artefact is safe to share with non-trusted readers.</item>
 /// </list>
 /// <para>
-/// Reference implementations: <c>HtmlEvalResultRenderer</c> (in
-/// <c>AgentEval.Core/Evals/Rendering/</c>, no native deps) and
-/// <c>PdfEvalResultRenderer</c> (in <c>AgentEval.Rendering.Pdf/</c>, QuestPDF dep).
-/// Contract tests live in <c>tests/AgentEval.Tests/Evals/Rendering/</c>.
-/// </para>
-/// <para>
-/// <b>Relationship to family-specific renderers</b>: existing
-/// <c>GDPRPdfRenderer</c> / <c>EuAiActPdfRenderer</c> / <c>AgenticPdfRenderer</c> stay
-/// in place — they consume the family-specific evidence envelope
-/// (<c>GdprComplianceEvidence</c>, ...) which carries cover-page-worthy metadata the
-/// generic <see cref="EvalResult"/> does not have. Implementations of this interface
-/// consume the universal <see cref="EvalResult"/> shape directly and are the right
-/// choice for cross-family scenarios — discovery walkthroughs, custom sample apps,
-/// third-party benchmark plugins.
-/// </para>
-/// <para>
-/// <b>Why <c>HtmlEvalResultRenderer</c> ships in <c>AgentEval.Core</c> but
-/// <c>PdfEvalResultRenderer</c> sits in its own <c>AgentEval.Rendering.Pdf</c>
-/// project</b> (plan-13 T4.1b item 14 — placement asymmetry): the HTML
-/// renderer has zero native dependencies (string concatenation + razor-style
-/// templating), so shipping it in Core keeps the umbrella package small and
-/// lets consumers render reports without taking on QuestPDF's ~70 MB of
-/// native QuestPDF.SkiaSharp runtimes. The PDF renderer's QuestPDF dependency
-/// is meaningful enough (and the CLI-as-tool size concern in T3.12 explicit
-/// enough) that PDF lives in its own ProjectReference-opt-in package. Moving
-/// <c>HtmlEvalResultRenderer</c> into a parallel <c>AgentEval.Rendering.Html</c>
-/// project would be a BREAKING change for namespace consumers without a
-/// corresponding size or coupling win — symmetry-for-symmetry's-sake is
-/// rejected here.
+/// Reference implementations are <c>HtmlEvalResultRenderer</c> and the engine-neutral
+/// <c>PdfEvalResultRenderer</c> adapter. PDF engines are installed and registered separately;
+/// the default package has no PDF engine. Rich family facades retain their metadata and
+/// use the same registered provider boundary.
 /// </para>
 /// <example>
 /// Render a composite evaluation result to HTML bytes:
 /// <code>
-/// var renderer = new HtmlEvalResultRenderer();   // or new PdfEvalResultRenderer();
+/// var renderer = new HtmlEvalResultRenderer();
 /// var opts = new EvalResultRenderOptions(
 ///     Subject: new SubjectIdentity(SubjectKind.Agent, "BookingAgent", "1.0.0", null, null, null, null),
 ///     Title: "Tool-Call Accuracy",
@@ -135,7 +110,7 @@ public interface IEvalResultRenderer
 /// — long evidence will then flow across multiple PDF / HTML page-breaks
 /// untouched. The HTML renderer ignores this option today (it streams evidence
 /// directly into <c>&lt;pre&gt;</c> blocks); PDF renderers honour it for layout
-/// reasons (QuestPDF page-overflow on multi-KB single-cell text).
+/// reasons. Truncation is disclosed in the output.
 /// </param>
 public sealed record EvalResultRenderOptions(
     SubjectIdentity Subject,

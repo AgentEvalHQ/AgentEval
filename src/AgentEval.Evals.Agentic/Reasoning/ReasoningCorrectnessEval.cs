@@ -118,7 +118,8 @@ public sealed class ReasoningCorrectnessEval : IEvalDefinitionWrapper
         ArgumentNullException.ThrowIfNull(input);
 
         // Resolve the reasoning trace: prefer explicit metadata key, fall back to response scan.
-        var reasoningText = ResolveReasoning(input);
+        var configured = _inner.HasPromptSelection(input);
+        var reasoningText = ResolveReasoning(input, configured);
         if (reasoningText is null)
             return Task.FromResult(EvalResult.Skipped(this,
                 $"No reasoning trace found: '{MetadataKey}' key absent from Metadata and no reasoning-style content detected in Response."));
@@ -126,7 +127,9 @@ public sealed class ReasoningCorrectnessEval : IEvalDefinitionWrapper
         // If the reasoning trace is a separate artefact (not the full response), inject it into
         // context so the judge receives it alongside the query and response.
         var judgeInput = reasoningText != input.Response
-            ? input with { Context = $"[Agent reasoning trace]\n{reasoningText}\n\n{input.Context}".TrimEnd() }
+            ? input with { Context = configured
+                ? LocalizedJudgeEvidence.Serialize(new { reasoningTrace = reasoningText, context = input.Context })
+                : $"[Agent reasoning trace]\n{reasoningText}\n\n{input.Context}".TrimEnd() }
             : input;
 
         return _inner.EvaluateAsync(judgeInput, ct);
@@ -135,7 +138,7 @@ public sealed class ReasoningCorrectnessEval : IEvalDefinitionWrapper
     /// <summary>
     /// Returns the reasoning text to evaluate, or <c>null</c> if no reasoning is observable.
     /// </summary>
-    private static string? ResolveReasoning(EvalInput input)
+    private static string? ResolveReasoning(EvalInput input, bool configured)
     {
         // Priority 1: explicit reasoning_trace metadata key.
         if (input.Metadata is not null &&
@@ -145,6 +148,10 @@ public sealed class ReasoningCorrectnessEval : IEvalDefinitionWrapper
         {
             return traceStr;
         }
+
+        // A configured rubric judges the supplied response directly. An English keyword
+        // miss must not hide a Swedish plan or reasoning trace from that instrument.
+        if (configured && !string.IsNullOrWhiteSpace(input.Response)) return input.Response;
 
         // Priority 2: scan response for chain-of-thought style markers.
         if (input.Response is not null)

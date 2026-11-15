@@ -139,7 +139,7 @@ internal static class StochasticReport
             // Over the measured runs only.
             sb.Append(string.Create(CultureInfo.InvariantCulture,
                 $"Score over {result.MeasuredCount} measured run(s): mean {stats.MeanScore:F1}, median {stats.MedianScore:F1}, " +
-                $"min {stats.MinScore}, max {stats.MaxScore}"));
+                $"min {stats.ExactMinScore}, max {stats.ExactMaxScore}"));
             if (stats.StandardDeviation is { } sd)
                 sb.Append(string.Create(CultureInfo.InvariantCulture, $", SD {sd:F1}"));
             else

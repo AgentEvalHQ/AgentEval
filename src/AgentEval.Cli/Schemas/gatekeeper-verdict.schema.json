@@ -17,7 +17,7 @@
     "matches": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Evidence spans. ALWAYS null for 'exfiltration-intent' and 'system-prompt-extraction' (the phrase may be the secret), including via a panel." },
     "redactedText": { "type": ["string", "null"], "description": "A masked, SAFE replacement (e.g. rendered-exfil's neutralized output). null for the two redact judge axes and when the gate set none." },
     "inlineReady": { "type": ["boolean", "null"], "description": "Judge gates only. From the calibration certificate. null (N/A) for deterministic gates." },
-    "inconclusive": { "type": "boolean", "description": "true when the CLI could not reach a genuine allow/block decision and failed closed: required history missing/unmappable, a panel child errored, an unmapped gate action, or a structural/usage error. A judge's own inconclusive verdict fails closed to a Block, so it does not set this. The exit code disambiguates (6 = fail-closed can't-evaluate, 2 = structural/usage error)." },
+    "inconclusive": { "type": "boolean", "description": "true when the CLI could not reach a genuine allow/block decision and failed closed: required history missing/unmappable, a panel child errored, an unmapped gate action, or a structural/usage error. Configured judge measurements that are inconclusive or unavailable also set this; legacy rubric collapse remains unchanged. The exit code disambiguates (6 = fail-closed can't-evaluate, 2 = structural/usage error)." },
     "warning": { "type": ["string", "null"], "description": "e.g. 'uncalibrated — advisory only', 'fail-closed: required history missing'." },
     "confidence": { "type": ["number", "null"], "description": "Always null in v1 (collapsed at the IChatGate boundary; a schema-consistency choice)." },
     "certificate": {
@@ -25,6 +25,7 @@
       "description": "Provenance when a calibration certificate governed inlineReady: one object for a single-axis judge, an array (one per child) for a panel, null for deterministic gates and advisory paths.",
       "items": { "type": "object" }
     },
+    "judgeInstruments": { "type": "array", "items": { "type": "object" }, "description": "Configured judge observations, including prompt/configuration identity, requested and observed model IDs and measurement status. No captured message content. Absent for legacy/deterministic paths." },
     "newArguments": { "type": ["object", "null"], "description": "Reserved for Mutate tool verdicts; null in v1." }
   }
 }

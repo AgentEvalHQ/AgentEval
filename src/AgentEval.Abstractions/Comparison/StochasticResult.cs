@@ -103,7 +103,7 @@ public record StochasticResult(
     internal static bool IsMeasured(TestResult run)
     {
         ArgumentNullException.ThrowIfNull(run);
-        return run.Error is null && !run.JudgeFailed;
+        return run.MeasuredScore is not null;
     }
 
     /// <summary>
@@ -353,6 +353,11 @@ public record StochasticStatistics(
     ConfidenceInterval? ConfidenceInterval,
     int SampleSize)
 {
+    /// <summary>Unrounded minimum when a fractional score policy was used; otherwise MinScore.</summary>
+    public double ExactMinScore { get; init; } = MinScore;
+    /// <summary>Unrounded maximum when a fractional score policy was used; otherwise MaxScore.</summary>
+    public double ExactMaxScore { get; init; } = MaxScore;
+
     private readonly int _sampleSize = RequireSample(SampleSize);
 
     /// <summary>Number of measured samples; must be positive, including when copying the record.</summary>

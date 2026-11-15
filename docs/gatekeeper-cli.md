@@ -91,6 +91,20 @@ vouch for the producing model with `--attest-fingerprint`. The certificate is an
 `inspect --cert-dir`) — it prevents *accidentally* trusting an un-calibrated judge, not a malicious operator. The
 certificate is tied to the exact model **and** gold set it was scored on; changing either invalidates it.
 
+For localized judges, export with `prompts export <directory> --family gatekeeper [--preset <axis>]` and pass
+`--judge-prompt-pack <manifest> --judge-locale <locale>` to both commands. Configured certificates additionally
+bind the resolved prompt/execution identity and supplied `--gold-set <dataset.json>` content and review metadata.
+They require human-reviewed held-out labels and all statistical checks; synthetic/unreviewed cases remain diagnostic.
+The library report's statistical `isInlineReady` and the CLI's `certificateEligible` are separate fields. The CLI
+returns 1 if a configured/custom run is not certificate-eligible. Legacy certificates cannot approve configured judges.
+See [runtime prompt packs and the dataset format](judge-prompt-packs.md#runtime-judge-gates) for the complete workflow.
+
+Configured verdicts add content-free `judgeInstruments` observations and mark unreadable judgments as
+`inconclusive: true` (exit 6 under blocking policy). Offline `--model-reply` uses the selected reader and records zero
+provider calls. Sensitive-axis rationales and captured prompt messages are omitted from these verdicts. A changed,
+unknown or unmeasured live model observation removes inline readiness. Panels preflight every child before judging;
+repeat `--gold-set` for the corresponding axis datasets when inspecting a certified configured panel.
+
 ## Panel gates
 
 `panel:<a,b,…>` runs a **fail-closed-OR fan-out** over the comma-listed child gates — any mix of the deterministic

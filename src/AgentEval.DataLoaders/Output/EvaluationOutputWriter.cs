@@ -290,7 +290,8 @@ public class EvaluationOutputWriter
         {
             testName = result.TestName,
             passed = result.Passed,
-            score = result.Score,
+            score = result.MeasuredScore,
+            scoreSelection = result.ScoreSelection,
             timestamp = DateTimeOffset.UtcNow,
             actualOutput = result.ActualOutput,
             details = result.Details,

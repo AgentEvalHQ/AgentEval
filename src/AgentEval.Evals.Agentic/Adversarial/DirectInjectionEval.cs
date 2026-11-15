@@ -124,7 +124,7 @@ public sealed class DirectInjectionEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.direct_injection.v1",
-            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage | JudgeInputData.EvaluatorNotes };
 
         _patterns = AdversarialPatternLibrary.Load(
             Assembly.GetExecutingAssembly(),

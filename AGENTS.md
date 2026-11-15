@@ -30,7 +30,7 @@ dotnet run --project samples/AgentEval.Samples
 - `src/AgentEval.RedTeam/` - Security scanning, attack types, compliance
 - `tests/AgentEval.Tests/` - Unit tests (mirrors src structure)
 - `tests/AgentEval.Memory.Tests/` - Memory module unit tests
-- `samples/AgentEval.Samples/` - 41 runnable samples
+- `samples/AgentEval.Samples/` - Runnable samples and benchmark walkthroughs (see Program.cs and the sample README)
 - `docs/` - Documentation
 
 ### Core Interfaces

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+    <PackageLicenseExpression>MIT AND OFL-1.1</PackageLicenseExpression>
+    <PackageId>AgentEval.Rendering.PdfSharp</PackageId>
+    <Description>Optional registered PDFsharp/MigraDoc 6.2.4 provider for AgentEval reports. PDF generation requires explicit installation, registration, and output selection.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval/AgentEval.csproj" />
+    <!-- Build-time references only; the normal AgentEval package dependency supplies these assemblies. -->
+    <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" PrivateAssets="all" />
+    <ProjectReference Include="../AgentEval.Rendering.Pdf/AgentEval.Rendering.Pdf.csproj" PrivateAssets="all" />
+    <PackageReference Include="PdfSharp-MigraDoc" />
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fonts/*.ttf" />
+    <None Include="Fonts/OFL.txt" Pack="true" PackagePath="licenses/Lato/" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="AgentEval.Rendering.PdfSharp.Tests" /></ItemGroup>
+</Project>

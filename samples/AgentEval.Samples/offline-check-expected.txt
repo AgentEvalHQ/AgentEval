@@ -26,6 +26,7 @@ QualitySafetyMetrics                           11  needs a chat provider for the
 JudgeCalibration                               11  needs a chat provider for the judges
 ResponsibleAI                                  11  needs a chat provider for the judges
 CalibratedEvaluatorDemo                        11  needs a chat provider for the judges
+MultilingualPromptPacks                         0  scripted prompt-pack transport demonstration, not judge calibration
 ConversationEvaluation                         11  needs a chat provider
 WorkflowEvaluationReal                         11  needs a chat provider (4-agent workflow)
 WorkflowWithTools                              11  needs a chat provider (4-agent workflow with tools)

@@ -5,7 +5,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Evals.Agentic.Reporting;
-using AgentEval.Evals.Agentic.Reporting.Pdf;
 using AgentEval.Output;
 using AgentEval.Results.Adapters.Reading;
 
@@ -13,7 +12,7 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval render</c> subcommand.
-/// Reads a verified original agentic report (converting legacy inputs) and renders Markdown/PDF without LLM cost.
+/// Reads a verified original agentic report (converting legacy inputs) and renders Markdown without LLM cost.
 /// </summary>
 public static class RenderCommand
 {
@@ -124,17 +123,7 @@ public static class RenderCommand
             return 1;
         }
 
-        // PDF report
-        var pdfPath = Path.Combine(resultDir, "report.pdf");
-        try
-        {
-            await new AgenticPdfRenderer().RenderAsync(result, pdfPath);
-            Console.WriteLine($"PDF report written to: {pdfPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-        }
+        Console.WriteLine("PDF is optional: use agenteval-pdf render --run <verified-run> --output report.pdf.");
 
         return 0;
     }

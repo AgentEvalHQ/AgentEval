@@ -5,6 +5,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Prompts;
 
 namespace AgentEval.Metrics.ResponsibleAI;
 
@@ -24,6 +25,8 @@ namespace AgentEval.Metrics.ResponsibleAI;
 /// </remarks>
 public class BiasMetric : ISafetyMetric
 {
+    private readonly JudgePromptOptions? _judgePrompts;
+
     private readonly IChatClient _chatClient;
 
     /// <inheritdoc />
@@ -41,6 +44,10 @@ public class BiasMetric : ISafetyMetric
     /// <inheritdoc />
     public decimal? EstimatedCostPerEvaluation => 0.002m;
 
+    /// <summary>Creates a judge with invocation-overridable declarative prompt selection.</summary>
+    public BiasMetric(IChatClient chatClient, JudgePromptOptions judgePrompts)
+        : this(chatClient) => _judgePrompts = judgePrompts ?? throw new ArgumentNullException(nameof(judgePrompts));
+
     /// <summary>
     /// Creates a BiasMetric with the specified chat client for evaluation.
     /// </summary>
@@ -55,6 +62,8 @@ public class BiasMetric : ISafetyMetric
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        if ((context.JudgePrompts ?? _judgePrompts) is { } prompts)
+            return await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, context, prompts, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(context.Output))
         {
             return MetricInstrument.Code(MetricResult.Pass(Name, 100,
@@ -83,6 +92,21 @@ public class BiasMetric : ISafetyMetric
         string demographicDimension,
         CancellationToken cancellationToken = default)
     {
+        if (originalContext.JudgePrompts is { } original && counterfactualContext.JudgePrompts is { } other && original != other)
+            throw new ArgumentException("Expected: one prompt selection for a counterfactual pair. Actual: conflicting selections. Suggestions: share one JudgePromptOptions instance. Because: both responses must be assessed by the same instrument.");
+        if ((originalContext.JudgePrompts ?? counterfactualContext.JudgePrompts ?? _judgePrompts) is { } prompts)
+        {
+            var paired = new EvaluationContext
+            {
+                Input = JsonSerializer.Serialize(new { original = originalContext.Input, counterfactual = counterfactualContext.Input }),
+                Output = JsonSerializer.Serialize(new { original = originalContext.Output, counterfactual = counterfactualContext.Output }),
+                Context = JsonSerializer.Serialize(new { demographicDimension })
+            };
+            var result = await ConfiguredMetricJudge.EvaluateAsync(_chatClient, Name, paired, prompts, cancellationToken,
+                BuiltInJudgePrompts.GetMetric("llm_bias_counterfactual")).ConfigureAwait(false);
+            if (result.Details is { } details) details["demographicDimension"] = demographicDimension;
+            return result;
+        }
         var prompt = BuildCounterfactualBiasPrompt(
             originalContext.Input, originalContext.Output,
             counterfactualContext.Input, counterfactualContext.Output,

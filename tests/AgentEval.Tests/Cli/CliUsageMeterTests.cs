@@ -9,6 +9,83 @@ namespace AgentEval.Tests.Cli;
 
 public class CliUsageMeterTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Snapshot_LongPricingMetadata_SealsUsageWithoutDroppingDetailedRates(bool highPrecision)
+    {
+        var key = "long-rate-source-" + Guid.NewGuid().ToString("N");
+        var rate = highPrecision ? 0.1234567890123456789012345678m : 0.001m;
+        var pricing = new AgentEval.Models.TokenPricing(rate, rate, rate)
+        { Source = "https://example.invalid/rate-card/" + new string('a', 1500) };
+        AgentEval.Models.ModelPricing.SetPricing(key, pricing);
+        using var meter = CliUsageMeter.Begin();
+        using var client = CliUsageMeter.Wrap(new Client(), "agent", key);
+        await client.GetResponseAsync("question");
+        var usage = meter.Snapshot()!;
+        var start = DateTimeOffset.UtcNow.AddSeconds(-2);
+        var leaf = new AgentEval.Evals.EvalResult(new("cost-fixture", "Cost fixture", "test", "1.0.0"),
+            new(1, null, "pass", true, null, "none", null), new(null, null, null, null, null),
+            new("atomic-code", null, null, null, null, 0, false)
+            { CostEstimate = AgentEval.Models.TokenCostEstimate.Calculate(10, 2, null, pricing) }, start);
+        var root = Path.Combine(Path.GetTempPath(), "agenteval-cost-source-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var (directory, _) = AgentEval.Results.Adapters.Native.AefCompositeRunWriter.Write(root, leaf,
+                AgentEval.Results.Adapters.Native.AefCompositeRunWriter.Undescribed, new()
+                {
+                    SubjectRef = "agent:fixture", SuiteRef = "bench:fixture", Lane = "test",
+                    TargetMode = AefTargetMode.Mocked, Usage = usage
+                }, start, start.AddSeconds(1));
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact,
+                AgentEval.Results.Integrity.AefRunVerifier.Verify(directory).Outcome);
+            Assert.InRange(Assert.Single(usage).CostSource!.Length, 1, 128);
+            Assert.Contains(pricing.Source, File.ReadAllText(Path.Combine(directory, "results.ndjson")));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Snapshot_CachedProviderUsage_PreservesDiscountAndSubset(bool streaming)
+    {
+        using var meter = CliUsageMeter.Begin();
+        using var client = CliUsageMeter.Wrap(new AgentEval.Tests.Core.TokenUsageMappingTests.UsageChatClient(new()
+        {
+            InputTokenCount = 10000, OutputTokenCount = 1000, CachedInputTokenCount = 8000
+        }), "agent");
+        if (streaming)
+        {
+            await foreach (var _ in client.GetStreamingResponseAsync("question")) { }
+        }
+        else await client.GetResponseAsync("question");
+        var result = Assert.Single(meter.Snapshot()!);
+        Assert.Equal(8000, result.CacheReadInputTokens);
+        Assert.Equal(0.025, result.CostUsd!.Value, 10); // gpt-4o: 2k ordinary + 8k cached + 1k output
+        Assert.Contains("CacheAdjusted", result.CostSource!);
+        Assert.Contains("cached=0.00125", result.CostSource!);
+    }
+
+    [Fact]
+    public async Task Snapshot_MixedCacheAssumptions_BoundsSummaryAndKeepsUnknownSubset()
+    {
+        using var meter = CliUsageMeter.Begin();
+        foreach (long? cached in new long?[] { 8000, null })
+        {
+            using var client = CliUsageMeter.Wrap(new AgentEval.Tests.Core.TokenUsageMappingTests.UsageChatClient(new()
+            { InputTokenCount = 10000, OutputTokenCount = 1000, CachedInputTokenCount = cached }), "agent");
+            await client.GetResponseAsync("question");
+        }
+        var usage = Assert.Single(meter.Snapshot()!);
+        Assert.Null(usage.CacheReadInputTokens);
+        Assert.Equal(0.06, usage.CostUsd!.Value, 10);
+        Assert.Contains("MixedCacheAssumptions", usage.CostSource!);
+        Assert.InRange(usage.CostSource!.Length, 1, 128);
+    }
     private sealed class Client(bool report = true, bool failStream = false) : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>

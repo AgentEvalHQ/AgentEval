@@ -126,6 +126,9 @@ public sealed class ChatTurn
     /// </summary>
     public TraceTokenUsage? TokenUsage { get; init; }
 
+    /// <summary>Multiple model identities were observed without per-model token attribution, even if token usage is unavailable.</summary>
+    public bool HasMixedModelUsage { get; init; }
+
     /// <summary>
     /// For agent turns: tool calls made during this response.
     /// </summary>

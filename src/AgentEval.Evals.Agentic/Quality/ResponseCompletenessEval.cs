@@ -83,6 +83,6 @@ public sealed class ResponseCompletenessEval : IEvalDefinitionWrapper
     {
         ArgumentNullException.ThrowIfNull(input);
         // The reference answer derives the expected facts when supplied; it was never sent (#203, B12a).
-        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+        return _inner.EvaluateAsync(_inner.HasPromptSelection(input) ? input : GroundTruthInput.Fold(input), ct);
     }
 }

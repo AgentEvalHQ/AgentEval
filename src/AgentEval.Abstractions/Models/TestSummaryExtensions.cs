@@ -79,12 +79,12 @@ public static class TestSummaryExtensions
     {
         // No verdict: its Score of 0 and Passed of false are placeholders (TestSummary.NotMeasuredCount), so it has no
         // score here. A test with no performance data was not timed: no duration, not 0 ms.
-        var notMeasured = result.JudgeFailed || result.HasError;
+        var notMeasured = result.MeasuredScore is null;
         return new TestResultSummary
         {
             Name = result.TestName,
             Category = suiteName,
-            Score = notMeasured ? null : result.Score,
+            Score = result.MeasuredScore,
             Passed = result.Passed,
             NotMeasured = notMeasured,
             Skipped = notMeasured,

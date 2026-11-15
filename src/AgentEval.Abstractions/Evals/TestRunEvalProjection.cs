@@ -43,7 +43,7 @@ using AgentEval.Models;
 ///   <item><term><see cref="EvalInput.Metadata"/></term><description><see cref="TestCase.Metadata"/>, copied.</description></item>
 ///   <item><term><see cref="EvalInput.CaseId"/></term><description><see cref="TestCase.Id"/> and <b>nothing else</b> — see the CaseId note below.</description></item>
 ///   <item><term><see cref="EvalInput.ToolDefinitions"/></term><description>🔴 <b>NOT CARRIED.</b> See the ToolDefinitions note below — carrying it flatters a real eval.</description></item>
-///   <item><term><see cref="EvalInput.Context"/></term><description>NOT CARRIED. Neither type records a retrieval context; there is nothing to read.</description></item>
+///   <item><term><see cref="EvalInput.Context"/></term><description>Invocation-owned <see cref="TestResult.JudgeContext"/>, otherwise <see cref="TestCase.Context"/>. Passages retain their order; captured empty becomes an empty string and unavailable stays null.</description></item>
 ///   <item><term><see cref="EvalInput.SystemMessage"/></term><description>Neither type records the system message, so the two-argument projection leaves it <see langword="null"/>. A caller that built the agent knows its instructions and passes them to <see cref="ToEvalInput(TestCase, TestResult, string)"/>; the judges whose rubric grades the response against the agent's instructions are shown them only then.</description></item>
 ///   <item><term><see cref="EvalInput.SubjectModel"/></term><description>NOT CARRIED. Neither type records the model the SUBJECT ran on, so <c>JudgeSubjectRelation</c> stays <c>Unknown</c> — which is the honest state, not a defect of this projection.</description></item>
 /// </list>
@@ -187,7 +187,7 @@ public static class TestRunEvalProjection
         return new EvalInput(
             Query: testCase.Input,
             Response: result.ActualOutput,
-            Context: null,
+            Context: (result.JudgeContext ?? testCase.Context) is { } context ? string.Join("\n\n", context) : null,
             GroundTruth: testCase.GroundTruth,
             ToolCalls: ProjectToolCalls(result),
             ToolDefinitions: null,

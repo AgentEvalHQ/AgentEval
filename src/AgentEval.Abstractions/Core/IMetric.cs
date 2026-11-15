@@ -157,6 +157,9 @@ public enum MetricCategory
 /// </summary>
 public class EvaluationContext
 {
+    /// <summary>Per-evaluation prompt selection for supported built-in judges, taking precedence over constructor configuration.</summary>
+    public Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
     /// <summary>Unique ID for this evaluation run.</summary>
     public string EvaluationId { get; init; } = Guid.NewGuid().ToString("N");
 
@@ -207,6 +210,10 @@ public class EvaluationContext
 /// </summary>
 public class MetricResult
 {
+    /// <summary>The configured instrument actually sent; full message content is retained only by explicit opt-in.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Prompts.JudgePromptProvenance? JudgePrompt { get; init; }
+
     // Preserve the original provider failure for in-process retry classification, never result serialization.
     [System.Text.Json.Serialization.JsonIgnore]
     internal Exception? CallFailure { get; init; }

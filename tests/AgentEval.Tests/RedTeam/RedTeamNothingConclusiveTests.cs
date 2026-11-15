@@ -8,14 +8,6 @@ using AgentEval.RedTeam.Baseline;
 using AgentEval.RedTeam.Output;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Pdf;
-using MigraCell = MigraDoc.DocumentObjectModel.Tables.Cell;
-using MigraDocument = MigraDoc.DocumentObjectModel.Document;
-using MigraObject = MigraDoc.DocumentObjectModel.DocumentObject;
-using MigraParagraph = MigraDoc.DocumentObjectModel.Paragraph;
-using MigraRow = MigraDoc.DocumentObjectModel.Tables.Row;
-using MigraSection = MigraDoc.DocumentObjectModel.Section;
-using MigraTable = MigraDoc.DocumentObjectModel.Tables.Table;
-using MigraText = MigraDoc.DocumentObjectModel.Text;
 
 namespace AgentEval.Tests.RedTeam;
 
@@ -436,42 +428,9 @@ public class RedTeamNothingConclusiveTests
 
     // ───────────────────────── helpers: read what the PDF document says ─────────────────────────
 
-    private static string DocumentText(MigraDocument document)
-    {
-        var sb = new StringBuilder();
-        foreach (var section in document.Sections.OfType<MigraSection>())
-            AppendText(section.Elements, sb);
-        return sb.ToString();
-    }
+    private static string DocumentText(AgentEval.Reporting.ReportDocument document) =>
+        string.Join("\n", document.Sections.SelectMany(s => s.Paragraphs));
 
-    private static void AppendText(IEnumerable<MigraObject> elements, StringBuilder sb)
-    {
-        foreach (var element in elements)
-        {
-            switch (element)
-            {
-                case MigraParagraph paragraph:
-                    sb.AppendLine(ParagraphText(paragraph));
-                    break;
-                case MigraTable table:
-                    foreach (var row in table.Rows.OfType<MigraRow>())
-                        foreach (var cell in row.Cells.OfType<MigraCell>())
-                            AppendText(cell.Elements, sb);
-                    break;
-            }
-        }
-    }
-
-    private static string ParagraphText(MigraParagraph paragraph) =>
-        string.Concat(paragraph.Elements.OfType<MigraText>().Select(t => t.Content));
-
-    /// <summary>Every table row in the document, one string per cell.</summary>
-    private static List<string[]> TableRows(MigraDocument document) =>
-        document.Sections.OfType<MigraSection>()
-            .SelectMany(s => s.Elements.OfType<MigraTable>())
-            .SelectMany(t => t.Rows.OfType<MigraRow>())
-            .Select(r => r.Cells.OfType<MigraCell>()
-                .Select(c => string.Concat(c.Elements.OfType<MigraParagraph>().Select(ParagraphText)))
-                .ToArray())
-            .ToList();
+    private static List<string[]> TableRows(AgentEval.Reporting.ReportDocument document) =>
+        document.Sections.SelectMany(s => s.Tables).SelectMany(t => t.Rows).Select(r => r.ToArray()).ToList();
 }

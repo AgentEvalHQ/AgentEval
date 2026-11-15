@@ -287,9 +287,7 @@ public class BenchEuAiActCommandTests : IDisposable
         var tsDir = Directory.GetDirectories(complianceRoot).OrderByDescending(d => d).First();
 
         Assert.True(File.Exists(Path.Combine(tsDir, "report.md")), "report.md should be generated");
-        Assert.True(File.Exists(Path.Combine(tsDir, "report.pdf")), "report.pdf should be generated");
-        Assert.True(new FileInfo(Path.Combine(tsDir, "report.pdf")).Length > 0,
-            "report.pdf should be non-empty");
+        Assert.False(File.Exists(Path.Combine(tsDir, "report.pdf")), "PDF must be explicitly requested through an installed provider");
     }
 
     [Fact]

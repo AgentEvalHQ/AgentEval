@@ -126,7 +126,7 @@ public sealed class PersonaAttackEval : IEvalInstrumentSource
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.persona_attack.v1",
-            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage };
+            failureSeverity: "critical") { JudgeSeesData = JudgeInputData.SystemMessage | JudgeInputData.EvaluatorNotes };
 
         _templates = AdversarialPatternLibrary.Load(
             Assembly.GetExecutingAssembly(),

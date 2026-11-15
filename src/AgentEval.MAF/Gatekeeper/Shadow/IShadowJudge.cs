@@ -22,6 +22,9 @@ public interface IShadowJudge
 /// <param name="Reason">Human-readable explanation, recorded to the verdict sink.</param>
 public sealed record ShadowVerdict(bool Compromised, string Reason)
 {
+    /// <summary>Configured judge observations actually used, including unavailable measurements. Empty for legacy shadow judges.</summary>
+    public IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGateInstrument> JudgeInstruments { get; init; } = [];
+
     /// <summary>A clean (not-compromised) verdict.</summary>
     public static ShadowVerdict Clean(string reason = "clean") => new(false, reason);
 

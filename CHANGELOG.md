@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.3]
+
+Third release candidate: configurable judging, retrieved evidence, cached-token estimates and optional PDF providers. Thanks to Andreas Adner (@adner) for the feedback behind [#314](https://github.com/AgentEvalHQ/AgentEval/issues/314), [#315](https://github.com/AgentEvalHQ/AgentEval/issues/315), [#316](https://github.com/AgentEvalHQ/AgentEval/issues/316) and [#317](https://github.com/AgentEvalHQ/AgentEval/issues/317).
+
+- **Context and scoring:** retrieved context reaches ordinary, streaming and stochastic criteria evaluation. Required unavailable evidence stays unmeasured. Support-focused Groundedness v2 has configurable dimensions and weights; opt-in criteria-fraction scoring preserves exact statistics and raw overall grades. Legacy defaults remain. See [judge context](docs/judge-context.md), [Groundedness policies](docs/groundedness-policies.md) and [score selection](docs/judge-score-policies.md).
+- **Cost estimates:** returned model identity and reported cached input feed agent/judge text-token pricing. Retries, streams, trace replay and artifacts retain usage, rates and assumptions; per-evaluation rate overrides avoid shared registry mutation. Missing data is not zero. See [cost estimation](docs/cost-estimation.md).
+- **Optional PDF:** default library and CLI packages contain no PDF engine. Install and register `AgentEval.Rendering.PdfSharp` and explicitly request output, or use the separate `AgentEval.Cli.Pdf` tool to render verified captured reports. PDFsharp/MigraDoc 6.2.4 uses the MIT license; bundled fonts use OFL. See [provider setup and migration](docs/pdf-providers.md).
+- **Multilingual judges:** versioned Markdown plus JSON/YAML packs configure supported RAG, safety, quality, task and atomic/composite judges. Per-call selections are isolated; customer instructions survive export and locale-only selection. Contracts, fencing, required evidence and safety caps remain implementation-owned. CLI authoring and agentic/GDPR/EU AI Act benchmark/calibration paths retain instrument identity. See [prompt packs and supported scope](docs/judge-prompt-packs.md).
+- **Red-team and runtime judging:** configured built-in attack graphs, fallback judges, explanations, benign controls and ten runtime rubrics use selected prompts instead of English semantic shortcuts. Structural marker/tool/retrieval checks remain enforced. Failed judgments cannot become safety passes; fallback adopts only attack success, and explanations never change verdicts. Configured graphs/readers/evidence and calibration identities require rebaselining. Unsupported routes fail explicitly; attack corpora and attacker prompts are not translated.
+- **Reporting and examples:** observed prompt/version/locale identities survive native evidence and compliance reports; mixed or unknown instruments remain labelled. Updated samples, RAG document-ID examples and migration guidance. Swedish fixtures and calibration labels are AI-authored and unreviewed; no customer accuracy claim is made.
+- **Calibration reuse:** `UseGatekeeperAsync` checks stored evidence and runtime judge observations. Applications can explicitly reuse ready same-axis evidence across languages/models, retaining original measurements and recording transfer provenance. Legacy axis-only calibration remains supported. Validation makes no model calls. See [calibration reuse](docs/calibration-reuse.md).
+- **Dependencies:** Microsoft Extensions AI, its OpenAI adapter and evaluation packages move together to 11.0.0. Libraries retain .NET 8/9/10 and MAF 1.27.0; target-specific tensor pins follow upstream package floors. Applications with direct MEAI references should align versions. See [upgrade guidance](docs/upgrading-to-1.0.md).
+
 ## [1.0.0-rc.2]
 
 Second release candidate for feedback before 1.0.0. It adds the experimental Microsoft 365 provider and moves to

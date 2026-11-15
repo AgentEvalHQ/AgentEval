@@ -77,8 +77,8 @@ public sealed class ClarificationAppropriatenessEval : IEvalDefinitionWrapper
 
         // Preserve every other EvalInput field via WithEnrichedQuery (BUG-57).
         var evalInput = history is { Count: > 0 }
-            ? ConversationHistoryHelper.WithEnrichedQuery(
-                input, ConversationHistoryHelper.FormatTranscript(history))
+            ? ConversationHistoryHelper.WithJudgeHistory(
+                input, history, _inner.HasPromptSelection(input))
             : input;
 
         return await _inner.EvaluateAsync(evalInput, ct);

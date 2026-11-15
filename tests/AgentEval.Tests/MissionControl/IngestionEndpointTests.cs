@@ -12,6 +12,7 @@ using AgentEval.MissionControl.Rest;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace AgentEval.Tests.MissionControl;
@@ -25,6 +26,8 @@ public sealed class IngestionEndpointTests : IDisposable
         string? remote = "127.0.0.1", bool https = false, string? key = Key)
     {
         var builder = WebApplication.CreateBuilder();
+        // A loopback fixture must not require permission to write the Windows Event Log.
+        builder.Logging.ClearProviders();
         builder.WebHost.UseTestServer();
         builder.Configuration.Sources.Clear();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>

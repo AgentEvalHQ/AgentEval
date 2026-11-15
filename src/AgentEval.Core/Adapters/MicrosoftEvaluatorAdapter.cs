@@ -9,6 +9,7 @@ using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Quality;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Prompts;
 
 // Alias to avoid conflict with AgentEval.Core.EvaluationContext
 using MicrosoftEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
@@ -119,6 +120,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(input);
+        JudgePromptResolver.RejectUnsupported(input.JudgePrompts, Key);
         if (input.Response is null)
             throw new InvalidOperationException($"{nameof(MicrosoftEvaluatorAdapter)} requires EvalInput.Response to be set.");
 
@@ -238,11 +240,15 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         // total incomplete, and a judge model with no rate has no price. The token total is complete or absent the same
         // way: summed over the counts that were reported, it read as the whole spend (T82).
         int? tokensUsed = null;
-        double? estimatedCost = null;
+        var costEstimate = AgentEval.Models.TokenCostEstimate.Calculate(
+            meter.UsageComplete ? meter.InputTokens : null, meter.UsageComplete ? meter.OutputTokens : null,
+            meter.CachedInputTokens, JudgeModel is null && meter.HasMixedModels ? null : JudgeCostMap.GetRate(judgeModel)?.ToTokenPricing())
+            with { ModelId = judgeModel, ModelSource = JudgeModel is not null ? "override" : meter.HasMixedModels ? "mixed"
+                : meter.ObservedModelId is not null ? "response" : "configured" };
+        double? estimatedCost = costEstimate.Amount is { } amount ? (double)amount : null;
         if (meter.UsageComplete)
         {
             tokensUsed = TokenUsageMapping.SaturatingTotal(meter.InputTokens, meter.OutputTokens);
-            estimatedCost = JudgeCostMap.EstimateCost(judgeModel, meter.InputTokens, meter.OutputTokens);
         }
 
         return new EvalProvenance(
@@ -252,7 +258,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             PromptHash: null,
             TokensUsed: tokensUsed,
             EstimatedCost: estimatedCost,
-            CacheHit: false);
+            CacheHit: false) { CostEstimate = costEstimate };
     }
 
     private static List<EvalEvidence> DiagnosticsAsEvidence(EvaluationMetric metric)
@@ -300,6 +306,8 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
 
         public long InputTokens { get; private set; }
         public long OutputTokens { get; private set; }
+        public long? CachedInputTokens { get; private set; } = 0;
+        public bool HasMixedModels { get; private set; }
         public string? ObservedModelId { get; private set; }
 
         /// <summary>True when every judge call reported both its input and its output token count.</summary>
@@ -357,8 +365,14 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         {
             lock (_gate)
             {
-                if (modelId is not null) ObservedModelId ??= modelId;
+                if (!string.IsNullOrWhiteSpace(modelId))
+                {
+                    HasMixedModels |= ObservedModelId is not null && !StringComparer.OrdinalIgnoreCase.Equals(ObservedModelId, modelId);
+                    ObservedModelId ??= modelId;
+                }
                 if (usage is null) return (false, false);
+                if (usage.InputTokenCount is not null || usage.CachedInputTokenCount is not null)
+                    CachedInputTokens = TokenUsageMapping.AddCached(CachedInputTokens, usage);
                 // Streaming chunks may split the two components; only supplied contributions are added.
                 // An invalid contribution or overflow invalidates the whole account permanently.
                 if (usage.InputTokenCount is { } i)
@@ -407,6 +421,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         Core.EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        JudgePromptResolver.RejectUnsupported(context.JudgePrompts, Key);
         if (NotSupplied(context.Context, context.GroundTruth) is { } notMeasured)
             return MetricResult.NotMeasured(Name, NotMeasuredCause.MissingInput, notMeasured);
 

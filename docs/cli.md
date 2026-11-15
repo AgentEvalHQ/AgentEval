@@ -4,6 +4,12 @@ AgentEval ships a CLI for managing the `.agenteval/` workspace from the terminal
 `gatekeeper` verb group, a **language-neutral runtime-policy service** any process (Python, Node, bash, a CI step) can
 call for a versioned gate verdict + exit code.
 
+For declarative judge localization, use `agenteval prompts export`, `validate` and `inspect`, then select the pack with `eval --judge-prompt-pack ... --judge-locale sv-SE`. The same flags work on `bench agentic`, `bench gdpr` and `bench eu-ai-act`; export and validate those instruments with the matching `--family` and `--preset`. These settings are independent of the target's `--system-prompt`. See [judge prompt packs](judge-prompt-packs.md) for supported metrics, fixed criterion rosters and the Swedish example.
+Runtime judges also accept these flags through `gatekeeper calibrate` and `gatekeeper inspect`; export with `prompts export <directory> --family gatekeeper [--preset <axis>]`. Configured certificates bind the exact instrument and supplied `--gold-set`, including held-out human-review metadata. AI-authored draft cases remain diagnostic. See the [runtime gate workflow](judge-prompt-packs.md#runtime-judge-gates).
+
+The separate `--family gatekeeper --preset hallucinated-citation` authoring preset exports the hybrid citation support prompt. Execute that hybrid through the library's `HallucinatedCitationJudge.FormatStructuredCase` API; it is not a `gatekeeper inspect` registry axis.
+
+
 ## Installation
 
 ```bash
@@ -564,6 +570,7 @@ a pass supported by only some requested trials becomes a warning. `--sut mock` s
   Eval and red-team suppress this informational note with `--quiet`.
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
 - Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
+- `bench agentic`, `bench gdpr` and `bench eu-ai-act` accept `--judge-prompt-pack <manifest>`, `--judge-locale <locale>` and an optional explicit `--judge-fallback-locale <locale>`. Preflight validates every selected leaf before model calls. Compliance `--runs` preserves these instruments across repeated trials. Code-only presets reject unused packs. Their `calibrate` subcommands accept the same flags plus `--dataset <family-calibration.jsonl>`; a supplied dataset or pack requires `--out`. Configured compliance calibration requires registered production scenario IDs unless `--allow-surrogate-rubrics` explicitly selects surrogate calibration. Reports distinguish those scopes, retain dataset/instrument digests and do not assert human label review. The decision-model adapter cannot bind these prompt packs.
 - **`bench gdpr calibrate --decisions` and `bench eu-ai-act calibrate --decisions`** grade the golden datasets with the decision model (TypeSafe Jev) instead of the generative judge. The transport is read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` (`JEV_TRANSPORT` forces one, `JEV_MODEL` pins a build); with neither configured the command exits **3**. The report header names the provider (TypeSafe or OpenRouter) and the model that was requested, marked as requested, because the provider may serve a different build under that name. It never contains the key or the endpoint.
 - **`typedmemeval` takes `--vertical <prospective|episodic|arithmetic|workingmemory|forgetting>` and `--subject`, both required** — the verticals measure different mechanisms, so there is no default. Corpora are embedded (no download, no dataset path); a real model is required, from whichever provider `AI_INFERENCE_PROVIDER` selects (the `AZURE_OPENAI_*` trio when it is unset), and there is no stub fallback. It prints the typed outcome vector with every denominator and gates on nothing: the family publishes no pass threshold, so a run exits **0** when it measured anything and **11** (`GateIndeterminate`) when it measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL. Cite results as `TypedMemEval-<Vertical> v5 (AgentEval)` — never summed or averaged with LongMemEval numbers. `--vertical prospective` additionally requires the agent under test to implement `ITimestampedHistoryInjectableAgent`; the run refuses before its first provider call otherwise.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
@@ -630,8 +637,8 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--format` / `-o` | Export format and output destination. |
 | `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |
 | `--calibration` | Relative scoring against a reference cohort. |
-| `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
-| `--benign-controls` | Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs `--judge`; does not change the verdict). |
+| `--explain` | Attach an LLM rationale to successful/inconclusive findings (requires `--judge` and evidence). Selected packs must include `redteam.explanation`; export it with `prompts export --family redteam --preset explanation` or `supported`. Narrative identity is separate from the verdict; configured conversations/tree searches use their actual transcript. |
+| `--benign-controls` | Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs `--judge`; does not change the verdict). Selected packs must include `gate.over-refusal`; `prompts export --family redteam --preset supported` includes it. |
 | `--aef <dir>` / `--no-aef` | Where the sealed AEF run goes: by default a workspace's `.agenteval/aef`; `--aef` writes it anywhere and fails the command (exit 3) if it cannot; `--no-aef` writes none. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench). |
 | `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`), and its exact version. |
 
@@ -651,7 +658,7 @@ drop straight into CI.
 ```
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect   --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
-agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify]
+agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify] [--judge-prompt-pack <manifest> --judge-locale <locale>] [--gold-set <dataset.json>]
 ```
 
 **Subcommands**
@@ -836,7 +843,7 @@ parent directory is created.
 
 ### `agenteval compliance render`
 
-Re-render a PDF report from existing compliance evidence — no LLM cost (the evidence is already on disk).
+Re-render a Markdown report from existing compliance evidence — no LLM cost (the evidence is already on disk). PDF generation is provided by the optional `agenteval-pdf` companion; see [PDF providers](pdf-providers.md).
 
 **Synopsis**
 
@@ -857,13 +864,13 @@ The reader verifies native AEF runs under `.agenteval/aef/runs` and reads captur
 
 Missing captured content, malformed reports, conflicting identities and invalid native evidence exit `1`. A legacy sibling cannot recover content omitted by the native capture policy. Selecting the latest report does not silently substitute an older captured report when a newer native report is unavailable. The bounded native scan verifies candidates before subject filtering, so an invalid or incompletely scanned native source must be resolved before rendering.
 
-PDFs are written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.pdf`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
+Markdown is written to `.agenteval/compliance/{regulation}/{subject}/{timestamp}/report.md`, outside the AEF source folder. Rendering leaves the source evidence and its seal unchanged. The printed integrity outcome and signature-trust status are separate; this command does not apply a signer trust policy.
 
 ---
 
 ### `agenteval render`
 
-Re-render Markdown and PDF from an original agentic report in verified AEF — no LLM cost.
+Re-render Markdown from an original agentic report in verified AEF — no LLM cost. The stock CLI does not install or initialize a PDF engine. Use the optional companion's explicit `agenteval-pdf render --run <verified-run> --output report.pdf` command for PDF output.
 
 **Synopsis**
 

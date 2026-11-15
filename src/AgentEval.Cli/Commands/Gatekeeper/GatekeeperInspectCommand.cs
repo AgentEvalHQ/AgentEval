@@ -48,6 +48,10 @@ internal static class GatekeeperInspectCommand
 
         var cmd = new Command("inspect", "Run a Gatekeeper gate over a JSON payload and emit a verdict.");
         model.AddTo(cmd);
+        var prompts = new JudgePromptCliOptions(cmd);
+        var runtime = new GateRuntimeOptions(cmd);
+        var datasetOpt = new Option<string[]>("--gold-set") { Description = "Exact labelled JSON datasets used for configured certificates; repeat for panel axes.", AllowMultipleArgumentsPerToken = true };
+        cmd.Options.Add(datasetOpt);
         foreach (var o in new Option[] { gateOpt, inputOpt, policyOpt, keywordOpt, keywordsFileOpt, forbiddenOpt, patternOpt,
             allowedDomainOpt, idArgOpt, guardedToolOpt, trustedToolOpt, sourceToolOpt, sinkToolOpt, minTaintOpt,
             modelReplyOpt, attestOpt, allowUncalibratedOpt, certDirOpt })
@@ -74,9 +78,23 @@ internal static class GatekeeperInspectCommand
             flags.SourceTools.AddRange(parse.GetValue(sourceToolOpt) ?? []);
             flags.SinkTools.AddRange(parse.GetValue(sinkToolOpt) ?? []);
 
+            AgentEval.Prompts.JudgePromptOptions? selection;
+            GateCalibrationDataset[] datasets;
+            GateRuntimeSettings settings;
+            try
+            {
+                selection = await prompts.Read(parse).LoadAsync(ct);
+                settings = runtime.Read(parse);
+                _ = settings.Bind(selection, null);
+                datasets = (parse.GetValue(datasetOpt) ?? []).Select(path => GateCalibrationDataset.Load(path)!).ToArray();
+                if (datasets.Select(d => d.Axis).Distinct(StringComparer.Ordinal).Count() != datasets.Length)
+                    throw new ArgumentException("Supply at most one calibration dataset per axis.");
+            }
+            catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+            { Console.Error.WriteLine(ex.Message); return ExitCodes.UsageError; }
             var (azure, endpoint, deployment, modelName, apiKey) = model.Read(parse);
             var judgeArgs = new JudgeArgs(azure, endpoint, deployment, modelName, apiKey,
-                parse.GetValue(modelReplyOpt), parse.GetValue(attestOpt), parse.GetValue(allowUncalibratedOpt), parse.GetValue(certDirOpt));
+                parse.GetValue(modelReplyOpt), parse.GetValue(attestOpt), parse.GetValue(allowUncalibratedOpt), parse.GetValue(certDirOpt), selection) { Datasets = datasets, RuntimeSettings = settings };
 
             return await RunAsync(parse.GetValue(gateOpt)!, parse.GetValue(inputOpt), parse.GetValue(policyOpt) ?? "block",
                 flags, Console.In, Console.Out, Console.Error, ct, judgeArgs);
@@ -90,6 +108,27 @@ internal static class GatekeeperInspectCommand
         string gateId, string? inputFile, string policy, GateFlags flags,
         TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct, JudgeArgs? judgeArgs = null)
     {
+        try { return await RunCoreAsync(gateId, inputFile, policy, flags, stdin, stdout, stderr, ct, judgeArgs); }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        { stderr.WriteLine(ex.Message); return ExitCodes.UsageError; }
+    }
+
+    private static async Task<int> RunCoreAsync(
+        string gateId, string? inputFile, string policy, GateFlags flags,
+        TextReader stdin, TextWriter stdout, TextWriter stderr, CancellationToken ct, JudgeArgs? judgeArgs)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (judgeArgs is not null)
+        {
+            var selectedAxes = gateId.StartsWith("panel:", StringComparison.Ordinal)
+                ? gateId["panel:".Length..].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(id => id.StartsWith("judge:", StringComparison.Ordinal)).Select(id => id["judge:".Length..]).ToArray()
+                : gateId.StartsWith("judge:", StringComparison.Ordinal) ? [gateId["judge:".Length..]] : Array.Empty<string>();
+            var datasets = judgeArgs.Dataset is { } single ? judgeArgs.Datasets.Append(single).ToArray() : judgeArgs.Datasets;
+            if (datasets.Select(d => d.Axis).Distinct(StringComparer.Ordinal).Count() != datasets.Count ||
+                datasets.Any(d => !selectedAxes.Contains(d.Axis, StringComparer.Ordinal)))
+                throw new ArgumentException("Expected: one dataset per selected judge axis. Actual: duplicate or unrelated datasets. Suggestions: select the matching files. Because: unused calibration evidence cannot silently govern another axis.");
+        }
         var warn = string.Equals(policy, "warn", StringComparison.OrdinalIgnoreCase);
         if (!warn && !string.Equals(policy, "block", StringComparison.OrdinalIgnoreCase))
         {
@@ -107,6 +146,8 @@ internal static class GatekeeperInspectCommand
             return await RunPanelSingleAsync(gateId, inputFile, warn, judgeArgs ?? JudgeArgs.Empty, flags, stdin, stdout, stderr, ct);
         }
 
+        if (judgeArgs is { Prompts: not null } or { Dataset: not null } || judgeArgs?.Datasets.Count > 0)
+            throw new ArgumentException("Prompt packs and calibration datasets require a judge gate or a panel with judges.");
         var desc = GateRegistry.Find(gateId) ?? (gateId.StartsWith("keyword:", StringComparison.Ordinal) ? GateRegistry.Find("keyword") : null);
         if (desc is null && !gateId.StartsWith("keyword:", StringComparison.Ordinal) && !gateId.StartsWith("judge:", StringComparison.Ordinal) && !gateId.StartsWith("panel:", StringComparison.Ordinal))
         {
@@ -285,6 +326,10 @@ internal static class GatekeeperInspectCommand
             return ExitCodes.UsageError;
         }
 
+        var dataset = args.DatasetFor(axis);
+        dataset?.Validate(axis);
+        var gold = dataset?.GoldSet() ?? entry.GoldSet();
+
         // ── --model-reply: evaluate the caller's reply, no model call (provenance rule applies) ──
         if (args.ModelReply is not null)
         {
@@ -302,13 +347,15 @@ internal static class GatekeeperInspectCommand
                 return ExitCodes.UsageError;
             }
 
-            var v = ParseOnlyJudge.Evaluate(entry.Rubric(), payload.Text, reply);
+            var options = args.Options(args.Azure ? args.Deployment : args.Model);
+            var v = ParseOnlyJudge.Evaluate(entry.Rubric(), payload.Text, reply, options);
+            var instrument = v.Provenance?.JudgeInstrument?.ConfigurationDigest;
             var d = GateVerdictDto.FromChat(v, gateId);
 
             if (args.AttestFingerprint is not null)
             {
-                var cert = InlineReadinessStore.TryLoad(axis, args.AttestFingerprint, args.CertDir);
-                if (CertValid(cert, entry.GoldSet()))
+                var cert = InlineReadinessStore.TryLoad(axis, args.AttestFingerprint, args.CertDir, instrument, dataset?.Digest);
+                if (InlineReadinessStore.IsValid(cert, gold, instrument, dataset))
                 {
                     d = d with { InlineReady = true, Certificate = Provenance(cert!), Warning = "inline readiness is operator-attested (--attest-fingerprint), not observed by the CLI" };
                 }
@@ -332,17 +379,20 @@ internal static class GatekeeperInspectCommand
         }
 
         // ── --model: the CLI makes the judge call ──
-        var mr = GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
+        var mr = args.ResolvedModel ?? GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
         if (mr.Client is null)
         {
             return mr.ExitCode;
         }
 
-        var stored = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir);
+        using var ownedClient = args.ResolvedModel is null ? mr.Client : null;
+        var judge = entry.Create(mr.Client, true, args.Options(mr.RequestedModelId));
+        var selectedInstrument = InlineReadinessStore.InstrumentOf(judge);
+        var stored = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir, selectedInstrument, dataset?.Digest);
         bool inlineReady;
         object? certObj = null;
         string? warning = null;
-        if (CertValid(stored, entry.GoldSet()))
+        if (InlineReadinessStore.IsValid(stored, gold, selectedInstrument, dataset))
         {
             inlineReady = true;
             certObj = Provenance(stored!);
@@ -361,7 +411,7 @@ internal static class GatekeeperInspectCommand
         GateVerdict jv;
         try
         {
-            jv = await entry.Create(mr.Client, true).InspectAsync(payload.Text, ct).ConfigureAwait(false);
+            jv = await judge.InspectAsync(payload.Text, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -369,6 +419,8 @@ internal static class GatekeeperInspectCommand
             return ExitCodes.RuntimeError;
         }
 
+        if (inlineReady && !InlineReadinessStore.MatchesObservedModels(stored!, jv))
+        { inlineReady = false; warning = "Current judge observation does not match a measured calibration instrument; advisory only."; certObj = null; }
         var jd = GateVerdictDto.FromChat(jv, gateId) with { InlineReady = inlineReady, Certificate = certObj, Warning = warning };
         stdout.WriteLine(jd.ToJson(indented: true));
         return warn ? ExitCodes.Success : ExitOf(jd);
@@ -410,22 +462,40 @@ internal static class GatekeeperInspectCommand
             if (JudgeAxisRegistry.For(axis) is null) { stderr.WriteLine($"  Error: unknown judge axis '{axis}' in panel."); return ExitCodes.UsageError; }
         }
 
+        if (judgeAxes.Count == 0 && (args.Prompts is not null || args.Dataset is not null || args.Datasets.Count > 0))
+            throw new ArgumentException("Prompt packs and calibration datasets require a panel containing judges.");
+        if (args.ModelReply is not null)
+            throw new ArgumentException("Panel model-reply inspection requires separate per-axis replies; inspect each judge separately.");
+        var children = new Dictionary<string, IChatGate>(StringComparer.Ordinal);
+        foreach (var childId in childIds.Where(c => !c.StartsWith("judge:", StringComparison.Ordinal)))
+            children[childId] = GateRegistry.TryResolveChatGate(childId, flags, out var childError)
+                ?? throw new ArgumentException($"Panel child '{childId}': {childError}");
+
         // ── honesty guard: every judge child must be certified for the model (else 7), unless --allow-uncalibrated ──
-        Microsoft.Extensions.AI.IChatClient? model = null;
+        using var clients = new OwnedModelClient();
+        var certificates = new Dictionary<string, CalibrationCertificate>(StringComparer.Ordinal);
         var provenances = new List<CertProvenance>();
         bool? inlineReady = null;
         string? warning = null;
         if (judgeAxes.Count > 0)
         {
-            var mr = GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
+            var mr = args.ResolvedModel ?? GatekeeperModelResolver.Resolve(args.Azure, args.Endpoint, args.Deployment, args.Model, args.ApiKey, stderr);
             if (mr.Client is null) { return mr.ExitCode; }
-            model = mr.Client;
+            if (args.ResolvedModel is null) clients.Client = mr.Client;
+            foreach (var axis in judgeAxes)
+            {
+                args.DatasetFor(axis)?.Validate(axis);
+                children["judge:" + axis] = JudgeAxisRegistry.For(axis)!.Create(mr.Client, true, args.Options(mr.RequestedModelId));
+            }
 
             var allCertified = true;
             foreach (var axis in judgeAxes)
             {
-                var cert = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir);
-                if (CertValid(cert, JudgeAxisRegistry.For(axis)!.GoldSet())) { provenances.Add(Provenance(cert!)); }
+                var dataset = args.DatasetFor(axis);
+                var instrument = InlineReadinessStore.InstrumentOf(children["judge:" + axis]);
+                var cert = InlineReadinessStore.TryLoad(axis, mr.Fingerprint!, args.CertDir, instrument, dataset?.Digest);
+                if (InlineReadinessStore.IsValid(cert, dataset?.GoldSet() ?? JudgeAxisRegistry.For(axis)!.GoldSet(), instrument, dataset))
+                { provenances.Add(Provenance(cert!)); certificates[axis] = cert!; }
                 else { allCertified = false; }
             }
 
@@ -443,21 +513,12 @@ internal static class GatekeeperInspectCommand
         var reasons = new List<string>();
         var matches = new List<string>();
         string? redactedText = null;   // a non-redact child's sanitized replacement (e.g. rendered-exfil's safe output)
+        var observations = new List<JudgeGateInstrument>();
         var anyBlock = false;   // a child returned Block on real evidence → policy block (5)
         var anyError = false;   // a child could not evaluate → fail-closed, but INCONCLUSIVE (6), not a policy block
         foreach (var childId in childIds)
         {
-            IChatGate child;
-            if (childId.StartsWith("judge:", StringComparison.Ordinal))
-            {
-                child = JudgeAxisRegistry.For(childId["judge:".Length..])!.Create(model!, true);
-            }
-            else
-            {
-                var resolved = GateRegistry.TryResolveChatGate(childId, flags, out var cerr);   // pass the CLI flags to deterministic children
-                if (resolved is null) { stderr.WriteLine($"  Error: panel child '{childId}': {cerr}"); return ExitCodes.UsageError; }
-                child = resolved;
-            }
+            var child = children[childId];
 
             GateVerdict cv;
             try
@@ -477,13 +538,20 @@ internal static class GatekeeperInspectCommand
                 continue;
             }
 
+            var childDto = GateVerdictDto.FromChat(cv, childId);
+            observations.AddRange(childDto.JudgeInstruments ?? []);
+            if (childId.StartsWith("judge:", StringComparison.Ordinal) && certificates.TryGetValue(childId["judge:".Length..], out var certificate)
+                && !InlineReadinessStore.MatchesObservedModels(certificate, cv))
+            { inlineReady = false; warning = "Current judge observation does not match a measured calibration instrument; advisory only."; provenances.Clear(); }
+            if (childDto.Inconclusive)
+            { anyError = true; reasons.Add($"{cv.PolicyName}: configured judgment unmeasured"); continue; }
             if (cv.Action != GateAction.Block)
             {
                 continue;
             }
 
             anyBlock = true;
-            reasons.Add($"{cv.PolicyName}: {cv.Reason}");
+            reasons.Add($"{cv.PolicyName}: {childDto.Reason}");
             var axis = GateVerdictDto.AxisOf(cv.PolicyName);
             var redact = axis is not null && GateVerdictDto.RedactAxes.Contains(axis);
             if (!redact)
@@ -513,6 +581,7 @@ internal static class GatekeeperInspectCommand
             Warning = warning,
             Inconclusive = inconclusive,
             Certificate = provenances.Count > 0 ? provenances : null,
+            JudgeInstruments = observations.Count == 0 ? null : observations,
         };
         stdout.WriteLine(dto.ToJson(indented: true));
         var exit = anyBlock ? ExitCodes.GateBlocked : anyError ? ExitCodes.GateInconclusive : ExitCodes.Success;
@@ -520,17 +589,18 @@ internal static class GatekeeperInspectCommand
     }
 
     private static CertProvenance Provenance(CalibrationCertificate c) =>
-        new(c.ModelFingerprint, c.GoldSetHash, c.IsInlineReady, c.CertifiedAtUtc);
-
-    // A certificate only counts if it is inline-ready AND was scored on the CURRENT gold set (a corpus change
-    // invalidates a stale cert) — otherwise the guard treats the judge as un-certified.
-    private static bool CertValid(CalibrationCertificate? cert, JudgeGoldSet gold) =>
-        cert?.IsInlineReady == true && cert.GoldSetHash == InlineReadinessStore.GoldSetHash(gold);
+        new(c.ModelFingerprint, c.GoldSetHash, c.IsInlineReady, c.CertifiedAtUtc, c.InstrumentDigest, c.Dataset);
 
     private static string NotCertifiedMsg(string axis, string fingerprint) =>
         $"  Error: axis '{axis}' is not certified inline-ready for model '{fingerprint}'. " +
         $"Run: agenteval gatekeeper calibrate --gate judge:{axis} <model flags> --certify " +
         "(e.g. --azure --deployment-name <d>, or --endpoint <url> --model <m>), or pass --allow-uncalibrated for advisory-only.";
+
+    private sealed class OwnedModelClient : IDisposable
+    {
+        internal IChatClient? Client { get; set; }
+        public void Dispose() => Client?.Dispose();
+    }
 
     private static Option<string[]> MultiOpt(string name, string description) =>
         new(name) { Description = description, AllowMultipleArgumentsPerToken = true };
@@ -539,10 +609,16 @@ internal static class GatekeeperInspectCommand
 /// <summary>The model-source + honesty-guard flags for judge <c>inspect</c>.</summary>
 internal sealed record JudgeArgs(
     bool Azure, string? Endpoint, string? Deployment, string? Model, string? ApiKey,
-    string? ModelReply, string? AttestFingerprint, bool AllowUncalibrated, string? CertDir)
+    string? ModelReply, string? AttestFingerprint, bool AllowUncalibrated, string? CertDir,
+    AgentEval.Prompts.JudgePromptOptions? Prompts = null, GateCalibrationDataset? Dataset = null)
 {
+    internal ModelResolution? ResolvedModel { get; init; }
+    internal IReadOnlyList<GateCalibrationDataset> Datasets { get; init; } = [];
+    internal GateCalibrationDataset? DatasetFor(string axis) => Dataset ?? Datasets.SingleOrDefault(d => d.Axis == axis);
+    internal GateRuntimeSettings RuntimeSettings { get; init; } = new();
+    internal JudgeGateOptions? Options(string? modelId) => RuntimeSettings.Bind(Prompts, modelId);
     public static readonly JudgeArgs Empty = new(false, null, null, null, null, null, null, false, null);
 }
 
 /// <summary>Compact certificate provenance surfaced in a judge verdict's <c>certificate</c> field.</summary>
-internal sealed record CertProvenance(string ModelFingerprint, string GoldSetHash, bool IsInlineReady, string CertifiedAtUtc);
+internal sealed record CertProvenance(string ModelFingerprint, string GoldSetHash, bool IsInlineReady, string CertifiedAtUtc, string? InstrumentDigest = null, GateDatasetProvenance? Dataset = null);

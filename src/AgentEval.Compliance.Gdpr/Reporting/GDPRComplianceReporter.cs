@@ -10,6 +10,7 @@ using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Output;
 using Json.Schema;
 using AgentEval.Compliance.Core;
+using AgentEval.Core.Reporting;
 
 namespace AgentEval.Compliance.Gdpr.Reporting;
 
@@ -82,6 +83,12 @@ public sealed class GDPRComplianceReporter
         ArgumentNullException.ThrowIfNull(compositeTree);
         options ??= new GdprReportOptions();
 
+        var promptVersions = JudgePromptAttestation.FromResult(compositeTree) ?? options.PromptVersions ?? new Dictionary<string, string>
+        {
+            ["gdpr-judge-system"] = "v1",
+            ["per-criterion"] = "v1"
+        };
+
         var sourceManifest = await store.GetRunManifestAsync(sourceRunId, ct)
             ?? throw new InvalidOperationException($"Source run {sourceRunId} not found.");
 
@@ -126,11 +133,7 @@ public sealed class GDPRComplianceReporter
             Disclaimer: Disclaimer,
             GdprAttestation: new GdprAttestation(
                 JudgeMode: options.JudgeMode,
-                PromptVersions: options.PromptVersions ?? new Dictionary<string, string>
-                {
-                    ["gdpr-judge-system"] = "v1",
-                    ["per-criterion"] = "v1"
-                }));
+                PromptVersions: promptVersions));
 
         await WriteGdprEvidenceFileAsync(store, subject, baseEvidence.GeneratedAt, gdprEvidence, ct);
         return gdprEvidence;

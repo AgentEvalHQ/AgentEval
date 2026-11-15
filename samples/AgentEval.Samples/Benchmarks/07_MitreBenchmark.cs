@@ -13,7 +13,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <summary>
 /// Benchmarks H7: MITRE ATLAS — runs an ATLAS attack pipeline against a real
 /// model-backed agent and renders the resulting composite (one leaf per
-/// ATLAS technique) to JSON + HTML + PDF. Like OWASP, this is a Shape B /
+/// ATLAS technique) to JSON + HTML (PDF is opt-in). Like OWASP, this is a Shape B /
 /// runner-style benchmark — the attack pipeline drives the agent itself via
 /// <see cref="MitreBenchmarkRun.EvaluateAsync"/>.
 ///
@@ -77,7 +77,7 @@ public static class MitreBenchmarkSample
             result, subject,
             benchmarkName: "mitre",
             regulationOrBenchmark: $"MITRE ATLAS — {run.PresetName}",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
             judgeModel: judgeModel);

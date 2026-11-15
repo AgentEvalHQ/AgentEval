@@ -165,11 +165,7 @@ public sealed class WorkflowTraceRecorder : IWorkflowEvaluableAgent, IAsyncDispo
             // Record token usage
             if (step.TokenUsage != null)
             {
-                traceStep.TokenUsage = new TraceTokenUsage
-                {
-                    PromptTokens = step.TokenUsage.PromptTokens,
-                    CompletionTokens = step.TokenUsage.CompletionTokens
-                };
+                traceStep.TokenUsage = TraceMapping.FromAgentUsage(step.TokenUsage);
             }
 
             // Record edge information

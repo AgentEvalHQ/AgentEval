@@ -276,6 +276,8 @@ class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Compariso
     AgentEval.Comparison.StochasticStatistics <Clone>$()
     Boolean Equals(AgentEval.Comparison.StochasticStatistics other)
     Boolean Equals(Object obj)
+    Double ExactMaxScore { get; init; }
+    Double ExactMinScore { get; init; }
     Double MeanScore { get; init; }
     Double MedianScore { get; init; }
     Double PassRate { get; init; }
@@ -327,8 +329,10 @@ static class AgentEval.Core.AgentEvalLoggerExtensions
     static Void LogWarning(AgentEval.Core.IAgentEvalLogger logger, String message)
 class AgentEval.Core.AgentResponse
     AgentEval.Core.TokenUsage TokenUsage { get; init; }
+    Boolean HasMixedModelUsage { get; init; }
     IReadOnlyDictionary<String, Object> AdditionalProperties { get; init; }
     IReadOnlyList<Object> RawMessages { get; init; }
+    IReadOnlyList<String> RetrievedContext { get; init; }
     String FinishReason { get; init; }
     String ModelId { get; init; }
     String Text { get; init; }
@@ -337,7 +341,9 @@ class AgentEval.Core.AgentResponseChunk
     AgentEval.Core.TokenUsage Usage { get; init; }
     AgentEval.Core.ToolCallInfo ToolCallStarted { get; init; }
     AgentEval.Core.ToolResultInfo ToolCallCompleted { get; init; }
+    Boolean HasMixedModelUsage { get; init; }
     Boolean IsComplete { get; init; }
+    IReadOnlyList<String> RetrievedContext { get; init; }
     String ModelId { get; init; }
     String Text { get; init; }
     ctor()
@@ -363,9 +369,12 @@ sealed class AgentEval.Core.AnswerSamplingRequest : IEquatable<AgentEval.Core.An
     String ToString()
     ctor()
 class AgentEval.Core.CriterionResult
+    Boolean Applicable { get; init; }
+    Boolean IsMeasured { get; init; }
     Boolean Met { get; init; }
     String Criterion { get; init; }
     String Explanation { get; init; }
+    String Id { get; init; }
     ctor()
 sealed class AgentEval.Core.EvalRubric : IEquatable<AgentEval.Core.EvalRubric>
     AgentEval.Core.EvalRubric <Clone>$()
@@ -387,6 +396,7 @@ class AgentEval.Core.EvaluationContext
     AgentEval.Models.PerformanceMetrics Performance { get; init; }
     AgentEval.Models.ToolCallTimeline Timeline { get; init; }
     AgentEval.Models.ToolUsageReport ToolUsage { get; init; }
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
     DateTimeOffset StartedAt { get; init; }
     IDictionary<String, Object> Properties { get; }
     IReadOnlyList<String> ExpectedTools { get; init; }
@@ -398,6 +408,10 @@ class AgentEval.Core.EvaluationContext
     T GetProperty<T>(String key)
     Void SetProperty<T>(String key, T value)
     ctor()
+enum AgentEval.Core.EvaluationContextSource
+    None
+    Fixture
+    Retrieved
 static class AgentEval.Core.EvaluationDefaults
     const Double DuplicateToolPenaltyPercent
     const Double ExtraToolPenaltyPercent
@@ -406,23 +420,56 @@ static class AgentEval.Core.EvaluationDefaults
     const Int32 DefaultMaxExpectedToolCalls
     const Int32 DefaultPassingScore
     static TimeSpan DefaultMaxToolDuration
+sealed class AgentEval.Core.EvaluationEvidence : IEquatable<AgentEval.Core.EvaluationEvidence>
+    AgentEval.Core.EvaluationEvidence <Clone>$()
+    Boolean Equals(AgentEval.Core.EvaluationEvidence other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String EvaluatorNotes { get; init; }
+    String EvaluatorPolicy { get; init; }
+    String ExpectedActions { get; init; }
+    String SystemMessage { get; init; }
+    String ToString()
+    String ToolCalls { get; init; }
+    String ToolDefinitions { get; init; }
+    ctor()
 class AgentEval.Core.EvaluationOptions
+    AgentEval.Core.JudgeScorePolicy ScorePolicy { get; init; }
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
     Boolean EvaluateResponse { get; init; }
     Boolean IncludeApprovalGatedToolCalls { get; init; }
     Boolean TrackPerformance { get; init; }
     Boolean TrackTools { get; init; }
     Boolean Verbose { get; init; }
+    Func<String, AgentEval.Models.TokenPricing> PricingResolver { get; init; }
     IReadOnlyList<String> SelectedMetrics { get; set; }
     Object GlassBoxTrace { get; set; }
     String ModelName { get; init; }
     ctor()
+sealed class AgentEval.Core.EvaluationRequest
+    AgentEval.Core.EvaluationContextSource ContextSource { get; }
+    AgentEval.Core.EvaluationEvidence Evidence { get; init; }
+    AgentEval.Core.EvaluationRequest WithPrompts(AgentEval.Prompts.JudgePromptOptions options)
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
+    Boolean RequiresContext { get; }
+    IReadOnlyList<AgentEval.Core.JudgeCriterion> JudgeCriteria { get; }
+    IReadOnlyList<String> Context { get; }
+    IReadOnlyList<String> Criteria { get; }
+    String GroundTruth { get; init; }
+    String Input { get; }
+    String Output { get; }
+    ctor(String input, String output, IEnumerable<String> criteria, IEnumerable<String> context = null, AgentEval.Core.EvaluationContextSource contextSource = EvaluationContextSource.Fixture, Boolean requiresContext = false)
+    static AgentEval.Core.EvaluationRequest ForCriteria(String input, String output, IEnumerable<AgentEval.Core.JudgeCriterion> criteria, IEnumerable<String> context = null, AgentEval.Core.EvaluationContextSource contextSource = EvaluationContextSource.Fixture, Boolean requiresContext = false)
 class AgentEval.Core.EvaluationResult
+    AgentEval.Prompts.JudgePromptProvenance JudgePrompt { get; init; }
+    Boolean CriteriaResultsValid { get; init; }
     Boolean EvaluationFailed { get; init; }
     Double? RubricScore { get; init; }
     IReadOnlyList<AgentEval.Core.CriterionResult> CriteriaResults { get; init; }
     IReadOnlyList<AgentEval.Core.JudgeEvidence> Evidence { get; init; }
     IReadOnlyList<String> Improvements { get; init; }
     Int32? OverallScore { get; init; }
+    Int64? CachedInputTokenCount { get; init; }
     Int64? InputTokenCount { get; init; }
     Int64? OutputTokenCount { get; init; }
     String JudgeLabel { get; init; }
@@ -469,6 +516,7 @@ interface AgentEval.Core.IEvaluableAgent
 interface AgentEval.Core.IEvaluationHarness
     Task<AgentEval.Models.TestResult> RunEvaluationAsync(AgentEval.Core.IEvaluableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Core.EvaluationOptions options = null, CancellationToken cancellationToken = default)
 interface AgentEval.Core.IEvaluator
+    Task<AgentEval.Core.EvaluationResult> EvaluateAsync(AgentEval.Core.EvaluationRequest request, CancellationToken cancellationToken = default)
     Task<AgentEval.Core.EvaluationResult> EvaluateAsync(String input, String output, IEnumerable<String> criteria, CancellationToken cancellationToken = default)
 interface AgentEval.Core.IExporterRegistry
     AgentEval.Core.IResultExporter Get(String formatName)
@@ -542,11 +590,40 @@ interface AgentEval.Core.IWorkflowEvaluableAgent : AgentEval.Core.IEvaluableAgen
     IReadOnlyList<String> ExecutorIds { get; }
     String WorkflowType { get; }
     Task<AgentEval.Models.WorkflowExecutionResult> ExecuteWorkflowAsync(String prompt, CancellationToken cancellationToken = default)
+sealed class AgentEval.Core.JudgeCriterion : IEquatable<AgentEval.Core.JudgeCriterion>
+    AgentEval.Core.JudgeCriterion <Clone>$()
+    Boolean Equals(AgentEval.Core.JudgeCriterion other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Id { get; }
+    String Text { get; }
+    String ToString()
+    ctor(String id, String text)
 sealed class AgentEval.Core.JudgeEvidence
     String Message { get; init; }
     String Reference { get; init; }
     String Source { get; init; }
     ctor()
+enum AgentEval.Core.JudgeScorePolicy
+    JudgeOverall
+    CriteriaMetFraction
+sealed class AgentEval.Core.JudgeScoreSelection : IEquatable<AgentEval.Core.JudgeScoreSelection>
+    AgentEval.Core.JudgeScoreSelection <Clone>$()
+    Boolean Equals(AgentEval.Core.JudgeScoreSelection other)
+    Boolean Equals(Object obj)
+    Double? SelectedScore { get; init; }
+    Int32 ExpectedCount { get; init; }
+    Int32 GetHashCode()
+    Int32? ApplicableCount { get; init; }
+    Int32? MetCount { get; init; }
+    Int32? RawOverallScore { get; init; }
+    String FailureCode { get; init; }
+    String PolicyId { get; init; }
+    String ToString()
+    const String FractionPolicyId
+    const String OverallPolicyId
+    ctor()
+    static Void RequireCompatible(IEnumerable<AgentEval.Core.JudgeScoreSelection> selections)
 enum AgentEval.Core.LogLevel
     Trace
     Debug
@@ -576,6 +653,7 @@ enum AgentEval.Core.MetricCategory
     Memory
 class AgentEval.Core.MetricResult
     AgentEval.Core.NotMeasuredCause? NotMeasuredCause { get; init; }
+    AgentEval.Prompts.JudgePromptProvenance JudgePrompt { get; init; }
     Boolean Measured { get; init; }
     Boolean Passed { get; init; }
     Boolean? ModelGraded { get; init; }
@@ -636,11 +714,15 @@ struct AgentEval.Core.TimestampedConversationTurn : IEquatable<AgentEval.Core.Ti
     Void Deconstruct(out String UserMessage, out String AssistantResponse, out DateTimeOffset Timestamp, out Int32 SessionIndex)
     ctor(String UserMessage, String AssistantResponse, DateTimeOffset Timestamp, Int32 SessionIndex)
 class AgentEval.Core.TokenUsage
+    Boolean HasMixedModelUsage { get; init; }
     Int32 CompletionTokens { get; init; }
     Int32 InputTokens { get; }
     Int32 OutputTokens { get; }
     Int32 PromptTokens { get; init; }
     Int32 TotalTokens { get; }
+    Int64? CachedInputTokenCount { get; init; }
+    Int64? ReportedInputTokenCount { get; init; }
+    Int64? ReportedOutputTokenCount { get; init; }
     ctor()
 class AgentEval.Core.ToolCallInfo
     IDictionary<String, Object> Arguments { get; init; }
@@ -845,6 +927,7 @@ sealed class AgentEval.Evals.EvalEvidence : IEquatable<AgentEval.Evals.EvalEvide
 sealed class AgentEval.Evals.EvalInput : IEquatable<AgentEval.Evals.EvalInput>
     AgentEval.Evals.EvalInput <Clone>$()
     AgentEval.Models.PerformanceMetrics Performance { get; init; }
+    AgentEval.Prompts.JudgePromptOptions JudgePrompts { get; init; }
     Boolean Equals(AgentEval.Evals.EvalInput other)
     Boolean Equals(Object obj)
     IReadOnlyDictionary<String, Object> Metadata { get; init; }
@@ -901,6 +984,8 @@ sealed class AgentEval.Evals.EvalMetadata : IEquatable<AgentEval.Evals.EvalMetad
     ctor(String Key, String Name, String Category, String Version)
 sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalProvenance>
     AgentEval.Evals.EvalProvenance <Clone>$()
+    AgentEval.Models.TokenCostEstimate CostEstimate { get; init; }
+    AgentEval.Prompts.JudgePromptProvenance JudgePrompt { get; init; }
     Boolean CacheHit { get; init; }
     Boolean Equals(AgentEval.Evals.EvalProvenance other)
     Boolean Equals(Object obj)
@@ -1083,15 +1168,19 @@ interface AgentEval.Evals.IEvalResultRenderer
     Task<Byte[]> RenderAsync(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options, CancellationToken ct = default)
 static class AgentEval.Evals.JudgeCostMap
     static AgentEval.Evals.JudgeCostMap.ModelRate? GetRate(String judgeModel)
+    static AgentEval.Models.TokenCostEstimate EstimateCostDetailed(String judgeModel, Int64? inputTokens, Int64? outputTokens, Int64? cachedInputTokens)
     static Boolean IsRegistered(String judgeModel)
     static Double? EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
+    static Void Register(String judgeModel, AgentEval.Evals.JudgeCostMap.ModelRate rate)
     static Void Register(String judgeModel, Double inputRatePer1K, Double outputRatePer1K)
 struct AgentEval.Evals.JudgeCostMap.ModelRate : IEquatable<AgentEval.Evals.JudgeCostMap.ModelRate>
     Boolean Equals(AgentEval.Evals.JudgeCostMap.ModelRate other)
     Boolean Equals(Object obj)
     Double InputRatePer1K { get; init; }
     Double OutputRatePer1K { get; init; }
+    Double? CachedInputRatePer1K { get; init; }
     Int32 GetHashCode()
+    String Source { get; init; }
     String ToString()
     Void Deconstruct(out Double InputRatePer1K, out Double OutputRatePer1K)
     ctor(Double InputRatePer1K, Double OutputRatePer1K)
@@ -1332,6 +1421,7 @@ class AgentEval.Models.DatasetTestCase
 static class AgentEval.Models.DatasetTestCaseExtensions
     static AgentEval.Core.EvaluationContext ToEvaluationContext(AgentEval.Models.DatasetTestCase d, String actualOutput, String contextSeparator = "
 ")
+    static AgentEval.Models.TestCase ToTestCase(AgentEval.Models.DatasetTestCase d, Boolean requiresContext, Func<AgentEval.Models.GroundTruthToolCall, String> groundTruthProjection = null)
     static AgentEval.Models.TestCase ToTestCase(AgentEval.Models.DatasetTestCase d, Func<AgentEval.Models.GroundTruthToolCall, String> groundTruthProjection = null)
 class AgentEval.Models.EdgeExecution : IEquatable<AgentEval.Models.EdgeExecution>
     AgentEval.Models.EdgeExecution <Clone>$()
@@ -1466,13 +1556,17 @@ static class AgentEval.Models.ModelPricing
     const String BaselineNotice
     const String TableName
     static AgentEval.Models.ModelPricingSnapshot CaptureSnapshot()
+    static AgentEval.Models.TokenPricing GetTokenPricing(String modelName)
     static Decimal? EstimateCost(String modelName, Int32 inputTokens, Int32 outputTokens)
     static IEnumerable<String> KnownModels { get; }
     static Int32 EstimatePromptTokens(String systemPrompt, String userInput)
     static Int32 EstimateTokensFromText(String text)
     static ValueTuple<Decimal, Decimal, Decimal, Decimal>? GetPricing(String modelName)
+    static Void SetPricing(String modelName, AgentEval.Models.TokenPricing pricing)
     static Void SetPricing(String modelName, Decimal inputPer1K, Decimal outputPer1K)
 sealed class AgentEval.Models.ModelPricingSnapshot
+    AgentEval.Models.TokenPricing GetTokenPricing(String modelName)
+    IReadOnlyDictionary<String, AgentEval.Models.TokenPricing> TokenRates { get; }
     IReadOnlyDictionary<String, ValueTuple<Decimal, Decimal>> Rates { get; }
     ValueTuple<Decimal, Decimal, Decimal, Decimal>? GetPricing(String modelName)
 class AgentEval.Models.ParallelBranch : IEquatable<AgentEval.Models.ParallelBranch>
@@ -1489,6 +1583,7 @@ class AgentEval.Models.ParallelBranch : IEquatable<AgentEval.Models.ParallelBran
     TimeSpan StartOffset { get; init; }
     ctor()
 class AgentEval.Models.PerformanceMetrics
+    AgentEval.Models.TokenCostEstimate CostEstimate { get; set; }
     Boolean TokensAreEstimated { get; set; }
     Boolean WasStreaming { get; set; }
     DateTimeOffset EndTime { get; set; }
@@ -1522,7 +1617,10 @@ class AgentEval.Models.RoutingDecision : IEquatable<AgentEval.Models.RoutingDeci
     TimeSpan DecisionTime { get; init; }
     ctor()
 class AgentEval.Models.TestCase
+    Boolean RequiresContext { get; init; }
     IDictionary<String, Object> Metadata { get; init; }
+    IReadOnlyList<AgentEval.Core.JudgeCriterion> JudgeCriteria { get; init; }
+    IReadOnlyList<String> Context { get; init; }
     IReadOnlyList<String> EvaluationCriteria { get; init; }
     IReadOnlyList<String> ExpectedTools { get; init; }
     IReadOnlyList<String> Tags { get; init; }
@@ -1534,22 +1632,28 @@ class AgentEval.Models.TestCase
     String Name { get; init; }
     ctor()
 class AgentEval.Models.TestResult
+    AgentEval.Core.EvaluationContextSource? JudgeContextSource { get; set; }
+    AgentEval.Core.JudgeScoreSelection ScoreSelection { get; set; }
     AgentEval.Models.FailureReport Failure { get; set; }
     AgentEval.Models.IRedTeamResult RedTeam { get; set; }
     AgentEval.Models.PerformanceMetrics Performance { get; set; }
     AgentEval.Models.ToolCallTimeline Timeline { get; set; }
     AgentEval.Models.ToolUsageReport ToolUsage { get; set; }
+    AgentEval.Prompts.JudgePromptProvenance JudgePrompt { get; set; }
     Boolean HasError { get; }
     Boolean JudgeFailed { get; set; }
     Boolean Passed { get; set; }
     Boolean ToolsWereCalled { get; }
+    Double? MeasuredScore { get; }
     Exception Error { get; set; }
     IReadOnlyList<AgentEval.Core.CriterionResult> CriteriaResults { get; set; }
     IReadOnlyList<AgentEval.Core.MetricResult> MetricResults { get; set; }
     IReadOnlyList<AgentEval.Output.AssertionResult> AssertionResults { get; set; }
+    IReadOnlyList<String> JudgeContext { get; set; }
     IReadOnlyList<String> Suggestions { get; set; }
     Int32 Score { get; set; }
     Int32 ToolCallCount { get; }
+    Int32? JudgeContextDocumentCount { get; set; }
     String ActualOutput { get; set; }
     String Details { get; set; }
     String JudgeRubricDigest { get; set; }
@@ -1588,6 +1692,44 @@ class AgentEval.Models.TestSummary
     ctor(String suiteName, IEnumerable<AgentEval.Models.TestResult> results)
 static class AgentEval.Models.TestSummaryExtensions
     static AgentEval.Models.EvaluationReport ToEvaluationReport(AgentEval.Models.TestSummary summary, String agentName = null, String modelName = null, String endpoint = null)
+sealed class AgentEval.Models.TokenCostEstimate : IEquatable<AgentEval.Models.TokenCostEstimate>
+    AgentEval.Models.TokenCostEstimate <Clone>$()
+    AgentEval.Models.TokenCostStatus Status { get; init; }
+    AgentEval.Models.TokenPricing Pricing { get; init; }
+    Boolean Equals(AgentEval.Models.TokenCostEstimate other)
+    Boolean Equals(Object obj)
+    Boolean UsageEstimated { get; init; }
+    Decimal? Amount { get; init; }
+    Int32 GetHashCode()
+    Int64? CachedInputTokens { get; init; }
+    Int64? InputTokens { get; init; }
+    Int64? OutputTokens { get; init; }
+    String ModelId { get; init; }
+    String ModelSource { get; init; }
+    String ToString()
+    Void Deconstruct(out Decimal? Amount, out AgentEval.Models.TokenCostStatus Status, out Int64? InputTokens, out Int64? OutputTokens, out Int64? CachedInputTokens, out AgentEval.Models.TokenPricing Pricing)
+    ctor(Decimal? Amount, AgentEval.Models.TokenCostStatus Status, Int64? InputTokens, Int64? OutputTokens, Int64? CachedInputTokens, AgentEval.Models.TokenPricing Pricing)
+    static AgentEval.Models.TokenCostEstimate Calculate(Int64? input, Int64? output, Int64? cachedInput, AgentEval.Models.TokenPricing pricing)
+enum AgentEval.Models.TokenCostStatus
+    Unpriced
+    ZeroUsage
+    Standard
+    CacheAdjusted
+    UndiscountedUnknownCache
+    UndiscountedMissingCacheRate
+    Invalid
+sealed class AgentEval.Models.TokenPricing : IEquatable<AgentEval.Models.TokenPricing>
+    AgentEval.Models.TokenPricing <Clone>$()
+    Boolean Equals(AgentEval.Models.TokenPricing other)
+    Boolean Equals(Object obj)
+    Decimal InputPer1K { get; init; }
+    Decimal OutputPer1K { get; init; }
+    Decimal? CachedInputPer1K { get; init; }
+    Int32 GetHashCode()
+    String Source { get; init; }
+    String ToString()
+    Void Deconstruct(out Decimal InputPer1K, out Decimal OutputPer1K, out Decimal? CachedInputPer1K)
+    ctor(Decimal InputPer1K, Decimal OutputPer1K, Decimal? CachedInputPer1K = null)
 class AgentEval.Models.ToolCallRecord
     Boolean HasError { get; }
     Boolean HasTiming { get; }
@@ -2404,6 +2546,174 @@ class AgentEval.Output.VerbositySettings
     Boolean SaveTraceFiles { get; set; }
     String TraceOutputDirectory { get; set; }
     ctor()
+interface AgentEval.Prompts.IJudgePromptBindable
+    AgentEval.Core.IEvaluator WithPromptDefinition(AgentEval.Prompts.JudgePromptDefinition definition, AgentEval.Prompts.JudgePromptOptions options = null)
+    Boolean HasPromptConfiguration { get; }
+interface AgentEval.Prompts.IJudgePromptPackLoader
+    Task ExportAsync(AgentEval.Prompts.JudgePromptPack pack, String directory, CancellationToken cancellationToken = default)
+    Task<AgentEval.Prompts.JudgePromptPack> LoadAsync(String manifestPath, CancellationToken cancellationToken = default)
+interface AgentEval.Prompts.IJudgePromptResolver
+    AgentEval.Prompts.ResolvedJudgePrompt Resolve(AgentEval.Prompts.JudgePromptDefinition builtIn, AgentEval.Prompts.JudgePromptOptions options)
+interface AgentEval.Prompts.IResolvedJudgePromptSource
+    AgentEval.Prompts.ResolvedJudgePrompt ResolvedPrompt { get; }
+sealed class AgentEval.Prompts.JudgePromptContent : IEquatable<AgentEval.Prompts.JudgePromptContent>
+    AgentEval.Prompts.JudgePromptContent <Clone>$()
+    Boolean Equals(AgentEval.Prompts.JudgePromptContent other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String RetryText { get; init; }
+    String SystemText { get; init; }
+    String ToString()
+    String UserMessage { get; init; }
+    Void Deconstruct(out String SystemText, out String UserMessage, out String RetryText)
+    ctor(String SystemText, String UserMessage, String RetryText)
+sealed class AgentEval.Prompts.JudgePromptDefinition : IEquatable<AgentEval.Prompts.JudgePromptDefinition>
+    AgentEval.Core.EvalRubric ToRubric()
+    AgentEval.Core.RubricScoreScale Scale { get; init; }
+    AgentEval.Prompts.JudgePromptDefinition <Clone>$()
+    AgentEval.Prompts.JudgeResponseContract ResponseContract { get; init; }
+    Boolean Equals(AgentEval.Prompts.JudgePromptDefinition other)
+    Boolean Equals(Object obj)
+    Double PassAt { get; init; }
+    Double? ReviewAt { get; init; }
+    IReadOnlyList<AgentEval.Core.JudgeCriterion> Criteria { get; init; }
+    IReadOnlyList<AgentEval.Core.RubricSeverityBand> SeverityBands { get; init; }
+    IReadOnlyList<String> DataSlots { get; init; }
+    Int32 GetHashCode()
+    String Dimension { get; init; }
+    String EvaluatorKey { get; init; }
+    String Id { get; init; }
+    String Locale { get; init; }
+    String RetryText { get; init; }
+    String SafetyText { get; init; }
+    String Status { get; init; }
+    String SystemText { get; init; }
+    String ToString()
+    String UserTemplate { get; init; }
+    String Version { get; init; }
+    Void Validate()
+    ctor()
+    static IReadOnlyList<String> TemplateSlots(String template)
+    static String NormalizeLocale(String locale)
+sealed class AgentEval.Prompts.JudgePromptOptions : IEquatable<AgentEval.Prompts.JudgePromptOptions>
+    AgentEval.Prompts.JudgePromptDefinition Override { get; init; }
+    AgentEval.Prompts.JudgePromptOptions <Clone>$()
+    AgentEval.Prompts.JudgePromptPack Pack { get; init; }
+    Boolean CaptureContent { get; init; }
+    Boolean Equals(AgentEval.Prompts.JudgePromptOptions other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String FallbackLocale { get; init; }
+    String Locale { get; init; }
+    String ToString()
+    ctor()
+sealed class AgentEval.Prompts.JudgePromptPack
+    Boolean TryGet(String evaluatorKey, String locale, out AgentEval.Prompts.JudgePromptDefinition definition)
+    IReadOnlyList<AgentEval.Prompts.JudgePromptDefinition> Definitions { get; }
+    ctor(IEnumerable<AgentEval.Prompts.JudgePromptDefinition> definitions)
+sealed class AgentEval.Prompts.JudgePromptProvenance : IEquatable<AgentEval.Prompts.JudgePromptProvenance>
+    AgentEval.Prompts.JudgePromptContent Content { get; init; }
+    AgentEval.Prompts.JudgePromptProvenance <Clone>$()
+    AgentEval.Prompts.JudgeResponseContract ResponseContract { get; init; }
+    Boolean Equals(AgentEval.Prompts.JudgePromptProvenance other)
+    Boolean Equals(Object obj)
+    Boolean FallbackUsed { get; init; }
+    Int32 GetHashCode()
+    String Digest { get; init; }
+    String EffectiveLocale { get; init; }
+    String EvaluatorKey { get; init; }
+    String InstrumentId { get; init; }
+    String Origin { get; init; }
+    String RequestedLocale { get; init; }
+    String ToString()
+    String Version { get; init; }
+    Void Deconstruct(out String EvaluatorKey, out String InstrumentId, out String Version, out String RequestedLocale, out String EffectiveLocale, out String Origin, out Boolean FallbackUsed, out String Digest, out AgentEval.Prompts.JudgeResponseContract ResponseContract)
+    ctor(String EvaluatorKey, String InstrumentId, String Version, String RequestedLocale, String EffectiveLocale, String Origin, Boolean FallbackUsed, String Digest, AgentEval.Prompts.JudgeResponseContract ResponseContract)
+    static Void RequireCompatible(IEnumerable<AgentEval.Prompts.JudgePromptProvenance> prompts)
+enum AgentEval.Prompts.JudgeResponseContract
+    CriteriaV1
+    RubricV1
+    FaithfulnessV1
+    RelevanceV1
+    ContextPrecisionV1
+    ContextRecallV1
+    AnswerCorrectnessV1
+    GroundednessV1
+    CoherenceV1
+    FluencyV1
+    BiasV1
+    CounterfactualBiasV1
+    MisinformationV1
+    ToxicityV1
+    TaskCompletionV1
+    RedTeamVerdictV1
+    RedTeamLikertV1
+    GateDecisionV1
+    RedTeamExplanationV1
+sealed class AgentEval.Prompts.ResolvedJudgePrompt : IEquatable<AgentEval.Prompts.ResolvedJudgePrompt>
+    AgentEval.Prompts.JudgePromptDefinition Definition { get; init; }
+    AgentEval.Prompts.JudgePromptProvenance Provenance { get; init; }
+    AgentEval.Prompts.ResolvedJudgePrompt <Clone>$()
+    Boolean CaptureContent { get; init; }
+    Boolean Equals(AgentEval.Prompts.ResolvedJudgePrompt other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out AgentEval.Prompts.JudgePromptDefinition Definition, out AgentEval.Prompts.JudgePromptProvenance Provenance, out Boolean CaptureContent)
+    ctor(AgentEval.Prompts.JudgePromptDefinition Definition, AgentEval.Prompts.JudgePromptProvenance Provenance, Boolean CaptureContent)
+interface AgentEval.Reporting.IPdfRendererRegistry
+    AgentEval.Reporting.IPdfReportRenderer Get(String providerId = null)
+    IReadOnlyList<String> ProviderIds { get; }
+interface AgentEval.Reporting.IPdfReportRenderer
+    Task<Byte[]> RenderAsync(AgentEval.Reporting.ReportDocument document, AgentEval.Reporting.PdfRenderOptions options, CancellationToken cancellationToken = default)
+enum AgentEval.Reporting.PdfPageSize
+    A4
+    Letter
+    Legal
+sealed class AgentEval.Reporting.PdfRenderOptions : IEquatable<AgentEval.Reporting.PdfRenderOptions>
+    AgentEval.Reporting.PdfPageSize PageSize { get; init; }
+    AgentEval.Reporting.PdfRenderOptions <Clone>$()
+    Boolean Equals(AgentEval.Reporting.PdfRenderOptions other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    ReadOnlyMemory<Byte> Logo { get; init; }
+    String FontFamily { get; init; }
+    String PrimaryColor { get; init; }
+    String SecondaryColor { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.Reporting.PdfPageSize PageSize, out String FontFamily, out String PrimaryColor, out String SecondaryColor, out ReadOnlyMemory<Byte> Logo)
+    ctor(AgentEval.Reporting.PdfPageSize PageSize = PdfPageSize.A4, String FontFamily = "AgentEval Sans", String PrimaryColor = "#0078D4", String SecondaryColor = "#2B579A", ReadOnlyMemory<Byte> Logo = default)
+sealed class AgentEval.Reporting.ReportDocument : IEquatable<AgentEval.Reporting.ReportDocument>
+    AgentEval.Reporting.ReportDocument <Clone>$()
+    Boolean Equals(AgentEval.Reporting.ReportDocument other)
+    Boolean Equals(Object obj)
+    DateTimeOffset GeneratedAt { get; }
+    IReadOnlyList<AgentEval.Reporting.ReportSection> Sections { get; }
+    Int32 GetHashCode()
+    String Author { get; }
+    String Subject { get; }
+    String Title { get; }
+    String ToString()
+    ctor(String title, IEnumerable<AgentEval.Reporting.ReportSection> sections, DateTimeOffset generatedAt, String subject = null, String author = null)
+sealed class AgentEval.Reporting.ReportSection : IEquatable<AgentEval.Reporting.ReportSection>
+    AgentEval.Reporting.ReportSection <Clone>$()
+    Boolean Equals(AgentEval.Reporting.ReportSection other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.Reporting.ReportTable> Tables { get; }
+    IReadOnlyList<String> Paragraphs { get; }
+    Int32 GetHashCode()
+    String Title { get; }
+    String ToString()
+    ctor(String title, IEnumerable<String> paragraphs = null, IEnumerable<AgentEval.Reporting.ReportTable> tables = null)
+sealed class AgentEval.Reporting.ReportTable : IEquatable<AgentEval.Reporting.ReportTable>
+    AgentEval.Reporting.ReportTable <Clone>$()
+    Boolean Equals(AgentEval.Reporting.ReportTable other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<IReadOnlyList<String>> Rows { get; }
+    IReadOnlyList<String> Headers { get; }
+    Int32 GetHashCode()
+    String ToString()
+    ctor(IEnumerable<String> headers, IEnumerable<IEnumerable<String>> rows)
 interface AgentEval.Snapshots.ISnapshotComparer
     AgentEval.Snapshots.SnapshotComparisonResult Compare(String expected, String actual)
     String ApplyScrubbing(String value)

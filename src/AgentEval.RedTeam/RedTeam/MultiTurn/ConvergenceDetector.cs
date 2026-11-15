@@ -64,6 +64,12 @@ public sealed class DefaultConvergenceDetector : IConvergenceDetector
         if (turnResult.Outcome == EvaluationOutcome.Succeeded)
             return new(ConvergenceSignal.SucceededStop, "objective achieved this turn");
 
+        // Configured judges already evaluate the selected language. An English lexical refusal
+        // signal must not turn an unreadable/ambiguous localized verdict into a resisted fold.
+        // Continue within the existing turn/time limits; success still stops immediately.
+        if (turnResult.JudgeGraphDigest is not null || turnResult.JudgeInstruments is not null)
+            return ConvergenceDecision.Continue;
+
         // Count trailing consecutive assistant turns that are refusals (History already includes this turn).
         var streak = 0;
         for (var i = context.History.Count - 1; i >= 0; i--)

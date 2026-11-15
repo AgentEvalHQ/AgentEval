@@ -33,7 +33,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// The 'agenteval eval' command — evaluate an AI agent against a dataset.
 /// </summary>
-internal static class EvalCommand
+internal static partial class EvalCommand
 {
     /// <summary>The <c>--format</c> value used when the option is not given.</summary>
     internal const string DefaultFormat = "json";
@@ -87,6 +87,9 @@ internal static class EvalCommand
             { Description = "Separate endpoint for LLM-as-judge evaluation" };
         var judgeModelOpt = new Option<string?>("--judge-model")
             { Description = "Model for judge (default: same as --model)" };
+        var judgePackOpt = new Option<FileInfo?>("--judge-prompt-pack") { Description = "Versioned judge prompt manifest (.json/.yaml); controls supported judges, independently of the target system prompt." };
+        var judgeLocaleOpt = new Option<string?>("--judge-locale") { Description = "Explicit judge locale for the pack (default: en)." };
+        var judgeFallbackOpt = new Option<string?>("--judge-fallback-locale") { Description = "Explicit fallback locale if the requested instrument is unavailable; otherwise fail." };
 
         // Stochastic evaluation
         var runsOpt = new Option<int>("--runs")
@@ -156,6 +159,9 @@ internal static class EvalCommand
         command.Options.Add(thresholdOpt);
         command.Options.Add(judgeEndpointOpt);
         command.Options.Add(judgeModelOpt);
+        command.Options.Add(judgePackOpt);
+        command.Options.Add(judgeLocaleOpt);
+        command.Options.Add(judgeFallbackOpt);
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
         command.Options.Add(outputDirOpt);
@@ -190,6 +196,9 @@ internal static class EvalCommand
                 SuccessThreshold = parseResult.GetValue(thresholdOpt),
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
+                JudgePromptPack = parseResult.GetValue(judgePackOpt),
+                JudgeLocale = parseResult.GetValue(judgeLocaleOpt),
+                JudgeFallbackLocale = parseResult.GetValue(judgeFallbackOpt),
                 Format = parseResult.GetValue(formatOpt)!,
                 Output = parseResult.GetValue(outputOpt),
                 OutputDir = parseResult.GetValue(outputDirOpt),
@@ -310,6 +319,15 @@ internal static class EvalCommand
         // 1. Resolve --sut, if set — the same shared seam `redteam`/`bench` use. Built-in
         // targets own their own validation (consent gates, required config, etc.) via ISutTarget.Validate,
         // invoked inside TryResolve.
+        var promptOptions = await JudgePromptCliOptions.LoadAsync(opts.JudgePromptPack, opts.JudgeLocale, opts.JudgeFallbackLocale, ct);
+        if (promptOptions is not null)
+        {
+            // Fail before invoking the target: requested localization may never be silently ignored.
+            _ = PromptInstruments(promptOptions, selectedMetrics, [], includeCriteriaJudge: false);
+            if (opts.Runs > 1 && selectedMetrics?.Any(n => n.StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) == true)
+                throw new ArgumentException("Prompt-pack metric evaluation requires --runs 1; this CLI's stochastic path does not execute named metrics. Use the library for repeated localized RAG metrics.");
+        }
+
         var sutTargets = (sutTargetsOverride ?? SutTargetResolver.BuiltInTargets()).Where(t => t.SupportedVerbs.Contains("eval")).ToList();
         var commonTargetOptions = new CommonTargetOptions
         {
@@ -401,6 +419,9 @@ internal static class EvalCommand
         if (testCases.Count == 0)
             throw new InvalidOperationException($"Dataset is empty: {opts.Dataset.FullName}");
 
+        if (promptOptions is not null && PromptInstruments(promptOptions, selectedMetrics, testCases, opts.JudgeEndpoint is not null).Count == 0)
+            throw new ArgumentException("--judge-prompt-pack has no judge to configure. Select supported LLM metrics or provide --judge with dataset evaluation criteria.");
+
         // 5. Create harness (optionally with LLM judge)
         // The ledger counts the judge's calls and the tokens they report, for the AEF run's usage.
         var judgeLedger = opts.JudgeEndpoint is not null
@@ -436,7 +457,7 @@ internal static class EvalCommand
         if (selectedMetrics is not null && opts.Runs <= 1)
         {
             selectedMetricInstances = selectedMetrics
-                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient, metricEmbeddings))
+                .Select(name => MetricCatalog.Resolve(name, metricsEvaluatorClient, metricEmbeddings, promptOptions))
                 .ToList();
         }
 
@@ -446,6 +467,7 @@ internal static class EvalCommand
 
         var evalOptions = new EvaluationOptions
         {
+            JudgePrompts = promptOptions,
             TrackTools = true,
             TrackPerformance = true,
             ModelName = resolvedName,
@@ -473,7 +495,7 @@ internal static class EvalCommand
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases, datasetSnapshot,
                 opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : caseEvidence?.SubjectProvider, embeddingSettings,
-                subjectSettings, subjectKind),
+                subjectSettings, subjectKind, promptOptions),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -688,7 +710,7 @@ internal static class EvalCommand
     {
         Input = testCase.Input,
         Output = testResult.ActualOutput ?? "",
-        Context = testCase.Context is null ? null : string.Join("\n", testCase.Context),
+        Context = (testResult.JudgeContext ?? testCase.Context) is { } context ? string.Join("\n", context) : null,
         GroundTruth = testCase.ExpectedOutput,
         ToolUsage = testResult.ToolUsage,
         Performance = testResult.Performance,
@@ -789,9 +811,10 @@ internal static class EvalCommand
     /// subject is a comparison candidate, not a different instrument.
     /// </param>
     /// <param name="subjectKind">What the subject is when <c>--subject</c> is not given (<see cref="DefaultSubjectRef"/>).</param>
+    /// <param name="promptOptions">Loaded immutable prompt configuration; only resolved identities enter suite metadata.</param>
     internal static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, byte[] datasetSnapshot, string? subjectProvider = null,
         EmbeddingProviderSettings? embeddingSettings = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null,
-        AefSubjectKind subjectKind = AefSubjectKind.Model)
+        AefSubjectKind subjectKind = AefSubjectKind.Model, AgentEval.Prompts.JudgePromptOptions? promptOptions = null)
     {
         var subjectRef = opts.Subject ?? DefaultSubjectRef(subjectKind, resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -834,6 +857,14 @@ internal static class EvalCommand
             ["metrics"] = opts.Runs == 1 ? settings["metrics"]?.DeepClone() : null,
             ["requirePasses"] = opts.Runs > 1 ? AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs) : 1,
         };
+        if (promptOptions is not null)
+        {
+            var promptIdentities = PromptInstruments(promptOptions,
+                opts.Runs == 1 ? opts.Metrics?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : null,
+                cases, opts.JudgeEndpoint is not null);
+            settings["judgePrompts"] = promptIdentities.DeepClone();
+            definitionSettings["judgePrompts"] = promptIdentities;
+        }
         if (opts.Runs == 1 && (opts.Metrics?.Split(',').Any(m => m.Trim().StartsWith("llm_", StringComparison.OrdinalIgnoreCase)) ?? false))
         {
             definitionSettings["metricJudgeModel"] = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName;
@@ -1045,7 +1076,7 @@ internal static class EvalCommand
         var startTime = DateTimeOffset.UtcNow;
         var caseIds = EvalAef.CaseIds(datasetTestCases);
         using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, datasetTestCases, datasetSnapshot,
-                caseEvidence?.SubjectProvider, subjectSettings: subjectSettings, subjectKind: subjectKind),
+                caseEvidence?.SubjectProvider, subjectSettings: subjectSettings, subjectKind: subjectKind, promptOptions: evalOptions.JudgePrompts),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startTime,
             opts.Runs, AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs));
 
@@ -1228,6 +1259,9 @@ internal sealed class EvalOptions
     public int? MaxTokens { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
+    public FileInfo? JudgePromptPack { get; init; }
+    public string? JudgeLocale { get; init; }
+    public string? JudgeFallbackLocale { get; init; }
     public required string Format { get; init; }
 
     public FileInfo? Output { get; init; }

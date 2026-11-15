@@ -17,7 +17,7 @@ namespace AgentEval.Samples;
 /// - Running the SAME test with streaming and non-streaming (async)
 /// - Comparing performance metrics between both approaches
 /// - Understanding token/cost tracking in each mode
-/// - Using EvaluationOptions.ModelName for accurate cost calculation
+/// - Supplying model identity and preserving reported cached tokens for cost estimates
 /// 
 /// ⏱️ Time to understand: 8 minutes
 /// </summary>
@@ -41,13 +41,15 @@ public static class StreamingVsAsyncPerformance
 
         // Create agent
         var agent = CreateAgent();
-        var adapter = new MAFAgentAdapter(agent);
+        // MAF does not expose the underlying ChatResponse.ModelId here. This adapter
+        // tags responses with the configured identity; aliases need matching rates.
+        var adapter = new MAFIdentifiableAgentAdapter(agent, AIConfig.ModelDeployment, AIConfig.ModelDeployment);
         var harness = new MAFEvaluationHarness(verbose: true);
 
         var options = new EvaluationOptions 
         { 
-            TrackPerformance = true,
-            ModelName = AIConfig.ModelDeployment
+            TrackPerformance = true
+            // ModelName is an optional pricing override; PricingResolver can price aliases.
         };
 
         var testCase = new TestCase
@@ -56,7 +58,7 @@ public static class StreamingVsAsyncPerformance
             Input = "Explain in 2-3 sentences why software testing is important.",
         };
 
-        Console.WriteLine($"   📋 EvaluationOptions.ModelName = '{options.ModelName}'\n");
+        Console.WriteLine("   The adapter supplies configured model identity; ModelName can override pricing.\n");
 
         Console.WriteLine("   ⏳ PART 1: NON-STREAMING (Async) Mode\n");
 
@@ -86,7 +88,7 @@ public static class StreamingVsAsyncPerformance
     }
 
     private static string Fmt(TimeSpan? t) => t.HasValue ? $"{t.Value.TotalMilliseconds:F0}ms" : "N/A";
-    private static string FmtCost(decimal? c) => c > 0 ? $"${c:F6}" : "N/A";
+    private static string FmtCost(decimal? c) => c.HasValue ? $"${c:F6}" : "N/A";
 
     private static AIAgent CreateAgent()
     {
@@ -146,13 +148,18 @@ public static class StreamingVsAsyncPerformance
 
             // Show token values with estimation indicator
             var tokenSource = p.TokensAreEstimated ? " (estimated)" : " (actual)";
-            Console.WriteLine($"   Input Tokens:  {p.PromptTokens ?? 0}{tokenSource}");
-            Console.WriteLine($"   Output Tokens: {p.CompletionTokens ?? 0}{tokenSource}");
-            Console.WriteLine($"   Total Tokens:  {p.TotalTokens}");
+            Console.WriteLine($"   Input Tokens:  {p.PromptTokens?.ToString() ?? "unknown"}{tokenSource}");
+            Console.WriteLine($"   Output Tokens: {p.CompletionTokens?.ToString() ?? "unknown"}{tokenSource}");
+            Console.WriteLine($"   Total Tokens:  {p.TotalTokens?.ToString() ?? "unknown"}");
             Console.WriteLine($"   Model:         {p.ModelUsed ?? "(not set)"}");
+            if (p.CostEstimate is { } estimate)
+            {
+                Console.WriteLine($"   Cached input:  {estimate.CachedInputTokens?.ToString() ?? "unknown"} (subset of input)");
+                Console.WriteLine($"   Cost status:   {estimate.Status}; model source: {estimate.ModelSource}");
+            }
             
             // Show cost
-            if (p.EstimatedCost.HasValue && p.EstimatedCost > 0)
+            if (p.EstimatedCost.HasValue)
             {
                 var costNote = p.TokensAreEstimated ? " (based on estimated tokens)" : "";
                 Console.WriteLine($"   Est. Cost:     ${p.EstimatedCost:F6}{costNote}");
@@ -160,7 +167,7 @@ public static class StreamingVsAsyncPerformance
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"   Est. Cost:     N/A - Model '{p.ModelUsed}' not in pricing database");
+                Console.WriteLine("   Est. Cost:     N/A - usable token counts or model rates are unavailable");
                 Console.ResetColor();
             }
         }
@@ -186,19 +193,16 @@ public static class StreamingVsAsyncPerformance
         Console.WriteLine("├──────────────────┼───────────────┼───────────────┤");
         Console.WriteLine($"│ Duration         │ {Fmt(ap?.TotalDuration),-13} │ {Fmt(sp?.TotalDuration),-13} │");
         Console.WriteLine($"│ TTFT             │ {"N/A",-13} │ {Fmt(sp?.TimeToFirstToken),-13} │");
-        Console.WriteLine($"│ Input Tokens     │ {ap?.PromptTokens ?? 0,-13} │ {sp?.PromptTokens ?? 0,-13} │");
-        Console.WriteLine($"│ Output Tokens    │ {ap?.CompletionTokens ?? 0,-13} │ {sp?.CompletionTokens ?? 0,-13} │");
+        Console.WriteLine($"│ Input Tokens     │ {ap?.PromptTokens?.ToString() ?? "unknown",-13} │ {sp?.PromptTokens?.ToString() ?? "unknown",-13} │");
+        Console.WriteLine($"│ Output Tokens    │ {ap?.CompletionTokens?.ToString() ?? "unknown",-13} │ {sp?.CompletionTokens?.ToString() ?? "unknown",-13} │");
         Console.WriteLine($"│ Est. Cost        │ {FmtCost(ap?.EstimatedCost),-13} │ {FmtCost(sp?.EstimatedCost),-13} │");
         Console.WriteLine("└──────────────────┴───────────────┴───────────────┘");
 
-        // Show if tokens are estimated
-        var asyncEst = ap?.TokensAreEstimated == true ? " (est)" : "";
-        var streamEst = sp?.TokensAreEstimated == true ? " (est)" : "";
-        
         Console.WriteLine("\n💡 KEY INSIGHTS:");
-        Console.WriteLine("   ✅ Both methods now capture token usage and costs!");
+        Console.WriteLine("   Both methods preserve reported usage; missing measurements remain unknown.");
         Console.WriteLine("   ✅ Streaming provides Time-to-First-Token (TTFT)");
-        Console.WriteLine("   ✅ EvaluationOptions.ModelName enables cost calculation");
+        Console.WriteLine("   ModelName overrides pricing; this adapter otherwise supplies configured identity.");
+        Console.WriteLine("   Reported cached input receives a discount when its rate is known.");
         if (ap?.TokensAreEstimated == true || sp?.TokensAreEstimated == true)
         {
             Console.WriteLine("   ℹ️  Tokens estimated (~4 chars/token) since provider didn't return usage");

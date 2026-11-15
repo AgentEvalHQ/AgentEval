@@ -21,6 +21,8 @@ public class ContainsTokenEvaluator : IProbeEvaluator
     private readonly string[] _tokens;
     private readonly StringComparison _comparison;
     private readonly bool _normalizeNfkc;
+    internal StringComparison Comparison => _comparison;
+    internal bool NormalizeNfkc => _normalizeNfkc;
 
     /// <summary>
     /// Initializes a new ContainsTokenEvaluator with the specified tokens.

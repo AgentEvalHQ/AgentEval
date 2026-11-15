@@ -47,7 +47,7 @@ public interface IStreamingEvaluationHarness : IEvaluationHarness
 /// </summary>
 /// <remarks>
 /// Converts <see cref="DatasetTestCase"/> to <see cref="TestCase"/> using
-/// <see cref="DatasetTestCaseExtensions.ToTestCase"/> and aggregates results into a <see cref="TestSummary"/>.
+/// <see cref="DatasetTestCaseExtensions"/>.<c>ToTestCase</c> and aggregates results into a <see cref="TestSummary"/>.
 /// </remarks>
 public interface IBatchEvaluationHarness : IEvaluationHarness
 {
@@ -71,6 +71,9 @@ public interface IBatchEvaluationHarness : IEvaluationHarness
 /// </summary>
 public class EvaluationOptions
 {
+    /// <summary>Per-evaluation prompt selection passed to a supporting judge without changing shared registration.</summary>
+    public Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
     /// <summary>Whether to track tool/function calls.</summary>
     public bool TrackTools { get; init; } = true;
 
@@ -94,12 +97,18 @@ public class EvaluationOptions
     
     /// <summary>Whether to evaluate the response with AI.</summary>
     public bool EvaluateResponse { get; init; } = true;
+
+    /// <summary>The score to use for pass/fail, statistics and exports. The raw judge score remains available.</summary>
+    public JudgeScorePolicy ScorePolicy { get; init; } = JudgeScorePolicy.JudgeOverall;
     
     /// <summary>Whether to print verbose output.</summary>
     public bool Verbose { get; init; } = true;
     
     /// <summary>Model name for cost estimation.</summary>
     public string? ModelName { get; init; }
+
+    /// <summary>Per-evaluation pricing resolver. When set, its result (including null) replaces the shared rate table.</summary>
+    public Func<string?, AgentEval.Models.TokenPricing?>? PricingResolver { get; init; }
 
     /// <summary>
     /// Optional list of metric names to run. When set, only these metrics are evaluated.

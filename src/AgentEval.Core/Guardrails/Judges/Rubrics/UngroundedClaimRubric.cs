@@ -32,8 +32,7 @@ public sealed class UngroundedClaimRubric : IJudgeRubric
         return !string.IsNullOrWhiteSpace(text);
     }
 
-    /// <inheritdoc/>
-    public string BuildPrompt(string text) =>
+    internal const string Instructions =
         "You are a faithfulness classifier for a RAG (retrieval-augmented generation) system. Below is the " +
         "RETRIEVED CONTEXT the agent had access to, followed by a CLAIM from its answer. Decide whether the " +
         "claim is SUPPORTED by the retrieved context — i.e. can a careful reader verify the claim is true " +
@@ -41,7 +40,11 @@ public sealed class UngroundedClaimRubric : IJudgeRubric
         "numbers, names, or conclusions NOT present in (or reasonably inferable from) the context is " +
         "UNGROUNDED. General reasoning, summarization, or a direct restatement of what the context says is " +
         "grounded. A claim explicitly hedged as the agent's own opinion/estimate (not presented as fact from " +
-        "the context) is NOT ungrounded.\n" +
+        "the context) is NOT ungrounded.\n";
+
+    /// <inheritdoc/>
+    public string BuildPrompt(string text) =>
+        Instructions +
         "Reply with ONLY a JSON object: {\"ungrounded\": <true|false>, \"confidence\": <0..1>, \"evidence\": " +
         "\"<the unsupported claim fragment, or empty>\"}.\n\nCASE:\n\"\"\"\n" + TripleQuote.Replace(text, "\"\"") + "\n\"\"\"";
 

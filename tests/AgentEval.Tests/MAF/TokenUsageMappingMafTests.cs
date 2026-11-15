@@ -61,6 +61,18 @@ public sealed class TokenUsageMappingMafTests
     }
 
     [Fact]
+    public async Task MAFAgentAdapter_CachedUsage_MapsCacheOnBothPaths()
+    {
+        var usage = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 5, CachedInputTokenCount = 80 };
+        var response = await new MAFAgentAdapter(new FakeAIAgent("agent", "Hello.", usage)).InvokeAsync("hi");
+        AgentResponseChunk? last = null;
+        await foreach (var chunk in new MAFAgentAdapter(new UsageStreamingAgent("agent", "Hello.", usage)).InvokeStreamingAsync("hi"))
+            last = chunk;
+        Assert.Equal(80, response.TokenUsage!.CachedInputTokenCount);
+        Assert.Equal(80, last!.Usage!.CachedInputTokenCount);
+    }
+
+    [Fact]
     public async Task WorkflowBridge_PartialUsage_IsNotReported_FullUsageIs()
     {
         static async Task<ExecutorAgentResponseEvent> RunAsync(UsageDetails usage)

@@ -364,8 +364,8 @@ public class PerformanceBenchmark
 
                 if (response.TokenUsage != null)
                 {
-                    totalInputTokens += response.TokenUsage.InputTokens;
-                    totalOutputTokens += response.TokenUsage.OutputTokens;
+                    totalInputTokens = (int)Math.Min((long)totalInputTokens + response.TokenUsage.InputTokens, int.MaxValue);
+                    totalOutputTokens = (int)Math.Min((long)totalOutputTokens + response.TokenUsage.OutputTokens, int.MaxValue);
                 }
                 else
                 {
@@ -381,7 +381,7 @@ public class PerformanceBenchmark
         // Try the initial key (explicit model or agent name), then the first reported model ID.
         // Both lookups use the same rates captured before execution.
         var resolvedModelName = modelName;
-        var pricing = pricingSnapshot.GetPricing(resolvedModelName);
+        var pricing = pricingSnapshot.GetTokenPricing(resolvedModelName);
 
         if (pricing == null)
         {
@@ -390,7 +390,7 @@ public class PerformanceBenchmark
                 .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
             if (!string.IsNullOrWhiteSpace(firstResponseModelId))
             {
-                var fallbackPricing = pricingSnapshot.GetPricing(firstResponseModelId);
+                var fallbackPricing = pricingSnapshot.GetTokenPricing(firstResponseModelId);
                 if (fallbackPricing != null)
                 {
                     resolvedModelName = firstResponseModelId!;
@@ -417,12 +417,31 @@ public class PerformanceBenchmark
                 "Cost is not measured: their tokens are unknown, not zero, so no cost is reported and the cost check is skipped.");
         }
 
-        // Not measured is null, never $0: no price for the model, no prompt that returned (nothing to price), or a
-        // response that reported no usage, or a failed dispatched call whose usage is unknown.
-        var estimatedCost = pricing != null && results.Count > 0 && responsesWithoutUsage == 0 && errors.Count == 0
-            ? (totalInputTokens / 1_000_000m * pricing.Value.InputPricePerMillion) +
-              (totalOutputTokens / 1_000_000m * pricing.Value.OutputPricePerMillion)
-            : (decimal?)null;
+        // Price each response using the frozen rate card. A known explicit model key is an
+        // override; otherwise preserve each response identity (including an unknown one).
+        var explicitPricing = pricingSnapshot.GetTokenPricing(modelName);
+        var costEstimates = results.Select(item =>
+        {
+            var response = item.Response;
+            var identity = explicitPricing is not null ? modelName
+                : !string.IsNullOrWhiteSpace(response.ModelId) ? response.ModelId : resolvedModelName;
+            var usage = response.TokenUsage;
+            var ambiguous = (response.HasMixedModelUsage || usage?.HasMixedModelUsage == true) && explicitPricing is null;
+            if (ambiguous) identity = null;
+            return TokenCostEstimate.Calculate(
+                usage?.ReportedInputTokenCount ?? usage?.PromptTokens,
+                usage?.ReportedOutputTokenCount ?? usage?.CompletionTokens,
+                usage?.CachedInputTokenCount, ambiguous
+                    ? null : pricingSnapshot.GetTokenPricing(identity)) with
+            {
+                ModelId = identity, ModelSource = ambiguous ? "mixed" : explicitPricing is not null ? "override"
+                    : !string.IsNullOrWhiteSpace(response.ModelId) ? "response" : "configured"
+            };
+        }).ToArray();
+        var estimatedCost = results.Count > 0 && errors.Count == 0 && costEstimates.All(c => c.Amount.HasValue)
+            ? SumCosts(costEstimates.Select(c => c.Amount!.Value)) : null;
+        if (explicitPricing is null && costEstimates.Select(c => c.ModelId).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+            resolvedModelName = "mixed (see per-response pricing evidence)";
 
         return new CostBenchmarkResult
         {
@@ -433,9 +452,10 @@ public class PerformanceBenchmark
             Errors = errors,
             TotalInputTokens = totalInputTokens,
             TotalOutputTokens = totalOutputTokens,
-            TotalTokens = totalInputTokens + totalOutputTokens,
+            TotalTokens = (int)Math.Min((long)totalInputTokens + totalOutputTokens, int.MaxValue),
             ResponsesWithoutUsage = responsesWithoutUsage,
             EstimatedCostUSD = estimatedCost,
+            CostEstimates = Array.AsReadOnly(costEstimates),
             AverageInputTokensPerPrompt = results.Count > 0
                 ? (double)totalInputTokens / results.Count
                 : 0,
@@ -534,7 +554,7 @@ public class PerformanceBenchmark
         // ── Build the three leaf EvalResults ─────────────────────────────────
         var latencyLeaf  = BuildLatencyLeaf(latencyResult,    opts);
         var throughputLeaf = BuildThroughputLeaf(throughputResult, opts);
-        var costLeaf     = BuildCostLeaf(costResult,          opts, plan.Pricing);
+        var costLeaf     = BuildCostLeaf(costResult,          opts);
 
         var leaves = new[] { latencyLeaf, throughputLeaf, costLeaf };
         // CapByWorst over three equally weighted leaves. Weights only: aggregation reads
@@ -784,16 +804,16 @@ public class PerformanceBenchmark
     }
 
     private static EvalResult BuildCostLeaf(
-        CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts, ModelPricingSnapshot pricingSnapshot)
+        CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
     {
         if (r.EstimatedCostUSD is null || r.SuccessfulPrompts == 0)
         {
             // Keep observations without calling a subtotal the total. A priced lower bound can still prove failure.
-            var price = pricingSnapshot.GetPricing(r.ModelName);
-            decimal? observedCost = price is { } rate && r.SuccessfulPrompts > 0
-                ? r.TotalInputTokens / 1_000_000m * rate.InputPricePerMillion
-                  + r.TotalOutputTokens / 1_000_000m * rate.OutputPricePerMillion
-                : null;
+            // An undiscounted estimate is not a lower bound when the cache count is unknown.
+            // Use the cheapest configured input rate (or zero when the cache rate is unknown)
+            // for that bound; retain known output charges and never infer a whole-workload total.
+            var bounds = r.CostEstimates.Select(CostLowerBound).OfType<decimal>().ToArray();
+            decimal? observedCost = bounds.Length > 0 ? SumCosts(bounds) : null;
             var knownViolation = opts.MaxCostUSD > 0
                 && observedCost is { } observed && (double)observed > opts.MaxCostUSD;
             var reason = r.SuccessfulPrompts == 0
@@ -867,12 +887,28 @@ public class PerformanceBenchmark
                     ["output_tokens"] = r.TotalOutputTokens,
                     ["cost_usd"] = costUsd,
                 },
-                Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", $"${costUsd:F6} vs max ${maxCost:F6}")],
+                Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", $"${costUsd:F6} vs max ${maxCost:F6}"),
+                    new EvalEvidence("cost-estimates", "text-token pricing", System.Text.Json.JsonSerializer.Serialize(r.CostEstimates))],
                 Recommendations: passed ? null : [$"Estimated cost ${costUsd:F6} exceeds budget ${maxCost:F6}. Consider a smaller model or caching repeated prompts."],
                 SubResults: null,
                 AggregationStrategy: null),
             Provenance: new("code", null, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    private static decimal? SumCosts(IEnumerable<decimal> amounts)
+    {
+        try { return amounts.Sum(); }
+        catch (OverflowException) { return null; }
+    }
+
+    private static decimal? CostLowerBound(TokenCostEstimate estimate)
+    {
+        if (estimate.Amount is null || estimate.Pricing is not { } pricing) return null;
+        if (estimate.Status is TokenCostStatus.Standard or TokenCostStatus.CacheAdjusted or TokenCostStatus.ZeroUsage)
+            return estimate.Amount;
+        return TokenCostEstimate.Calculate(estimate.InputTokens, estimate.OutputTokens, estimate.InputTokens,
+            pricing with { CachedInputPer1K = Math.Min(pricing.InputPer1K, pricing.CachedInputPer1K ?? 0) }).Amount;
     }
 
     private static IReadOnlyList<string>? BuildRecommendations(
@@ -1059,6 +1095,9 @@ public class CostBenchmarkResult
     /// returned, a dispatched prompt failed, or a response reported no usage. Never $0 for "not measured".
     /// </summary>
     public decimal? EstimatedCostUSD { get; init; }
+
+    /// <summary>Per-response usage, cached-token treatment, identity and frozen prices. Missing calls are not fabricated.</summary>
+    public IReadOnlyList<TokenCostEstimate> CostEstimates { get; init; } = [];
     
     public double AverageInputTokensPerPrompt { get; init; }
     public double AverageOutputTokensPerPrompt { get; init; }

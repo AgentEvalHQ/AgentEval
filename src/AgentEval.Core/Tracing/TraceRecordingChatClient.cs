@@ -99,7 +99,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
         var sw = Stopwatch.StartNew();
         var chunks = new List<TraceStreamChunk>();
         var updates = new List<ChatResponseUpdate>();
-        long? inputTokens = 0, outputTokens = 0;
+        var usageAccumulator = new Core.StreamingUsageAccumulator();
         var idx = 0;
         var errorRecorded = false;
         var completedNaturally = false;
@@ -133,10 +133,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
                 // into a plausible total. Missing chunk components may arrive in later chunks.
                 foreach (var usage in cur.Contents.OfType<UsageContent>())
                 {
-                    if (usage.Details.InputTokenCount is { } input)
-                        inputTokens = Core.TokenUsageMapping.Add(inputTokens, input);
-                    if (usage.Details.OutputTokenCount is { } output)
-                        outputTokens = Core.TokenUsageMapping.Add(outputTokens, output);
+                    usageAccumulator.Add(usage.Details);
                 }
                 if (!string.IsNullOrEmpty(cur.Text))
                 {
@@ -165,7 +162,7 @@ public sealed class TraceRecordingChatClient : DelegatingChatClient
                 _trace.ModelId ??= resp.ModelId;
                 var responseEntry = TraceEntry.ForChatResponse(
                     i, corr, resp.Text, sw.ElapsedMilliseconds,
-                    completedNaturally && inputTokens is not null && outputTokens is not null ? MapUsage(resp.Usage) : null,
+                    completedNaturally ? TraceMapping.FromAgentUsage(usageAccumulator.ToTokenUsage()) : null,
                     MapToolCalls(resp), resp.FinishReason?.Value, ExtractProviderMetadata(resp));
                 responseEntry.IsStreaming = true;
                 responseEntry.StreamingChunks = chunks;

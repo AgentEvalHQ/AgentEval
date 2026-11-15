@@ -18,7 +18,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <summary>
 /// Benchmarks H1: Registry Discovery — walk the canonical
 /// <see cref="BenchmarkFamilyRegistry"/> and enumerate every registered family
-/// + preset shipped by v0.10.x. Demonstrates the discovery surface that
+/// + preset in the installed modules. Demonstrates the discovery surface that
 /// <c>agenteval bench --list</c> and Mission Control build their family
 /// pickers on top of.
 ///
@@ -29,7 +29,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <b>Assembly-anchor trick</b>: <see cref="BenchmarkFamilyRegistry"/> is populated
 /// lazily by <c>[ModuleInitializer]</c>-attributed methods. We force-load each
 /// sub-assembly by referencing one type per family (the <c>using</c> lines above)
-/// so all eight families are visible before <see cref="BenchmarkFamilyRegistry.All"/>
+/// so their families are visible before <see cref="BenchmarkFamilyRegistry.All"/>
 /// is enumerated.
 /// </para>
 /// </remarks>

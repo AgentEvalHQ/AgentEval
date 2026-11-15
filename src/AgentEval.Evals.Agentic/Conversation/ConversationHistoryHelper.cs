@@ -103,4 +103,19 @@ public static class ConversationHistoryHelper
         ArgumentNullException.ThrowIfNull(input);
         return input with { Query = $"{transcript}\n\nCurrent user query: {input.Query}" };
     }
+
+    internal static EvalInput WithJudgeHistory(EvalInput input, IReadOnlyList<ConversationTurn> history,
+        bool configured, bool previousOnly = false)
+    {
+        if (!configured)
+            return WithEnrichedQuery(input, previousOnly ? FormatPreviousTurn(history[^1]) : FormatTranscript(history));
+        return input with
+        {
+            Query = LocalizedJudgeEvidence.Serialize(new
+            {
+                query = input.Query,
+                conversationHistory = previousOnly ? new[] { history[^1] } : history
+            })
+        };
+    }
 }

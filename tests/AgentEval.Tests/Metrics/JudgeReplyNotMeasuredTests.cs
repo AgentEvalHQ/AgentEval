@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Calibration;
@@ -247,12 +246,18 @@ public sealed class JudgeReplyNotMeasuredTests
     internal static List<IMetric> JudgeMetrics(Func<IChatClient> client) =>
         typeof(FaithfulnessMetric).Assembly.GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IMetric).IsAssignableFrom(t))
-            .Select(t => t.GetConstructors().FirstOrDefault(c =>
-                c.GetParameters() is { Length: > 0 } parameters && parameters[0].ParameterType == typeof(IChatClient)))
-            .OfType<ConstructorInfo>()
-            .Select(ctor => (IMetric)ctor.Invoke(ctor.GetParameters()
-                .Select((p, i) => i == 0 ? client() : p.HasDefaultValue ? p.DefaultValue : null)
-                .ToArray()))
+            .Select(t => t.GetConstructors().Where(c =>
+                c.GetParameters() is { Length: > 0 } parameters && parameters[0].ParameterType == typeof(IChatClient)).ToArray())
+            .Where(constructors => constructors.Length > 0)
+            .Select(constructors =>
+            {
+                // Reflection order is not an API contract. Select the default instrument explicitly;
+                // a new overload requiring prompt options must not receive a fabricated null.
+                var ctor = constructors.FirstOrDefault(c => c.GetParameters().Skip(1).All(p => p.HasDefaultValue));
+                Assert.NotNull(ctor);
+                return (IMetric)ctor.Invoke(ctor.GetParameters()
+                    .Select((p, i) => i == 0 ? client() : p.DefaultValue).ToArray());
+            })
             .ToList();
 
     internal static string Sha256(string text) =>

@@ -118,7 +118,10 @@ public partial class MAFWorkflowEventBridgeTests
         var builder = new MAFWorkflows.WorkflowBuilder(worker).AddEdge<string>(worker, worker, _ => outerCalls < 2).WithOutputFrom(worker);
         var outer = instrumented && outerProcess ? timing.Build(builder)
             : builder.WithOpenTelemetry(options => options.DisableExecutorProcess = !outerProcess).Build();
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        // This is a hang watchdog, not the timing assertion. Parallel CI runs can take more than
+        // ten seconds to schedule the nested workflows; the ownership checks below still require
+        // both outer deliveries and their measured 80 ms work, independently of queueing delay.
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         var result = await MAFWorkflowAdapter.FromMAFWorkflow(outer, "nested ownership", ["Worker"])
             .ExecuteWorkflowAsync("input", cancellation.Token);
         Assert.True(result.IsSuccess);

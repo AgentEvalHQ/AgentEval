@@ -43,6 +43,15 @@ public sealed class OfflineSampleCheckTests
     private static IReadOnlyList<OfflineSampleCheck.Expectation> CheckedInTable() =>
         OfflineSampleCheck.Parse(File.ReadAllText(Path.Combine(SamplesDir, OfflineSampleCheck.ExpectationsFileName)));
 
+    [Theory]
+    [InlineData(13, "ConversationEvaluation")]
+    [InlineData(99, "DeterministicBenchmark")]
+    [InlineData(110, "Microsoft365Walkthrough")]
+    public void Catalogue_NewSamples_PreserveExistingNumericShortcuts(int number, string sampleId)
+    {
+        Assert.Equal(sampleId, CatalogueIds()[number - 1]);
+    }
+
     [Fact]
     public void TheCheckedInTable_HasExactlyOneRowPerMenuSample()
     {

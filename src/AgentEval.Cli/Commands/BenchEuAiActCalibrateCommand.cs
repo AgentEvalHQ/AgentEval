@@ -90,8 +90,20 @@ public static class BenchEuAiActCalibrateCommand
         IEvaluator? evaluatorOverride,
         CancellationToken ct = default,
         CalibrationJudgeIdentity? evaluatorOverrideIdentity = null,
-        int? limitPerPillar = null)
+        int? limitPerPillar = null, CalibrationCliOptions.Selection? selection = null)
     {
+        AgentEval.Prompts.JudgePromptOptions? promptOptions;
+        try
+        {
+            selection?.ValidateOutput(outPathOverride);
+            promptOptions = selection is null ? null : await selection.Prompts.LoadAsync(ct);
+        }
+        catch (Exception ex) when (JudgePromptCliOptions.IsConfigurationError(ex))
+        {
+            Console.Error.WriteLine(ex.Message);
+            return ExitCodes.UsageError;
+        }
+
         if (limitPerPillar is < 1)
         {
             Console.Error.WriteLine("--limit must be at least 1.");
@@ -139,27 +151,38 @@ public static class BenchEuAiActCalibrateCommand
 
         // ── Load calibration datasets from the test assembly ─────────────────
         IReadOnlyList<CalibrationDataset> datasets;
+        CalibrationDatasetIdentity datasetIdentity;
         try
         {
             // The golden JSONL files are embedded in the test assembly.
-            var testAssembly = CalibrationGoldenAssembly.TryLocate();
-            if (testAssembly is null)
+            if (selection?.Dataset is { } datasetFile)
             {
-                Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
-                return 1;
+                var loaded = await CalibrationCliOptions.LoadAsync(datasetFile, new CalibrationDatasetLoader().LoadAsync, ct);
+                datasets = [loaded.Dataset];
+                datasetIdentity = loaded.Identity;
             }
+            else
+            {
+                var testAssembly = CalibrationGoldenAssembly.TryLocate();
+                if (testAssembly is null)
+                {
+                    Console.Error.WriteLine(CalibrationGoldenAssembly.NotFoundMessage);
+                    return 1;
+                }
 
-            var datasetLoader = new CalibrationDatasetLoader();
-            datasets = await datasetLoader.LoadAllFromAssemblyAsync(testAssembly);
+                var datasetLoader = new CalibrationDatasetLoader();
+                datasets = await datasetLoader.LoadAllFromAssemblyAsync(testAssembly, ct);
 
-            // Filter to only EU AI Act datasets (containing 'pillar' key patterns from EU files)
-            // The loader matches on .Calibration.Golden. in the resource name, so both GDPR and
-            // EU AI Act files match. We need only the EU AI Act ones.
-            // EU AI Act golden files have control IDs starting with "eu_ai." — filter by probing first entry.
-            datasets = datasets
-                .Where(ds => ds.Entries.Count > 0 &&
-                             ds.Entries[0].ArticleControlId.StartsWith("eu_ai.", StringComparison.Ordinal))
-                .ToList();
+                // Filter to only EU AI Act datasets (containing 'pillar' key patterns from EU files)
+                // The loader matches on .Calibration.Golden. in the resource name, so both GDPR and
+                // EU AI Act files match. We need only the EU AI Act ones.
+                // EU AI Act golden files have control IDs starting with "eu_ai." — filter by probing first entry.
+                datasets = datasets
+                    .Where(ds => ds.Entries.Count > 0 &&
+                                 ds.Entries[0].ArticleControlId.StartsWith("eu_ai.", StringComparison.Ordinal))
+                    .ToList();
+                datasetIdentity = CalibrationCliOptions.EmbeddedIdentity(datasets);
+            }
 
             if (datasets.Count == 0)
             {
@@ -172,7 +195,7 @@ public static class BenchEuAiActCalibrateCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to load calibration datasets: {ex.Message}");
-            return 1;
+            return selection?.Dataset is not null ? ExitCodes.UsageError : 1;
         }
 
         // ── Run calibration ──────────────────────────────────────────────────
@@ -180,13 +203,18 @@ public static class BenchEuAiActCalibrateCommand
         CalibrationReport report;
         try
         {
-            var runner = new CalibrationRunner(articles, judge);
+            var runner = new CalibrationRunner(articles, judge)
+            {
+                JudgeModel = evaluatorOverride is null ? judgeModelName : evaluatorOverrideIdentity?.Model,
+                JudgePrompts = promptOptions,
+                RequireProductionScenarios = promptOptions is not null && selection?.AllowSurrogateRubrics != true
+            };
             report = await runner.RunAsync(datasets, limitPerPillar, ct);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Calibration run failed: {ex.Message}");
-            return 1;
+            return JudgePromptCliOptions.IsConfigurationError(ex) ? ExitCodes.UsageError : 1;
         }
 
         // ── Write Markdown report ────────────────────────────────────────────
@@ -199,7 +227,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report, judgeIdentity);
+            var md = BuildMarkdownReport(report, judgeIdentity, datasetIdentity);
             if (limitPerPillar is int lim)
                 md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per pillar.** A wiring check, not a baseline: " +
                      "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
@@ -266,7 +294,7 @@ public static class BenchEuAiActCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    internal static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
+    internal static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge, CalibrationDatasetIdentity? datasetIdentity = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# EU AI Act Calibration Report");
@@ -274,6 +302,12 @@ public static class BenchEuAiActCalibrateCommand
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
         judge.AppendMarkdownHeader(sb);
+        datasetIdentity?.AppendMarkdownHeader(sb);
+        sb.AppendLine("Instrument scope: registered production scenarios and synthetic surrogate substance rubrics are counted separately below. Surrogate agreement does not establish production-rubric accuracy.");
+        sb.AppendLine();
+        foreach (var instrument in report.Instruments)
+            sb.AppendLine($"Judge instrument: `{instrument.EvaluatorKey}` [{instrument.EffectiveLocale}], `{instrument.Digest}`");
+        if (report.Instruments.Count > 0) sb.AppendLine();
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 
@@ -295,6 +329,9 @@ public static class BenchEuAiActCalibrateCommand
             sb.AppendLine($"| Metric | Value | Threshold | Status |");
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
+            sb.AppendLine($"| Production scenario attempts | {pr.ProductionEntries} | n/a | scope |");
+            sb.AppendLine($"| Surrogate rubric attempts | {pr.SurrogateEntries} | n/a | separate instrument |");
+            sb.AppendLine($"| Unknown article entries | {pr.UnknownArticleEntries} | == 0 | not measured |");
             sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
             sb.AppendLine($"| Not measured (not scored) | {pr.NotMeasured} | == 0 | {(pr.NotMeasured == 0 ? "OK" : "INCOMPLETE")} |");

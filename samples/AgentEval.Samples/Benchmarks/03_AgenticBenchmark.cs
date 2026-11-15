@@ -15,7 +15,7 @@ namespace AgentEval.Samples.Benchmarks;
 /// <summary>
 /// Benchmarks H3: Agentic — invokes a real model-backed agent that has a tool, records the tool calls it makes,
 /// and grades its answer and those calls with the agentic preset selected by
-/// <see cref="BenchmarkSampleHelpers.ResolvePreset"/>. Renders the resulting composite tree to JSON + HTML + PDF
+/// <see cref="BenchmarkSampleHelpers.ResolvePreset"/>. Renders the resulting composite tree to JSON + HTML (PDF is opt-in)
 /// using the v0.10.1 generic renderers.
 ///
 /// Preset mapping:
@@ -48,7 +48,7 @@ public static class AgenticBenchmarkSample
     {
         BenchmarkSampleHelpers.PrintHeader(
             "Benchmarks H3: Agentic",
-            "Real agent invocation + real judge. JSON + HTML + PDF outputs.");
+            "Real agent invocation + real judge. JSON + HTML outputs; PDF is opt-in.");
 
         if (!AIConfig.IsConfigured)
         {
@@ -116,7 +116,7 @@ public static class AgenticBenchmarkSample
             result, subject,
             benchmarkName: "agentic",
             regulationOrBenchmark: $"AgentEval Agentic — {presetLabel}",
-            includePdf: true,
+            includePdf: false,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
             judgeModel: AIConfig.ModelDeployment);

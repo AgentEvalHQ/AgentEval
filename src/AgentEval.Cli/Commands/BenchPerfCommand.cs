@@ -124,9 +124,8 @@ public static class BenchPerfCommand
         }
 
         // ── Build EvalInput from prompt(s) ───────────────────────────────────
-        // P0-1: price the model the agent actually used: --model for an --endpoint target, the model the provider
-        // resolved for --from-env. Without it the cost leaf falls back to agent.Name, which never matches a
-        // pricing entry.
+        // Supply the explicit/configured pricing key. If it has no known rate, the cost benchmark
+        // resolves each returned model independently and keeps any incomplete workload unpriced.
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
         var metadata = new Dictionary<string, object>
         {
@@ -255,14 +254,13 @@ public static class BenchPerfCommand
             {
                 Console.Error.WriteLine($"Warning: failed to write perf JSON report: {ex.Message}");
             }
-            var (htmlPath, pdfPath) = await GenericReportRenderer.WriteHtmlAndPdfAsync(
+            var htmlPath = await GenericReportRenderer.WriteHtmlAsync(
                 result,
                 runDir,
                 subjectIdentity,
                 benchmarkLabel: $"Performance — {preset}",
                 runId: runId);
             if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
-            if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
             ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)

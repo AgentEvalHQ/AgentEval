@@ -52,6 +52,10 @@ public sealed record EvalInput(
     string? SystemMessage = null,
     IReadOnlyDictionary<string, object>? Metadata = null)
 {
+    /// <summary>Invocation-owned prompt selection for supported LLM leaves; never serialized as case content.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Prompts.JudgePromptOptions? JudgePrompts { get; init; }
+
     /// <summary>
     /// Canonical <see cref="Metadata"/> key under which a Glass Box <c>AgentTrace</c> may be stashed so
     /// trace-aware evaluators (Glass Box Part 2) can read what actually happened at the chat/tool boundary.

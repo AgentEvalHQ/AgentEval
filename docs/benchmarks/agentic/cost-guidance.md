@@ -41,14 +41,14 @@ The `EvaluatorCostTier` enum (in `AgentEval.Abstractions/Evals/EvaluatorCostTier
 
 | Evaluator key | Cost tier | Notes |
 |---------------|-----------|-------|
-| `groundedness` | MEDIUM | Composite of **4 sub-LLM judges** (claim_support / claim_contradicted / citation_accuracy / evidence_coverage) |
+| `groundedness` | MEDIUM | The default legacy policy uses **4 sub-LLM judges** (claim_support / claim_contradicted / citation_accuracy / evidence_coverage). Opt-in SupportFocusedV2 disables source coverage by default; only enabled dimensions invoke the judge. |
 | `relevance` | LOW | Single-turn LLM judge |
 | `coherence` | LOW | Single-turn LLM judge |
 | `fluency` | LOW | Single-turn LLM judge |
 | `similarity` | LOW | Single-turn LLM judge |
 | `response_completeness` | LOW | Single-turn LLM judge |
 | `f1_score` | TRIVIAL | Pure-code token overlap |
-| `qa_composite` | HIGH | Composite of all 7 above — GroundednessEval alone fans out to 4 LLM judges; 10+ LLM calls per scenario |
+| `qa_composite` | HIGH | Composite of all 7 above — its default legacy GroundednessEval fans out to 4 LLM judges; 10+ LLM calls per scenario |
 
 ### Phase 3 — Judge Quality (Meta)
 

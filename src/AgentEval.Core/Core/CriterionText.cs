@@ -259,6 +259,9 @@ public static class CriterionText
                 : new CriterionResult
                 {
                     Criterion = match,
+                    Id = result.Id,
+                    IsMeasured = result.IsMeasured,
+                    Applicable = result.Applicable,
                     Met = result.Met,
                     Explanation = result.Explanation,
                 });

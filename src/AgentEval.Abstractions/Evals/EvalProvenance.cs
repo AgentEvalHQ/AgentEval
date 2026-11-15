@@ -27,6 +27,10 @@ public sealed record EvalProvenance(
     double? EstimatedCost,
     bool CacheHit)
 {
+    /// <summary>The actual resolved prompt identity and locale; content is present only when explicitly captured.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Prompts.JudgePromptProvenance? JudgePrompt { get; init; }
+
     /// <summary>Full SHA-256 of the rubric/instrument, as sha256: plus 64 hex characters, when known.</summary>
     /// <remarks>The legacy <see cref="PromptHash"/> remains a short compatibility fingerprint.</remarks>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -41,4 +45,8 @@ public sealed record EvalProvenance(
     /// are separately invoked adjudicators, not additional panel votes. Absent for ordinary composites.</remarks>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public int? JudgePanelSize { get; init; }
+
+    /// <summary>Detailed text-token pricing evidence for this judge call, including retries. Unrelated to result caching.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public AgentEval.Models.TokenCostEstimate? CostEstimate { get; init; }
 }

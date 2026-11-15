@@ -2,6 +2,10 @@
 
 > **Comprehensive evaluation for Retrieval-Augmented Generation systems**
 
+For criteria judging through `MAFEvaluationHarness` or `StochasticRunner`, see [retrieved context in harness evaluations](judge-context.md). Metric APIs using `EvaluationContext.Context` remain supported.
+
+To replace or translate the built-in faithfulness, relevance, context precision/recall and answer correctness prompts, use [versioned judge prompt packs](judge-prompt-packs.md). The same metric classes accept Markdown plus YAML/JSON instructions; no custom metric subclass is required.
+
 ---
 
 ## Overview
@@ -68,9 +72,11 @@ var metric = new RecallAtKMetric(k: 5);
 
 var context = new EvaluationContext
 {
-    RelevantDocumentIds = ["doc1", "doc2", "doc3"],      // Ground truth
-    RetrievedDocumentIds = ["doc1", "doc4", "doc2", "doc5", "doc6"]  // Search results
+    Input = "Find the relevant documents.",
+    Output = "" // Retrieval metrics use document IDs rather than answer text.
 };
+context.SetProperty<IReadOnlyList<string>>(RecallAtKMetric.RelevantDocumentIdsKey, ["doc1", "doc2", "doc3"]);
+context.SetProperty<IReadOnlyList<string>>(RecallAtKMetric.RetrievedDocumentIdsKey, ["doc1", "doc4", "doc2", "doc5", "doc6"]);
 
 var result = await metric.EvaluateAsync(context);
 // Score: 67 (2 of 3 relevant docs found in top 5)
@@ -113,9 +119,11 @@ var metric = new MRRMetric(maxRank: 10);
 
 var context = new EvaluationContext
 {
-    RelevantDocumentIds = ["doc1", "doc2"],
-    RetrievedDocumentIds = ["docA", "docB", "doc1", "docC"]  // doc1 at rank 3
+    Input = "Find the relevant documents.",
+    Output = ""
 };
+context.SetProperty<IReadOnlyList<string>>(MRRMetric.RelevantDocumentIdsKey, ["doc1", "doc2"]);
+context.SetProperty<IReadOnlyList<string>>(MRRMetric.RetrievedDocumentIdsKey, ["docA", "docB", "doc1", "docC"]); // doc1 at rank 3
 
 var result = await metric.EvaluateAsync(context);
 // Score: 33 (1/3 = 0.333)
@@ -403,55 +411,58 @@ if (Random.Shared.NextDouble() < sampleRate)
 
 ## Complete RAG Evaluation Example
 
+Pass your configured chat client and `IAgentEvalEmbeddings` implementation to this method:
+
 ```csharp
 using AgentEval.Core;
 using AgentEval.Metrics.RAG;
+using AgentEval.Metrics.Retrieval;
 using AgentEval.Embeddings;
+using Microsoft.Extensions.AI;
 
-// Setup
-var embeddings = new OpenAIEmbeddings("text-embedding-3-small");
-var chatClient = GetAzureOpenAIChatClient();
-
-// Define all RAG metrics
-var metrics = new IMetric[]
+static async Task EvaluateRagAsync(IChatClient chatClient, IAgentEvalEmbeddings embeddings)
 {
-    // FREE - Information Retrieval
-    new RecallAtKMetric(k: 5),
-    new MRRMetric(),
-    
-    // $ - Embedding-based
-    new AnswerSimilarityMetric(embeddings),
-    new ResponseContextSimilarityMetric(embeddings),
-    new QueryContextSimilarityMetric(embeddings),
-    
-    // $$$ - LLM-based
-    new FaithfulnessMetric(chatClient),
-    new RelevanceMetric(chatClient),
-    new ContextPrecisionMetric(chatClient),
-    new ContextRecallMetric(chatClient),
-    new AnswerCorrectnessMetric(chatClient)
-};
+    // Define all RAG metrics
+    var metrics = new IMetric[]
+    {
+        // FREE - Information Retrieval
+        new RecallAtKMetric(k: 5),
+        new MRRMetric(),
 
-// Prepare evaluation context
-var context = new EvaluationContext
-{
-    Input = "What is AgentEval?",
-    Output = "AgentEval is a .NET evaluation toolkit for AI agents.",
-    Context = "AgentEval is the comprehensive .NET evaluation toolkit...",
-    GroundTruth = "AgentEval is a .NET toolkit for evaluating AI agents.",
-    RelevantDocumentIds = ["doc-agenteval-readme", "doc-agenteval-quickstart"],
-    RetrievedDocumentIds = ["doc-agenteval-readme", "doc-other", "doc-quickstart"]
-};
+        // $ - Embedding-based
+        new AnswerSimilarityMetric(embeddings),
+        new ResponseContextSimilarityMetric(embeddings),
+        new QueryContextSimilarityMetric(embeddings),
 
-// Run all metrics
-Console.WriteLine("Metric                    Score  Passed");
-Console.WriteLine("-----------------------------------------");
+        // $$$ - LLM-based
+        new FaithfulnessMetric(chatClient),
+        new RelevanceMetric(chatClient),
+        new ContextPrecisionMetric(chatClient),
+        new ContextRecallMetric(chatClient),
+        new AnswerCorrectnessMetric(chatClient)
+    };
 
-foreach (var metric in metrics)
-{
-    var result = await metric.EvaluateAsync(context);
-    var status = result.Passed ? "PASS" : "FAIL";
-    Console.WriteLine($"{metric.Name,-25} {result.Score,5:F0}  {status}");
+    // Prepare evaluation context
+    var context = new EvaluationContext
+    {
+        Input = "What is AgentEval?",
+        Output = "AgentEval is a .NET evaluation toolkit for AI agents.",
+        Context = "AgentEval is the comprehensive .NET evaluation toolkit...",
+        GroundTruth = "AgentEval is a .NET toolkit for evaluating AI agents."
+    };
+    context.SetProperty<IReadOnlyList<string>>(RecallAtKMetric.RelevantDocumentIdsKey, ["doc-agenteval-readme", "doc-agenteval-quickstart"]);
+    context.SetProperty<IReadOnlyList<string>>(RecallAtKMetric.RetrievedDocumentIdsKey, ["doc-agenteval-readme", "doc-other", "doc-agenteval-quickstart"]);
+
+    // Run all metrics
+    Console.WriteLine("Metric                    Score  Passed");
+    Console.WriteLine("-----------------------------------------");
+
+    foreach (var metric in metrics)
+    {
+        var result = await metric.EvaluateAsync(context);
+        var status = result.Passed ? "PASS" : "FAIL";
+        Console.WriteLine($"{metric.Name,-25} {result.Score,5:F0}  {status}");
+    }
 }
 ```
 

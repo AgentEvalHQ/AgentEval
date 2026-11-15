@@ -189,6 +189,16 @@ public class CliParseErrorExitCodeTests
     }
 
     [Fact]
+    public async Task ComplianceRenderHelp_StockTool_DescribesMarkdownOutput()
+    {
+        var (exitCode, stdout, _) = await RunCliAsync("compliance", "render", "--help");
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        Assert.Contains("Render a Markdown report", stdout);
+        Assert.DoesNotContain("Render a PDF report", stdout);
+    }
+
+    [Fact]
     public async Task Version_ExitsSuccess()
     {
         var (exitCode, _, _) = await RunCliAsync("--version");

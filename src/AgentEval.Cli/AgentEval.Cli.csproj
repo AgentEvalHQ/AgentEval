@@ -79,7 +79,7 @@
     <ProjectReference Include="..\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\AgentEval.Memory\AgentEval.Memory.csproj" />
     <!-- T0.5 (v1.1): generic IEvalResultRenderer for OWASP / MITRE / Perf CLI report parity
-         with GDPR / EuAiAct / Agentic. QuestPDF is bundled PrivateAssets in Rendering.Pdf. -->
+         with GDPR / EuAiAct / Agentic. Rendering.Pdf contains engine-neutral projections only. -->
     <ProjectReference Include="..\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
     <!-- v1.1 CLI consolidation: MAFEvaluationHarness is the runtime hosting the eval pipeline
          for the ported `agenteval eval` command (and only that command). Other commands talk

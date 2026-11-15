@@ -115,15 +115,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    # Bounded: on 2026-10-07 an Ubuntu mirror stopped answering mid-`apt-get update` and the step
-    # sat silent until the job's 15-minute timeout cancelled it, before any test ran. With a
-    # per-request timeout apt gives up on a dead mirror and retries; the step limit catches the rest.
-    - name: Install fonts for PDF generation (Linux)
-      timeout-minutes: 5
-      run: |
-        sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-        sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y fonts-liberation fontconfig
-
     # Every runtime the tests target; the SDK that builds is the one global.json names.
     - name: Setup .NET
       uses: actions/setup-dotnet@v6

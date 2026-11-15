@@ -31,7 +31,27 @@ public static class JudgeCostMap
     /// <summary>Per-model pricing record. Rates are USD per 1,000 tokens.</summary>
     /// <param name="InputRatePer1K">USD per 1K input (prompt) tokens.</param>
     /// <param name="OutputRatePer1K">USD per 1K output (completion) tokens.</param>
-    public readonly record struct ModelRate(double InputRatePer1K, double OutputRatePer1K);
+    public readonly record struct ModelRate(double InputRatePer1K, double OutputRatePer1K)
+    {
+        /// <summary>Optional USD price per thousand cached input tokens.</summary>
+        public double? CachedInputRatePer1K { get; init; }
+        /// <summary>Optional dated rate-card source.</summary>
+        public string? Source { get; init; }
+
+        internal AgentEval.Models.TokenPricing ToTokenPricing()
+        {
+            try
+            {
+                return new((decimal)InputRatePer1K, (decimal)OutputRatePer1K,
+                    CachedInputRatePer1K is { } cached ? (decimal)cached : null) { Source = Source };
+            }
+            catch (OverflowException)
+            {
+                // NaN, infinities and values beyond decimal are invalid rates, never free usage.
+                return new(-1, -1);
+            }
+        }
+    }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ModelRate> s_rates = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -39,9 +59,9 @@ public static class JudgeCostMap
         // on 2026-10-07 (rows the page no longer lists keep their last known value). ModelPricing carries the same
         // prices for the models both tables know (ModelPricingConsistencyTests). Consumers should Register(...)
         // their own rates for a different list price or a volume discount.
-        ["gpt-4o"]                   = new(0.00250, 0.01000),
-        ["gpt-4o-mini"]              = new(0.00015, 0.00060),
-        ["gpt-4.1"]                  = new(0.00200, 0.00800),
+        ["gpt-4o"]                   = new(0.00250, 0.01000) { CachedInputRatePer1K = 0.00125, Source = "https://developers.openai.com/api/docs/models/gpt-4o (standard text rates, 2026-11-11)" },
+        ["gpt-4o-mini"]              = new(0.00015, 0.00060) { CachedInputRatePer1K = 0.000075, Source = "https://developers.openai.com/api/docs/models/gpt-4o-mini (standard text rates, 2026-11-11)" },
+        ["gpt-4.1"]                  = new(0.00200, 0.00800) { CachedInputRatePer1K = 0.0005, Source = "https://developers.openai.com/api/docs/models/gpt-4.1 (standard text rates, 2026-11-11)" },
         ["gpt-4.1-mini"]             = new(0.00040, 0.00160),
         ["gpt-4.1-nano"]             = new(0.00010, 0.00040),
         ["gpt-4-turbo"]              = new(0.01000, 0.03000),
@@ -138,9 +158,21 @@ public static class JudgeCostMap
     /// </returns>
     public static double? EstimateCost(string? judgeModel, long inputTokens, long outputTokens)
     {
-        if (inputTokens < 0 || outputTokens < 0) return null;
-        if (inputTokens == 0 && outputTokens == 0) return 0;
-        if (GetRate(judgeModel) is not { } rate) return null;
-        return (inputTokens / 1000.0) * rate.InputRatePer1K + (outputTokens / 1000.0) * rate.OutputRatePer1K;
+        var estimate = EstimateCostDetailed(judgeModel, inputTokens, outputTokens, null);
+        return estimate.Amount is { } amount ? (double)amount : null;
     }
+
+    /// <summary>Registers a full rate card without changing the legacy two-rate constructor.</summary>
+    public static void Register(string judgeModel, ModelRate rate)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(judgeModel);
+        s_rates[judgeModel] = rate;
+    }
+
+    /// <summary>Estimates text-token cost with explicit cache uncertainty and the resolved rates.</summary>
+    public static AgentEval.Models.TokenCostEstimate EstimateCostDetailed(
+        string? judgeModel, long? inputTokens, long? outputTokens, long? cachedInputTokens) =>
+        AgentEval.Models.TokenCostEstimate.Calculate(inputTokens, outputTokens, cachedInputTokens,
+            GetRate(judgeModel)?.ToTokenPricing()) with { ModelId = judgeModel, ModelSource = "configured" };
+
 }

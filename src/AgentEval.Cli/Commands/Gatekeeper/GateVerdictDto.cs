@@ -5,6 +5,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AgentEval.Guardrails;
+using AgentEval.Guardrails.Judges;
 using AgentEval.MAF.Gatekeeper;
 
 namespace AgentEval.Cli.Commands.Gatekeeper;
@@ -58,6 +59,12 @@ internal sealed record GateVerdictDto
     public object? Certificate { get; init; }             // object | array | null (honesty guard, slice 2)
     public object? NewArguments { get; init; }            // reserved for Mutate tool verdicts; null in v1
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<JudgeGateInstrument>? JudgeInstruments { get; init; }
+
+    internal static JudgeGateInstrument WithoutContent(JudgeGateInstrument instrument) =>
+        instrument with { Prompt = instrument.Prompt with { Content = null } };
+
     /// <summary>The axis encoded in a <c>judge:&lt;axis&gt;</c> policy name, else null (a panel is <c>judge-panel</c> → null).</summary>
     public static string? AxisOf(string policyName) => SensitiveJudgeAxes.AxisOf(policyName);
 
@@ -66,6 +73,7 @@ internal sealed record GateVerdictDto
     {
         var axis = AxisOf(v.PolicyName);
         var redact = axis is not null && RedactAxes.Contains(axis);
+        var instruments = JudgeGateInstrumentation.Observed(v.Provenance).Select(WithoutContent).ToArray();
 
         // GateAction is a closed {Allow, Block}, but map defensively: any unmapped value fails closed to Block.
         string action;
@@ -88,12 +96,13 @@ internal sealed record GateVerdictDto
             Action = action,
             Policy = v.PolicyName,
             Axis = axis,
-            Reason = v.Reason,
+            Reason = redact && instruments.Length > 0 && v.Reason is not null ? "Sensitive judge rationale omitted." : v.Reason,
             Matches = redact ? null : v.Matches,
             RedactedText = redact ? null : v.RedactedText,
             InlineReady = null,   // deterministic; the judge path (honesty guard) sets this
-            Inconclusive = inconclusive,
+            Inconclusive = inconclusive || instruments.Any(i => !i.Measured),
             Warning = warning,
+            JudgeInstruments = instruments.Length == 0 ? null : instruments,
         };
     }
 

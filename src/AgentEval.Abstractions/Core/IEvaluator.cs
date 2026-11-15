@@ -5,7 +5,7 @@
 namespace AgentEval.Core;
 
 /// <summary>
-/// The <b>LLM-judge transport</b>: hands an (input, output, criteria) triple to a language model
+/// The <b>LLM-judge transport</b>: hands input, output and criteria, optionally with explicit context, to a language model
 /// acting as judge and returns its verdict as an <see cref="EvaluationResult"/>.
 /// </summary>
 /// <remarks>
@@ -22,10 +22,33 @@ namespace AgentEval.Core;
 /// <see cref="EvaluationResult.EvaluationFailed"/> is set. Consumers of this interface directly (e.g. the
 /// MAF evaluation harness) must likewise read <see cref="EvaluationResult.EvaluationFailed"/> before the score.
 /// </para>
-/// <para>Retyped in documentation only by ADR-030 §3.3; no member changed.</para>
+/// <para>The request overload is additive; legacy implementations retain their context-free transport.</para>
 /// </remarks>
 public interface IEvaluator
 {
+    /// <summary>Evaluate an invocation with explicit context evidence.</summary>
+    /// <remarks>
+    /// Override this overload to support context. The default preserves legacy context-free evaluators
+    /// and refuses context-bearing or context-required requests rather than silently discarding evidence.
+    /// </remarks>
+    /// <param name="request">The immutable judge request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A verdict, or an explicit evaluation failure when context is unsupported.</returns>
+    Task<EvaluationResult> EvaluateAsync(EvaluationRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Context is not null || request.RequiresContext || request.JudgeCriteria is not null || request.JudgePrompts is not null || request.GroundTruth is not null)
+            return Task.FromResult(new EvaluationResult
+            {
+                EvaluationFailed = true,
+                Summary = "Expected: a context-capable evaluator supporting stable criterion IDs. Actual: this evaluator supports only input/output/criteria. " +
+                    "Suggestions: implement the EvaluationRequest overload or use ChatClientEvaluator. " +
+                    "Because: context evidence or criterion identity cannot be silently discarded."
+            });
+        return EvaluateAsync(request.Input, request.Output, request.Criteria, cancellationToken);
+    }
+
     /// <summary>
     /// Evaluate an agent response against criteria.
     /// </summary>
@@ -48,6 +71,10 @@ public interface IEvaluator
 /// </summary>
 public class EvaluationResult
 {
+    /// <summary>Configured prompt identity and explicitly captured content for this invocation.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Prompts.JudgePromptProvenance? JudgePrompt { get; init; }
+
     private readonly int? _overallScore;
 
     /// <summary>Overall score from 0 to 100, or null when absent or the evaluation failed.</summary>
@@ -67,6 +94,9 @@ public class EvaluationResult
 
     /// <summary>Individual criteria results.</summary>
     public IReadOnlyList<CriterionResult> CriteriaResults { get; init; } = [];
+
+    /// <summary>False when malformed or conflicting criterion data prevents selection of a criteria-based score.</summary>
+    public bool CriteriaResultsValid { get; init; } = true;
 
     /// <summary>
     /// True when the evaluation itself failed to produce a usable judgement — e.g. the judge
@@ -95,6 +125,9 @@ public class EvaluationResult
     /// </summary>
     public long? OutputTokenCount { get; init; }
 
+    /// <summary>Cached subset of input tokens across all judge attempts; null when any attempt omitted it.</summary>
+    public long? CachedInputTokenCount { get; init; }
+
     /// <summary>
     /// The exact score (0..1) when the judge graded with a <see cref="EvalRubric"/>; <see langword="null"/> otherwise.
     /// <see cref="OverallScore"/> holds it rounded to 0–100, which can cross a band boundary, so a reader of a rubric
@@ -117,6 +150,15 @@ public class EvaluationResult
 /// </summary>
 public class CriterionResult
 {
+    /// <summary>The stable criterion identifier echoed by the judge, when requested.</summary>
+    public string? Id { get; init; }
+
+    /// <summary>Whether the criterion verdict is well formed; missing booleans are not measured false verdicts.</summary>
+    public bool IsMeasured { get; init; } = true;
+
+    /// <summary>Whether this declared criterion applies. Exclusion must be explicitly reported by the judge.</summary>
+    public bool Applicable { get; init; } = true;
+
     /// <summary>The criterion being evaluated.</summary>
     public string Criterion { get; init; } = "";
     

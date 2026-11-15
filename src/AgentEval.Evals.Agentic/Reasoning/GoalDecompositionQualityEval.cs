@@ -103,7 +103,8 @@ public sealed class GoalDecompositionQualityEval : IEvalDefinitionWrapper
         ArgumentNullException.ThrowIfNull(input);
 
         // Resolve decomposition source: prefer explicit plan metadata, fall back to response scan.
-        var decompositionText = ResolveDecomposition(input);
+        var configured = _inner.HasPromptSelection(input);
+        var decompositionText = ResolveDecomposition(input, configured);
         if (decompositionText is null)
             return Task.FromResult(EvalResult.Skipped(this,
                 "No goal decomposition found: 'plan' key absent from Metadata and no sub-goal structure detected in Response."));
@@ -111,7 +112,9 @@ public sealed class GoalDecompositionQualityEval : IEvalDefinitionWrapper
         // If the decomposition is sourced from the plan metadata rather than the response,
         // inject it into the context so the judge can see it alongside the query.
         var judgeInput = decompositionText != input.Response
-            ? input with { Context = $"[Agent decomposition]\n{decompositionText}\n\n{input.Context}".TrimEnd() }
+            ? input with { Context = configured
+                ? LocalizedJudgeEvidence.Serialize(new { decomposition = decompositionText, context = input.Context })
+                : $"[Agent decomposition]\n{decompositionText}\n\n{input.Context}".TrimEnd() }
             : input;
 
         return _inner.EvaluateAsync(judgeInput, ct);
@@ -120,7 +123,7 @@ public sealed class GoalDecompositionQualityEval : IEvalDefinitionWrapper
     /// <summary>
     /// Returns the text to evaluate for decomposition quality, or <c>null</c> if none found.
     /// </summary>
-    private static string? ResolveDecomposition(EvalInput input)
+    private static string? ResolveDecomposition(EvalInput input, bool configured)
     {
         // Priority 1: explicit plan metadata key (most reliable decomposition source).
         if (input.Metadata is not null &&
@@ -130,6 +133,10 @@ public sealed class GoalDecompositionQualityEval : IEvalDefinitionWrapper
         {
             return planStr;
         }
+
+        // A configured rubric judges the supplied response directly. An English keyword
+        // miss must not hide a Swedish plan or reasoning trace from that instrument.
+        if (configured && !string.IsNullOrWhiteSpace(input.Response)) return input.Response;
 
         // Priority 2: scan response for decomposition markers.
         if (input.Response is not null)

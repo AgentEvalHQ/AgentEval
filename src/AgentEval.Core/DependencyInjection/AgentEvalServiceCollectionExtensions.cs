@@ -37,6 +37,7 @@ public static class AgentEvalServiceCollectionExtensions
         // Register core utilities as singletons (stateless)
         services.TryAddSingleton<IStatisticsCalculator, DefaultStatisticsCalculator>();
         services.TryAddSingleton<IToolUsageExtractor, DefaultToolUsageExtractor>();
+        services.TryAddSingleton<Prompts.IJudgePromptResolver, Prompts.JudgePromptResolver>();
 
         // Register snapshot services as singletons (stateless comparers)
         services.TryAddSingleton<ISnapshotComparer, SnapshotComparer>();

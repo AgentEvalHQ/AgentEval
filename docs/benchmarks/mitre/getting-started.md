@@ -76,10 +76,11 @@ Each run writes to `.agenteval/compliance/MITRE-ATLAS/{subject}/{timestamp}/` an
 - `report.json` — canonical eval-result shape (one leaf per ATLAS technique covered + `NotTested` / `NotApplicable` skipped leaves).
 - `report.md` — human-readable markdown summary (PR-friendly).
 - `report.html` — HTML report, rendered by `GenericReportRenderer`.
-- `report.pdf` — PDF report, generated via `AgentEval.Rendering.Pdf` / QuestPDF.
 - Plus the rich `MITREATLASReport` JSON written via `MITREATLASReporter.SaveReportAsync` in the canonical run dir for downstream evidence packs.
 
-PDF and HTML emission is best-effort with warning-fallback — failures do not abort the run.
+HTML emission is best-effort with warning-fallback; a rendering failure does not abort the run. The stock CLI does not generate PDFs or install a PDF engine.
+
+PDF output requires an explicitly registered library provider or the separately installed companion; see [optional PDF providers](../../pdf-providers.md). For an existing sealed AEF run, `agenteval-pdf render --run <recorded-aef-run-directory> --family generic --output ./mitre-report.pdf` renders a summary of the recorded fields. It does not reconstruct a missing rich red-team report. Keep the PDF outside the sealed source directory; rendering does not rerun attacks or change evidence.
 
 ## Interpreting results
 

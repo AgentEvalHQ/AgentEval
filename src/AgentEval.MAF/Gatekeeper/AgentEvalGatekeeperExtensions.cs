@@ -46,6 +46,25 @@ public static class AgentEvalGatekeeperExtensions
 
         var options = new GatekeeperOptions();
         configure(options);
+        return UseConfiguredGatekeeper(builder, enforcement, options);
+    }
+
+    /// <summary>Configures Gatekeeper, validates inline calibration, then installs registrations with runtime
+    /// model checks and calibration-use provenance. Validation performs store I/O but no model calls.
+    /// Existing synchronous registration remains available without automatic calibration validation.</summary>
+    public static async Task<AIAgentBuilder> UseGatekeeperAsync(this AIAgentBuilder builder,
+        GatekeeperEnforcement enforcement, Action<GatekeeperOptions> configure, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = new GatekeeperOptions();
+        configure(options);
+        await options.ValidateInlineJudgesAsync(cancellationToken).ConfigureAwait(false);
+        return UseConfiguredGatekeeper(builder, enforcement, options);
+    }
+
+    private static AIAgentBuilder UseConfiguredGatekeeper(AIAgentBuilder builder, GatekeeperEnforcement enforcement, GatekeeperOptions options)
+    {
         // Phase 3, Task 3.0: validate and freeze defaults before any preflight side effect or builder mutation.
         var resolvedOptions = GatekeeperOptionsResolver.Resolve(options);
         var refusalPresenter = GatekeeperRefusalPresenter.FromResolved(resolvedOptions);

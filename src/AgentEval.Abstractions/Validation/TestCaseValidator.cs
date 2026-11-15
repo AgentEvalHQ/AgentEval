@@ -35,6 +35,10 @@ public static class TestCaseValidator
     {
         ArgumentNullException.ThrowIfNull(testCase);
 
+        if (testCase.JudgeCriteria is not null && testCase.EvaluationCriteria?.Count > 0)
+            throw new ArgumentException("Expected: one criteria source. Actual: both JudgeCriteria and EvaluationCriteria supplied. " +
+                "Suggestions: use JudgeCriteria for stable IDs. Because: overriding one list silently would change the instrument.", nameof(testCase));
+
         if (string.IsNullOrWhiteSpace(testCase.Name))
         {
             throw new ArgumentException(

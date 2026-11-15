@@ -237,7 +237,7 @@ public static class TypedMemEvalBaselineDemo
                 subject,
                 benchmarkName: "typedmemeval",
                 regulationOrBenchmark: $"TypedMemEval — {results.Count} verticals ({TypedMemEvalVerticalDescriptor.CorpusRevision})",
-                includePdf: true,
+                includePdf: false,                // opt in explicitly to register the optional PDF provider
                 regulationCodeForEvidence: null,   // not a compliance benchmark
                 presetLabel: $"{results.Count}-vertical sweep",
                 judgeModel: deployment).ConfigureAwait(false);
