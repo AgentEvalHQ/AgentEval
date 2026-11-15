@@ -6,7 +6,7 @@
 // SAMPLE SHIM: an agent.EvaluateAsync() extension method of this sample's own
 //
 // MAF ships its own AgentEvaluationExtensions.EvaluateAsync() in
-// Microsoft.Agents.AI (five overloads in 1.27.0, see
+// Microsoft.Agents.AI (five overloads in 1.28.0, see
 // docs/using-agenteval-with-maf-evals.md). This file is NOT that API.
 //
 // This sample keeps its own shim on purpose. It passes the MEAI evaluator the

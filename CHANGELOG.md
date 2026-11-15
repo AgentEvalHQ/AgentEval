@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Align the standalone NuGet consumer and its package identity tests with published RC.3 (MAF 1.27 / MEAI 11).
 - Isolate the workflow source-disposal test from unrelated workflow builds observed by its process-wide telemetry listener.
 - Record the maintainer-witnessed Microsoft 365 live evaluation/benchmark, while retaining the limits of manual acceptance without saved run artifacts.
+- **Dependencies:** the Microsoft Agent Framework core packages move from 1.27.0 to 1.28.0 (`Microsoft.Agents.AI`, `.OpenAI`, `.Workflows`, `.Workflows.Generators`, `.Harness`). An application that references these packages directly needs 1.28.0 or later beside this release. MAF 1.28 renames the workflow run span from `workflow_invoke` to `invoke_workflow`, followed by the workflow's name when it has one, and the tag `workflow.name` to `gen_ai.workflow.name`; it no longer writes the `executor.input`, `executor.output` and `message.content` tags. Update your own trace filters and dashboards if they match the old names. AgentEval's workflow timing reads the new span name, and its results do not change. The A2A, Foundry and AgentHooks previews stay on 1.23.
 
 ## [1.0.0-rc.3]
 
