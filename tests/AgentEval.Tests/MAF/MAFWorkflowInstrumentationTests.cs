@@ -134,16 +134,27 @@ public sealed class MAFWorkflowInstrumentationTests
     {
         using var owner = new MAFWorkflowInstrumentation();
         ActivitySource? rejected = null;
+        using var rejectedBuild = new Activity("test.rejected-workflow-build").Start();
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == "AgentEval.MAF.WorkflowTiming",
             Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-            ActivityStarted = activity => { if (activity.OperationName == "workflow.build") rejected = activity.Source; }
+            ActivityStarted = activity =>
+            {
+                if (activity.OperationName == "workflow.build" && activity.ParentId == rejectedBuild.Id)
+                    rejected = activity.Source;
+            }
         };
         ActivitySource.AddActivityListener(listener);
         var start = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Start");
         var orphan = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Orphan");
         Assert.ThrowsAny<Exception>(() => owner.Build(new WorkflowBuilder(start).BindExecutor(orphan)));
+        rejectedBuild.Stop();
+        // Another workflow can build while this process-wide listener is active.
+        // Its live source must not replace the failed attempt's disposed source.
+        using var unrelatedOwner = new MAFWorkflowInstrumentation();
+        var unrelatedStart = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Unrelated");
+        Assert.NotNull(unrelatedOwner.Build(new WorkflowBuilder(unrelatedStart).WithOutputFrom(unrelatedStart)));
         Assert.NotNull(rejected);
         Assert.False(rejected.HasListeners());
         Assert.NotNull(owner.Build(new WorkflowBuilder(start).WithOutputFrom(start)));

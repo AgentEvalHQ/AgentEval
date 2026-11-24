@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Align the standalone NuGet consumer and its package identity tests with published RC.3 (MAF 1.27 / MEAI 11).
+- Isolate the workflow source-disposal test from unrelated workflow builds observed by its process-wide telemetry listener.
+- Record the maintainer-witnessed Microsoft 365 live evaluation/benchmark, while retaining the limits of manual acceptance without saved run artifacts.
+
 ## [1.0.0-rc.3]
 
 Third release candidate: configurable judging, retrieved evidence, cached-token estimates and optional PDF providers. Thanks to Andreas Adner (@adner) for the feedback behind [#314](https://github.com/AgentEvalHQ/AgentEval/issues/314), [#315](https://github.com/AgentEvalHQ/AgentEval/issues/315), [#316](https://github.com/AgentEvalHQ/AgentEval/issues/316) and [#317](https://github.com/AgentEvalHQ/AgentEval/issues/317).
