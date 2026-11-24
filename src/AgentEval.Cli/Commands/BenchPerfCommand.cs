@@ -48,7 +48,8 @@ public static class BenchPerfCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        bool agentIsLive = false, string? agentEndpoint = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null,
+        IOutputStore? storeOverride = null)
     {
         // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
         // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
@@ -173,7 +174,7 @@ public static class BenchPerfCommand
                 $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for the echo stand-in", aefWritten: aef is not null && !noAef);
         }
 
-        var store = CliRunOutput.CreateStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();

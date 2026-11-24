@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0]
+
+First stable release of AgentEval. Stable library APIs and documented CLI commands, options and exit codes follow the 1.x compatibility promise; existing Beta/Experimental fronts and `[Experimental]` APIs retain their exceptions. AEF 1.0 is frozen by its separate `aef-1.0` tag and corpus digest.
+
+- Remove the hidden RC-only `--legacy-output` option. CLI producers retain native AEF evidence and reports; legacy folder readers/converters and library stores remain available through 1.x.
+- Preserve both old and new MAF workflow run-span names in timing capture.
+- Align the standalone NuGet consumer and its package identity tests with published RC.3 (MAF 1.27 / MEAI 11).
+- Isolate the workflow source-disposal test from unrelated workflow builds observed by its process-wide telemetry listener.
+- Record the maintainer-witnessed Microsoft 365 live evaluation/benchmark, while retaining the limits of manual acceptance without saved run artifacts.
+- **Dependencies:** the Microsoft Agent Framework core packages move from 1.27.0 to 1.28.0 (`Microsoft.Agents.AI`, `.OpenAI`, `.Workflows`, `.Workflows.Generators`, `.Harness`). An application that references these packages directly needs 1.28.0 or later beside this release. MAF 1.28 renames the workflow run span from `workflow_invoke` to `invoke_workflow`, followed by the workflow's name when it has one, and the tag `workflow.name` to `gen_ai.workflow.name`; it no longer writes the `executor.input`, `executor.output` and `message.content` tags. Update your own trace filters and dashboards if they match the old names. AgentEval's workflow timing reads the new span name, and its results do not change. The A2A, Foundry and AgentHooks previews stay on 1.23.
+
 ## [1.0.0-rc.3]
 
 Third release candidate: configurable judging, retrieved evidence, cached-token estimates and optional PDF providers. Thanks to Andreas Adner (@adner) for the feedback behind [#314](https://github.com/AgentEvalHQ/AgentEval/issues/314), [#315](https://github.com/AgentEvalHQ/AgentEval/issues/315), [#316](https://github.com/AgentEvalHQ/AgentEval/issues/316) and [#317](https://github.com/AgentEvalHQ/AgentEval/issues/317).
@@ -9039,7 +9050,9 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.2...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.3...v1.0.0
+[1.0.0-rc.3]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.2...v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/AgentEvalHQ/AgentEval/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...v1.0.0-rc.1
 [0.43.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...v0.43.0-beta

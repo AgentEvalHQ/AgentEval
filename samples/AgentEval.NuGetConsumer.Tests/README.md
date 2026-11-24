@@ -48,7 +48,7 @@ $env:BITDEER_API_KEY = "your-api-key"               # BITDEER_MODEL / BITDEER_MO
 `openai`, `foundry` and `openai-compatible` work the same way. With `AI_INFERENCE_PROVIDER` unset, the first provider with
 complete credentials is used.
 
-Both projects target the published **AgentEval 1.0.0-rc.1** package (MAF 1.24.0). `PackageReachabilityTests` runs offline and verifies package identity and evaluation contracts. The agent evaluation tests use a real LLM and skip without provider configuration. To exercise the application offline, run `dotnet run --project samples/AgentEval.NuGetConsumer -- --mock --demo all`.
+Both projects target the published **AgentEval 1.0.0-rc.3** package (MAF 1.27.0 / Microsoft.Extensions.AI 11.0.0). `PackageReachabilityTests` runs offline and verifies package identity and evaluation contracts. The agent evaluation tests use a real LLM and skip without provider configuration. To exercise the application offline, run `dotnet run --project samples/AgentEval.NuGetConsumer -- --mock --demo all`.
 
 ## Running the Tests
 

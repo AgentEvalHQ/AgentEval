@@ -16,16 +16,16 @@
 
   <!-- Validate the published RC as an external consumer; do not substitute a source project reference. -->
   <ItemGroup>
-    <PackageReference Include="AgentEval" Version="1.0.0-rc.1" />
+    <PackageReference Include="AgentEval" Version="1.0.0-rc.3" />
 
-    <!-- Explicit versions (CPM disabled), aligned to the published RC.1 nuspec:
-         MAF 1.24.0 / Microsoft.Extensions.AI 10.10.0 / OpenTelemetry.Api 1.18.0.
-         Microsoft.Extensions.AI.OpenAI 10.10.1 matches this repository's provider adapter. -->
+    <!-- Explicit versions (CPM disabled), aligned to the published RC.3 nuspec:
+         MAF 1.27.0 / Microsoft.Extensions.AI 11.0.0 / OpenTelemetry.Api 1.18.0.
+         Microsoft.Extensions.AI.OpenAI 11.0.0 matches the published RC.3 contract. -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageReference Include="System.Memory.Data" Version="10.0.10" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.24.0" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.27.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="11.0.0" />
     <!-- Security: explicit transitive pin (GHSA-g94r-2vxg-569j); CPM disabled in this project.
          The published RC already requires OpenTelemetry.Api 1.18.0, but a CPM-disabled consumer
          won't inherit transitive pinning — keep this explicit so the resolved version is unambiguous. -->

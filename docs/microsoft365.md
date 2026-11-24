@@ -27,9 +27,9 @@ the prerequisites and a CLI path for when the maintainers ask.
 ---
 
 > **Status: Experimental.** The provider, the CLI target and `agenteval m365 doctor` are built and tested offline. The
-> maintainers have no Microsoft 365 tenant and have not run the live path; an external tester validates it with the
-> [tester guide](microsoft365-tester-guide.md). No sentence on this page claims a live result. See
-> [what is verified, and what still needs a tenant](#whats-verified-vs-what-still-needs-a-live-check).
+> owner confirmed on 2026-11-24 that a live connection and evaluation/benchmark completed successfully on an external
+> tester's computer, with the owner present. This is manual live acceptance; run artifacts were not retained. Detailed
+> protocol capabilities remain unverified. See [the verification scope](#whats-verified-vs-what-still-needs-a-live-check).
 
 ## What it is
 
@@ -457,7 +457,11 @@ statuses, file paths and the service's error messages. No prompt and no answer. 
 - The CLI end to end with a stand-in agent: every refusal, `eval`, the `bench` families (AEF marks the run `Mocked`), the
   AEF run settings and evidence documents, and `m365 doctor`'s options and exit codes.
 
-**Needs a tenant** (the external tester's job, see the [tester guide](microsoft365-tester-guide.md)):
+**Manual live acceptance, reported 2026-11-24:** the owner personally witnessed a successful connection and completed
+an evaluation or benchmark on an external tester's computer. No inspectable run bundle was retained. This confirms
+that the end-to-end path worked in that trial; it does not establish individual protocol details or a case pass rate.
+
+**Detailed live checks not recorded** (use the [tester guide](microsoft365-tester-guide.md) when these capabilities matter):
 
 - The MSAL device-code prompt, the silent refresh and the token cache across runs.
 - The real agent card: its interfaces, and a JSON-RPC 1.0 interface on a trusted host.
@@ -468,7 +472,7 @@ statuses, file paths and the service's error messages. No prompt and no answer. 
 - What `CancelTask` returns on a completed task, and whether a follow-up turn on the same context is accepted.
 - How a real confirmation card, a 401, a 403, a 429 and a long-running task present.
 
-When the tester's results arrive, this section records what passed, where, with which agent and profile, and when.
+Future retained results can add the agent/profile, observed protocol details and run identity. The manual acceptance above does not fill in unrecorded details.
 
 ## Troubleshooting
 

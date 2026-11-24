@@ -23,9 +23,15 @@ public static class BenchTraceFidelityCommand
 {
     /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies, WARN), 9 (discrepancies, FAIL),
     /// 11 (nothing to reconcile: no verdict, stored PENDING) or 1 (setup/IO error).</summary>
-    public static async Task<int> RunAsync(
+    public static Task<int> RunAsync(
         string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default,
-        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null) =>
+        RunCoreAsync(agentTraceFile, chatTraceFile, preset, subject, rootOverride, ct, aef, noAef, subjectVersion);
+
+    // Explicit store injection retains legacy library/converter coverage without a CLI write mode.
+    internal static async Task<int> RunCoreAsync(
+        string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default,
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null, IOutputStore? storeOverride = null)
     {
         var startedAt = DateTimeOffset.UtcNow;
         // ── Workspace setup (mirrors BenchMemoryCommand) ──
@@ -97,7 +103,7 @@ public static class BenchTraceFidelityCommand
         try
         {
             nativeReportJson = JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true });
-            store = CliRunOutput.CreateStore(agentEvalDir);
+            store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
             await CliRunOutput.SweepAsync(store, ct);
             var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
             await store.EnsureSolutionAsync();

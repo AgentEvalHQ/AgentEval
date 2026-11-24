@@ -29,8 +29,10 @@ public sealed class PerformanceProducerParityTests
         var command = new Command("test");
         command.Options.Add(new Option<DirectoryInfo?>("--aef"));
         var controls = new AefCliOptions(command);
-        var exit = await controls.InvokeAsync(command.Parse(["--aef-content", capture ? "on" : "off", "--legacy-output"]),
-            () => BenchPerfCommand.RunAsync(preset, "subject", "workload", temp.Path, new MeasuredAgent()));
+        // Exercise the legacy library store explicitly to retain converter parity coverage after the CLI fallback's removal.
+        var exit = await controls.InvokeAsync(command.Parse(["--aef-content", capture ? "on" : "off"]),
+            () => BenchPerfCommand.RunAsync(preset, "subject", "workload", temp.Path, new MeasuredAgent(),
+                storeOverride: new FileSystemOutputStore(workspace)));
         Assert.True(exit is 0 or 9 or 10 or 11, "The actual offline command must finish with a domain outcome.");
         var nativePath = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(workspace, "aef"), "run.json", SearchOption.AllDirectories)))!;
         var legacyPath = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(workspace, "subjects"), "manifest.json", SearchOption.AllDirectories)))!;

@@ -134,16 +134,27 @@ public sealed class MAFWorkflowInstrumentationTests
     {
         using var owner = new MAFWorkflowInstrumentation();
         ActivitySource? rejected = null;
+        using var rejectedBuild = new Activity("test.rejected-workflow-build").Start();
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == "AgentEval.MAF.WorkflowTiming",
             Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-            ActivityStarted = activity => { if (activity.OperationName == "workflow.build") rejected = activity.Source; }
+            ActivityStarted = activity =>
+            {
+                if (activity.OperationName == "workflow.build" && activity.ParentId == rejectedBuild.Id)
+                    rejected = activity.Source;
+            }
         };
         ActivitySource.AddActivityListener(listener);
         var start = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Start");
         var orphan = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Orphan");
         Assert.ThrowsAny<Exception>(() => owner.Build(new WorkflowBuilder(start).BindExecutor(orphan)));
+        rejectedBuild.Stop();
+        // Another workflow can build while this process-wide listener is active.
+        // Its live source must not replace the failed attempt's disposed source.
+        using var unrelatedOwner = new MAFWorkflowInstrumentation();
+        var unrelatedStart = ((Func<string, string>)(s => s)).BindAsExecutor<string, string>("Unrelated");
+        Assert.NotNull(unrelatedOwner.Build(new WorkflowBuilder(unrelatedStart).WithOutputFrom(unrelatedStart)));
         Assert.NotNull(rejected);
         Assert.False(rejected.HasListeners());
         Assert.NotNull(owner.Build(new WorkflowBuilder(start).WithOutputFrom(start)));
@@ -172,6 +183,36 @@ public sealed class MAFWorkflowInstrumentationTests
             using var session = source.StartActivity("workflow.session");
             session!.SetTag("session.id", capture.SessionId);
             using (unrelated.StartActivity("executor.process Worker")) { }
+            using (source.StartActivity("executor.process Worker")) { }
+        }
+        var delivery = Assert.IsType<MAFWorkflowTimingCapture.Delivery>(capture.Take("Worker"));
+        Assert.NotNull(delivery.End);
+        Assert.Null(capture.Take("Worker"));
+    }
+
+    // MAF 1.28 names the run span "invoke_workflow", followed by the workflow's name when it has one.
+    [Theory]
+    [InlineData("workflow_invoke")]
+    [InlineData("invoke_workflow")]
+    [InlineData("invoke_workflow Order flow")]
+    public void Capture_RunSpan_DecidesTheSessionOfItsOperations(string runSpan)
+    {
+        using var source = new ActivitySource("run.span");
+        using var capture = new MAFWorkflowTimingCapture(TimeProvider.System.GetTimestamp(),
+            new Dictionary<string, ActivitySource> { ["Worker"] = source });
+        using (capture.Enter())
+        {
+            using (var session = source.StartActivity("workflow.session"))
+            {
+                session!.SetTag("session.id", capture.SessionId);
+                using var otherRun = source.StartActivity(runSpan);
+                Assert.NotNull(otherRun);
+                otherRun.SetTag("session.id", "another-run");
+                using (source.StartActivity("executor.process Worker")) { }
+            }
+            using var run = source.StartActivity(runSpan);
+            Assert.NotNull(run);
+            run.SetTag("session.id", capture.SessionId);
             using (source.StartActivity("executor.process Worker")) { }
         }
         var delivery = Assert.IsType<MAFWorkflowTimingCapture.Delivery>(capture.Take("Worker"));

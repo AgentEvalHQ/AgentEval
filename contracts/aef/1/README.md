@@ -1,6 +1,6 @@
 # AEF 1.0
 
-**The AgentEval Evidence Format, version 1.0.** Status: **draft for 1.0**, unreleased; it may still change.
+**The AgentEval Evidence Format, version 1.0.** Status: **release candidate pending the `aef-1.0` tag**. That tag and the [corpus digest](RELEASE.md) identify the final freeze; an untagged checkout is not a published specification.
 
 AEF lets someone other than the tool that made an evaluation claim check it: that a run's evidence is unchanged and
 whose it is, that a release decision follows from that evidence, and that a runner kept to its plan. Start with the

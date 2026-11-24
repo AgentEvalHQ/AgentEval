@@ -238,16 +238,16 @@ public class BenchOwaspCommandTests : IDisposable
         // Through 0.42 a failing judge turned the semantic categories into skipped leaves and the composite read PASS.
         InitWorkspace();
 
-        var result = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchOwaspCommand.RunAsync(
+        var result = await BenchOwaspCommand.RunAsync(
             preset: "top10", subject: "OwaspFlakyJudgeAgent", rootOverride: _root, inputText: null,
             evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspFlakyJudgeAgent"),
-            judgeClientOverride: new FailsAfterPreflightJudge()));
+            judgeClientOverride: new FailsAfterPreflightJudge());
 
         Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
-        var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;   // the AEF run has its own summary.json
-        var summary = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories)
-            .Single(f => !f.StartsWith(aef, StringComparison.Ordinal));
-        Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+        var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(run).Outcome);
+        using var gate = JsonDocument.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))));
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, gate.RootElement.GetProperty("exitCode").GetInt32());
     }
 
     [Fact]

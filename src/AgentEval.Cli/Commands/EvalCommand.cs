@@ -262,7 +262,7 @@ internal static partial class EvalCommand
             return ExitCodes.UsageError;
         }
 
-        if (!AefCliOptions.LegacyOutput && opts.OutputDir is not null &&
+        if (opts.OutputDir is not null &&
             (opts.NoAef || (opts.Aef is not null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.Aef.FullName)).Equals(
                 Path.TrimEndingDirectorySeparator(Path.GetFullPath(opts.OutputDir.FullName)), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))))
         {
@@ -964,15 +964,6 @@ internal static partial class EvalCommand
         if (!isDirectoryFormat)
             await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
 
-        // Directory export (ADR-002) — can coexist with single-file export
-        if (opts.OutputDir is not null && AefCliOptions.LegacyOutput)
-        {
-            var dirName = DirectoryExporter.GenerateDirectoryName(report);
-            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
-            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  Results written to: {dirPath.FullName}");
-        }
     }
 
     /// <summary>
@@ -1179,7 +1170,7 @@ internal static class EvalAef
 {
     /// <summary>The AEF root a run goes to: <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>, else none.</summary>
     public static string? Root(EvalOptions opts) => opts.NoAef ? null :
-        Root(opts.Aef ?? (AefCliOptions.LegacyOutput ? null : opts.OutputDir));
+        Root(opts.Aef ?? opts.OutputDir);
 
     /// <summary>Where a command writes AEF runs: <paramref name="aef"/>, else a workspace's <c>.agenteval/aef</c>, else null.</summary>
     public static string? Root(DirectoryInfo? aef)

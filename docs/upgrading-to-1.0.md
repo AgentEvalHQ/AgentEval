@@ -3,11 +3,20 @@
 Update the library and the CLI together:
 
 ```powershell
-dotnet add package AgentEval --version 1.0.0-rc.3
-dotnet tool update --global AgentEval.Cli --version 1.0.0-rc.3
+dotnet add package AgentEval --version 1.0.0
+dotnet tool update --global AgentEval.Cli --version 1.0.0
 ```
 
 Coming from 0.43? Read [From 0.43 to 1.0.0-rc.1](#from-043-to-100-rc1) first, then the rc.2 and rc.3 sections.
+
+## From 1.0.0-rc.3 to 1.0.0
+
+These instructions target the published stable release. Until 1.0.0 is available on NuGet, use matching packages from a local build/feed.
+
+- Update direct Microsoft Agent Framework core references to **1.28.0 or later** (A2A, Foundry and AgentHooks previews remain at 1.23). AgentEval recognizes both the older `workflow_invoke` and the new `invoke_workflow` workflow run spans, including named runs.
+- Remove the hidden RC-only `--legacy-output` switch. CLI producers write native AEF evidence and retain their human-readable reports. `eval --output-dir` selects native evidence output; it cannot be combined with `--no-aef`. Existing legacy folders remain readable and convertible with `agenteval aef export` throughout 1.x. Library store APIs remain available.
+- Stable library APIs and documented CLI commands/options/exit codes now follow the 1.x compatibility promise. Existing Beta, Experimental and `[Experimental]` surfaces keep their exceptions; see [Feature Maturity](../README.md#feature-maturity).
+- AEF 1.0 is frozen by the `aef-1.0` tag and the SHA-256 of its corpus index. See [AEF release identity](../contracts/aef/1/RELEASE.md). The stable candidate does not change schema or corpus semantics.
 
 ## From 1.0.0-rc.2 to 1.0.0-rc.3
 

@@ -49,7 +49,7 @@ public static class BenchAgenticCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null, JudgePromptCliOptions.Selection? promptSelection = null)
+        string? subjectVersion = null, JudgePromptCliOptions.Selection? promptSelection = null, IOutputStore? storeOverride = null)
     {
         AgentEval.Prompts.JudgePromptOptions? promptOptions;
         try { promptOptions = promptSelection is null ? null : await promptSelection.LoadAsync(ct); }
@@ -245,7 +245,7 @@ public static class BenchAgenticCommand
                 benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1, budgetTier: appliedBudgetTier);
         }
 
-        var store = CliRunOutput.CreateStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
         // CLI writer paths sweep; MC (read-only viewer) does not.
         await CliRunOutput.SweepAsync(store, ct);

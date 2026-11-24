@@ -14,54 +14,37 @@ namespace AgentEval.Tests.Cli.Aef;
 [Collection("ConsoleTests")]
 public sealed class NativeWriteDefaultsTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Perf_DefaultAndFallback_PreserveNativeAndReportsWithOnlyActualStoreLinks(bool legacy)
+    [Fact]
+    public async Task Perf_Default_PreservesNativeAndReportsWithoutLegacyStoreLinks()
     {
         using var temp = TempWorkspace.Create("NativeWrite");
         var workspace = Path.Combine(temp.Path, ".agenteval");
         await new FileSystemOutputStore(workspace).InitializeSolutionAsync("native-write");
         var exit = await NativeVerbIntegrationTests.WithCapture(false,
-            () => BenchPerfCommand.RunAsync("cost", "subject", "workload", temp.Path, new OfflineAgent()), legacy);
+            () => BenchPerfCommand.RunAsync("cost", "subject", "workload", temp.Path, new OfflineAgent()));
         Assert.True(exit is 0 or 9 or 10 or 11);
         var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(workspace, "aef"), "run.json", SearchOption.AllDirectories)))!;
         Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(native).Outcome);
         var manifests = Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories);
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(native, "run.json")))!;
         var link = header["ext"]?["agenteval.store-v1"];
-        if (legacy)
-        {
-            var manifest = JsonNode.Parse(File.ReadAllText(Assert.Single(manifests)))!;
-            Assert.Equal((string?)manifest["run"]!["runId"], (string?)link?["runId"]);
-        }
-        else
-        {
-            Assert.Empty(manifests);
-            Assert.Null(link);
-            Assert.False(Directory.Exists(Path.Combine(workspace, "subjects")));
-            Assert.Single(Directory.GetFiles(Path.Combine(workspace, "reports"), "report.json", SearchOption.AllDirectories));
-        }
-        Assert.False(AefCliOptions.LegacyOutput);
+        Assert.Empty(manifests);
+        Assert.Null(link);
+        Assert.False(Directory.Exists(Path.Combine(workspace, "subjects")));
+        Assert.Single(Directory.GetFiles(Path.Combine(workspace, "reports"), "report.json", SearchOption.AllDirectories));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Eval_OutputDirectory_WritesNativeByDefaultAndOldDirectoryOnlyWithFallback(bool legacy)
+    [Fact]
+    public async Task Eval_OutputDirectory_WritesNativeWithoutLegacyDirectory()
     {
         using var temp = TempWorkspace.Create("EvalOutput");
         await using var endpoint = await LocalChatEndpoint.StartAsync();
-        // With the fallback, the native run would go to the nearest workspace: here, the repository's own .agenteval.
-        var options = Options(temp.Path, endpoint.Endpoint, noAef: legacy);
-        Assert.Equal(0, await NativeVerbIntegrationTests.WithCapture(false, () => EvalCommand.ExecuteAsync(options, CancellationToken.None), legacy));
+        var options = Options(temp.Path, endpoint.Endpoint);
+        Assert.Equal(0, await NativeVerbIntegrationTests.WithCapture(false, () => EvalCommand.ExecuteAsync(options, CancellationToken.None)));
         var destination = options.OutputDir!.FullName;
-        Assert.Equal(legacy ? 1 : 0, Directory.GetFiles(destination, "results.jsonl", SearchOption.AllDirectories).Length);
-        if (!legacy)
-        {
-            var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(destination, "seal.json", SearchOption.AllDirectories)))!;
-            Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(native).Outcome);
-        }
+        Assert.Empty(Directory.GetFiles(destination, "results.jsonl", SearchOption.AllDirectories));
+        var native = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(destination, "seal.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(native).Outcome);
     }
 
     [Theory]
@@ -77,13 +60,13 @@ public sealed class NativeWriteDefaultsTests
         Assert.Empty(endpoint.Requests);
     }
 
-    private static EvalOptions Options(string root, string endpoint, string? mode = null, bool noAef = false)
+    private static EvalOptions Options(string root, string endpoint, string? mode = null)
     {
         var dataset = Path.Combine(root, "dataset.yaml");
         File.WriteAllText(dataset, "- id: question\n  input: hello\n  expected: Hi\n");
         return new() { Dataset = new(dataset), Endpoint = endpoint, Model = "local-model", ApiKey = "local-test",
             Format = "directory", OutputDir = mode == "missing" ? null : new(Path.Combine(root, "output")), Quiet = true,
-            NoAef = mode == "disabled" || noAef, Aef = mode == "conflict" ? new(Path.Combine(root, "other")) : null };
+            NoAef = mode == "disabled", Aef = mode == "conflict" ? new(Path.Combine(root, "other")) : null };
     }
 
     [Fact]

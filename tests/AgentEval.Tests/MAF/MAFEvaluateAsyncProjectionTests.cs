@@ -20,7 +20,7 @@ namespace AgentEval.Tests.MAF;
 /// MAF's MEAI <c>IEvaluator</c> overload wraps the evaluator in its internal <c>MeaiEvaluatorAdapter</c>, which sends
 /// the split's query messages and <c>EvalItem.RawResponse</c> (built from the last returned message), while
 /// <c>EvalItem.Conversation</c> keeps the tool turns. AgentEval's <c>AsAgentEvaluator</c> forwards the conversation.
-/// MAF's evaluation source is the same at 1.24.0 and 1.27.0. If a later MAF changes the projection, these tests fail
+/// MAF's evaluation source is the same at 1.24.0, 1.27.0 and 1.28.0. If a later MAF changes the projection, these tests fail
 /// and the docs table needs updating.
 /// </remarks>
 public sealed class MAFEvaluateAsyncProjectionTests
