@@ -7,7 +7,7 @@ using AgentEval.Output;
 
 namespace AgentEval.Cli.Commands;
 
-/// <summary>CLI-only compatibility boundary: transient report assembly unless legacy writes are explicitly enabled.</summary>
+/// <summary>Assembles transient CLI reports; durable evidence is written through the native AEF writers.</summary>
 internal static class CliRunOutput
 {
     private static readonly JsonSerializerOptions ReportJson = new()
@@ -18,9 +18,7 @@ internal static class CliRunOutput
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
-    internal static IOutputStore CreateStore(string root) => AefCliOptions.LegacyOutput
-        ? new FileSystemOutputStore(root)
-        : new InMemoryOutputStore();
+    internal static IOutputStore CreateStore(string root) => new InMemoryOutputStore();
 
     internal static Task SweepAsync(IOutputStore store, CancellationToken ct) => store is FileSystemOutputStore files
         ? files.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct)

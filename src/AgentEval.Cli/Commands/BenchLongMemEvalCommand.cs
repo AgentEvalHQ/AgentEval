@@ -64,7 +64,7 @@ public static class BenchLongMemEvalCommand
         bool noAef = false,
         string? subjectVersion = null,
         Action<QuestionResult>? onQuestionCompleted = null, bool pairedOracle = false,
-        Action<LongMemEvalArm, QuestionResult>? onPairedQuestionCompleted = null)
+        Action<LongMemEvalArm, QuestionResult>? onPairedQuestionCompleted = null, IOutputStore? storeOverride = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -167,7 +167,7 @@ public static class BenchLongMemEvalCommand
                 subjectVersion, agentEvalDir, aef, noAef, chatClientOverride is null, agentEndpoint, ct, onPairedQuestionCompleted);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = CliRunOutput.CreateStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();

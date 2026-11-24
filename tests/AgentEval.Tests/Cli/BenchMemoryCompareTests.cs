@@ -5,6 +5,8 @@
 using System.Text.Json;
 using AgentEval.Cli;
 using AgentEval.Cli.Commands;
+using AgentEval.Results.Adapters.Comparison;
+using AgentEval.Results.Integrity;
 using Microsoft.Extensions.AI;
 using Xunit;
 
@@ -50,23 +52,26 @@ public sealed class BenchMemoryCompareTests : IDisposable
     }
 
     private string[] RunDirectories() =>
-        Directory.GetDirectories(_root, "scenarios", SearchOption.AllDirectories)
+        Directory.GetFiles(Path.Combine(_root, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories)
             .Select(d => Path.GetDirectoryName(d)!)
             .OrderBy(d => d, StringComparer.Ordinal)
             .ToArray();
 
     [Fact]
-    public async Task TwoMemoryRuns_WriteScenarioResults_AndCompareReadsThem()
+    public async Task TwoMemoryRuns_WriteNativeEvidence_AndCompareReadsThem()
     {
-        var first = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient()));
-        var second = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient()));
+        var first = await BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient());
+        var second = await BenchMemoryCommand.RunAsync("quick", "mem-compare", _root, new FixedReplyChatClient());
         Assert.NotEqual(ExitCodes.UsageError, first);
         Assert.NotEqual(ExitCodes.UsageError, second);
 
         var runs = RunDirectories();
         Assert.Equal(2, runs.Length);
         foreach (var run in runs)
-            Assert.NotEmpty(Directory.GetFiles(Path.Combine(run, "scenarios"), "*.json"));
+        {
+            Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(run).Outcome);
+            Assert.NotEmpty(new AefComparisonReader().Read(run).Scenarios);
+        }
 
         var exit = CompareCommand.Run(runs[0], runs[1]);
 
@@ -97,7 +102,7 @@ public sealed class BenchMemoryCompareTests : IDisposable
         int exit;
         try
         {
-            exit = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(() => BenchMemoryCommand.RunAsync("quick", "mem-incomplete", _root, new NoScoreChatClient()));
+            exit = await BenchMemoryCommand.RunAsync("quick", "mem-incomplete", _root, new NoScoreChatClient());
         }
         finally
         {
@@ -107,9 +112,13 @@ public sealed class BenchMemoryCompareTests : IDisposable
         Assert.Equal(ExitCodes.GateIndeterminate, exit);
         Assert.Contains("INCOMPLETE", stdout.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("Grade:", stdout.ToString(), StringComparison.Ordinal);
-        var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;   // the AEF run has its own summary.json
-        var summary = Directory.GetFiles(_root, "summary.json", SearchOption.AllDirectories).Single(f => !f.StartsWith(aef, StringComparison.Ordinal));
-        Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+        var run = Assert.Single(RunDirectories());
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(run).Outcome);
+        var comparison = new AefComparisonReader().Read(run);
+        Assert.NotEmpty(comparison.Scenarios);
+        Assert.All(comparison.Scenarios, scenario => Assert.Null(scenario.Score));
+        using var gate = JsonDocument.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))));
+        Assert.Equal(ExitCodes.GateIndeterminate, gate.RootElement.GetProperty("exitCode").GetInt32());
     }
 
     [Fact]

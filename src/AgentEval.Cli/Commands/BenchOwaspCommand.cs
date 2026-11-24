@@ -65,7 +65,7 @@ public static class BenchOwaspCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false, string? agentEndpoint = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null)
+        bool agentIsLive = false, string? agentEndpoint = null, System.Text.Json.Nodes.JsonObject? subjectSettings = null, IOutputStore? storeOverride = null)
     {
         // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
         // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
@@ -183,7 +183,7 @@ public static class BenchOwaspCommand
         IOutputStore? store = null;
         if (!isMock)
         {
-            store = CliRunOutput.CreateStore(agentEvalDir);
+            store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
             await CliRunOutput.SweepAsync(store, ct);
             await store.EnsureSolutionAsync();
             await store.EnsureSubjectAsync(subjectIdentity);

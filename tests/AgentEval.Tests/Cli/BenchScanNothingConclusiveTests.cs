@@ -85,22 +85,22 @@ public class BenchScanNothingConclusiveTests : IDisposable
         var agent = new UnreachableAgent();
         var judge = new AnswersPreflightOnlyJudge();
 
-        var result = await Aef.NativeVerbIntegrationTests.WithLegacyOutput(async () => family switch
+        var result = family switch
         {
-            "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
-            "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
-            _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge, noAef: true),
-        });
+            "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge),
+            "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge),
+            _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent, judgeClientOverride: judge),
+        };
 
         Assert.NotEqual(0, result.ExitCode);   // nothing measured is not a pass
-        var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;
-        var summaryPath = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories)
-            .Single(f => !f.StartsWith(aef, StringComparison.Ordinal));
-        using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
-        var metrics = summary.RootElement.GetProperty("metrics");
-
-        Assert.False(metrics.TryGetProperty("overallScore", out _), "a composite that measured nothing has no overall score");
-        Assert.False(metrics.TryGetProperty("overallPassRate", out _), "a scan with no conclusive probe has no pass rate");
-        Assert.NotEqual("PASS", summary.RootElement.GetProperty("verdict").GetString());
+        var run = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(Path.Combine(_root, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories)))!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(run).Outcome);
+        var comparison = new AgentEval.Results.Adapters.Comparison.AefComparisonReader().Read(run);
+        Assert.NotEmpty(comparison.Scenarios);
+        Assert.All(comparison.Scenarios, scenario => Assert.Null(scenario.Score));
+        Assert.DoesNotContain("overallScore", comparison.Metrics.Keys);
+        Assert.DoesNotContain("overallPassRate", comparison.Metrics.Keys);
+        using var gate = JsonDocument.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))));
+        Assert.Equal(result.ExitCode, gate.RootElement.GetProperty("exitCode").GetInt32());
     }
 }

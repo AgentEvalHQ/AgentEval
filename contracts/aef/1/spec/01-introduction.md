@@ -1,6 +1,6 @@
 # 1. Introduction
 
-**AEF 1.0, the AgentEval Evidence Format.** Status: draft for 1.0, unreleased. This document is normative except
+**AEF 1.0, the AgentEval Evidence Format.** Status: release candidate until the `aef-1.0` tag; that tag identifies the final 1.0 specification. This document is normative except
 where it says it is not.
 
 ## 1.1 Purpose

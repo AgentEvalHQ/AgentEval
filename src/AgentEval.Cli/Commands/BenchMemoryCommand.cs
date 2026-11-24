@@ -43,7 +43,7 @@ public static class BenchMemoryCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        Action<BenchmarkCategoryResult>? onCategoryCompleted = null)
+        Action<BenchmarkCategoryResult>? onCategoryCompleted = null, IOutputStore? storeOverride = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -115,7 +115,7 @@ public static class BenchMemoryCommand
             includeHistory: true);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = CliRunOutput.CreateStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();

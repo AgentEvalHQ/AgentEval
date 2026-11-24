@@ -38,7 +38,8 @@ public sealed class BenchLongMemEvalCommandTests
                 preset: "subset",
                 subject: "cli-longmemeval",
                 rootOverride: fixture.Root,
-                chatClientOverride: client), legacy: legacyOutput));
+                chatClientOverride: client,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(fixture.Root, ".agenteval")) : null)));
 
         // B6c-9: 1 of 3 questions is inconclusive, so the 50% pass rests on part of them: a warn, exit 10 (it was PASS, 0).
         Assert.Equal(AgentEval.Cli.ExitCodes.GateWarning, invocation.ExitCode);
@@ -121,7 +122,8 @@ public sealed class BenchLongMemEvalCommandTests
                 preset: "subset",
                 subject: "cli-longmemeval-empty",
                 rootOverride: fixture.Root,
-                chatClientOverride: client), legacy: true));
+                chatClientOverride: client,
+                storeOverride: new AgentEval.Output.FileSystemOutputStore(Path.Combine(fixture.Root, ".agenteval")))));
 
         Assert.True(
             invocation.ExitCode == ExitCodes.GateInconclusive,

@@ -58,7 +58,7 @@ internal sealed class MAFWorkflowTimingCapture : IDisposable
 
     // MAF 1.28 names the run span "invoke_workflow", followed by the workflow's name when it has one
     // (it was "workflow_invoke" through 1.27). Both it and the session span carry session.id.
-    private static bool IsRunOwner(string name) => name is "workflow.session" or "invoke_workflow" ||
+    private static bool IsRunOwner(string name) => name is "workflow.session" or "workflow_invoke" or "invoke_workflow" ||
         name.StartsWith("invoke_workflow ", StringComparison.Ordinal);
 
     private void Started(Activity activity)

@@ -89,7 +89,7 @@ public static class BenchTypedMemEvalCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        Action<QuestionResult>? onQuestionCompleted = null)
+        Action<QuestionResult>? onQuestionCompleted = null, IOutputStore? storeOverride = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -167,7 +167,7 @@ public static class BenchTypedMemEvalCommand
             includeHistory: true);
 
         // ── Persist setup ────────────────────────────────────────────────────
-        var store = CliRunOutput.CreateStore(agentEvalDir);
+        var store = storeOverride ?? CliRunOutput.CreateStore(agentEvalDir);
         await CliRunOutput.SweepAsync(store, ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
         await store.EnsureSolutionAsync();

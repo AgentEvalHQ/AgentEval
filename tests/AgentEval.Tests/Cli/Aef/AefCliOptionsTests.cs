@@ -5,6 +5,7 @@
 using System.CommandLine;
 using System.Security.Cryptography;
 using AgentEval.Cli.Commands;
+using AgentEval.Results.Writing;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.Aef;
@@ -13,30 +14,30 @@ namespace AgentEval.Tests.Cli.Aef;
 public sealed class AefCliOptionsTests
 {
     [Fact]
-    public void LegacyOutput_FallbackIsAcceptedButHidden()
+    public void LegacyOutput_RemovedFallback_IsRejected()
     {
         var (command, _) = Create();
-        Assert.Empty(command.Parse("--legacy-output").Errors);
-        Assert.True(command.Options.Single(o => o.Name == "--legacy-output").Hidden);
+        Assert.NotEmpty(command.Parse("--legacy-output").Errors);
+        Assert.DoesNotContain(command.Options, option => option.Name == "--legacy-output");
     }
 
     [Fact]
-    public async Task LegacyOutput_ScopeRestoresAfterExceptionAndDoesNotLeakIntoNestedInvocation()
+    public async Task ContentCapture_ExceptionAndNestedInvocation_RestoresThePreviousScope()
     {
         var (command, controls) = Create();
-        Assert.False(AefCliOptions.LegacyOutput);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => controls.InvokeAsync(command.Parse("--legacy-output"), async () =>
+        Assert.Equal(AefContentCapture.Off, AefCliOptions.ContentCapture);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controls.InvokeAsync(command.Parse("--aef-content on"), async () =>
         {
-            Assert.True(AefCliOptions.LegacyOutput);
+            Assert.Equal(AefContentCapture.On, AefCliOptions.ContentCapture);
             await controls.InvokeAsync(command.Parse(""), () =>
             {
-                Assert.False(AefCliOptions.LegacyOutput);
+                Assert.Equal(AefContentCapture.Off, AefCliOptions.ContentCapture);
                 return Task.FromResult(0);
             });
-            Assert.True(AefCliOptions.LegacyOutput);
+            Assert.Equal(AefContentCapture.On, AefCliOptions.ContentCapture);
             throw new InvalidOperationException("synthetic interruption");
         }));
-        Assert.False(AefCliOptions.LegacyOutput);
+        Assert.Equal(AefContentCapture.Off, AefCliOptions.ContentCapture);
     }
 
     [Theory]

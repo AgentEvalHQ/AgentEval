@@ -20,21 +20,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "aef-native-" + Guid.NewGuid().ToString("N"));
 
-    internal static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke, bool legacy = false)
+    internal static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke)
     {
         var command = new Command("test");
         command.Options.Add(new Option<DirectoryInfo?>("--aef"));
         var controls = new AefCliOptions(command);
-        return controls.InvokeAsync(command.Parse(legacy
-            ? ["--aef-content", enabled ? "on" : "off", "--legacy-output"]
-            : ["--aef-content", enabled ? "on" : "off"]), invoke);
-    }
-
-    internal static async Task<T> WithLegacyOutput<T>(Func<Task<T>> invoke)
-    {
-        T result = default!;
-        await WithCapture(false, async () => { result = await invoke(); return 0; }, legacy: true);
-        return result;
+        return controls.InvokeAsync(command.Parse(["--aef-content", enabled ? "on" : "off"]), invoke);
     }
 
     private static List<JsonNode> ArtifactLines(string directory) => File.Exists(Path.Combine(directory, "evidence.ndjson"))
@@ -870,14 +861,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             ("OPENAI_COMPATIBLE_API_KEY", "local-test"));
         var aef = new DirectoryInfo(Path.Combine(_root, "bench-aef"));
 
-        async Task<int> Run(DirectoryInfo destination, bool noAef) => (family switch
+        async Task<int> Run(DirectoryInfo destination, bool noAef, bool legacyStore = false) => (family switch
         {
             "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                storeOverride: legacyStore ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")) : null),
             "nist" => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                storeOverride: legacyStore ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")) : null),
             _ => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                judgeClientOverride: fromEnvironment ? null : judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                storeOverride: legacyStore ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")) : null),
         }).ExitCode;
         var written = await Run(aef, false);
         Assert.Equal("bench " + family, (string?)Document(RunDirectory(aef.FullName), "run.json")["ext"]!["agenteval.cli"]!["verb"]);
@@ -896,9 +890,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 #endif
         var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
             Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
-        // Default publication above has no legacy run. Exercise the temporary fallback separately for conversion parity.
+        // Default publication has no legacy run. Exercise the library store explicitly for conversion parity.
         var fallbackAef = new DirectoryInfo(Path.Combine(_root, "fallback-aef"));
-        Assert.Equal(written, await WithCapture(false, () => Run(fallbackAef, false), legacy: true));
+        Assert.Equal(written, await WithCapture(false, () => Run(fallbackAef, false, legacyStore: true)));
         // The historical comparison unit is the entire benchmark, not one of its probe resistance readings.
         var workspace = Path.Combine(_root, ".agenteval");
         var legacy = Path.GetDirectoryName(Assert.Single(Directory.GetFiles(workspace, "manifest.json", SearchOption.AllDirectories)))!;
@@ -1576,7 +1570,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeCalls) Console.SetOut(output);
-            exit = await WithCapture(capture, () => BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination), legacy: legacyOutput);
+            exit = await WithCapture(capture, () => BenchMemoryCommand.RunAsync("quick", "subject", _root, client, cancel.Token, destination,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")) : null));
         }
         finally { Console.SetOut(original); }
         Assert.Equal(cancelBeforeCalls ? 1 : 0, exit);
@@ -1655,7 +1650,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             if (cancelBeforeQuestions) Console.SetOut(output);
-            exit = await WithCapture(capture, () => BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination), legacy: legacyOutput);
+            exit = await WithCapture(capture, () => BenchTypedMemEvalCommand.RunAsync(descriptor.Slug, "subject", _root, false, client, cancel.Token, destination,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval")) : null));
         }
         finally { Console.SetOut(previous); }
         Assert.Equal(cancelBeforeQuestions ? 1 : 0, exit);
@@ -1784,9 +1780,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
         var exit = await WithCapture(true, () => euAiAct
             ? BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                responseText: "answer", runs: runs, aef: aef)
+                responseText: "answer", runs: runs, aef: aef,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(workspace) : null)
             : BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                responseText: "answer", runs: runs, aef: aef), legacy: legacyOutput);
+                responseText: "answer", runs: runs, aef: aef,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(workspace) : null));
         Assert.Equal(0, exit);
         var directory = RunDirectory(aef.FullName);
         AssertIntact(directory);
@@ -1824,9 +1822,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
         var exit = await WithCapture(false, async () => euAiAct
             ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                responseText: "answer", runs: runs, aef: aef, noAef: noAef)
+                responseText: "answer", runs: runs, aef: aef, noAef: noAef,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(workspace) : null)
             : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                responseText: "answer", runs: runs, aef: aef, noAef: noAef), legacy: legacyOutput);
+                responseText: "answer", runs: runs, aef: aef, noAef: noAef,
+                storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(workspace) : null));
         Assert.Equal(invalidDestination ? 3 : 1, exit);
         if (noAef || invalidDestination)
         {
@@ -1859,9 +1859,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
         var exit = await WithCapture(false, async () => euAiAct
             ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
-                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token)
+                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token,
+                storeOverride: new AgentEval.Output.FileSystemOutputStore(workspace))
             : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: judge,
-                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token), legacy: true);
+                responseText: "answer", runs: runs, aef: aef, ct: cancellation.Token,
+                storeOverride: new AgentEval.Output.FileSystemOutputStore(workspace)));
         Assert.Equal(1, exit);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
@@ -2111,7 +2113,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
         var exit = await WithCapture(false, () => BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", failure == "mock" ? null : "answer", judge,
             mock: failure == "mock", budgetTier: "HIGH",
-            aef: aef, noAef: noAef, ct: cancellation.Token), legacy: legacyOutput);
+            aef: aef, noAef: noAef, ct: cancellation.Token,
+            storeOverride: legacyOutput ? new AgentEval.Output.FileSystemOutputStore(workspace) : null));
         // "success" withholds its pass (no trace, so the required tool checks were not measured): no conclusive verdict,
         // 11 (D-17, D-21). It was 10, a warning CI may treat as non-blocking.
         Assert.Equal(invalidDestination ? 3 : failure == "success" ? 11 : failure == "mock" ? 11 : 1, exit);
@@ -2233,12 +2236,15 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var result = await WithCapture(false, async () => (family switch
             {
                 "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                    storeOverride: new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval"))),
                 "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                    storeOverride: new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval"))),
                 _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
-            }).ExitCode, legacy: true);
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint,
+                    storeOverride: new AgentEval.Output.FileSystemOutputStore(Path.Combine(_root, ".agenteval"))),
+            }).ExitCode);
             Assert.Equal(invalidDestination ? 3 : 1, result);
         }
         finally { Console.SetOut(original); (agent as IDisposable)?.Dispose(); }

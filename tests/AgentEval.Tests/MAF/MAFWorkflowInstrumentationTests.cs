@@ -192,6 +192,7 @@ public sealed class MAFWorkflowInstrumentationTests
 
     // MAF 1.28 names the run span "invoke_workflow", followed by the workflow's name when it has one.
     [Theory]
+    [InlineData("workflow_invoke")]
     [InlineData("invoke_workflow")]
     [InlineData("invoke_workflow Order flow")]
     public void Capture_RunSpan_DecidesTheSessionOfItsOperations(string runSpan)
